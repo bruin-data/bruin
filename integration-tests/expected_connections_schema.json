@@ -704,6 +704,12 @@
             "$ref": "#/$defs/TableauConnection"
           },
           "type": "array"
+        },
+        "trino": {
+          "items": {
+            "$ref": "#/$defs/TrinoConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -1482,7 +1488,28 @@
         "port": {
           "type": "string"
         },
-        "dbname": {
+        "service_name": {
+          "type": "string"
+        },
+        "sid": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "boolean"
+        },
+        "ssl_verify": {
+          "type": "boolean"
+        },
+        "prefetch_rows": {
+          "type": "integer"
+        },
+        "trace_file": {
+          "type": "string"
+        },
+        "wallet": {
           "type": "string"
         }
       },
@@ -1494,7 +1521,14 @@
         "password",
         "host",
         "port",
-        "dbname"
+        "service_name",
+        "sid",
+        "role",
+        "ssl",
+        "ssl_verify",
+        "prefetch_rows",
+        "trace_file",
+        "wallet"
       ]
     },
     "PersonioConnection": {
@@ -2072,6 +2106,41 @@
         "personal_access_token_secret",
         "site_id",
         "api_version"
+      ]
+    },
+    "TrinoConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "port",
+        "username",
+        "catalog",
+        "schema"
       ]
     },
     "TikTokAdsConnection": {

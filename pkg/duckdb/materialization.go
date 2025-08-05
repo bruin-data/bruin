@@ -31,7 +31,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2QueryByTime,
+		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2ByTimeQuery,
 		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
 	},
 }
@@ -187,22 +187,147 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	return createTableStmt, nil
 }
 
-func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
-	query = strings.TrimRight(query, ";")
+func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimSuffix(query, ";")
+
+	var (
+		primaryKeys = make([]string, 0, 4)
+		userCols    = make([]string, 0, 12)
+		nonPKCols   = make([]string, 0, 12)
+	)
+
+	for _, col := range asset.Columns {
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		} else {
+			nonPKCols = append(nonPKCols, col.Name)
+		}
+		userCols = append(userCols, col.Name)
+	}
+
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
+	}
+
+	// Build join conditions for primary keys
+	onConds := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
+	}
+	joinCondition := strings.Join(onConds, " AND ")
+
+	sourcePKCols := make([]string, len(primaryKeys))
+	targetPKCols := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		sourcePKCols[i] = "s." + pk
+		targetPKCols[i] = "t." + pk
+	}
+
+	changeConditions := make([]string, 0, len(nonPKCols))
+	for _, col := range nonPKCols {
+		changeConditions = append(changeConditions, fmt.Sprintf("t.%s != s.%s", col, col))
+	}
+	changeCondition := ""
+	if len(changeConditions) > 0 {
+		changeCondition = strings.Join(changeConditions, " OR ")
+	}
+
+	// Build user column list for SELECTs
+	userColList := strings.Join(userCols, ", ")
+	allCols := append([]string{}, userCols...)
+	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
+	allColList := strings.Join(allCols, ", ")
+
+	// to_keep SELECT
+	toKeepSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toKeepSelectCols = append(toKeepSelectCols, "t."+col)
+	}
+
+	// to_insert SELECT
+	toInsertSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toInsertSelectCols = append(toInsertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
+	}
+
+	// Build the SQL using array formatting
+	sqlLines := []string{
+		"CREATE OR REPLACE TABLE " + asset.Name + " AS",
+		"WITH",
+		"time_now AS (",
+		"\tSELECT CURRENT_TIMESTAMP AS now",
+		"),",
+		"source AS (",
+		fmt.Sprintf("\tSELECT %s,", userColList),
+		"\tTRUE as _matched_by_source",
+		"\tFROM (" + strings.TrimSpace(query),
+		"\t)",
+		"),",
+		"target AS (",
+		fmt.Sprintf("\tSELECT %s,", allColList),
+		"\tTRUE as _matched_by_target FROM " + asset.Name,
+		"),",
+		"current_data AS (",
+		fmt.Sprintf("\tSELECT %s, _matched_by_target", allColList),
+		"\tFROM target as t",
+		"\tWHERE _is_current = TRUE",
+		"),",
+		"--current or updated (expired) existing rows from target",
+		"to_keep AS (",
+		fmt.Sprintf("\tSELECT %s,", strings.Join(toKeepSelectCols, ", ")),
+		"\tt._valid_from,",
+		"\t\tCASE",
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN (SELECT now FROM time_now)", changeCondition),
+		"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)",
+		"\t\t\tELSE t._valid_until",
+		"\t\tEND AS _valid_until,",
+		"\t\tCASE",
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN FALSE", changeCondition),
+		"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE",
+		"\t\t\tELSE t._is_current",
+		"\t\tEND AS _is_current",
+		"\tFROM target t",
+		fmt.Sprintf("\tLEFT JOIN source s ON (%s) AND t._is_current = TRUE", joinCondition),
+		"),",
+		"--new/updated rows from source",
+		"to_insert AS (",
+		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
+		"\t(SELECT now FROM time_now) AS _valid_from,",
+		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
+		"\tTRUE AS _is_current",
+		"\tFROM source s",
+		fmt.Sprintf("\tLEFT JOIN current_data t ON (%s)", joinCondition),
+		fmt.Sprintf("\tWHERE (_matched_by_target IS NULL) OR (%s)", changeCondition),
+		")",
+		fmt.Sprintf("SELECT %s FROM to_keep", allColList),
+		"UNION ALL",
+		fmt.Sprintf("SELECT %s FROM to_insert;", allColList),
+	}
+
+	return strings.Join(sqlLines, "\n"), nil
+}
+
+func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimSuffix(query, ";")
 
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
 	}
 
+	incrementalKey := asset.Materialization.IncrementalKey
+
 	var (
-		primaryKeys        = make([]string, 0, 4)
-		nonIncrementalCols = make([]string, 0, 12)
-		insertValues       = make([]string, 0, 12)
+		primaryKeys = make([]string, 0, 4)
+		userCols    = make([]string, 0, 12)
 	)
 
 	for _, col := range asset.Columns {
 		switch col.Name {
-		case "_valid_from", "_valid_until", "_is_current":
+		case "_is_current", "_valid_from", "_valid_until":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
 		if col.Name == asset.Materialization.IncrementalKey {
@@ -211,201 +336,98 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 				return "", errors.New("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
 			}
 		}
-		if col.Name != asset.Materialization.IncrementalKey {
-			insertValues = append(insertValues, "s."+col.Name)
-			nonIncrementalCols = append(nonIncrementalCols, "t."+col.Name)
-		}
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
 		}
-	}
-
-	nonIncColsList := strings.Join(nonIncrementalCols, ", ")
-
-	if len(primaryKeys) == 0 {
-		return "", fmt.Errorf(
-			"materialization strategy %s requires the primary_key field to be set on at least one column",
-			asset.Materialization.Strategy,
-		)
-	}
-
-	pkJoin := make([]string, 0, len(primaryKeys))
-	sourcePKs := make([]string, 0, len(primaryKeys))
-	sourceNPKs := make([]string, 0, len(primaryKeys))
-	for _, pk := range primaryKeys {
-		pkJoin = append(pkJoin, fmt.Sprintf("t.%[1]s = s.%[1]s", pk))
-		sourcePKs = append(sourcePKs, fmt.Sprintf("s.%[1]s IS NULL", pk))
-		sourceNPKs = append(sourceNPKs, fmt.Sprintf("s.%[1]s IS NOT NULL", pk))
-	}
-	sourcePrimaryKeyIsNull := strings.Join(sourcePKs, " AND ")
-	sourcePrimaryKeyIsNotNull := strings.Join(sourceNPKs, " AND ")
-	joinCondition := strings.Join(pkJoin, " AND ")
-	incrementalKey := asset.Materialization.IncrementalKey
-
-	// Build final SQL
-	finalQuery := fmt.Sprintf(`
-CREATE OR REPLACE TABLE %s AS
-WITH 
-source AS (
-  %s
-),
-current_data AS (
-  SELECT * FROM %s
-),
-t_new AS (
-  SELECT
-    %s, t._valid_from,
-    CASE 
-      WHEN %s THEN CURRENT_TIMESTAMP
-      WHEN %s 
-           AND %s 
-           AND t._valid_from < CAST(s.%s AS TIMESTAMP)
-      THEN CAST(s.dt AS TIMESTAMP)
-      ELSE t._valid_until
-    END AS _valid_until,
-	CASE
-      WHEN %s THEN FALSE
-      WHEN %s
-           AND %s
-           AND t._valid_from < CAST(s.%s AS TIMESTAMP)
-      THEN FALSE
-      ELSE t._is_current
-    END AS _is_current
-  FROM current_data t
-  LEFT JOIN source s ON %s
-),
-insert_rows AS (
-  SELECT 
-    %s,
-    CAST(s.%s AS TIMESTAMP) AS _valid_from,
-    TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-    TRUE AS _is_current
-  FROM source s
-)
-SELECT * FROM t_new 
-UNION
-SELECT * FROM insert_rows;`,
-		asset.Name,
-		query,
-		asset.Name,
-		nonIncColsList,
-		sourcePrimaryKeyIsNull,
-		sourcePrimaryKeyIsNotNull,
-		joinCondition,
-		incrementalKey,
-		sourcePrimaryKeyIsNull,
-		sourcePrimaryKeyIsNotNull,
-		joinCondition,
-		incrementalKey,
-		joinCondition,
-		strings.Join(insertValues, ", "),
-		incrementalKey,
-	)
-	return strings.TrimSpace(finalQuery), nil
-}
-
-func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
-	query = strings.TrimRight(query, ";")
-	var (
-		primaryKeys       = make([]string, 0, 4)
-		compareCondsS1T1  = make([]string, 0, 4)
-		tNewSelectCols    = make([]string, 0, 12)
-		insertsSelectCols = make([]string, 0, 12)
-	)
-
-	for _, col := range asset.Columns {
-		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, col.Name)
-		}
-		switch col.Name {
-		case "_is_current", "_valid_from", "_valid_until":
-			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
-		}
-
-		if !col.PrimaryKey {
-			compareCondsS1T1 = append(compareCondsS1T1, fmt.Sprintf("t.%[1]s != s.%[1]s", col.Name))
-		}
-
-		// For t_new SELECT
-		tNewSelectCols = append(tNewSelectCols, "t."+col.Name)
-		// For inserts SELECT
-		insertsSelectCols = append(insertsSelectCols, "s."+col.Name)
+		userCols = append(userCols, col.Name)
 	}
 
 	if len(primaryKeys) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
-			asset.Materialization.Strategy)
+		return "", fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
+	// Build join conditions for primary keys
 	onConds := make([]string, len(primaryKeys))
-	sourcePKs := make([]string, 0, len(primaryKeys))
-	targetPKs := make([]string, 0, len(primaryKeys))
 	for i, pk := range primaryKeys {
-		onConds[i] = fmt.Sprintf("t.%[1]s = s.%[1]s", pk)
-		sourcePKs = append(sourcePKs, fmt.Sprintf("s.%[1]s IS NULL", pk))
-		targetPKs = append(targetPKs, fmt.Sprintf("t.%[1]s IS NULL", pk))
+		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
 	}
 	joinCondition := strings.Join(onConds, " AND ")
-	fullCompareCondition := strings.Join(compareCondsS1T1, " OR ")
-	soucePrimaryKeyIsNull := strings.Join(sourcePKs, " AND ")
-	targetPrimaryKeyIsNull := strings.Join(targetPKs, " AND ")
 
-	tbl := asset.Name
+	changeCondition := fmt.Sprintf("CAST(s.%s AS TIMESTAMP) > t._valid_from", incrementalKey)
 
-	queryStr := fmt.Sprintf(`
-CREATE OR REPLACE TABLE %s AS
-WITH
-source AS (
-  %s
-),
-current_data AS (
-  SELECT * FROM %s WHERE _is_current = TRUE
-),
-t_new AS (
-  SELECT 
-    %s,
-    t._valid_from,
-    CASE
-	  WHEN %s OR %s THEN CURRENT_TIMESTAMP
-      ELSE t._valid_until 
-    END AS _valid_until,
-    CASE 
-	  WHEN %s OR %s THEN FALSE
-      ELSE t._is_current
-    END AS _is_current
-  FROM current_data t
-  LEFT JOIN source s ON %s
-),
-insert_rows AS (
-  SELECT 
-    %s,
-    CURRENT_TIMESTAMP AS _valid_from,
-    TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-    TRUE AS _is_current
-  FROM source s
-  LEFT JOIN current_data t ON %s
-  WHERE %s
-	OR %s
-)
-SELECT * FROM t_new
-UNION
-SELECT * FROM insert_rows;
-`,
-		tbl,
-		strings.TrimSpace(query),
-		tbl,
-		strings.Join(tNewSelectCols, ",\n    "),
-		soucePrimaryKeyIsNull,
-		fullCompareCondition,
-		soucePrimaryKeyIsNull,
-		fullCompareCondition,
-		joinCondition,
-		strings.Join(insertsSelectCols, ",\n    "),
-		joinCondition,
-		targetPrimaryKeyIsNull,
-		fullCompareCondition,
-	)
-	return strings.TrimSpace(queryStr), nil
+	// Build user column list for SELECTs
+	userColList := strings.Join(userCols, ", ")
+	allCols := append([]string{}, userCols...)
+	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
+	allColList := strings.Join(allCols, ", ")
+
+	// to_keep SELECT
+	toKeepSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toKeepSelectCols = append(toKeepSelectCols, "t."+col)
+	}
+
+	// to_insert SELECT
+	toInsertSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toInsertSelectCols = append(toInsertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
+	}
+
+	// Build the SQL using array formatting
+	sqlLines := []string{
+		"CREATE OR REPLACE TABLE " + asset.Name + " AS",
+		"WITH",
+		"time_now AS (",
+		"\tSELECT CURRENT_TIMESTAMP AS now",
+		"),",
+		"source AS (",
+		fmt.Sprintf("\tSELECT %s,", userColList),
+		"\tTRUE as _matched_by_source",
+		"\tFROM (" + strings.TrimSpace(query),
+		"\t)",
+		"),",
+		"target AS (",
+		fmt.Sprintf("\tSELECT %s,", allColList),
+		"\tTRUE as _matched_by_target FROM " + asset.Name,
+		"),",
+		"current_data AS (",
+		fmt.Sprintf("\tSELECT %s, _matched_by_target", allColList),
+		"\tFROM target as t",
+		"\tWHERE _is_current = TRUE",
+		"),",
+		"--current or updated (expired) existing rows from target",
+		"to_keep AS (",
+		fmt.Sprintf("\tSELECT %s,", strings.Join(toKeepSelectCols, ", ")),
+		"\tt._valid_from,",
+		"\t\tCASE",
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN CAST(s.%s AS TIMESTAMP)", changeCondition, incrementalKey),
+		"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)",
+		"\t\t\tELSE t._valid_until",
+		"\t\tEND AS _valid_until,",
+		"\t\tCASE",
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN FALSE", changeCondition),
+		"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE",
+		"\t\t\tELSE t._is_current",
+		"\t\tEND AS _is_current",
+		"\tFROM target t",
+		fmt.Sprintf("\tLEFT JOIN source s ON (%s) AND t._is_current = TRUE", joinCondition),
+		"),",
+		"--new/updated rows from source",
+		"to_insert AS (",
+		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
+		fmt.Sprintf("\tCAST(s.%s AS TIMESTAMP) AS _valid_from,", incrementalKey),
+		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
+		"\tTRUE AS _is_current",
+		"\tFROM source s",
+		fmt.Sprintf("\tLEFT JOIN current_data t ON (%s)", joinCondition),
+		fmt.Sprintf("\tWHERE (_matched_by_target IS NULL) OR (%s)", changeCondition),
+		")",
+		fmt.Sprintf("SELECT %s FROM to_keep", allColList),
+		"UNION ALL",
+		fmt.Sprintf("SELECT %s FROM to_insert;", allColList),
+	}
+
+	return strings.Join(sqlLines, "\n"), nil
 }
 
 func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
@@ -415,25 +437,29 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
-		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
+		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
 	}
-	tbl := asset.Name
-	stmt := fmt.Sprintf(
-		`CREATE OR REPLACE TABLE %s AS
-SELECT
-  CAST (%s AS TIMESTAMP) AS _valid_from,
-  src.*,
-  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-  TRUE AS _is_current
-FROM (
-%s
-) AS src;`,
-		tbl,
+
+	srcCols := make([]string, len(asset.Columns))
+	for i, col := range asset.Columns {
+		srcCols[i] = "src." + col.Name
+	}
+
+	createQuery := fmt.Sprintf(
+		"CREATE OR REPLACE TABLE %s AS\n"+
+			"SELECT %s,\n"+
+			"CAST(src.%s AS TIMESTAMP) AS _valid_from,\n"+
+			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"TRUE AS _is_current\n"+
+			"FROM (%s\n"+
+			") AS src;",
+		asset.Name,
+		strings.Join(srcCols, ", "),
 		asset.Materialization.IncrementalKey,
 		strings.TrimSpace(query),
 	)
 
-	return strings.TrimSpace(stmt), nil
+	return strings.TrimSpace(createQuery), nil
 }
 
 func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
@@ -441,20 +467,24 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	if len(primaryKeys) == 0 {
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
-	tbl := asset.Name
-	stmt := fmt.Sprintf(
-		`
-CREATE OR REPLACE TABLE %s AS
-SELECT
-  CURRENT_TIMESTAMP AS _valid_from,
-  src.*,
-  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-  TRUE                    AS _is_current
-FROM (
-%s
-) AS src;`,
-		tbl,
+
+	srcCols := make([]string, len(asset.Columns))
+	for i, col := range asset.Columns {
+		srcCols[i] = "src." + col.Name
+	}
+
+	createQuery := fmt.Sprintf(
+		"CREATE OR REPLACE TABLE %s AS\n"+
+			"SELECT %s,\n"+
+			"CURRENT_TIMESTAMP AS _valid_from,\n"+
+			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"TRUE AS _is_current\n"+
+			"FROM (%s\n"+
+			") AS src;",
+		asset.Name,
+		strings.Join(srcCols, ", "),
 		strings.TrimSpace(query),
 	)
-	return strings.TrimSpace(stmt), nil
+
+	return strings.TrimSpace(createQuery), nil
 }

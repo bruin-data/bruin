@@ -1,4 +1,4 @@
-# Interval Modifiers: Adjusting Your Processing Window
+# Interval Modifiers
 
 Bruin supports adjusting the start and end of your data processing window using `interval_modifiers`. This is useful in situations where events might arrive late (e.g. offline mobile game events) or slightly ahead of schedule.
 
@@ -15,6 +15,21 @@ interval_modifiers:
   start: -2h    # Shift start time back 2 hours
   end: 1h       # Shift end time forward 1 hour
 ```
+
+## Conditional Interval Modifiers with Jinja
+
+You can use [Jinja templating](./templating/templating.md) within the `interval_modifiers` values themselves to conditionally modify intervals based on dynamic conditions:
+
+```yaml
+interval_modifiers:
+  start: '{% if start_timestamp|date_format("%H") == "00" %}-20d{% else %}0{% endif %}'
+```
+
+This example:
+- Shifts the start time back by 20 days if the start timestamp is at midnight (hour = 00)
+- Otherwise, applies no shift (0)
+
+You can use any Jinja expressions, filters, and conditional logic to determine your interval modifiers dynamically. For more information about Jinja syntax and features, see the [Jinja templating documentation](./templating/templating.md).
 
 ## Pipeline-Level Defaults
 

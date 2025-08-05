@@ -550,3 +550,34 @@ func TestManager_AddGenericConnectionFromConfig(t *testing.T) {
 	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
+
+func TestManager_AddAwsConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	res := m.GetConnection("test")
+	assert.Nil(t, res)
+
+	configuration := &config.AwsConnection{
+		Name:      "test",
+		AccessKey: "AKIAEXAMPLE",
+		SecretKey: "SECRETKEYEXAMPLE",
+	}
+
+	err := m.AddAwsConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*config.AwsConnection)
+	assert.True(t, ok)
+	assert.NotNil(t, res)
+
+	awsConn, ok := res.(*config.AwsConnection)
+	assert.True(t, ok)
+	assert.Equal(t, "test", awsConn.Name)
+	assert.Equal(t, "AKIAEXAMPLE", awsConn.AccessKey)
+	assert.Equal(t, "SECRETKEYEXAMPLE", awsConn.SecretKey)
+}

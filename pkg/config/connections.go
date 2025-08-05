@@ -799,12 +799,19 @@ func (c DB2Connection) GetName() string {
 }
 
 type OracleConnection struct {
-	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Port     string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
-	DBName   string `yaml:"dbname,omitempty" json:"dbname" mapstructure:"dbname"`
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password     string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port         string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	ServiceName  string `yaml:"service_name,omitempty" json:"service_name" mapstructure:"service_name"`
+	SID          string `yaml:"sid,omitempty" json:"sid" mapstructure:"sid"`
+	Role         string `yaml:"role,omitempty" json:"role" mapstructure:"role"`
+	SSL          bool   `yaml:"ssl,omitempty" json:"ssl" mapstructure:"ssl"`
+	SSLVerify    bool   `yaml:"ssl_verify,omitempty" json:"ssl_verify" mapstructure:"ssl_verify"`
+	PrefetchRows int    `yaml:"prefetch_rows,omitempty" json:"prefetch_rows" mapstructure:"prefetch_rows"`
+	TraceFile    string `yaml:"trace_file,omitempty" json:"trace_file" mapstructure:"trace_file"`
+	Wallet       string `yaml:"wallet,omitempty" json:"wallet" mapstructure:"wallet"`
 }
 
 func (c OracleConnection) GetName() string {
@@ -919,6 +926,20 @@ type TableauConnection struct {
 	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret" mapstructure:"personal_access_token_secret"`
 	SiteID                    string `yaml:"site_id,omitempty" json:"site_id" mapstructure:"site_id"`
 	APIVersion                string `yaml:"api_version,omitempty" json:"api_version" mapstructure:"api_version"`
+}
+
+type TrinoConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port" json:"port" mapstructure:"port"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Catalog  string `yaml:"catalog" json:"catalog" mapstructure:"catalog"`
+	Schema   string `yaml:"schema" json:"schema" mapstructure:"schema"`
+}
+
+func (c TrinoConnection) GetName() string {
+	return c.Name
 }
 
 func (c TableauConnection) GetName() string {

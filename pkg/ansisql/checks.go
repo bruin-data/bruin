@@ -194,7 +194,10 @@ func NewCustomCheck(conn config.ConnectionGetter, renderer jinja.RendererInterfa
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
 	qq := ti.Check.Query
 	if c.renderer != nil {
-		r := c.renderer.CloneForAsset(ctx, ti.GetPipeline(), ti.GetAsset())
+		r, err := c.renderer.CloneForAsset(ctx, ti.GetPipeline(), ti.GetAsset())
+		if err != nil {
+			return errors.Wrap(err, "failed to create renderer for asset")
+		}
 		qry, err := r.Render(qq)
 		if err != nil {
 			return errors.Wrap(err, "failed to render custom check query")

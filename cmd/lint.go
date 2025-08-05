@@ -28,6 +28,13 @@ import (
 
 var ErrExcludeTagNotSupported = errors.New("exclude-tag flag is not supported for asset-only validation")
 
+// createPipelineFinderWithExclusions creates a pipeline finder function that excludes specified paths.
+func createPipelineFinderWithExclusions(excludePaths []string) func(string, []string) ([]string, error) {
+	return func(root string, pipelineDefinitionFile []string) ([]string, error) {
+		return path.GetPipelinePathsWithExclusions(root, pipelineDefinitionFile, excludePaths)
+	}
+}
+
 type jinjaRenderedMaterializer struct {
 	renderer     *jinja.Renderer
 	materializer queryMaterializer
@@ -83,6 +90,10 @@ func Lint(isDebug *bool) *cli.Command {
 			&cli.BoolFlag{
 				Name:  "fast",
 				Usage: "run only fast validation rules, excludes some important rules such as query validation",
+			},
+			&cli.StringSliceFlag{
+				Name:  "exclude-paths",
+				Usage: "exclude the given list of paths from the folders that are searched during validation",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -190,10 +201,14 @@ func Lint(isDebug *bool) *cli.Command {
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
 
+			// Create a pipeline finder that respects exclude paths
+			excludePaths := c.StringSlice("exclude-paths")
+			pipelineFinder := createPipelineFinderWithExclusions(excludePaths)
+
 			var result *lint.PipelineAnalysisResult
 			var errr error
 			if asset == "" {
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, parser)
+				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, logger, parser)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
 				result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
@@ -205,7 +220,7 @@ func Lint(isDebug *bool) *cli.Command {
 				}
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, parser)
+				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, logger, parser)
 				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c)
 			}
 

@@ -26,7 +26,7 @@ Defaults to the current directory (".") if not provided.
 | `--config-file`          |            | The path to the `.bruin.yml` file.                                           |
 | `--exclude-tag`          |            | Excludes assets with the given tag from validation.                          |
 | `--fast`                 |            | Runs only fast validation rules, excludes some important rules such as query validation. |
-
+| `--exclude-paths`        |            | Excludes the given paths from the folders that are searched during validation. |
 
 
 ### Dry-run Validation
@@ -61,4 +61,10 @@ bruin validate --output json
 ```bash
 bruin validate path/to/specific-asset
 
+```
+
+**4. Validate while excluding specific paths:**
+
+```bash
+bruin validate --exclude-paths path/to/exclude1 --exclude-paths path/to/exclude2
 ```

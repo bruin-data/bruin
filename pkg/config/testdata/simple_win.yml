@@ -314,7 +314,7 @@ environments:
           password: "password-123"
           host: "host-123"
           port: "1234"
-          dbname: "dbname-123"
+          service_name: "service-123"
       phantombuster:
         - name: "phantombuster-1"
           api_key: "api-key-123"

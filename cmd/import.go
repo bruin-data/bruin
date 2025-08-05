@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/mssql"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -44,9 +46,9 @@ func ImportDatabase() *cli.Command {
 				Usage:   "filter by specific schema name",
 			},
 			&cli.BoolFlag{
-				Name:    "fill-columns",
-				Aliases: []string{"f"},
-				Usage:   "automatically fill column metadata from database schema",
+				Name:    "no-columns",
+				Aliases: []string{"n"},
+				Usage:   "skip filling column metadata from database schema",
 			},
 			&cli.StringFlag{
 				Name:    "environment",
@@ -67,11 +69,11 @@ func ImportDatabase() *cli.Command {
 
 			connectionName := c.String("connection")
 			schema := c.String("schema")
-			fillColumns := c.Bool("fill-columns")
+			noColumns := c.Bool("no-columns")
 			environment := c.String("environment")
 			configFile := c.String("config-file")
 
-			return runImport(c.Context, pipelinePath, connectionName, schema, fillColumns, environment, configFile)
+			return runImport(c.Context, pipelinePath, connectionName, schema, !noColumns, environment, configFile)
 		},
 	}
 }
@@ -171,6 +173,12 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 
 	// Query to get column information
 	queryStr := fmt.Sprintf("SELECT * FROM %s.%s WHERE 1=0 LIMIT 0", schemaName, tableName)
+
+	if _, ok := conn.(*mssql.DB); ok {
+		queryStr = "SELECT TOP 0 * FROM " + schemaName + "." + tableName
+	} else if _, ok := conn.(*oracle.Client); ok {
+		queryStr = "SELECT * FROM " + schemaName + "." + tableName + " WHERE 1=0"
+	}
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(ctx, q)
 	if err != nil {
@@ -259,6 +267,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		if strings.Contains(connType, "clickhouse") {
 			return pipeline.AssetTypeClickHouseSource
 		}
+		if strings.Contains(connType, "oracle") {
+			return pipeline.AssetTypeOracleSource
+		}
 	}
 
 	// Fallback: try to detect the connection type from the connection name
@@ -293,6 +304,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 	}
 	if strings.Contains(connectionLower, "mssql") || strings.Contains(connectionLower, "sqlserver") {
 		return pipeline.AssetTypeMsSQLSource
+	}
+	if strings.Contains(connectionLower, "oracle") {
+		return pipeline.AssetTypeOracleSource
 	}
 
 	// Default to Snowflake if we can't determine the type

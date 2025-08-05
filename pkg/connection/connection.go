@@ -70,6 +70,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
+	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
@@ -93,6 +94,7 @@ type Manager struct {
 	Klaviyo              map[string]*klaviyo.Client
 	Adjust               map[string]*adjust.Client
 	Athena               map[string]*athena.DB
+	Aws                  map[string]*config.AwsConnection
 	FacebookAds          map[string]*facebookads.Client
 	Stripe               map[string]*stripe.Client
 	Appsflyer            map[string]*appsflyer.Client
@@ -143,6 +145,7 @@ type Manager struct {
 	ISOCPulse            map[string]*isocpulse.Client
 	InfluxDB             map[string]*influxdb.Client
 	Tableau              map[string]*tableau.Client
+	Trino                map[string]*trino.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -283,6 +286,21 @@ func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnect
 		Database:        connection.Database,
 	})
 	m.availableConnections[connection.Name] = m.Athena[connection.Name]
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddAwsConnectionFromConfig(connection *config.AwsConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if m.Aws == nil {
+		m.Aws = make(map[string]*config.AwsConnection)
+	}
+
+	m.Aws[connection.Name] = connection
+	m.availableConnections[connection.Name] = m.Aws[connection.Name]
 	m.AllConnectionDetails[connection.Name] = connection
 
 	return nil
@@ -1655,11 +1673,18 @@ func (m *Manager) AddOracleConnectionFromConfig(connection *config.OracleConnect
 	m.mutex.Unlock()
 
 	client, err := oracle.NewClient(oracle.Config{
-		Username: connection.Username,
-		Password: connection.Password,
-		Host:     connection.Host,
-		Port:     connection.Port,
-		DBName:   connection.DBName,
+		Username:     connection.Username,
+		Password:     connection.Password,
+		Host:         connection.Host,
+		Port:         connection.Port,
+		ServiceName:  connection.ServiceName,
+		SID:          connection.SID,
+		Role:         connection.Role,
+		SSL:          connection.SSL,
+		SSLVerify:    connection.SSLVerify,
+		PrefetchRows: connection.PrefetchRows,
+		TraceFile:    connection.TraceFile,
+		Wallet:       connection.Wallet,
 	})
 	if err != nil {
 		return err
@@ -1874,6 +1899,36 @@ func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConne
 	return nil
 }
 
+func (m *Manager) AddTrinoConnectionFromConfig(connection *config.TrinoConnection) error {
+	m.mutex.Lock()
+	if m.Trino == nil {
+		m.Trino = make(map[string]*trino.Client)
+	}
+	m.mutex.Unlock()
+
+	config := trino.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Catalog:  connection.Catalog,
+		Schema:   connection.Schema,
+	}
+
+	client, err := trino.NewClient(config)
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Trino[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
 func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
@@ -1927,6 +1982,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	var mu sync.Mutex
 
 	processConnections(cm.SelectedEnvironment.Connections.AthenaConnection, connectionManager.AddAthenaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AwsConnection, connectionManager.AddAwsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleCloudPlatform, connectionManager.AddBqConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Snowflake, connectionManager.AddSfConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Postgres, connectionManager.AddPgConnectionFromConfig, &wg, &errList, &mu)
@@ -1993,6 +2049,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.InfluxDB, connectionManager.AddInfluxDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

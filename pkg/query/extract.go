@@ -24,7 +24,7 @@ type QueryResult struct {
 
 type QueryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*Query, error)
-	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) QueryExtractor
+	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (QueryExtractor, error)
 	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
@@ -137,11 +137,16 @@ func splitQueries(fileContent string) []*Query {
 	return queries
 }
 
-func (f FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) QueryExtractor {
-	return &FileQuerySplitterExtractor{
-		Renderer: f.Renderer.CloneForAsset(ctx, p, t),
-		Fs:       f.Fs,
+func (f FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (QueryExtractor, error) {
+	renderer, err := f.Renderer.CloneForAsset(ctx, p, t)
+	if err != nil {
+		return nil, err
 	}
+
+	return &FileQuerySplitterExtractor{
+		Renderer: renderer,
+		Fs:       f.Fs,
+	}, nil
 }
 
 func (f FileQuerySplitterExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
@@ -181,9 +186,14 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 	return allQueries, nil
 }
 
-func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) QueryExtractor {
-	return &WholeFileExtractor{
-		Renderer: f.Renderer.CloneForAsset(ctx, p, t),
-		Fs:       f.Fs,
+func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (QueryExtractor, error) {
+	renderer, err := f.Renderer.CloneForAsset(ctx, p, t)
+	if err != nil {
+		return nil, err
 	}
+
+	return &WholeFileExtractor{
+		Renderer: renderer,
+		Fs:       f.Fs,
+	}, nil
 }

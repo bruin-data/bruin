@@ -56,6 +56,8 @@ const (
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
 	materializationIncrementalKeyNotSupportedForViews = "Materialization incremental key is not supported for views because views cannot be updated incrementally"
 	materializationClusterByNotSupportedForViews      = "Materialization cluster by is not supported for views because views cannot be clustered"
+
+	trinoMaterializationNotSupported = "Trino assets do not support materialization types or strategies (this is temporary until materialization is fully implemented for Trino)"
 )
 
 var validIDRegexCompiled = regexp.MustCompile(validIDRegex)
@@ -1095,7 +1097,10 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 			return issues, nil
 		}
 
-		assetRenderer := renderer.CloneForAsset(ctx, p, asset)
+		assetRenderer, err := renderer.CloneForAsset(ctx, p, asset)
+		if err != nil {
+			return nil, err
+		}
 
 		for _, check := range asset.CustomChecks {
 			if strings.TrimSpace(check.Query) == "" {
@@ -1234,7 +1239,12 @@ func (u UsedTableValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeli
 func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	missingDeps, err := u.parser.GetMissingDependenciesForAsset(asset, p, u.renderer.CloneForAsset(ctx, p, asset))
+	assetRenderer, err := u.renderer.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return nil, err
+	}
+
+	missingDeps, err := u.parser.GetMissingDependenciesForAsset(asset, p, assetRenderer)
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -1308,6 +1318,31 @@ func EnsureSecretMappingsHaveKeyForASingleAsset(ctx context.Context, p *pipeline
 				Description: secretMappingKeyMustExist,
 			})
 		}
+	}
+
+	return issues, nil
+}
+
+// TODO: Remove this once materialization is fully implemented for Trino.
+func ValidateTrinoAssetMaterialization(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if asset.Type != pipeline.AssetTypeTrinoQuery && asset.Type != pipeline.AssetTypeTrinoQuerySensor {
+		return issues, nil
+	}
+
+	if asset.Materialization.Type != pipeline.MaterializationTypeNone {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: trinoMaterializationNotSupported,
+		})
+	}
+
+	if asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: trinoMaterializationNotSupported,
+		})
 	}
 
 	return issues, nil

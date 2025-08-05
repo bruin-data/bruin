@@ -136,6 +136,7 @@ export default withMermaid({
                     {text: "Databricks", link: "/platforms/databricks"},
                     {text: "DuckDB", link: "/platforms/duckdb"},
                     {text: "MotherDuck", link: "/platforms/motherduck"},
+                    {text: "Oracle", link: "/platforms/oracle"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
                     {text: "Microsoft SQL Server", link: "/platforms/mssql"},
                     {text: "Postgres", link: "/platforms/postgres"},
@@ -157,7 +158,9 @@ export default withMermaid({
                             {text: "Ingestr", link: "/assets/ingestr"},
                             {text: "Python", link: "/assets/python"},
                             {text: "Sensor", link: "/assets/sensor"},
-                            {text: "Tableau", link: "/assets/tableau-refresh.md"},
+                            {text: "Dashboard", link: "/assets/dashboard", items: [
+                                {text: "Tableau", link: "/assets/tableau-refresh.md"},
+                            ]},
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
@@ -265,6 +268,7 @@ export default withMermaid({
                     {text: "Init", link: "/commands/init"},
                     {text: "Import", link: "/commands/import"},
                     {text: "Lineage", link: "/commands/lineage"},
+                    {text: "Patch", link: "/commands/patch"},
                     {text: "Render", link: "/commands/render"},
                     {text: "Run", link: "/commands/run"},
                     {text: "Query", link: "/commands/query"},

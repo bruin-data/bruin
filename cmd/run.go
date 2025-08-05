@@ -46,6 +46,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -119,33 +120,31 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 		}
 	}
 
-	// Add skipped assets
-	skippedTasks := s.GetTaskInstancesByStatus(scheduler.Skipped)
+	// Only add upstream failed assets (skip the "skipped" ones entirely)
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
-	allSkippedTasks := append(skippedTasks, upstreamFailedTasks...) // nolint:gocritic
 
-	for _, task := range allSkippedTasks {
+	for _, task := range upstreamFailedTasks {
 		assetName := task.GetAsset().Name
 		if _, exists := assetResults[assetName]; !exists {
 			assetResults[assetName] = make(map[string]*scheduler.TaskExecutionResult)
 			assetOrder = append(assetOrder, assetName)
 		}
 
-		// Create a fake skipped result
-		skippedResult := &scheduler.TaskExecutionResult{
+		// Create a fake result for upstream failed task
+		upstreamFailedResult := &scheduler.TaskExecutionResult{
 			Instance: task,
-			Error:    nil, // We'll use nil to indicate skipped
+			Error:    nil, // We'll use nil to indicate upstream failed
 		}
 
 		switch instance := task.(type) {
 		case *scheduler.AssetInstance:
-			assetResults[assetName]["main"] = skippedResult
+			assetResults[assetName]["main"] = upstreamFailedResult
 		case *scheduler.ColumnCheckInstance:
 			key := fmt.Sprintf("column:%s:%s", instance.Column.Name, instance.Check.Name)
-			assetResults[assetName][key] = skippedResult
+			assetResults[assetName][key] = upstreamFailedResult
 		case *scheduler.CustomCheckInstance:
 			key := "custom:" + instance.Check.Name
-			assetResults[assetName][key] = skippedResult
+			assetResults[assetName][key] = upstreamFailedResult
 		}
 	}
 
@@ -168,13 +167,12 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			assetStatus = "SKIP"
 			assetColor = color.New(color.Faint)
 		} else if mainResult.Error == nil {
-			// Check if this is actually skipped
-			_, isSkipped := find(skippedTasks, mainResult.Instance)
+			// Check if this is upstream failed
 			_, isUpstreamFailed := find(upstreamFailedTasks, mainResult.Instance)
 
-			if isSkipped || isUpstreamFailed {
-				assetStatus = "SKIP"
-				assetColor = color.New(color.Faint)
+			if isUpstreamFailed {
+				assetStatus = "UPSTREAM FAILED"
+				assetColor = color.New(color.FgYellow)
 			} else {
 				assetStatus = "PASS"
 				assetColor = color.New(color.FgGreen)
@@ -197,12 +195,11 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			if result == nil { // nolint:gocritic
 				fmt.Print(faint("."))
 			} else if result.Error == nil {
-				// Check if skipped
-				_, isSkipped := find(skippedTasks, result.Instance)
+				// Check if upstream failed
 				_, isUpstreamFailed := find(upstreamFailedTasks, result.Instance)
 
-				if isSkipped || isUpstreamFailed {
-					fmt.Print(faint("."))
+				if isUpstreamFailed {
+					fmt.Print(color.New(color.FgYellow).Sprint("U"))
 				} else {
 					fmt.Print(color.New(color.FgGreen).Sprint("."))
 				}
@@ -401,34 +398,17 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 		}
 	}
 
-	// Count skipped tasks from scheduler state
-	skippedTasks := s.GetTaskInstancesByStatus(scheduler.Skipped)
-	for _, skippedTask := range skippedTasks {
+	// Don't count truly skipped tasks (those filtered out) in the summary
+
+	// Count upstream failed tasks (they should be shown as skipped in summary)
+	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
+	upstreamFailedAssets := make(map[string]bool)
+	for _, t := range upstreamFailedTasks {
 		summary.SkippedTasks++
 
-		switch skippedTask.(type) {
-		case *scheduler.AssetInstance:
-			summary.Assets.Total++
-			summary.Assets.Skipped++
-		case *scheduler.ColumnCheckInstance:
-			summary.ColumnChecks.Total++
-			summary.ColumnChecks.Skipped++
-		case *scheduler.CustomCheckInstance:
-			summary.CustomChecks.Total++
-			summary.CustomChecks.Skipped++
-		case *scheduler.MetadataPushInstance:
-			summary.MetadataPush.Total++
-			summary.MetadataPush.Skipped++
-		}
-	}
-
-	// Count upstream failed tasks as skipped
-	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
-	skippedAssets := make(map[string]bool)
-	for _, t := range upstreamFailedTasks {
 		assetName := t.GetAsset().Name
-		if !skippedAssets[assetName] {
-			skippedAssets[assetName] = true
+		if !upstreamFailedAssets[assetName] {
+			upstreamFailedAssets[assetName] = true
 			summary.Assets.Total++
 			summary.Assets.Skipped++
 		}
@@ -1194,7 +1174,22 @@ func SetupExecutors(
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
+	if s.WillRunTaskOfType(pipeline.AssetTypeTrinoQuery) || estimateCustomCheckType == pipeline.AssetTypeTrinoQuery || s.WillRunTaskOfType(pipeline.AssetTypeTrinoQuerySensor) {
+		trinoFileExtractor := &query.FileQuerySplitterExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
+		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor)
+		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
+		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
+		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
+		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		trinoQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeMain] = trinoQuerySensor
+		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
+		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed)
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer(fullRefresh))
