@@ -215,8 +215,17 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 }
 
 func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool) (*pipeline.Asset, error) {
-	fileName := fmt.Sprintf("%s.%s.asset.yml", strings.ToLower(schemaName), strings.ToLower(tableName))
-	filePath := filepath.Join(assetsPath, fileName)
+	// Create schema subfolder
+	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
+
+	// Ensure the schema directory exists
+	fs := afero.NewOsFs()
+	if err := fs.MkdirAll(schemaFolder, 0o755); err != nil {
+		return nil, errors2.Wrapf(err, "failed to create schema directory %s", schemaFolder)
+	}
+
+	fileName := fmt.Sprintf("%s.asset.yml", strings.ToLower(tableName))
+	filePath := filepath.Join(schemaFolder, fileName)
 	asset := &pipeline.Asset{
 		Type: assetType,
 		ExecutableFile: pipeline.ExecutableFile{
