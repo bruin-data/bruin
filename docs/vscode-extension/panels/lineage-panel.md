@@ -52,7 +52,5 @@ This feature is particularly useful for:
 - **Debugging**: Identifying where data transformations might be causing issues
 - **Documentation**: Visualizing complex data relationships for team understanding
 
-![Column Level Lineage](../../public/vscode-extension/panels/lineage-panel/column-level-lineage.gif)
-
 
  

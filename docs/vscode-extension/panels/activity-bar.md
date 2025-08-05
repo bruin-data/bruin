@@ -29,7 +29,6 @@ The Activity Bar is located on the left side of VS Code, alongside other VS Code
 4. **View Table Details**: Click on individual tables to see their structure and metadata
 5. **Preview Data**: Use the integrated query preview functionality to examine table contents
 
-![Activity Bar Database Browser](../../public/vscode-extension/panels/activity-bar/database-browser.gif)
 
 ## Benefits
 
