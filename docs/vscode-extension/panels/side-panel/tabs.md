@@ -21,10 +21,13 @@ This tab provides a comprehensive view of your asset, allowing you to manage key
 ## 2. Columns
 - Lists the columns associated with the asset.
 - *Each column shows*:
+  - **Primary Key**: Whether the column is a primary key.
+  - **Nullable**: Whether the column can contain null values.
   - **Name**: The name of the column.
   - **Type**: The data type of the column (e.g., string, number).
   - **Quality Checks**: Any quality checks linked to the column.
   - **Description**: A brief description of the column's purpose.
+  - **Owner**: The owner of the column.
   - **Glossary Integration**:
     - Columns sourced from the Glossary are marked with a link icon.
     - Clicking the link opens the corresponding glossary for more details.
@@ -39,74 +42,87 @@ The Columns tab includes a "Fill from DB" feature that allows you to automatical
 - **Auto-populate Columns**: Retrieve column definitions directly from the connected database
 - **Background Processing**: The fill operation runs in the background rather than in the terminal for a smoother experience
 - **Column Sync**: Automatically sync column names, types, and constraints from your database schema
-- **Conditional Availability**: The "Fill from DB" button appears based on connection availability and asset type
 
 ![Bruin Columns Tab](../../../public/vscode-extension/panels/side-panel/manage-columns.gif)
 
 ## 3. Details
 
-The Details tab is your central hub for configuring crucial metadata and operational aspects of your asset within the database. It allows you to manage everything from how your asset is stored to who owns it and how its data intervals are defined.
+The Details tab lets you configure asset metadata and database settings. It has a collapsible interface that auto-saves changes.
 
-### Features
-- **Owner and Tags**:
-  - **Owner**: Set or edit the owner of the asset. This can be useful for identifying who is responsible for the asset.
-  - **Tags**: Add or remove tags to categorize and filter assets.
+### Basic Information
 
-- **Partitioning**:
-  - Select a column or manually enter an expression to partition the table by. Supports expressions such as date(col_name) or timestamp_trunc(col2, hour).
+#### Owner Management
+- Click to edit owner with inline editing
+- Changes auto-save
 
-- **Clustering**:
-  - Select multiple columns to cluster the table by. Clustering organizes data storage based on the specified columns, which can improve query performance.
+#### Tags Management
+- Add/remove tags with inline editing
+- Tags display as visual badges
+- Changes update immediately
 
-- **Interval Modifiers**: Define the time window or validity period for your asset's data. See [Interval Modifiers](../../../assets/interval-modifiers.md) for more details.
+### Advanced Settings
 
-  - **Start**: Set the beginning of the interval using a numerical value and select a specific unit from the dropdown (e.g., -2 days).
-  - **End**: Set the end of the interval using a numerical value and select a specific unit from the dropdown (e.g., 1 month).
+#### Interval Modifiers
+Set start/end intervals with units:
+- **Start**: Beginning of the interval
+- **End**: End of the interval  
+- **Units**: months, days, hours, minutes, seconds
 
-- **Materialization**: Control how your asset is materialized in the database.
-  - **None**: No materialization.
-  - **Table**: Materialize the asset as a table.
-  - **View**: Materialize the asset as a view.
+#### Partitioning
+- Searchable dropdown to select partition columns
+- Manual entry for expressions like `date(col_name)`
+- Shows selected partition columns
 
-- **Strategy** (for Tables):
-  - **Create + Replace**: Drop and recreate the table completely.
-  - **Delete + Insert**: Delete existing data using an incremental key and insert new records.
-  - **Append**: Add new rows without modifying existing data.
-  - **Merge**: Update existing rows and insert new ones using primary keys.
-  - **Time Interval**: Process time-based data using an incremental key.
-  - **DDL**: Use DDL to create a new table using the information provided in the embedded Bruin section.
+#### Clustering
+- Multi-select dropdown for cluster columns
+- Checkboxes for easy selection
 
-### How to Use
+### Dependencies
 
-1. **Set Owner and Tags**:
-   - Edit the owner by clicking on the edit icon next to the owner field. Changes are saved immediately.
-   - Add or remove tags by clicking on the add or remove icons next to the tags field. Changes are saved immediately.
+#### Current Dependencies
+- List of existing dependencies
+- Type indicators (Pipeline/External)
+- Dependency counts
 
-2. **Set Partitioning**:
-   - Click on the partitioning input field and select a column from the dropdown list to partition your table.
+#### Dependency Mode
+- Toggle between "full" and "symbolic" modes
+- Tooltips explain each mode
 
-3. **Set Clustering**:
-   - Click on the clustering input field and select one or more columns from the dropdown list to cluster your table.
+#### Pipeline Dependencies
+- Searchable dropdown to find pipeline assets
+- Multi-select support
 
-4. **Set Interval Modifiers**:
-   - Edit the interval modifiers by clicking on the edit icon next to the interval modifiers field. Changes are saved immediately.
+#### External Dependencies
+- Text input for external dependencies
 
-5. **Select Materialization Type**:
-   - Choose between `None`, `Table`, or `View` using the radio buttons.
+#### Fill from Query
+- Auto-populate dependencies from SQL analysis
 
-6. **Configure Strategy** (if Table is selected):
-   - Select a strategy from the dropdown menu. Each strategy has a description to help you understand its use case.
+### Materialization
 
-7. **Save Changes**:
-   - Click the "Save Changes" button to apply your materialization settings for partitioning, clustering, and strategy.
+#### Materialization Type
+- Radio buttons: None/Table/View
 
-### Fill Asset Dependencies and Columns from DB
-The Details tab also provides functionality to automatically populate asset dependencies and columns from your database:
+#### Strategy Selection
+Dropdown with strategies:
+- **Create+Replace**: Drop and recreate table
+- **Delete+Insert**: Delete existing data, insert new records
+- **Append**: Add new rows without modifying existing
+- **Merge**: Update existing rows, insert new ones
+- **Time Interval**: Process time-based data
+- **DDL**: Use DDL to create table
+- **SCD2 by Time**: Slowly Changing Dimension Type 2 by time
+- **SCD2 by Column**: Slowly Changing Dimension Type 2 by column
 
-- **Fill Dependencies**: Automatically detect and fill asset dependencies based on database relationships
-- **Database Integration**: Pull dependency information directly from your connected database systems
-- **Smart Detection**: Intelligent detection of upstream and downstream dependencies
-- **Bulk Operations**: Fill multiple dependencies at once for complex asset relationships
+#### Advanced Options
+- **Incremental Key**: Text input for incremental key column
+- **Time Granularity**: Dropdown for date/timestamp granularity
+
+### Interface Features
+
+#### Collapsible Sections
+- Expandable sections with chevron indicators
+- Remembers collapsed/expanded state
 
 ![Details Tab](../../../public/vscode-extension/panels/side-panel/details-tab.gif)
 
@@ -120,6 +136,7 @@ The Custom Checks tab allows you to manage custom checks for your assets directl
    - Enter the details for your custom check:
      - **Name**: Provide a descriptive name.
      - **Value**: Set the expected value or threshold.
+     - **Count**: Set the number of rows to check.
      - **Description**: Add a brief description of the check.
      - **Query**: Input the SQL query for validation.
 
@@ -152,8 +169,10 @@ The Settings tab has two main sections:
 
 ![Bruin Settings Tab](../../../public/vscode-extension/panels/side-panel/settings-tab.png)
 
-### b. Connection Management
-- You can manage your connections, including:
+### b. Connection and Environment Management
+- You can manage your connections, and environments, including:
+  - **Add Environment**: Enter the name to add a new environment. This will display a new connection list with an empty connection, allowing you to add a new connection to this environment.
+  - **Delete/Update Environment**: Inline edit existing environment name or delete the environment.
   - **Add Connection**: Add new connections by entering the required credentials. If the connection name already exists in the same environment, an error will be displayed.
   - **Duplicate Connection**:  If some connections share similar credentials, it's easier to duplicate and modify them as needed. This is fully supported.
   - **Update Connection**: Update existing connections.
