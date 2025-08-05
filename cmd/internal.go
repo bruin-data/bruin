@@ -34,7 +34,7 @@ func Internal() *cli.Command {
 			ParseAsset(),
 			ParsePipeline(),
 			PatchAsset(),
-			LoadGlossary(),
+			ParseGlossary(),
 			ConnectionSchemas(),
 			DBSummary(),
 			FetchDatabases(),
@@ -100,10 +100,10 @@ func ParsePipeline() *cli.Command {
 	}
 }
 
-func LoadGlossary() *cli.Command {
+func ParseGlossary() *cli.Command {
 	return &cli.Command{
-		Name:      "load-glossary",
-		Usage:     "load and parse a glossary file",
+		Name:      "parse-glossary",
+		Usage:     "parse a glossary file",
 		ArgsUsage: "[path to the glossary.yml file]",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
