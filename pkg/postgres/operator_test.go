@@ -162,7 +162,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 				f.q.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
 
-				f.q.On("RunQueryWithoutResult", mock.Anything, mock.Anything).
+				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(nil)
 			},
 			args: args{
