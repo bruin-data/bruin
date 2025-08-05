@@ -367,22 +367,32 @@ func Patch() *cli.Command {
 							return cli.Exit("", 1)
 						}
 						
-						var message string
-						switch status {
-						case fillStatusUpdated:
-							message = fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name)
-						case fillStatusSkipped:
-							message = fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name)
-						case fillStatusFailed:
-							message = fmt.Sprintf("Failed to fill columns from DB for asset '%s'", pp.Asset.Name)
-						}
-						
-						if output == "json" {
+						switch output {
+						case "plain":
+							switch status {
+							case fillStatusUpdated:
+								printSuccessForOutput(output, fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name))
+							case fillStatusSkipped:
+								printWarningForOutput(output, fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name))
+							case fillStatusFailed:
+								printErrorForOutput(output, fmt.Errorf("Failed to fill columns from DB for asset '%s'", pp.Asset.Name))
+							}
+						case "json":
 							type jsonResponse struct {
 								Status    string             `json:"status"`
 								AssetName string             `json:"asset_name"`
 								Columns   []pipeline.Column  `json:"columns"`
 								Message   string             `json:"message"`
+							}
+							
+							var message string
+							switch status {
+							case fillStatusUpdated:
+								message = fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name)
+							case fillStatusSkipped:
+								message = fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name)
+							case fillStatusFailed:
+								message = fmt.Sprintf("Failed to fill columns from DB for asset '%s'", pp.Asset.Name)
 							}
 							
 							response := jsonResponse{
@@ -398,15 +408,9 @@ func Patch() *cli.Command {
 								return cli.Exit("", 1)
 							}
 							fmt.Println(string(jsonData))
-						} else {
-							switch status {
-							case fillStatusUpdated:
-								printSuccessForOutput(output, message)
-							case fillStatusSkipped:
-								printWarningForOutput(output, message)
-							case fillStatusFailed:
-								printErrorForOutput(output, fmt.Errorf("%s", message))
-							}
+						default:
+							printErrorForOutput(output, fmt.Errorf("invalid output type: %s", output))
+							return cli.Exit("", 1)
 						}
 						
 						if status == fillStatusFailed {
