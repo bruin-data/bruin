@@ -62,8 +62,8 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 	return nil
 }
 
-// Returns: status ("updated", "skipped", "failed").
-func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager interface{}) (string, error) {
+// Returns: status ("updated", "skipped", "failed"), columns, error.
+func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager interface{}) (string, []pipeline.Column, error) {
 	var conn interface{}
 	var err error
 
@@ -71,22 +71,22 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 	if manager != nil {
 		managerInterface, ok := manager.(config.ConnectionGetter)
 		if !ok {
-			return fillStatusFailed, errors.New("manager does not implement GetConnection")
+			return fillStatusFailed, nil, errors.New("manager does not implement GetConnection")
 		}
 
 		connName, err := pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
 		if err != nil {
-			return fillStatusFailed, err
+			return fillStatusFailed, nil, err
 		}
 
 		conn = managerInterface.GetConnection(connName)
 		if conn == nil {
-			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s'", pp.Asset.Name)
+			return fillStatusFailed, nil, fmt.Errorf("failed to get connection for asset '%s'", pp.Asset.Name)
 		}
 	} else {
 		_, conn, err = getConnectionFromPipelineInfo(pp, environment)
 		if err != nil {
-			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
+			return fillStatusFailed, nil, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
 		}
 	}
 
@@ -94,7 +94,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 	})
 	if !ok {
-		return fillStatusFailed, fmt.Errorf("connection for asset '%s' does not support schema introspection", pp.Asset.Name)
+		return fillStatusFailed, nil, fmt.Errorf("connection for asset '%s' does not support schema introspection", pp.Asset.Name)
 	}
 	tableName := pp.Asset.Name
 	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", tableName)
@@ -104,10 +104,10 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(context.Background(), q)
 	if err != nil {
-		return fillStatusFailed, fmt.Errorf("failed to query columns for asset '%s': %w", pp.Asset.Name, err)
+		return fillStatusFailed, nil, fmt.Errorf("failed to query columns for asset '%s': %w", pp.Asset.Name, err)
 	}
 	if len(result.Columns) == 0 {
-		return fillStatusFailed, fmt.Errorf("no columns found for asset '%s' (table may not exist)", pp.Asset.Name)
+		return fillStatusFailed, nil, fmt.Errorf("no columns found for asset '%s' (table may not exist)", pp.Asset.Name)
 	}
 
 	// Skip special column names
@@ -138,9 +138,9 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 		pp.Asset.Columns = columns
 		err = pp.Asset.Persist(fs)
 		if err != nil {
-			return fillStatusFailed, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
+			return fillStatusFailed, nil, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
 		}
-		return fillStatusUpdated, nil
+		return fillStatusUpdated, pp.Asset.Columns, nil
 	}
 
 	hasChanges := false
@@ -172,14 +172,14 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 	}
 
 	if !hasChanges {
-		return fillStatusSkipped, nil
+		return fillStatusSkipped, pp.Asset.Columns, nil
 	}
 
 	err = pp.Asset.Persist(fs)
 	if err != nil {
-		return fillStatusFailed, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
+		return fillStatusFailed, nil, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
 	}
-	return fillStatusUpdated, nil
+	return fillStatusUpdated, pp.Asset.Columns, nil
 }
 
 func Patch() *cli.Command {
@@ -361,20 +361,55 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, err)
 							return cli.Exit("", 1)
 						}
-						status, err := fillColumnsFromDB(pp, fs, environment, nil)
+						status, columns, err := fillColumnsFromDB(pp, fs, environment, nil)
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s': %w", pp.Asset.Name, err))
 							return cli.Exit("", 1)
 						}
+						
+						var message string
 						switch status {
 						case fillStatusUpdated:
-							printSuccessForOutput(output, fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name))
-							return nil
+							message = fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name)
 						case fillStatusSkipped:
-							printWarningForOutput(output, fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name))
-							return nil
+							message = fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name)
 						case fillStatusFailed:
-							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s'", pp.Asset.Name))
+							message = fmt.Sprintf("Failed to fill columns from DB for asset '%s'", pp.Asset.Name)
+						}
+						
+						if output == "json" {
+							type jsonResponse struct {
+								Status    string             `json:"status"`
+								AssetName string             `json:"asset_name"`
+								Columns   []pipeline.Column  `json:"columns"`
+								Message   string             `json:"message"`
+							}
+							
+							response := jsonResponse{
+								Status:    status,
+								AssetName: pp.Asset.Name,
+								Columns:   columns,
+								Message:   message,
+							}
+							
+							jsonData, err := json.Marshal(response)
+							if err != nil {
+								printErrorForOutput(output, fmt.Errorf("failed to marshal result to JSON: %w", err))
+								return cli.Exit("", 1)
+							}
+							fmt.Println(string(jsonData))
+						} else {
+							switch status {
+							case fillStatusUpdated:
+								printSuccessForOutput(output, message)
+							case fillStatusSkipped:
+								printWarningForOutput(output, message)
+							case fillStatusFailed:
+								printErrorForOutput(output, fmt.Errorf("%s", message))
+							}
+						}
+						
+						if status == fillStatusFailed {
 							return cli.Exit("", 1)
 						}
 						return nil
@@ -404,7 +439,7 @@ func Patch() *cli.Command {
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, fs, environment, nil)
+							status, _, err := fillColumnsFromDB(pp, fs, environment, nil)
 							processedAssets++
 							assetName := asset.Name
 							switch status {

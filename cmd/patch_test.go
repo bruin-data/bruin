@@ -233,7 +233,7 @@ func TestFillColumnsFromDB(t *testing.T) {
 			fs := afero.NewMemMapFs()
 
 			// Execute the function with mock manager
-			status, err := fillColumnsFromDB(pp, fs, "test", mockManager)
+			status, columns, err := fillColumnsFromDB(pp, fs, "test", mockManager)
 
 			// Verify results
 			if tt.expectError {
@@ -245,6 +245,7 @@ func TestFillColumnsFromDB(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedStatus, status)
 				assert.Equal(t, tt.expectedCols, asset.Columns)
+				assert.Equal(t, tt.expectedCols, columns)
 			}
 
 			mockConn.AssertExpectations(t)
