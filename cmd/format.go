@@ -17,7 +17,7 @@ import (
 	errors2 "github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Format(isDebug *bool) *cli.Command {
@@ -42,7 +42,7 @@ func Format(isDebug *bool) *cli.Command {
 				Value: false,
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			logger := makeLogger(*isDebug)
 
 			repoOrAsset := c.Args().Get(0)

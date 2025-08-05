@@ -1,13 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"runtime"
 
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Docs() *cli.Command {
@@ -20,7 +21,7 @@ func Docs() *cli.Command {
 				Usage: "Open the documentation in your default web browser",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			const docsURL = "https://bruin-data.github.io/bruin/"
 			openFlag := c.Bool("open")
 

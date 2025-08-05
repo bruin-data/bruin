@@ -30,7 +30,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type ModifierInfo struct {
@@ -59,7 +59,7 @@ func Render() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.BoolFlag{
@@ -71,7 +71,7 @@ func Render() *cli.Command {
 				Usage: "override pipeline variables with custom values",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fullRefresh := c.Bool("full-refresh")
 
 			if vars := c.StringSlice("var"); len(vars) > 0 {
@@ -140,7 +140,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			pl, err = DefaultPipelineBuilder.MutatePipeline(c.Context, pl)
+			pl, err = DefaultPipelineBuilder.MutatePipeline(ctx, pl)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to mutate the pipeline:")
 				return cli.Exit("", 1)
@@ -152,7 +152,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(c.Context, asset, pl)
+			asset, err = DefaultPipelineBuilder.MutateAsset(ctx, asset, pl)
 			if err != nil {
 				printError(errors.New("failed to mutate the asset"), c.String("output"), "Failed to mutate the asset:")
 				return cli.Exit("", 1)
@@ -195,7 +195,7 @@ func Render() *cli.Command {
 				}
 			}
 
-			runCtx := context.WithValue(c.Context, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
+			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "your-run-id")
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)

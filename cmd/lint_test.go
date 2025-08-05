@@ -1,22 +1,22 @@
 package cmd
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/urfave/cli/v2"
 )
 
 func BenchmarkLint(b *testing.B) {
 	isDebug := false
-	app := cli.NewApp()
+	cmd := Lint(&isDebug)
 
 	for range [10]int{} {
 		b.ResetTimer()
 		start := time.Now()
-		if err := Lint(&isDebug).Run(cli.NewContext(app, nil, nil), "./testdata/lineage"); err != nil {
+		if err := cmd.Run(context.Background(), []string{"lint", "./testdata/lineage"}); err != nil {
 			b.Fatalf("Failed to run Lint command: %v", err)
 		}
 		b.StopTimer()

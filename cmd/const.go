@@ -73,7 +73,11 @@ func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMu
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {
 		overrides := map[string]any{}
-		for _, variable := range variables {
+		
+		// Try to reconstruct JSON that may have been split by comma separation
+		reconstructedVars := reconstructSplitJSON(variables)
+		
+		for _, variable := range reconstructedVars {
 			parsed, err := parseVariable(variable)
 			if err != nil {
 				return nil, fmt.Errorf("invalid variable override %q: %w", variable, err)
@@ -88,6 +92,133 @@ func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 		}
 		return p, nil
 	}
+}
+
+func reconstructSplitJSON(variables []string) []string {
+	if len(variables) <= 1 {
+		return variables
+	}
+	
+	var result []string
+	var currentJSON strings.Builder
+	var braceCount int
+	var bracketCount int
+	var inJSON bool
+	var inKeyValueJSON bool
+	var isFirstKeyValuePart bool
+	
+	for _, variable := range variables {
+		variable = strings.TrimSpace(variable)
+		
+		// Check if this looks like the start of a JSON object
+		if strings.HasPrefix(variable, "{") && !inJSON && !inKeyValueJSON {
+			inJSON = true
+			braceCount = 0
+			currentJSON.Reset()
+		}
+		
+		// Check if this looks like key=JSON pattern (e.g., "users=[\"mark\"")
+		if strings.Contains(variable, "=") && (strings.Contains(variable, "[") || strings.Contains(variable, "{")) && !inJSON && !inKeyValueJSON {
+			parts := strings.SplitN(variable, "=", 2)
+			if len(parts) == 2 {
+				valueStart := parts[1]
+				if strings.HasPrefix(valueStart, "[") || strings.HasPrefix(valueStart, "{") {
+					inKeyValueJSON = true
+					braceCount = 0
+					bracketCount = 0
+					currentJSON.Reset()
+					currentJSON.WriteString(variable)
+					
+					// Count initial brackets/braces
+					for _, char := range valueStart {
+						switch char {
+						case '{':
+							braceCount++
+						case '}':
+							braceCount--
+						case '[':
+							bracketCount++
+						case ']':
+							bracketCount--
+						}
+					}
+					
+					// Check if already complete
+					if braceCount == 0 && bracketCount == 0 {
+						result = append(result, currentJSON.String())
+						inKeyValueJSON = false
+						currentJSON.Reset()
+					}
+					// Mark that we've processed the first part
+					isFirstKeyValuePart = false
+					continue
+				}
+			}
+		}
+		
+		if inJSON {
+			if currentJSON.Len() > 0 {
+				currentJSON.WriteString(",")
+			}
+			currentJSON.WriteString(variable)
+			
+			// Count braces to determine when JSON is complete
+			for _, char := range variable {
+				switch char {
+				case '{':
+					braceCount++
+				case '}':
+					braceCount--
+				}
+			}
+			
+			// If braces are balanced, JSON is complete
+			if braceCount == 0 {
+				result = append(result, currentJSON.String())
+				inJSON = false
+				currentJSON.Reset()
+			}
+		} else if inKeyValueJSON {
+			if !isFirstKeyValuePart {
+				// Add comma and space to properly separate JSON array elements
+				currentJSON.WriteString(", ")
+			}
+			isFirstKeyValuePart = false
+			currentJSON.WriteString(variable)
+			
+			// Count both braces and brackets to determine when JSON is complete
+			for _, char := range variable {
+				switch char {
+				case '{':
+					braceCount++
+				case '}':
+					braceCount--
+				case '[':
+					bracketCount++
+				case ']':
+					bracketCount--
+				}
+			}
+			
+			// If brackets and braces are balanced, JSON is complete
+			if braceCount == 0 && bracketCount == 0 {
+				result = append(result, currentJSON.String())
+				inKeyValueJSON = false
+				currentJSON.Reset()
+			}
+		} else {
+			// Not JSON, add as-is
+			result = append(result, variable)
+		}
+	}
+	
+	// If we're still in JSON mode, something went wrong
+	if inJSON || inKeyValueJSON {
+		// Return original variables as fallback
+		return variables
+	}
+	
+	return result
 }
 
 func parseVariable(variable string) (map[string]any, error) {
@@ -110,8 +241,10 @@ func parseVariable(variable string) (map[string]any, error) {
 	}
 
 	key := strings.TrimSpace(segments[0])
+	valueStr := segments[1]
+	
 	var value any
-	if err := json.Unmarshal([]byte(segments[1]), &value); err != nil {
+	if err := json.Unmarshal([]byte(valueStr), &value); err != nil {
 		return nil, err
 	}
 	return map[string]any{key: value}, nil

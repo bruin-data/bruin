@@ -13,7 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type contextKey string
@@ -103,7 +103,7 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 	}
 }
 
-func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, c *cli.Context) (*PipelineAnalysisResult, error) {
+func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, c *cli.Command) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 	excludeTag := ""
 	if c != nil {
@@ -134,7 +134,7 @@ func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFi
 	return l.LintPipelines(ctx, pipelines)
 }
 
-func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
+func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Command) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err

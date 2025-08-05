@@ -13,14 +13,14 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Connections() *cli.Command {
 	return &cli.Command{
 		Name:   "connections",
 		Hidden: true,
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			ListConnections(),
 			AddConnection(),
 			DeleteConnection(),
@@ -33,7 +33,6 @@ func ListConnections() *cli.Command {
 	return &cli.Command{
 		Name:      "list",
 		Usage:     "list connections defined in a Bruin project",
-		Args:      true,
 		ArgsUsage: "[path to project root, defaults to current folder]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -48,11 +47,11 @@ func ListConnections() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := ConnectionsCommand{}
 
 			path := "."
@@ -109,11 +108,11 @@ func AddConnection() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			path := "."
 			if c.Args().Present() {
 				path = c.Args().First()
@@ -208,11 +207,11 @@ func DeleteConnection() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			environment := c.String("environment")
 			name := c.String("name")
 			output := c.String("output")
@@ -404,11 +403,11 @@ func PingConnection() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			// Extract command-line arguments
 			environment := c.String("environment")
 			name := c.String("name")

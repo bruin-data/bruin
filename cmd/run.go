@@ -50,7 +50,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/xlab/treeprint"
 	"go.uber.org/zap"
 )
@@ -443,14 +443,14 @@ var (
 		Usage:       "the start date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
 		DefaultText: "beginning of yesterday, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
 		Value:       defaultStartDate.Format("2006-01-02 15:04:05.000000"),
-		EnvVars:     []string{"BRUIN_START_DATE"},
+		Sources:     cli.EnvVars("BRUIN_START_DATE"),
 	}
 	endDateFlag = &cli.StringFlag{
 		Name:        "end-date",
 		Usage:       "the end date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
 		DefaultText: "end of yesterday, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
 		Value:       defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
-		EnvVars:     []string{"BRUIN_END_DATE"},
+		Sources:     cli.EnvVars("BRUIN_END_DATE"),
 	}
 )
 
@@ -498,7 +498,7 @@ func Run(isDebug *bool) *cli.Command {
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
-				EnvVars: []string{"BRUIN_FULL_REFRESH"},
+				Sources: cli.EnvVars("BRUIN_FULL_REFRESH"),
 			},
 			&cli.BoolFlag{
 				Name:        "apply-interval-modifiers",
@@ -542,12 +542,12 @@ func Run(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.StringFlag{
 				Name:    "secrets-backend",
-				EnvVars: []string{"BRUIN_SECRETS_BACKEND"},
+				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
 				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault'",
 			},
 			&cli.BoolFlag{
@@ -570,7 +570,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringSliceFlag{
 				Name:    "var",
 				Usage:   "override pipeline variables with custom values",
-				EnvVars: []string{"BRUIN_VARS"},
+				Sources: cli.EnvVars("BRUIN_VARS"),
 			},
 			&cli.IntFlag{
 				Name:  "timeout",
@@ -578,7 +578,7 @@ func Run(isDebug *bool) *cli.Command {
 				Value: 604800, // 7 days default
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 
 			logger := makeLogger(*isDebug)
@@ -1506,7 +1506,7 @@ func Clean(str string) string {
 	return re.ReplaceAllString(str, "")
 }
 
-func sendTelemetry(s *scheduler.Scheduler, c *cli.Context) {
+func sendTelemetry(s *scheduler.Scheduler, c *cli.Command) {
 	assetStats := make(map[string]int)
 	for _, asset := range s.GetTaskInstancesByStatus(scheduler.Pending) {
 		_, ok := assetStats[string(asset.GetAsset().Type)]

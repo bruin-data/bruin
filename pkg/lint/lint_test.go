@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 )
 
@@ -212,7 +211,7 @@ func TestLinter_Lint(t *testing.T) {
 				logger:        logger.Sugar(),
 			}
 
-			_, err := l.Lint(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, cli.NewContext(nil, nil, nil))
+			_, err := l.Lint(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, nil)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -479,7 +478,7 @@ func TestLinter_LintAsset(t *testing.T) {
 				logger:        logger.Sugar(),
 			}
 
-			_, err := l.LintAsset(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, "my-asset", cli.NewContext(nil, nil, nil))
+			_, err := l.LintAsset(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, "my-asset", nil)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
