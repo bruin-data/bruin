@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -32,6 +34,7 @@ func Internal() *cli.Command {
 			ParseAsset(),
 			ParsePipeline(),
 			PatchAsset(),
+			ParseGlossary(),
 			ConnectionSchemas(),
 			DBSummary(),
 			FetchDatabases(),
@@ -93,6 +96,66 @@ func ParsePipeline() *cli.Command {
 			}
 
 			return r.ParsePipeline(c.Context, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
+		},
+	}
+}
+
+func ParseGlossary() *cli.Command {
+	return &cli.Command{
+		Name:      "parse-glossary",
+		Usage:     "parse a glossary file",
+		ArgsUsage: "[path to the glossary.yml file]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "pretty",
+				Usage: "pretty print the JSON output",
+			},
+			&cli.BoolFlag{
+				Name:  "entities-only",
+				Usage: "show only entities information",
+			},
+			&cli.BoolFlag{
+				Name:  "domains-only",
+				Usage: "show only domains information",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			glossaryPath := c.Args().Get(0)
+			if glossaryPath == "" {
+				return errors.New("glossary file path is required")
+			}
+
+			// Load the glossary file
+			loadedGlossary, err := glossary.LoadGlossaryFromFile(glossaryPath)
+			if err != nil {
+				return errors2.Wrap(err, "failed to load glossary file")
+			}
+
+			// Prepare output based on flags
+			var output interface{}
+			switch {
+			case c.Bool("entities-only"):
+				output = loadedGlossary.Entities
+			case c.Bool("domains-only"):
+				output = loadedGlossary.Domains
+			default:
+				output = loadedGlossary
+			}
+
+			// Convert to JSON
+			var jsonBytes []byte
+			if c.Bool("pretty") {
+				jsonBytes, err = json.MarshalIndent(output, "", "  ")
+			} else {
+				jsonBytes, err = json.Marshal(output)
+			}
+
+			if err != nil {
+				return errors2.Wrap(err, "failed to marshal glossary to JSON")
+			}
+
+			fmt.Println(string(jsonBytes))
+			return nil
 		},
 	}
 }
