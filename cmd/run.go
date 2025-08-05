@@ -400,12 +400,12 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 
 	// Don't count truly skipped tasks (those filtered out) in the summary
 
-	// Count upstream failed tasks (they should be shown as skipped in summary)  
+	// Count upstream failed tasks (they should be shown as skipped in summary)
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
 	upstreamFailedAssets := make(map[string]bool)
 	for _, t := range upstreamFailedTasks {
 		summary.SkippedTasks++
-		
+
 		assetName := t.GetAsset().Name
 		if !upstreamFailedAssets[assetName] {
 			upstreamFailedAssets[assetName] = true
