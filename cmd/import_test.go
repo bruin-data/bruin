@@ -78,10 +78,9 @@ func TestCreateAsset(t *testing.T) {
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
-					Name: "public.users.asset.yml",
-					Path: filepath.Join(testAssetsPath, "public.users.asset.yml"),
+					Name: "users.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public", "users.asset.yml"),
 				},
-				Name:        "public.users",
 				Description: "Imported table public.users",
 				Columns:     nil,
 			},
@@ -105,10 +104,9 @@ func TestCreateAsset(t *testing.T) {
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
-					Name: "public.products.asset.yml",
-					Path: filepath.Join(testAssetsPath, "public.products.asset.yml"),
+					Name: "products.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public", "products.asset.yml"),
 				},
-				Name:        "public.products",
 				Description: "Imported table public.products",
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
@@ -147,10 +145,9 @@ func TestCreateAsset(t *testing.T) {
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
-					Name: "public.temporal_table.asset.yml",
-					Path: filepath.Join(testAssetsPath, "public.temporal_table.asset.yml"),
+					Name: "temporal_table.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public", "temporal_table.asset.yml"),
 				},
-				Name:        "public.temporal_table",
 				Description: "Imported table public.temporal_table",
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
