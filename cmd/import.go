@@ -124,15 +124,24 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 			if err != nil {
 				return errors2.Wrapf(err, "failed to create asset for table %s.%s", schemaObj.Name, table.Name)
 			}
-			if existingAssets[createdAsset.Name] == nil {
+
+			assetName := fmt.Sprintf("%s.%s", strings.ToLower(schemaObj.Name), strings.ToLower(table.Name))
+
+			if existingAssets[assetName] == nil {
+
+				schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaObj.Name))
+				if err := fs.MkdirAll(schemaFolder, 0o755); err != nil {
+					return errors2.Wrapf(err, "failed to create schema directory %s", schemaFolder)
+				}
+
 				err = createdAsset.Persist(fs)
 				if err != nil {
 					return err
 				}
-				existingAssets[createdAsset.Name] = createdAsset
+				existingAssets[assetName] = createdAsset
 				totalTables++
 			} else {
-				existingAsset := existingAssets[createdAsset.Name]
+				existingAsset := existingAssets[assetName]
 				existingColumns := make(map[string]pipeline.Column, len(existingAsset.Columns))
 				for _, column := range existingAsset.Columns {
 					existingColumns[column.Name] = column
@@ -218,12 +227,6 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	// Create schema subfolder
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 
-	// Ensure the schema directory exists
-	fs := afero.NewOsFs()
-	if err := fs.MkdirAll(schemaFolder, 0o755); err != nil {
-		return nil, errors2.Wrapf(err, "failed to create schema directory %s", schemaFolder)
-	}
-
 	fileName := fmt.Sprintf("%s.asset.yml", strings.ToLower(tableName))
 	filePath := filepath.Join(schemaFolder, fileName)
 	asset := &pipeline.Asset{
@@ -232,7 +235,6 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 			Name: fileName,
 			Path: filePath,
 		},
-		Name:        fmt.Sprintf("%s.%s", strings.ToLower(schemaName), strings.ToLower(tableName)),
 		Description: fmt.Sprintf("Imported table %s.%s", schemaName, tableName),
 	}
 
