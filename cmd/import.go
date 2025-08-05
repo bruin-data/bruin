@@ -126,9 +126,7 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 			}
 
 			assetName := fmt.Sprintf("%s.%s", strings.ToLower(schemaObj.Name), strings.ToLower(table.Name))
-
 			if existingAssets[assetName] == nil {
-
 				schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaObj.Name))
 				if err := fs.MkdirAll(schemaFolder, 0o755); err != nil {
 					return errors2.Wrapf(err, "failed to create schema directory %s", schemaFolder)
@@ -227,7 +225,7 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	// Create schema subfolder
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 
-	fileName := fmt.Sprintf("%s.asset.yml", strings.ToLower(tableName))
+	fileName := strings.ToLower(tableName) + ".asset.yml"
 	filePath := filepath.Join(schemaFolder, fileName)
 	asset := &pipeline.Asset{
 		Type: assetType,
