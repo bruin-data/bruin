@@ -455,7 +455,7 @@ func PingConnection() *cli.Command {
 			if tester, ok := conn.(interface {
 				Ping(ctx context.Context) error
 			}); ok {
-				testErr := tester.Ping(context.Background())
+				testErr := tester.Ping(ctx)
 				if testErr != nil {
 					printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to test connection '%s'", name)))
 					return cli.Exit("", 1)

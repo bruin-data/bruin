@@ -361,7 +361,7 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, err)
 							return cli.Exit("", 1)
 						}
-						status, err := fillColumnsFromDB(pp, fs, environment, nil)
+						status, err := fillColumnsFromDB(pp, fs, environment, nil) //nolint:contextcheck
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s': %w", pp.Asset.Name, err))
 							return cli.Exit("", 1)
@@ -404,7 +404,7 @@ func Patch() *cli.Command {
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, fs, environment, nil)
+							status, err := fillColumnsFromDB(pp, fs, environment, nil) //nolint:contextcheck
 							processedAssets++
 							assetName := asset.Name
 							switch status {

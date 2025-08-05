@@ -51,9 +51,10 @@ func (j jinjaRenderedMaterializer) Render(asset *pipeline.Asset, query string) (
 
 func Lint(isDebug *bool) *cli.Command {
 	return &cli.Command{
-		Name:      "validate",
-		Usage:     "validate the bruin pipeline configuration for all the pipelines in a given directory",
-		ArgsUsage: "[path to pipelines]",
+		Name:                      "validate",
+		Usage:                     "validate the bruin pipeline configuration for all the pipelines in a given directory",
+		ArgsUsage:                 "[path to pipelines]",
+		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "environment",
@@ -196,8 +197,7 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debugf("successfully loaded %d rules", len(rules))
 			}
 
-			lintCtx := context.Background()
-			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
+			lintCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, defaultStartDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
 

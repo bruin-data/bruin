@@ -41,9 +41,10 @@ type ModifierInfo struct {
 
 func Render() *cli.Command {
 	return &cli.Command{
-		Name:      "render",
-		Usage:     "render a single Bruin SQL asset",
-		ArgsUsage: "[path to the asset definition]",
+		Name:                      "render",
+		Usage:                     "render a single Bruin SQL asset",
+		ArgsUsage:                 "[path to the asset definition]",
+		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "full-refresh",

@@ -127,7 +127,6 @@ func Query() *cli.Command {
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
-				ctx := context.Background()
 				ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 				defer cancel()
 
@@ -275,8 +274,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 		if err != nil {
 			return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
 		}
-		fetchCtx := context.Background()
-		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigStartDate, startDate)
+		fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 		// Auto-detect mode (both asset path and query)
@@ -309,8 +307,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 		return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
 	}
 
-	fetchCtx := context.Background()
-	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigStartDate, startDate)
+	fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 	extractor = &query.WholeFileExtractor{

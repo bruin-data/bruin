@@ -606,7 +606,7 @@ func PatchAsset() *cli.Command {
 			}
 
 			if c.Bool("convert") {
-				return convertToBruinAsset(afero.NewOsFs(), assetPath)
+				return convertToBruinAsset(afero.NewOsFs(), assetPath) //nolint:contextcheck
 			}
 
 			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)

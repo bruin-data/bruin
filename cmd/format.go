@@ -172,7 +172,7 @@ func Format(isDebug *bool) *cli.Command {
 
 			// Run sqlfluff if requested
 			if runSqlfluff {
-				if err := runSqlfluffWithErrorHandling(repoOrAsset, output, logger); err != nil {
+				if err := runSqlfluffWithErrorHandling(repoOrAsset, output, logger); err != nil { //nolint:contextcheck
 					return err
 				}
 			}

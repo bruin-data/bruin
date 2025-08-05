@@ -578,6 +578,7 @@ func Run(isDebug *bool) *cli.Command {
 				Value: 604800, // 7 days default
 			},
 		},
+		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 
@@ -647,8 +648,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			runID := NewRunID()
-			runCtx := context.Background()
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
@@ -740,7 +740,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			secretsBackend := c.String("secrets-backend")
 			if secretsBackend == "vault" {
-				connectionManager, err = secrets.NewVaultClientFromEnv(logger)
+				connectionManager, err = secrets.NewVaultClientFromEnv(logger) //nolint:contextcheck
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}
@@ -810,7 +810,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			if !c.Bool("continue") {
 				// Apply the filter to mark assets based on include/exclude tags
-				if err := ApplyAllFilters(context.Background(), filter, s, foundPipeline); err != nil {
+				if err := ApplyAllFilters(context.Background(), filter, s, foundPipeline); err != nil { //nolint:contextcheck
 					errorPrinter.Printf("Failed to filter assets: %v\n", err)
 					return cli.Exit("", 1)
 				}
