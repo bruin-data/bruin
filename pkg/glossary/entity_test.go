@@ -77,7 +77,7 @@ func TestLoadGlossaryFromFile_WithDomains(t *testing.T) {
 	t.Parallel()
 
 	// Test loading the test glossary file to ensure domains are properly converted from map to array
-	glossary, err := LoadGlossaryFromFile("../../test-glossary.yml")
+	glossary, err := LoadGlossaryFromFile("testdata/glossary.yml")
 	require.NoError(t, err)
 	assert.NotNil(t, glossary)
 
