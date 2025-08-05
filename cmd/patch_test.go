@@ -233,7 +233,7 @@ func TestFillColumnsFromDB(t *testing.T) {
 			fs := afero.NewMemMapFs()
 
 			// Execute the function with mock manager
-			status, columns, err := fillColumnsFromDB(pp, fs, "test", mockManager)
+			status, columns, err := fillColumnsFromDB(pp, fs, "test", mockManager, false)
 
 			// Verify results
 			if tt.expectError {

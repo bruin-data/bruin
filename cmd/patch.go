@@ -63,7 +63,7 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 }
 
 // Returns: status ("updated", "skipped", "failed"), columns, error.
-func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager interface{}) (string, []pipeline.Column, error) {
+func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager interface{}, dryRun bool) (string, []pipeline.Column, error) {
 	var conn interface{}
 	var err error
 
@@ -136,9 +136,11 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 			})
 		}
 		pp.Asset.Columns = columns
-		err = pp.Asset.Persist(fs)
-		if err != nil {
-			return fillStatusFailed, nil, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
+		if !dryRun {
+			err = pp.Asset.Persist(fs)
+			if err != nil {
+				return fillStatusFailed, nil, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
+			}
 		}
 		return fillStatusUpdated, pp.Asset.Columns, nil
 	}
@@ -175,9 +177,11 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 		return fillStatusSkipped, pp.Asset.Columns, nil
 	}
 
-	err = pp.Asset.Persist(fs)
-	if err != nil {
-		return fillStatusFailed, nil, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
+	if !dryRun {
+		err = pp.Asset.Persist(fs)
+		if err != nil {
+			return fillStatusFailed, nil, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
+		}
 	}
 	return fillStatusUpdated, pp.Asset.Columns, nil
 }
@@ -342,6 +346,11 @@ func Patch() *cli.Command {
 						Aliases: []string{"env"},
 						Usage:   "Target environment name as defined in .bruin.yml.",
 					},
+					&cli.BoolFlag{
+						Name:    "dry-run",
+						Aliases: []string{"n"},
+						Usage:   "Show what would be changed without modifying files",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					inputPath := c.Args().First()
@@ -351,6 +360,7 @@ func Patch() *cli.Command {
 
 					output := c.String("output")
 					environment := c.String("environment")
+					dryRun := c.Bool("dry-run")
 					fs := afero.NewOsFs()
 					ctx := context.Background()
 
@@ -361,7 +371,7 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, err)
 							return cli.Exit("", 1)
 						}
-						status, columns, err := fillColumnsFromDB(pp, fs, environment, nil)
+						status, columns, err := fillColumnsFromDB(pp, fs, environment, nil, dryRun)
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s': %w", pp.Asset.Name, err))
 							return cli.Exit("", 1)
@@ -370,7 +380,11 @@ func Patch() *cli.Command {
 						var message string
 						switch status {
 						case fillStatusUpdated:
-							message = fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name)
+							if dryRun {
+								message = fmt.Sprintf("Would update columns for asset '%s' (dry-run)", pp.Asset.Name)
+							} else {
+								message = fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name)
+							}
 						case fillStatusSkipped:
 							message = fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name)
 						case fillStatusFailed:
@@ -443,7 +457,7 @@ func Patch() *cli.Command {
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, _, err := fillColumnsFromDB(pp, fs, environment, nil)
+							status, _, err := fillColumnsFromDB(pp, fs, environment, nil, dryRun)
 							processedAssets++
 							assetName := asset.Name
 							switch status {
