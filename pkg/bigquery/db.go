@@ -105,6 +105,10 @@ func (d *Client) GetIngestrURI() (string, error) {
 	return d.config.GetIngestrURI()
 }
 
+func (d *Client) ProjectID() string {
+	return d.config.ProjectID
+}
+
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	q := d.client.Query(query.ToDryRunQuery())
 	q.DryRun = true
