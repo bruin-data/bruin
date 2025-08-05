@@ -153,7 +153,6 @@ func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnChec
 	})
 }
 
-
 type MetadataOperator struct {
 	connection config.ConnectionGetter
 }
@@ -173,7 +172,7 @@ func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) e
 	client, ok := o.connection.GetConnection(connName).(PgClient)
 	if !ok {
 		return errors.Errorf("'%s' either does not exist or is not a postgres connection", connName)
-	}	
+	}
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if writer == nil {

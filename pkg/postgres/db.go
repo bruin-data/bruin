@@ -720,7 +720,6 @@ func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	return stats, rows.Err()
 }
 
-
 func escapeSQLString(s string) string {
 	return strings.ReplaceAll(s, "'", "''") // Escape single quotes for SQL safety
 }
