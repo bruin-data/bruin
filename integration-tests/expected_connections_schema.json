@@ -597,6 +597,12 @@
           },
           "type": "array"
         },
+        "wise": {
+          "items": {
+            "$ref": "#/$defs/WiseConnection"
+          },
+          "type": "array"
+        },
         "zoom": {
           "items": {
             "$ref": "#/$defs/ZoomConnection"
@@ -2212,6 +2218,22 @@
         "email",
         "oauth_token",
         "sub_domain"
+      ]
+    },
+    "WiseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "ZoomConnection": {

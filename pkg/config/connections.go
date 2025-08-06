@@ -713,6 +713,15 @@ func (c QuickBooksConnection) GetName() string {
 	return c.Name
 }
 
+type WiseConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c WiseConnection) GetName() string {
+	return c.Name
+}
+
 type ZoomConnection struct {
 	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ClientID     string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`

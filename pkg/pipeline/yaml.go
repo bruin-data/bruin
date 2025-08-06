@@ -459,7 +459,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Checks:          tests,
 			PrimaryKey:      column.PrimaryKey,
 			UpdateOnMerge:   column.UpdateOnMerge,
-			Nullable:        column.Nullable,
+			Nullable:        DefaultTrueBool{Value: column.Nullable},
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
 			Upstreams:       upstreamColumns,

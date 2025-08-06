@@ -149,6 +149,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "valid-parent-domains",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        gr.EnsureParentDomainsExistInGlossary,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
 			Identifier:       "duplicate-column-names",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
@@ -210,13 +217,6 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsurePipelineConcurrencyIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
-		},
-		&SimpleRule{
-			Identifier:       "trino-materialization-not-supported",
-			Fast:             true,
-			Severity:         ValidatorSeverityCritical,
-			AssetValidator:   ValidateTrinoAssetMaterialization,
-			ApplicableLevels: []Level{LevelAsset},
 		},
 	}
 
