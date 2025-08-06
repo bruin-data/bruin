@@ -720,6 +720,11 @@ func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	return stats, rows.Err()
 }
 
+// ExecuteMetadataOperations implements the ansisql.MetadataHandler interface
+func (c *Client) ExecuteMetadataOperations(ctx context.Context, asset *pipeline.Asset) error {
+	return c.PushColumnDescriptions(ctx, asset)
+}
+
 func escapeSQLString(s string) string {
 	return strings.ReplaceAll(s, "'", "''") // Escape single quotes for SQL safety
 }

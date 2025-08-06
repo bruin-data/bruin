@@ -1,6 +1,15 @@
 package ansisql
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
+)
+
+type MetadataHandler interface {
+	ExecuteMetadataOperations(ctx context.Context, asset *pipeline.Asset) error
+}
 
 type DBDatabase struct {
 	Name    string      `json:"name"`

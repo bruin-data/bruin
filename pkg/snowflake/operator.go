@@ -2,7 +2,6 @@ package snowflake
 
 import (
 	"context"
-	"io"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -27,7 +26,6 @@ type SfClient interface {
 	Ping(ctx context.Context) error
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
-	PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error
 	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error
 	SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
@@ -189,47 +187,6 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		}
 
 		time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
-	}
-
-	return nil
-}
-
-type MetadataOperator struct {
-	connection config.ConnectionGetter
-}
-
-func NewMetadataPushOperator(conn config.ConnectionGetter) *MetadataOperator {
-	return &MetadataOperator{
-		connection: conn,
-	}
-}
-
-func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	connName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
-	if err != nil {
-		return err
-	}
-
-	client, ok := o.connection.GetConnection(connName).(SfClient)
-	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a snowflake connection", connName)
-	}
-
-	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
-	if writer == nil {
-		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
-	}
-
-	// Skip metadata push for views
-	if ti.GetAsset().Materialization.Type == pipeline.MaterializationTypeView {
-		_, _ = writer.Write([]byte("\"Skipping metadata update: Column comments are not supported for Views.\n"))
-		return nil
-	}
-
-	err = client.PushColumnDescriptions(ctx, ti.GetAsset())
-	if err != nil {
-		_, _ = writer.Write([]byte("Failed to push metadata to Snowflake, skipping...\n"))
-		return err
 	}
 
 	return nil

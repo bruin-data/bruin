@@ -100,3 +100,53 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		}
 	}
 }
+
+// MetadataOperator handles pushing metadata to database clients that support it
+type MetadataOperator struct {
+	connection config.ConnectionGetter
+}
+
+// NewMetadataPushOperator creates a new MetadataOperator
+func NewMetadataPushOperator(conn config.ConnectionGetter) *MetadataOperator {
+	return &MetadataOperator{
+		connection: conn,
+	}
+}
+
+// Run executes the metadata push operation
+func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	connName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	client := o.connection.GetConnection(connName)
+	if client == nil {
+		return errors.Errorf("'%s' does not exist", connName)
+	}
+
+	// Check if the client implements the MetadataHandler interface
+	metadataHandler, ok := client.(MetadataHandler)
+	if !ok {
+		return errors.Errorf("'%s' does not support metadata operations (does not implement MetadataHandler interface)", connName)
+	}
+
+	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if writer == nil {
+		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
+	}
+
+	// Skip metadata push for views
+	if ti.GetAsset().Materialization.Type == pipeline.MaterializationTypeView {
+		_, _ = writer.Write([]byte("Skipping metadata update: Column comments are not supported for Views.\n"))
+		return nil
+	}
+
+	err = metadataHandler.ExecuteMetadataOperations(ctx, ti.GetAsset())
+	if err != nil {
+		_, _ = writer.Write([]byte(fmt.Sprintf("Failed to execute metadata operations on %s, skipping...\n", connName)))
+		return err
+	}
+
+	return nil
+}
