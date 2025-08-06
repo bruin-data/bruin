@@ -2210,11 +2210,11 @@ func TestGlossaryChecker_EnsureParentDomainsExistInGlossary_WithCache(t *testing
 	t.Parallel()
 
 	tests := []struct {
-		name           string
+		name            string
 		initialGlossary *glossary.Glossary
-		cacheGlossary  bool
-		want           []string
-		wantErr        assert.ErrorAssertionFunc
+		cacheGlossary   bool
+		want            []string
+		wantErr         assert.ErrorAssertionFunc
 	}{
 		{
 			name: "uses cached glossary when available",
@@ -2227,8 +2227,8 @@ func TestGlossaryChecker_EnsureParentDomainsExistInGlossary_WithCache(t *testing
 				Entities: []*glossary.Entity{},
 			},
 			cacheGlossary: true,
-			want:         []string{"Parent domain 'missing' for domain 'orphan' does not exist in the glossary"},
-			wantErr:      assert.NoError,
+			want:          []string{"Parent domain 'missing' for domain 'orphan' does not exist in the glossary"},
+			wantErr:       assert.NoError,
 		},
 		{
 			name: "handles empty cached glossary",
@@ -2237,8 +2237,8 @@ func TestGlossaryChecker_EnsureParentDomainsExistInGlossary_WithCache(t *testing
 				Entities: []*glossary.Entity{},
 			},
 			cacheGlossary: true,
-			want:         []string{},
-			wantErr:      assert.NoError,
+			want:          []string{},
+			wantErr:       assert.NoError,
 		},
 	}
 
