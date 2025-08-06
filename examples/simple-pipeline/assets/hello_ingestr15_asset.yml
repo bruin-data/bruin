@@ -1,9 +1,9 @@
-name: public.googleanalytics
+name: public.wise
 type: ingestr
-connection: postgres
+connection: neon
 
 parameters:
-  source_connection: googleanalytics
-  source_table: 'custom:city,date:activeUsers,newUsers,checkouts'
+  source_connection: wise
+  source_table: 'balances'
 
   destination: postgres

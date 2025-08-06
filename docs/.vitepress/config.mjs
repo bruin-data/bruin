@@ -232,6 +232,7 @@ export default withMermaid({
                             {text: "Slack", link: "/ingestion/slack.md"},
                             {text: "SQLite", link: "/ingestion/sqlite"},
                             {text: "TikTok Ads", link: "/ingestion/tiktokads.md"},
+                            {text: "Wise", link: "/ingestion/wise.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                             {text: "Zoom", link: "/ingestion/zoom"},
                         ],
