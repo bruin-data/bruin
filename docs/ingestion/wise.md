@@ -21,7 +21,7 @@ connections:
 To ingest data from Wise, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., wise_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
-name: public.2ise
+name: public.wise
 type: ingestr
 
 parameters:
