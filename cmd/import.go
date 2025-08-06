@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -25,7 +26,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
-
 	"github.com/urfave/cli/v3"
 	"google.golang.org/api/iterator"
 )
@@ -328,8 +328,8 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	return asset, nil
 }
 
-// max returns the larger of two integers
-func max(a, b int) int {
+// maxInt returns the larger of two integers.
+func maxInt(a, b int) int {
 	if a > b {
 		return a
 	}
@@ -425,7 +425,7 @@ func GetPipelinefromPath(ctx context.Context, inputPath string) (*pipeline.Pipel
 	return foundPipeline, nil
 }
 
-// Scheduled query data structures
+// Scheduled query data structures.
 type ScheduledQuery struct {
 	Name        string
 	DisplayName string
@@ -435,7 +435,7 @@ type ScheduledQuery struct {
 	Config      *datatransferpb.TransferConfig
 }
 
-// scheduledQueryItem implements list.Item interface
+// scheduledQueryItem implements list.Item interface.
 type scheduledQueryItem struct {
 	query    ScheduledQuery
 	selected bool
@@ -454,10 +454,10 @@ func (i scheduledQueryItem) Title() string {
 func (i scheduledQueryItem) Description() string {
 	var parts []string
 	if i.query.Schedule != "" {
-		parts = append(parts, fmt.Sprintf("Schedule: %s", i.query.Schedule))
+		parts = append(parts, "Schedule: "+i.query.Schedule)
 	}
 	if i.query.Dataset != "" {
-		parts = append(parts, fmt.Sprintf("Dataset: %s", i.query.Dataset))
+		parts = append(parts, "Dataset: "+i.query.Dataset)
 	}
 	if len(parts) == 0 {
 		return "No additional details"
@@ -469,7 +469,7 @@ func (i scheduledQueryItem) FilterValue() string {
 	return i.Title()
 }
 
-// customDelegate implements list.ItemDelegate with selection indicators
+// customDelegate implements list.ItemDelegate with selection indicators.
 type customDelegate struct {
 	list.DefaultDelegate
 	selectedItems map[int]bool
@@ -535,7 +535,7 @@ func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem li
 	}
 }
 
-// Bubbletea model for scheduled query selection
+// Bubbletea model for scheduled query selection.
 type scheduledQueryModel struct {
 	queries       []ScheduledQuery
 	list          list.Model
@@ -550,7 +550,7 @@ type scheduledQueryModel struct {
 	focusedPane   int // 0 for left pane, 1 for right pane
 }
 
-// Styles for the UI
+// Styles for the UI.
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -558,7 +558,7 @@ var (
 			MarginTop(1).
 			MarginBottom(1)
 
-	// Panel styles
+	// Panel styles.
 	leftPanelStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#4F46E5")).
@@ -569,18 +569,18 @@ var (
 			BorderForeground(lipgloss.Color("#FF6B35")).
 			Padding(0, 1)
 
-	// Status bar style
+	// Status bar style.
 	statusBarStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("#1F2937")).
 			Foreground(lipgloss.Color("#9CA3AF")).
 			Padding(0, 1)
 )
 
-func (m scheduledQueryModel) Init() tea.Cmd {
+func (m *scheduledQueryModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m scheduledQueryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *scheduledQueryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -748,15 +748,15 @@ func (m *scheduledQueryModel) updateRightPanelContent() {
 			Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#374151"))
-		
+
 		content.WriteString(noQueryStyle.Render("-- No SQL query available --"))
 	} else {
 		highlightedSQL := highlightCode(query.Query, "sql")
-		
+
 		content.WriteString("\n")
 		content.WriteString(sectionHeaderStyle.Render("Query"))
 		content.WriteString("\n\n")
-		
+
 		// Wrap highlighted SQL in a styled code block
 		content.WriteString(regularTextStyle.Render(highlightedSQL))
 	}
@@ -764,30 +764,7 @@ func (m *scheduledQueryModel) updateRightPanelContent() {
 	m.rightViewport.SetContent(content.String())
 }
 
-
-// explainCronSchedule provides a human-readable explanation of common cron patterns
-func explainCronSchedule(cron string) string {
-	switch cron {
-	case "0 0 * * *":
-		return "Runs daily at midnight (00:00)"
-	case "0 12 * * *":
-		return "Runs daily at noon (12:00)"
-	case "0 0 * * 0":
-		return "Runs weekly on Sunday at midnight"
-	case "0 0 1 * *":
-		return "Runs monthly on the 1st at midnight"
-	case "0 * * * *":
-		return "Runs every hour"
-	case "*/15 * * * *":
-		return "Runs every 15 minutes"
-	case "*/30 * * * *":
-		return "Runs every 30 minutes"
-	default:
-		return fmt.Sprintf("Custom schedule: %s", cron)
-	}
-}
-
-func (m scheduledQueryModel) View() string {
+func (m *scheduledQueryModel) View() string {
 	if m.quitting {
 		return ""
 	}
@@ -812,12 +789,12 @@ func (m scheduledQueryModel) View() string {
 			selectedCount++
 		}
 	}
-	
+
 	summaryText := fmt.Sprintf("Selected: %d/%d queries", selectedCount, len(m.queries))
 	if selectedCount > 0 {
 		summaryText += " ✓"
 	}
-	
+
 	summary := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#10B981")).
 		Bold(true).
@@ -828,7 +805,7 @@ func (m scheduledQueryModel) View() string {
 	if m.focusedPane == 0 {
 		leftPanelTitle += " •"
 	}
-	
+
 	leftTitle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#4F46E5")).
@@ -838,7 +815,7 @@ func (m scheduledQueryModel) View() string {
 	// Panel styles with dynamic border colors based on focus
 	leftBorderColor := "#374151"
 	rightBorderColor := "#374151"
-	
+
 	if m.focusedPane == 0 {
 		leftBorderColor = "#4F46E5"
 	} else if m.focusedPane == 1 {
@@ -846,7 +823,7 @@ func (m scheduledQueryModel) View() string {
 	}
 
 	// Use the same height for both panels to ensure alignment
-	panelHeight := max(m.list.Height() + 4, m.rightViewport.Height + 4) // +4 for borders and padding
+	panelHeight := maxInt(m.list.Height()+4, m.rightViewport.Height+4) // +4 for borders and padding
 
 	currentLeftPanelStyle := leftPanelStyle.
 		BorderForeground(lipgloss.Color(leftBorderColor)).
@@ -883,25 +860,25 @@ func (m scheduledQueryModel) View() string {
 
 	// Enhanced status bar with more helpful shortcuts
 	var statusParts []string
-	
+
 	// Navigation
 	statusParts = append(statusParts, "↑/↓/j/k: Navigate")
 	statusParts = append(statusParts, "Tab: Switch Panes")
-	
+
 	// Selection
 	statusParts = append(statusParts, "Space: Select")
 	statusParts = append(statusParts, "a: Select All")
 	statusParts = append(statusParts, "n: Select None")
-	
+
 	// Scrolling hint
 	if m.focusedPane == 1 {
 		statusParts = append(statusParts, "↑/↓: Scroll Details")
 	}
-	
+
 	// Actions
 	statusParts = append(statusParts, "Enter: Import")
 	statusParts = append(statusParts, "q/Esc: Quit")
-	
+
 	statusText := strings.Join(statusParts, " • ")
 	statusBar := statusBarStyle.
 		Width(m.windowWidth).
@@ -913,12 +890,12 @@ func (m scheduledQueryModel) View() string {
 	if remainingHeight < 0 {
 		remainingHeight = 0
 	}
-	
-	var fillerLines []string
-	for i := 0; i < remainingHeight; i++ {
-		fillerLines = append(fillerLines, "")
+
+	fillerLines := make([]string, remainingHeight)
+	for i := range remainingHeight {
+		fillerLines[i] = ""
 	}
-	
+
 	elements := []string{summary, "", content}
 	elements = append(elements, fillerLines...)
 	elements = append(elements, statusBar)
@@ -948,7 +925,7 @@ func runScheduledQueriesImport(ctx context.Context, pipelinePath, connectionName
 			projectID = bqClient.ProjectID()
 		}
 		if projectID == "" {
-			return fmt.Errorf("could not determine project ID from connection, please specify --project-id")
+			return errors.New("could not determine project ID from connection, please specify --project-id")
 		}
 	}
 
@@ -1012,7 +989,7 @@ func listScheduledQueries(ctx context.Context, client *datatransfer.Client, proj
 	return allQueries, nil
 }
 
-// searchLocationsInParallel searches all locations in parallel with a beautiful loader
+// searchLocationsInParallel searches all locations in parallel with a beautiful loader.
 func searchLocationsInParallel(ctx context.Context, client *datatransfer.Client, projectID string, locations []string) []ScheduledQuery {
 	var allQueries []ScheduledQuery
 	var mu sync.Mutex
@@ -1121,7 +1098,7 @@ func searchLocationsInParallel(ctx context.Context, client *datatransfer.Client,
 	return allQueries
 }
 
-// showAnimatedLoader displays a beautiful animated loader
+// showAnimatedLoader displays a beautiful animated loader.
 func showAnimatedLoader(done chan bool, totalLocations int) {
 	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	frameIndex := 0
@@ -1148,7 +1125,7 @@ func showAnimatedLoader(done chan bool, totalLocations int) {
 	}
 }
 
-// getCommonBigQueryLocations returns a list of common BigQuery locations to search
+// getCommonBigQueryLocations returns a list of common BigQuery locations to search.
 func getCommonBigQueryLocations() []string {
 	return []string{
 		"us",                      // Multi-regional US
@@ -1181,7 +1158,7 @@ func getCommonBigQueryLocations() []string {
 	}
 }
 
-// listScheduledQueriesInLocation searches for scheduled queries in a specific location
+// listScheduledQueriesInLocation searches for scheduled queries in a specific location.
 func listScheduledQueriesInLocation(ctx context.Context, client *datatransfer.Client, projectID, location string, debug bool) ([]ScheduledQuery, error) {
 	parent := fmt.Sprintf("projects/%s/locations/%s", projectID, location)
 
@@ -1196,7 +1173,7 @@ func listScheduledQueriesInLocation(ctx context.Context, client *datatransfer.Cl
 	queryCount := 0
 	for {
 		config, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
@@ -1204,28 +1181,28 @@ func listScheduledQueriesInLocation(ctx context.Context, client *datatransfer.Cl
 		}
 
 		// Only process scheduled queries (double-check in case the filter didn't work)
-		if config.DataSourceId != "scheduled_query" {
+		if config.GetDataSourceId() != "scheduled_query" {
 			continue
 		}
 
 		queryCount++
 		if debug {
-			fmt.Printf("  Found scheduled query #%d: %s (Display Name: %s)\n", queryCount, config.Name, config.DisplayName)
+			fmt.Printf("  Found scheduled query #%d: %s (Display Name: %s)\n", queryCount, config.GetName(), config.GetDisplayName())
 		}
 
 		// Extract query parameters
 		queryText := ""
-		if config.Params != nil && config.Params.Fields != nil {
-			if queryField, ok := config.Params.Fields["query"]; ok {
+		if config.GetParams() != nil && config.GetParams().GetFields() != nil {
+			if queryField, ok := config.GetParams().GetFields()["query"]; ok {
 				queryText = queryField.GetStringValue()
 			}
 		}
 
 		query := ScheduledQuery{
-			Name:        config.Name,
-			DisplayName: config.DisplayName,
+			Name:        config.GetName(),
+			DisplayName: config.GetDisplayName(),
 			Query:       queryText,
-			Schedule:    config.Schedule,
+			Schedule:    config.GetSchedule(),
 			Dataset:     config.GetDestinationDatasetId(),
 			Config:      config,
 		}
@@ -1264,7 +1241,7 @@ func showScheduledQuerySelector(queries []ScheduledQuery) ([]ScheduledQuery, err
 	queryList.SetShowHelp(false)
 	queryList.SetShowTitle(false)
 
-	model := scheduledQueryModel{
+	model := &scheduledQueryModel{
 		queries:     queries,
 		list:        queryList,
 		delegate:    delegate,
@@ -1278,7 +1255,7 @@ func showScheduledQuerySelector(queries []ScheduledQuery) ([]ScheduledQuery, err
 		return nil, err
 	}
 
-	final := finalModel.(scheduledQueryModel)
+	final := finalModel.(*scheduledQueryModel)
 	if final.confirmed {
 		var selected []ScheduledQuery
 		for i, isSelected := range final.selected {
@@ -1314,10 +1291,7 @@ func importSelectedQueries(ctx context.Context, pipelinePath string, queries []S
 
 	for _, query := range queries {
 		// Create asset from scheduled query
-		asset, err := createAssetFromScheduledQuery(query, assetsPath)
-		if err != nil {
-			return errors2.Wrapf(err, "failed to create asset for scheduled query '%s'", query.DisplayName)
-		}
+		asset := createAssetFromScheduledQuery(query, assetsPath)
 
 		// Check if asset already exists
 		if existingAssets[asset.Name] != nil {
@@ -1345,7 +1319,7 @@ func importSelectedQueries(ctx context.Context, pipelinePath string, queries []S
 	return nil
 }
 
-func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) (*pipeline.Asset, error) {
+func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) *pipeline.Asset {
 	// Generate a safe filename from the display name or use a default
 	assetName := query.DisplayName
 	if assetName == "" {
@@ -1381,7 +1355,7 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) (*pi
 			Path:    filePath,
 			Content: query.Query, // Add the SQL query content
 		},
-		Description: fmt.Sprintf("Imported from scheduled query: %s", query.DisplayName),
+		Description: "Imported from scheduled query: " + query.DisplayName,
 	}
 
 	// Set the materialization if we have dataset info
@@ -1391,6 +1365,5 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) (*pi
 		}
 	}
 
-	return asset, nil
+	return asset
 }
-
