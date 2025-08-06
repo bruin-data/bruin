@@ -38,7 +38,7 @@ table td:first-child {
 |------|------|---------|-------------|
 | `--connection`, `-c` | string | - | **Required.** Name of the connection to use as defined in `.bruin.yml` |
 | `--schema`, `-s` | string | - | Filter by specific schema name |
-| `--fill-columns`, `-f` | bool | `false` | Automatically fill column metadata from database schema |
+| `--no-columns`, `-n` | bool | `false` | Skip filling column metadata from database schema |
 | `--environment`, `--env` | string | - | Target environment name as defined in `.bruin.yml` |
 | `--config-file` | string | - | Path to the `.bruin.yml` file. Can also be set via `BRUIN_CONFIG_FILE` environment variable |
 
@@ -84,10 +84,18 @@ bruin import database --connection bigquery-dev --schema analytics ./my-pipeline
 
 ### Import with Column Metadata
 
-Import tables and automatically fill column information:
+Import tables and automatically fill column information (default behavior):
 
 ```bash
-bruin import database --connection postgres-local --fill-columns ./my-pipeline
+bruin import database --connection postgres-local ./my-pipeline
+```
+
+### Import without Column Metadata
+
+Skip filling column information:
+
+```bash
+bruin import database --connection postgres-local --no-columns ./my-pipeline
 ```
 
 ### Environment-Specific Import
@@ -114,9 +122,9 @@ The asset file includes:
 - **Description**: `"Imported table {schema}.{table}"`
 - **Asset Type**: Automatically determined from connection type
 
-### With Column Metadata (`--fill-columns`)
+### With Column Metadata (Default)
 
-When using the `--fill-columns` flag, the asset will also include:
+By default, the asset will include column metadata:
 
 ```yaml
 type: postgres
@@ -162,7 +170,7 @@ Common errors and solutions:
 ## Best Practices
 
 1. **Start Small**: Use schema filtering for large databases to avoid importing too many tables
-2. **Use Column Metadata**: Enable `--fill-columns` to get richer asset definitions
+2. **Column Metadata**: Column metadata is filled by default for richer asset definitions
 3. **Review Generated Assets**: Check and customize the generated assets  as needed
 
 

@@ -50,7 +50,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"github.com/xlab/treeprint"
 	"go.uber.org/zap"
 )
@@ -120,33 +120,31 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 		}
 	}
 
-	// Add skipped assets
-	skippedTasks := s.GetTaskInstancesByStatus(scheduler.Skipped)
+	// Only add upstream failed assets (skip the "skipped" ones entirely)
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
-	allSkippedTasks := append(skippedTasks, upstreamFailedTasks...) // nolint:gocritic
 
-	for _, task := range allSkippedTasks {
+	for _, task := range upstreamFailedTasks {
 		assetName := task.GetAsset().Name
 		if _, exists := assetResults[assetName]; !exists {
 			assetResults[assetName] = make(map[string]*scheduler.TaskExecutionResult)
 			assetOrder = append(assetOrder, assetName)
 		}
 
-		// Create a fake skipped result
-		skippedResult := &scheduler.TaskExecutionResult{
+		// Create a fake result for upstream failed task
+		upstreamFailedResult := &scheduler.TaskExecutionResult{
 			Instance: task,
-			Error:    nil, // We'll use nil to indicate skipped
+			Error:    nil, // We'll use nil to indicate upstream failed
 		}
 
 		switch instance := task.(type) {
 		case *scheduler.AssetInstance:
-			assetResults[assetName]["main"] = skippedResult
+			assetResults[assetName]["main"] = upstreamFailedResult
 		case *scheduler.ColumnCheckInstance:
 			key := fmt.Sprintf("column:%s:%s", instance.Column.Name, instance.Check.Name)
-			assetResults[assetName][key] = skippedResult
+			assetResults[assetName][key] = upstreamFailedResult
 		case *scheduler.CustomCheckInstance:
 			key := "custom:" + instance.Check.Name
-			assetResults[assetName][key] = skippedResult
+			assetResults[assetName][key] = upstreamFailedResult
 		}
 	}
 
@@ -169,13 +167,12 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			assetStatus = "SKIP"
 			assetColor = color.New(color.Faint)
 		} else if mainResult.Error == nil {
-			// Check if this is actually skipped
-			_, isSkipped := find(skippedTasks, mainResult.Instance)
+			// Check if this is upstream failed
 			_, isUpstreamFailed := find(upstreamFailedTasks, mainResult.Instance)
 
-			if isSkipped || isUpstreamFailed {
-				assetStatus = "SKIP"
-				assetColor = color.New(color.Faint)
+			if isUpstreamFailed {
+				assetStatus = "UPSTREAM FAILED"
+				assetColor = color.New(color.FgYellow)
 			} else {
 				assetStatus = "PASS"
 				assetColor = color.New(color.FgGreen)
@@ -198,12 +195,11 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			if result == nil { // nolint:gocritic
 				fmt.Print(faint("."))
 			} else if result.Error == nil {
-				// Check if skipped
-				_, isSkipped := find(skippedTasks, result.Instance)
+				// Check if upstream failed
 				_, isUpstreamFailed := find(upstreamFailedTasks, result.Instance)
 
-				if isSkipped || isUpstreamFailed {
-					fmt.Print(faint("."))
+				if isUpstreamFailed {
+					fmt.Print(color.New(color.FgYellow).Sprint("U"))
 				} else {
 					fmt.Print(color.New(color.FgGreen).Sprint("."))
 				}
@@ -402,34 +398,17 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 		}
 	}
 
-	// Count skipped tasks from scheduler state
-	skippedTasks := s.GetTaskInstancesByStatus(scheduler.Skipped)
-	for _, skippedTask := range skippedTasks {
+	// Don't count truly skipped tasks (those filtered out) in the summary
+
+	// Count upstream failed tasks (they should be shown as skipped in summary)
+	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
+	upstreamFailedAssets := make(map[string]bool)
+	for _, t := range upstreamFailedTasks {
 		summary.SkippedTasks++
 
-		switch skippedTask.(type) {
-		case *scheduler.AssetInstance:
-			summary.Assets.Total++
-			summary.Assets.Skipped++
-		case *scheduler.ColumnCheckInstance:
-			summary.ColumnChecks.Total++
-			summary.ColumnChecks.Skipped++
-		case *scheduler.CustomCheckInstance:
-			summary.CustomChecks.Total++
-			summary.CustomChecks.Skipped++
-		case *scheduler.MetadataPushInstance:
-			summary.MetadataPush.Total++
-			summary.MetadataPush.Skipped++
-		}
-	}
-
-	// Count upstream failed tasks as skipped
-	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
-	skippedAssets := make(map[string]bool)
-	for _, t := range upstreamFailedTasks {
 		assetName := t.GetAsset().Name
-		if !skippedAssets[assetName] {
-			skippedAssets[assetName] = true
+		if !upstreamFailedAssets[assetName] {
+			upstreamFailedAssets[assetName] = true
 			summary.Assets.Total++
 			summary.Assets.Skipped++
 		}
@@ -464,14 +443,14 @@ var (
 		Usage:       "the start date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
 		DefaultText: "beginning of yesterday, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
 		Value:       defaultStartDate.Format("2006-01-02 15:04:05.000000"),
-		EnvVars:     []string{"BRUIN_START_DATE"},
+		Sources:     cli.EnvVars("BRUIN_START_DATE"),
 	}
 	endDateFlag = &cli.StringFlag{
 		Name:        "end-date",
 		Usage:       "the end date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
 		DefaultText: "end of yesterday, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
 		Value:       defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
-		EnvVars:     []string{"BRUIN_END_DATE"},
+		Sources:     cli.EnvVars("BRUIN_END_DATE"),
 	}
 )
 
@@ -519,7 +498,7 @@ func Run(isDebug *bool) *cli.Command {
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
-				EnvVars: []string{"BRUIN_FULL_REFRESH"},
+				Sources: cli.EnvVars("BRUIN_FULL_REFRESH"),
 			},
 			&cli.BoolFlag{
 				Name:        "apply-interval-modifiers",
@@ -563,12 +542,12 @@ func Run(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.StringFlag{
 				Name:    "secrets-backend",
-				EnvVars: []string{"BRUIN_SECRETS_BACKEND"},
+				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
 				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault'",
 			},
 			&cli.BoolFlag{
@@ -591,7 +570,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringSliceFlag{
 				Name:    "var",
 				Usage:   "override pipeline variables with custom values",
-				EnvVars: []string{"BRUIN_VARS"},
+				Sources: cli.EnvVars("BRUIN_VARS"),
 			},
 			&cli.IntFlag{
 				Name:  "timeout",
@@ -599,7 +578,8 @@ func Run(isDebug *bool) *cli.Command {
 				Value: 604800, // 7 days default
 			},
 		},
-		Action: func(c *cli.Context) error {
+		DisableSliceFlagSeparator: true,
+		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 
 			logger := makeLogger(*isDebug)
@@ -668,8 +648,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			runID := NewRunID()
-			runCtx := context.Background()
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
@@ -761,7 +740,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			secretsBackend := c.String("secrets-backend")
 			if secretsBackend == "vault" {
-				connectionManager, err = secrets.NewVaultClientFromEnv(logger)
+				connectionManager, err = secrets.NewVaultClientFromEnv(logger) //nolint:contextcheck
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}
@@ -831,7 +810,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			if !c.Bool("continue") {
 				// Apply the filter to mark assets based on include/exclude tags
-				if err := ApplyAllFilters(context.Background(), filter, s, foundPipeline); err != nil {
+				if err := ApplyAllFilters(context.Background(), filter, s, foundPipeline); err != nil { //nolint:contextcheck
 					errorPrinter.Printf("Failed to filter assets: %v\n", err)
 					return cli.Exit("", 1)
 				}
@@ -843,7 +822,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			sendTelemetry(s, c)
 			infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
-			infoPrinter.Printf("\n%s\n", executionStartLog)
+			infoPrinter.Printf("\n%s\n\n", executionStartLog)
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
 					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
@@ -1164,6 +1143,7 @@ func SetupExecutors(
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh), parser)
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		pgMetadataPushOperator := postgres.NewMetadataPushOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -1172,10 +1152,12 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
 
 		mainExecutors[pipeline.AssetTypePostgresSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypePostgresSeed][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresSeed][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
 
 		mainExecutors[pipeline.AssetTypeRedshiftSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeRedshiftSeed][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -1184,6 +1166,7 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypePostgresQuerySensor][scheduler.TaskInstanceTypeMain] = pgQuerySensor
 		mainExecutors[pipeline.AssetTypePostgresQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresQuerySensor][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeMain] = pgQuerySensor
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -1527,7 +1510,7 @@ func Clean(str string) string {
 	return re.ReplaceAllString(str, "")
 }
 
-func sendTelemetry(s *scheduler.Scheduler, c *cli.Context) {
+func sendTelemetry(s *scheduler.Scheduler, c *cli.Command) {
 	assetStats := make(map[string]int)
 	for _, asset := range s.GetTaskInstancesByStatus(scheduler.Pending) {
 		_, ok := assetStats[string(asset.GetAsset().Type)]

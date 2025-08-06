@@ -9,6 +9,12 @@ The Query Preview Panel is located at the bottom of the VS Code interface, near 
     - **Limit**: The maximum number of rows displayed in the query output is limited to `1000`. This limit is editable, but it cannot exceed `1000` rows.  
     - **Clear Icon Button**: Clears the results of the current query output.  
     - **Search**: Allows you to search for specific words within the query output. The number of matches found is displayed along with the total number of rows.
+    - **Pagination**: Added pagination support to navigate through large query results efficiently.
+
+- **Query Timeout and Cancellation**
+    - **Timeout Support**: Queries now support configurable timeout settings to prevent long-running queries from blocking the interface.
+    - **Query Cancellation**: You can cancel running queries using the cancel button that appears during query execution.
+    - **Improved Performance**: Better handling of query execution with enhanced timeout management.
 
 - **Multi-Tab Functionality**  
     - Multiple queries can be run in separate tabs, allowing you to add or delete tabs as needed. When you run a query, the output is displayed in the current tab, while the other tabs retain their individual query outputs.  

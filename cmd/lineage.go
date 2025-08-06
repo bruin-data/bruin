@@ -8,7 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Lineage() *cli.Command {
@@ -27,14 +27,14 @@ func Lineage() *cli.Command {
 				Usage:   "the output type, possible values are: plain, json",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := LineageCommand{
 				builder:      DefaultPipelineBuilder,
 				infoPrinter:  infoPrinter,
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Context, c.Args().Get(0), c.Bool("full"), c.String("output"))
+			return r.Run(ctx, c.Args().Get(0), c.Bool("full"), c.String("output"))
 		},
 	}
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -22,17 +24,18 @@ import (
 	errors2 "github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Internal() *cli.Command {
 	return &cli.Command{
 		Name:   "internal",
 		Hidden: true,
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			ParseAsset(),
 			ParsePipeline(),
 			PatchAsset(),
+			ParseGlossary(),
 			ConnectionSchemas(),
 			DBSummary(),
 			FetchDatabases(),
@@ -57,13 +60,13 @@ func ParseAsset() *cli.Command {
 				DefaultText: "false",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Context, c.Args().Get(0), c.Bool("column-lineage"))
+			return r.Run(ctx, c.Args().Get(0), c.Bool("column-lineage"))
 		},
 	}
 }
@@ -88,13 +91,73 @@ func ParsePipeline() *cli.Command {
 				DefaultText: "false",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
 
-			return r.ParsePipeline(c.Context, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
+			return r.ParsePipeline(ctx, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
+		},
+	}
+}
+
+func ParseGlossary() *cli.Command {
+	return &cli.Command{
+		Name:      "parse-glossary",
+		Usage:     "parse a glossary file",
+		ArgsUsage: "[path to the glossary.yml file]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "pretty",
+				Usage: "pretty print the JSON output",
+			},
+			&cli.BoolFlag{
+				Name:  "entities-only",
+				Usage: "show only entities information",
+			},
+			&cli.BoolFlag{
+				Name:  "domains-only",
+				Usage: "show only domains information",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			glossaryPath := c.Args().Get(0)
+			if glossaryPath == "" {
+				return errors.New("glossary file path is required")
+			}
+
+			// Load the glossary file
+			loadedGlossary, err := glossary.LoadGlossaryFromFile(glossaryPath)
+			if err != nil {
+				return errors2.Wrap(err, "failed to load glossary file")
+			}
+
+			// Prepare output based on flags
+			var output interface{}
+			switch {
+			case c.Bool("entities-only"):
+				output = loadedGlossary.Entities
+			case c.Bool("domains-only"):
+				output = loadedGlossary.Domains
+			default:
+				output = loadedGlossary
+			}
+
+			// Convert to JSON
+			var jsonBytes []byte
+			if c.Bool("pretty") {
+				jsonBytes, err = json.MarshalIndent(output, "", "  ")
+			} else {
+				jsonBytes, err = json.Marshal(output)
+			}
+
+			if err != nil {
+				return errors2.Wrap(err, "failed to marshal glossary to JSON")
+			}
+
+			fmt.Println(string(jsonBytes))
+			return nil
 		},
 	}
 }
@@ -103,7 +166,7 @@ func ConnectionSchemas() *cli.Command {
 	return &cli.Command{
 		Name:  "connections",
 		Usage: "return all the possible connection types and their schemas",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			jsonStringSchema, err := config.GetConnectionsSchema()
 			if err != nil {
 				printErrorJSON(err)
@@ -142,11 +205,11 @@ func DBSummary() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			connectionName := c.String("connection")
 			environment := c.String("environment")
@@ -167,7 +230,6 @@ func DBSummary() *cli.Command {
 			}
 
 			// Get database summary
-			ctx := context.Background()
 			summary, err := summarizer.GetDatabaseSummary(ctx)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve database summary"))
@@ -538,7 +600,7 @@ func PatchAsset() *cli.Command {
 				DefaultText: "false",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			assetPath := c.Args().Get(0)
 			if assetPath == "" {
 				printErrorJSON(errors2.New("empty asset path given, you must provide an existing asset path"))
@@ -546,7 +608,7 @@ func PatchAsset() *cli.Command {
 			}
 
 			if c.Bool("convert") {
-				return convertToBruinAsset(afero.NewOsFs(), assetPath)
+				return convertToBruinAsset(afero.NewOsFs(), assetPath) //nolint:contextcheck
 			}
 
 			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
@@ -555,7 +617,7 @@ func PatchAsset() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(c.Context, asset, nil)
+			asset, err = DefaultPipelineBuilder.MutateAsset(ctx, asset, nil)
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to patch the asset with the given json body"))
 				return cli.Exit("", 1)
@@ -669,11 +731,11 @@ func FetchDatabases() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			connectionName := c.String("connection")
 			environment := c.String("environment")
@@ -694,7 +756,7 @@ func FetchDatabases() *cli.Command {
 			}
 
 			// Get databases
-			ctx := context.Background()
+			// ctx is already available from function signature
 			databases, err := fetcher.GetDatabases(ctx)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve databases"))
@@ -784,11 +846,11 @@ func FetchTables() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			connectionName := c.String("connection")
 			databaseName := c.String("database")
@@ -810,7 +872,7 @@ func FetchTables() *cli.Command {
 			}
 
 			// Get tables
-			ctx := context.Background()
+			// ctx is already available from function signature
 			tables, err := fetcher.GetTables(ctx, databaseName)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve tables"))
@@ -909,11 +971,11 @@ func FetchColumns() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			connectionName := c.String("connection")
 			databaseName := c.String("database")
@@ -936,7 +998,7 @@ func FetchColumns() *cli.Command {
 			}
 
 			// Get columns
-			ctx := context.Background()
+			// ctx is already available from function signature
 			columns, err := fetcher.GetColumns(ctx, databaseName, tableName)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve columns"))

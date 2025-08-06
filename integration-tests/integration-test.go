@@ -1475,20 +1475,6 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:    "run-seed-data",
-			Command: binary,
-			Args:    []string{"run", "--env", "env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
-			Env:     []string{},
-			Expected: e2e.Output{
-				ExitCode: 0,
-				Contains: []string{"bruin run completed"},
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-				e2e.AssertByContains,
-			},
-		},
-		{
 			Name:          "parse-asset-seed-data",
 			Command:       binary,
 			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
@@ -1501,20 +1487,6 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
 				e2e.AssertByOutputJSON,
-			},
-		},
-		{
-			Name:    "run-asset-default-option-pipeline",
-			Command: binary,
-			Args:    []string{"run", "--env", "env-run-default-option", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
-			Env:     []string{},
-			Expected: e2e.Output{
-				ExitCode: 0,
-				Contains: []string{"Successfully validated 4 assets", "bruin run completed", "Finished: chess_playground.player_summary", "Finished: chess_playground.games", "Finished: python_asset"},
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-				e2e.AssertByContains,
 			},
 		},
 		{
@@ -1575,20 +1547,6 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
 				e2e.AssertByOutputJSON,
-			},
-		},
-		{
-			Name:    "run-python-materialization",
-			Command: binary,
-			Args:    []string{"run", "--env", "env-run-python-materialization", filepath.Join(currentFolder, "test-pipelines/run-python-materialization")},
-			Env:     []string{},
-			Expected: e2e.Output{
-				ExitCode: 0,
-				Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: materialize.country"},
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-				e2e.AssertByContains,
 			},
 		},
 		{
@@ -1657,6 +1615,48 @@ func getIngestrTasks(binary string, currentFolder string) []e2e.Task {
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Contains: []string{"bruin run completed", "Finished: chess_playground.profiles", "Finished: chess_playground.games", "Finished: chess_playground.player_summary", "Finished: chess_playground.player_summary:total_games:positive"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "run-seed-data",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"bruin run completed"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "run-asset-default-option-pipeline",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-run-default-option", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 4 assets", "bruin run completed", "Finished: chess_playground.player_summary", "Finished: chess_playground.games", "Finished: python_asset"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "run-python-materialization",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-run-python-materialization", filepath.Join(currentFolder, "test-pipelines/run-python-materialization")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: materialize.country"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,

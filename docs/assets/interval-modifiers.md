@@ -16,6 +16,21 @@ interval_modifiers:
   end: 1h       # Shift end time forward 1 hour
 ```
 
+## Conditional Interval Modifiers with Jinja
+
+You can use [Jinja templating](./templating/templating.md) within the `interval_modifiers` values themselves to conditionally modify intervals based on dynamic conditions:
+
+```yaml
+interval_modifiers:
+  start: '{% if start_timestamp|date_format("%H") == "00" %}-20d{% else %}0{% endif %}'
+```
+
+This example:
+- Shifts the start time back by 20 days if the start timestamp is at midnight (hour = 00)
+- Otherwise, applies no shift (0)
+
+You can use any Jinja expressions, filters, and conditional logic to determine your interval modifiers dynamically. For more information about Jinja syntax and features, see the [Jinja templating documentation](./templating/templating.md).
+
 ## Pipeline-Level Defaults
 
 You can set default interval modifiers at the pipeline level that will apply to all assets unless explicitly overridden. Define these in your pipeline's `default` section:

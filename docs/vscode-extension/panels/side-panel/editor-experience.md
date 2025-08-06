@@ -37,3 +37,27 @@ The extension offers an inline "Preview" button, leveraging CodeLens functionali
   * When a subquery is selected and the "Preview" button is clicked, the results of the subquery are displayed.
 
 ![CodeLens Preview Button](../../../public/vscode-extension/panels/side-panel/codelens-preview.gif)
+
+## Language Server Protocol (LSP) Features
+The extension provides intelligent autocomplete and validation for Bruin asset files through Language Server Protocol integration.
+
+### Autocomplete Features
+- **Materialization Completions**: Suggests materialization types (table, view, none) and strategies
+- **Column Suggestions**: Suggests existing column names for partitioning and clustering
+- **Dependency Completions**: Suggests pipeline assets from your current pipeline for dependencies
+- **Asset Properties**: Autocomplete for asset structure and YAML formatting
+- **Context-Aware**: Shows relevant suggestions based on your current position in the file
+
+### Validation Features
+- **Real-time Validation**: Checks asset structure and required fields as you type
+- **Error Highlighting**: Highlights problematic code sections
+- **Strategy Validation**: Validates fields based on your chosen materialization strategy
+
+### Smart Features
+- **Section Detection**: Identifies when you're in materialization, dependencies, or other sections
+- **Indentation Help**: Validates proper YAML indentation
+- **Descriptive Help**: Provides detailed descriptions for each completion option
+- **Dependency Navigation**: Dependencies appear as clickable links (underlined)
+  - Hover shows tooltip with "Go to [dependency_name]"
+  - Clicking opens the dependency file in the editor
+
