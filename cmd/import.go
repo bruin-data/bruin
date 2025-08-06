@@ -27,10 +27,6 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/urfave/cli/v3"
-	datatransfer "cloud.google.com/go/bigquery/datatransfer/apiv1"
-	"cloud.google.com/go/bigquery/datatransfer/apiv1/datatransferpb"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/bruin-data/bruin/pkg/bigquery"
 	"google.golang.org/api/iterator"
 )
 
@@ -130,7 +126,7 @@ Example:
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.StringFlag{
@@ -144,7 +140,7 @@ Example:
 				Usage:   "BigQuery location/region (uses connection config if not specified)",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			pipelinePath := c.Args().Get(0)
 			if pipelinePath == "" {
 				return cli.Exit("pipeline path is required", 1)
@@ -156,7 +152,7 @@ Example:
 			projectID := c.String("project-id")
 			location := c.String("location")
 
-			return runScheduledQueriesImport(c.Context, pipelinePath, connectionName, environment, configFile, projectID, location)
+			return runScheduledQueriesImport(ctx, pipelinePath, connectionName, environment, configFile, projectID, location)
 		},
 	}
 }
