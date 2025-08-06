@@ -3,16 +3,26 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
+	datatransfer "cloud.google.com/go/bigquery/datatransfer/apiv1"
+	"cloud.google.com/go/bigquery/datatransfer/apiv1/datatransferpb"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 
@@ -21,6 +31,7 @@ import (
 	"cloud.google.com/go/bigquery/datatransfer/apiv1/datatransferpb"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"google.golang.org/api/iterator"
 )
 
 func Import() *cli.Command {
@@ -86,8 +97,8 @@ func ImportDatabase() *cli.Command {
 
 func ImportScheduledQueries() *cli.Command {
 	return &cli.Command{
-		Name:      "scheduledqueries",
-		Usage:     "Import BigQuery scheduled queries as Bruin assets",
+		Name:  "scheduledqueries",
+		Usage: "Import BigQuery scheduled queries as Bruin assets",
 		Description: `Import BigQuery scheduled queries from the Data Transfer Service as individual Bruin assets.
 
 This command connects to BigQuery Data Transfer Service, lists all scheduled queries,
@@ -321,6 +332,14 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	return asset, nil
 }
 
+// max returns the larger of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func determineAssetTypeFromConnection(connectionName string, conn interface{}) pipeline.AssetType {
 	// First, try to determine from the actual connection type
 	if _, ok := conn.(interface {
@@ -420,55 +439,356 @@ type ScheduledQuery struct {
 	Config      *datatransferpb.TransferConfig
 }
 
+// scheduledQueryItem implements list.Item interface
+type scheduledQueryItem struct {
+	query    ScheduledQuery
+	selected bool
+}
+
+func (i scheduledQueryItem) Title() string {
+	if i.query.DisplayName != "" {
+		return i.query.DisplayName
+	}
+	if i.query.Name != "" {
+		return i.query.Name
+	}
+	return "Unnamed Query"
+}
+
+func (i scheduledQueryItem) Description() string {
+	var parts []string
+	if i.query.Schedule != "" {
+		parts = append(parts, fmt.Sprintf("Schedule: %s", i.query.Schedule))
+	}
+	if i.query.Dataset != "" {
+		parts = append(parts, fmt.Sprintf("Dataset: %s", i.query.Dataset))
+	}
+	if len(parts) == 0 {
+		return "No additional details"
+	}
+	return strings.Join(parts, " | ")
+}
+
+func (i scheduledQueryItem) FilterValue() string {
+	return i.Title()
+}
+
+// customDelegate implements list.ItemDelegate with selection indicators
+type customDelegate struct {
+	list.DefaultDelegate
+	selectedItems map[int]bool
+}
+
+func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	item, ok := listItem.(scheduledQueryItem)
+	if !ok {
+		d.DefaultDelegate.Render(w, m, index, listItem)
+		return
+	}
+
+	// Check if this item is selected
+	isSelected := d.selectedItems[index]
+	isCurrent := index == m.Index()
+
+	// Create selection indicator with better styling
+	checkbox := "[ ]"
+	if isSelected {
+		checkbox = "[x]"
+	}
+
+	// Create clean title and description
+	title := item.Title()
+	desc := item.Description()
+
+	// Apply consistent styling
+	if isCurrent {
+		// Current item - purple background
+		styledLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(lipgloss.Color("#7C3AED")).
+			Width(m.Width()-4).
+			Padding(0, 1).
+			MarginTop(1).
+			Render(fmt.Sprintf("%s %s", checkbox, title))
+
+		descLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9CA3AF")).
+			Padding(0, 5).
+			Render(desc)
+
+		fmt.Fprintf(w, "%s\n%s", styledLine, descLine)
+	} else {
+		// Non-current item
+		titleColor := "#374151"
+		if isSelected {
+			titleColor = "#059669"
+		}
+
+		titleLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(titleColor)).
+			Padding(0, 1).
+			MarginTop(1).
+			Render(fmt.Sprintf("%s %s", checkbox, title))
+
+		descLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9CA3AF")).
+			Padding(0, 5).
+			Render(desc)
+
+		fmt.Fprintf(w, "%s\n%s", titleLine, descLine)
+	}
+}
+
 // Bubbletea model for scheduled query selection
 type scheduledQueryModel struct {
 	queries       []ScheduledQuery
+	list          list.Model
+	delegate      customDelegate
+	rightViewport viewport.Model
 	selected      map[int]bool
-	cursor        int
-	showPreview   bool
 	windowWidth   int
 	windowHeight  int
 	quitting      bool
+	confirmed     bool // true if user pressed Enter, false if they pressed q
 	err           error
+	focusedPane   int // 0 for left pane, 1 for right pane
 }
+
+// Styles for the UI
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FF6B35")).
+			MarginTop(1).
+			MarginBottom(1)
+
+	// Panel styles
+	leftPanelStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#4F46E5")).
+			Padding(1)
+
+	rightPanelStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#FF6B35")).
+			Padding(0, 1)
+
+	// Status bar style
+	statusBarStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("#1F2937")).
+			Foreground(lipgloss.Color("#9CA3AF")).
+			Padding(0, 1)
+)
 
 func (m scheduledQueryModel) Init() tea.Cmd {
 	return nil
 }
 
 func (m scheduledQueryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c", "q", "esc":
 			m.quitting = true
 			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "down", "j":
-			if m.cursor < len(m.queries)-1 {
-				m.cursor++
-			}
+		case "tab":
+			// Switch focus between left and right panes
+			m.focusedPane = (m.focusedPane + 1) % 2
 		case " ":
-			// Toggle selection
+			// Only allow selection when focused on left pane
+			if m.focusedPane == 0 {
+				currentIndex := m.list.Index()
+				if m.selected == nil {
+					m.selected = make(map[int]bool)
+				}
+				m.selected[currentIndex] = !m.selected[currentIndex]
+
+				// Update the delegate's selected items map for visual feedback
+				m.delegate.selectedItems[currentIndex] = m.selected[currentIndex]
+				m.list.SetDelegate(m.delegate)
+
+				m.updateRightPanelContent()
+			}
+		case "enter":
+			// Finish selection
+			m.confirmed = true
+			m.quitting = true
+			return m, tea.Quit
+		case "a":
+			// Select all queries
 			if m.selected == nil {
 				m.selected = make(map[int]bool)
 			}
-			m.selected[m.cursor] = !m.selected[m.cursor]
-		case "enter":
-			// Finish selection
-			return m, tea.Quit
-		case "p":
-			// Toggle preview mode
-			m.showPreview = !m.showPreview
+			for i := range m.queries {
+				m.selected[i] = true
+				m.delegate.selectedItems[i] = true
+			}
+			m.list.SetDelegate(m.delegate)
+			m.updateRightPanelContent()
+		case "n":
+			// Deselect all queries
+			if m.selected == nil {
+				m.selected = make(map[int]bool)
+			}
+			for i := range m.queries {
+				m.selected[i] = false
+				m.delegate.selectedItems[i] = false
+			}
+			m.list.SetDelegate(m.delegate)
+			m.updateRightPanelContent()
 		}
+
 	case tea.WindowSizeMsg:
 		m.windowWidth = msg.Width
 		m.windowHeight = msg.Height
+
+		// Calculate sizes for split-pane layout
+		leftWidth := m.windowWidth/2 - 4
+		rightWidth := m.windowWidth - leftWidth - 8
+		viewportHeight := m.windowHeight - 14 // Account for all header content, extra spacing, and status bar
+
+		if leftWidth < 30 {
+			leftWidth = 30
+		}
+		if rightWidth < 40 {
+			rightWidth = 40
+		}
+		if viewportHeight < 10 {
+			viewportHeight = 10
+		}
+
+		// Update list size
+		m.list.SetSize(leftWidth, viewportHeight)
+
+		// Initialize or update right viewport
+		if m.rightViewport.Width == 0 {
+			m.rightViewport = viewport.New(rightWidth, viewportHeight)
+			m.updateRightPanelContent()
+		} else {
+			m.rightViewport.Width = rightWidth
+			m.rightViewport.Height = viewportHeight
+			m.updateRightPanelContent()
+		}
 	}
-	return m, nil
+
+	// Update list only when focused on left pane
+	if m.focusedPane == 0 {
+		m.list, cmd = m.list.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	// Update right viewport only when focused on right pane
+	if m.focusedPane == 1 {
+		m.rightViewport, cmd = m.rightViewport.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	// Update right panel when list selection changes
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		if msg.String() == "up" || msg.String() == "down" || msg.String() == "k" || msg.String() == "j" {
+			m.updateRightPanelContent()
+		}
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m *scheduledQueryModel) updateRightPanelContent() {
+	if m.rightViewport.Width == 0 {
+		return // Viewport not initialized yet
+	}
+
+	currentIndex := m.list.Index()
+	if currentIndex >= len(m.queries) {
+		m.rightViewport.SetContent(lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6B7280")).
+			Render("No query selected"))
+		return
+	}
+
+	query := m.queries[currentIndex]
+	var content strings.Builder
+
+	sectionHeaderStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#A78BFA"))
+
+	regularTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
+
+	if query.DisplayName != "" {
+		content.WriteString(sectionHeaderStyle.Render("Name: "))
+		content.WriteString(regularTextStyle.Render(query.DisplayName))
+		content.WriteString("\n")
+	}
+
+	// Internal Name Section
+	if query.Name != "" {
+		content.WriteString(sectionHeaderStyle.Render("ID: "))
+		content.WriteString(regularTextStyle.Render(query.Name))
+		content.WriteString("\n")
+	}
+
+	// Dataset Section
+	if query.Dataset != "" {
+		content.WriteString(sectionHeaderStyle.Render("Target Dataset: "))
+		content.WriteString(regularTextStyle.Render(query.Dataset))
+		content.WriteString("\n")
+	}
+
+	// Schedule Section
+	if query.Schedule != "" {
+		content.WriteString(sectionHeaderStyle.Render("Schedule: "))
+		content.WriteString(regularTextStyle.Render(query.Schedule))
+		content.WriteString("\n")
+	}
+
+	if strings.TrimSpace(query.Query) == "" {
+		noQueryStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6B7280")).
+			Italic(true).
+			Padding(1, 2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#374151"))
+		
+		content.WriteString(noQueryStyle.Render("-- No SQL query available --"))
+	} else {
+		highlightedSQL := highlightCode(query.Query, "sql")
+		
+		content.WriteString("\n")
+		content.WriteString(sectionHeaderStyle.Render("Query"))
+		content.WriteString("\n\n")
+		
+		// Wrap highlighted SQL in a styled code block
+		content.WriteString(regularTextStyle.Render(highlightedSQL))
+	}
+
+	m.rightViewport.SetContent(content.String())
+}
+
+
+// explainCronSchedule provides a human-readable explanation of common cron patterns
+func explainCronSchedule(cron string) string {
+	switch cron {
+	case "0 0 * * *":
+		return "Runs daily at midnight (00:00)"
+	case "0 12 * * *":
+		return "Runs daily at noon (12:00)"
+	case "0 0 * * 0":
+		return "Runs weekly on Sunday at midnight"
+	case "0 0 1 * *":
+		return "Runs monthly on the 1st at midnight"
+	case "0 * * * *":
+		return "Runs every hour"
+	case "*/15 * * * *":
+		return "Runs every 15 minutes"
+	case "*/30 * * * *":
+		return "Runs every 30 minutes"
+	default:
+		return fmt.Sprintf("Custom schedule: %s", cron)
+	}
 }
 
 func (m scheduledQueryModel) View() string {
@@ -481,125 +801,133 @@ func (m scheduledQueryModel) View() string {
 	}
 
 	if len(m.queries) == 0 {
-		return "No scheduled queries found.\n"
+		return titleStyle.Render("No scheduled queries found.") + "\n"
 	}
 
-	var s strings.Builder
-	s.WriteString("Select scheduled queries to import (Space to select, Enter to confirm, P to toggle preview, Q to quit):\n\n")
-
-	if m.showPreview && m.windowWidth > 80 {
-		// Dual pane view
-		return m.dualPaneView()
+	// If viewports aren't initialized yet, show a loading message
+	if m.rightViewport.Width == 0 {
+		return titleStyle.Render("Loading...") + "\n"
 	}
 
-	// Single pane view
-	for i, query := range m.queries {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
+	// Selection summary
+	selectedCount := 0
+	for _, selected := range m.selected {
+		if selected {
+			selectedCount++
 		}
-
-		checked := " "
-		if m.selected[i] {
-			checked = "✓"
-		}
-
-		displayText := query.DisplayName
-		if displayText == "" {
-			displayText = query.Name
-		}
-		if displayText == "" {
-			displayText = fmt.Sprintf("Query %d", i+1)
-		}
-
-		s.WriteString(fmt.Sprintf("%s [%s] %s\n", cursor, checked, displayText))
-		if query.Schedule != "" {
-			s.WriteString(fmt.Sprintf("     Schedule: %s\n", query.Schedule))
-		}
-		if query.Dataset != "" {
-			s.WriteString(fmt.Sprintf("     Dataset: %s\n", query.Dataset))
-		}
-		s.WriteString("\n")
 	}
-
-	s.WriteString("\nPress 'p' to toggle preview mode")
-	return s.String()
-}
-
-func (m scheduledQueryModel) dualPaneView() string {
-	var s strings.Builder
 	
-	leftWidth := m.windowWidth / 2 - 2
-	rightWidth := m.windowWidth - leftWidth - 3
-
-	s.WriteString("Select scheduled queries to import (Space to select, Enter to confirm, P to toggle preview, Q to quit):\n\n")
-
-	// Split view
-	lines := make([]string, 0)
+	summaryText := fmt.Sprintf("Selected: %d/%d queries", selectedCount, len(m.queries))
+	if selectedCount > 0 {
+		summaryText += " ✓"
+	}
 	
-	// Left pane - query list
-	for i, query := range m.queries {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
+	summary := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#10B981")).
+		Bold(true).
+		Render(summaryText)
 
-		checked := " "
-		if m.selected[i] {
-			checked = "✓"
-		}
-
-		displayText := query.DisplayName
-		if displayText == "" {
-			displayText = query.Name
-		}
-		if displayText == "" {
-			displayText = fmt.Sprintf("Query %d", i+1)
-		}
-
-		// Truncate if too long
-		if len(displayText) > leftWidth-6 {
-			displayText = displayText[:leftWidth-9] + "..."
-		}
-
-		lines = append(lines, fmt.Sprintf("%s [%s] %s", cursor, checked, displayText))
+	// Left panel title with focus indicator
+	leftPanelTitle := "📋 Scheduled Queries"
+	if m.focusedPane == 0 {
+		leftPanelTitle += " •"
 	}
-
-	// Right pane - query details
-	rightContent := ""
-	if m.cursor < len(m.queries) {
-		query := m.queries[m.cursor]
-		rightContent = fmt.Sprintf("Query Details:\n\nDisplay Name: %s\nName: %s\nSchedule: %s\nDataset: %s\n\nQuery:\n%s",
-			query.DisplayName, query.Name, query.Schedule, query.Dataset, query.Query)
-	}
-
-	rightLines := strings.Split(rightContent, "\n")
-
-	maxLines := max(len(lines), len(rightLines))
 	
-	for i := 0; i < maxLines; i++ {
-		leftLine := ""
-		if i < len(lines) {
-			leftLine = lines[i]
-		}
-		// Pad left line to left width
-		if len(leftLine) < leftWidth {
-			leftLine += strings.Repeat(" ", leftWidth-len(leftLine))
-		}
+	leftTitle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#4F46E5")).
+		Padding(0, 1).
+		Render(leftPanelTitle)
 
-		rightLine := ""
-		if i < len(rightLines) {
-			rightLine = rightLines[i]
-			// Truncate right line if too long
-			if len(rightLine) > rightWidth {
-				rightLine = rightLine[:rightWidth-3] + "..."
-			}
-		}
-
-		s.WriteString(fmt.Sprintf("%s | %s\n", leftLine, rightLine))
+	// Panel styles with dynamic border colors based on focus
+	leftBorderColor := "#374151"
+	rightBorderColor := "#374151"
+	
+	if m.focusedPane == 0 {
+		leftBorderColor = "#4F46E5"
+	} else if m.focusedPane == 1 {
+		rightBorderColor = "#FF6B35"
 	}
 
-	return s.String()
+	// Use the same height for both panels to ensure alignment
+	panelHeight := max(m.list.Height() + 4, m.rightViewport.Height + 4) // +4 for borders and padding
+
+	currentLeftPanelStyle := leftPanelStyle.
+		BorderForeground(lipgloss.Color(leftBorderColor)).
+		Width(m.list.Width() + 2).
+		Height(panelHeight)
+
+	currentRightPanelStyle := rightPanelStyle.
+		BorderForeground(lipgloss.Color(rightBorderColor)).
+		Width(m.rightViewport.Width + 2).
+		Height(panelHeight)
+
+	// Left panel content
+	leftContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		leftTitle,
+		"",
+		m.list.View(),
+	)
+
+	// Right panel content
+	rightContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		m.rightViewport.View(),
+	)
+
+	leftPane := currentLeftPanelStyle.Render(leftContent)
+	rightPane := currentRightPanelStyle.Render(rightContent)
+
+	content := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftPane,
+		rightPane,
+	)
+
+	// Enhanced status bar with more helpful shortcuts
+	var statusParts []string
+	
+	// Navigation
+	statusParts = append(statusParts, "↑/↓/j/k: Navigate")
+	statusParts = append(statusParts, "Tab: Switch Panes")
+	
+	// Selection
+	statusParts = append(statusParts, "Space: Select")
+	statusParts = append(statusParts, "a: Select All")
+	statusParts = append(statusParts, "n: Select None")
+	
+	// Scrolling hint
+	if m.focusedPane == 1 {
+		statusParts = append(statusParts, "↑/↓: Scroll Details")
+	}
+	
+	// Actions
+	statusParts = append(statusParts, "Enter: Import")
+	statusParts = append(statusParts, "q/Esc: Quit")
+	
+	statusText := strings.Join(statusParts, " • ")
+	statusBar := statusBarStyle.
+		Width(m.windowWidth).
+		Render(statusText)
+
+	// Calculate remaining space and add it before status bar to push it to bottom
+	usedHeight := 2 + 1 + 2 + panelHeight + 1 // summary + spacing + content + spacing for status bar
+	remainingHeight := m.windowHeight - usedHeight
+	if remainingHeight < 0 {
+		remainingHeight = 0
+	}
+	
+	var fillerLines []string
+	for i := 0; i < remainingHeight; i++ {
+		fillerLines = append(fillerLines, "")
+	}
+	
+	elements := []string{summary, "", content}
+	elements = append(elements, fillerLines...)
+	elements = append(elements, statusBar)
+
+	return lipgloss.JoinVertical(lipgloss.Left, elements...)
 }
 
 func runScheduledQueriesImport(ctx context.Context, pipelinePath, connectionName, environment, configFile, projectID, location string) error {
@@ -628,8 +956,12 @@ func runScheduledQueriesImport(ctx context.Context, pipelinePath, connectionName
 		}
 	}
 
+	if location == "" {
+		location = bqClient.Location()
+	}
+
 	// Create Data Transfer Service client using the same credentials as BigQuery
-	dtClient, err := datatransfer.NewClient(ctx)
+	dtClient, err := bqClient.NewDataTransferClient(ctx)
 	if err != nil {
 		return errors2.Wrap(err, "failed to create BigQuery Data Transfer Service client")
 	}
@@ -662,26 +994,227 @@ func runScheduledQueriesImport(ctx context.Context, pipelinePath, connectionName
 }
 
 func listScheduledQueries(ctx context.Context, client *datatransfer.Client, projectID, location string) ([]ScheduledQuery, error) {
-	parent := fmt.Sprintf("projects/%s", projectID)
+	var allQueries []ScheduledQuery
+
+	// If location is specified, only search in that location
 	if location != "" {
-		parent = fmt.Sprintf("projects/%s/locations/%s", projectID, location)
+		fmt.Printf("Looking for scheduled queries in location: %s\n", location)
+		queries, err := listScheduledQueriesInLocation(ctx, client, projectID, location, true)
+		if err != nil {
+			return nil, err
+		}
+		allQueries = append(allQueries, queries...)
+	} else {
+		// If no location specified, search in all common BigQuery locations
+		fmt.Println("🔍 Searching for scheduled queries across all BigQuery regions...")
+
+		locations := getCommonBigQueryLocations()
+		allQueries = searchLocationsInParallel(ctx, client, projectID, locations)
 	}
 
+	fmt.Printf("Total scheduled queries found across all locations: %d\n", len(allQueries))
+	return allQueries, nil
+}
+
+// searchLocationsInParallel searches all locations in parallel with a beautiful loader
+func searchLocationsInParallel(ctx context.Context, client *datatransfer.Client, projectID string, locations []string) []ScheduledQuery {
+	var allQueries []ScheduledQuery
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Results channel to collect findings
+	type locationResult struct {
+		location string
+		queries  []ScheduledQuery
+		err      error
+	}
+
+	results := make(chan locationResult, len(locations))
+
+	// Start the animated loader
+	done := make(chan bool)
+	go showAnimatedLoader(done, len(locations))
+
+	// Launch goroutines for each location
+	for _, loc := range locations {
+		wg.Add(1)
+		go func(location string) {
+			defer wg.Done()
+			queries, err := listScheduledQueriesInLocation(ctx, client, projectID, location, false)
+			results <- locationResult{
+				location: location,
+				queries:  queries,
+				err:      err,
+			}
+		}(loc)
+	}
+
+	// Wait for all goroutines to complete
+	go func() {
+		wg.Wait()
+		close(results)
+		done <- true
+	}()
+
+	// Collect results
+	locationsWithQueries := 0
+	totalQueries := 0
+
+	for result := range results {
+		if result.err != nil {
+			// Silently skip locations with errors (common for disabled regions)
+			continue
+		}
+		if len(result.queries) > 0 {
+			locationsWithQueries++
+			totalQueries += len(result.queries)
+
+			mu.Lock()
+			allQueries = append(allQueries, result.queries...)
+			mu.Unlock()
+
+			// Show real-time findings with beautiful styling
+			successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#059669")).Bold(true)
+			locationStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED"))
+
+			queryWord := "query"
+			if len(result.queries) > 1 {
+				queryWord = "queries"
+			}
+
+			message := fmt.Sprintf("✨ Found %d %s in %s",
+				len(result.queries),
+				queryWord,
+				locationStyle.Render(result.location))
+
+			fmt.Printf("\r%s%s\n",
+				successStyle.Render(message),
+				strings.Repeat(" ", 20)) // Clear any remaining chars
+		}
+	}
+
+	// Final summary
+	if totalQueries > 0 {
+		summaryStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#059669")).
+			Bold(true).
+			MarginTop(1)
+
+		regionWord := "region"
+		if locationsWithQueries > 1 {
+			regionWord = "regions"
+		}
+
+		queryWord := "query"
+		if totalQueries > 1 {
+			queryWord = "queries"
+		}
+
+		message := fmt.Sprintf("🎉 Search complete! Found %d %s across %d %s",
+			totalQueries, queryWord, locationsWithQueries, regionWord)
+
+		fmt.Printf("\n%s\n", summaryStyle.Render(message))
+	} else {
+		emptyStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6B7280")).
+			MarginTop(1)
+
+		fmt.Printf("\n%s\n", emptyStyle.Render("📭 No scheduled queries found in any region"))
+	}
+
+	return allQueries
+}
+
+// showAnimatedLoader displays a beautiful animated loader
+func showAnimatedLoader(done chan bool, totalLocations int) {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	frameIndex := 0
+
+	// Color styles
+	spinnerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED")).Bold(true)
+	textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#374151"))
+
+	ticker := time.NewTicker(80 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-done:
+			// Clear the line completely
+			fmt.Printf("\r%s\r", strings.Repeat(" ", 60))
+			return
+		case <-ticker.C:
+			spinner := spinnerStyle.Render(frames[frameIndex])
+			text := textStyle.Render(fmt.Sprintf("Scanning %d regions in parallel...", totalLocations))
+			fmt.Printf("\r%s %s", spinner, text)
+			frameIndex = (frameIndex + 1) % len(frames)
+		}
+	}
+}
+
+// getCommonBigQueryLocations returns a list of common BigQuery locations to search
+func getCommonBigQueryLocations() []string {
+	return []string{
+		"us",                      // Multi-regional US
+		"eu",                      // Multi-regional EU
+		"asia",                    // Multi-regional Asia
+		"us-central1",             // Iowa
+		"us-east1",                // South Carolina
+		"us-east4",                // Northern Virginia
+		"us-west1",                // Oregon
+		"us-west2",                // Los Angeles
+		"us-west3",                // Salt Lake City
+		"us-west4",                // Las Vegas
+		"europe-north1",           // Finland
+		"europe-west1",            // Belgium
+		"europe-west2",            // London
+		"europe-west3",            // Frankfurt
+		"europe-west4",            // Netherlands
+		"europe-west6",            // Zurich
+		"asia-east1",              // Taiwan
+		"asia-east2",              // Hong Kong
+		"asia-northeast1",         // Tokyo
+		"asia-northeast2",         // Osaka
+		"asia-northeast3",         // Seoul
+		"asia-south1",             // Mumbai
+		"asia-southeast1",         // Singapore
+		"asia-southeast2",         // Jakarta
+		"australia-southeast1",    // Sydney
+		"northamerica-northeast1", // Montreal
+		"southamerica-east1",      // São Paulo
+	}
+}
+
+// listScheduledQueriesInLocation searches for scheduled queries in a specific location
+func listScheduledQueriesInLocation(ctx context.Context, client *datatransfer.Client, projectID, location string, debug bool) ([]ScheduledQuery, error) {
+	parent := fmt.Sprintf("projects/%s/locations/%s", projectID, location)
+
 	req := &datatransferpb.ListTransferConfigsRequest{
-		Parent: parent,
+		Parent:        parent,
 		DataSourceIds: []string{"scheduled_query"}, // Filter for scheduled queries only
 	}
 
 	var queries []ScheduledQuery
 	it := client.ListTransferConfigs(ctx, req)
-	
+
+	queryCount := 0
 	for {
 		config, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
 		if err != nil {
-			if err.Error() == "no more items in iterator" {
-				break
-			}
 			return nil, err
+		}
+
+		// Only process scheduled queries (double-check in case the filter didn't work)
+		if config.DataSourceId != "scheduled_query" {
+			continue
+		}
+
+		queryCount++
+		if debug {
+			fmt.Printf("  Found scheduled query #%d: %s (Display Name: %s)\n", queryCount, config.Name, config.DisplayName)
 		}
 
 		// Extract query parameters
@@ -704,13 +1237,43 @@ func listScheduledQueries(ctx context.Context, client *datatransfer.Client, proj
 		queries = append(queries, query)
 	}
 
+	if debug && len(queries) > 0 {
+		fmt.Printf("Total scheduled queries found in %s: %d\n", location, len(queries))
+	}
+
 	return queries, nil
 }
 
 func showScheduledQuerySelector(queries []ScheduledQuery) ([]ScheduledQuery, error) {
+	// Convert queries to list items
+	items := make([]list.Item, len(queries))
+	for i, query := range queries {
+		items[i] = scheduledQueryItem{
+			query:    query,
+			selected: false,
+		}
+	}
+
+	// Create list with custom delegate
+	delegate := customDelegate{
+		selectedItems: make(map[int]bool),
+	}
+	delegate.ShowDescription = true
+	delegate.SetHeight(3)
+
+	queryList := list.New(items, delegate, 0, 0)
+	queryList.Title = ""
+	queryList.SetShowStatusBar(false)
+	queryList.SetFilteringEnabled(true)
+	queryList.SetShowHelp(false)
+	queryList.SetShowTitle(false)
+
 	model := scheduledQueryModel{
-		queries:  queries,
-		selected: make(map[int]bool),
+		queries:     queries,
+		list:        queryList,
+		delegate:    delegate,
+		selected:    make(map[int]bool),
+		focusedPane: 0,
 	}
 
 	p := tea.NewProgram(model, tea.WithAltScreen())
@@ -720,7 +1283,7 @@ func showScheduledQuerySelector(queries []ScheduledQuery) ([]ScheduledQuery, err
 	}
 
 	final := finalModel.(scheduledQueryModel)
-	if final.quitting {
+	if final.confirmed {
 		var selected []ScheduledQuery
 		for i, isSelected := range final.selected {
 			if isSelected && i < len(queries) {
@@ -792,7 +1355,7 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) (*pi
 	if assetName == "" {
 		assetName = "scheduled_query"
 	}
-	
+
 	// Sanitize the asset name for filename use
 	assetName = strings.ToLower(assetName)
 	assetName = strings.ReplaceAll(assetName, " ", "_")
@@ -805,7 +1368,7 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) (*pi
 		}
 	}
 	assetName = sanitized.String()
-	
+
 	if assetName == "" {
 		assetName = "scheduled_query"
 	}
@@ -815,10 +1378,11 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) (*pi
 
 	// Create the asset
 	asset := &pipeline.Asset{
+		Name: assetName,
 		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
-			Name: fileName,
-			Path: filePath,
+			Name:    fileName,
+			Path:    filePath,
 			Content: query.Query, // Add the SQL query content
 		},
 		Description: fmt.Sprintf("Imported from scheduled query: %s", query.DisplayName),
@@ -834,9 +1398,3 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) (*pi
 	return asset, nil
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
