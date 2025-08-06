@@ -28,8 +28,8 @@ func TestBuildCreateReplaceQuery(t *testing.T) {
 			},
 			query: "SELECT * FROM source_table",
 			expected: `
-DROP TABLE IF EXISTS test_table;
-CREATE TABLE test_table WITH (format = 'PARQUET') AS
+DROP TABLE IF EXISTS "test_table";
+CREATE TABLE "test_table" WITH (format = 'PARQUET') AS
 SELECT * FROM source_table;`,
 		},
 		{
@@ -44,8 +44,8 @@ SELECT * FROM source_table;`,
 			},
 			query: "SELECT * FROM source_table",
 			expected: `
-DROP TABLE IF EXISTS partitioned_table;
-CREATE TABLE partitioned_table WITH (format = 'PARQUET', partitioning = ARRAY['date_column']) AS
+DROP TABLE IF EXISTS "partitioned_table";
+CREATE TABLE "partitioned_table" WITH (format = 'PARQUET', partitioning = ARRAY['date_column']) AS
 SELECT * FROM source_table;`,
 		},
 		{
@@ -59,8 +59,8 @@ SELECT * FROM source_table;`,
 			},
 			query: "SELECT * FROM source_table;",
 			expected: `
-DROP TABLE IF EXISTS test_table;
-CREATE TABLE test_table WITH (format = 'PARQUET') AS
+DROP TABLE IF EXISTS "test_table";
+CREATE TABLE "test_table" WITH (format = 'PARQUET') AS
 SELECT * FROM source_table;`,
 		},
 		{
@@ -80,8 +80,8 @@ SELECT * FROM source_table;`,
 FROM users 
 WHERE active = true`,
 			expected: `
-DROP TABLE IF EXISTS complex_table;
-CREATE TABLE complex_table WITH (format = 'PARQUET', partitioning = ARRAY['year']) AS
+DROP TABLE IF EXISTS "complex_table";
+CREATE TABLE "complex_table" WITH (format = 'PARQUET', partitioning = ARRAY['year']) AS
 SELECT 
     id,
     name,
@@ -100,8 +100,8 @@ WHERE active = true;`,
 			},
 			query: "SELECT 1 as col",
 			expected: `
-DROP TABLE IF EXISTS schema.test_table;
-CREATE TABLE schema.test_table WITH (format = 'PARQUET') AS
+DROP TABLE IF EXISTS "schema"."test_table";
+CREATE TABLE "schema"."test_table" WITH (format = 'PARQUET') AS
 SELECT 1 as col;`,
 		},
 	}
@@ -179,7 +179,7 @@ func TestBuildAppendQuery(t *testing.T) {
 				},
 			},
 			query:    "SELECT * FROM source_table",
-			expected: "INSERT INTO target_table SELECT * FROM source_table",
+			expected: "INSERT INTO \"target_table\" SELECT * FROM source_table",
 		},
 		{
 			name: "append with SELECT statement",
@@ -191,7 +191,7 @@ func TestBuildAppendQuery(t *testing.T) {
 				},
 			},
 			query:    "SELECT id, message, timestamp FROM temp_logs WHERE processed = false",
-			expected: "INSERT INTO logs SELECT id, message, timestamp FROM temp_logs WHERE processed = false",
+			expected: "INSERT INTO \"logs\" SELECT id, message, timestamp FROM temp_logs WHERE processed = false",
 		},
 		{
 			name: "append with VALUES clause",
@@ -203,7 +203,7 @@ func TestBuildAppendQuery(t *testing.T) {
 				},
 			},
 			query:    "VALUES (1, 'test'), (2, 'data')",
-			expected: "INSERT INTO test_data VALUES (1, 'test'), (2, 'data')",
+			expected: "INSERT INTO \"test_data\" VALUES (1, 'test'), (2, 'data')",
 		},
 		{
 			name: "append with schema-qualified table name",
@@ -215,7 +215,7 @@ func TestBuildAppendQuery(t *testing.T) {
 				},
 			},
 			query:    "SELECT * FROM source",
-			expected: "INSERT INTO schema.target_table SELECT * FROM source",
+			expected: "INSERT INTO \"schema\".\"target_table\" SELECT * FROM source",
 		},
 		{
 			name: "append with complex query",
@@ -227,17 +227,19 @@ func TestBuildAppendQuery(t *testing.T) {
 				},
 			},
 			query: `SELECT 
-    date_trunc('day', created_at) as day,
-    COUNT(*) as total_count
+    user_id,
+    COUNT(*) as event_count,
+    SUM(amount) as total_amount
 FROM events 
-WHERE event_type = 'click'
-GROUP BY date_trunc('day', created_at)`,
-			expected: `INSERT INTO aggregated_data SELECT 
-    date_trunc('day', created_at) as day,
-    COUNT(*) as total_count
+WHERE created_at >= '2023-01-01'
+GROUP BY user_id`,
+			expected: `INSERT INTO "aggregated_data" SELECT 
+    user_id,
+    COUNT(*) as event_count,
+    SUM(amount) as total_amount
 FROM events 
-WHERE event_type = 'click'
-GROUP BY date_trunc('day', created_at)`,
+WHERE created_at >= '2023-01-01'
+GROUP BY user_id`,
 		},
 		{
 			name: "append preserves query with trailing semicolon",
@@ -249,7 +251,7 @@ GROUP BY date_trunc('day', created_at)`,
 				},
 			},
 			query:    "SELECT * FROM source;",
-			expected: "INSERT INTO target_table SELECT * FROM source;",
+			expected: "INSERT INTO \"target_table\" SELECT * FROM source;",
 		},
 	}
 
@@ -279,7 +281,7 @@ func TestBuildAppendQuery_EdgeCases(t *testing.T) {
 		result, err := buildAppendQuery(asset, "")
 
 		require.NoError(t, err)
-		assert.Equal(t, "INSERT INTO test_table ", result)
+		assert.Equal(t, "INSERT INTO \"test_table\" ", result)
 	})
 
 	t.Run("query with only whitespace", func(t *testing.T) {
@@ -295,7 +297,7 @@ func TestBuildAppendQuery_EdgeCases(t *testing.T) {
 		result, err := buildAppendQuery(asset, "   \n\t  ")
 
 		require.NoError(t, err)
-		assert.Equal(t, "INSERT INTO test_table    \n\t  ", result)
+		assert.Equal(t, "INSERT INTO \"test_table\"    \n\t  ", result)
 	})
 }
 
@@ -319,13 +321,13 @@ func TestBuildIncrementalQuery(t *testing.T) {
 			},
 			query: "SELECT id, name, email FROM source_users WHERE updated_at > '2023-01-01'",
 			expected: `
-DELETE FROM users 
+DELETE FROM "users" 
 WHERE id IN (
     SELECT DISTINCT id 
     FROM (SELECT id, name, email FROM source_users WHERE updated_at > '2023-01-01') AS new_data
 );
 
-INSERT INTO users
+INSERT INTO "users"
 SELECT * FROM (SELECT id, name, email FROM source_users WHERE updated_at > '2023-01-01') AS new_data;`,
 		},
 		{
@@ -340,13 +342,13 @@ SELECT * FROM (SELECT id, name, email FROM source_users WHERE updated_at > '2023
 			},
 			query: "SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01'",
 			expected: `
-DELETE FROM daily_metrics 
+DELETE FROM "daily_metrics" 
 WHERE date IN (
     SELECT DISTINCT date 
     FROM (SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01') AS new_data
 );
 
-INSERT INTO daily_metrics
+INSERT INTO "daily_metrics"
 SELECT * FROM (SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01') AS new_data;`,
 		},
 		{
@@ -361,13 +363,13 @@ SELECT * FROM (SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01
 			},
 			query: "SELECT session_id, user_id, duration FROM raw_sessions",
 			expected: `
-DELETE FROM analytics.user_sessions 
+DELETE FROM "analytics"."user_sessions" 
 WHERE session_id IN (
     SELECT DISTINCT session_id 
     FROM (SELECT session_id, user_id, duration FROM raw_sessions) AS new_data
 );
 
-INSERT INTO analytics.user_sessions
+INSERT INTO "analytics"."user_sessions"
 SELECT * FROM (SELECT session_id, user_id, duration FROM raw_sessions) AS new_data;`,
 		},
 		{
@@ -382,13 +384,13 @@ SELECT * FROM (SELECT session_id, user_id, duration FROM raw_sessions) AS new_da
 			},
 			query: "SELECT product_id, name, price FROM source_products;",
 			expected: `
-DELETE FROM products 
+DELETE FROM "products" 
 WHERE product_id IN (
     SELECT DISTINCT product_id 
     FROM (SELECT product_id, name, price FROM source_products) AS new_data
 );
 
-INSERT INTO products
+INSERT INTO "products"
 SELECT * FROM (SELECT product_id, name, price FROM source_products) AS new_data;`,
 		},
 		{
@@ -411,7 +413,7 @@ LEFT JOIN orders o ON u.user_id = o.user_id
 WHERE u.updated_at > '2023-01-01'
 GROUP BY u.user_id, u.name`,
 			expected: `
-DELETE FROM user_stats 
+DELETE FROM "user_stats" 
 WHERE user_id IN (
     SELECT DISTINCT user_id 
     FROM (SELECT 
@@ -425,7 +427,7 @@ WHERE u.updated_at > '2023-01-01'
 GROUP BY u.user_id, u.name) AS new_data
 );
 
-INSERT INTO user_stats
+INSERT INTO "user_stats"
 SELECT * FROM (SELECT 
     u.user_id,
     u.name,
@@ -514,10 +516,10 @@ func TestBuildTimeIntervalQuery(t *testing.T) {
 			},
 			query: "SELECT id, user_id, event_type, created_at FROM raw_events WHERE created_at BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			expected: `
-DELETE FROM events 
+DELETE FROM "events" 
 WHERE created_at BETWEEN TIMESTAMP '{{start_timestamp}}' AND TIMESTAMP '{{end_timestamp}}';
 
-INSERT INTO events
+INSERT INTO "events"
 SELECT id, user_id, event_type, created_at FROM raw_events WHERE created_at BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';`,
 		},
 		{
@@ -533,10 +535,10 @@ SELECT id, user_id, event_type, created_at FROM raw_events WHERE created_at BETW
 			},
 			query: "SELECT product_id, sale_date, amount FROM sales WHERE sale_date BETWEEN '{{start_date}}' AND '{{end_date}}'",
 			expected: `
-DELETE FROM daily_sales 
+DELETE FROM "daily_sales" 
 WHERE sale_date BETWEEN DATE '{{start_date}}' AND DATE '{{end_date}}';
 
-INSERT INTO daily_sales
+INSERT INTO "daily_sales"
 SELECT product_id, sale_date, amount FROM sales WHERE sale_date BETWEEN '{{start_date}}' AND '{{end_date}}';`,
 		},
 		{
@@ -552,10 +554,10 @@ SELECT product_id, sale_date, amount FROM sales WHERE sale_date BETWEEN '{{start
 			},
 			query: "SELECT user_id, event_type, event_timestamp FROM events",
 			expected: `
-DELETE FROM analytics.user_events 
+DELETE FROM "analytics"."user_events" 
 WHERE event_timestamp BETWEEN TIMESTAMP '{{start_timestamp}}' AND TIMESTAMP '{{end_timestamp}}';
 
-INSERT INTO analytics.user_events
+INSERT INTO "analytics"."user_events"
 SELECT user_id, event_type, event_timestamp FROM events;`,
 		},
 		{
@@ -571,10 +573,10 @@ SELECT user_id, event_type, event_timestamp FROM events;`,
 			},
 			query: "SELECT level, message, log_date FROM system_logs;",
 			expected: `
-DELETE FROM logs 
+DELETE FROM "logs" 
 WHERE log_date BETWEEN DATE '{{start_date}}' AND DATE '{{end_date}}';
 
-INSERT INTO logs
+INSERT INTO "logs"
 SELECT level, message, log_date FROM system_logs;`,
 		},
 		{
@@ -596,10 +598,10 @@ FROM events
 WHERE created_at BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}'
 GROUP BY DATE_TRUNC('hour', created_at)`,
 			expected: `
-DELETE FROM hourly_metrics 
+DELETE FROM "hourly_metrics" 
 WHERE hour_timestamp BETWEEN TIMESTAMP '{{start_timestamp}}' AND TIMESTAMP '{{end_timestamp}}';
 
-INSERT INTO hourly_metrics
+INSERT INTO "hourly_metrics"
 SELECT 
     DATE_TRUNC('hour', created_at) as hour_timestamp,
     COUNT(*) as event_count,
@@ -725,7 +727,7 @@ func TestViewMaterializer(t *testing.T) {
 				},
 			},
 			query:    "SELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id",
-			expected: "CREATE OR REPLACE VIEW user_stats AS\nSELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id",
+			expected: "CREATE OR REPLACE VIEW \"user_stats\" AS\nSELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id",
 		},
 		{
 			name: "view with schema qualifier",
@@ -737,7 +739,7 @@ func TestViewMaterializer(t *testing.T) {
 				},
 			},
 			query:    "SELECT DATE_TRUNC('month', sale_date) as month, SUM(amount) as total FROM sales GROUP BY DATE_TRUNC('month', sale_date)",
-			expected: "CREATE OR REPLACE VIEW analytics.monthly_sales AS\nSELECT DATE_TRUNC('month', sale_date) as month, SUM(amount) as total FROM sales GROUP BY DATE_TRUNC('month', sale_date)",
+			expected: "CREATE OR REPLACE VIEW \"analytics\".\"monthly_sales\" AS\nSELECT DATE_TRUNC('month', sale_date) as month, SUM(amount) as total FROM sales GROUP BY DATE_TRUNC('month', sale_date)",
 		},
 		{
 			name: "complex view with joins",
@@ -756,7 +758,7 @@ func TestViewMaterializer(t *testing.T) {
 FROM customers c
 LEFT JOIN orders o ON c.customer_id = o.customer_id
 GROUP BY c.customer_id, c.name`,
-			expected: `CREATE OR REPLACE VIEW customer_summary AS
+			expected: `CREATE OR REPLACE VIEW "customer_summary" AS
 SELECT 
     c.customer_id,
     c.name,
@@ -776,7 +778,7 @@ GROUP BY c.customer_id, c.name`,
 				},
 			},
 			query:    "SELECT user_id, last_login FROM users WHERE last_login > CURRENT_DATE - INTERVAL '30' DAY;",
-			expected: "CREATE OR REPLACE VIEW active_users AS\nSELECT user_id, last_login FROM users WHERE last_login > CURRENT_DATE - INTERVAL '30' DAY",
+			expected: "CREATE OR REPLACE VIEW \"active_users\" AS\nSELECT user_id, last_login FROM users WHERE last_login > CURRENT_DATE - INTERVAL '30' DAY",
 		},
 		{
 			name: "view with window functions",
@@ -788,7 +790,7 @@ GROUP BY c.customer_id, c.name`,
 				},
 			},
 			query:    "SELECT product_id, name, price, ROW_NUMBER() OVER (ORDER BY price DESC) as price_rank FROM products",
-			expected: "CREATE OR REPLACE VIEW ranked_products AS\nSELECT product_id, name, price, ROW_NUMBER() OVER (ORDER BY price DESC) as price_rank FROM products",
+			expected: "CREATE OR REPLACE VIEW \"ranked_products\" AS\nSELECT product_id, name, price, ROW_NUMBER() OVER (ORDER BY price DESC) as price_rank FROM products",
 		},
 		{
 			name: "view with CTEs",
@@ -809,10 +811,10 @@ GROUP BY c.customer_id, c.name`,
 SELECT 
     month,
     monthly_total,
-    LAG(monthly_total) OVER (ORDER BY month) as previous_month,
-    monthly_total - LAG(monthly_total) OVER (ORDER BY month) as growth
+    LAG(monthly_total) OVER (ORDER BY month) as prev_month_total,
+    (monthly_total - LAG(monthly_total) OVER (ORDER BY month)) / LAG(monthly_total) OVER (ORDER BY month) * 100 as growth_percent
 FROM monthly_sales`,
-			expected: `CREATE OR REPLACE VIEW sales_with_growth AS
+			expected: `CREATE OR REPLACE VIEW "sales_with_growth" AS
 WITH monthly_sales AS (
     SELECT 
         DATE_TRUNC('month', sale_date) as month,
@@ -823,8 +825,8 @@ WITH monthly_sales AS (
 SELECT 
     month,
     monthly_total,
-    LAG(monthly_total) OVER (ORDER BY month) as previous_month,
-    monthly_total - LAG(monthly_total) OVER (ORDER BY month) as growth
+    LAG(monthly_total) OVER (ORDER BY month) as prev_month_total,
+    (monthly_total - LAG(monthly_total) OVER (ORDER BY month)) / LAG(monthly_total) OVER (ORDER BY month) * 100 as growth_percent
 FROM monthly_sales`,
 		},
 	}
@@ -855,7 +857,7 @@ func TestViewMaterializer_EdgeCases(t *testing.T) {
 		result, err := viewMaterializer(asset, "")
 
 		require.NoError(t, err)
-		assert.Equal(t, "CREATE OR REPLACE VIEW empty_view AS\n", result)
+		assert.Equal(t, "CREATE OR REPLACE VIEW \"empty_view\" AS\n", result)
 	})
 
 	t.Run("multiple trailing semicolons", func(t *testing.T) {
@@ -872,7 +874,7 @@ func TestViewMaterializer_EdgeCases(t *testing.T) {
 
 		require.NoError(t, err)
 		// Should only trim one semicolon from the end
-		assert.Equal(t, "CREATE OR REPLACE VIEW test_view AS\nSELECT 1 as col;;", result)
+		assert.Equal(t, "CREATE OR REPLACE VIEW \"test_view\" AS\nSELECT 1 as col;;", result)
 	})
 }
 
@@ -920,7 +922,7 @@ func TestBuildDDLQuery(t *testing.T) {
 				},
 			},
 			query: "", // DDL doesn't use the query parameter
-			expected: `CREATE TABLE IF NOT EXISTS users (
+			expected: `CREATE TABLE IF NOT EXISTS "users" (
     id BIGINT,
     name VARCHAR,
     email VARCHAR
@@ -941,7 +943,7 @@ func TestBuildDDLQuery(t *testing.T) {
 				},
 			},
 			query: "",
-			expected: `CREATE TABLE IF NOT EXISTS products (
+			expected: `CREATE TABLE IF NOT EXISTS "products" (
     product_id BIGINT COMMENT 'Unique product identifier',
     name VARCHAR COMMENT 'Product name',
     price DECIMAL(10,2) COMMENT 'Product price in USD'
@@ -964,7 +966,7 @@ func TestBuildDDLQuery(t *testing.T) {
 				},
 			},
 			query: "",
-			expected: `CREATE TABLE IF NOT EXISTS events (
+			expected: `CREATE TABLE IF NOT EXISTS "events" (
     event_id BIGINT,
     user_id BIGINT,
     event_type VARCHAR,
@@ -986,7 +988,7 @@ func TestBuildDDLQuery(t *testing.T) {
 				},
 			},
 			query: "",
-			expected: `CREATE TABLE IF NOT EXISTS analytics.user_metrics (
+			expected: `CREATE TABLE IF NOT EXISTS "analytics"."user_metrics" (
     user_id BIGINT,
     total_orders INTEGER,
     total_spent DECIMAL(15,2)
@@ -1001,14 +1003,14 @@ func TestBuildDDLQuery(t *testing.T) {
 					Strategy: pipeline.MaterializationStrategyDDL,
 				},
 				Columns: []pipeline.Column{
-					{Name: "id", Type: "BIGINT", Description: "User's unique ID"},
-					{Name: "notes", Type: "TEXT", Description: "User notes with 'quotes' and special chars"},
+					{Name: "id", Type: "BIGINT", Description: "ID with 'quotes' and \"double quotes\""},
+					{Name: "name", Type: "VARCHAR", Description: "Name with special chars: @#$%"},
 				},
 			},
 			query: "",
-			expected: `CREATE TABLE IF NOT EXISTS test_table (
-    id BIGINT COMMENT 'User''s unique ID',
-    notes TEXT COMMENT 'User notes with ''quotes'' and special chars'
+			expected: `CREATE TABLE IF NOT EXISTS "test_table" (
+    id BIGINT COMMENT 'ID with ''quotes'' and "double quotes"',
+    name VARCHAR COMMENT 'Name with special chars: @#$%'
 ) WITH (format = 'PARQUET')`,
 		},
 		{
@@ -1030,7 +1032,7 @@ func TestBuildDDLQuery(t *testing.T) {
 				},
 			},
 			query: "",
-			expected: `CREATE TABLE IF NOT EXISTS complex_table (
+			expected: `CREATE TABLE IF NOT EXISTS "complex_table" (
     id BIGINT,
     data JSON COMMENT 'JSON data column',
     tags ARRAY(VARCHAR),

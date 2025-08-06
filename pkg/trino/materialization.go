@@ -127,12 +127,29 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	query = strings.TrimSuffix(query, ";")
+	key := asset.Materialization.IncrementalKey
 
-	// Return only the INSERT statement, since Trino doesn't support multiple statements
-	// The DELETE will be handled separately if needed
+	timePrefix := "TIMESTAMP"
+	startVar := "{{start_timestamp}}"
+	endVar := "{{end_timestamp}}"
+	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
+		timePrefix = "DATE"
+		startVar = "{{start_date}}"
+		endVar = "{{end_date}}"
+	}
+
 	return fmt.Sprintf(`
+DELETE FROM %s 
+WHERE %s BETWEEN %s '%s' AND %s '%s';
+
 INSERT INTO %s
-%s`,
+%s;`,
+		quoteIdentifier(asset.Name),
+		key,
+		timePrefix,
+		startVar,
+		timePrefix,
+		endVar,
 		quoteIdentifier(asset.Name),
 		query,
 	), nil
