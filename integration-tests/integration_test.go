@@ -1,9 +1,11 @@
 package main_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
@@ -408,22 +410,10 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "Time materialization",
+			name: "Time_materialization",
 			workflow: e2e.Workflow{
 				Name: "Time materialization",
 				Steps: []e2e.Task{
-					{
-						Name:    "restore asset to initial state",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "resources/products.sql"), filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
 					{
 						Name:    "create the table",
 						Command: binary,
@@ -434,6 +424,49 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "query the initial table",
+						Command: binary,
+						Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS;", "--output", "json"},
+						Env:     []string{},
+	
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/expectations/initial_expected.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+					{
+						Name:    "update the table with time materialization",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-time-materialization", "--start-date", "2025-03-01", "--end-date", "2025-03-31", filepath.Join(currentFolder, "test-pipelines/time-materialization-update-pipeline/assets/products_updated.sql")},  
+						Env:     []string{},
+	
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "query the updated table with time materialization",
+						Command: binary,
+						Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS;", "--output", "json"},
+						Env:     []string{},
+	
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/expectations/final_expected.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
 						},
 					},
 				},
@@ -449,6 +482,14 @@ func TestWorkflowTasks(t *testing.T) {
 			t.Logf("Workflow '%s' completed successfully", tt.workflow.Name)
 		})
 	}
+}
+
+func readQueryFromFile(filePath string) string {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to read query file %s: %v", filePath, err))
+	}
+	return strings.TrimSpace(string(content))
 }
 
 func TestIngestrTasks(t *testing.T) {

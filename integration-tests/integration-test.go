@@ -305,19 +305,6 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 			Name: "Time materialization",
 			Steps: []e2e.Task{
 				{
-					Name:    "restore asset to initial state",
-					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "resources/products.sql"), filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
-					Env:     []string{},
-
-					Expected: e2e.Output{
-						ExitCode: 0,
-					},
-					Asserts: []func(*e2e.Task) error{
-						e2e.AssertByExitCode,
-					},
-				},
-				{
 					Name:    "create the table",
 					Command: binary,
 					Args:    []string{"run", "--full-refresh", "--env", "env-time-materialization", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline")},
@@ -384,6 +371,19 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
 						e2e.AssertByOutputJSON,
+					},
+				},
+				{
+					Name:    "restore asset to initial state",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "resources/products.sql"), filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
 					},
 				},
 			},
