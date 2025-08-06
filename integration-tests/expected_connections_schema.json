@@ -2233,7 +2233,7 @@
       "type": "object",
       "required": [
         "name",
-        "api_token"
+        "api_key"
       ]
     },
     "ZoomConnection": {

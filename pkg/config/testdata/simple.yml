@@ -256,6 +256,7 @@ environments:
           username: "user-123"
           password: "secret-123"
           project_id: "12345"
+          server: "eu"
       wise:
         - name: "wise-1"
           api_key: "token-123"
