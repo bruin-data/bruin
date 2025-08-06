@@ -387,10 +387,22 @@ func TestPostgresWorkflows(t *testing.T) {
 					{
 						Name:    "metadata-push: drop table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS test_metadata.sample_data12312;"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS test_metadata.sample_data;"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 1, // this is expected because DDL statements do not return result sets
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "metadata-push: confirm the table is dropped",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT * FROM test_metadata.sample_data;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
