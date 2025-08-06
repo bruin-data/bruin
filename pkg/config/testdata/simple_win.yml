@@ -260,7 +260,7 @@ environments:
           server: "eu"
       wise:
         - name: "wise-1"
-          api_token: "token-123"
+          api_key: "token-123"
       pinterest:
         - name: "pinterest-1"
           access_token: "token"

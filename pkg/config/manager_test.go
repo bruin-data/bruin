@@ -438,8 +438,8 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Wise: []WiseConnection{
 				{
-					Name:     "wise-1",
-					APIToken: "token-123",
+					Name:   "wise-1",
+					APIKey: "token-123",
 				},
 			},
 			Trustpilot: []TrustpilotConnection{

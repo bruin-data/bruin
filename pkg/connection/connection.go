@@ -1562,7 +1562,7 @@ func (m *Manager) AddWiseConnectionFromConfig(connection *config.WiseConnection)
 	m.mutex.Unlock()
 
 	client, err := wise.NewClient(wise.Config{
-		APIToken: connection.APIToken,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
