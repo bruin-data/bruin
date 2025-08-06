@@ -18,11 +18,22 @@ In order to set up a Trino connection, you need to add a configuration item to `
 
 ## Trino Assets
 
-> [!WARNING]
-> Materializations are not yet implemented for Trino in Bruin. Users should write their own queries to create tables, views, or other materialized objects.
-
 ### `trino.sql`
-Runs a Trino script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
+Runs a materialized Trino asset or a Trino script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page. For information about materialization strategies, see the [Materialization](../assets/materialization.md) page.
+
+#### Example: Create a table using table materialization
+```bruin-sql
+/* @bruin
+name: hive.events.install
+type: trino.sql
+materialization:
+    type: table
+@bruin */
+
+SELECT user_id, event_name, ts
+FROM hive.analytics.events
+WHERE event_name = 'install'
+```
 
 #### Example: Run a Trino script
 ```bruin-sql
@@ -67,4 +78,4 @@ name: analytics_123456789.events
 type: trino.sensor.query
 parameters:
     query: select exists(select 1 from upstream_table where inserted_at > '{{ end_timestamp }}')
-``` 
+```
