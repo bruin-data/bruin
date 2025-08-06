@@ -1203,6 +1203,39 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 	return issues, nil
 }
 
+func (g *GlossaryChecker) EnsureParentDomainsExistInGlossary(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	var err error
+
+	foundGlossary := g.foundGlossary
+	if g.foundGlossary == nil {
+		foundGlossary, err = g.gr.GetGlossary(p.DefinitionFile.Path)
+		if err != nil {
+			g.foundGlossary = &glossary.Glossary{Entities: make([]*glossary.Entity, 0)}
+			return issues, err
+		}
+
+		if foundGlossary != nil && g.cacheFoundGlossary {
+			g.foundGlossary = foundGlossary
+		}
+	}
+
+	for _, domain := range foundGlossary.Domains {
+		if domain.ParentDomain == "" {
+			continue
+		}
+
+		parentDomain := foundGlossary.GetDomain(domain.ParentDomain)
+		if parentDomain == nil {
+			issues = append(issues, &Issue{
+				Description: fmt.Sprintf("Parent domain '%s' for domain '%s' does not exist in the glossary", domain.ParentDomain, domain.Name),
+			})
+		}
+	}
+
+	return issues, nil
+}
+
 type sqlParser interface {
 	UsedTables(sql, dialect string) ([]string, error)
 	GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error)
