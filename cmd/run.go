@@ -1183,7 +1183,7 @@ func SetupExecutors(
 			Fs:       fs,
 			Renderer: renderer,
 		}
-		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor)
+		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor, trino.NewMaterializer(fullRefresh))
 		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
