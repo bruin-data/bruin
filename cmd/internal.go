@@ -1089,7 +1089,7 @@ func ListTemplates() *cli.Command {
 				Usage:       "the output type, possible values are: plain, json",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			output := c.String("output")
 
 			folders, err := templates.Templates.ReadDir(".")
