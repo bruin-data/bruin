@@ -238,6 +238,100 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	return result, nil
 }
 
+type QueryMetadata struct {
+	BIEngineStatistics            *bigquery.BIEngineStatistics
+	BillingTier                   int64
+	CacheHit                      bool
+	StatementType                 string
+	TotalBytesBilled              int64
+	TotalBytesProcessed           int64
+	TotalBytesProcessedAccuracy   string
+	QueryPlan                     []*bigquery.ExplainQueryStage
+	NumDMLAffectedRows            int64
+	DMLStats                      *bigquery.DMLStatistics
+	Timeline                      []*bigquery.QueryTimelineSample
+	ReferencedTables              []*bigquery.Table
+	Schema                        bigquery.Schema
+	SlotMillis                    int64
+	UndeclaredQueryParameterNames []string
+	DDLTargetTable                *bigquery.Table
+	DDLOperationPerformed         string
+	DDLTargetRoutine              *bigquery.Routine
+	ExportDataStatistics          *bigquery.ExportDataStatistics
+}
+
+func (d *Client) queryDryRun(ctx context.Context, queryObj *query.Query) (*QueryMetadata, error) {
+	q := d.client.Query(queryObj.String())
+	q.DryRun = true
+	// Location must match that of the dataset(s) referenced in the query.
+	q.Location = "US"
+
+	job, err := q.Run(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Dry run is not asynchronous, so get the latest status and statistics.
+	status := job.LastStatus()
+	if err := status.Err(); err != nil {
+		return nil, err
+	}
+
+
+	result := &QueryMetadata{
+		BIEngineStatistics:            status.Statistics.BIEngineStatistics,
+		BillingTier:                   status.Statistics.BillingTier,
+		CacheHit:                      status.Statistics.CacheHit,
+		StatementType:                 status.Statistics.StatementType,
+		TotalBytesBilled:              status.Statistics.TotalBytesBilled,
+		TotalBytesProcessed:           status.Statistics.TotalBytesProcessed, // Use statistics instead of status.Statistics
+		TotalBytesProcessedAccuracy:   status.Statistics.TotalBytesProcessedAccuracy,
+		QueryPlan:                     status.Statistics.QueryPlan,
+		NumDMLAffectedRows:            status.Statistics.NumDMLAffectedRows,
+		DMLStats:                      status.Statistics.DMLStats,
+		Timeline:                      status.Statistics.Timeline,
+		ReferencedTables:              status.Statistics.ReferencedTables,
+		Schema:                        status.Statistics.Schema,
+		SlotMillis:                    status.Statistics.SlotMillis,
+		UndeclaredQueryParameterNames: status.Statistics.UndeclaredQueryParameterNames,
+		DDLTargetTable:                status.Statistics.DDLTargetTable, // Use statistics instead of status.Statistics
+		DDLOperationPerformed:         status.Statistics.DDLOperationPerformed,
+		DDLTargetRoutine:              status.Statistics.DDLTargetRoutine,
+		ExportDataStatistics:          status.Statistics.ExportDataStatistics,
+	}
+
+	for {
+		var values []bigquery.Value
+		err := rows.Next(&values)
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to read row: %w", err)
+		}
+
+		row := make([]interface{}, len(values))
+		for i, v := range values {
+			row[i] = v
+		}
+		result.Rows = append(result.Rows, row)
+	}
+
+	if rows.Schema != nil {
+		for _, field := range rows.Schema {
+			result.Columns = append(result.Columns, field.Name)
+			// Extract the type information from the schema
+			columnTypes = append(columnTypes, string(field.Type))
+		}
+	} else {
+		return nil, errors.New("schema information is not available")
+	}
+
+	// Store the column types in the result
+	result.ColumnTypes = columnTypes
+
+	return result, nil
+}
+
 type NoMetadataUpdatedError struct{}
 
 func (m NoMetadataUpdatedError) Error() string {
