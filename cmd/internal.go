@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/templates"
 	color2 "github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	errors2 "github.com/pkg/errors"
@@ -37,6 +38,7 @@ func Internal() *cli.Command {
 			FetchDatabases(),
 			FetchTables(),
 			FetchColumns(),
+			ListTemplates(),
 		},
 	}
 }
@@ -1005,6 +1007,85 @@ func printColumns(databaseName, tableName string, columns []*ansisql.DBColumn) {
 		}
 
 		t.AppendRow(table.Row{col.Name, col.Type, nullable, primaryKey, unique})
+	}
+
+	t.SetStyle(table.StyleLight)
+	t.Render()
+}
+
+func ListTemplates() *cli.Command {
+	return &cli.Command{
+		Name:   "list-templates",
+		Usage:  "List all available Bruin templates",
+		Before: telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Value:       "plain",
+				Usage:       "the output type, possible values are: plain, json",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			output := c.String("output")
+
+			folders, err := templates.Templates.ReadDir(".")
+			if err != nil {
+				return handleError(output, errors2.Wrap(err, "failed to read templates directory"))
+			}
+
+			templateList := make([]string, 0)
+			for _, entry := range folders {
+				if entry.IsDir() {
+					templateList = append(templateList, entry.Name())
+				}
+			}
+
+			// Output result based on format specified
+			switch output {
+			case "plain":
+				printTemplates(templateList)
+			case "json":
+				type jsonResponse struct {
+					Templates []string `json:"templates"`
+					Count     int      `json:"count"`
+				}
+
+				finalOutput := jsonResponse{
+					Templates: templateList,
+					Count:     len(templateList),
+				}
+
+				jsonData, err := json.Marshal(finalOutput)
+				if err != nil {
+					return handleError(output, errors2.Wrap(err, "failed to marshal result to JSON"))
+				}
+				fmt.Println(string(jsonData))
+			default:
+				return handleError(output, fmt.Errorf("invalid output type: %s", output))
+			}
+
+			return nil
+		},
+	}
+}
+
+func printTemplates(templates []string) {
+	if len(templates) == 0 {
+		fmt.Println("No templates found")
+		return
+	}
+
+	fmt.Printf("Found %d template(s):\n", len(templates))
+	fmt.Println(strings.Repeat("=", 30))
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Template"})
+
+	for _, template := range templates {
+		t.AppendRow(table.Row{template})
 	}
 
 	t.SetStyle(table.StyleLight)
