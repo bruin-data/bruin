@@ -72,6 +72,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
+	"github.com/bruin-data/bruin/pkg/wise"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
 	"github.com/pkg/errors"
@@ -126,6 +127,7 @@ type Manager struct {
 	Pinterest            map[string]*pinterest.Client
 	Trustpilot           map[string]*trustpilot.Client
 	QuickBooks           map[string]*quickbooks.Client
+	Wise                 map[string]*wise.Client
 	Zoom                 map[string]*zoom.Client
 	Frankfurter          map[string]*frankfurter.Client
 	EMRSeverless         map[string]*emr_serverless.Client
@@ -1552,6 +1554,27 @@ func (m *Manager) AddInfluxDBConnectionFromConfig(connection *config.InfluxDBCon
 	return nil
 }
 
+func (m *Manager) AddWiseConnectionFromConfig(connection *config.WiseConnection) error {
+	m.mutex.Lock()
+	if m.Wise == nil {
+		m.Wise = make(map[string]*wise.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := wise.NewClient(wise.Config{
+		APIToken: connection.APIToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Wise[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddZoomConnectionFromConfig(connection *config.ZoomConnection) error {
 	m.mutex.Lock()
 	if m.Zoom == nil {
@@ -2029,6 +2052,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Wise, connectionManager.AddWiseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)

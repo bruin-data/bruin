@@ -436,6 +436,12 @@ func TestLoadFromFile(t *testing.T) {
 					Server:    "eu",
 				},
 			},
+			Wise: []WiseConnection{
+				{
+					Name:     "wise-1",
+					APIToken: "token-123",
+				},
+			},
 			Trustpilot: []TrustpilotConnection{
 				{
 					Name:           "trustpilot-1",
