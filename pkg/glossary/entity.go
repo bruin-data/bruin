@@ -17,11 +17,12 @@ type Contact struct {
 }
 
 type Domain struct {
-	Name        string     `json:"name" yaml:"name,omitempty"`
-	Description string     `json:"description" yaml:"description,omitempty"`
-	Owners      []string   `json:"owners" yaml:"owners,omitempty"`
-	Tags        []string   `json:"tags" yaml:"tags,omitempty"`
-	Contact     []*Contact `json:"contact" yaml:"contact,omitempty"`
+	Name         string     `json:"name" yaml:"name,omitempty"`
+	Description  string     `json:"description" yaml:"description,omitempty"`
+	ParentDomain string     `json:"parent_domain" yaml:"parent_domain,omitempty"`
+	Owners       []string   `json:"owners" yaml:"owners,omitempty"`
+	Tags         []string   `json:"tags" yaml:"tags,omitempty"`
+	Contact      []*Contact `json:"contact" yaml:"contact,omitempty"`
 }
 
 type Attribute struct {

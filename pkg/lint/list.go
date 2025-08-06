@@ -149,6 +149,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "valid-parent-domains",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        gr.EnsureParentDomainsExistInGlossary,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
 			Identifier:       "duplicate-column-names",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
