@@ -56,7 +56,7 @@
         "tags": [],
         "primary_key": false,
         "update_on_merge": false,
-        "nullable": null,
+        "nullable": true,
         "owner": "",
         "domains": [],
         "meta": {},
