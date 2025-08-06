@@ -2094,6 +2094,178 @@ func TestGlossaryChecker_EnsureAssetEntitiesExistInGlossary(t *testing.T) {
 	}
 }
 
+func TestGlossaryChecker_EnsureParentDomainsExistInGlossary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		glossary *glossary.Glossary
+		want     []string
+		wantErr  assert.ErrorAssertionFunc
+	}{
+		{
+			name: "no domains in glossary",
+			glossary: &glossary.Glossary{
+				Domains:  []*glossary.Domain{},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "domains with no parent domains",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "domain1", ParentDomain: ""},
+					{Name: "domain2", ParentDomain: ""},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "domain with valid parent domain",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "parent-domain", ParentDomain: ""},
+					{Name: "child-domain", ParentDomain: "parent-domain"},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "domain with missing parent domain",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "domain1", ParentDomain: ""},
+					{Name: "domain2", ParentDomain: "nonexistent-parent"},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{"Parent domain 'nonexistent-parent' for domain 'domain2' does not exist in the glossary"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "multiple domains with missing parent domains",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "domain1", ParentDomain: ""},
+					{Name: "domain2", ParentDomain: "missing-parent1"},
+					{Name: "domain3", ParentDomain: "missing-parent2"},
+					{Name: "domain4", ParentDomain: "domain1"}, // valid
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want: []string{
+				"Parent domain 'missing-parent1' for domain 'domain2' does not exist in the glossary",
+				"Parent domain 'missing-parent2' for domain 'domain3' does not exist in the glossary",
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "complex domain hierarchy",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "root-domain", ParentDomain: ""},
+					{Name: "level1-domain1", ParentDomain: "root-domain"},
+					{Name: "level1-domain2", ParentDomain: "root-domain"},
+					{Name: "level2-domain1", ParentDomain: "level1-domain1"},
+					{Name: "level2-domain2", ParentDomain: "level1-domain1"},
+					{Name: "orphan-domain", ParentDomain: "missing-root"},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{"Parent domain 'missing-root' for domain 'orphan-domain' does not exist in the glossary"},
+			wantErr: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			checker := GlossaryChecker{
+				foundGlossary: tt.glossary,
+			}
+
+			got, err := checker.EnsureParentDomainsExistInGlossary(context.Background(), &pipeline.Pipeline{})
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			gotMessages := make([]string, len(got))
+			for i, issue := range got {
+				gotMessages[i] = issue.Description
+			}
+
+			assert.Equal(t, tt.want, gotMessages)
+		})
+	}
+}
+
+func TestGlossaryChecker_EnsureParentDomainsExistInGlossary_WithCache(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		initialGlossary *glossary.Glossary
+		cacheGlossary  bool
+		want           []string
+		wantErr        assert.ErrorAssertionFunc
+	}{
+		{
+			name: "uses cached glossary when available",
+			initialGlossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "parent", ParentDomain: ""},
+					{Name: "child", ParentDomain: "parent"},
+					{Name: "orphan", ParentDomain: "missing"},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			cacheGlossary: true,
+			want:         []string{"Parent domain 'missing' for domain 'orphan' does not exist in the glossary"},
+			wantErr:      assert.NoError,
+		},
+		{
+			name: "handles empty cached glossary",
+			initialGlossary: &glossary.Glossary{
+				Domains:  []*glossary.Domain{},
+				Entities: []*glossary.Entity{},
+			},
+			cacheGlossary: true,
+			want:         []string{},
+			wantErr:      assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			checker := GlossaryChecker{
+				foundGlossary:      tt.initialGlossary,
+				cacheFoundGlossary: tt.cacheGlossary,
+			}
+
+			got, err := checker.EnsureParentDomainsExistInGlossary(context.Background(), &pipeline.Pipeline{})
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			gotMessages := make([]string, len(got))
+			for i, issue := range got {
+				gotMessages[i] = issue.Description
+			}
+
+			assert.Equal(t, tt.want, gotMessages)
+		})
+	}
+}
+
 type mockSQLParser struct {
 	mock.Mock
 }
