@@ -175,7 +175,7 @@ func DBSummary() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printDatabaseSummary(summary)
 			case "json":
 				type jsonResponse struct {
@@ -702,7 +702,7 @@ func FetchDatabases() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printDatabases(databases)
 			case "json":
 				type jsonResponse struct {
@@ -818,7 +818,7 @@ func FetchTables() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printTableNames(databaseName, tables)
 			case "json":
 				type jsonResponse struct {
@@ -944,7 +944,7 @@ func FetchColumns() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printColumns(databaseName, tableName, columns)
 			case "json":
 				type jsonResponse struct {
@@ -1044,7 +1044,7 @@ func ListTemplates() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printTemplates(templateList)
 			case "json":
 				type jsonResponse struct {
