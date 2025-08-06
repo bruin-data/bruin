@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	path2 "path"
@@ -10,14 +11,14 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Environments(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:  "environments",
 		Usage: "manage environments defined in .bruin.yml",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			ListEnvironments(isDebug),
 			CreateEnvironment(isDebug),
 			UpdateEnvironment(isDebug),
@@ -38,11 +39,11 @@ func ListEnvironments(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := EnvironmentListCommand{}
 			logger := makeLogger(*isDebug)
 
@@ -139,11 +140,11 @@ func CreateEnvironment(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			envName := c.String("name")
 			schemaPrefix := c.String("schema-prefix")
 			output := strings.ToLower(c.String("output"))
@@ -212,11 +213,11 @@ func UpdateEnvironment(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := EnvironmentUpdateCommand{}
 			logger := makeLogger(*isDebug)
 
@@ -325,11 +326,11 @@ func DeleteEnvironment(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := EnvironmentDeleteCommand{}
 			logger := makeLogger(*isDebug)
 

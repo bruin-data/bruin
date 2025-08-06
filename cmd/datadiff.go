@@ -19,7 +19,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/sourcegraph/conc"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 // TableComparer defines an interface for connections that can compare tables.
@@ -86,7 +86,7 @@ func DataDiffCmd() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "config-file",
-				EnvVars:     []string{"BRUIN_CONFIG_FILE"},
+				Sources:     cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:       "the path to the .bruin.yml file",
 				Destination: &configFilePath,
 			},
@@ -103,7 +103,7 @@ func DataDiffCmd() *cli.Command {
 				Destination: &schemaOnly,
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			if c.NArg() != 2 {
 				return errors.New("incorrect number of arguments, please provide two table names")
 			}
@@ -157,7 +157,7 @@ func DataDiffCmd() *cli.Command {
 				return fmt.Errorf("failed to get connection '%s'", conn2Name)
 			}
 
-			ctx := c.Context
+			// ctx is already available from the function signature
 
 			s1, ok1 := conn1.(diff.TableSummarizer)
 			s2, ok2 := conn2.(diff.TableSummarizer)
@@ -177,12 +177,12 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			if schemaComparison != nil {
-				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.App.Writer)
+				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.Writer)
 				if hasDifferences {
 					return cli.Exit("", 1) // Exit with code 1 when differences are found
 				}
 			} else {
-				fmt.Fprintf(c.App.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
+				fmt.Fprintf(c.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
 				return errors.New("failed to compare table summaries due to missing data")
 			}
 

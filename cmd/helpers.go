@@ -15,7 +15,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/manifoldco/promptui"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type ErrorResponse struct {

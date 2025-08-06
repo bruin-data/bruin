@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	fs2 "io/fs"
 	"os"
@@ -14,7 +15,7 @@ import (
 	"github.com/bruin-data/bruin/templates"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
@@ -213,7 +214,7 @@ func Init() *cli.Command {
 			strings.Join(templateList, "|"),
 		),
 		Flags: []cli.Flag{},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 
 			templateName := c.Args().Get(0)
