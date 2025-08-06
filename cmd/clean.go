@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,7 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func CleanCmd() *cli.Command {
@@ -18,7 +19,7 @@ func CleanCmd() *cli.Command {
 		Name:      "clean",
 		Usage:     "clean the temporary artifacts such as logs",
 		ArgsUsage: "[path to project root]",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			inputPath := c.Args().Get(0)
 			if inputPath == "" {
 				inputPath = "."

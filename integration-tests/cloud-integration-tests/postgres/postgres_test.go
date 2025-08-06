@@ -1,8 +1,10 @@
 package postgres
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
@@ -351,6 +353,64 @@ func TestPostgresWorkflows(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "postgres-metadata-push",
+			workflow: e2e.Workflow{
+				Name: "postgres-metadata-push",
+				Steps: []e2e.Task{
+					{
+						Name:    "metadata-push: create table with metadata",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--push-metadata", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "metadata-push: query the table metadata",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", readQueryFromFile(filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/resources/check_metadata.sql")), "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/expectations/metadata_query_results.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "metadata-push: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS test_metadata.sample_data;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1, // this is expected because DDL statements do not return result sets
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "metadata-push: confirm the table is dropped",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT * FROM test_metadata.sample_data;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -415,4 +475,12 @@ func TestPostgresIndividualTasks(t *testing.T) {
 			t.Logf("Task '%s' completed successfully", task.Name)
 		})
 	}
+}
+
+func readQueryFromFile(filePath string) string {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to read query file %s: %v", filePath, err))
+	}
+	return strings.TrimSpace(string(content))
 }
