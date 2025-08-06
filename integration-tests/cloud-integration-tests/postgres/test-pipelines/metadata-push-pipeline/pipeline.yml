@@ -1,0 +1,3 @@
+name: postgres-metadata-push
+default_connections:
+    postgres: "postgres-default"
