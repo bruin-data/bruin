@@ -1747,7 +1747,7 @@ func readQueryFromFile(filePath string) string {
 func TestIngestrTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
-	//t.Parallel()
+	t.Parallel()
 
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
 	if !includeIngestr {
