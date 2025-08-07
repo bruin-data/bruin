@@ -19,7 +19,7 @@ var (
 		Parameters: scheduler.RunConfig{
 			Downstream:   false,
 			Workers:      16,
-			Environment:  "",
+			Environment:  "env-continue",
 			Force:        false,
 			PushMetadata: false,
 			NoLogFile:    false,
@@ -60,7 +60,7 @@ var (
 			StartDate:    "2024-12-22 00:00:00.000000",
 			EndDate:      "2024-12-22 23:59:59.999999",
 			Workers:      16,
-			Environment:  "",
+			Environment:  "env-continue",
 			Force:        false,
 			PushMetadata: false,
 			NoLogFile:    false,
@@ -1050,14 +1050,6 @@ func TestWorkflowTasks(t *testing.T) {
 	}
 	defer os.RemoveAll(tempdir)
 
-	// Create the shipping providers temp file in advance
-	tempfile, err := os.CreateTemp(tempdir, "shipping_providers*.sql")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	tempfilePath := tempfile.Name()
-	tempfile.Close() // Close the file but keep the path
-
 	tests := []struct {
 		name     string
 		workflow e2e.Workflow
@@ -1068,9 +1060,21 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "continue_after_failure",
 				Steps: []e2e.Task{
 					{
+						Name:    "continue: copy shipping_providers_broken.sql to assets folder",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/continue-pipeline/resources/shipping_providers_broken.sql"), filepath.Join(currentFolder, "test-pipelines/continue-pipeline/assets/shipping_providers.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "continue: run first time",
 						Command: binary,
-						Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "continue")},
+						Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-12-31", "--env", "env-continue", filepath.Join(currentFolder, "test-pipelines/continue-pipeline")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 1,
@@ -1081,21 +1085,9 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "continue: copy shipping_providers.sql to tempfile",
+						Name:    "continue: copy shipping_providers_corrected.sql to shipping_providers.sql",
 						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "continue/assets/shipping_providers.sql"), tempfilePath},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "continue: copy shipping_providers.sql to continue",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "shipping_providers.sql"), filepath.Join(currentFolder, "continue/assets/shipping_providers.sql")},
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/continue-pipeline/resources/shipping_providers_corrected.sql"), filepath.Join(currentFolder, "test-pipelines/continue-pipeline/assets/shipping_providers.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1107,7 +1099,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "continue: run continue",
 						Command: binary,
-						Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-12-31", "--continue", filepath.Join(currentFolder, "continue")},
+						Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-12-31", "--env", "env-continue", "--continue", filepath.Join(currentFolder, "test-pipelines/continue-pipeline")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1118,9 +1110,9 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "continue: copy broken shipping_providers.sql back to continue",
-						Command: "cp",
-						Args:    []string{tempfilePath, filepath.Join(currentFolder, "continue/assets/shipping_providers.sql")},
+						Name:    "continue: delete shipping_providers.sql",
+						Command: "rm",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/continue-pipeline/assets/shipping_providers.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1471,18 +1463,6 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "run_pipeline_with_scd2_by_column",
 				Steps: []e2e.Task{
 					{
-						Name:    "scd2-by-column: drop table if exists",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS test.menu;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
 						Name:    "scd2-by-column: restore asset to initial state",
 						Command: "cp",
 						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_original.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql")},
@@ -1497,7 +1477,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-column: create the initial table",
 						Command: binary,
-						Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline")},
+						Args:    []string{"run", "--full-refresh", "--env", "env-scd2-by-column", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1509,7 +1489,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-column: query the initial table",
 						Command: binary,
-						Args:    []string{"query", "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1535,7 +1515,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-column: run menu_updated_01.sql with SCD2 materialization",
 						Command: binary,
-						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql")},
+						Args:    []string{"run", "--env", "env-scd2-by-column", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1547,7 +1527,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-column: query the updated table 01",
 						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1573,7 +1553,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-column: run menu_updated_02.sql with SCD2 materialization",
 						Command: binary,
-						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql")},
+						Args:    []string{"run", "--env", "env-scd2-by-column", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1585,7 +1565,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-column: query the updated table 02",
 						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1594,30 +1574,6 @@ func TestWorkflowTasks(t *testing.T) {
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
 							e2e.AssertByCSV,
-						},
-					},
-					{
-						Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-default", "--query", "DROP TABLE IF EXISTS test.menu;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-column: confirm the table is dropped",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-default", "--query", "SELECT * FROM test.menu;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1, // Should fail because table doesn't exist
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
 						},
 					},
 				},
