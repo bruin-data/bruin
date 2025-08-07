@@ -40,6 +40,17 @@ integration-test: build
 	@cd integration-tests && git init
 	@INCLUDE_INGESTR=1 go run integration-tests/integration-test.go
 
+integration-test2: build
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@cd integration-tests && INCLUDE_INGESTR=1 go test -tags="no_duckdb_arrow" -v -count=1 .
+
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git
 	@touch integration-tests/cloud-integration-tests/bruin
