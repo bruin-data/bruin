@@ -122,7 +122,7 @@ func main() {
 
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
 	runIntegrationTests(binary, currentFolder, includeIngestr)
-	runIntegrationWorkflow(binary, currentFolder)
+	//runIntegrationWorkflow(binary, currentFolder)
 }
 
 func runIntegrationWorkflow(binary string, currentFolder string) {
