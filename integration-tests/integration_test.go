@@ -1,11 +1,9 @@
 package main_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
@@ -97,21 +95,19 @@ var (
 	}
 )
 
-// cleanupDuckDBFiles removes all files from the duckdb-files directory
 func cleanupDuckDBFiles(t *testing.T) {
 	duckdbFilesDir := "duckdb-files"
 
-	// Remove the directory if it exists
 	if err := os.RemoveAll(duckdbFilesDir); err != nil {
 		t.Fatalf("Failed to remove duckdb-files directory: %v", err)
 	}
 
-	// Recreate the directory
 	if err := os.MkdirAll(duckdbFilesDir, 0755); err != nil {
 		t.Fatalf("Failed to create duckdb-files directory: %v", err)
 	}
 }
 
+//nolint:maintidx
 func TestIndividualTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
@@ -684,10 +680,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-happy-path-chess-games",
 			task: e2e.Task{
-				Name:    "parse-asset-happy-path-chess-games",
-				Command: binary,
-				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/chess_games.asset.yml")},
-				Env:     []string{},
+				Name:          "parse-asset-happy-path-chess-games",
+				Command:       binary,
+				Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/chess_games.asset.yml")},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -702,10 +698,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-happy-path-chess-profiles",
 			task: e2e.Task{
-				Name:    "parse-asset-happy-path-chess-profiles",
-				Command: binary,
-				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml")},
-				Env:     []string{},
+				Name:          "parse-asset-happy-path-chess-profiles",
+				Command:       binary,
+				Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml")},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -720,10 +716,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-happy-path-player-summary",
 			task: e2e.Task{
-				Name:    "parse-asset-happy-path-player-summary",
-				Command: binary,
-				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/player_summary.sql")},
-				Env:     []string{},
+				Name:          "parse-asset-happy-path-player-summary",
+				Command:       binary,
+				Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/player_summary.sql")},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -756,10 +752,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "validate-missing-upstream",
 			task: e2e.Task{
-				Name:    "validate-missing-upstream",
-				Command: binary,
-				Args:    []string{"validate", "-o", "json", filepath.Join(currentFolder, "test-pipelines/missing-upstream-pipeline/assets/nonexistent.sql")},
-				Env:     []string{},
+				Name:          "validate-missing-upstream",
+				Command:       binary,
+				Args:          []string{"validate", "-o", "json", filepath.Join(currentFolder, "test-pipelines/missing-upstream-pipeline/assets/nonexistent.sql")},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -792,10 +788,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "internal-connections",
 			task: e2e.Task{
-				Name:    "internal-connections",
-				Command: binary,
-				Args:    []string{"internal", "connections"},
-				Env:     []string{},
+				Name:          "internal-connections",
+				Command:       binary,
+				Args:          []string{"internal", "connections"},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -810,10 +806,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "connections-list",
 			task: e2e.Task{
-				Name:    "connections-list",
-				Command: binary,
-				Args:    []string{"connections", "list", "-o", "json", currentFolder},
-				Env:     []string{},
+				Name:          "connections-list",
+				Command:       binary,
+				Args:          []string{"connections", "list", "-o", "json", currentFolder},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -828,10 +824,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-lineage",
 			task: e2e.Task{
-				Name:    "parse-lineage",
-				Command: binary,
-				Args:    []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "test-pipelines/parse-lineage-pipeline")},
-				Env:     []string{},
+				Name:          "parse-lineage",
+				Command:       binary,
+				Args:          []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "test-pipelines/parse-lineage-pipeline")},
+				Env:           []string{},
 				SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -846,10 +842,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-lineage",
 			task: e2e.Task{
-				Name:    "parse-asset-lineage",
-				Command: binary,
-				Args:    []string{"internal", "parse-asset", "-c", filepath.Join(currentFolder, "test-pipelines/parse-asset-lineage-pipeline/assets/example.sql")},
-				Env:     []string{},
+				Name:          "parse-asset-lineage",
+				Command:       binary,
+				Args:          []string{"internal", "parse-asset", "-c", filepath.Join(currentFolder, "test-pipelines/parse-asset-lineage-pipeline/assets/example.sql")},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -864,10 +860,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-seed-data",
 			task: e2e.Task{
-				Name:    "parse-asset-seed-data",
-				Command: binary,
-				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
-				Env:     []string{},
+				Name:          "parse-asset-seed-data",
+				Command:       binary,
+				Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -882,10 +878,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-default-option-pipeline",
 			task: e2e.Task{
-				Name:    "parse-asset-default-option-pipeline",
-				Command: binary,
-				Args:    []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
-				Env:     []string{},
+				Name:          "parse-asset-default-option-pipeline",
+				Command:       binary,
+				Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
+				Env:           []string{},
 				SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -900,10 +896,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-default-option-asset-py",
 			task: e2e.Task{
-				Name:    "parse-asset-default-option-asset-py",
-				Command: binary,
-				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-default-option/assets/asset.py")},
-				Env:     []string{},
+				Name:          "parse-asset-default-option-asset-py",
+				Command:       binary,
+				Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-default-option/assets/asset.py")},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -918,10 +914,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-default-option-chess-games",
 			task: e2e.Task{
-				Name:    "parse-asset-default-option-chess-games",
-				Command: binary,
-				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-default-option/assets/chess_games.asset.yml")},
-				Env:     []string{},
+				Name:          "parse-asset-default-option-chess-games",
+				Command:       binary,
+				Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-default-option/assets/chess_games.asset.yml")},
+				Env:           []string{},
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -936,10 +932,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "parse-asset-extends",
 			task: e2e.Task{
-				Name:    "parse-asset-extends",
-				Command: binary,
-				Args:    []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-asset-extends")},
-				Env:     []string{},
+				Name:          "parse-asset-extends",
+				Command:       binary,
+				Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-asset-extends")},
+				Env:           []string{},
 				SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -1020,7 +1016,7 @@ func TestIndividualTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//t.Parallel()
+			t.Parallel()
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
 			t.Logf("Task '%s' completed successfully", tt.task.Name)
@@ -1044,11 +1040,7 @@ func TestWorkflowTasks(t *testing.T) {
 	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
 
-	tempdir, err := os.MkdirTemp(os.TempDir(), "bruin-test")
-	if err != nil {
-		t.Fatalf("Failed to create temporary directory: %v", err)
-	}
-	defer os.RemoveAll(tempdir)
+	tempdir := t.TempDir()
 
 	tests := []struct {
 		name     string
@@ -1728,20 +1720,12 @@ func TestWorkflowTasks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//t.Parallel()
+			t.Parallel()
 			err := tt.workflow.Run()
 			require.NoError(t, err, "Workflow %s failed: %v", tt.workflow.Name, err)
 			t.Logf("Workflow '%s' completed successfully", tt.workflow.Name)
 		})
 	}
-}
-
-func readQueryFromFile(filePath string) string {
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to read query file %s: %v", filePath, err))
-	}
-	return strings.TrimSpace(string(content))
 }
 
 func TestIngestrTasks(t *testing.T) {
