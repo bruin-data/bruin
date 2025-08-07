@@ -1020,7 +1020,7 @@ func TestIndividualTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			//t.Parallel()
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
 			t.Logf("Task '%s' completed successfully", tt.task.Name)
@@ -1576,6 +1576,18 @@ func TestWorkflowTasks(t *testing.T) {
 							e2e.AssertByCSV,
 						},
 					},
+					{
+						Name:    "scd2-by-column: restore asset folder to initial state",
+						Command: "rm",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/assets/menu.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
 				},
 			},
 		},
@@ -1698,6 +1710,18 @@ func TestWorkflowTasks(t *testing.T) {
 							e2e.AssertByCSV,
 						},
 					},
+					{
+						Name:    "scd2-by-time: restore asset folder to initial state",
+						Command: "rm",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
 				},
 			},
 		},
@@ -1723,7 +1747,7 @@ func readQueryFromFile(filePath string) string {
 func TestIngestrTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
-	t.Parallel()
+	//t.Parallel()
 
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
 	if !includeIngestr {
