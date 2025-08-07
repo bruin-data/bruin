@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -29,7 +30,7 @@ func CleanCmd() *cli.Command {
 				Usage:   "clean uv caches",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			inputPath := c.Args().Get(0)
 			if inputPath == "" {
 				inputPath = "."
