@@ -112,7 +112,7 @@ func cleanupDuckDBFiles(t *testing.T) {
 func TestIndividualTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
-	//t.Parallel()
+	t.Parallel()
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1028,7 +1028,7 @@ func TestIndividualTasks(t *testing.T) {
 func TestWorkflowTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
-	//t.Parallel()
+	t.Parallel()
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1456,7 +1456,7 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "run_pipeline_with_scd2_by_column",
 				Steps: []e2e.Task{
 					{
-						Name:    "scd2-by-column-01: setup directory, run git init, and copy pipeline",
+						Name:    "scd2-col-01: setup directory, run git init, and copy pipeline",
 						Command: "bash",
 						Args:    []string{"-c", fmt.Sprintf("mkdir -p %[1]s && cd %[1]s && git init && cp -a %[2]s .", 
 							filepath.Join(tempdir, "test-scd2-by-column"),
@@ -1469,7 +1469,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-column-02: run pipeline with full refresh",
+						Name:    "scd2-col-02: run pipeline with full refresh",
 						Command: binary,
 						Args:    []string{"run", "--full-refresh", "--env", "env-scd2-by-column", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline")},
 						Env:     []string{},
@@ -1481,7 +1481,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-column-03: query the initial table",
+						Name:    "scd2-col-03: query the initial table",
 						Command: binary,
 						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
@@ -1495,7 +1495,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-column-04: copy menu_updated_01.sql and run pipeline",
+						Name:    "scd2-col-04: copy menu_updated_01.sql and run pipeline",
 						Command: "bash",
 						Args:    []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-column %s", 
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_updated_01.sql"),
@@ -1511,7 +1511,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-column-05: query the updated table 01",
+						Name:    "scd2-col-05: query the updated table 01",
 						Command: binary,
 						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
@@ -1525,7 +1525,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-column-06: copy menu_updated_02.sql and run pipeline",
+						Name:    "scd2-col-06: copy menu_updated_02.sql and run pipeline",
 						Command: "bash",
 						Args:    []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-column %s", 
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_updated_02.sql"),
@@ -1541,7 +1541,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-column-07: query the updated table 02",
+						Name:    "scd2-col-07: query the updated table 02",
 						Command: binary,
 						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
@@ -1563,7 +1563,7 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "run_pipeline_with_scd2_by_time",
 				Steps: []e2e.Task{
 					{
-						Name:    "scd2-by-time-01: setup directory, run git init, and copy pipeline",
+						Name:    "scd2-time-01: setup directory, run git init, and copy pipeline",
 						Command: "bash",
 						Args:    []string{"-c", fmt.Sprintf("mkdir -p %[1]s && cd %[1]s && git init && cp -a %[2]s .", 
 							filepath.Join(tempdir, "test-scd2-by-time"),
@@ -1576,7 +1576,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time-02: run pipeline with full refresh",
+						Name:    "scd2-time-02: run pipeline with full refresh",
 						Command: binary,
 						Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-time", filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline")},
 						Env:     []string{},
@@ -1588,7 +1588,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time-03: query the initial table",
+						Name:    "scd2-time-03: query the initial table",
 						Command: binary,
 						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
@@ -1602,7 +1602,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time-04: copy products_updated_01.sql and run pipeline",
+						Name:    "scd2-time-04: copy products_updated_01.sql and run pipeline",
 						Command: "bash",
 						Args:    []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-time %s", 
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_01.sql"),
@@ -1618,7 +1618,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time-05: query the updated table 01",
+						Name:    "scd2-time-05: query the updated table 01",
 						Command: binary,
 						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
@@ -1632,7 +1632,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time-06: copy products_updated_02.sql and run pipeline",
+						Name:    "scd2-time-06: copy products_updated_02.sql and run pipeline",
 						Command: "bash",
 						Args:    []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-time %s", 
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_02.sql"),
@@ -1648,7 +1648,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time-07: query the updated table 02",
+						Name:    "scd2-time-07: query the updated table 02",
 						Command: binary,
 						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
@@ -1667,8 +1667,9 @@ func TestWorkflowTasks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//t.Parallel()
+			t.Parallel()
 			err := tt.workflow.Run()
+			
 			require.NoError(t, err, "Workflow %s failed: %v", tt.workflow.Name, err)
 			t.Logf("Workflow '%s' completed successfully", tt.workflow.Name)
 		})
@@ -1678,7 +1679,7 @@ func TestWorkflowTasks(t *testing.T) {
 func TestIngestrTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
-	//t.Parallel()
+	t.Parallel()
 
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
 	if !includeIngestr {
