@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -16,6 +17,7 @@ type Config struct {
 	Schema       string
 	PoolMaxConns int
 	SslMode      string
+	ReadOnly     bool
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
@@ -31,6 +33,9 @@ func (c Config) ToDBConnectionURI() string {
 	if c.Schema != "" {
 		connectionURI += "&search_path=" + c.Schema
 	}
+	if c.ReadOnly {
+		connectionURI += "&options=" + url.QueryEscape("-c default_transaction_read_only=on")
+	}
 
 	return connectionURI
 }
@@ -43,8 +48,16 @@ func (c Config) GetIngestrURI() string {
 		c.Database,
 	)
 
+	params := []string{}
 	if c.SslMode != "" {
-		connString += "?sslmode=" + c.SslMode
+		params = append(params, "sslmode="+c.SslMode)
+	}
+	if c.ReadOnly {
+		params = append(params, "options="+url.QueryEscape("-c default_transaction_read_only=on"))
+	}
+
+	if len(params) > 0 {
+		connString += "?" + strings.Join(params, "&")
 	}
 
 	return connString
@@ -62,6 +75,7 @@ type RedShiftConfig struct {
 	Database string
 	Schema   string
 	SslMode  string
+	ReadOnly bool
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
@@ -76,6 +90,9 @@ func (c RedShiftConfig) ToDBConnectionURI() string {
 	if c.Schema != "" {
 		connectionURI += "&search_path=" + c.Schema
 	}
+	if c.ReadOnly {
+		connectionURI += "&options=" + url.QueryEscape("-c default_transaction_read_only=on")
+	}
 
 	return connectionURI
 }
@@ -87,6 +104,18 @@ func (c RedShiftConfig) GetIngestrURI() string {
 		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
 		c.Database,
 	)
+
+	params := []string{}
+	if c.SslMode != "" {
+		params = append(params, "sslmode="+c.SslMode)
+	}
+	if c.ReadOnly {
+		params = append(params, "options="+url.QueryEscape("-c default_transaction_read_only=on"))
+	}
+
+	if len(params) > 0 {
+		connString += "?" + strings.Join(params, "&")
+	}
 
 	return connString
 }
