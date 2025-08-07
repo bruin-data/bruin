@@ -1585,18 +1585,6 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "run_pipeline_with_scd2_by_time",
 				Steps: []e2e.Task{
 					{
-						Name:    "scd2-by-time: drop table if exists",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS test.products;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
 						Name:    "scd2-by-time: restore products asset to initial state",
 						Command: "cp",
 						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
@@ -1611,7 +1599,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-time: create the initial products table",
 						Command: binary,
-						Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline")},
+						Args:    []string{"run", "--full-refresh", "--env", "env-scd2-by-time", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1623,7 +1611,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-time: query the initial table",
 						Command: binary,
-						Args:    []string{"query", "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1649,7 +1637,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-time: run products_updated_01.sql with SCD2 materialization",
 						Command: binary,
-						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
+						Args:    []string{"run", "--env", "env-scd2-by-time", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1661,7 +1649,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-time: query the updated table 01",
 						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1687,7 +1675,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-time: run products_updated_02.sql with SCD2 materialization",
 						Command: binary,
-						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
+						Args:    []string{"run", "--env", "env-scd2-by-time", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1699,7 +1687,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-by-time: query the updated table 02",
 						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -1708,30 +1696,6 @@ func TestWorkflowTasks(t *testing.T) {
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
 							e2e.AssertByCSV,
-						},
-					},
-					{
-						Name:    "scd2-by-time: drop the table",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-default", "--query", "DROP TABLE IF EXISTS test.products;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-time: confirm the table is dropped",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-default", "--query", "SELECT * FROM test.products;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1, // Should fail because table doesn't exist
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
 						},
 					},
 				},
