@@ -108,7 +108,7 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 	}
 	existingAssets := make(map[string]*pipeline.Asset, len(pipelineFound.Assets))
 	for _, asset := range pipelineFound.Assets {
-		existingAssets[asset.Name] = asset
+		existingAssets[strings.ToLower(asset.Name)] = asset
 	}
 
 	assetsPath := filepath.Join(pipelinePath, "assets")
