@@ -1458,7 +1458,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-01: setup directory, run git init, and copy pipeline",
 						Command: "bash",
-						Args:    []string{"-c", fmt.Sprintf("mkdir -p %[1]s && cd %[1]s && git init && cp -a %[2]s .", 
+						Args: []string{"-c", fmt.Sprintf("mkdir -p %[1]s && cd %[1]s && git init && cp -a %[2]s .",
 							filepath.Join(tempdir, "test-scd2-by-column"),
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline"))},
 						Expected: e2e.Output{
@@ -1497,7 +1497,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-04: copy menu_updated_01.sql and run pipeline",
 						Command: "bash",
-						Args:    []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-column %s", 
+						Args: []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-column %s",
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_updated_01.sql"),
 							filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql"),
 							binary,
@@ -1527,7 +1527,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-06: copy menu_updated_02.sql and run pipeline",
 						Command: "bash",
-						Args:    []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-column %s", 
+						Args: []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-column %s",
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_updated_02.sql"),
 							filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql"),
 							binary,
@@ -1565,7 +1565,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-time-01: setup directory, run git init, and copy pipeline",
 						Command: "bash",
-						Args:    []string{"-c", fmt.Sprintf("mkdir -p %[1]s && cd %[1]s && git init && cp -a %[2]s .", 
+						Args: []string{"-c", fmt.Sprintf("mkdir -p %[1]s && cd %[1]s && git init && cp -a %[2]s .",
 							filepath.Join(tempdir, "test-scd2-by-time"),
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline"))},
 						Expected: e2e.Output{
@@ -1604,7 +1604,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-time-04: copy products_updated_01.sql and run pipeline",
 						Command: "bash",
-						Args:    []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-time %s", 
+						Args: []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-time %s",
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_01.sql"),
 							filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql"),
 							binary,
@@ -1634,7 +1634,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-time-06: copy products_updated_02.sql and run pipeline",
 						Command: "bash",
-						Args:    []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-time %s", 
+						Args: []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-time %s",
 							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_02.sql"),
 							filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql"),
 							binary,
@@ -1669,7 +1669,7 @@ func TestWorkflowTasks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := tt.workflow.Run()
-			
+
 			require.NoError(t, err, "Workflow %s failed: %v", tt.workflow.Name, err)
 			t.Logf("Workflow '%s' completed successfully", tt.workflow.Name)
 		})
