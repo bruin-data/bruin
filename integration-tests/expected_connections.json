@@ -17,6 +17,14 @@
         {
           "name": "duckdb-variables",
           "path": "duckdb-files/variables.db"
+        },
+        {
+          "name": "duckdb-scd2-by-column",
+          "path": "duckdb-files/scd2-by-column.db"
+        },
+        {
+          "name": "duckdb-scd2-by-time",
+          "path": "duckdb-files/scd2-by-time.db"
         }
       ],
       "chess": [
@@ -48,6 +56,14 @@
           {
             "name": "duckdb-variables",
             "path": "duckdb-files/variables.db"
+          },
+          {
+            "name": "duckdb-scd2-by-column",
+            "path": "duckdb-files/scd2-by-column.db"
+          },
+          {
+            "name": "duckdb-scd2-by-time",
+            "path": "duckdb-files/scd2-by-time.db"
           }
         ],
         "chess": [
@@ -437,6 +453,17 @@
       },
       "schema_prefix": ""
     },
+    "env-validate-with-exclude-tag": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-validate-with-exclude-tag",
+            "path": "duckdb-files/validate-with-exclude-tag.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-continue": {
       "connections": {
         "duckdb": [
@@ -465,17 +492,6 @@
           {
             "name": "duckdb-scd2-by-time",
             "path": "duckdb-files/scd2-by-time.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
-    "env-validate-with-exclude-tag": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-validate-with-exclude-tag",
-            "path": "duckdb-files/validate-with-exclude-tag.db"
           }
         ]
       },
