@@ -29,6 +29,8 @@ build-no-duckdb: deps
 	@echo "$(OK_COLOR)==> Building the application without DuckDB support...$(NO_COLOR)"
 	@CGO_ENABLED=0 go build -v -tags="bruin_no_duckdb" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)-no-duckdb" "$(BUILD_SRC)"
 
+# Default to serial execution
+ENABLE_PARALLEL ?= 
 it-all: integration-test
 integration-test: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
