@@ -77,9 +77,9 @@ jobs:
         run: |
           mkdir -p bin
           if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
-            go build -o bin/bruin.exe ./cmd/bruin
+            go build -o bin/bruin.exe .
           else
-            go build -o bin/bruin ./cmd/bruin
+            go build -o bin/bruin .
           fi
         shell: bash
       - name: Verify binary exists
