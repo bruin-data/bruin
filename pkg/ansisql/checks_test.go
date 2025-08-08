@@ -372,3 +372,135 @@ func TestCustomCheckCount(t *testing.T) {
 		})
 	}
 }
+
+func TestMinCheck_Int(t *testing.T) {
+	t.Parallel()
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return NewMinCheck(conn)
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column < 10",
+		"column 'test_column' has 5 values below minimum 10",
+		&pipeline.ColumnCheck{
+			Name: "min",
+			Value: pipeline.ColumnCheckValue{
+				Int: ptrToInt(10),
+			},
+		},
+	)
+}
+
+func TestMinCheck_Float(t *testing.T) {
+	t.Parallel()
+	val := 10.5
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return NewMinCheck(conn)
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column < 10.500000",
+		"column 'test_column' has 5 values below minimum 10.500000",
+		&pipeline.ColumnCheck{
+			Name: "min",
+			Value: pipeline.ColumnCheckValue{
+				Float: &val,
+			},
+		},
+	)
+}
+
+func TestMinCheck_String(t *testing.T) {
+	t.Parallel()
+	val := "2024-01-01"
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return NewMinCheck(conn)
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column < '2024-01-01'",
+		"column 'test_column' has 5 values below minimum 2024-01-01",
+		&pipeline.ColumnCheck{
+			Name: "min",
+			Value: pipeline.ColumnCheckValue{
+				String: &val,
+			},
+		},
+	)
+}
+
+func TestMaxCheck_Int(t *testing.T) {
+	t.Parallel()
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return NewMaxCheck(conn)
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column > 100",
+		"column 'test_column' has 5 values above maximum 100",
+		&pipeline.ColumnCheck{
+			Name: "max",
+			Value: pipeline.ColumnCheckValue{
+				Int: ptrToInt(100),
+			},
+		},
+	)
+}
+
+func TestMaxCheck_Float(t *testing.T) {
+	t.Parallel()
+	val := 99.9
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return NewMaxCheck(conn)
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column > 99.900000",
+		"column 'test_column' has 5 values above maximum 99.900000",
+		&pipeline.ColumnCheck{
+			Name: "max",
+			Value: pipeline.ColumnCheckValue{
+				Float: &val,
+			},
+		},
+	)
+}
+
+func TestMaxCheck_String(t *testing.T) {
+	t.Parallel()
+	val := "2024-12-31"
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return NewMaxCheck(conn)
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column > '2024-12-31'",
+		"column 'test_column' has 5 values above maximum 2024-12-31",
+		&pipeline.ColumnCheck{
+			Name: "max",
+			Value: pipeline.ColumnCheckValue{
+				String: &val,
+			},
+		},
+	)
+}
+
+func ptrToInt(i int) *int { return &i }
