@@ -1681,11 +1681,6 @@ func TestIngestrTasks(t *testing.T) {
 
 	t.Parallel()
 
-	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
-	if !includeIngestr {
-		t.Skip("Skipping ingestr tests - set INCLUDE_INGESTR=1 to run")
-	}
-
 	currentFolder, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current working directory: %v", err)
