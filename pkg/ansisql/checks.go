@@ -3,6 +3,7 @@ package ansisql
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -182,6 +183,19 @@ func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 	}).Check(ctx, ti)
 }
 
+func thresholdSQLValue(intPtr *int, floatPtr *float64, stringPtr *string, checkName string) (string, error) {
+	switch {
+	case intPtr != nil:
+		return strconv.Itoa(*intPtr), nil
+	case floatPtr != nil:
+		return strconv.FormatFloat(*floatPtr, 'f', 6, 64), nil
+	case stringPtr != nil:
+		return fmt.Sprintf("'%s'", *stringPtr), nil
+	default:
+		return "", errors.Errorf("unexpected value for %s check, the value must be an int, float or string", checkName)
+	}
+}
+
 type MinCheck struct {
 	conn config.ConnectionGetter
 }
@@ -189,15 +203,9 @@ type MinCheck struct {
 func NewMinCheck(conn config.ConnectionGetter) *MinCheck { return &MinCheck{conn: conn} }
 
 func (c *MinCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
-	var threshold string
-	if ti.Check.Value.Int != nil {
-		threshold = fmt.Sprintf("%d", *ti.Check.Value.Int)
-	} else if ti.Check.Value.Float != nil {
-		threshold = fmt.Sprintf("%f", *ti.Check.Value.Float)
-	} else if ti.Check.Value.String != nil {
-		threshold = fmt.Sprintf("'%s'", *ti.Check.Value.String)
-	} else {
-		return errors.Errorf("unexpected value %s for min check, the value must be an int, float or string", ti.Check.Value.ToString())
+	threshold, err := thresholdSQLValue(ti.Check.Value.Int, ti.Check.Value.Float, ti.Check.Value.String, "min")
+	if err != nil {
+		return err
 	}
 
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < %s", ti.GetAsset().Name, ti.Column.Name, threshold)
@@ -218,15 +226,9 @@ type MaxCheck struct {
 func NewMaxCheck(conn config.ConnectionGetter) *MaxCheck { return &MaxCheck{conn: conn} }
 
 func (c *MaxCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
-	var threshold string
-	if ti.Check.Value.Int != nil {
-		threshold = fmt.Sprintf("%d", *ti.Check.Value.Int)
-	} else if ti.Check.Value.Float != nil {
-		threshold = fmt.Sprintf("%f", *ti.Check.Value.Float)
-	} else if ti.Check.Value.String != nil {
-		threshold = fmt.Sprintf("'%s'", *ti.Check.Value.String)
-	} else {
-		return errors.Errorf("unexpected value %s for max check, the value must be an int, float or string", ti.Check.Value.ToString())
+	threshold, err := thresholdSQLValue(ti.Check.Value.Int, ti.Check.Value.Float, ti.Check.Value.String, "max")
+	if err != nil {
+		return err
 	}
 
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s > %s", ti.GetAsset().Name, ti.Column.Name, threshold)
