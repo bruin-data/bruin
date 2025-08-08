@@ -1,7 +1,6 @@
 package main_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1043,6 +1042,8 @@ func TestWorkflowTasks(t *testing.T) {
 
 	tempdir := t.TempDir()
 
+	//for SCD2 tests, we
+
 	tests := []struct {
 		name     string
 		workflow e2e.Workflow
@@ -1456,11 +1457,33 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "run_pipeline_with_scd2_by_column",
 				Steps: []e2e.Task{
 					{
-						Name:    "scd2-col-01: setup directory, run git init, and copy pipeline",
-						Command: "bash",
-						Args: []string{"-c", fmt.Sprintf("mkdir -p %[1]s && cd %[1]s && git init && cp -a %[2]s .",
-							filepath.Join(tempdir, "test-scd2-by-column"),
-							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline"))},
+						Name:    "scd2-col-01a: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempdir, "test-scd2-by-column")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "scd2-col-01b: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempdir, "test-scd2-by-column"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "scd2-col-01c: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline"), "."},
+						WorkingDir: filepath.Join(tempdir, "test-scd2-by-column"),
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
@@ -1495,14 +1518,20 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-col-04: copy menu_updated_01.sql and run pipeline",
-						Command: "bash",
-						Args: []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-column %s",
-							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_updated_01.sql"),
-							filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql"),
-							binary,
-							filepath.Join(currentFolder, ".bruin.yml"),
-							filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline"))},
+						Name:    "scd2-col-04a: copy menu_updated_01.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_updated_01.sql"), filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-col-04b: run pipeline with updated menu",
+						Command: binary,
+						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-column", filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline")},
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
@@ -1525,14 +1554,20 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-col-06: copy menu_updated_02.sql and run pipeline",
-						Command: "bash",
-						Args: []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-column %s",
-							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_updated_02.sql"),
-							filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql"),
-							binary,
-							filepath.Join(currentFolder, ".bruin.yml"),
-							filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline"))},
+						Name:    "scd2-col-06a: copy menu_updated_02.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/menu_updated_02.sql"), filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-col-06b: run pipeline with updated menu 02",
+						Command: binary,
+						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-column", filepath.Join(tempdir, "test-scd2-by-column/scd2-by-column-pipeline")},
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
@@ -1563,11 +1598,33 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "run_pipeline_with_scd2_by_time",
 				Steps: []e2e.Task{
 					{
-						Name:    "scd2-time-01: setup directory, run git init, and copy pipeline",
-						Command: "bash",
-						Args: []string{"-c", fmt.Sprintf("mkdir -p %[1]s && cd %[1]s && git init && cp -a %[2]s .",
-							filepath.Join(tempdir, "test-scd2-by-time"),
-							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline"))},
+						Name:    "scd2-time-01a: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempdir, "test-scd2-by-time")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "scd2-time-01b: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempdir, "test-scd2-by-time"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "scd2-time-01c: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline"), "."},
+						WorkingDir: filepath.Join(tempdir, "test-scd2-by-time"),
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
@@ -1602,14 +1659,20 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-time-04: copy products_updated_01.sql and run pipeline",
-						Command: "bash",
-						Args: []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-time %s",
-							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_01.sql"),
-							filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql"),
-							binary,
-							filepath.Join(currentFolder, ".bruin.yml"),
-							filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline"))},
+						Name:    "scd2-time-04a: copy products_updated_01.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_01.sql"), filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-time-04b: run pipeline with updated products",
+						Command: binary,
+						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-time", filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline")},
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
@@ -1632,14 +1695,20 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-time-06: copy products_updated_02.sql and run pipeline",
-						Command: "bash",
-						Args: []string{"-c", fmt.Sprintf("cp %s %s && %s run --config-file %s --env env-scd2-by-time %s",
-							filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_02.sql"),
-							filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql"),
-							binary,
-							filepath.Join(currentFolder, ".bruin.yml"),
-							filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline"))},
+						Name:    "scd2-time-06a: copy products_updated_02.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_02.sql"), filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-time-06b: run pipeline with updated products 02",
+						Command: binary,
+						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-time", filepath.Join(tempdir, "test-scd2-by-time/scd2-by-time-pipeline")},
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
