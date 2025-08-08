@@ -111,7 +111,10 @@ func cleanupDuckDBFiles(t *testing.T) {
 func TestIndividualTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
-	t.Parallel()
+	// Check if parallel execution is enabled via environment variable
+    if os.Getenv("ENABLE_PARALLEL") == "1" {
+        t.Parallel()
+    }
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1016,7 +1019,10 @@ func TestIndividualTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			// Check if parallel execution is enabled via environment variable
+			if os.Getenv("ENABLE_PARALLEL") == "1" {
+				t.Parallel()
+			}
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
 			t.Logf("Task '%s' completed successfully", tt.task.Name)
@@ -1027,7 +1033,10 @@ func TestIndividualTasks(t *testing.T) {
 func TestWorkflowTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
-	t.Parallel()
+	// Check if parallel execution is enabled via environment variable
+    if os.Getenv("ENABLE_PARALLEL") == "1" {
+        t.Parallel()
+    }
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1734,7 +1743,10 @@ func TestWorkflowTasks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			// Check if parallel execution is enabled via environment variable
+			if os.Getenv("ENABLE_PARALLEL") == "1" {
+				t.Parallel()
+			}
 			err := tt.workflow.Run()
 
 			require.NoError(t, err, "Workflow %s failed: %v", tt.workflow.Name, err)
@@ -1746,7 +1758,10 @@ func TestWorkflowTasks(t *testing.T) {
 func TestIngestrTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
-	t.Parallel()
+	// Check if parallel execution is enabled via environment variable
+    if os.Getenv("ENABLE_PARALLEL") == "1" {
+        t.Parallel()
+    }
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1835,7 +1850,10 @@ func TestIngestrTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			// Check if parallel execution is enabled via environment variable
+			if os.Getenv("ENABLE_PARALLEL") == "1" {
+				t.Parallel()
+			}
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
 			t.Logf("Task '%s' completed successfully", tt.task.Name)
