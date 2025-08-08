@@ -93,6 +93,8 @@ func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnChec
 		"positive":        ansisql.NewPositiveCheck(manager),
 		"non_negative":    ansisql.NewNonNegativeCheck(manager),
 		"negative":        ansisql.NewNegativeCheck(manager),
+		"min":             ansisql.NewMinCheck(manager),
+		"max":             ansisql.NewMaxCheck(manager),
 		"accepted_values": &AcceptedValuesCheck{conn: manager},
 		"pattern":         &PatternCheck{conn: manager},
 	})

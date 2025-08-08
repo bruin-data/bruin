@@ -9,6 +9,8 @@ Bruin provides the following checks to validate assets, ensuring that asset data
 - [**Pattern**](#pattern)
 - [**Positive**](#positive)
 - [**Unique**](#unique)
+- [**Min**](#min)
+- [**Max**](#max)
 
 You can find a detailed description of each check below.
 ## Accepted values
@@ -98,4 +100,48 @@ columns:
     description: "Just a number"
     checks:
       - name: unique
+```
+
+## Min
+This check ensures that all values in the column are greater than or equal to the specified minimum threshold.
+
+```yaml
+columns:
+  - name: amount
+    type: float
+    checks:
+      - name: min
+        value: 0.0
+```
+
+You can also use integers or strings where appropriate (e.g., dates):
+
+```yaml
+checks:
+  - name: min
+    value: 10
+  - name: min
+    value: "2024-01-01"
+```
+
+## Max
+This check ensures that all values in the column are less than or equal to the specified maximum threshold.
+
+```yaml
+columns:
+  - name: amount
+    type: float
+    checks:
+      - name: max
+        value: 100.0
+```
+
+You can also use integers or strings where appropriate (e.g., dates):
+
+```yaml
+checks:
+  - name: max
+    value: 100
+  - name: max
+    value: "2024-12-31"
 ```
