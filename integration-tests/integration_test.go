@@ -1042,8 +1042,6 @@ func TestWorkflowTasks(t *testing.T) {
 
 	tempdir := t.TempDir()
 
-	//for SCD2 tests, we
-
 	tests := []struct {
 		name     string
 		workflow e2e.Workflow
