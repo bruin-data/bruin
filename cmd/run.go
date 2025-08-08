@@ -947,7 +947,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 	opts = append(opts, pipeline.WithMutate())
 	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
 	if err != nil {
-		errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
+		errorPrinter.Println("Failed to build pipeline: ", err.Error())
 		errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
 
 		return &PipelineInfo{
