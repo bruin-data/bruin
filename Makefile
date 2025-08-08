@@ -29,19 +29,8 @@ build-no-duckdb: deps
 	@echo "$(OK_COLOR)==> Building the application without DuckDB support...$(NO_COLOR)"
 	@CGO_ENABLED=0 go build -v -tags="bruin_no_duckdb" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)-no-duckdb" "$(BUILD_SRC)"
 
-integration-test: build
-	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
-	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
-	@touch integration-tests/.git
-	@touch integration-tests/bruin
-	@rm -rf integration-tests/.git
-	@rm integration-tests/bruin
-	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
-	@cd integration-tests && git init
-	@INCLUDE_INGESTR=1 go run integration-tests/integration-test.go
-
 it-all: integration-test-all
-integration-test-all: build
+integration-test: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
 	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
 	@touch integration-tests/.git
@@ -116,7 +105,7 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests/cloud-integration-tests') 
+	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
