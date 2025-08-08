@@ -90,7 +90,7 @@ jobs:
             ls -la bin/bruin
           fi
         shell: bash
-      - run: make integration-test
+      - run: make integration-test SERIAL=1
         shell: bash
 
   dockerBuild:
