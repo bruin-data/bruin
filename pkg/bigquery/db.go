@@ -292,6 +292,11 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	return nil
 }
 
+// ExecuteMetadataOperations implements the ansisql.MetadataHandler interface
+func (d *Client) ExecuteMetadataOperations(ctx context.Context, asset *pipeline.Asset) error {
+	return d.UpdateTableMetadataIfNotExist(ctx, asset)
+}
+
 func formatError(err error) error {
 	var googleError *googleapi.Error
 	if !errors.As(err, &googleError) {

@@ -1101,7 +1101,7 @@ func SetupExecutors(
 			return nil, err
 		}
 
-		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
+		metadataPushOperator := ansisql.NewMetadataPushOperator(conn)
 		bqQuerySensor := bigquery.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
@@ -1143,7 +1143,7 @@ func SetupExecutors(
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh), parser)
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
-		pgMetadataPushOperator := postgres.NewMetadataPushOperator(conn)
+		pgMetadataPushOperator := ansisql.NewMetadataPushOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -1202,7 +1202,7 @@ func SetupExecutors(
 
 		sfQuerySensor := snowflake.NewQuerySensor(conn, wholeFileExtractor, 30)
 
-		sfMetadataPushOperator := snowflake.NewMetadataPushOperator(conn)
+		sfMetadataPushOperator := ansisql.NewMetadataPushOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeMain] = sfOperator
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner

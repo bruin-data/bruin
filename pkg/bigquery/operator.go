@@ -173,46 +173,6 @@ func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 	return executor.Check(ctx, test)
 }
 
-type MetadataPushOperator struct {
-	connection config.ConnectionGetter
-}
-
-func NewMetadataPushOperator(conn config.ConnectionGetter) *MetadataPushOperator {
-	return &MetadataPushOperator{
-		connection: conn,
-	}
-}
-
-func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	conn, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
-	if err != nil {
-		return err
-	}
-
-	client, ok := o.connection.GetConnection(conn).(DB)
-	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", conn)
-	}
-
-	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
-	if writer == nil {
-		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
-	}
-
-	err = client.UpdateTableMetadataIfNotExist(ctx, ti.GetAsset())
-	if err != nil {
-		var noMetadata NoMetadataUpdatedError
-		if errors.As(err, &noMetadata) {
-			_, _ = writer.Write([]byte("No metadata found to be pushed to BigQuery, skipping...\n"))
-			return nil
-		}
-
-		return err
-	}
-
-	return nil
-}
-
 type QuerySensor struct {
 	connection config.ConnectionGetter
 	extractor  query.QueryExtractor

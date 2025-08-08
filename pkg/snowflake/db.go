@@ -365,6 +365,11 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 	return nil
 }
 
+// ExecuteMetadataOperations implements the ansisql.MetadataHandler interface
+func (db *DB) ExecuteMetadataOperations(ctx context.Context, asset *pipeline.Asset) error {
+	return db.PushColumnDescriptions(ctx, asset)
+}
+
 func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
 	var schemaName string
