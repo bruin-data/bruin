@@ -1347,3 +1347,51 @@ func (c *Config) EnvironmentExists(name string) bool {
 	_, exists := c.Environments[name]
 	return exists
 }
+
+// CloneEnvironment creates a copy of an existing environment with a new name.
+// If the source environment does not exist or the target name already exists, an error is returned.
+// The schemaPrefix argument is optional and will override the source environment's schema prefix if provided.
+func (c *Config) CloneEnvironment(sourceName, targetName, schemaPrefix string) error {
+	if sourceName == "" {
+		return errors.New("source environment name cannot be empty")
+	}
+	if targetName == "" {
+		return errors.New("target environment name cannot be empty")
+	}
+
+	if c.Environments == nil {
+		return fmt.Errorf("environment '%s' does not exist", sourceName)
+	}
+
+	sourceEnv, exists := c.Environments[sourceName]
+	if !exists {
+		return fmt.Errorf("environment '%s' does not exist", sourceName)
+	}
+
+	if _, exists := c.Environments[targetName]; exists {
+		return fmt.Errorf("environment '%s' already exists", targetName)
+	}
+
+	// Create a new environment by copying the source
+	targetEnv := Environment{
+		Connections:  &Connections{},
+		SchemaPrefix: sourceEnv.SchemaPrefix,
+	}
+
+	// Override schema prefix if provided
+	if schemaPrefix != "" {
+		targetEnv.SchemaPrefix = schemaPrefix
+	}
+
+	// Copy all connections from source to target
+	if sourceEnv.Connections != nil {
+		err := targetEnv.Connections.MergeFrom(sourceEnv.Connections)
+		if err != nil {
+			return fmt.Errorf("failed to copy connections: %w", err)
+		}
+	}
+
+	c.Environments[targetName] = targetEnv
+
+	return nil
+}
