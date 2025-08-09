@@ -25,6 +25,8 @@ columns:
     type: INTEGER
     description: "Number of units in stock"
 @bruin */
+
+
 SELECT
     1 AS product_id,
     'Laptop' AS product_name,

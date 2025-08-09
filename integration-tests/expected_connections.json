@@ -17,6 +17,14 @@
         {
           "name": "duckdb-variables",
           "path": "duckdb-files/variables.db"
+        },
+        {
+          "name": "duckdb-scd2-by-column",
+          "path": "duckdb-files/scd2-by-column.db"
+        },
+        {
+          "name": "duckdb-scd2-by-time",
+          "path": "duckdb-files/scd2-by-time.db"
         }
       ],
       "chess": [
@@ -48,6 +56,14 @@
           {
             "name": "duckdb-variables",
             "path": "duckdb-files/variables.db"
+          },
+          {
+            "name": "duckdb-scd2-by-column",
+            "path": "duckdb-files/scd2-by-column.db"
+          },
+          {
+            "name": "duckdb-scd2-by-time",
+            "path": "duckdb-files/scd2-by-time.db"
           }
         ],
         "chess": [
@@ -443,6 +459,39 @@
           {
             "name": "duckdb-validate-with-exclude-tag",
             "path": "duckdb-files/validate-with-exclude-tag.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-continue": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-continue",
+            "path": "duckdb-files/continue.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-scd2-by-column": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-scd2-by-column",
+            "path": "duckdb-files/scd2-by-column.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-scd2-by-time": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-scd2-by-time",
+            "path": "duckdb-files/scd2-by-time.db"
           }
         ]
       },
