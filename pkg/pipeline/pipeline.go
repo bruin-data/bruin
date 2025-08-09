@@ -267,7 +267,7 @@ type DiscordNotification struct {
 func (n Notifications) MarshalJSON() ([]byte, error) {
 	slack := make([]SlackNotification, 0, len(n.Slack))
 	MSTeams := make([]MSTeamsNotification, 0, len(n.MSTeams))
-	discord := make([]DiscordNotification, 0, len(n.MSTeams))
+	discord := make([]DiscordNotification, 0, len(n.Discord))
 	for _, s := range n.Slack {
 		if !reflect.ValueOf(s).IsZero() {
 			slack = append(slack, s)
