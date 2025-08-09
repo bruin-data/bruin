@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"cloud.google.com/go/bigquery"
+	datatransfer "cloud.google.com/go/bigquery/datatransfer/apiv1"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -103,6 +104,33 @@ func NewDB(c *Config) (*Client, error) {
 
 func (d *Client) GetIngestrURI() (string, error) {
 	return d.config.GetIngestrURI()
+}
+
+func (d *Client) ProjectID() string {
+	return d.config.ProjectID
+}
+
+func (d *Client) Location() string {
+	return d.config.Location
+}
+
+func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Client, error) {
+	options := []option.ClientOption{
+		option.WithScopes(scopes...),
+	}
+
+	switch {
+	case d.config.CredentialsJSON != "":
+		options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
+	case d.config.CredentialsFilePath != "":
+		options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
+	case d.config.Credentials != nil:
+		options = append(options, option.WithCredentials(d.config.Credentials))
+	default:
+		return nil, errors.New("no credentials provided for Data Transfer client")
+	}
+
+	return datatransfer.NewClient(ctx, options...)
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
