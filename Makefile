@@ -31,7 +31,6 @@ build-no-duckdb: deps
 
 # Default to serial execution
 ENABLE_PARALLEL ?= 
-it-all: integration-test
 integration-test: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
 	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
@@ -43,7 +42,6 @@ integration-test: build
 	@cd integration-tests && git init
 	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 $(if $(SERIAL),-parallel=1,) .
 
-it-individual: integration-test-individual
 integration-test-individual: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
 	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
@@ -55,7 +53,6 @@ integration-test-individual: build
 	@cd integration-tests && git init
 	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIndividualTasks github.com/bruin-data/bruin/integration-tests $(if $(SERIAL),-parallel=1,)
 
-it-workflow: integration-test-workflow
 integration-test-workflow: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
 	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
@@ -67,7 +64,6 @@ integration-test-workflow: build
 	@cd integration-tests && git init
 	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestWorkflowTasks github.com/bruin-data/bruin/integration-tests $(if $(SERIAL),-parallel=1,)
 
-it-ingestr: integration-test-ingestr
 integration-test-ingestr: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
 	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
@@ -79,7 +75,6 @@ integration-test-ingestr: build
 	@cd integration-tests && git init
 	@cd integration-tests && INCLUDE_INGESTR=1 go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIngestrTasks github.com/bruin-data/bruin/integration-tests $(if $(SERIAL),-parallel=1,)
 
-it-cloud: integration-test-cloud
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git
 	@touch integration-tests/cloud-integration-tests/bruin
