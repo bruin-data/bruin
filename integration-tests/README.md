@@ -33,10 +33,9 @@ The following make commands are available for running integration tests:
 ```bash
 # Run all integration tests (including ingestr tests)
 make integration-test
-# Short form:
-make it-all
-# Run with serial execution for better readability
-make it-all SERIAL=1
+
+# Run all integration tests in parallel
+ENABLE_PARALLEL=1 make integration-test
 ```
 
 #### Individual Test Categories
@@ -44,25 +43,21 @@ make it-all SERIAL=1
 ```bash
 # Run only individual task tests
 make integration-test-individual
-# Alternativ short form
-make it-indivdual
-# To run with serial execution
-make it-individual SERIAL=1
+# Run only individual task tests in parallel
+ENABLE_PARALLEL=1 make integration-test-individual
 
 # Run only workflow tests
 make integration-test-workflow
-# Alternative short form:
-make it-workflow
-# To run with serial execution
-make it-workflow SERIAL=1
+# Run only workflow tests in parallel
+ENABLE_PARALLEL=1 make integration-test-workflow
 
 # Run only ingestr tests
 make integration-test-ingestr
-# Alternative shoft form:
-make it-ingestr
-# To run with serial execution
-make it-ingester SERIAL=1
+# Run only ingestr tests in parallel
+ENABLE_PARALLEL=1 make integration-test-ingestr
 ```
+
+**Note**: `ENABLE_PARALLEL=1` enables parallel test execution. By default, tests run sequentially.
 
 ## Test Pipeline Structure
 
