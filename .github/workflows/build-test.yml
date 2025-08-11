@@ -73,7 +73,7 @@ jobs:
       - name: Install winget
         if: matrix.platform == 'windows-2022'
         uses: Cyberboss/install-winget@v1
-       - name: Build Bruin executable
+      - name: Build Bruin executable
         run: |
           mkdir -p bin
           if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
