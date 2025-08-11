@@ -40,7 +40,7 @@ integration-test: build
 	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 $(if $(SERIAL),-parallel=1,) .
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 .
 
 integration-test-individual: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
@@ -51,7 +51,7 @@ integration-test-individual: build
 	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIndividualTasks github.com/bruin-data/bruin/integration-tests $(if $(SERIAL),-parallel=1,)
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIndividualTasks github.com/bruin-data/bruin/integration-tests
 
 integration-test-workflow: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
@@ -62,7 +62,7 @@ integration-test-workflow: build
 	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestWorkflowTasks github.com/bruin-data/bruin/integration-tests $(if $(SERIAL),-parallel=1,)
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestWorkflowTasks github.com/bruin-data/bruin/integration-tests
 
 integration-test-ingestr: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
@@ -73,7 +73,7 @@ integration-test-ingestr: build
 	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && INCLUDE_INGESTR=1 go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIngestrTasks github.com/bruin-data/bruin/integration-tests $(if $(SERIAL),-parallel=1,)
+	@cd integration-tests && INCLUDE_INGESTR=1 go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIngestrTasks github.com/bruin-data/bruin/integration-tests
 
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git
