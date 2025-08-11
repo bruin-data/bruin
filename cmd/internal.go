@@ -1244,7 +1244,11 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			out, err := json.Marshal(meta)
+			response := map[string]interface{}{
+				"bigquery": meta,
+			}
+
+			out, err := json.Marshal(response)
 			if err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)
