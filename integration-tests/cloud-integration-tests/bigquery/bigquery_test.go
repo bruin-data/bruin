@@ -166,6 +166,104 @@ func TestBigQueryWorkflows(t *testing.T) {
 			},
 		},
 		{
+			name: "bigquery-merge-with-nulls",
+			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
+				return e2e.Workflow{
+					Name: "bigquery-merge-with-nulls",
+					Steps: []e2e.Task{
+						{
+							Name:    "restore the initial nulltable table",
+							Command: "cp",
+							Args:    []string{filepath.Join(tempDir, "test-pipelines/nullable-pipeline/resources/nulltable_initial.sql"), filepath.Join(tempDir, "test-pipelines/nullable-pipeline/assets/nulltable.sql")},
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "create the initial table",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", filepath.Join(tempDir, "test-pipelines/nullable-pipeline/assets/nulltable.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "query the nulltable table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.nulltable ORDER BY id;", "--output", "csv"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/nullable-pipeline/expectations/initial.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+						{
+							Name:    "copy the nulltable_updated.sql to nulltable.sql",
+							Command: "cp",
+							Args:    []string{filepath.Join(tempDir, "test-pipelines/nullable-pipeline/resources/nulltable_merge.sql"), filepath.Join(tempDir, "test-pipelines/nullable-pipeline/assets/nulltable.sql")},
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "run the merge pipeline",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), filepath.Join(tempDir, "test-pipelines/nullable-pipeline/assets/nulltable.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "query the nulltable table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.nulltable ORDER BY id;", "--output", "csv"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/nullable-pipeline/expectations/updated.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+						{
+							Name:    "drop the table if it exists",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS dataset.nulltable;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
 			name: "bigquery-scd2-by-column",
 			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
 				return e2e.Workflow{
