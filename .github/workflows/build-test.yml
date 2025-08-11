@@ -82,14 +82,6 @@ jobs:
             go build -o bin/bruin .
           fi
         shell: bash
-      - name: Verify binary exists
-        run: |
-          if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
-            ls -la bin/bruin.exe
-          else
-            ls -la bin/bruin
-          fi
-        shell: bash
       - run: make integration-test
         shell: bash
 
