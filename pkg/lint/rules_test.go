@@ -2476,6 +2476,71 @@ func TestValidateDuplicateColumnNames(t *testing.T) {
 	}
 }
 
+func TestValidateDuplicateTags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "no duplicate tags",
+			asset: &pipeline.Asset{
+				Name:    "asset1",
+				Tags:    []string{"tag1", "tag2"},
+				Columns: []pipeline.Column{{Name: "col1", Tags: []string{"a", "b"}}},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "duplicate asset tags",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Tags: []string{"tag1", "Tag1"},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1", Tags: []string{"tag1", "Tag1"}},
+					Description: "Duplicate asset tag 'Tag1' found",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "duplicate column tags",
+			asset: &pipeline.Asset{
+				Name:    "asset1",
+				Columns: []pipeline.Column{{Name: "col1", Tags: []string{"a", "A"}}},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1", Columns: []pipeline.Column{{Name: "col1", Tags: []string{"a", "A"}}}},
+					Description: "Duplicate tag 'A' found in column 'col1'",
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ValidateDuplicateTags(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
 	t.Parallel()
 

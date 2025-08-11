@@ -674,6 +674,44 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 	return issues, nil
 }
 
+// ValidateDuplicateTags checks for duplicate tags within an asset and its columns.
+// It performs case-insensitive comparisons to find duplicates and returns issues
+// for any repeated tags found either on the asset itself or within individual
+// columns.
+func ValidateDuplicateTags(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
+
+	tagSet := make(map[string]bool)
+	for _, tag := range asset.Tags {
+		key := strings.ToLower(tag)
+		if tagSet[key] {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Duplicate asset tag '%s' found", tag),
+			})
+		} else {
+			tagSet[key] = true
+		}
+	}
+
+	for _, column := range asset.Columns {
+		columnTagSet := make(map[string]bool)
+		for _, tag := range column.Tags {
+			key := strings.ToLower(tag)
+			if columnTagSet[key] {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("Duplicate tag '%s' found in column '%s'", tag, column.Name),
+				})
+			} else {
+				columnTagSet[key] = true
+			}
+		}
+	}
+
+	return issues, nil
+}
+
 func ValidateAssetDirectoryExist(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	var issues []*Issue
 

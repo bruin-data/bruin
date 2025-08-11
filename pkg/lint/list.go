@@ -163,6 +163,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "duplicate-tags",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateDuplicateTags,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "custom-check-query-exists",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
