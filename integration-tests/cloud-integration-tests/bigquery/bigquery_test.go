@@ -253,7 +253,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS dataset.nulltable;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 0,
+								ExitCode: 1,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,

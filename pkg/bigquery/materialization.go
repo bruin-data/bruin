@@ -59,7 +59,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 
 	on := make([]string, 0, len(primaryKeys))
 	for _, key := range primaryKeys {
-		on = append(on, fmt.Sprintf("target.%s = source.%s", key, key))
+		on = append(on, fmt.Sprintf("target.%s IS NOT DISTINCT FROM source.%s", key, key))
 	}
 	onQuery := strings.Join(on, " AND ")
 
@@ -79,7 +79,8 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 
 	mergeLines := []string{
 		fmt.Sprintf("MERGE %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING (%s) source", strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("ON (%s)", onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
