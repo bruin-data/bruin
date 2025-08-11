@@ -10,12 +10,15 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/templates"
@@ -42,6 +45,7 @@ func Internal() *cli.Command {
 			FetchTables(),
 			FetchColumns(),
 			ListTemplates(),
+			AssetMetadata(),
 		},
 	}
 }
@@ -1152,4 +1156,101 @@ func printTemplates(templates []string) {
 
 	t.SetStyle(table.StyleLight)
 	t.Render()
+}
+
+func AssetMetadata() *cli.Command {
+	return &cli.Command{
+		Name:      "asset-metadata",
+		Usage:     "run a dry-run for a BigQuery asset and return query metadata",
+		ArgsUsage: "[path to the asset sql file]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
+				Usage:   "the path to the .bruin.yml file",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			assetPath := c.Args().Get(0)
+			if assetPath == "" {
+				return cli.Exit("asset path is required", 1)
+			}
+
+			fs := afero.NewOsFs()
+
+			pp, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+
+			// Only for BigQuery assets
+			if pp.Asset.Type != pipeline.AssetTypeBigqueryQuery {
+				return cli.Exit("asset-metadata is only available for BigQuery SQL assets", 1)
+			}
+
+			// Prepare extractor and get the rendered query
+			parser, err := sqlparser.NewSQLParser(false)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+			defer parser.Close()
+			if err := parser.Start(); err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: query.DefaultJinjaRenderer}
+			extractor, err := whole.CloneForAsset(ctx, pp.Pipeline, pp.Asset)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+			queries, err := extractor.ExtractQueriesFromString(pp.Asset.ExecutableFile.Content)
+			if err != nil || len(queries) == 0 {
+				if err == nil {
+					err = errors.New("no query found in asset")
+				}
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+			q := queries[0]
+
+			// Resolve connection manager and BigQuery client
+			manager, errs := connection.NewManagerFromConfig(pp.Config)
+			if len(errs) > 0 {
+				printErrorJSON(errs[0])
+				return cli.Exit("", 1)
+			}
+			connName, err := pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+			conn := manager.GetConnection(connName)
+			bqClient, ok := conn.(*bigquery.Client)
+			if !ok {
+				return cli.Exit("resolved connection is not BigQuery", 1)
+			}
+
+			meta, err := bqClient.QueryDryRun(ctx, q)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+
+			out, err := json.Marshal(meta)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+			fmt.Println(string(out))
+			return nil
+		},
+	}
 }

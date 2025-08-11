@@ -260,74 +260,57 @@ type QueryMetadata struct {
 	ExportDataStatistics          *bigquery.ExportDataStatistics
 }
 
-func (d *Client) queryDryRun(ctx context.Context, queryObj *query.Query) (*QueryMetadata, error) {
+func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*QueryMetadata, error) {
 	q := d.client.Query(queryObj.String())
 	q.DryRun = true
-	// Location must match that of the dataset(s) referenced in the query.
-	q.Location = "US"
+	// Respect configured client location if set
+	if d.client.Location != "" {
+		q.Location = d.client.Location
+	}
 
 	job, err := q.Run(ctx)
 	if err != nil {
-		return nil, err
-	}
-	// Dry run is not asynchronous, so get the latest status and statistics.
-	status := job.LastStatus()
-	if err := status.Err(); err != nil {
-		return nil, err
+		return nil, formatError(err)
 	}
 
+	// For dry runs, Status(ctx) is not supported; use LastStatus instead.
+	status := job.LastStatus()
+	if status == nil {
+		return nil, errors.New("missing job status for dry run")
+	}
+	if status.Err() != nil {
+		return nil, status.Err()
+	}
+	if status.Statistics == nil {
+		return nil, errors.New("missing statistics in dry run status")
+	}
+
+	qs, ok := status.Statistics.Details.(*bigquery.QueryStatistics)
+	if !ok || qs == nil {
+		return nil, errors.New("missing query statistics details in dry run status")
+	}
 
 	result := &QueryMetadata{
-		BIEngineStatistics:            status.Statistics.BIEngineStatistics,
-		BillingTier:                   status.Statistics.BillingTier,
-		CacheHit:                      status.Statistics.CacheHit,
-		StatementType:                 status.Statistics.StatementType,
-		TotalBytesBilled:              status.Statistics.TotalBytesBilled,
-		TotalBytesProcessed:           status.Statistics.TotalBytesProcessed, // Use statistics instead of status.Statistics
-		TotalBytesProcessedAccuracy:   status.Statistics.TotalBytesProcessedAccuracy,
-		QueryPlan:                     status.Statistics.QueryPlan,
-		NumDMLAffectedRows:            status.Statistics.NumDMLAffectedRows,
-		DMLStats:                      status.Statistics.DMLStats,
-		Timeline:                      status.Statistics.Timeline,
-		ReferencedTables:              status.Statistics.ReferencedTables,
-		Schema:                        status.Statistics.Schema,
-		SlotMillis:                    status.Statistics.SlotMillis,
-		UndeclaredQueryParameterNames: status.Statistics.UndeclaredQueryParameterNames,
-		DDLTargetTable:                status.Statistics.DDLTargetTable, // Use statistics instead of status.Statistics
-		DDLOperationPerformed:         status.Statistics.DDLOperationPerformed,
-		DDLTargetRoutine:              status.Statistics.DDLTargetRoutine,
-		ExportDataStatistics:          status.Statistics.ExportDataStatistics,
+		BIEngineStatistics:            qs.BIEngineStatistics,
+		BillingTier:                   qs.BillingTier,
+		CacheHit:                      qs.CacheHit,
+		StatementType:                 qs.StatementType,
+		TotalBytesBilled:              qs.TotalBytesBilled,
+		TotalBytesProcessed:           qs.TotalBytesProcessed,
+		TotalBytesProcessedAccuracy:   qs.TotalBytesProcessedAccuracy,
+		QueryPlan:                     qs.QueryPlan,
+		NumDMLAffectedRows:            qs.NumDMLAffectedRows,
+		DMLStats:                      qs.DMLStats,
+		Timeline:                      qs.Timeline,
+		ReferencedTables:              qs.ReferencedTables,
+		Schema:                        qs.Schema,
+		SlotMillis:                    qs.SlotMillis,
+		UndeclaredQueryParameterNames: qs.UndeclaredQueryParameterNames,
+		DDLTargetTable:                qs.DDLTargetTable,
+		DDLOperationPerformed:         qs.DDLOperationPerformed,
+		DDLTargetRoutine:              qs.DDLTargetRoutine,
+		ExportDataStatistics:          qs.ExportDataStatistics,
 	}
-
-	for {
-		var values []bigquery.Value
-		err := rows.Next(&values)
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to read row: %w", err)
-		}
-
-		row := make([]interface{}, len(values))
-		for i, v := range values {
-			row[i] = v
-		}
-		result.Rows = append(result.Rows, row)
-	}
-
-	if rows.Schema != nil {
-		for _, field := range rows.Schema {
-			result.Columns = append(result.Columns, field.Name)
-			// Extract the type information from the schema
-			columnTypes = append(columnTypes, string(field.Type))
-		}
-	} else {
-		return nil, errors.New("schema information is not available")
-	}
-
-	// Store the column types in the result
-	result.ColumnTypes = columnTypes
 
 	return result, nil
 }
