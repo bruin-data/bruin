@@ -107,14 +107,14 @@ func cleanupDuckDBFiles(t *testing.T) {
 	}
 }
 
-//nolint:maintidx
+//nolint:maintidx,paralleltest
 func TestIndividualTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
 	// Check if parallel execution is enabled via environment variable
-    if os.Getenv("ENABLE_PARALLEL") == "1" {
-        t.Parallel()
-    }
+	if os.Getenv("ENABLE_PARALLEL") == "1" {
+		t.Parallel()
+	}
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1030,13 +1030,14 @@ func TestIndividualTasks(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest
 func TestWorkflowTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
 	// Check if parallel execution is enabled via environment variable
-    if os.Getenv("ENABLE_PARALLEL") == "1" {
-        t.Parallel()
-    }
+	if os.Getenv("ENABLE_PARALLEL") == "1" {
+		t.Parallel()
+	}
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1755,13 +1756,14 @@ func TestWorkflowTasks(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest
 func TestIngestrTasks(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
 	// Check if parallel execution is enabled via environment variable
-    if os.Getenv("ENABLE_PARALLEL") == "1" {
-        t.Parallel()
-    }
+	if os.Getenv("ENABLE_PARALLEL") == "1" {
+		t.Parallel()
+	}
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
