@@ -80,9 +80,9 @@ func TestPostgresWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-column: initialize git repository",
-						Command: "git",
-						Args:    []string{"init"},
+						Name:       "scd2-by-column: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
 						WorkingDir: filepath.Join(tempDir, "test-scd2-by-column"),
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -255,9 +255,9 @@ func TestPostgresWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time: initialize git repository",
-						Command: "git",
-						Args:    []string{"init"},
+						Name:       "scd2-by-time: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
 						WorkingDir: filepath.Join(tempDir, "test-scd2-by-time"),
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -265,7 +265,7 @@ func TestPostgresWorkflows(t *testing.T) {
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
 						},
-					},	
+					},
 					{
 						Name:       "scd2-by-time: copy pipeline files",
 						Command:    "cp",
