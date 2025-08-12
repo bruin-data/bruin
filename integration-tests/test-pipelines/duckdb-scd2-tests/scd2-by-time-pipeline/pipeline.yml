@@ -1,2 +1,7 @@
 name: scd2-by-time-pipeline
 
+default_connections:
+  duckdb: "duckdb-scd2-by-time"
+
+
+

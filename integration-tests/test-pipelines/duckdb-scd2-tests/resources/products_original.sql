@@ -22,6 +22,7 @@ columns:
     type: INTEGER
     description: "Number of units in stock"
 @bruin */
+
 SELECT
     1 AS product_id,
     'Laptop' AS product_name,
@@ -46,4 +47,3 @@ SELECT
     'Monitor' AS product_name,
     25 AS stock,
     DATE '2025-04-02' AS dt
-

@@ -38,7 +38,40 @@ integration-test: build
 	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@INCLUDE_INGESTR=1 go run integration-tests/integration-test.go
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 .
+
+integration-test-individual: build
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIndividualTasks github.com/bruin-data/bruin/integration-tests
+
+integration-test-workflow: build
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestWorkflowTasks github.com/bruin-data/bruin/integration-tests
+
+integration-test-ingestr: build
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@cd integration-tests && INCLUDE_INGESTR=1 go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIngestrTasks github.com/bruin-data/bruin/integration-tests
 
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git
@@ -49,17 +82,6 @@ integration-test-cloud: build
 	@cd integration-tests && git init
 	@cd integration-tests/cloud-integration-tests && go test -count=1 -v .
 
-integration-test-light: build
-	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
-	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
-	@touch integration-tests/.git
-	@touch integration-tests/bruin
-	@rm -rf integration-tests/.git
-	@rm integration-tests/bruin
-	@echo "$(OK_COLOR)==> Running light integration tests...$(NO_COLOR)"
-	@cd integration-tests && git init
-	@INCLUDE_INGESTR=0 go run integration-tests/integration-test.go
-
 clean:
 	@rm -rf ./bin
 
@@ -67,7 +89,7 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests/cloud-integration-tests') 
+	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
@@ -145,3 +167,4 @@ duck-db-static-lib:
 	@mkdir vendor/github.com/marcboeker/go-duckdb/deps || true
 	@mkdir vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH) || true
 	@cp $$(go env GOPATH)/pkg/mod/github.com/marcboeker/go-duckdb@v1.8.2/deps/$(OS_ARCH)/libduckdb.a vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH)/libduckdb.a
+

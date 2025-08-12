@@ -1,0 +1,4 @@
+name: continue_duckdb
+
+default_connections:
+   duckdb: "duckdb-continue"
