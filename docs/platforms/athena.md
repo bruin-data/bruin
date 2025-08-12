@@ -128,3 +128,37 @@ name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
 ```
+
+### `athena.sensor.query`
+
+Checks if a query returns any results in Clickhouse, runs every 5 minutes until this query returns any results.
+
+```yaml
+name: string
+type: string
+parameters:
+    query: string
+```
+
+**Parameters**:
+- `query`: Query you expect to return any results
+
+#### Example: Partitioned upstream table
+
+Checks if the data available in upstream table for end date of the run.
+```yaml
+name: analytics_123456789.events
+type: athena.sensor.query
+parameters:
+    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}"
+```
+
+#### Example: Streaming upstream table
+
+Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+```yaml
+name: analytics_123456789.events
+type: athena.sensor.query
+parameters:
+    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
+```
