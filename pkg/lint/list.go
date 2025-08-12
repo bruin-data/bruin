@@ -218,6 +218,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        EnsurePipelineConcurrencyIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
+		&SimpleRule{
+			Identifier:             "cross-pipeline-uri-dependencies",
+			Fast:                   true,
+			Severity:               ValidatorSeverityWarning,
+			CrossPipelineValidator: ValidateCrossPipelineURIDependencies,
+			ApplicableLevels:       []Level{LevelCrossPipeline},
+		},
 	}
 
 	if parser != nil {

@@ -24,9 +24,10 @@ const (
 )
 
 type (
-	pipelineFinder    func(root string, pipelineDefinitionFile []string) ([]string, error)
-	PipelineValidator func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error)
-	AssetValidator    func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
+	pipelineFinder         func(root string, pipelineDefinitionFile []string) ([]string, error)
+	PipelineValidator      func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error)
+	AssetValidator         func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
+	CrossPipelineValidator func(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error)
 )
 
 type pipelineBuilder interface {
@@ -44,17 +45,19 @@ type Rule interface {
 	IsFast() bool
 	Validate(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error)
 	ValidateAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
+	ValidateCrossPipeline(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error)
 	GetApplicableLevels() []Level
 	GetSeverity() ValidatorSeverity
 }
 
 type SimpleRule struct {
-	Identifier       string
-	Fast             bool
-	Validator        PipelineValidator
-	AssetValidator   AssetValidator
-	ApplicableLevels []Level
-	Severity         ValidatorSeverity
+	Identifier             string
+	Fast                   bool
+	Validator              PipelineValidator
+	AssetValidator         AssetValidator
+	CrossPipelineValidator CrossPipelineValidator
+	ApplicableLevels       []Level
+	Severity               ValidatorSeverity
 }
 
 func (g *SimpleRule) Validate(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
@@ -71,6 +74,14 @@ func (g *SimpleRule) ValidateAsset(ctx context.Context, pipeline *pipeline.Pipel
 	}
 
 	return g.AssetValidator(ctx, pipeline, asset)
+}
+
+func (g *SimpleRule) ValidateCrossPipeline(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
+	if g.CrossPipelineValidator == nil {
+		return []*Issue{}, nil
+	}
+
+	return g.CrossPipelineValidator(ctx, pipelines)
 }
 
 func (g *SimpleRule) Name() string {
@@ -351,11 +362,35 @@ func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeli
 		AssetWithExcludeTagCount: assetWithExcludeTagCount,
 	}
 
+	// First, run cross-pipeline validation rules
+	crossPipelineIssues := make(map[Rule][]*Issue)
+	for _, rule := range l.rules {
+		if slices.Contains(rule.GetApplicableLevels(), LevelCrossPipeline) {
+			issues, err := rule.ValidateCrossPipeline(ctx, pipelines)
+			if err != nil {
+				return nil, err
+			}
+			if len(issues) > 0 {
+				crossPipelineIssues[rule] = issues
+			}
+		}
+	}
+
+	// Then, run individual pipeline validation
 	for _, p := range pipelines {
 		pipelineResult, err := l.LintPipeline(ctx, p)
 		if err != nil {
 			return nil, err
 		}
+
+		// Add cross-pipeline issues to the first pipeline's result
+		// (this is a design choice - we could distribute them differently)
+		if len(crossPipelineIssues) > 0 && len(result.Pipelines) == 0 {
+			for rule, issues := range crossPipelineIssues {
+				pipelineResult.Issues[rule] = append(pipelineResult.Issues[rule], issues...)
+			}
+		}
+
 		result.Pipelines = append(result.Pipelines, pipelineResult)
 	}
 

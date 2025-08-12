@@ -1297,6 +1297,11 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	return issues, nil
 }
 
+func (u UsedTableValidatorRule) ValidateCrossPipeline(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
+	// This rule doesn't need cross-pipeline validation
+	return []*Issue{}, nil
+}
+
 func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
@@ -1316,8 +1321,7 @@ func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, err
 
 func EnsurePipelineConcurrencyIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-
-	if p.Concurrency < 1 {
+	if p.Concurrency <= 0 {
 		issues = append(issues, &Issue{
 			Description: pipelineConcurrencyMustBePositive,
 		})
@@ -1348,6 +1352,68 @@ func EnsureSecretMappingsHaveKeyForASingleAsset(ctx context.Context, p *pipeline
 				Task:        asset,
 				Description: secretMappingKeyMustExist,
 			})
+		}
+	}
+	return issues, nil
+}
+
+// ValidateCrossPipelineURIDependencies validates all URI dependencies across all pipelines
+// and returns warnings for any URI dependencies that cannot be resolved or duplicate URIs.
+func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	// Create a map of all available URIs across all pipelines and track duplicates
+	availableURIs := make(map[string]*pipeline.Asset)
+	uriToAssets := make(map[string][]*pipeline.Asset)
+
+	for _, pl := range pipelines {
+		for _, asset := range pl.Assets {
+			if asset.URI != "" {
+				availableURIs[asset.URI] = asset
+				uriToAssets[asset.URI] = append(uriToAssets[asset.URI], asset)
+			}
+		}
+	}
+
+	// Check for duplicate URIs
+	for uri, assets := range uriToAssets {
+		if len(assets) > 1 {
+			// Report duplicate URI issue for the first asset
+			assetNames := make([]string, len(assets))
+			for i, asset := range assets {
+				assetNames[i] = asset.Name
+			}
+			issues = append(issues, &Issue{
+				Task:        assets[0],
+				Description: fmt.Sprintf("Duplicate URI '%s' found across multiple assets: %s", uri, strings.Join(assetNames, ", ")),
+			})
+		}
+	}
+
+	// Check each asset in all pipelines for URI dependencies
+	for _, pl := range pipelines {
+		for _, asset := range pl.Assets {
+			for _, dep := range asset.Upstreams {
+				if dep.Type != "uri" {
+					continue
+				}
+
+				if dep.Value == "" {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "URI dependency cannot be empty",
+					})
+					continue
+				}
+
+				// Check if the URI exists in any of the available pipelines
+				if _, exists := availableURIs[dep.Value]; !exists {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: fmt.Sprintf("Cross-pipeline URI dependency '%s' not found in any available pipeline", dep.Value),
+					})
+				}
+			}
 		}
 	}
 
