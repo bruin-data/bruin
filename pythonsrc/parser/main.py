@@ -130,7 +130,7 @@ def get_table_name(table: exp.Table):
     schema_name = ""
     if hasattr(table, "db") and table.db:
         schema_name = table.db + "."
-    
+
     # Handle case where table name is inside an Anonymous expression (e.g., SQL Server's table(nolock))
     table_name = table.name
     if not table_name and hasattr(table, "this"):
@@ -142,7 +142,7 @@ def get_table_name(table: exp.Table):
                 table_name = str(table.this.this)
         elif isinstance(table.this, exp.Identifier):
             table_name = table.this.this
-    
+
     return db_name + schema_name + table_name
 
 

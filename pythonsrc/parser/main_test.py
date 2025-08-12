@@ -2269,49 +2269,49 @@ def test_merge_parts():
     """Test merge_parts function with various table formats including SQL Server hints."""
     from sqlglot import parse_one
     from .main import merge_parts
-    
+
     # Test simple table name
     query = "SELECT * FROM users"
     parsed = parse_one(query, dialect="bigquery")
     table = parsed.find(exp.Table)
     assert merge_parts(table) == "users"
-    
+
     # Test table with schema
     query = "SELECT * FROM myschema.users"
     parsed = parse_one(query, dialect="bigquery")
     table = parsed.find(exp.Table)
     assert merge_parts(table) == "myschema.users"
-    
+
     # Test table with catalog and schema
     query = "SELECT * FROM mycatalog.myschema.users"
     parsed = parse_one(query, dialect="bigquery")
     table = parsed.find(exp.Table)
     assert merge_parts(table) == "mycatalog.myschema.users"
-    
+
     # Test SQL Server table with nolock hint - this is the key test case
     query = "SELECT * FROM Warehouse.schema.FactTable(nolock)"
     parsed = parse_one(query, dialect="tsql")
     table = parsed.find(exp.Table)
     assert merge_parts(table) == "Warehouse.schema.FactTable"
-    
+
     # Test SQL Server table with multiple hints
     query = "SELECT * FROM sales.orders(nolock, nowait)"
     parsed = parse_one(query, dialect="tsql")
     table = parsed.find(exp.Table)
     assert merge_parts(table) == "sales.orders"
-    
+
     # Test SQL Server table with hints and brackets
     query = "SELECT * FROM mytable.[dbo].[my_fact](nolock)"
     parsed = parse_one(query, dialect="tsql")
     table = parsed.find(exp.Table)
     assert merge_parts(table) == "mytable.dbo.my_fact"
-    
+
     # Test SQL Server simple table with hint
     query = "SELECT * FROM employees(nolock)"
     parsed = parse_one(query, dialect="tsql")
     table = parsed.find(exp.Table)
     assert merge_parts(table) == "employees"
-    
+
     # Test in a JOIN context
     query = """
     SELECT * FROM 
@@ -2329,67 +2329,67 @@ def test_get_table_name():
     """Test get_table_name function with various table formats and dialects."""
     from sqlglot import parse_one
     from .main import get_table_name
-    
+
     # Test simple table name
     query = "SELECT * FROM users"
     parsed = parse_one(query, dialect="bigquery")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "users"
-    
+
     # Test table with schema
     query = "SELECT * FROM myschema.users"
     parsed = parse_one(query, dialect="bigquery")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "myschema.users"
-    
+
     # Test table with catalog and schema
     query = "SELECT * FROM mycatalog.myschema.users"
     parsed = parse_one(query, dialect="bigquery")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "mycatalog.myschema.users"
-    
+
     # Test SQL Server table with nolock hint
     query = "SELECT * FROM Warehouse.schema.FactTable(nolock)"
     parsed = parse_one(query, dialect="tsql")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "Warehouse.schema.FactTable"
-    
+
     # Test SQL Server table with multiple hints
     query = "SELECT * FROM sales.orders(nolock, nowait)"
     parsed = parse_one(query, dialect="tsql")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "sales.orders"
-    
+
     # Test SQL Server simple table with hint
     query = "SELECT * FROM employees(nolock)"
     parsed = parse_one(query, dialect="tsql")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "employees"
-    
+
     # Test BigQuery backticked table names
     query = "SELECT * FROM `project.dataset.table`"
     parsed = parse_one(query, dialect="bigquery")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "project.dataset.table"
-    
+
     # Test PostgreSQL quoted identifiers
     query = 'SELECT * FROM "public"."users"'
     parsed = parse_one(query, dialect="postgres")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "public.users"
-    
+
     # Test MySQL backticked identifiers
     query = "SELECT * FROM `database`.`table`"
     parsed = parse_one(query, dialect="mysql")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "database.table"
-    
+
     # Test Snowflake uppercase handling
     query = "SELECT * FROM DATABASE.SCHEMA.TABLE"
     parsed = parse_one(query, dialect="snowflake")
     table = parsed.find(exp.Table)
     assert get_table_name(table) == "DATABASE.SCHEMA.TABLE"
-    
+
     # Test complex SQL Server query with multiple tables
     query = """
     SELECT * FROM 
