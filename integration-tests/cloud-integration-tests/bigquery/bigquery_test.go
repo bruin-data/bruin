@@ -184,7 +184,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "query the nulltable table",
+							Name:    "query the table",
 							Command: binary,
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.nulltable ORDER BY id;", "--output", "csv"),
 							Env:     []string{},
@@ -198,7 +198,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "copy the nulltable_updated.sql to nulltable.sql",
+							Name:    "copy nulltable_updated.sql to nulltable.sql",
 							Command: "cp",
 							Args:    []string{filepath.Join(tempDir, "test-pipelines/nullable-pipeline/resources/nulltable_merge.sql"), filepath.Join(tempDir, "test-pipelines/nullable-pipeline/assets/nulltable.sql")},
 							Env:     []string{},
@@ -210,7 +210,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "run the merge pipeline",
+							Name:    "update table with merge",
 							Command: binary,
 							Args:    append(append([]string{"run"}, configFlags...), filepath.Join(tempDir, "test-pipelines/nullable-pipeline/assets/nulltable.sql")),
 							Env:     []string{},
@@ -222,7 +222,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "query the nulltable table",
+							Name:    "query the table",
 							Command: binary,
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.nulltable ORDER BY id;", "--output", "csv"),
 							Env:     []string{},
@@ -236,7 +236,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "drop the table if it exists",
+							Name:    "drop the table",
 							Command: binary,
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS dataset.nulltable;"),
 							Env:     []string{},
