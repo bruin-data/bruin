@@ -125,12 +125,25 @@ def extract_columns(parsed):
 
 def get_table_name(table: exp.Table):
     db_name = ""
-    if hasattr(table, "catalog") and len(table.catalog) > 0:
+    if hasattr(table, "catalog") and table.catalog:
         db_name = table.catalog + "."
     schema_name = ""
-    if hasattr(table, "db") and len(table.db) > 0:
+    if hasattr(table, "db") and table.db:
         schema_name = table.db + "."
-    return db_name + schema_name + table.name
+    
+    # Handle case where table name is inside an Anonymous expression (e.g., SQL Server's table(nolock))
+    table_name = table.name
+    if not table_name and hasattr(table, "this"):
+        if isinstance(table.this, exp.Anonymous):
+            # Extract the function name part (e.g., "TableName" from "TableName(nolock)")
+            if isinstance(table.this.this, exp.Identifier):
+                table_name = table.this.this.name
+            else:
+                table_name = str(table.this.this)
+        elif isinstance(table.this, exp.Identifier):
+            table_name = table.this.this
+    
+    return db_name + schema_name + table_name
 
 
 def get_tables(query: str, dialect: str):
@@ -152,7 +165,7 @@ def get_tables(query: str, dialect: str):
             return {"tables": [], "error": str(e)}
 
     return {
-        "tables": list(set([get_table_name(table) for table in tables])),
+        "tables": sorted(list(set([get_table_name(table) for table in tables]))),
     }
 
 
@@ -322,9 +335,18 @@ def find_leaf_nodes(node: Node, leaf_nodes):
 
 
 def merge_parts(table: exp.Table) -> str:
-    return ".".join(
-        part.name for part in table.parts if isinstance(part, exp.Identifier)
-    )
+    parts = []
+    for part in table.parts:
+        if isinstance(part, exp.Identifier):
+            parts.append(part.name)
+        elif isinstance(part, exp.Anonymous):
+            # Handle SQL Server syntax like table(nolock)
+            # Extract just the table name part
+            if isinstance(part.this, exp.Identifier):
+                parts.append(part.this.name)
+            else:
+                parts.append(str(part.this))
+    return ".".join(parts)
 
 
 def schema_dict_to_schema_object(schema_dict: dict) -> dict:
