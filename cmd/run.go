@@ -39,6 +39,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/secrets"
 	"github.com/bruin-data/bruin/pkg/snowflake"
@@ -1413,6 +1414,11 @@ func SetupExecutors(
 			mainExecutors[typ][scheduler.TaskInstanceTypeColumnCheck] = emrCheckRunner
 			mainExecutors[typ][scheduler.TaskInstanceTypeCustomCheck] = emrCustomCheckRunner
 		}
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeS3KeySensor) {
+		s3KeySensor := s3.NewKeySensor(conn, sensorMode)
+		mainExecutors[pipeline.AssetTypeS3KeySensor][scheduler.TaskInstanceTypeMain] = s3KeySensor
 	}
 
 	return mainExecutors, nil

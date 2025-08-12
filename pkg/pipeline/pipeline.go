@@ -97,6 +97,7 @@ const (
 	AssetTypeModeBI                 = AssetType("modebi")
 	AssetTypeRedash                 = AssetType("redash")
 	AssetTypeGoodData               = AssetType("gooddata")
+	AssetTypeS3KeySensor            = AssetType("s3.sensor.key_sensor")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
@@ -592,6 +593,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeTrinoQuerySensor:      "trino",
 	AssetTypeOracleQuery:           "oracle",
 	AssetTypeOracleSource:          "oracle",
+	AssetTypeS3KeySensor:           "aws",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{

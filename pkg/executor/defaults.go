@@ -267,7 +267,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
-	"s3.sensor.key_sensor": {
+	pipeline.AssetTypeS3KeySensor: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
