@@ -266,10 +266,33 @@ func TestAthenaWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time: restore products asset to initial state",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
-						Env:     []string{},
+						Name:    "scd2-by-time: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempDir, "test-scd2-by-time")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "scd2-by-time: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempDir, "test-scd2-by-time"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "scd2-by-time: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline"), filepath.Join(tempDir, "test-scd2-by-time")},
+						WorkingDir: filepath.Join(tempDir, "test-scd2-by-time"),
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
@@ -280,23 +303,25 @@ func TestAthenaWorkflows(t *testing.T) {
 					{
 						Name:    "scd2-by-time: create the initial products table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
+							Contains: []string{"Finished: products"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
+							e2e.AssertByContains,
 						},
 					},
 					{
 						Name:    "scd2-by-time: query the initial table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM products ORDER BY product_id, _valid_from;", "--output", "csv"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM products ORDER BY product_id, _valid_from;", "--output", "csv"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_initial.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/expectations/scd2_by_time_expected_initial.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -306,7 +331,7 @@ func TestAthenaWorkflows(t *testing.T) {
 					{
 						Name:    "scd2-by-time: copy products_updated_01.sql to products.sql",
 						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated_01.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated_01.sql"), filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -318,23 +343,25 @@ func TestAthenaWorkflows(t *testing.T) {
 					{
 						Name:    "scd2-by-time: run products_updated_01.sql with SCD2 materialization",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
+							Contains: []string{"Finished: products"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
+							e2e.AssertByContains,
 						},
 					},
 					{
 						Name:    "scd2-by-time: query the updated table 01",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM products ORDER BY product_id, _valid_from;", "--output", "csv"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM products ORDER BY product_id, _valid_from;", "--output", "csv"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_01.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_01.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -344,7 +371,7 @@ func TestAthenaWorkflows(t *testing.T) {
 					{
 						Name:    "scd2-by-time: copy products_updated_02.sql to products.sql",
 						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated_02.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated_02.sql"), filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -356,23 +383,25 @@ func TestAthenaWorkflows(t *testing.T) {
 					{
 						Name:    "scd2-by-time: run products_updated_02.sql with SCD2 materialization",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
+							Contains: []string{"Finished: products"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
+							e2e.AssertByContains,
 						},
 					},
 					{
 						Name:    "scd2-by-time: query the updated table 02",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM products ORDER BY product_id, _valid_from;", "--output", "csv"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM products ORDER BY product_id, _valid_from;", "--output", "csv"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_02.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_02.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
