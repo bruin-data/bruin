@@ -49,6 +49,58 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 				e2e.AssertByExitCode,
 			},
 		},
+		{
+			Name:    "dry-run-bad-asset-path",	
+			Command: binary,
+			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/non_existent_asset.sql")),
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "Please provide a valid asset path",
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "dry-run-non-bq-asset",	
+			Command: binary,
+			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/non_bq_asset.sql")),
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "asset-metadata is only available for BigQuery SQL assets",
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "dry-run-malformed-asset",	
+			Command: binary,
+			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/malformed_asset.sql")),
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "no query found in asset",
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "dry-run-empty-asset",	
+			Command: binary,
+			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/empty.sql")),
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "no query found in asset: empty.sql",
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 	}
 
 	for _, task := range tasks {
