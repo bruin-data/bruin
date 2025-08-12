@@ -2838,7 +2838,6 @@ func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func TestEnsureSecretMappingsHaveKeyForASingleAsset(t *testing.T) {
 	t.Parallel()
 
