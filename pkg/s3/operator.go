@@ -10,6 +10,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -60,12 +61,8 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		return errors.Errorf("'%s' either does not exist or is not an AWS connection", connName)
 	}
 
-	if awsConn.Region == "" {
-		return errors.New("AWS connection requires a region")
-	}
-
+	// Load base config without forcing region
 	cfg, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion(awsConn.Region),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			awsConn.AccessKey, awsConn.SecretKey, "",
 		)),
@@ -74,6 +71,22 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		return errors.Wrap(err, "failed to load AWS config")
 	}
 
+	// If region is not set, discover it from the bucket
+	region := awsConn.Region
+	if region == "" {
+		tmpCfg := cfg
+		tmpCfg.Region = "us-east-1" // fallback for discovery
+		tmpS3 := s3.NewFromConfig(tmpCfg)
+
+		discoveredRegion, err := manager.GetBucketRegion(ctx, tmpS3, bucketName)
+		if err != nil {
+			return errors.Wrap(err, "failed to determine bucket region")
+		}
+		region = discoveredRegion
+	}
+
+	// Rebuild config with correct region
+	cfg.Region = region
 	s3Client := s3.NewFromConfig(cfg)
 
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
