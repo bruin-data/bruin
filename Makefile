@@ -93,16 +93,16 @@ test-unit:
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
-	go vet ./... &
+	go vet -tags="no_duckdb_arrow" ./... & 
 
 	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
-	gci write cmd pkg integration-tests/integration-test.go main.go &
+	gci write cmd pkg integration-tests/integration_test.go main.go &
 
 	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
 	gofumpt -w cmd pkg &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	golangci-lint run --timeout 10m60s ./...  & \
+	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
 	wait
 
 tools:
