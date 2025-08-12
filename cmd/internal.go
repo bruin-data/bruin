@@ -1189,12 +1189,10 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Only for BigQuery assets
 			if pp.Asset.Type != pipeline.AssetTypeBigqueryQuery {
 				return cli.Exit("asset-metadata is only available for BigQuery SQL assets", 1)
 			}
 
-			// Prepare extractor and get the rendered query
 			parser, err := sqlparser.NewSQLParser(false)
 			if err != nil {
 				printErrorJSON(err)
@@ -1221,7 +1219,6 @@ func AssetMetadata() *cli.Command {
 			}
 			q := queries[0]
 
-			// Resolve connection manager and BigQuery client
 			manager, errs := connection.NewManagerFromConfig(pp.Config)
 			if len(errs) > 0 {
 				printErrorJSON(errs[0])
