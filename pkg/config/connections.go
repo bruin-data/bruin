@@ -14,6 +14,7 @@ type AwsConnection struct {
 	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKey string `yaml:"access_key,omitempty" json:"access_key" mapstructure:"access_key"`
 	SecretKey string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key"`
+	Region    string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 }
 
 func (c AwsConnection) GetName() string {

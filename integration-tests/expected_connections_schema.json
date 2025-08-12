@@ -199,6 +199,9 @@
         },
         "secret_key": {
           "type": "string"
+        },
+        "region": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -206,7 +209,8 @@
       "required": [
         "name",
         "access_key",
-        "secret_key"
+        "secret_key",
+        "region"
       ]
     },
     "ChessConnection": {
@@ -351,12 +355,6 @@
           },
           "type": "array"
         },
-        "motherduck": {
-          "items": {
-            "$ref": "#/$defs/MotherduckConnection"
-          },
-          "type": "array"
-        },
         "mysql": {
           "items": {
             "$ref": "#/$defs/MySQLConnection"
@@ -417,12 +415,6 @@
           },
           "type": "array"
         },
-        "influxdb": {
-          "items": {
-            "$ref": "#/$defs/InfluxDBConnection"
-          },
-          "type": "array"
-        },
         "appsflyer": {
           "items": {
             "$ref": "#/$defs/AppsflyerConnection"
@@ -438,6 +430,12 @@
         "duckdb": {
           "items": {
             "$ref": "#/$defs/DuckDBConnection"
+          },
+          "type": "array"
+        },
+        "motherduck": {
+          "items": {
+            "$ref": "#/$defs/MotherduckConnection"
           },
           "type": "array"
         },
@@ -702,6 +700,12 @@
         "isoc_pulse": {
           "items": {
             "$ref": "#/$defs/ISOCPulseConnection"
+          },
+          "type": "array"
+        },
+        "influxdb": {
+          "items": {
+            "$ref": "#/$defs/InfluxDBConnection"
           },
           "type": "array"
         },
@@ -1188,6 +1192,40 @@
       "required": [
         "name",
         "token"
+      ]
+    },
+    "InfluxDBConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "token": {
+          "type": "string"
+        },
+        "org": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "secure": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "token",
+        "org",
+        "bucket"
       ]
     },
     "KafkaConnection": {
@@ -2007,40 +2045,6 @@
         "api_key"
       ]
     },
-    "InfluxDBConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port":{
-          "type": "integer"
-        },
-        "secure": {
-          "type": "string"
-        },
-        "token": {
-          "type": "string"
-        },
-        "org": {
-          "type": "string"
-        },
-        "bucket": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "host",
-        "token",
-        "org",
-        "bucket"
-      ]
-    },
     "SynapseConnection": {
       "properties": {
         "name": {
@@ -2114,6 +2118,29 @@
         "api_version"
       ]
     },
+    "TikTokAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "advertiser_ids": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token",
+        "advertiser_ids"
+      ]
+    },
     "TrinoConnection": {
       "properties": {
         "name": {
@@ -2149,29 +2176,6 @@
         "schema"
       ]
     },
-    "TikTokAdsConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_token": {
-          "type": "string"
-        },
-        "advertiser_ids": {
-          "type": "string"
-        },
-        "timezone": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "access_token",
-        "advertiser_ids"
-      ]
-    },
     "TrustpilotConnection": {
       "properties": {
         "name": {
@@ -2189,6 +2193,22 @@
       "required": [
         "name",
         "business_unit_id",
+        "api_key"
+      ]
+    },
+    "WiseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
         "api_key"
       ]
     },
@@ -2218,22 +2238,6 @@
         "email",
         "oauth_token",
         "sub_domain"
-      ]
-    },
-    "WiseConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_key"
       ]
     },
     "ZoomConnection": {
