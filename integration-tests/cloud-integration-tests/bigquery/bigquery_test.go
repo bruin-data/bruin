@@ -50,7 +50,7 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			Name:    "dry-run-bad-asset-path",	
+			Name:    "dry-run-bad-asset-path",
 			Command: binary,
 			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/non_existent_asset.sql")),
 			Expected: e2e.Output{
@@ -63,7 +63,7 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			Name:    "dry-run-non-bq-asset",	
+			Name:    "dry-run-non-bq-asset",
 			Command: binary,
 			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/non_bq_asset.sql")),
 			Expected: e2e.Output{
@@ -76,7 +76,7 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			Name:    "dry-run-malformed-asset",	
+			Name:    "dry-run-malformed-asset",
 			Command: binary,
 			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/malformed_asset.sql")),
 			Expected: e2e.Output{
@@ -89,7 +89,7 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			Name:    "dry-run-empty-asset",	
+			Name:    "dry-run-empty-asset",
 			Command: binary,
 			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/empty.sql")),
 			Expected: e2e.Output{
@@ -503,9 +503,9 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:	"dry-run-pipeline: query the table",
-							Command: binary,
-							Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/select.sql")),
+							Name:          "dry-run-pipeline: query the table",
+							Command:       binary,
+							Args:          append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/select.sql")),
 							SkipJSONNodes: []string{`"ProjectID"`},
 							Expected: e2e.Output{
 								ExitCode: 0,

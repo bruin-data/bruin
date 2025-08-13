@@ -11,9 +11,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
-// Mock interfaces
+// Mock interfaces.
 type mockConnectionGetter struct {
 	mock.Mock
 }
@@ -42,7 +43,10 @@ func (m *mockQueryExtractor) ExtractQueriesFromString(filepath string) ([]*query
 }
 
 func TestDryRunner_DryRun(t *testing.T) {
+	t.Parallel()
+
 	t.Run("non-BigQuery asset type should error", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -62,12 +66,13 @@ func TestDryRunner_DryRun(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "asset-metadata is only available for BigQuery SQL assets")
 		assert.Nil(t, result)
 	})
 
 	t.Run("query extractor error", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -89,7 +94,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "syntax error")
 		assert.Nil(t, result)
 
@@ -97,6 +102,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 	})
 
 	t.Run("no queries found", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -118,7 +124,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no query found in asset")
 		assert.Nil(t, result)
 
@@ -126,6 +132,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 	})
 
 	t.Run("pipeline connection name error - no default connection", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -152,7 +159,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
@@ -161,6 +168,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 	})
 
 	t.Run("connection is not BigQuery", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -189,7 +197,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
@@ -198,6 +206,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 	})
 
 	t.Run("asset with explicit connection", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -238,7 +247,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, "SELECT", result["bigquery"].(*bigquery.QueryStatistics).StatementType)
 
@@ -249,7 +258,10 @@ func TestDryRunner_DryRun(t *testing.T) {
 }
 
 func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil context", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -276,9 +288,9 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(nil, *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(context.TODO(), *pipeline, asset, &config.Config{})
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
@@ -287,6 +299,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("nil config", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -315,7 +328,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, nil)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
@@ -324,6 +337,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("empty query content", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -349,7 +363,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no query found in asset")
 		assert.Nil(t, result)
 
@@ -357,6 +371,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("multiple queries - uses first query", func(t *testing.T) {
+		t.Parallel()
 		connGetter := &mockConnectionGetter{}
 		queryExtractor := &mockQueryExtractor{}
 
@@ -386,7 +401,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 
 		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
