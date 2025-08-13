@@ -1189,60 +1189,28 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			if pp.Asset.Type != pipeline.AssetTypeBigqueryQuery {
-				return cli.Exit("asset-metadata is only available for BigQuery SQL assets", 1)
+			manager, errs := connection.NewManagerFromConfig(pp.Config)
+			if len(errs) > 0 {
+				printErrorJSON(errs[0])
+				return cli.Exit("", 1)
 			}
 
-			parser, err := sqlparser.NewSQLParser(false)
-			if err != nil {
-				printErrorJSON(err)
-				return cli.Exit("", 1)
-			}
-			defer parser.Close()
-			if err := parser.Start(); err != nil {
-				printErrorJSON(err)
-				return cli.Exit("", 1)
-			}
 			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: query.DefaultJinjaRenderer}
 			extractor, err := whole.CloneForAsset(ctx, pp.Pipeline, pp.Asset)
 			if err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)
 			}
-			queries, err := extractor.ExtractQueriesFromString(pp.Asset.ExecutableFile.Content)
-			if err != nil || len(queries) == 0 {
-				if err == nil {
-					err = errors.New("no query found in asset")
-				}
-				printErrorJSON(err)
-				return cli.Exit("", 1)
-			}
-			q := queries[0]
 
-			manager, errs := connection.NewManagerFromConfig(pp.Config)
-			if len(errs) > 0 {
-				printErrorJSON(errs[0])
-				return cli.Exit("", 1)
+			dryRunner := bigquery.DryRunner{
+				ConnectionGetter: manager,
+				QueryExtractor:   extractor,
 			}
-			connName, err := pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
+
+			response, err := dryRunner.DryRun(ctx, *pp.Pipeline, *pp.Asset, pp.Config)
 			if err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)
-			}
-			conn := manager.GetConnection(connName)
-			bqClient, ok := conn.(*bigquery.Client)
-			if !ok {
-				return cli.Exit("resolved connection is not BigQuery", 1)
-			}
-
-			meta, err := bqClient.QueryDryRun(ctx, q)
-			if err != nil {
-				printErrorJSON(err)
-				return cli.Exit("", 1)
-			}
-
-			response := map[string]interface{}{
-				"bigquery": meta,
 			}
 
 			out, err := json.Marshal(response)

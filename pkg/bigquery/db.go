@@ -238,29 +238,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	return result, nil
 }
 
-type QueryMetadata struct {
-	BIEngineStatistics            *bigquery.BIEngineStatistics
-	BillingTier                   int64
-	CacheHit                      bool
-	StatementType                 string
-	TotalBytesBilled              int64
-	TotalBytesProcessed           int64
-	TotalBytesProcessedAccuracy   string
-	QueryPlan                     []*bigquery.ExplainQueryStage
-	NumDMLAffectedRows            int64
-	DMLStats                      *bigquery.DMLStatistics
-	Timeline                      []*bigquery.QueryTimelineSample
-	ReferencedTables              []*bigquery.Table
-	Schema                        bigquery.Schema
-	SlotMillis                    int64
-	UndeclaredQueryParameterNames []string
-	DDLTargetTable                *bigquery.Table
-	DDLOperationPerformed         string
-	DDLTargetRoutine              *bigquery.Routine
-	ExportDataStatistics          *bigquery.ExportDataStatistics
-}
-
-func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*QueryMetadata, error) {
+func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
 	q := d.client.Query(queryObj.String())
 	q.DryRun = true
 	// Respect configured client location if set
@@ -290,29 +268,7 @@ func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*Query
 		return nil, errors.New("missing query statistics details in dry run status")
 	}
 
-	result := &QueryMetadata{
-		BIEngineStatistics:            qs.BIEngineStatistics,
-		BillingTier:                   qs.BillingTier,
-		CacheHit:                      qs.CacheHit,
-		StatementType:                 qs.StatementType,
-		TotalBytesBilled:              qs.TotalBytesBilled,
-		TotalBytesProcessed:           qs.TotalBytesProcessed,
-		TotalBytesProcessedAccuracy:   qs.TotalBytesProcessedAccuracy,
-		QueryPlan:                     qs.QueryPlan,
-		NumDMLAffectedRows:            qs.NumDMLAffectedRows,
-		DMLStats:                      qs.DMLStats,
-		Timeline:                      qs.Timeline,
-		ReferencedTables:              qs.ReferencedTables,
-		Schema:                        qs.Schema,
-		SlotMillis:                    qs.SlotMillis,
-		UndeclaredQueryParameterNames: qs.UndeclaredQueryParameterNames,
-		DDLTargetTable:                qs.DDLTargetTable,
-		DDLOperationPerformed:         qs.DDLOperationPerformed,
-		DDLTargetRoutine:              qs.DDLTargetRoutine,
-		ExportDataStatistics:          qs.ExportDataStatistics,
-	}
-
-	return result, nil
+	return qs, nil
 }
 
 type NoMetadataUpdatedError struct{}
