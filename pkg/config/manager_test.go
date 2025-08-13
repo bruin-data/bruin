@@ -1892,8 +1892,11 @@ environments:
 
 	envConfigContentNoConnections := `default_environment: default
 environments:
-	default:
-    # No connections section - this should cause the error`
+    default:
+    connections:
+            duckdb:
+                - name: duckdb-default
+                  path: duckdb.db`
 
 	expectedConfig := &Config{
 		DefaultEnvironmentName:  "dev",
@@ -1957,7 +1960,9 @@ environments:
 			envConfig:      envConfigContentNoConnections,
 			configFilePath: "testdata/nonexistent.yml",
 			want:           nil,
-			wantErr:        assert.Error,
+			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				return assert.ErrorContains(t, err, "environment 'default' has no connections defined")
+			},
 		},
 	}
 
