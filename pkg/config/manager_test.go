@@ -1890,6 +1890,11 @@ environments:
           service_account_json: "{\"key10\": \"value10\"}"
           project_id: "my-project"`
 
+	envConfigContentNoConnections := `default_environment: default
+environments:
+	default:
+    # No connections section - this should cause the error`
+
 	expectedConfig := &Config{
 		DefaultEnvironmentName:  "dev",
 		SelectedEnvironmentName: "dev",
@@ -1943,6 +1948,13 @@ environments:
 		{
 			name:           "load from environment variable with empty content",
 			envConfig:      "",
+			configFilePath: "testdata/nonexistent.yml",
+			want:           nil,
+			wantErr:        assert.Error,
+		},
+		{
+			name:           "environment with no connections should error",
+			envConfig:      envConfigContentNoConnections,
 			configFilePath: "testdata/nonexistent.yml",
 			want:           nil,
 			wantErr:        assert.Error,
