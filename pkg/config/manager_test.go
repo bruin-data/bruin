@@ -632,6 +632,15 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "environment with no connections should error",
+			args: args{
+				path: "testdata/no_connections.yml",
+			},
+			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				return assert.ErrorContains(t, err, "environment 'default' has no connections defined")
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
