@@ -38,6 +38,6 @@ def replace_table_references(
                     table_node.set("alias", source_table)
 
     return {
-        "query": "; ".join([q.sql() for q in parsed_queries]),
+        "query": "; ".join([q.sql(dialect=dialect) for q in parsed_queries]),
         "error": None,
     }

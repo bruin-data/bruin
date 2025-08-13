@@ -823,6 +823,14 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			},
 			want: "SELECT * FROM raw_dev.items",
 		},
+		{
+			name:  `SELECT from unnest`,
+			query: "SELECT d FROM `raw.mytable` join unnest(json_extract_array(values.domains)) as d",
+			tableMappings: map[string]string{
+				"raw.mytable": "raw_dev.mytable",
+			},
+			want: "SELECT d FROM `mytable`, UNNEST(JSON_EXTRACT_ARRAY(values.domains, '$')) AS d",
+		},
 	}
 
 	for _, tt := range tests { //nolint
