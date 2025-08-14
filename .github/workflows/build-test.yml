@@ -29,7 +29,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.ref == 'refs/heads/main' && github.sha || github.ref) }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 
 env:
@@ -45,13 +45,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 # TODO: Replace with actions/setup-go once issue is resolved https://github.com/actions/setup-go/pull/515
       - name: Setup Go 
         uses: antontroshin/setup-go@windows-go-mod-cache
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
+          cache: true
       - run: make test
 
 
@@ -63,23 +64,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 # TODO: Replace with actions/setup-go once issue is resolved https://github.com/actions/setup-go/pull/515
       - name: Setup Go 
         uses: antontroshin/setup-go@windows-go-mod-cache
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
+          cache: true
       - name: Install winget
         if: matrix.platform == 'windows-2022'
         uses: Cyberboss/install-winget@v1
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            bin/
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-
       - name: Build Bruin executable
         run: |
           mkdir -p bin
           if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
-            go build -o bin/bruin.exe .
+            go build -tags="no_duckdb_arrow" -ldflags="-s -w" -o bin/bruin.exe .
           else
-            go build -o bin/bruin .
+            go build -tags="no_duckdb_arrow" -ldflags="-s -w" -o bin/bruin .
           fi
         shell: bash
       - run: ENABLE_PARALLEL=1 make integration-test

@@ -29,7 +29,11 @@ build-no-duckdb: deps
 	@echo "$(OK_COLOR)==> Building the application without DuckDB support...$(NO_COLOR)"
 	@CGO_ENABLED=0 go build -v -tags="bruin_no_duckdb" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)-no-duckdb" "$(BUILD_SRC)"
 
-integration-test: build
+build-fast:
+	@echo "$(OK_COLOR)==> Building the application (fast)...$(NO_COLOR)"
+	@CGO_ENABLED=1 go build -tags="no_duckdb_arrow" -ldflags="-s -w" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
+
+integration-test: build-fast
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
 	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
 	@touch integration-tests/.git
