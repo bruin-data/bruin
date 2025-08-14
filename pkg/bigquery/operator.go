@@ -315,6 +315,11 @@ func (ts *TableSensor) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	return ts.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
 
+type SensorDB interface {
+	BuildTableExistsQuery(tableName string) (string, error)
+	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+}
+
 func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
 	if ts.sensorMode == "skip" {
 		return nil
@@ -329,7 +334,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, ok := ts.connection.GetConnection(connName).(DB)
+	conn, ok := ts.connection.GetConnection(connName).(SensorDB)
 	if !ok {
 		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
