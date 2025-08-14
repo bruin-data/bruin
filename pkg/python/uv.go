@@ -67,11 +67,34 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
 	u.mut.Lock()
 	defer u.mut.Unlock()
 
-	// Check if uv is already installed
-	m := user.NewConfigManager(afero.NewOsFs())
-	bruinHomeDirAbsPath, err := m.EnsureAndGetBruinHomeDir()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get bruin home directory")
+	// Check if we're running integration tests and should use a temporary directory
+	var bruinHomeDirAbsPath string
+	if os.Getenv("BRUIN_INTEGRATION_TEST") == "1" {
+		testTempDir := os.Getenv("BRUIN_TEST_TEMP_DIR")
+		if testTempDir != "" {
+			// Use the test-specific temporary directory for uv installation
+			bruinHomeDirAbsPath = testTempDir
+			// Ensure the temporary directory exists
+			if err := os.MkdirAll(bruinHomeDirAbsPath, 0755); err != nil {
+				return "", errors.Wrap(err, "failed to create test temporary directory")
+			}
+		} else {
+			// Fallback to regular bruin home directory
+			m := user.NewConfigManager(afero.NewOsFs())
+			var err error
+			bruinHomeDirAbsPath, err = m.EnsureAndGetBruinHomeDir()
+			if err != nil {
+				return "", errors.Wrap(err, "failed to get bruin home directory")
+			}
+		}
+	} else {
+		// Regular operation - use bruin home directory
+		m := user.NewConfigManager(afero.NewOsFs())
+		var err error
+		bruinHomeDirAbsPath, err = m.EnsureAndGetBruinHomeDir()
+		if err != nil {
+			return "", errors.Wrap(err, "failed to get bruin home directory")
+		}
 	}
 	var binaryName string
 	if runtime.GOOS == "windows" {

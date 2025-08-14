@@ -1,9 +1,11 @@
 package main_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
@@ -95,6 +97,59 @@ var (
 	}
 )
 
+// Global variables for managing shared temporary directories
+var (
+	sharedTempDir      string
+	sharedTempDirOnce  sync.Once
+	sharedTempDirMutex sync.Mutex
+)
+
+// getSharedTempDir returns a shared temporary directory for all integration tests
+func getSharedTempDir(t *testing.T) string {
+	sharedTempDirOnce.Do(func() {
+		var err error
+		sharedTempDir, err = os.MkdirTemp("", "bruin-integration-tests-*")
+		if err != nil {
+			t.Fatalf("Failed to create shared temporary directory: %v", err)
+		}
+		t.Logf("Created shared temporary directory: %s", sharedTempDir)
+	})
+	return sharedTempDir
+}
+
+// getTestTempDir returns a unique temporary directory for a specific test
+func getTestTempDir(t *testing.T) string {
+	sharedTempDirMutex.Lock()
+	defer sharedTempDirMutex.Unlock()
+
+	sharedDir := getSharedTempDir(t)
+	testDir, err := os.MkdirTemp(sharedDir, "test-*")
+	if err != nil {
+		t.Fatalf("Failed to create test temporary directory: %v", err)
+	}
+	return testDir
+}
+
+// setupTestEnvironment sets up the test environment with temporary directories
+func setupTestEnvironment(t *testing.T) {
+	// Set environment variable to indicate we're running integration tests
+	os.Setenv("BRUIN_INTEGRATION_TEST", "1")
+}
+
+// setupTaskEnvironment sets up the environment for an individual task
+func setupTaskEnvironment(t *testing.T) {
+	// Create a unique temporary directory for this specific task
+	taskTempDir := getTestTempDir(t)
+	os.Setenv("BRUIN_TEST_TEMP_DIR", taskTempDir)
+}
+
+// cleanupTestEnvironment cleans up the test environment
+func cleanupTestEnvironment(t *testing.T) {
+	// Clean up test-specific environment variables
+	os.Unsetenv("BRUIN_TEST_TEMP_DIR")
+	os.Unsetenv("BRUIN_INTEGRATION_TEST")
+}
+
 func cleanupDuckDBFiles(t *testing.T) {
 	duckdbFilesDir := "duckdb-files"
 
@@ -115,6 +170,10 @@ func TestIndividualTasks(t *testing.T) {
 	if os.Getenv("ENABLE_PARALLEL") == "1" {
 		t.Parallel()
 	}
+
+	// Setup test environment
+	setupTestEnvironment(t)
+	defer cleanupTestEnvironment(t)
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1023,6 +1082,10 @@ func TestIndividualTasks(t *testing.T) {
 			if os.Getenv("ENABLE_PARALLEL") == "1" {
 				t.Parallel()
 			}
+
+			// Setup task-specific environment (each task gets its own UV installation directory)
+			setupTaskEnvironment(t)
+
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
 			t.Logf("Task '%s' completed successfully", tt.task.Name)
@@ -1038,6 +1101,10 @@ func TestWorkflowTasks(t *testing.T) {
 	if os.Getenv("ENABLE_PARALLEL") == "1" {
 		t.Parallel()
 	}
+
+	// Setup test environment
+	setupTestEnvironment(t)
+	defer cleanupTestEnvironment(t)
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
@@ -1765,6 +1832,10 @@ func TestIngestrTasks(t *testing.T) {
 		t.Parallel()
 	}
 
+	// Setup test environment
+	setupTestEnvironment(t)
+	defer cleanupTestEnvironment(t)
+
 	currentFolder, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current working directory: %v", err)
@@ -1856,9 +1927,37 @@ func TestIngestrTasks(t *testing.T) {
 			if os.Getenv("ENABLE_PARALLEL") == "1" {
 				t.Parallel()
 			}
+
+			// Setup task-specific environment (each task gets its own UV installation directory)
+			setupTaskEnvironment(t)
+
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
 			t.Logf("Task '%s' completed successfully", tt.task.Name)
 		})
 	}
+}
+
+// cleanupSharedTempDir cleans up the shared temporary directory
+func cleanupSharedTempDir() {
+	if sharedTempDir != "" {
+		if err := os.RemoveAll(sharedTempDir); err != nil {
+			// Log the error but don't fail the tests
+			fmt.Printf("Warning: failed to clean up shared temporary directory %s: %v\n", sharedTempDir, err)
+		} else {
+			fmt.Printf("Cleaned up shared temporary directory: %s\n", sharedTempDir)
+		}
+	}
+}
+
+// TestMain runs before and after all tests
+func TestMain(m *testing.M) {
+	// Run the tests
+	code := m.Run()
+
+	// Clean up shared temporary directory
+	cleanupSharedTempDir()
+
+	// Exit with the test result code
+	os.Exit(code)
 }

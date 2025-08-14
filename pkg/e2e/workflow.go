@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/google/uuid"
 )
@@ -31,6 +32,16 @@ func (w *Workflow) Run() error {
 	}
 
 	for _, task := range w.Steps {
+		// Set up task-specific environment for each workflow step
+		// This ensures each step gets its own UV installation directory if needed
+		if os.Getenv("BRUIN_INTEGRATION_TEST") == "1" {
+			// Create a unique temporary directory for this workflow step
+			tempDir, err := os.MkdirTemp("", "workflow-step-*")
+			if err == nil {
+				os.Setenv("BRUIN_TEST_TEMP_DIR", tempDir)
+			}
+		}
+		
 		if err := task.Run(); err != nil {
 			wfErr := &WorkflowError{
 				StepName:     task.Name,
