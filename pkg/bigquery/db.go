@@ -55,35 +55,6 @@ type DB interface {
 	TableManager
 }
 
-// BigQueryClientInterface provides an interface for BigQuery client operations.
-type BigQueryClientInterface interface {
-	Query(q string) BigQueryQueryInterface
-	Location() string
-}
-
-// BigQueryQueryInterface provides an interface for BigQuery query operations.
-type BigQueryQueryInterface interface {
-	SetDryRun(dryRun bool) BigQueryQueryInterface
-	SetLocation(location string) BigQueryQueryInterface
-	Run(ctx context.Context) (BigQueryJobInterface, error)
-}
-
-// BigQueryJobInterface provides an interface for BigQuery job operations.
-type BigQueryJobInterface interface {
-	LastStatus() BigQueryJobStatusInterface
-}
-
-// BigQueryJobStatusInterface provides an interface for BigQuery job status operations.
-type BigQueryJobStatusInterface interface {
-	Err() error
-	Statistics() BigQueryJobStatisticsInterface
-}
-
-// BigQueryJobStatisticsInterface provides an interface for BigQuery job statistics operations.
-type BigQueryJobStatisticsInterface interface {
-	Details() interface{}
-}
-
 var (
 	datasetNameCache sync.Map // Global cache for dataset existence
 	datasetLocks     sync.Map // Global map for dataset-specific locks
