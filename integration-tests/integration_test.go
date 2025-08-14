@@ -1826,120 +1826,120 @@ func TestWorkflowTasks(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest
-// func TestIngestrTasks(t *testing.T) {
-// 	cleanupDuckDBFiles(t)
+// nolint:paralleltest
+func TestIngestrTasks(t *testing.T) {
+	cleanupDuckDBFiles(t)
 
-// 	// Check if parallel execution is enabled via environment variable
-// 	if os.Getenv("ENABLE_PARALLEL") == "1" {
-// 		t.Parallel()
-// 	}
+	// Check if parallel execution is enabled via environment variable
+	if os.Getenv("ENABLE_PARALLEL") == "1" {
+		t.Parallel()
+	}
 
-// 	// Setup test environment
-// 	setupTestEnvironment(t)
-// 	defer cleanupTestEnvironment(t)
+	// Setup test environment
+	setupTestEnvironment()
+	defer cleanupTestEnvironment()
 
-// 	currentFolder, err := os.Getwd()
-// 	if err != nil {
-// 		t.Fatalf("Failed to get current working directory: %v", err)
-// 	}
+	currentFolder, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
 
-// 	executable := "bruin"
-// 	if runtime.GOOS == "windows" {
-// 		executable = "bruin.exe"
-// 	}
-// 	binary := filepath.Join(currentFolder, "../bin", executable)
+	executable := "bruin"
+	if runtime.GOOS == "windows" {
+		executable = "bruin.exe"
+	}
+	binary := filepath.Join(currentFolder, "../bin", executable)
 
-// 	tests := []struct {
-// 		name string
-// 		task e2e.Task
-// 	}{
-// 		{
-// 			name: "ingestr-pipeline",
-// 			task: e2e.Task{
-// 				Name:    "ingestr-pipeline",
-// 				Command: binary,
-// 				Args:    []string{"run", "-env", "env-ingestr", filepath.Join(currentFolder, "test-pipelines/ingestr-pipeline")},
-// 				Env:     []string{},
-// 				Expected: e2e.Output{
-// 					ExitCode: 0,
-// 					Contains: []string{"bruin run completed", "Finished: chess_playground.profiles", "Finished: chess_playground.games", "Finished: chess_playground.player_summary", "Finished: chess_playground.player_summary:total_games:positive"},
-// 				},
-// 				Asserts: []func(*e2e.Task) error{
-// 					e2e.AssertByExitCode,
-// 					e2e.AssertByContains,
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "run-seed-data",
-// 			task: e2e.Task{
-// 				Name:    "run-seed-data",
-// 				Command: binary,
-// 				Args:    []string{"run", "--env", "env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
-// 				Env:     []string{},
-// 				Expected: e2e.Output{
-// 					ExitCode: 0,
-// 					Contains: []string{"bruin run completed"},
-// 				},
-// 				Asserts: []func(*e2e.Task) error{
-// 					e2e.AssertByExitCode,
-// 					e2e.AssertByContains,
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "run-asset-default-option-pipeline",
-// 			task: e2e.Task{
-// 				Name:    "run-asset-default-option-pipeline",
-// 				Command: binary,
-// 				Args:    []string{"run", "--env", "env-run-default-option", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
-// 				Env:     []string{},
-// 				Expected: e2e.Output{
-// 					ExitCode: 0,
-// 					Contains: []string{"Successfully validated 4 assets", "bruin run completed", "Finished: chess_playground.player_summary", "Finished: chess_playground.games", "Finished: python_asset"},
-// 				},
-// 				Asserts: []func(*e2e.Task) error{
-// 					e2e.AssertByExitCode,
-// 					e2e.AssertByContains,
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "run-python-materialization",
-// 			task: e2e.Task{
-// 				Name:    "run-python-materialization",
-// 				Command: binary,
-// 				Args:    []string{"run", "--env", "env-run-python-materialization", filepath.Join(currentFolder, "test-pipelines/run-python-materialization")},
-// 				Env:     []string{},
-// 				Expected: e2e.Output{
-// 					ExitCode: 0,
-// 					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: materialize.country"},
-// 				},
-// 				Asserts: []func(*e2e.Task) error{
-// 					e2e.AssertByExitCode,
-// 					e2e.AssertByContains,
-// 				},
-// 			},
-// 		},
-// 	}
+	tests := []struct {
+		name string
+		task e2e.Task
+	}{
+		{
+			name: "ingestr-pipeline",
+			task: e2e.Task{
+				Name:    "ingestr-pipeline",
+				Command: binary,
+				Args:    []string{"run", "-env", "env-ingestr", filepath.Join(currentFolder, "test-pipelines/ingestr-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"bruin run completed", "Finished: chess_playground.profiles", "Finished: chess_playground.games", "Finished: chess_playground.player_summary", "Finished: chess_playground.player_summary:total_games:positive"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-seed-data",
+			task: e2e.Task{
+				Name:    "run-seed-data",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"bruin run completed"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-asset-default-option-pipeline",
+			task: e2e.Task{
+				Name:    "run-asset-default-option-pipeline",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-run-default-option", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 4 assets", "bruin run completed", "Finished: chess_playground.player_summary", "Finished: chess_playground.games", "Finished: python_asset"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-materialization",
+			task: e2e.Task{
+				Name:    "run-python-materialization",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-run-python-materialization", filepath.Join(currentFolder, "test-pipelines/run-python-materialization")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: materialize.country"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+	}
 
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			// Check if parallel execution is enabled via environment variable
-// 			if os.Getenv("ENABLE_PARALLEL") == "1" {
-// 				t.Parallel()
-// 			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Check if parallel execution is enabled via environment variable
+			if os.Getenv("ENABLE_PARALLEL") == "1" {
+				t.Parallel()
+			}
 
-// 			// Setup task-specific environment (each task gets its own UV installation directory)
-// 			setupTaskEnvironment(t)
+			// Setup task-specific environment (each task gets its own UV installation directory)
+			setupTaskEnvironment(t)
 
-// 			err := tt.task.Run()
-// 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
-// 			t.Logf("Task '%s' completed successfully", tt.task.Name)
-// 		})
-// 	}
-// }
+			err := tt.task.Run()
+			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
+			t.Logf("Task '%s' completed successfully", tt.task.Name)
+		})
+	}
+}
 
 // cleanupSharedTempDir cleans up the shared temporary directory.
 func cleanupSharedTempDir() {

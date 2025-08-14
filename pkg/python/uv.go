@@ -79,13 +79,13 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
 				return "", errors.Wrap(err, "failed to create test temporary directory")
 			}
 		} else {
-			// Fallback to regular bruin home directory
-			m := user.NewConfigManager(afero.NewOsFs())
-			var err error
-			bruinHomeDirAbsPath, err = m.EnsureAndGetBruinHomeDir()
+			// Create a unique temporary directory for this specific UV installation
+			// This ensures that each Python asset execution gets its own UV installation
+			uniqueTempDir, err := os.MkdirTemp("", "bruin-uv-install-*")
 			if err != nil {
-				return "", errors.Wrap(err, "failed to get bruin home directory")
+				return "", errors.Wrap(err, "failed to create unique temporary directory for UV installation")
 			}
+			bruinHomeDirAbsPath = uniqueTempDir
 		}
 	} else {
 		// Regular operation - use bruin home directory
