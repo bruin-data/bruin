@@ -1890,7 +1890,7 @@ environments:
           service_account_json: "{\"key10\": \"value10\"}"
           project_id: "my-project"`
 
-	envConfigContentNoConnections := `default_environment: default
+	envConfigContentMalformedConnections := `default_environment: default
 environments:
     default:
     connections:
@@ -1957,7 +1957,7 @@ environments:
 		},
 		{
 			name:           "environment with no connections should error",
-			envConfig:      envConfigContentNoConnections,
+			envConfig:      envConfigContentMalformedConnections,
 			configFilePath: "testdata/nonexistent.yml",
 			want:           nil,
 			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
