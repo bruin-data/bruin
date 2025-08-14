@@ -214,14 +214,8 @@ func (ts *TableSensor) RunTask(ctx context.Context, p PipelineProvider, t *pipel
 		return errors.Errorf("'%s' does not exist", connName)
 	}
 
-	// Try to get a TableExistsChecker from the connection
-	tableChecker, ok := conn.(TableExistsChecker)
-	if !ok {
-		return errors.Errorf("'%s' does not support table existence checking", connName)
-	}
-
 	// Build the table exists query
-	qq, err := tableChecker.BuildTableExistsQuery(tableName)
+	qq, err := conn.BuildTableExistsQuery(tableName)
 	if err != nil {
 		return errors.Wrap(err, "failed to build table exists query")
 	}

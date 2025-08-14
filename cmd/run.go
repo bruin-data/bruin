@@ -1202,6 +1202,7 @@ func SetupExecutors(
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
 
 		sfQuerySensor := snowflake.NewQuerySensor(conn, wholeFileExtractor, 30)
+		sfTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		sfMetadataPushOperator := snowflake.NewMetadataPushOperator(conn)
 
@@ -1212,6 +1213,11 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeSnowflakeQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
 		mainExecutors[pipeline.AssetTypeSnowflakeQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeMetadataPush] = sfMetadataPushOperator
+
+		mainExecutors[pipeline.AssetTypeSnowflakeTableSensor][scheduler.TaskInstanceTypeMain] = sfTableSensor
+		mainExecutors[pipeline.AssetTypeSnowflakeTableSensor][scheduler.TaskInstanceTypeMetadataPush] = sfMetadataPushOperator
+		mainExecutors[pipeline.AssetTypeSnowflakeTableSensor][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
+		mainExecutors[pipeline.AssetTypeSnowflakeTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeSnowflakeSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeSnowflakeSeed][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
