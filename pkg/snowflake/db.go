@@ -73,6 +73,38 @@ func (db *DB) GetIngestrURI() (string, error) {
 	return db.config.GetIngestrURI()
 }
 
+func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in database.schema.table or schema.table format, '%s' given", tableName)
+		}
+	}
+
+	var databaseRef, schemaRef, targetTable string
+
+	switch len(tableComponents) {
+	case 2:
+		// schema.table format - use current database
+		databaseRef = db.config.Database
+		schemaRef = tableComponents[0]
+		targetTable = tableComponents[1]
+	case 3:
+		// database.schema.table format
+		databaseRef = tableComponents[0]
+		schemaRef = tableComponents[1]
+		targetTable = tableComponents[2]
+	default:
+		return "", fmt.Errorf("table name must be in database.schema.table or schema.table format, '%s' given", tableName)
+	}
+
+	// Use COUNT to return the number of tables matching the criteria
+	// In Snowflake, we query DATABASE.INFORMATION_SCHEMA.TABLES and filter by table_schema
+	query := fmt.Sprintf("SELECT COUNT(*) FROM `%s.%s.INFORMATION_SCHEMA.TABLES` WHERE table_name = '%s'", databaseRef, schemaRef, targetTable)
+
+	return strings.TrimSpace(query), nil
+}
+
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	if err := db.initializeDB(); err != nil {
 		return nil, err

@@ -371,11 +371,11 @@ func TestSnowflakeWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: run the table sensor",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "once", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 0,
-							Output:   "Poking: SELECT * FROM test.datatable;",
+							ExitCode: 1,
+							Contains: []string{"[dataset.sensor] Poking: dataset.datatable", "Failed: dataset.sensor"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -383,13 +383,13 @@ func TestSnowflakeWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "table-sensor: create the initial table",
+						Name:    "table-sensor: create the table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/create_table.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/create_table.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Output:   "FINISHED: dataset.datatable",
+							Output:   "FINISHED: dataset.datatablexyz",
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -399,11 +399,11 @@ func TestSnowflakeWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: run the table sensor",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "once", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Output:   "Poking: SELECT * FROM test.datatable;",
+							Contains: []string{"[dataset.sensor] Poking: dataset.datatable", "FINISHED: dataset.sensor"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -413,8 +413,8 @@ func TestSnowflakeWorkflows(t *testing.T) {
 				},
 			},
 		},
-	}	
-	
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
