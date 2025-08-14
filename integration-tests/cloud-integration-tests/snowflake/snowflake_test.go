@@ -351,7 +351,70 @@ func TestSnowflakeWorkflows(t *testing.T) {
 				},
 			},
 		},
-	}
+		{
+			name: "table-sensor",
+			workflow: e2e.Workflow{
+				Name: "table-sensor",
+				Steps: []e2e.Task{
+					{
+						Name:    "table-sensor: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "snowflake-default", "--query", "DROP TABLE IF EXISTS test.datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "table-sensor: run the table sensor",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "Poking: SELECT * FROM test.datatable;",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: create the initial table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/create_table.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "FINISHED: dataset.datatable",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: run the table sensor",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "Poking: SELECT * FROM test.datatable;",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+	}	
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
