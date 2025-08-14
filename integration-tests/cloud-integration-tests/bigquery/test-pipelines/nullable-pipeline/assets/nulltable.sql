@@ -22,3 +22,6 @@ SELECT
 UNION ALL
 SELECT
     NULL AS id, 'z' AS value
+UNION ALL
+SELECT
+    NULL AS id, 'w' AS value
