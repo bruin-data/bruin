@@ -75,7 +75,7 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
 			// Use the test-specific temporary directory for uv installation
 			bruinHomeDirAbsPath = testTempDir
 			// Ensure the temporary directory exists
-			if err := os.MkdirAll(bruinHomeDirAbsPath, 0755); err != nil {
+			if err := os.MkdirAll(bruinHomeDirAbsPath, 0o755); err != nil {
 				return "", errors.Wrap(err, "failed to create test temporary directory")
 			}
 		} else {

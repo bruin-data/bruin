@@ -41,7 +41,7 @@ func (w *Workflow) Run() error {
 				os.Setenv("BRUIN_TEST_TEMP_DIR", tempDir)
 			}
 		}
-		
+
 		if err := task.Run(); err != nil {
 			wfErr := &WorkflowError{
 				StepName:     task.Name,
