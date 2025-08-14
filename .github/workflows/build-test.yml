@@ -82,7 +82,7 @@ jobs:
             go build -o bin/bruin .
           fi
         shell: bash
-      - run: make integration-test
+      - run: ENABLE_PARALLEL=1 make integration-test
         shell: bash
 
   dockerBuild:
