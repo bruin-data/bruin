@@ -37,7 +37,7 @@ env:
   IMAGE_NAME: bruin-data/bruin
 
 jobs:
-  test:
+  test-fast:
     strategy:
       matrix:
         platform: [ ubuntu-latest ]
@@ -53,7 +53,43 @@ jobs:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
           cache: true
-      - run: make test
+      - name: Cache test results
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-test-cache-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-test-cache-
+      - run: make test-fast
+
+  test-full:
+    strategy:
+      matrix:
+        platform: [ ubuntu-latest ]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+# TODO: Replace with actions/setup-go once issue is resolved https://github.com/actions/setup-go/pull/515
+      - name: Setup Go 
+        uses: antontroshin/setup-go@windows-go-mod-cache
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
+          cache: true
+      - name: Cache test results
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-test-cache-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-test-cache-
+      - run: make test-unit
 
 
   end2end:
@@ -80,8 +116,9 @@ jobs:
         with:
           path: |
             ~/.cache/go-build
+            ~/go/pkg/mod
             bin/
-          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-build-
       - name: Build Bruin executable

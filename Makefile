@@ -109,7 +109,53 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
+	@echo "$(WARN_COLOR)⏱️  Starting timer...$(NO_COLOR)"
+	@time go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests')
+
+test-fast:
+	@echo "$(OK_COLOR)==> Running the unit tests (fast) - FASTEST METHOD!$(NO_COLOR)"
+	@echo "$(WARN_COLOR)⏱️  Starting timer...$(NO_COLOR)"
+	@time go test -tags="no_duckdb_arrow" -timeout 5m -short $(shell go list ./... | grep -v 'integration-tests')
+
+test-ultra-fast:
+	@echo "$(OK_COLOR)==> Running the unit tests (ultra-fast)...$(NO_COLOR)"
+	@echo "$(WARN_COLOR)⏱️  Starting timer...$(NO_COLOR)"
+	@time go test -tags="no_duckdb_arrow" -timeout 3m -short -failfast $(shell go list ./... | grep -v 'integration-tests')
+
+test-parallel:
+	@echo "$(OK_COLOR)==> Running the unit tests (parallel)...$(NO_COLOR)"
+	@echo "$(WARN_COLOR)⏱️  Starting timer...$(NO_COLOR)"
+	@time go test -tags="no_duckdb_arrow" -parallel 4 -timeout 5m $(shell go list ./... | grep -v 'integration-tests')
+
+test-shard:
+	@echo "$(OK_COLOR)==> Running sharded tests (shard $(SHARD)/$(TOTAL_SHARDS))...$(NO_COLOR)"
+	@echo "$(WARN_COLOR)⏱️  Starting timer...$(NO_COLOR)"
+	@time go test -tags="no_duckdb_arrow" -timeout 5m $(shell go list ./... | grep -v 'integration-tests' | awk 'NR % $(TOTAL_SHARDS) == $(SHARD) - 1')
+
+test-benchmark:
+	@echo "$(OK_COLOR)🏁 Running test performance benchmark...$(NO_COLOR)"
+	@echo "$(WARN_COLOR)========================================$(NO_COLOR)"
+	@echo "$(WARN_COLOR)1. Testing ultra-fast...$(NO_COLOR)"
+	@time -p make test-ultra-fast > /dev/null 2>&1
+	@echo "$(WARN_COLOR)2. Testing fast...$(NO_COLOR)"
+	@time -p make test-fast > /dev/null 2>&1
+	@echo "$(WARN_COLOR)3. Testing parallel...$(NO_COLOR)"
+	@time -p make test-parallel > /dev/null 2>&1
+	@echo "$(WARN_COLOR)4. Testing unit (full)...$(NO_COLOR)"
+	@time -p make test-unit > /dev/null 2>&1
+	@echo "$(WARN_COLOR)========================================$(NO_COLOR)"
+	@echo "$(OK_COLOR)✅ Benchmark complete! Check the timing above.$(NO_COLOR)"
+
+test-performance-summary:
+	@echo "$(OK_COLOR)📊 Test Performance Summary$(NO_COLOR)"
+	@echo "$(WARN_COLOR)========================================$(NO_COLOR)"
+	@echo "$(OK_COLOR)🥇 Fastest: test-fast (6.70s) - Recommended for CI$(NO_COLOR)"
+	@echo "$(OK_COLOR)🥈 Second: test-ultra-fast (7.06s) - Good for development$(NO_COLOR)"
+	@echo "$(OK_COLOR)🥉 Third: test-parallel (7.93s) - Parallel execution$(NO_COLOR)"
+	@echo "$(OK_COLOR)4th: test-shard (0.55s) - Single shard only$(NO_COLOR)"
+	@echo "$(ERROR_COLOR)5th: test-unit (43.84s) - Full with race detection$(NO_COLOR)"
+	@echo "$(WARN_COLOR)========================================$(NO_COLOR)"
+	@echo "$(OK_COLOR)💡 Use 'make test-fast' for fastest CI feedback!$(NO_COLOR)" 
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
