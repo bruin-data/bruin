@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,6 +47,58 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "dry-run-bad-asset-path",
+			Command: binary,
+			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/non_existent_asset.sql")),
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "Please provide a valid asset path",
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "dry-run-non-bq-asset",
+			Command: binary,
+			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/non_bq_asset.sql")),
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "asset-metadata is only available for BigQuery SQL assets",
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "dry-run-malformed-asset",
+			Command: binary,
+			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/malformed_asset.sql")),
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "no query found in asset",
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "dry-run-empty-asset",
+			Command: binary,
+			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/empty.sql")),
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "no query found in asset: empty.sql",
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 	}
@@ -423,6 +476,52 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 1, // Should fail because table doesn't exist
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "bigquery-dry-run-pipeline",
+			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
+				return e2e.Workflow{
+					Name: "bigquery-dry-run-pipeline",
+					Steps: []e2e.Task{
+						{
+							Name:    "dry-run-pipeline: run the pipeline",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/dry_run_table.sql")),
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:          "dry-run-pipeline: query the table",
+							Command:       binary,
+							Args:          append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/select.sql")),
+							SkipJSONNodes: []string{`"ProjectID"`},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								Output:   helpers.ReadFile(filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/expectations/results.json")),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByOutputJSON,
+							},
+						},
+						{
+							Name:    "dry-run-pipeline: drop the table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS dataset.dry_run_table;"),
+							Expected: e2e.Output{
+								ExitCode: 1,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,

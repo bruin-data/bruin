@@ -238,6 +238,38 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	return result, nil
 }
 
+func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
+	q := d.client.Query(queryObj.String())
+	q.DryRun = true
+
+	if d.client.Location != "" {
+		q.Location = d.client.Location
+	}
+
+	job, err := q.Run(ctx)
+	if err != nil {
+		return nil, formatError(err)
+	}
+
+	status := job.LastStatus()
+	if status == nil {
+		return nil, errors.New("missing job status for dry run")
+	}
+	if status.Err() != nil {
+		return nil, status.Err()
+	}
+	if status.Statistics == nil {
+		return nil, errors.New("missing statistics in dry run status")
+	}
+
+	qs, ok := status.Statistics.Details.(*bigquery.QueryStatistics)
+	if !ok || qs == nil {
+		return nil, errors.New("missing query statistics details in dry run status")
+	}
+
+	return qs, nil
+}
+
 type NoMetadataUpdatedError struct{}
 
 func (m NoMetadataUpdatedError) Error() string {
