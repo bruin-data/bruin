@@ -886,3 +886,86 @@ ORDER BY table_schema, table_name;`).
 		})
 	}
 }
+
+func TestDB_BuildTableExistsQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		db          *DB
+		tableName   string
+		wantQuery   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:      "valid schema.table format",
+			db:        &DB{config: &Config{Database: "test_db"}},
+			tableName: "test_schema.test_table",
+			wantQuery: "SELECT COUNT(*) FROM test_db.test_schema.INFORMATION_SCHEMA.TABLES WHERE table_name = 'test_table'",
+			wantErr:   false,
+		},
+		{
+			name:      "valid database.schema.table format",
+			db:        &DB{config: &Config{Database: "test_db"}},
+			tableName: "other_db.test_schema.test_table",
+			wantQuery: "SELECT COUNT(*) FROM other_db.test_schema.INFORMATION_SCHEMA.TABLES WHERE table_name = 'test_table'",
+			wantErr:   false,
+		},
+		{
+			name:        "invalid empty component",
+			db:          &DB{config: &Config{Database: "test_db"}},
+			tableName:   "test_schema..test_table",
+			wantErr:     true,
+			errContains: "table name must be in database.schema.table or schema.table format",
+		},
+		{
+			name:        "invalid format - too few components",
+			db:          &DB{config: &Config{Database: "test_db"}},
+			tableName:   "single",
+			wantErr:     true,
+			errContains: "table name must be in database.schema.table or schema.table format",
+		},
+		{
+			name:        "invalid format - too many components",
+			db:          &DB{config: &Config{Database: "test_db"}},
+			tableName:   "a.b.c.d",
+			wantErr:     true,
+			errContains: "table name must be in database.schema.table or schema.table format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotQuery, err := tt.db.BuildTableExistsQuery(tt.tableName)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantQuery, gotQuery)
+		})
+	}
+}
+
+func TestDB_ImplementsTableExistsChecker(t *testing.T) {
+	t.Parallel()
+
+	// Create a Snowflake DB instance
+	db := &DB{config: &Config{Database: "test_db"}}
+
+	// Verify it implements the TableExistsChecker interface
+	var _ ansisql.TableExistsChecker = db
+
+	// Test that both required methods exist and work
+	query, err := db.BuildTableExistsQuery("test_schema.test_table")
+	require.NoError(t, err)
+	assert.Contains(t, query, "SELECT COUNT(*) FROM test_db.INFORMATION_SCHEMA.TABLES WHERE table_schema = 'test_schema'")
+
+	// The Select method should exist (it's already implemented in the DB struct)
+	// We can't easily test it without a real connection, but we can verify the method exists
+	assert.NotNil(t, db.Select)
+}
