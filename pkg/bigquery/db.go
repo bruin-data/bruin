@@ -270,7 +270,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
 	q := d.client.Query(queryObj.String())
 	q.DryRun = true
-	// Respect configured client location if set
+
 	if d.client.Location != "" {
 		q.Location = d.client.Location
 	}
@@ -280,7 +280,6 @@ func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigqu
 		return nil, formatError(err)
 	}
 
-	// For dry runs, Status(ctx) is not supported; use LastStatus instead.
 	status := job.LastStatus()
 	if status == nil {
 		return nil, errors.New("missing job status for dry run")
