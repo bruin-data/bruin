@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"os"
 	path2 "path"
-
+	
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	bruinpath "github.com/bruin-data/bruin/pkg/path"
 	"github.com/jedib0t/go-pretty/v6/table"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -272,6 +273,11 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment,
 
 	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 	if err != nil {
+		if _, ok := err.(*bruinpath.YamlParseError); ok {
+			printErrorForOutput(output, fmt.Errorf("failed to parse Bruin config at %s: %s", configFilePath, err.Error()))
+			return cli.Exit("", 1)
+		}
+
 		errorPrinter.Printf("Failed to load or create the config file: %v\n", err)
 		return cli.Exit("", 1)
 	}
