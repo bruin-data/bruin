@@ -359,7 +359,7 @@ func TestSnowflakeWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: drop the table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "snowflake-default", "--query", "DROP TABLE IF EXISTS test.datatable;"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "snowflake-default", "--query", "DROP TABLE IF EXISTS dataset.datatable;"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -369,9 +369,23 @@ func TestSnowflakeWorkflows(t *testing.T) {
 						},
 					},
 					{
+						Name:    "table-sensor: confirm the table is dropped",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "snowflake-default", "--query", "SELECT * FROM dataset.datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"Object", "does not exist or not authorized"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
 						Name:    "table-sensor: run the table sensor",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "once", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "10", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 1,
@@ -389,7 +403,7 @@ func TestSnowflakeWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Output:   "FINISHED: dataset.datatablexyz",
+							Contains: []string{"Finished: dataset.datatable"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -399,11 +413,11 @@ func TestSnowflakeWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: run the table sensor",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "once", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "10", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Contains: []string{"[dataset.sensor] Poking: dataset.datatable", "FINISHED: dataset.sensor"},
+							Contains: []string{"[dataset.sensor] Poking: dataset.datatable", "Finished: dataset.sensor"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
