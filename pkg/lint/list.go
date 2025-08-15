@@ -124,7 +124,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Identifier:       "valid-bigquery-table-sensor",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
-			AssetValidator:   EnsureBigQueryTableSensorHasTableParameterForASingleAsset,
+			AssetValidator:   EnsureTableSensorHasTableParameterForASingleAsset,
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{

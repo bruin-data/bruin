@@ -32,6 +32,7 @@ const (
 	AssetTypeSnowflakeQuery         = AssetType("sf.sql")
 	AssetTypeSnowflakeSeed          = AssetType("sf.seed")
 	AssetTypeSnowflakeQuerySensor   = AssetType("sf.sensor.query")
+	AssetTypeSnowflakeTableSensor   = AssetType("sf.sensor.table")
 	AssetTypeBigqueryQuery          = AssetType("bq.sql")
 	AssetTypeBigqueryTableSensor    = AssetType("bq.sensor.table")
 	AssetTypeBigqueryQuerySensor    = AssetType("bq.sensor.query")
@@ -553,6 +554,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 
 	AssetTypeSnowflakeQuery:        "snowflake",
 	AssetTypeSnowflakeQuerySensor:  "snowflake",
+	AssetTypeSnowflakeTableSensor:  "snowflake",
 	AssetTypeSnowflakeSeed:         "snowflake",
 	AssetTypeSnowflakeSource:       "snowflake",
 	AssetTypePostgresQuery:         "postgres",
