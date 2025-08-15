@@ -24,12 +24,6 @@ type PipelineProvider interface {
 	GetConnectionNameForAsset(asset *pipeline.Asset) (string, error)
 }
 
-type TimeProvider interface {
-	Now() time.Time
-	Sleep(duration time.Duration)
-	After(duration time.Duration) <-chan time.Time
-}
-
 type QuerySensor struct {
 	connection config.ConnectionGetter
 	extractor  query.QueryExtractor
