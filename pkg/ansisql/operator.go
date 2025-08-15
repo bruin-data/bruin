@@ -20,10 +20,6 @@ type TableExistsChecker interface {
 	BuildTableExistsQuery(tableName string) (string, error)
 }
 
-type PipelineProvider interface {
-	GetConnectionNameForAsset(asset *pipeline.Asset) (string, error)
-}
-
 type QuerySensor struct {
 	connection config.ConnectionGetter
 	extractor  query.QueryExtractor
@@ -140,7 +136,7 @@ func (ts *TableSensor) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	return ts.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
 
-func (ts *TableSensor) RunTask(ctx context.Context, p PipelineProvider, t *pipeline.Asset) error {
+func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
 	if ts.sensorMode == "skip" {
 		return nil
 	}
