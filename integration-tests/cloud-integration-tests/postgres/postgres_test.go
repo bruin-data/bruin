@@ -278,18 +278,6 @@ func TestPostgresWorkflows(t *testing.T) {
 							e2e.AssertByExitCode,
 						},
 					},
-					// {
-					// 	Name:    "scd2-by-time: restore products asset to initial state",
-					// 	Command: "cp",
-					// 	Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_original.sql"), filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")},
-					// 	Env:     []string{},
-					// 	Expected: e2e.Output{
-					// 		ExitCode: 0,
-					// 	},
-					// 	Asserts: []func(*e2e.Task) error{
-					// 		e2e.AssertByExitCode,
-					// 	},
-					// },
 					{
 						Name:    "scd2-by-time: create the initial products table",
 						Command: binary,
