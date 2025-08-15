@@ -281,7 +281,8 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: "MERGE my\\.asset target\n" +
-				"USING \\(SELECT 1\\) source ON target\\.dt = source.dt AND target\\.event_type = source\\.event_type\n" +
+				"USING \\(SELECT 1\\) source\n" +
+				"ON \\(target\\.dt IS NOT DISTINCT FROM source\\.dt AND target\\.event_type IS NOT DISTINCT FROM source\\.event_type\\)\n" +
 				"\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
@@ -302,7 +303,8 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1;",
 			want: "MERGE my\\.asset target\n" +
-				"USING \\(SELECT 1\\) source ON target\\.dt = source.dt AND target\\.event_type = source\\.event_type\n" +
+				"USING \\(SELECT 1\\) source\n" +
+				"ON \\(target\\.dt IS NOT DISTINCT FROM source\\.dt AND target\\.event_type IS NOT DISTINCT FROM source\\.event_type\\)\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.value = source\\.value\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
