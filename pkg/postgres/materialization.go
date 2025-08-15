@@ -513,7 +513,7 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 			asset.Materialization.Strategy)
 	}
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, ":session_timestamp", "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
+	insertValues = append(insertValues, "(SELECT session_timestamp FROM _ts)", "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
 
 	// Build ON condition for MERGE
 	onConditions := make([]string, 0, len(primaryKeys))
@@ -538,7 +538,9 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 	queryStr := fmt.Sprintf(`
 BEGIN TRANSACTION;
 
-SET session_timestamp = CURRENT_TIMESTAMP;
+-- Capture the timestamp once for the entire transaction
+CREATE TEMP TABLE _ts AS 
+SELECT CURRENT_TIMESTAMP AS session_timestamp;
 
 -- Create temp table with source data
 CREATE TEMP TABLE %s AS 
@@ -546,7 +548,7 @@ SELECT *, TRUE AS _is_current FROM (%s) AS src;
 
 -- Update existing records that have changes
 UPDATE %s AS target
-SET _valid_until = :session_timestamp, _is_current = FALSE
+SET _valid_until = (SELECT session_timestamp FROM _ts), _is_current = FALSE
 WHERE target._is_current = TRUE
   AND EXISTS (
     SELECT 1 FROM %s AS source
@@ -555,7 +557,7 @@ WHERE target._is_current = TRUE
 
 -- Update records that are no longer in source (expired)
 UPDATE %s AS target
-SET _valid_until = :session_timestamp, _is_current = FALSE
+SET _valid_until = (SELECT session_timestamp FROM _ts), _is_current = FALSE
 WHERE target._is_current = TRUE
   AND NOT EXISTS (
     SELECT 1 FROM %s AS source
