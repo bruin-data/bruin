@@ -42,20 +42,6 @@ func (d *DefaultTimeProvider) Sleep(duration time.Duration) {
 
 func (d *DefaultTimeProvider) After(duration time.Duration) <-chan time.Time {
 	return time.After(duration)
-} // Printer defines the interface for output operations (for testability)
-type Printer interface {
-	Println(a ...interface{}) (n int, err error)
-}
-type ContextPrinter struct {
-	writer io.Writer
-}
-
-func NewContextPrinter(ctx context.Context) *ContextPrinter {
-	return &ContextPrinter{writer: ctx.Value(executor.KeyPrinter).(io.Writer)}
-}
-
-func (c *ContextPrinter) Println(a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(c.writer, a...)
 }
 
 type QuerySensor struct {
@@ -149,7 +135,6 @@ type TableSensor struct {
 	sensorMode   string
 	extractor    query.QueryExtractor
 	timeProvider TimeProvider
-	printer      Printer
 }
 
 func NewTableSensor(conn config.ConnectionGetter, sensorMode string, extractor query.QueryExtractor) *TableSensor {
@@ -166,14 +151,12 @@ func NewTableSensorWithDependencies(
 	sensorMode string,
 	extractor query.QueryExtractor,
 	timeProvider TimeProvider,
-	printer Printer,
 ) *TableSensor {
 	return &TableSensor{
 		connection:   conn,
 		sensorMode:   sensorMode,
 		extractor:    extractor,
 		timeProvider: timeProvider,
-		printer:      printer,
 	}
 }
 
@@ -222,58 +205,38 @@ func (ts *TableSensor) RunTask(ctx context.Context, p PipelineProvider, t *pipel
 
 	extractedQuery := extractedQueries[0]
 
-	printer := ts.printer
-	if printer == nil {
-		printer = NewContextPrinter(ctx)
+	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if printerExists {
+		fmt.Fprintln(printer, "Poking:", tableName)
 	}
 
-	printer.Println("Poking:", tableName)
-
-	// Run the sensor loop
-	return ts.runSensorLoop(ctx, tableChecker, extractedQuery, t, printer)
-}
-
-func (ts *TableSensor) runSensorLoop(
-	ctx context.Context,
-	tableChecker TableExistsChecker,
-	extractedQuery *query.Query,
-	t *pipeline.Asset,
-	printer Printer,
-) error {
-	timeout := ts.timeProvider.After(24 * time.Hour)
-
+	timeout := time.After(24 * time.Hour)
 	for {
 		select {
 		case <-timeout:
 			return errors.New("Sensor timed out after 24 hours")
-		case <-ctx.Done():
-			return ctx.Err()
 		default:
-			// Check if table exists
 			res, err := tableChecker.Select(ctx, extractedQuery)
 			if err != nil {
-				return errors.Wrap(err, "failed to check table existence")
+				return err
 			}
-
 			intRes, err := helpers.CastResultToInteger(res)
 			if err != nil {
-				return errors.Wrap(err, "failed to parse table sensor result")
+				return errors.Wrap(err, "failed to parse query sensor result")
 			}
 
-			// If table exists, we're done
 			if intRes > 0 {
 				return nil
 			}
-
-			// If sensor mode is "once", fail immediately
 			if ts.sensorMode == "once" || ts.sensorMode == "" {
 				return errors.New("Sensor didn't return the expected result")
 			}
 
-			// Otherwise, wait and retry
 			pokeInterval := helpers.GetPokeInterval(ctx, t)
-			ts.timeProvider.Sleep(time.Duration(pokeInterval) * time.Second)
-			printer.Println("Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
+			time.Sleep(time.Duration(pokeInterval) * time.Second)
+			if printerExists {
+				fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
+			}
 		}
 	}
 }
