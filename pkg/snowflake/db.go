@@ -77,30 +77,35 @@ func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 	tableComponents := strings.Split(tableName, ".")
 	for _, component := range tableComponents {
 		if component == "" {
-			return "", fmt.Errorf("table name must be in database.schema.table or schema.table format, '%s' given", tableName)
+			return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
 		}
 	}
 
-	var databaseRef, schemaRef, targetTable string
+	var schemaRef, targetTableRef string
 
 	switch len(tableComponents) {
 	case 2:
-		// schema.table format - use current database
-		databaseRef = db.config.Database
-		schemaRef = tableComponents[0]
-		targetTable = tableComponents[1]
+		// schema.table → use default database from config.
+		schemaRef = fmt.Sprintf("%s.INFORMATION_SCHEMA.TABLES", db.config.Database)
+		targetTableRef = tableComponents[1]
 	case 3:
-		// database.schema.table format
-		databaseRef = tableComponents[0]
-		schemaRef = tableComponents[1]
-		targetTable = tableComponents[2]
+		// database.schema.table
+		schemaRef = fmt.Sprintf("%s.INFORMATION_SCHEMA.TABLES", tableComponents[0])
+		targetTableRef = tableComponents[2]
 	default:
-		return "", fmt.Errorf("table name must be in database.schema.table or schema.table format, '%s' given", tableName)
+		return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
 	}
 
-	// Use COUNT to return the number of tables matching the criteria
-	// In Snowflake, we query DATABASE.INFORMATION_SCHEMA.TABLES and filter by table_schema
-	query := fmt.Sprintf("SELECT COUNT(*) FROM `%s.%s.INFORMATION_SCHEMA.TABLES` WHERE table_name = '%s'", databaseRef, schemaRef, targetTable)
+	// Snowflake stores unquoted identifiers in uppercase.
+	schemaName := strings.ToUpper(tableComponents[len(tableComponents)-2])
+	targetTableName := strings.ToUpper(targetTableRef)
+
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM %s WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
+		schemaRef,
+		schemaName,
+		targetTableName,
+	)
 
 	return strings.TrimSpace(query), nil
 }
