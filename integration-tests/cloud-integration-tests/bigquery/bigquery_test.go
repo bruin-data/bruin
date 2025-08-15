@@ -172,18 +172,6 @@ func TestBigQueryWorkflows(t *testing.T) {
 					Name: "bigquery-merge-with-nulls",
 					Steps: []e2e.Task{
 						{
-							Name:    "drop the table",
-							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS dataset.nulltable;"),
-							Env:     []string{},
-							Expected: e2e.Output{
-								ExitCode: 1,
-							},
-							Asserts: []func(*e2e.Task) error{
-								e2e.AssertByExitCode,
-							},
-						},
-						{
 							Name:    "create the initial table",
 							Command: binary,
 							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", filepath.Join(tempDir, "test-pipelines/nullable-pipeline/assets/nulltable.sql")),
