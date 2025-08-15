@@ -30,20 +30,6 @@ type TimeProvider interface {
 	After(duration time.Duration) <-chan time.Time
 }
 
-type DefaultTimeProvider struct{}
-
-func (d *DefaultTimeProvider) Now() time.Time {
-	return time.Now()
-}
-
-func (d *DefaultTimeProvider) Sleep(duration time.Duration) {
-	time.Sleep(duration)
-}
-
-func (d *DefaultTimeProvider) After(duration time.Duration) <-chan time.Time {
-	return time.After(duration)
-}
-
 type QuerySensor struct {
 	connection config.ConnectionGetter
 	extractor  query.QueryExtractor
@@ -131,18 +117,16 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 }
 
 type TableSensor struct {
-	connection   config.ConnectionGetter
-	sensorMode   string
-	extractor    query.QueryExtractor
-	timeProvider TimeProvider
+	connection config.ConnectionGetter
+	sensorMode string
+	extractor  query.QueryExtractor
 }
 
 func NewTableSensor(conn config.ConnectionGetter, sensorMode string, extractor query.QueryExtractor) *TableSensor {
 	return &TableSensor{
-		connection:   conn,
-		sensorMode:   sensorMode,
-		extractor:    extractor,
-		timeProvider: &DefaultTimeProvider{},
+		connection: conn,
+		sensorMode: sensorMode,
+		extractor:  extractor,
 	}
 }
 
@@ -150,13 +134,11 @@ func NewTableSensorWithDependencies(
 	conn config.ConnectionGetter,
 	sensorMode string,
 	extractor query.QueryExtractor,
-	timeProvider TimeProvider,
 ) *TableSensor {
 	return &TableSensor{
-		connection:   conn,
-		sensorMode:   sensorMode,
-		extractor:    extractor,
-		timeProvider: timeProvider,
+		connection: conn,
+		sensorMode: sensorMode,
+		extractor:  extractor,
 	}
 }
 
