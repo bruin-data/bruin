@@ -632,6 +632,15 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "environment with no connections should error",
+			args: args{
+				path: "testdata/no_connections.yml",
+			},
+			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				return assert.ErrorContains(t, err, "environment 'default' has no connections defined")
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1881,6 +1890,14 @@ environments:
           service_account_json: "{\"key10\": \"value10\"}"
           project_id: "my-project"`
 
+	envConfigContentMalformedConnections := `default_environment: default
+environments:
+    default:
+    connections:
+            duckdb:
+                - name: duckdb-default
+                  path: duckdb.db`
+
 	expectedConfig := &Config{
 		DefaultEnvironmentName:  "dev",
 		SelectedEnvironmentName: "dev",
@@ -1937,6 +1954,15 @@ environments:
 			configFilePath: "testdata/nonexistent.yml",
 			want:           nil,
 			wantErr:        assert.Error,
+		},
+		{
+			name:           "environment with no connections should error",
+			envConfig:      envConfigContentMalformedConnections,
+			configFilePath: "testdata/nonexistent.yml",
+			want:           nil,
+			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				return assert.ErrorContains(t, err, "environment 'default' has no connections defined")
+			},
 		},
 	}
 

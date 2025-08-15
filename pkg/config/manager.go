@@ -275,8 +275,13 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	}
 	configLocation := filepath.Dir(absoluteConfigPath)
 
-	// Make duckdb paths absolute
-	for _, env := range config.Environments {
+	for envName, env := range config.Environments {
+		// Check if Connections is nil and return an error
+		if env.Connections == nil {
+			return nil, fmt.Errorf("environment '%s' has no connections defined", envName)
+		}
+
+		// Make duckdb paths absolute
 		for i, conn := range env.Connections.DuckDB {
 			if filepath.IsAbs(conn.Path) {
 				continue

@@ -1,0 +1,4 @@
+default_environment: default
+environments:
+  default:
+    # No connections defined - this should trigger the error 
