@@ -73,43 +73,6 @@ func (db *DB) GetIngestrURI() (string, error) {
 	return db.config.GetIngestrURI()
 }
 
-func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
-	tableComponents := strings.Split(tableName, ".")
-	for _, component := range tableComponents {
-		if component == "" {
-			return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
-		}
-	}
-
-	var schemaRef, targetTableRef string
-
-	switch len(tableComponents) {
-	case 2:
-		// schema.table → use default database from config.
-		schemaRef = fmt.Sprintf("%s.INFORMATION_SCHEMA.TABLES", db.config.Database)
-		targetTableRef = tableComponents[1]
-	case 3:
-		// database.schema.table
-		schemaRef = fmt.Sprintf("%s.INFORMATION_SCHEMA.TABLES", tableComponents[0])
-		targetTableRef = tableComponents[2]
-	default:
-		return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
-	}
-
-	// Snowflake stores unquoted identifiers in uppercase.
-	schemaName := strings.ToUpper(tableComponents[len(tableComponents)-2])
-	targetTableName := strings.ToUpper(targetTableRef)
-
-	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM %s WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
-		schemaRef,
-		schemaName,
-		targetTableName,
-	)
-
-	return strings.TrimSpace(query), nil
-}
-
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	if err := db.initializeDB(); err != nil {
 		return nil, err
@@ -1100,4 +1063,47 @@ ORDER BY table_schema, table_name;
 	})
 
 	return summary, nil
+}
+
+func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
+		}
+	}
+
+	if db.config.Database == "" {
+		return "", fmt.Errorf("no database name provided")
+	}
+
+	databaseName := strings.ToUpper(db.config.Database)
+
+	var schemaRef, targetTable string
+
+	switch len(tableComponents) {
+	case 2:
+		// schema.table → use default database from config.
+		schemaRef = fmt.Sprintf("%s.INFORMATION_SCHEMA.TABLES", databaseName)
+		targetTable = tableComponents[1]
+	case 3:
+		// database.schema.table
+		schemaRef = fmt.Sprintf("%s.INFORMATION_SCHEMA.TABLES", databaseName)
+		targetTable = tableComponents[2]
+	default:
+		return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
+	}
+
+	// Snowflake stores unquoted identifiers in uppercase.
+	schemaName := strings.ToUpper(tableComponents[len(tableComponents)-2])
+	targetTable = strings.ToUpper(targetTable)
+
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM %s WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
+		schemaRef,
+		schemaName,
+		targetTable,
+	)
+
+	return strings.TrimSpace(query), nil
 }
