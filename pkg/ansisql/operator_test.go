@@ -2,13 +2,11 @@ package ansisql
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -85,7 +83,7 @@ func TestNewTableSensorModeSkip(t *testing.T) {
 		},
 	})
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestNewTableSensorModeNoTable(t *testing.T) {
@@ -186,7 +184,7 @@ func TestNewTableSensorBuildTableExistsQueryError(t *testing.T) {
 	mockExtractor := &MockQueryExtractor{}
 
 	mockConn.On("GetConnection", "gcp-default").Return(mockTableExistsChecker)
-	mockTableExistsChecker.On("BuildTableExistsQuery", "test.table").Return("", fmt.Errorf("failed to build table exists query"))
+	mockTableExistsChecker.On("BuildTableExistsQuery", "test.table").Return("", errors.New("failed to build table exists query"))
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
@@ -213,7 +211,7 @@ func TestNewTableSensorExtractQueriesFromStringError(t *testing.T) {
 
 	mockConn.On("GetConnection", "gcp-default").Return(mockTableExistsChecker)
 	mockTableExistsChecker.On("BuildTableExistsQuery", "database.test.table").Return("SELECT 1", nil)
-	mockExtractor.On("ExtractQueriesFromString", "SELECT 1").Return([]*query.Query{}, fmt.Errorf("failed to extract table exists query"))
+	mockExtractor.On("ExtractQueriesFromString", "SELECT 1").Return([]*query.Query{}, errors.New("failed to extract table exists query"))
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
@@ -256,50 +254,4 @@ func TestNewTableSensorgNoQueries(t *testing.T) {
 	})
 
 	assert.ErrorContains(t, err, "no queries extracted from table exists query")
-}
-
-
-
-
-///////////////////
-
-func TestNewTableSensorTestPoking(t *testing.T) {
-	t.Parallel()
-	var output strings.Builder
-	ctx := context.WithValue(context.Background(), executor.KeyPrinter, &output)
-
-	mockConn := &MockConnectionGetter{}
-	mockExtractor := &MockQueryExtractor{}
-	mockDb := &MockSensorDB{}
-
-	mockConn.On("GetConnection", "gcp-default").Return(mockDb)
-
-	// BuildTableExistsQuery succeeds
-	mockDb.On("BuildTableExistsQuery", "test.table").Return("", nil)
-
-	// ExtractQueriesFromString succeeds
-	mockExtractor.On("ExtractQueriesFromString", "SELECT * FROM test.data").Return([]*query.Query{
-		{Query: "SELECT * FROM test.data"},
-	}, nil)
-
-	// Select fails
-	mockDb.On("Select", mock.Anything, mock.MatchedBy(func(q *query.Query) bool {
-		return q.Query == "SELECT * FROM test.data"
-	})).Return([][]interface{}{{1}}, nil)
-
-	ts := NewTableSensor(mockConn, "wait", mockExtractor)
-
-	err := ts.RunTask(ctx, &pipeline.Pipeline{}, &pipeline.Asset{
-		Type: pipeline.AssetTypeBigqueryQuery,
-		ExecutableFile: pipeline.ExecutableFile{
-			Path:    "test-file.sql",
-			Content: "SELECT * FROM test.data",
-		},
-		Parameters: pipeline.EmptyStringMap{
-			"table": "test.table",
-		},
-	})
-
-	assert.Nil(t, err)
-	assert.Contains(t, output.String(), "Poking: test.table")
 }

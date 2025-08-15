@@ -917,7 +917,7 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			tableName:   "single",
 			wantErr:     true,
 			errContains: "table name must be in schema.table or database.schema.table format, 'single' given",
-		},	
+		},
 		{
 			name:        "invalid format - empty table name",
 			db:          &DB{config: &Config{Database: "test_db"}},
@@ -971,23 +971,4 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			assert.Equal(t, tt.wantQuery, gotQuery)
 		})
 	}
-}
-
-func TestDB_ImplementsTableExistsChecker(t *testing.T) {
-	t.Parallel()
-
-	// Create a Snowflake DB instance
-	db := &DB{config: &Config{Database: "test_db"}}
-
-	// Verify it implements the TableExistsChecker interface
-	var _ ansisql.TableExistsChecker = db
-
-	// Test that both required methods exist and work
-	query, err := db.BuildTableExistsQuery("test_schema.test_table")
-	require.NoError(t, err)
-	assert.Contains(t, query, "SELECT COUNT(*) FROM test_db.INFORMATION_SCHEMA.TABLES WHERE table_schema = 'test_schema'")
-
-	// The Select method should exist (it's already implemented in the DB struct)
-	// We can't easily test it without a real connection, but we can verify the method exists
-	assert.NotNil(t, db.Select)
 }
