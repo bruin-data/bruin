@@ -21,7 +21,4 @@ SELECT
     2 AS id, 'y' AS value
 UNION ALL
 SELECT
-    NULL AS id, 'z' AS value
-UNION ALL
-SELECT
-    NULL AS id, 'w' AS value
+    NULL AS id, 'z' AS value 
