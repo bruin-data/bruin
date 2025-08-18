@@ -1,11 +1,4 @@
-
-
-
-
-It's a bruin repo.
-
-Bruin allows you to ingest data, run SQL / Python codes. It's a mix of dbt and airflow. It's local first.
-
+Bruin is a CLI tool that allows users to ingest data from many different sources, transform data using SQL and Python, run data quality checks, compare table outputs, and more. If you are reading this documentation it means Bruin CLI is already installed, therefore you can run all the relevant commands.
 Some CLI commands:
 
 # Command: Run
