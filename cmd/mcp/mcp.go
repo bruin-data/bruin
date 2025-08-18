@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bruin-data/bruin/docs/ingestion"
+	"github.com/bruin-data/bruin/docs/platforms"
 	"github.com/urfave/cli/v3"
 )
 
@@ -305,8 +307,22 @@ func getBruinInfo() string {
 }
 
 func getTreeList() string {
-	tree := buildEmbeddedTree("docs", 0)
-	return "Bruin Documentation\n" + tree
+	var result strings.Builder
+	result.WriteString("Bruin Documentation\n")
+	
+	// MCP docs (existing)
+	result.WriteString("    MCP\n")
+	result.WriteString(buildEmbeddedTree("docs", 1))
+	
+	// Ingestion docs
+	result.WriteString("    Ingestion\n")
+	result.WriteString(buildIngestionTree(1))
+	
+	// Platforms docs
+	result.WriteString("    Platforms\n")
+	result.WriteString(buildPlatformsTree(1))
+	
+	return result.String()
 }
 
 func formatEntryName(name string) string {
@@ -319,17 +335,28 @@ func getDocContent(filename string) string {
 		filename += ".md"
 	}
 
+	// Try to find in MCP docs first
 	filePath, err := findEmbeddedFile("docs", filename)
-	if err != nil {
-		return "Error: " + err.Error()
+	if err == nil {
+		content, err := DocsFS.ReadFile(filePath)
+		if err == nil {
+			return string(content)
+		}
 	}
 
-	content, err := DocsFS.ReadFile(filePath)
-	if err != nil {
-		return fmt.Sprintf("Error reading file: %v", err)
+	// Try to find in ingestion docs
+	content, err := ingestion.DocsFS.ReadFile(filename)
+	if err == nil {
+		return string(content)
 	}
 
-	return string(content)
+	// Try to find in platforms docs
+	content, err = platforms.DocsFS.ReadFile(filename)
+	if err == nil {
+		return string(content)
+	}
+
+	return fmt.Sprintf("Error: File '%s' not found in any documentation directory", filename)
 }
 
 func buildEmbeddedTree(rootPath string, depth int) string {
@@ -351,6 +378,48 @@ func buildEmbeddedTree(rootPath string, depth int) string {
 		if entry.IsDir() {
 			subPath := filepath.Join(rootPath, entry.Name())
 			result.WriteString(buildEmbeddedTree(subPath, depth+1))
+		}
+	}
+
+	return result.String()
+}
+
+func buildIngestionTree(depth int) string {
+	var result strings.Builder
+
+	entries, err := fs.ReadDir(ingestion.DocsFS, ".")
+	if err != nil {
+		return fmt.Sprintf("Error reading ingestion directory: %v\n", err)
+	}
+
+	sortedEntries := sortEmbeddedEntries(entries)
+
+	for _, entry := range sortedEntries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
+			indent := strings.Repeat("    ", depth+1)
+			name := formatEntryName(entry.Name())
+			result.WriteString(indent + name + "\n")
+		}
+	}
+
+	return result.String()
+}
+
+func buildPlatformsTree(depth int) string {
+	var result strings.Builder
+
+	entries, err := fs.ReadDir(platforms.DocsFS, ".")
+	if err != nil {
+		return fmt.Sprintf("Error reading platforms directory: %v\n", err)
+	}
+
+	sortedEntries := sortEmbeddedEntries(entries)
+
+	for _, entry := range sortedEntries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
+			indent := strings.Repeat("    ", depth+1)
+			name := formatEntryName(entry.Name())
+			result.WriteString(indent + name + "\n")
 		}
 	}
 
