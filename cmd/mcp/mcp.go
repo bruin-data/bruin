@@ -155,7 +155,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 						},
 					},
 					{
-						"name":        "get_docs_tree",
+						"name":        "bruin_get_docs_tree",
 						"description": "Get tree view of documentation files in cmd/mcp/docs directory",
 						"inputSchema": map[string]interface{}{
 							"type":       "object",
