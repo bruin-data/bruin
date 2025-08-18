@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/urfave/cli/v2"
@@ -148,6 +151,28 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 							"properties": map[string]interface{}{},
 						},
 					},
+					{
+						"name":        "get_docs_tree",
+						"description": "Get tree view of documentation files in cmd/mcp/docs directory",
+						"inputSchema": map[string]interface{}{
+							"type":       "object",
+							"properties": map[string]interface{}{},
+						},
+					},
+					{
+						"name":        "get_doc_content",
+						"description": "Get content of a specific markdown file from docs directory",
+						"inputSchema": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"filename": map[string]interface{}{
+									"type":        "string",
+									"description": "Name of the markdown file to fetch (with or without .md extension)",
+								},
+							},
+							"required": []string{"filename"},
+						},
+					},
 				},
 			},
 		}
@@ -206,6 +231,57 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 				},
 			},
 		}
+	case "get_docs_tree":
+		return JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": getTreeList(),
+					},
+				},
+			},
+		}
+	case "get_doc_content":
+		// Extract filename parameter
+		args, ok := params["arguments"].(map[string]interface{})
+		if !ok {
+			return JSONRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error: &JSONRPCError{
+					Code:    -32602,
+					Message: "Invalid arguments",
+				},
+			}
+		}
+
+		filename, ok := args["filename"].(string)
+		if !ok {
+			return JSONRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error: &JSONRPCError{
+					Code:    -32602,
+					Message: "Missing or invalid filename parameter",
+				},
+			}
+		}
+
+		return JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result: map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": getDocContent(filename),
+					},
+				},
+			},
+		}
 
 	default:
 		return JSONRPCResponse{
@@ -219,24 +295,100 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 	}
 }
 func getBruinInfo() string {
-	return `# Bruin Data Platform
+	content, err := DocsFS.ReadFile("docs/overview.md")
+	if err != nil {
+		return fmt.Sprintf("Error: Could not read overview.md: %v", err)
+	}
+	return string(content)
+}
 
-Bruin is packed with features:
+func getTreeList() string {
+	tree := buildEmbeddedTree("docs", 0)
+	return "Bruin Documentation\n" + tree
+}
 
-📥 **ingest data** with ingestr / Python
-✨ **run SQL & Python transformations** on many platforms
-📐 **table/view materializations**, incremental tables
-🐍 **run Python** in isolated environments using uv
-💅 **built-in data quality checks**
-🔗 **visualize dependencies** with lineage
-🔍 **compare tables** across connections with data-diff
-🧙 **Jinja templating** to avoid repetition
-✅ **validate pipelines** end-to-end via dry-run
-👷 **run on your local machine**, an EC2 instance, or GitHub Actions
-🔒 **secrets injection** via environment variables
-📚 **shared terminology** via glossaries
-🆚 **VS Code extension** for a better developer experience
-⚡ **written in Golang**
+func formatEntryName(name string) string {
+	return name
+}
 
-For more information, visit: https://bruin-data.github.io/bruin/`
+func getDocContent(filename string) string {
+	// Ensure filename has .md extension
+	if !strings.HasSuffix(filename, ".md") {
+		filename = filename + ".md"
+	}
+
+	filePath, err := findEmbeddedFile("docs", filename)
+	if err != nil {
+		return fmt.Sprintf("Error: %s", err.Error())
+	}
+
+	content, err := DocsFS.ReadFile(filePath)
+	if err != nil {
+		return fmt.Sprintf("Error reading file: %v", err)
+	}
+
+	return string(content)
+}
+
+func buildEmbeddedTree(rootPath string, depth int) string {
+	var result strings.Builder
+
+	entries, err := fs.ReadDir(DocsFS, rootPath)
+	if err != nil {
+		return fmt.Sprintf("Error reading directory %s: %v\n", rootPath, err)
+	}
+
+	sortedEntries := sortEmbeddedEntries(entries)
+
+	for _, entry := range sortedEntries {
+		indent := strings.Repeat("    ", depth+1)
+		name := formatEntryName(entry.Name())
+
+		result.WriteString(indent + name + "\n")
+
+		if entry.IsDir() {
+			subPath := filepath.Join(rootPath, entry.Name())
+			result.WriteString(buildEmbeddedTree(subPath, depth+1))
+		}
+	}
+
+	return result.String()
+}
+
+func sortEmbeddedEntries(entries []fs.DirEntry) []fs.DirEntry {
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].IsDir() != entries[j].IsDir() {
+			return entries[i].IsDir()
+		}
+		return entries[i].Name() < entries[j].Name()
+	})
+	return entries
+}
+
+func findEmbeddedFile(rootPath, filename string) (string, error) {
+	var foundPath string
+
+	// Walk through all directories to find the file
+	err := fs.WalkDir(DocsFS, rootPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() && d.Name() == filename {
+			foundPath = path
+			return fs.SkipAll // Stop walking after finding the file
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("error searching for file: %v", err)
+	}
+
+	if foundPath == "" {
+		return "", fmt.Errorf("file '%s' not found in docs directory", filename)
+	}
+
+	return foundPath, nil
 }
