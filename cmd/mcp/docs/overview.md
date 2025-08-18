@@ -129,7 +129,7 @@ columns:
 ```
 
 
-* A Bruın pipeline always contains a pipeline.yml file and a group of assets in the assets folder next to it. If you are creating a new pipeline you must adhere this rule.
+* A Bruin pipeline always contains a pipeline.yml file and a group of assets in the assets folder next to it. If you are creating a new pipeline you must adhere this rule.
 * If you need credentials always check the available connections using `bruin connections list` command.
 * You can and you should run `bruin validate` often when you change something in the assets or add new assets or pipelines.
 * If the connection is not defined for an asset, you can find the default connection name for the pipeline in pipeline.yml file in the respective parent folder.
