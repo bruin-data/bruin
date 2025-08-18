@@ -316,12 +316,12 @@ func formatEntryName(name string) string {
 func getDocContent(filename string) string {
 	// Ensure filename has .md extension
 	if !strings.HasSuffix(filename, ".md") {
-		filename = filename + ".md"
+		filename += ".md"
 	}
 
 	filePath, err := findEmbeddedFile("docs", filename)
 	if err != nil {
-		return fmt.Sprintf("Error: %s", err.Error())
+		return "Error: " + err.Error()
 	}
 
 	content, err := DocsFS.ReadFile(filePath)
@@ -384,7 +384,7 @@ func findEmbeddedFile(rootPath, filename string) (string, error) {
 		return nil
 	})
 	if err != nil {
-		return "", fmt.Errorf("error searching for file: %v", err)
+		return "", fmt.Errorf("error searching for file: %w", err)
 	}
 
 	if foundPath == "" {
