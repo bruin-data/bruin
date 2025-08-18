@@ -309,19 +309,19 @@ func getBruinInfo() string {
 func getTreeList() string {
 	var result strings.Builder
 	result.WriteString("Bruin Documentation\n")
-	
+
 	// MCP docs (existing)
 	result.WriteString("    MCP\n")
 	result.WriteString(buildEmbeddedTree("docs", 1))
-	
+
 	// Ingestion docs
 	result.WriteString("    Ingestion\n")
 	result.WriteString(buildIngestionTree(1))
-	
+
 	// Platforms docs
 	result.WriteString("    Platforms\n")
 	result.WriteString(buildPlatformsTree(1))
-	
+
 	return result.String()
 }
 
