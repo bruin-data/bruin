@@ -295,6 +295,7 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 		}
 	}
 }
+
 func getBruinInfo() string {
 	content, err := DocsFS.ReadFile("docs/overview.md")
 	if err != nil {
@@ -382,7 +383,6 @@ func findEmbeddedFile(rootPath, filename string) (string, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return "", fmt.Errorf("error searching for file: %v", err)
 	}
