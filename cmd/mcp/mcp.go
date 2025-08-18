@@ -163,7 +163,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 						},
 					},
 					{
-						"name":        "get_doc_content",
+						"name":        "bruin_get_doc_content",
 						"description": "Get content of a specific markdown file from docs directory",
 						"inputSchema": map[string]interface{}{
 							"type": "object",
