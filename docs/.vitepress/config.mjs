@@ -143,7 +143,9 @@ export default withMermaid({
                     {text: "Redshift", link: "/platforms/redshift"},
                     {text: "Snowflake", link: "/platforms/snowflake"},
                     {text: "Synapse", link: "/platforms/synapse"},
+                    {text: "S3", link: "/platforms/s3"},
                     {text: "Trino", link: "/platforms/trino"},
+
                     {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                 ],
             },
