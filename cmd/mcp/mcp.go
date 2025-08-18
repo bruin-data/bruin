@@ -147,7 +147,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 			Result: map[string]interface{}{
 				"tools": []map[string]interface{}{
 					{
-						"name":        "get_bruin_info",
+						"name":        "bruin_get_overview",
 						"description": "Get information about Bruin features and capabilities",
 						"inputSchema": map[string]interface{}{
 							"type":       "object",
