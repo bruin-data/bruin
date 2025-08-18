@@ -156,7 +156,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 					},
 					{
 						"name":        "bruin_get_docs_tree",
-						"description": "Get tree view of documentation files for Bruin, including all the supported platforms, data sources and destinations.
+						"description": "Get tree view of documentation files for Bruin, including all the supported platforms, data sources and destinations.",
 						"inputSchema": map[string]interface{}{
 							"type":       "object",
 							"properties": map[string]interface{}{},
@@ -196,6 +196,10 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 
 //nolint:unparam
 func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
+	if debug {
+		fmt.Fprintf(os.Stderr, "Handling tool call request\n")
+	}
+
 	params, ok := req.Params.(map[string]interface{})
 	if !ok {
 		return JSONRPCResponse{
