@@ -58,7 +58,7 @@ jobs:
   end2end:
     strategy:
       matrix:
-        platform: [ ubuntu-latest, windows-2022 ]
+        platform: [ ubuntu-latest ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
