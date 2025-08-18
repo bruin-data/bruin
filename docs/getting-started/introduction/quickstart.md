@@ -142,7 +142,7 @@ print('hello world')
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
 ```bash
-bruin run assets/my_python_asset.sql
+bruin run assets/my_python_asset.py
 ```
 
 At this point, you can also run the whole pipeline:
@@ -184,7 +184,7 @@ columns: // [!code ++]
 custom_checks:
   - name: row count is greater than zero // [!code ++]  
     description: this check ensures that the table is not empty // [!code ++]  
-    query: SELECT count(*) > 1 FROM dataset.player_count // [!code ++]  
+    query: SELECT count(*) > 1 FROM dataset.player_stats // [!code ++]  
    
 @bruin */
 

@@ -229,6 +229,9 @@ environments:
       gcs:
         - name: "gcs-1"
           service_account_file: "/path/to/service_account.json"
+          bucket_name: "my-bucket"
+          path_to_file: "/folder1/file.csv"
+          layout: "my_layout"
       applovinmax:
         - name: "applovinmax-1"
           api_key: "api-key-123"
@@ -245,12 +248,18 @@ environments:
       pipedrive:
         - name: "pipedrive-1"
           api_token: "token-123"
+      clickup:
+        - name: "clickup-1"
+          api_token: "token_123"
       mixpanel:
         - name: "mixpanel-1"
           username: "user-123"
           password: "secret-123"
           project_id: "12345"
           server: "eu"
+      wise:
+        - name: "wise-1"
+          api_key: "token-123"
       pinterest:
         - name: "pinterest-1"
           access_token: "token"
@@ -301,7 +310,7 @@ environments:
           password: "password-123"
           host: "host-123"
           port: "1234"
-          dbname: "dbname-123"
+          service_name: "service-123"
       db2:
         - name: "db2-default"
           username: "username-123"
@@ -350,6 +359,13 @@ environments:
       isoc_pulse:
         - name: "isoc_pulse-1"
           token: "isoc-pulse-token-123"
+      influxdb:
+        - name: "influxdb-1"
+          host: "influxdb-host"
+          token: "influxdb-token"
+          org: "influxdb-org"
+          bucket: "influxdb-bucket"
+          secure: "true"
 
   prod:
     connections:

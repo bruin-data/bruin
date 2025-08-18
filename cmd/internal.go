@@ -3,40 +3,49 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/bigquery" //nolint:unused
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/templates"
 	color2 "github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	errors2 "github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Internal() *cli.Command {
 	return &cli.Command{
 		Name:   "internal",
 		Hidden: true,
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			ParseAsset(),
 			ParsePipeline(),
 			PatchAsset(),
+			ParseGlossary(),
 			ConnectionSchemas(),
 			DBSummary(),
 			FetchDatabases(),
 			FetchTables(),
 			FetchColumns(),
+			ListTemplates(),
+			AssetMetadata(),
 		},
 	}
 }
@@ -55,13 +64,13 @@ func ParseAsset() *cli.Command {
 				DefaultText: "false",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Context, c.Args().Get(0), c.Bool("column-lineage"))
+			return r.Run(ctx, c.Args().Get(0), c.Bool("column-lineage"))
 		},
 	}
 }
@@ -86,13 +95,73 @@ func ParsePipeline() *cli.Command {
 				DefaultText: "false",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
 
-			return r.ParsePipeline(c.Context, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
+			return r.ParsePipeline(ctx, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
+		},
+	}
+}
+
+func ParseGlossary() *cli.Command {
+	return &cli.Command{
+		Name:      "parse-glossary",
+		Usage:     "parse a glossary file",
+		ArgsUsage: "[path to the glossary.yml file]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "pretty",
+				Usage: "pretty print the JSON output",
+			},
+			&cli.BoolFlag{
+				Name:  "entities-only",
+				Usage: "show only entities information",
+			},
+			&cli.BoolFlag{
+				Name:  "domains-only",
+				Usage: "show only domains information",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			glossaryPath := c.Args().Get(0)
+			if glossaryPath == "" {
+				return errors.New("glossary file path is required")
+			}
+
+			// Load the glossary file
+			loadedGlossary, err := glossary.LoadGlossaryFromFile(glossaryPath)
+			if err != nil {
+				return errors2.Wrap(err, "failed to load glossary file")
+			}
+
+			// Prepare output based on flags
+			var output interface{}
+			switch {
+			case c.Bool("entities-only"):
+				output = loadedGlossary.Entities
+			case c.Bool("domains-only"):
+				output = loadedGlossary.Domains
+			default:
+				output = loadedGlossary
+			}
+
+			// Convert to JSON
+			var jsonBytes []byte
+			if c.Bool("pretty") {
+				jsonBytes, err = json.MarshalIndent(output, "", "  ")
+			} else {
+				jsonBytes, err = json.Marshal(output)
+			}
+
+			if err != nil {
+				return errors2.Wrap(err, "failed to marshal glossary to JSON")
+			}
+
+			fmt.Println(string(jsonBytes))
+			return nil
 		},
 	}
 }
@@ -101,7 +170,7 @@ func ConnectionSchemas() *cli.Command {
 	return &cli.Command{
 		Name:  "connections",
 		Usage: "return all the possible connection types and their schemas",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			jsonStringSchema, err := config.GetConnectionsSchema()
 			if err != nil {
 				printErrorJSON(err)
@@ -140,11 +209,11 @@ func DBSummary() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			connectionName := c.String("connection")
 			environment := c.String("environment")
@@ -165,7 +234,6 @@ func DBSummary() *cli.Command {
 			}
 
 			// Get database summary
-			ctx := context.Background()
 			summary, err := summarizer.GetDatabaseSummary(ctx)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve database summary"))
@@ -173,7 +241,7 @@ func DBSummary() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printDatabaseSummary(summary)
 			case "json":
 				type jsonResponse struct {
@@ -536,7 +604,7 @@ func PatchAsset() *cli.Command {
 				DefaultText: "false",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			assetPath := c.Args().Get(0)
 			if assetPath == "" {
 				printErrorJSON(errors2.New("empty asset path given, you must provide an existing asset path"))
@@ -544,7 +612,7 @@ func PatchAsset() *cli.Command {
 			}
 
 			if c.Bool("convert") {
-				return convertToBruinAsset(afero.NewOsFs(), assetPath)
+				return convertToBruinAsset(afero.NewOsFs(), assetPath) //nolint:contextcheck
 			}
 
 			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
@@ -553,7 +621,7 @@ func PatchAsset() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(c.Context, asset, nil)
+			asset, err = DefaultPipelineBuilder.MutateAsset(ctx, asset, nil)
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to patch the asset with the given json body"))
 				return cli.Exit("", 1)
@@ -667,11 +735,11 @@ func FetchDatabases() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			connectionName := c.String("connection")
 			environment := c.String("environment")
@@ -692,7 +760,7 @@ func FetchDatabases() *cli.Command {
 			}
 
 			// Get databases
-			ctx := context.Background()
+			// ctx is already available from function signature
 			databases, err := fetcher.GetDatabases(ctx)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve databases"))
@@ -700,7 +768,7 @@ func FetchDatabases() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printDatabases(databases)
 			case "json":
 				type jsonResponse struct {
@@ -782,11 +850,11 @@ func FetchTables() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			connectionName := c.String("connection")
 			databaseName := c.String("database")
@@ -808,7 +876,7 @@ func FetchTables() *cli.Command {
 			}
 
 			// Get tables
-			ctx := context.Background()
+			// ctx is already available from function signature
 			tables, err := fetcher.GetTables(ctx, databaseName)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve tables"))
@@ -816,7 +884,7 @@ func FetchTables() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printTableNames(databaseName, tables)
 			case "json":
 				type jsonResponse struct {
@@ -907,11 +975,11 @@ func FetchColumns() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			connectionName := c.String("connection")
 			databaseName := c.String("database")
@@ -934,7 +1002,7 @@ func FetchColumns() *cli.Command {
 			}
 
 			// Get columns
-			ctx := context.Background()
+			// ctx is already available from function signature
 			columns, err := fetcher.GetColumns(ctx, databaseName, tableName)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve columns"))
@@ -942,7 +1010,7 @@ func FetchColumns() *cli.Command {
 
 			// Output result based on format specified
 			switch output {
-			case "plain":
+			case outputFormatPlain:
 				printColumns(databaseName, tableName, columns)
 			case "json":
 				type jsonResponse struct {
@@ -1009,4 +1077,149 @@ func printColumns(databaseName, tableName string, columns []*ansisql.DBColumn) {
 
 	t.SetStyle(table.StyleLight)
 	t.Render()
+}
+
+func ListTemplates() *cli.Command {
+	return &cli.Command{
+		Name:   "list-templates",
+		Usage:  "List all available Bruin templates",
+		Before: telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Value:       "plain",
+				Usage:       "the output type, possible values are: plain, json",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			output := c.String("output")
+
+			folders, err := templates.Templates.ReadDir(".")
+			if err != nil {
+				return handleError(output, errors2.Wrap(err, "failed to read templates directory"))
+			}
+
+			templateList := make([]string, 0)
+			for _, entry := range folders {
+				if entry.IsDir() {
+					templateList = append(templateList, entry.Name())
+				}
+			}
+
+			// Output result based on format specified
+			switch output {
+			case outputFormatPlain:
+				printTemplates(templateList)
+			case "json":
+				type jsonResponse struct {
+					Templates []string `json:"templates"`
+					Count     int      `json:"count"`
+				}
+
+				finalOutput := jsonResponse{
+					Templates: templateList,
+					Count:     len(templateList),
+				}
+
+				jsonData, err := json.Marshal(finalOutput)
+				if err != nil {
+					return handleError(output, errors2.Wrap(err, "failed to marshal result to JSON"))
+				}
+				fmt.Println(string(jsonData))
+			default:
+				return handleError(output, fmt.Errorf("invalid output type: %s", output))
+			}
+
+			return nil
+		},
+	}
+}
+
+func printTemplates(templates []string) {
+	if len(templates) == 0 {
+		fmt.Println("No templates found")
+		return
+	}
+
+	fmt.Printf("Found %d template(s):\n", len(templates))
+	fmt.Println(strings.Repeat("=", 30))
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Template"})
+
+	for _, template := range templates {
+		t.AppendRow(table.Row{template})
+	}
+
+	t.SetStyle(table.StyleLight)
+	t.Render()
+}
+
+func AssetMetadata() *cli.Command {
+	return &cli.Command{
+		Name:      "asset-metadata",
+		Usage:     "run a dry-run for a BigQuery asset and return query metadata",
+		ArgsUsage: "[path to the asset sql file]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
+				Usage:   "the path to the .bruin.yml file",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			assetPath := c.Args().Get(0)
+			if assetPath == "" {
+				return cli.Exit("asset path is required", 1)
+			}
+
+			fs := afero.NewOsFs()
+
+			pp, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+
+			manager, errs := connection.NewManagerFromConfig(pp.Config)
+			if len(errs) > 0 {
+				printErrorJSON(errs[0])
+				return cli.Exit("", 1)
+			}
+
+			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: query.DefaultJinjaRenderer}
+			extractor, err := whole.CloneForAsset(ctx, pp.Pipeline, pp.Asset)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+
+			dryRunner := bigquery.DryRunner{
+				ConnectionGetter: manager,
+				QueryExtractor:   extractor,
+			}
+
+			response, err := dryRunner.DryRun(ctx, *pp.Pipeline, *pp.Asset, pp.Config)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+
+			out, err := json.Marshal(response)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+			fmt.Println(string(out))
+			return nil
+		},
+	}
 }

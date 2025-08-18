@@ -10,6 +10,7 @@ TELEMETRY_OPTOUT=1
 CURRENT_DIR=$(pwd)
 TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
+OS_ARCH:=$(shell go env GOOS)_$(shell go env GOARCH)
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
@@ -35,9 +36,58 @@ integration-test: build
 	@touch integration-tests/bruin
 	@rm -rf integration-tests/.git
 	@rm integration-tests/bruin
+	@rm -rf integration-tests/logs
+	@mkdir -p integration-tests/logs
+	@mkdir -p integration-tests/logs/exports
+	@mkdir -p integration-tests/logs/runs
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@INCLUDE_INGESTR=1 go run integration-tests/integration-test.go
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 .
+
+integration-test-individual: build
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@rm -rf integration-tests/logs
+	@mkdir -p integration-tests/logs
+	@mkdir -p integration-tests/logs/exports
+	@mkdir -p integration-tests/logs/runs
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIndividualTasks github.com/bruin-data/bruin/integration-tests
+
+integration-test-workflow: build
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@rm -rf integration-tests/logs
+	@mkdir -p integration-tests/logs
+	@mkdir -p integration-tests/logs/exports
+	@mkdir -p integration-tests/logs/runs
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestWorkflowTasks github.com/bruin-data/bruin/integration-tests
+
+integration-test-ingestr: build
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@rm -rf integration-tests/logs
+	@mkdir -p integration-tests/logs
+	@mkdir -p integration-tests/logs/exports
+	@mkdir -p integration-tests/logs/runs
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@cd integration-tests && INCLUDE_INGESTR=1 go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIngestrTasks github.com/bruin-data/bruin/integration-tests
 
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git
@@ -48,17 +98,6 @@ integration-test-cloud: build
 	@cd integration-tests && git init
 	@cd integration-tests/cloud-integration-tests && go test -count=1 -v .
 
-integration-test-light: build
-	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
-	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
-	@touch integration-tests/.git
-	@touch integration-tests/bruin
-	@rm -rf integration-tests/.git
-	@rm integration-tests/bruin
-	@echo "$(OK_COLOR)==> Running light integration tests...$(NO_COLOR)"
-	@cd integration-tests && git init
-	@INCLUDE_INGESTR=0 go run integration-tests/integration-test.go
-
 clean:
 	@rm -rf ./bin
 
@@ -66,20 +105,20 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -race -cover -timeout 10m $(shell go list ./... | grep -v '/cloud-integration-tests/') 
+	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
-	go vet ./... &
+	go vet -tags="no_duckdb_arrow" ./... & 
 
 	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
-	gci write cmd pkg integration-tests/integration-test.go main.go &
+	gci write cmd pkg integration-tests/integration_test.go main.go &
 
 	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
 	gofumpt -w cmd pkg &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	golangci-lint run --timeout 10m60s ./...  & \
+	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
 	wait
 
 tools:
@@ -138,3 +177,10 @@ refresh-integration-expectations: build
 	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expected_connections_schema.json
 	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expected_connections.json
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
+
+# sometimes vendoring doesn't move the precompiled library
+duck-db-static-lib:
+	@mkdir vendor/github.com/marcboeker/go-duckdb/deps || true
+	@mkdir vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH) || true
+	@cp $$(go env GOPATH)/pkg/mod/github.com/marcboeker/go-duckdb@v1.8.2/deps/$(OS_ARCH)/libduckdb.a vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH)/libduckdb.a
+

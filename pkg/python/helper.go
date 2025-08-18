@@ -94,7 +94,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 			applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 			endTime := endTimeInstance
 			if ok && applyModifiers {
-				endTime = pipeline.ModifyDate(endTimeInstance, asset.IntervalModifiers.Start)
+				endTime = pipeline.ModifyDate(endTimeInstance, asset.IntervalModifiers.End)
 			}
 			cmdArgs = append(cmdArgs, "--interval-end", endTime.Format(time.RFC3339))
 		}

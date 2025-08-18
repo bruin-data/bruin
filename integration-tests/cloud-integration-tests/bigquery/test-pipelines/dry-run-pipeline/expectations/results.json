@@ -1,0 +1,94 @@
+{
+    "bigquery": {
+      "BIEngineStatistics": null,
+      "BillingTier": 0,
+      "CacheHit": false,
+      "StatementType": "SELECT",
+      "TotalBytesBilled": 0,
+      "TotalBytesProcessed": 255,
+      "TotalBytesProcessedAccuracy": "PRECISE",
+      "QueryPlan": null,
+      "NumDMLAffectedRows": 0,
+      "DMLStats": null,
+      "Timeline": null,
+      "ReferencedTables": [
+        {
+          "DatasetID": "dataset",
+          "TableID": "dry_run_table"
+        }
+      ],
+      "Schema": [
+      {
+        "Name": "id",
+        "Description": "",
+        "Repeated": false,
+        "Required": false,
+        "Type": "INTEGER",
+        "PolicyTags": null,
+        "Schema": null,
+        "MaxLength": 0,
+        "Precision": 0,
+        "Scale": 0,
+        "DefaultValueExpression": "",
+        "Collation": "",
+        "RangeElementType": null,
+        "RoundingMode": ""
+      },
+      {
+        "Name": "name",
+        "Description": "",
+        "Repeated": false,
+        "Required": false,
+        "Type": "STRING",
+        "PolicyTags": null,
+        "Schema": null,
+        "MaxLength": 0,
+        "Precision": 0,
+        "Scale": 0,
+        "DefaultValueExpression": "",
+        "Collation": "",
+        "RangeElementType": null,
+        "RoundingMode": ""
+      },
+      {
+        "Name": "value",
+        "Description": "",
+        "Repeated": false,
+        "Required": false,
+        "Type": "FLOAT",
+        "PolicyTags": null,
+        "Schema": null,
+        "MaxLength": 0,
+        "Precision": 0,
+        "Scale": 0,
+        "DefaultValueExpression": "",
+        "Collation": "",
+        "RangeElementType": null,
+        "RoundingMode": ""
+      },
+      {
+        "Name": "category",
+        "Description": "",
+        "Repeated": false,
+        "Required": false,
+        "Type": "STRING",
+        "PolicyTags": null,
+        "Schema": null,
+        "MaxLength": 0,
+        "Precision": 0,
+        "Scale": 0,
+        "DefaultValueExpression": "",
+        "Collation": "",
+        "RangeElementType": null,
+        "RoundingMode": ""
+      }
+    ],
+      "SlotMillis": 0,
+      "UndeclaredQueryParameterNames": null,
+      "DDLTargetTable": null,
+      "DDLOperationPerformed": "",
+      "DDLTargetRoutine": null,
+      "ExportDataStatistics": null,
+      "PerformanceInsights": null
+    }
+  }

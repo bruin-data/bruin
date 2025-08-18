@@ -28,6 +28,7 @@ func TestManager_GetConnection(t *testing.T) {
 
 	existingDB := new(bigquery.Client)
 	m := Manager{
+		AllConnectionDetails: map[string]any{},
 		BigQuery: map[string]*bigquery.Client{
 			"another":  new(bigquery.Client),
 			"existing": existingDB,
@@ -75,7 +76,10 @@ func TestManager_GetConnection(t *testing.T) {
 func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		availableConnections: make(map[string]any),
+		AllConnectionDetails: map[string]any{},
+	}
 
 	res := m.GetConnection("test")
 	assert.Nil(t, res)
@@ -102,7 +106,10 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 
 	res := m.GetConnection("test")
 	assert.Nil(t, res)
@@ -129,7 +136,10 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 
 	res, ok := m.GetConnection("test").(postgres.PgClient)
 	assert.False(t, ok)
@@ -156,7 +166,10 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 
 	res := m.GetConnection("test")
 	assert.Nil(t, res)
@@ -182,7 +195,10 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 
 	res := m.GetConnection("test")
 
@@ -209,6 +225,7 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	t.Parallel()
 
 	m := Manager{
+		AllConnectionDetails: map[string]any{},
 		availableConnections: make(map[string]any),
 		Mysql:                make(map[string]*mysql.Client),
 	}
@@ -236,7 +253,10 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 
 	res := m.GetConnection("test")
 	assert.Nil(t, res)
@@ -257,7 +277,10 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 
 	res := m.GetConnection("test")
 	assert.Nil(t, res)
@@ -279,7 +302,10 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 
 	res := m.GetConnection("test")
 	assert.Nil(t, res)
@@ -302,7 +328,10 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 
 	res := m.GetConnection("test")
 	assert.Nil(t, res)
@@ -327,7 +356,10 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{availableConnections: make(map[string]any)}
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
 	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
@@ -388,6 +420,23 @@ func TestNewManagerFromConfig(t *testing.T) {
 				"PERSONIO_CLIENT_SECRET": "secret2",
 			},
 			want: &Manager{
+				AllConnectionDetails: map[string]any{
+					"key1": &config.PersonioConnection{
+						Name:         "key1",
+						ClientID:     "id1",
+						ClientSecret: "secret1",
+					},
+					"key2": &config.PersonioConnection{
+						Name:         "key2",
+						ClientID:     "val1_id2_val2",
+						ClientSecret: "secret2",
+					},
+					"key3": &config.PersonioConnection{
+						Name:         "key3",
+						ClientID:     "",
+						ClientSecret: "",
+					},
+				},
 				availableConnections: map[string]any{
 					"key1": personio.NewClient(personio.Config{
 						ClientID:     "id1",
@@ -424,7 +473,7 @@ func TestNewManagerFromConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for k, v := range tt.env {
-				os.Setenv(k, v)
+				os.Setenv(k, v) //nolint
 			}
 			got, errors := NewManagerFromConfig(tt.cm)
 			assert.Equalf(t, tt.want, got, "NewManagerFromConfig(%v)", tt.cm)
@@ -437,6 +486,7 @@ func TestManager_GetSfConnection(t *testing.T) {
 	t.Parallel()
 
 	m := Manager{
+		AllConnectionDetails: map[string]any{},
 		Snowflake: map[string]*snowflake.DB{
 			"existing": {},
 		},
@@ -476,4 +526,58 @@ func TestManager_GetSfConnection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestManager_AddGenericConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+	res := m.GetConnection("test")
+	assert.Nil(t, res)
+
+	configuration := &config.GenericConnection{
+		Name:  "test",
+		Value: "somevalue",
+	}
+
+	err := m.AddGenericConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*config.GenericConnection)
+	assert.True(t, ok)
+	assert.NotNil(t, res)
+}
+
+func TestManager_AddAwsConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		AllConnectionDetails: map[string]any{},
+		availableConnections: make(map[string]any),
+	}
+
+	res := m.GetConnection("test")
+	assert.Nil(t, res)
+
+	configuration := &config.AwsConnection{
+		Name:      "test",
+		AccessKey: "AKIAEXAMPLE",
+		SecretKey: "SECRETKEYEXAMPLE",
+	}
+
+	err := m.AddAwsConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*config.AwsConnection)
+	assert.True(t, ok)
+	assert.NotNil(t, res)
+
+	awsConn, ok := res.(*config.AwsConnection)
+	assert.True(t, ok)
+	assert.Equal(t, "test", awsConn.Name)
+	assert.Equal(t, "AKIAEXAMPLE", awsConn.AccessKey)
+	assert.Equal(t, "SECRETKEYEXAMPLE", awsConn.SecretKey)
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -91,17 +91,17 @@ func Query() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			if err := validateFlags(c.String("connection"), c.String("query"), c.String("asset")); err != nil {
 				return handleError(c.String("output"), err)
 			}
 
-			connName, conn, queryStr, assetType, err := prepareQueryExecution(c, fs)
+			connName, conn, queryStr, assetType, err := prepareQueryExecution(ctx, c, fs)
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
@@ -127,7 +127,6 @@ func Query() *cli.Command {
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
-				ctx := context.Background()
 				ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 				defer cancel()
 
@@ -238,7 +237,7 @@ func validateFlags(connection, query, asset string) error {
 	}
 }
 
-func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, string, pipeline.AssetType, error) {
+func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (string, interface{}, string, pipeline.AssetType, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
@@ -271,12 +270,11 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	}
 
 	if queryStr != "" {
-		pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
+		pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
 		}
-		fetchCtx := context.Background()
-		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigStartDate, startDate)
+		fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 		// Auto-detect mode (both asset path and query)
@@ -286,7 +284,10 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 		}
 
-		newExtractor := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+		newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+		if err != nil {
+			return "", nil, "", "", errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+		}
 
 		connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
 		if err != nil {
@@ -301,13 +302,12 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		return connName, conn, queryStr, pipelineInfo.Asset.Type, nil
 	}
 	// Asset query mode (only asset path)
-	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
+	pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
 	if err != nil {
 		return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
 	}
 
-	fetchCtx := context.Background()
-	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigStartDate, startDate)
+	fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 	extractor = &query.WholeFileExtractor{
@@ -315,7 +315,10 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		// note: we don't support variables for now
 		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 	}
-	newExtractor := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+	newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+	if err != nil {
+		return "", nil, "", "", errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+	}
 	// Verify that the asset is a SQL asset
 	if !pipelineInfo.Asset.IsSQLAsset() {
 		return "", nil, "", "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",

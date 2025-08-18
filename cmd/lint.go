@@ -23,10 +23,17 @@ import (
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var ErrExcludeTagNotSupported = errors.New("exclude-tag flag is not supported for asset-only validation")
+
+// createPipelineFinderWithExclusions creates a pipeline finder function that excludes specified paths.
+func createPipelineFinderWithExclusions(excludePaths []string) func(string, []string) ([]string, error) {
+	return func(root string, pipelineDefinitionFile []string) ([]string, error) {
+		return path.GetPipelinePathsWithExclusions(root, pipelineDefinitionFile, excludePaths)
+	}
+}
 
 type jinjaRenderedMaterializer struct {
 	renderer     *jinja.Renderer
@@ -44,9 +51,10 @@ func (j jinjaRenderedMaterializer) Render(asset *pipeline.Asset, query string) (
 
 func Lint(isDebug *bool) *cli.Command {
 	return &cli.Command{
-		Name:      "validate",
-		Usage:     "validate the bruin pipeline configuration for all the pipelines in a given directory",
-		ArgsUsage: "[path to pipelines]",
+		Name:                      "validate",
+		Usage:                     "validate the bruin pipeline configuration for all the pipelines in a given directory",
+		ArgsUsage:                 "[path to pipelines]",
+		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "environment",
@@ -69,7 +77,7 @@ func Lint(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.StringFlag{
@@ -84,8 +92,12 @@ func Lint(isDebug *bool) *cli.Command {
 				Name:  "fast",
 				Usage: "run only fast validation rules, excludes some important rules such as query validation",
 			},
+			&cli.StringSliceFlag{
+				Name:  "exclude-paths",
+				Usage: "exclude the given list of paths from the folders that are searched during validation",
+			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
 			// and only print the JSON output directly to the stdout
 			if c.String("output") == "json" {
@@ -185,15 +197,18 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debugf("successfully loaded %d rules", len(rules))
 			}
 
-			lintCtx := context.Background()
-			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
+			lintCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, defaultStartDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
+
+			// Create a pipeline finder that respects exclude paths
+			excludePaths := c.StringSlice("exclude-paths")
+			pipelineFinder := createPipelineFinderWithExclusions(excludePaths)
 
 			var result *lint.PipelineAnalysisResult
 			var errr error
 			if asset == "" {
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, parser)
+				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, logger, parser)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
 				result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
@@ -205,7 +220,7 @@ func Lint(isDebug *bool) *cli.Command {
 				}
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, parser)
+				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, logger, parser)
 				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c)
 			}
 
@@ -357,7 +372,7 @@ func flattenErrors(err error) []string {
 	return foundErrors
 }
 
-func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager *connection.Manager) []lint.Rule {
+func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager config.ConnectionGetter) []lint.Rule {
 	rules := []lint.Rule{}
 	renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
 	if len(cfg.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {

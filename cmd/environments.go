@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	path2 "path"
@@ -10,18 +11,19 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Environments(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:  "environments",
 		Usage: "manage environments defined in .bruin.yml",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			ListEnvironments(isDebug),
 			CreateEnvironment(isDebug),
 			UpdateEnvironment(isDebug),
 			DeleteEnvironment(isDebug),
+			CloneEnvironment(isDebug),
 		},
 	}
 }
@@ -38,11 +40,11 @@ func ListEnvironments(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := EnvironmentListCommand{}
 			logger := makeLogger(*isDebug)
 
@@ -139,11 +141,11 @@ func CreateEnvironment(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			envName := c.String("name")
 			schemaPrefix := c.String("schema-prefix")
 			output := strings.ToLower(c.String("output"))
@@ -212,11 +214,11 @@ func UpdateEnvironment(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := EnvironmentUpdateCommand{}
 			logger := makeLogger(*isDebug)
 
@@ -325,11 +327,11 @@ func DeleteEnvironment(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			r := EnvironmentDeleteCommand{}
 			logger := makeLogger(*isDebug)
 
@@ -423,5 +425,123 @@ func (r *EnvironmentDeleteCommand) Run(name string, force bool, output, configFi
 	}
 
 	printSuccessForOutput(output, fmt.Sprintf("Successfully deleted environment '%s'", name))
+	return nil
+}
+
+func CloneEnvironment(isDebug *bool) *cli.Command {
+	return &cli.Command{
+		Name:  "clone",
+		Usage: "clone an existing environment",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "source",
+				Aliases: []string{"s"},
+				Usage:   "the name of the environment to clone from (defaults to default environment)",
+			},
+			&cli.StringFlag{
+				Name:     "target",
+				Aliases:  []string{"t"},
+				Usage:    "the name of the new environment",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:    "schema-prefix",
+				Aliases: []string{"p"},
+				Usage:   "schema prefix for the cloned environment (optional)",
+			},
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"o"},
+				Usage:   "the output type, possible values are: plain, json",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
+				Usage:   "the path to the .bruin.yml file",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			r := EnvironmentCloneCommand{}
+			logger := makeLogger(*isDebug)
+
+			configFilePath := c.String("config-file")
+			if configFilePath == "" {
+				repoRoot, err := git.FindRepoFromPath(path2.Clean("."))
+				if err != nil {
+					printError(errors.Wrap(err, "Failed to find the git repository root"), strings.ToLower(c.String("output")), "")
+					return cli.Exit("", 1)
+				}
+				logger.Debugf("found repo root '%s'", repoRoot.Path)
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+
+			return r.Run(c.String("source"), c.String("target"), c.String("schema-prefix"), strings.ToLower(c.String("output")), configFilePath)
+		},
+	}
+}
+
+type EnvironmentCloneCommand struct{}
+
+func (r *EnvironmentCloneCommand) Run(sourceName, targetName, schemaPrefix, output, configFilePath string) error {
+	defer RecoverFromPanic()
+
+	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	if err != nil {
+		printError(err, output, "Failed to load the config file at "+configFilePath)
+		return cli.Exit("", 1)
+	}
+
+	// Use default environment if source is not specified
+	if sourceName == "" {
+		sourceName = cm.DefaultEnvironmentName
+	}
+
+	// Validate source environment exists
+	if !cm.EnvironmentExists(sourceName) {
+		printError(fmt.Errorf("source environment '%s' does not exist", sourceName), output, "")
+		return cli.Exit("", 1)
+	}
+
+	// Validate target environment doesn't exist
+	if cm.EnvironmentExists(targetName) {
+		printError(fmt.Errorf("target environment '%s' already exists", targetName), output, "")
+		return cli.Exit("", 1)
+	}
+
+	// Clone the environment
+	if err := cm.CloneEnvironment(sourceName, targetName, schemaPrefix); err != nil {
+		printError(err, output, "failed to clone environment")
+		return cli.Exit("", 1)
+	}
+
+	// Persist changes
+	if err := cm.Persist(); err != nil {
+		printError(err, output, "failed to persist config")
+		return cli.Exit("", 1)
+	}
+
+	if output == "json" {
+		result := map[string]interface{}{
+			"message":     "Environment cloned successfully",
+			"source_name": sourceName,
+			"target_name": targetName,
+		}
+		if schemaPrefix != "" {
+			result["schema_prefix"] = schemaPrefix
+		}
+		js, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			printError(err, output, "failed to marshal JSON")
+			return cli.Exit("", 1)
+		}
+		fmt.Println(string(js))
+		return nil
+	}
+
+	message := fmt.Sprintf("Successfully cloned environment '%s' to '%s'", sourceName, targetName)
+	if schemaPrefix != "" {
+		message += fmt.Sprintf(" with schema prefix '%s'", schemaPrefix)
+	}
+	printSuccessForOutput(output, message)
 	return nil
 }

@@ -3,6 +3,7 @@ package ansisql
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -182,6 +183,65 @@ func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 	}).Check(ctx, ti)
 }
 
+func thresholdSQLValue(intPtr *int, floatPtr *float64, stringPtr *string, checkName string) (string, error) {
+	switch {
+	case intPtr != nil:
+		return strconv.Itoa(*intPtr), nil
+	case floatPtr != nil:
+		return strconv.FormatFloat(*floatPtr, 'f', 6, 64), nil
+	case stringPtr != nil:
+		return fmt.Sprintf("'%s'", *stringPtr), nil
+	default:
+		return "", errors.Errorf("unexpected value for %s check, the value must be an int, float or string", checkName)
+	}
+}
+
+type MinCheck struct {
+	conn config.ConnectionGetter
+}
+
+func NewMinCheck(conn config.ConnectionGetter) *MinCheck { return &MinCheck{conn: conn} }
+
+func (c *MinCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	threshold, err := thresholdSQLValue(ti.Check.Value.Int, ti.Check.Value.Float, ti.Check.Value.String, "min")
+	if err != nil {
+		return err
+	}
+
+	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < %s", ti.GetAsset().Name, ti.Column.Name, threshold)
+	return (&CountableQueryCheck{
+		conn:          c.conn,
+		queryInstance: &query.Query{Query: qq},
+		checkName:     "min",
+		customError: func(count int64) error {
+			return errors.Errorf("column '%s' has %d values below minimum %s", ti.Column.Name, count, ti.Check.Value.ToString())
+		},
+	}).Check(ctx, ti)
+}
+
+type MaxCheck struct {
+	conn config.ConnectionGetter
+}
+
+func NewMaxCheck(conn config.ConnectionGetter) *MaxCheck { return &MaxCheck{conn: conn} }
+
+func (c *MaxCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	threshold, err := thresholdSQLValue(ti.Check.Value.Int, ti.Check.Value.Float, ti.Check.Value.String, "max")
+	if err != nil {
+		return err
+	}
+
+	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s > %s", ti.GetAsset().Name, ti.Column.Name, threshold)
+	return (&CountableQueryCheck{
+		conn:          c.conn,
+		queryInstance: &query.Query{Query: qq},
+		checkName:     "max",
+		customError: func(count int64) error {
+			return errors.Errorf("column '%s' has %d values above maximum %s", ti.Column.Name, count, ti.Check.Value.ToString())
+		},
+	}).Check(ctx, ti)
+}
+
 type CustomCheck struct {
 	conn     config.ConnectionGetter
 	renderer jinja.RendererInterface
@@ -194,7 +254,10 @@ func NewCustomCheck(conn config.ConnectionGetter, renderer jinja.RendererInterfa
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
 	qq := ti.Check.Query
 	if c.renderer != nil {
-		r := c.renderer.CloneForAsset(ctx, ti.GetPipeline(), ti.GetAsset())
+		r, err := c.renderer.CloneForAsset(ctx, ti.GetPipeline(), ti.GetAsset())
+		if err != nil {
+			return errors.Wrap(err, "failed to create renderer for asset")
+		}
 		qry, err := r.Render(qq)
 		if err != nil {
 			return errors.Wrap(err, "failed to render custom check query")

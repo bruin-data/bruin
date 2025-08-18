@@ -1,0 +1,5 @@
+table_schema,table_name,column_name,column_description,table_description
+test_metadata,sample_data,id,Unique identifier,A sample table
+test_metadata,sample_data,name,Sample name field,A sample table
+test_metadata,sample_data,value,Sample numeric value,A sample table
+test_metadata,sample_data,category,Sample category field,A sample table

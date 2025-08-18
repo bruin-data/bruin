@@ -153,3 +153,7 @@ logs/runs
 logs/exports
 .claude
 bruin
+
+__debug_bin*
+.claude
+test-glossary.yml

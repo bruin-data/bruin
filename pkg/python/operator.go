@@ -2,12 +2,12 @@ package python
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -48,14 +48,10 @@ type LocalOperator struct {
 	module       modulePathFinder
 	runner       localRunner
 	envVariables map[string]string
-	config       secretFinder
+	config       config.ConnectionDetailsGetter
 }
 
-type secretFinder interface {
-	GetSecretByKey(key string) (string, error)
-}
-
-func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
+func NewLocalOperator(config config.ConnectionAndDetailsGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 	fs := afero.NewOsFs()
 
@@ -82,7 +78,7 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 	}
 }
 
-func NewLocalOperatorWithUv(config *config.Config, conn *connection.Manager, envVariables map[string]string) *LocalOperator {
+func NewLocalOperatorWithUv(config config.ConnectionAndDetailsGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 
 	return &LocalOperator{
@@ -93,7 +89,7 @@ func NewLocalOperatorWithUv(config *config.Config, conn *connection.Manager, env
 			UvInstaller: &UvChecker{
 				cmd: CommandRunner{},
 			},
-			conn: conn,
+			conn: config,
 		},
 		envVariables: envVariables,
 		config:       config,
@@ -146,7 +142,14 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
-	perAssetEnvVariables, err := env.SetupVariables(ctx, p, t, o.envVariables)
+	// Create a copy of environment variables to avoid race conditions when multiple goroutines
+	// are running concurrently and modifying the same map
+	envCopy := make(map[string]string, len(o.envVariables))
+	for k, v := range o.envVariables {
+		envCopy[k] = v
+	}
+
+	perAssetEnvVariables, err := env.SetupVariables(ctx, p, t, envCopy)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup environment variables")
 	}
@@ -159,16 +162,22 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	envVariables["BRUIN_THIS"] = t.Name
 
 	for _, mapping := range t.Secrets {
-		val, err := o.config.GetSecretByKey(mapping.SecretKey)
+		conn := o.config.GetConnectionDetails(mapping.SecretKey)
+		if conn == nil {
+			return errors.New(fmt.Sprintf("there's no secret with the name '%s'.", mapping.SecretKey))
+		}
+
+		val, ok := conn.(*config.GenericConnection)
+		if ok {
+			envVariables[mapping.InjectedKey] = val.Value
+			continue
+		}
+
+		res, err := json.Marshal(conn)
 		if err != nil {
-			return errors.Wrapf(err, "there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey)
+			return errors.Wrapf(err, "failed to marshal connection")
 		}
-
-		if val == "" {
-			return errors.New(fmt.Sprintf("there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey))
-		}
-
-		envVariables[mapping.InjectedKey] = val
+		envVariables[mapping.InjectedKey] = string(res)
 	}
 
 	err = o.runner.Run(ctx, &executionContext{

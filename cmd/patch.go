@@ -10,13 +10,15 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/mssql"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -26,7 +28,12 @@ const (
 )
 
 func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipeline.Pipeline, sp *sqlparser.SQLParser, renderer *jinja.Renderer) error {
-	missingDeps, err := sp.GetMissingDependenciesForAsset(asset, p, renderer.CloneForAsset(ctx, p, asset))
+	assetRenderer, err := renderer.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return fmt.Errorf("failed to create renderer for asset '%s': %w", asset.Name, err)
+	}
+
+	missingDeps, err := sp.GetMissingDependenciesForAsset(asset, p, assetRenderer)
 	if err != nil {
 		return fmt.Errorf("failed to get missing dependencies for asset '%s': %w", asset.Name, err)
 	}
@@ -92,6 +99,12 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 	}
 	tableName := pp.Asset.Name
 	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", tableName)
+	if _, ok := conn.(*mssql.DB); ok {
+		queryStr = "SELECT TOP 0 * FROM " + tableName
+	}
+	if _, ok := conn.(*oracle.Client); ok {
+		queryStr = "SELECT * FROM " + tableName + " WHERE 1=0"
+	}
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(context.Background(), q)
 	if err != nil {
@@ -134,24 +147,35 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 		return fillStatusUpdated, nil
 	}
 
-	hasNewColumns := false
+	hasChanges := false
 	for i, colName := range result.Columns {
 		if skipColumns[colName] {
 			continue
 		}
 		lowerColName := strings.ToLower(colName)
-		if _, exists := existingColumns[lowerColName]; !exists {
+		if existingCol, exists := existingColumns[lowerColName]; exists {
+			if existingCol.Type != result.ColumnTypes[i] {
+				for j := range pp.Asset.Columns {
+					if strings.ToLower(pp.Asset.Columns[j].Name) == lowerColName {
+						pp.Asset.Columns[j].Type = result.ColumnTypes[i]
+						hasChanges = true
+						break
+					}
+				}
+			}
+		} else {
+			// Add new column
 			pp.Asset.Columns = append(pp.Asset.Columns, pipeline.Column{
 				Name:      colName,
 				Type:      result.ColumnTypes[i],
 				Checks:    []pipeline.ColumnCheck{},
 				Upstreams: []*pipeline.UpstreamColumn{},
 			})
-			hasNewColumns = true
+			hasChanges = true
 		}
 	}
 
-	if !hasNewColumns {
+	if !hasChanges {
 		return fillStatusSkipped, nil
 	}
 
@@ -166,7 +190,7 @@ func Patch() *cli.Command {
 	return &cli.Command{
 		Name:      "patch",
 		ArgsUsage: "[path to the asset or pipeline]",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			{
 				Name:      "fill-asset-dependencies",
 				Usage:     "Fills missing asset dependencies based on the query. Accepts a path to an asset file or a pipeline directory.",
@@ -179,7 +203,7 @@ func Patch() *cli.Command {
 						Value:   "plain",
 					},
 				},
-				Action: func(c *cli.Context) error {
+				Action: func(ctx context.Context, c *cli.Command) error {
 					inputPath := c.Args().First()
 					if inputPath == "" {
 						fmt.Println("Please provide a path to an asset or a pipeline.")
@@ -197,7 +221,7 @@ func Patch() *cli.Command {
 
 					jinjaRenderer := jinja.NewRendererWithYesterday("test-pipeline", "test-run-id")
 
-					ctx := context.Background()
+					// ctx is already available from function signature
 
 					if isPathReferencingAsset(inputPath) { //nolint
 						pipelinePath, err := path.GetPipelineRootFromTask(inputPath, []string{".bruin.yml", "pipeline.yml"}) // TODO: use shared constant
@@ -323,7 +347,7 @@ func Patch() *cli.Command {
 						Usage:   "Target environment name as defined in .bruin.yml.",
 					},
 				},
-				Action: func(c *cli.Context) error {
+				Action: func(ctx context.Context, c *cli.Command) error {
 					inputPath := c.Args().First()
 					if inputPath == "" {
 						return errors.New("please provide a path to an asset or a pipeline")
@@ -332,7 +356,7 @@ func Patch() *cli.Command {
 					output := c.String("output")
 					environment := c.String("environment")
 					fs := afero.NewOsFs()
-					ctx := context.Background()
+					// ctx is already available from function signature
 
 					if isPathReferencingAsset(inputPath) { //nolint:nestif
 						// Single asset
@@ -341,7 +365,7 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, err)
 							return cli.Exit("", 1)
 						}
-						status, err := fillColumnsFromDB(pp, fs, environment, nil)
+						status, err := fillColumnsFromDB(pp, fs, environment, nil) //nolint:contextcheck
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s': %w", pp.Asset.Name, err))
 							return cli.Exit("", 1)
@@ -384,7 +408,7 @@ func Patch() *cli.Command {
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, fs, environment, nil)
+							status, err := fillColumnsFromDB(pp, fs, environment, nil) //nolint:contextcheck
 							processedAssets++
 							assetName := asset.Name
 							switch status {

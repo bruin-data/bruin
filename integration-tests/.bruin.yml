@@ -7,6 +7,10 @@ environments:
           path: "duckdb-files/duckdb.db"
         - name: "duckdb-variables"
           path: "duckdb-files/variables.db"
+        - name: "duckdb-scd2-by-column"
+          path: "duckdb-files/scd2-by-column.db"
+        - name: "duckdb-scd2-by-time"
+          path: "duckdb-files/scd2-by-time.db"
       chess:
         - name: "chess-default"
           players:
@@ -214,14 +218,20 @@ environments:
         - name: "duckdb-custom-check-count-true"
           path: "duckdb-files/duckdb-custom-check-count-true.db"
 
-  env-scd2-col-duckdb:
+  env-continue:
     connections:
       duckdb:
-        - name: "scd2-by-col-duckdb"
-          path: "duckdb-files/scd2-by-col-duckdb.db"
+        - name: "duckdb-continue"
+          path: "duckdb-files/continue.db"
   
-  env-scd2-time-duckdb:
+  env-scd2-by-column:
     connections:
       duckdb:
-        - name: "scd2-by-time-duckdb"
-          path: "duckdb-files/scd2-by-time-duckdb.db"
+        - name: "duckdb-scd2-by-column"
+          path: "duckdb-files/scd2-by-column.db"
+  
+  env-scd2-by-time:
+    connections:
+      duckdb:
+        - name: "duckdb-scd2-by-time"
+          path: "duckdb-files/scd2-by-time.db"

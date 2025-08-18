@@ -79,6 +79,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "secret-mapping-key-exists",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureSecretMappingsHaveKeyForASingleAsset,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "acyclic-pipeline",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
@@ -142,10 +149,24 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "valid-parent-domains",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        gr.EnsureParentDomainsExistInGlossary,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
 			Identifier:       "duplicate-column-names",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			AssetValidator:   ValidateDuplicateColumnNames,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
+			Identifier:       "duplicate-tags",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateDuplicateTags,
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
@@ -203,6 +224,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsurePipelineConcurrencyIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
+			Identifier:             "cross-pipeline-uri-dependencies",
+			Fast:                   true,
+			Severity:               ValidatorSeverityWarning,
+			CrossPipelineValidator: ValidateCrossPipelineURIDependencies,
+			ApplicableLevels:       []Level{LevelCrossPipeline},
 		},
 	}
 

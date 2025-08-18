@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,7 +30,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type ModifierInfo struct {
@@ -40,9 +41,10 @@ type ModifierInfo struct {
 
 func Render() *cli.Command {
 	return &cli.Command{
-		Name:      "render",
-		Usage:     "render a single Bruin SQL asset",
-		ArgsUsage: "[path to the asset definition]",
+		Name:                      "render",
+		Usage:                     "render a single Bruin SQL asset",
+		ArgsUsage:                 "[path to the asset definition]",
+		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "full-refresh",
@@ -58,7 +60,7 @@ func Render() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.BoolFlag{
@@ -70,7 +72,7 @@ func Render() *cli.Command {
 				Usage: "override pipeline variables with custom values",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fullRefresh := c.Bool("full-refresh")
 
 			if vars := c.StringSlice("var"); len(vars) > 0 {
@@ -139,7 +141,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			pl, err = DefaultPipelineBuilder.MutatePipeline(c.Context, pl)
+			pl, err = DefaultPipelineBuilder.MutatePipeline(ctx, pl)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to mutate the pipeline:")
 				return cli.Exit("", 1)
@@ -151,7 +153,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(c.Context, asset, pl)
+			asset, err = DefaultPipelineBuilder.MutateAsset(ctx, asset, pl)
 			if err != nil {
 				printError(errors.New("failed to mutate the asset"), c.String("output"), "Failed to mutate the asset:")
 				return cli.Exit("", 1)
@@ -194,10 +196,22 @@ func Render() *cli.Command {
 				}
 			}
 
+			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "your-run-id")
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
+
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value())
+			forAsset, err := renderer.CloneForAsset(runCtx, pl, asset)
+			if err != nil {
+				return err
+			}
+
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
-					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value()),
+					Renderer: forAsset,
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeBigqueryQuery:   bigquery.NewMaterializer(fullRefresh),
@@ -254,10 +268,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 		return errors.New("failed to find the asset: asset cannot be nil")
 	}
 	extractor := r.extractor
-	applyModifiers := modifierInfo.ApplyModifiers
-	if applyModifiers {
-		extractor = modifyExtractor(modifierInfo, pl, task)
-	}
+
 	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
 		r.printErrorOrJSON(err.Error())
@@ -361,13 +372,18 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, PipelineDefinitionFiles)
 }
 
-func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) queryExtractor {
+func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) (queryExtractor, error) {
 	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
 	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
 	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, p.Name, "your-run-id", p.Variables.Value())
 
-	return &query.WholeFileExtractor{
-		Renderer: newRenderer,
-		Fs:       fs,
+	renderer, err := newRenderer.CloneForAsset(context.Background(), p, t)
+	if err != nil {
+		return nil, err
 	}
+
+	return &query.WholeFileExtractor{
+		Renderer: renderer,
+		Fs:       fs,
+	}, nil
 }

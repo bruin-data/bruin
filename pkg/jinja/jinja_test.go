@@ -1,10 +1,12 @@
 package jinja
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
 )
 
@@ -914,6 +916,321 @@ func TestAddMilliseconds(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestRenderer_CloneForAsset_IntervalModifierTemplates(t *testing.T) {
+	t.Parallel()
+
+	basePipeline := &pipeline.Pipeline{
+		Name: "test-pipeline",
+		Variables: pipeline.Variables{
+			"env": map[string]any{
+				"test_var": "test_value",
+			},
+		},
+	}
+
+	tests := []struct {
+		name              string
+		asset             *pipeline.Asset
+		endDate           time.Time
+		startDate         time.Time
+		wantErr           bool
+		wantErrMsg        string
+		description       string
+		expectedStartDate string
+		expectedEndDate   string
+	}{
+		{
+			name: "thirty_days_back_template",
+			asset: &pipeline.Asset{
+				Name: "thirty-days-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{{ '-30d' }}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{{ '-1d' }}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			startDate:         time.Date(2023, 12, 2, 0, 0, 0, 0, time.UTC),
+			description:       "30 days back template should resolve correctly",
+			expectedStartDate: "2023-11-02", // startDate + 30 days back = 2023-11-02
+			expectedEndDate:   "2024-01-01", // endDate - 1 day = 2024-01-01
+		},
+		{
+			name: "two_hours_back_template",
+			asset: &pipeline.Asset{
+				Name: "two-hours-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{{ '-2h' }}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{{ '-1d' }}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 14, 30, 0, 0, time.UTC),
+			startDate:         time.Date(2023, 12, 2, 14, 30, 0, 0, time.UTC),
+			description:       "2 hours back template should resolve correctly",
+			expectedStartDate: "2023-12-02", // startDate + 2 hours back = 2023-12-02 12:30:00
+			expectedEndDate:   "2024-01-01", // endDate - 1 day = 2024-01-01
+		},
+		{
+			name: "conditional_truncate_day_template",
+			asset: &pipeline.Asset{
+				Name: "conditional-truncate-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{% if end_datetime == (end_datetime | truncate_day) %}-30d{% else %}-2h{% endif %}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{{ '-1d' }}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC), // Midnight
+			startDate:         time.Date(2023, 12, 2, 0, 0, 0, 0, time.UTC),
+			description:       "conditional template with truncate_day should use 30d for midnight",
+			expectedStartDate: "2023-11-02", // startDate + 30 days back (midnight case)
+			expectedEndDate:   "2024-01-01", // endDate - 1 day = 2024-01-01
+		},
+		{
+			name: "conditional_truncate_day_template_afternoon",
+			asset: &pipeline.Asset{
+				Name: "conditional-truncate-afternoon-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{% if end_datetime == (end_datetime | truncate_day) %}-30d{% else %}-2h{% endif %}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{{ '-1d' }}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 14, 30, 0, 0, time.UTC), // Afternoon
+			startDate:         time.Date(2023, 12, 2, 14, 30, 0, 0, time.UTC),
+			description:       "conditional template with truncate_day should use 2h for afternoon",
+			expectedStartDate: "2023-12-02", // startDate + 2 hours back (afternoon case)
+			expectedEndDate:   "2024-01-01", // endDate - 1 day = 2024-01-01
+		},
+		{
+			name: "simple_static_templates",
+			asset: &pipeline.Asset{
+				Name: "simple-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{{ '-6h' }}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{{ '+1h' }}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 14, 30, 0, 0, time.UTC),
+			startDate:         time.Date(2024, 1, 1, 14, 30, 0, 0, time.UTC),
+			description:       "simple static templates should resolve correctly",
+			expectedStartDate: "2024-01-01", // startDate + 6 hours back = 2024-01-01 08:30:00
+			expectedEndDate:   "2024-01-02", // endDate + 1 hour = 2024-01-02 15:30:00
+		},
+		{
+			name: "variable_based_templates",
+			asset: &pipeline.Asset{
+				Name: "variable-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{{ '-12h' }}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{{ '30m' }}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 12, 0, 0, 0, time.UTC),
+			startDate:         time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+			description:       "templates using simple time values should work",
+			expectedStartDate: "2024-01-01", // startDate + 12 hours back = 2024-01-01 00:00:00
+			expectedEndDate:   "2024-01-02", // endDate + 30 minutes = 2024-01-02 12:30:00
+		},
+		{
+			name: "complex_conditional_templates",
+			asset: &pipeline.Asset{
+				Name: "complex-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{{ '-12h' }}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{{ '+1h' }}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 15, 0, 0, 0, time.UTC),
+			startDate:         time.Date(2024, 1, 1, 15, 0, 0, 0, time.UTC),
+			description:       "complex conditional templates with multiple conditions",
+			expectedStartDate: "2024-01-01", // startDate + 12 hours back = 2024-01-01 03:00:00
+			expectedEndDate:   "2024-01-02", // endDate + 1 hour = 2024-01-02 16:00:00
+		},
+		{
+			name: "invalid_template_syntax",
+			asset: &pipeline.Asset{
+				Name: "invalid-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{% invalid syntax %}",
+					},
+				},
+			},
+			endDate:     time.Date(2024, 1, 2, 10, 0, 0, 0, time.UTC),
+			startDate:   time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC),
+			wantErr:     true,
+			wantErrMsg:  "failed to resolve start interval modifier template",
+			description: "invalid template syntax should return error",
+		},
+		{
+			name: "template_renders_invalid_format",
+			asset: &pipeline.Asset{
+				Name: "invalid-format-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{{ 'invalid-format' }}",
+					},
+				},
+			},
+			endDate:     time.Date(2024, 1, 2, 16, 0, 0, 0, time.UTC),
+			startDate:   time.Date(2024, 1, 1, 16, 0, 0, 0, time.UTC),
+			wantErr:     true,
+			wantErrMsg:  "failed to resolve start interval modifier template",
+			description: "template rendering invalid time format should return error",
+		},
+		{
+			name: "no_interval_modifiers",
+			asset: &pipeline.Asset{
+				Name: "no-modifiers-asset",
+			},
+			endDate:           time.Date(2024, 1, 2, 18, 0, 0, 0, time.UTC),
+			startDate:         time.Date(2024, 1, 1, 18, 0, 0, 0, time.UTC),
+			description:       "asset without interval modifiers should work normally",
+			expectedStartDate: "2024-01-01", // No modifiers applied, original start date
+			expectedEndDate:   "2024-01-02", // No modifiers applied, original end date
+		},
+		{
+			name: "business_hours_logic",
+			asset: &pipeline.Asset{
+				Name: "business-hours-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{% if end_datetime >= '2024-01-02T09:00:00' and end_datetime <= '2024-01-02T17:00:00' %}-6h{% else %}-12h{% endif %}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{% if end_datetime >= '2024-01-02T09:00:00' and end_datetime <= '2024-01-02T17:00:00' %}-1h{% else %}-3h{% endif %}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 14, 30, 0, 0, time.UTC), // Business hours (2:30 PM)
+			startDate:         time.Date(2024, 1, 1, 14, 30, 0, 0, time.UTC),
+			description:       "business hours should use shorter intervals",
+			expectedStartDate: "2024-01-01", // startDate + 6h back = 2024-01-01 08:30:00
+			expectedEndDate:   "2024-01-02", // endDate + 1h back = 2024-01-02 13:30:00
+		},
+		{
+			name: "month_end_logic",
+			asset: &pipeline.Asset{
+				Name: "month-end-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{% if end_date >= '2024-01-25' %}-7d{% else %}-1d{% endif %}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{% if end_date >= '2024-01-25' %}-1d{% else %}-2h{% endif %}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 31, 10, 0, 0, 0, time.UTC), // Month end (day 31)
+			startDate:         time.Date(2024, 1, 30, 10, 0, 0, 0, time.UTC),
+			description:       "month end should use longer lookback",
+			expectedStartDate: "2024-01-23", // startDate + 7d back = 2024-01-23 10:00:00
+			expectedEndDate:   "2024-01-30", // endDate + 1d back = 2024-01-30 10:00:00
+		},
+		{
+			name: "variable_based_conditional",
+			asset: &pipeline.Asset{
+				Name: "variable-conditional-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{% if end_datetime >= '2024-01-02T12:00:00' %}-24h{% else %}-6h{% endif %}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{% if end_datetime >= '2024-01-02T12:00:00' %}-2h{% else %}-1h{% endif %}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 12, 0, 0, 0, time.UTC),
+			startDate:         time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+			description:       "afternoon time should use longer intervals",
+			expectedStartDate: "2023-12-31", // startDate + 24h back (afternoon) = 2023-12-31 12:00:00
+			expectedEndDate:   "2024-01-02", // endDate + 2h back (afternoon) = 2024-01-02 10:00:00
+		},
+		{
+			name: "complex_time_based_logic",
+			asset: &pipeline.Asset{
+				Name: "complex-time-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{
+						Template: "{% if end_datetime < '2024-01-02T06:00:00' %}-36h{% elif end_datetime < '2024-01-02T12:00:00' %}-24h{% elif end_datetime < '2024-01-02T18:00:00' %}-12h{% else %}-6h{% endif %}",
+					},
+					End: pipeline.TimeModifier{
+						Template: "{% if end_datetime < '2024-01-02T06:00:00' %}-6h{% elif end_datetime < '2024-01-02T12:00:00' %}-3h{% elif end_datetime < '2024-01-02T18:00:00' %}-2h{% else %}-1h{% endif %}",
+					},
+				},
+			},
+			endDate:           time.Date(2024, 1, 2, 3, 0, 0, 0, time.UTC), // Early morning (3 AM)
+			startDate:         time.Date(2024, 1, 1, 3, 0, 0, 0, time.UTC),
+			description:       "early morning should use longest intervals",
+			expectedStartDate: "2023-12-30", // startDate + 36h back = 2023-12-30 15:00:00
+			expectedEndDate:   "2024-01-01", // endDate + 6h back = 2024-01-01 21:00:00
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, tt.startDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, tt.endDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
+			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+
+			baseRenderer := NewRenderer(Context{})
+			clonedRenderer, err := baseRenderer.CloneForAsset(ctx, basePipeline, tt.asset)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, clonedRenderer)
+
+			// Test that the cloned renderer brings the correct asset name
+			testQuery := "SELECT '{{ this }}' as asset_name"
+			result, err := clonedRenderer.Render(testQuery)
+			require.NoError(t, err)
+			require.Equal(t, "SELECT '"+tt.asset.Name+"' as asset_name", result)
+
+			// Test that interval modifiers were applied correctly by checking the dates
+			dateQuery := "SELECT '{{ start_date }}' as start_date, '{{ end_date }}' as end_date"
+			dateResult, err := clonedRenderer.Render(dateQuery)
+			require.NoError(t, err)
+			require.Contains(t, dateResult, tt.expectedStartDate)
+			require.Contains(t, dateResult, tt.expectedEndDate)
 		})
 	}
 }

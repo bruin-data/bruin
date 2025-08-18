@@ -17,9 +17,11 @@ var bruinExcludes = []string{
 	"pipeline.yaml",
 }
 
-var venvExcludes = []*regexp.Regexp{
+var dirExcludes = []*regexp.Regexp{
 	regexp.MustCompile(`[/\\].venv[/\\]`),
 	regexp.MustCompile(`[/\\]venv[/\\]`),
+	regexp.MustCompile(`^logs/.*$`),
+	regexp.MustCompile(`^\.git/.*$`),
 }
 
 func exclude(path string) bool {
@@ -28,7 +30,7 @@ func exclude(path string) bool {
 		return true
 	}
 
-	for _, re := range venvExcludes {
+	for _, re := range dirExcludes {
 		if re.MatchString(path) {
 			return true
 		}
@@ -38,7 +40,7 @@ func exclude(path string) bool {
 
 // zip.AddFS() modified with support for filesystem prefix
 // and some spark specific adjustments.
-func packageContextWithPrefix(zw *zip.Writer, context fs.FS, prefix string) error {
+func packageContextWithPrefix(zw *zip.Writer, context fs.FS) error {
 	// todo(turtledev): exclude assets from the packaged zip.
 	// this shouldn't create any issues in most cases, but
 	// adding this will fool-proof our implementation
@@ -46,15 +48,14 @@ func packageContextWithPrefix(zw *zip.Writer, context fs.FS, prefix string) erro
 		if err != nil {
 			return err
 		}
-		fullPath := path.Join(prefix, name)
-		if exclude(fullPath) {
+		if exclude(name) {
 			return nil
 		}
 		if d.IsDir() {
 			// spark will refuse to treat a directory as a package
 			// if it doesn't contain __init__.py
 			zw.CreateHeader(&zip.FileHeader{ //nolint
-				Name: path.Join(fullPath, "__init__.py"),
+				Name: path.Join(name, "__init__.py"),
 			})
 			return nil
 		}
@@ -69,7 +70,7 @@ func packageContextWithPrefix(zw *zip.Writer, context fs.FS, prefix string) erro
 		if err != nil {
 			return err
 		}
-		h.Name = fullPath
+		h.Name = name
 		h.Method = zip.Deflate
 		fw, err := zw.CreateHeader(h)
 		if err != nil {

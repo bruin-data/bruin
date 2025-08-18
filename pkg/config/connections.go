@@ -14,6 +14,7 @@ type AwsConnection struct {
 	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKey string `yaml:"access_key,omitempty" json:"access_key" mapstructure:"access_key"`
 	SecretKey string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key"`
+	Region    string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 }
 
 func (c AwsConnection) GetName() string {
@@ -407,6 +408,16 @@ func (d DuckDBConnection) GetName() string {
 	return d.Name
 }
 
+type MotherduckConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Token    string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Database string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+}
+
+func (m MotherduckConnection) GetName() string {
+	return m.Name
+}
+
 type ClickHouseConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
@@ -618,8 +629,11 @@ func (c LinearConnection) GetName() string {
 
 type GCSConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file" mapstructure:"service_account_file"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json"`
+	BucketName         string `yaml:"bucket_name,omitempty" json:"bucket_name,omitempty" mapstructure:"bucket_name"`
+	PathToFile         string `yaml:"path_to_file,omitempty" json:"path_to_file,omitempty" mapstructure:"path_to_file"`
+	Layout             string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
 }
 
 func (c GCSConnection) GetName() string {
@@ -658,6 +672,15 @@ func (c MixpanelConnection) GetName() string {
 	return c.Name
 }
 
+type ClickupConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIToken string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+}
+
+func (c ClickupConnection) GetName() string {
+	return c.Name
+}
+
 type PinterestConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
@@ -688,6 +711,15 @@ type QuickBooksConnection struct {
 }
 
 func (c QuickBooksConnection) GetName() string {
+	return c.Name
+}
+
+type WiseConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c WiseConnection) GetName() string {
 	return c.Name
 }
 
@@ -777,12 +809,19 @@ func (c DB2Connection) GetName() string {
 }
 
 type OracleConnection struct {
-	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Port     string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
-	DBName   string `yaml:"dbname,omitempty" json:"dbname" mapstructure:"dbname"`
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password     string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port         string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	ServiceName  string `yaml:"service_name,omitempty" json:"service_name" mapstructure:"service_name"`
+	SID          string `yaml:"sid,omitempty" json:"sid" mapstructure:"sid"`
+	Role         string `yaml:"role,omitempty" json:"role" mapstructure:"role"`
+	SSL          bool   `yaml:"ssl,omitempty" json:"ssl" mapstructure:"ssl"`
+	SSLVerify    bool   `yaml:"ssl_verify,omitempty" json:"ssl_verify" mapstructure:"ssl_verify"`
+	PrefetchRows int    `yaml:"prefetch_rows,omitempty" json:"prefetch_rows" mapstructure:"prefetch_rows"`
+	TraceFile    string `yaml:"trace_file,omitempty" json:"trace_file" mapstructure:"trace_file"`
+	Wallet       string `yaml:"wallet,omitempty" json:"wallet" mapstructure:"wallet"`
 }
 
 func (c OracleConnection) GetName() string {
@@ -874,6 +913,20 @@ func (c ISOCPulseConnection) GetName() string {
 	return c.Name
 }
 
+type InfluxDBConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Host   string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port   int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	Token  string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Org    string `yaml:"org,omitempty" json:"org" mapstructure:"org"`
+	Bucket string `yaml:"bucket,omitempty" json:"bucket" mapstructure:"bucket"`
+	Secure string `yaml:"secure,omitempty" json:"secure,omitempty" mapstructure:"secure" default:"true"`
+}
+
+func (c InfluxDBConnection) GetName() string {
+	return c.Name
+}
+
 type TableauConnection struct {
 	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Host                      string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
@@ -883,6 +936,20 @@ type TableauConnection struct {
 	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret" mapstructure:"personal_access_token_secret"`
 	SiteID                    string `yaml:"site_id,omitempty" json:"site_id" mapstructure:"site_id"`
 	APIVersion                string `yaml:"api_version,omitempty" json:"api_version" mapstructure:"api_version"`
+}
+
+type TrinoConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port" json:"port" mapstructure:"port"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Catalog  string `yaml:"catalog" json:"catalog" mapstructure:"catalog"`
+	Schema   string `yaml:"schema" json:"schema" mapstructure:"schema"`
+}
+
+func (c TrinoConnection) GetName() string {
+	return c.Name
 }
 
 func (c TableauConnection) GetName() string {

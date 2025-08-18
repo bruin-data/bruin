@@ -199,6 +199,9 @@
         },
         "secret_key": {
           "type": "string"
+        },
+        "region": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -206,7 +209,8 @@
       "required": [
         "name",
         "access_key",
-        "secret_key"
+        "secret_key",
+        "region"
       ]
     },
     "ChessConnection": {
@@ -271,6 +275,22 @@
         "database",
         "http_port",
         "secure"
+      ]
+    },
+    "ClickupConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
       ]
     },
     "Connections": {
@@ -413,6 +433,12 @@
           },
           "type": "array"
         },
+        "motherduck": {
+          "items": {
+            "$ref": "#/$defs/MotherduckConnection"
+          },
+          "type": "array"
+        },
         "clickhouse": {
           "items": {
             "$ref": "#/$defs/ClickHouseConnection"
@@ -545,6 +571,12 @@
           },
           "type": "array"
         },
+        "clickup": {
+          "items": {
+            "$ref": "#/$defs/ClickupConnection"
+          },
+          "type": "array"
+        },
         "pinterest": {
           "items": {
             "$ref": "#/$defs/PinterestConnection"
@@ -560,6 +592,12 @@
         "quickbooks": {
           "items": {
             "$ref": "#/$defs/QuickBooksConnection"
+          },
+          "type": "array"
+        },
+        "wise": {
+          "items": {
+            "$ref": "#/$defs/WiseConnection"
           },
           "type": "array"
         },
@@ -665,9 +703,21 @@
           },
           "type": "array"
         },
+        "influxdb": {
+          "items": {
+            "$ref": "#/$defs/InfluxDBConnection"
+          },
+          "type": "array"
+        },
         "tableau": {
           "items": {
             "$ref": "#/$defs/TableauConnection"
+          },
+          "type": "array"
+        },
+        "trino": {
+          "items": {
+            "$ref": "#/$defs/TrinoConnection"
           },
           "type": "array"
         }
@@ -888,6 +938,20 @@
       ]
     },
     "GCSConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "service_account_file"
+          ],
+          "title": "service_account_file"
+        },
+        {
+          "required": [
+            "service_account_json"
+          ],
+          "title": "service_account_json"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -897,14 +961,21 @@
         },
         "service_account_json": {
           "type": "string"
+        },
+        "bucket_name": {
+          "type": "string"
+        },
+        "path_to_file": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "name",
-        "service_account_file",
-        "service_account_json"
+        "name"
       ]
     },
     "GenericConnection": {
@@ -1123,6 +1194,40 @@
         "token"
       ]
     },
+    "InfluxDBConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "token": {
+          "type": "string"
+        },
+        "org": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "secure": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "token",
+        "org",
+        "bucket"
+      ]
+    },
     "KafkaConnection": {
       "properties": {
         "name": {
@@ -1297,6 +1402,25 @@
         "database"
       ]
     },
+    "MotherduckConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "token"
+      ]
+    },
     "MsSQLConnection": {
       "properties": {
         "name": {
@@ -1408,7 +1532,28 @@
         "port": {
           "type": "string"
         },
-        "dbname": {
+        "service_name": {
+          "type": "string"
+        },
+        "sid": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "boolean"
+        },
+        "ssl_verify": {
+          "type": "boolean"
+        },
+        "prefetch_rows": {
+          "type": "integer"
+        },
+        "trace_file": {
+          "type": "string"
+        },
+        "wallet": {
           "type": "string"
         }
       },
@@ -1420,7 +1565,14 @@
         "password",
         "host",
         "port",
-        "dbname"
+        "service_name",
+        "sid",
+        "role",
+        "ssl",
+        "ssl_verify",
+        "prefetch_rows",
+        "trace_file",
+        "wallet"
       ]
     },
     "PersonioConnection": {
@@ -1989,6 +2141,41 @@
         "advertiser_ids"
       ]
     },
+    "TrinoConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "port",
+        "username",
+        "catalog",
+        "schema"
+      ]
+    },
     "TrustpilotConnection": {
       "properties": {
         "name": {
@@ -2006,6 +2193,22 @@
       "required": [
         "name",
         "business_unit_id",
+        "api_key"
+      ]
+    },
+    "WiseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
         "api_key"
       ]
     },

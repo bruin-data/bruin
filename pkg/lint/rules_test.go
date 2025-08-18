@@ -2094,6 +2094,178 @@ func TestGlossaryChecker_EnsureAssetEntitiesExistInGlossary(t *testing.T) {
 	}
 }
 
+func TestGlossaryChecker_EnsureParentDomainsExistInGlossary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		glossary *glossary.Glossary
+		want     []string
+		wantErr  assert.ErrorAssertionFunc
+	}{
+		{
+			name: "no domains in glossary",
+			glossary: &glossary.Glossary{
+				Domains:  []*glossary.Domain{},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "domains with no parent domains",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "domain1", ParentDomain: ""},
+					{Name: "domain2", ParentDomain: ""},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "domain with valid parent domain",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "parent-domain", ParentDomain: ""},
+					{Name: "child-domain", ParentDomain: "parent-domain"},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "domain with missing parent domain",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "domain1", ParentDomain: ""},
+					{Name: "domain2", ParentDomain: "nonexistent-parent"},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{"Parent domain 'nonexistent-parent' for domain 'domain2' does not exist in the glossary"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "multiple domains with missing parent domains",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "domain1", ParentDomain: ""},
+					{Name: "domain2", ParentDomain: "missing-parent1"},
+					{Name: "domain3", ParentDomain: "missing-parent2"},
+					{Name: "domain4", ParentDomain: "domain1"}, // valid
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want: []string{
+				"Parent domain 'missing-parent1' for domain 'domain2' does not exist in the glossary",
+				"Parent domain 'missing-parent2' for domain 'domain3' does not exist in the glossary",
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "complex domain hierarchy",
+			glossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "root-domain", ParentDomain: ""},
+					{Name: "level1-domain1", ParentDomain: "root-domain"},
+					{Name: "level1-domain2", ParentDomain: "root-domain"},
+					{Name: "level2-domain1", ParentDomain: "level1-domain1"},
+					{Name: "level2-domain2", ParentDomain: "level1-domain1"},
+					{Name: "orphan-domain", ParentDomain: "missing-root"},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			want:    []string{"Parent domain 'missing-root' for domain 'orphan-domain' does not exist in the glossary"},
+			wantErr: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			checker := GlossaryChecker{
+				foundGlossary: tt.glossary,
+			}
+
+			got, err := checker.EnsureParentDomainsExistInGlossary(context.Background(), &pipeline.Pipeline{})
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			gotMessages := make([]string, len(got))
+			for i, issue := range got {
+				gotMessages[i] = issue.Description
+			}
+
+			assert.Equal(t, tt.want, gotMessages)
+		})
+	}
+}
+
+func TestGlossaryChecker_EnsureParentDomainsExistInGlossary_WithCache(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		initialGlossary *glossary.Glossary
+		cacheGlossary   bool
+		want            []string
+		wantErr         assert.ErrorAssertionFunc
+	}{
+		{
+			name: "uses cached glossary when available",
+			initialGlossary: &glossary.Glossary{
+				Domains: []*glossary.Domain{
+					{Name: "parent", ParentDomain: ""},
+					{Name: "child", ParentDomain: "parent"},
+					{Name: "orphan", ParentDomain: "missing"},
+				},
+				Entities: []*glossary.Entity{},
+			},
+			cacheGlossary: true,
+			want:          []string{"Parent domain 'missing' for domain 'orphan' does not exist in the glossary"},
+			wantErr:       assert.NoError,
+		},
+		{
+			name: "handles empty cached glossary",
+			initialGlossary: &glossary.Glossary{
+				Domains:  []*glossary.Domain{},
+				Entities: []*glossary.Entity{},
+			},
+			cacheGlossary: true,
+			want:          []string{},
+			wantErr:       assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			checker := GlossaryChecker{
+				foundGlossary:      tt.initialGlossary,
+				cacheFoundGlossary: tt.cacheGlossary,
+			}
+
+			got, err := checker.EnsureParentDomainsExistInGlossary(context.Background(), &pipeline.Pipeline{})
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			gotMessages := make([]string, len(got))
+			for i, issue := range got {
+				gotMessages[i] = issue.Description
+			}
+
+			assert.Equal(t, tt.want, gotMessages)
+		})
+	}
+}
+
 type mockSQLParser struct {
 	mock.Mock
 }
@@ -2293,6 +2465,71 @@ func TestValidateDuplicateColumnNames(t *testing.T) {
 			t.Parallel()
 
 			got, err := ValidateDuplicateColumnNames(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestValidateDuplicateTags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "no duplicate tags",
+			asset: &pipeline.Asset{
+				Name:    "asset1",
+				Tags:    []string{"tag1", "tag2"},
+				Columns: []pipeline.Column{{Name: "col1", Tags: []string{"a", "b"}}},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "duplicate asset tags",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Tags: []string{"tag1", "Tag1"},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1", Tags: []string{"tag1", "Tag1"}},
+					Description: "Duplicate asset tag 'Tag1' found",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "duplicate column tags",
+			asset: &pipeline.Asset{
+				Name:    "asset1",
+				Columns: []pipeline.Column{{Name: "col1", Tags: []string{"a", "A"}}},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1", Columns: []pipeline.Column{{Name: "col1", Tags: []string{"a", "A"}}}},
+					Description: "Duplicate tag 'A' found in column 'col1'",
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ValidateDuplicateTags(context.Background(), &pipeline.Pipeline{}, tt.asset)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -2662,6 +2899,265 @@ func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEnsureSecretMappingsHaveKeyForASingleAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "secret without key returns issue",
+			asset: &pipeline.Asset{
+				Secrets: []pipeline.SecretMapping{{SecretKey: "", InjectedKey: "SENTRY_DSN"}},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Secrets: []pipeline.SecretMapping{{SecretKey: "", InjectedKey: "SENTRY_DSN"}}},
+					Description: secretMappingKeyMustExist,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "all secrets have keys",
+			asset: &pipeline.Asset{
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "GCP", InjectedKey: "GCP"},
+					{SecretKey: "SENTRY_DSN", InjectedKey: ""},
+				},
+			},
+			want:    []*Issue{},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := EnsureSecretMappingsHaveKeyForASingleAsset(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("EnsureSecretMappingsHaveKeyForASingleAsset() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestValidateCrossPipelineURIDependencies(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		pipelines []*pipeline.Pipeline
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "no pipelines returns no issues",
+			args: args{
+				pipelines: []*pipeline.Pipeline{},
+			},
+			want: noIssues,
+		},
+		{
+			name: "pipelines with no URI dependencies return no issues",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								Upstreams: []pipeline.Upstream{
+									{Type: "asset", Value: "task2"},
+								},
+							},
+							{
+								Name: "task2",
+							},
+						},
+					},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "valid URI dependencies are resolved correctly",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								Upstreams: []pipeline.Upstream{
+									{Type: "uri", Value: "external://dataset1"},
+								},
+							},
+						},
+					},
+					{
+						Name: "pipeline2",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task2",
+								URI:  "external://dataset1",
+							},
+						},
+					},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "missing URI dependencies are reported",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								Upstreams: []pipeline.Upstream{
+									{Type: "uri", Value: "external://missing_dataset"},
+									{Type: "uri", Value: "external://another_missing"},
+								},
+							},
+							{
+								Name: "task2",
+								Upstreams: []pipeline.Upstream{
+									{Type: "uri", Value: "external://dataset1"}, // this one exists
+								},
+							},
+						},
+					},
+					{
+						Name: "pipeline2",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task3",
+								URI:  "external://dataset1",
+							},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "task1",
+						Upstreams: []pipeline.Upstream{
+							{Type: "uri", Value: "external://missing_dataset"},
+							{Type: "uri", Value: "external://another_missing"},
+						},
+					},
+					Description: "Cross-pipeline URI dependency 'external://missing_dataset' not found in any available pipeline",
+				},
+				{
+					Task: &pipeline.Asset{
+						Name: "task1",
+						Upstreams: []pipeline.Upstream{
+							{Type: "uri", Value: "external://missing_dataset"},
+							{Type: "uri", Value: "external://another_missing"},
+						},
+					},
+					Description: "Cross-pipeline URI dependency 'external://another_missing' not found in any available pipeline",
+				},
+			},
+		},
+		{
+			name: "empty URI dependencies are reported",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								Upstreams: []pipeline.Upstream{
+									{Type: "uri", Value: ""},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "task1",
+						Upstreams: []pipeline.Upstream{
+							{Type: "uri", Value: ""},
+						},
+					},
+					Description: "URI dependency cannot be empty",
+				},
+			},
+		},
+		{
+			name: "duplicate URIs are reported",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								URI:  "external://dataset1",
+							},
+							{
+								Name: "task2",
+								URI:  "external://dataset1", // duplicate
+							},
+						},
+					},
+					{
+						Name: "pipeline2",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task3",
+								URI:  "external://dataset1", // another duplicate
+							},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "task1",
+						URI:  "external://dataset1",
+					},
+					Description: "Duplicate URI 'external://dataset1' found across multiple assets: task1, task2, task3",
+				},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ValidateCrossPipelineURIDependencies(ctx, tt.args.pipelines)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.ElementsMatch(t, tt.want, got)
 		})
 	}
 }

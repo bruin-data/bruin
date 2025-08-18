@@ -1,6 +1,7 @@
 package tableau
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -118,4 +119,106 @@ func TestNewClient_DefaultAPIVersion(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	require.Equal(t, "3.4", client.config.APIVersion)
+}
+
+func TestFindDatasourceIDByName(t *testing.T) {
+	t.Parallel()
+	datasources := []DataSourceInfo{
+		{ID: "id1", Name: "Alpha"},
+		{ID: "id2", Name: "Beta"},
+	}
+
+	id, err := FindDatasourceIDByName(context.Background(), "alpha", datasources)
+	require.NoError(t, err)
+	require.Equal(t, "id1", id)
+
+	id, err = FindDatasourceIDByName(context.Background(), "BETA", datasources)
+	require.NoError(t, err)
+	require.Equal(t, "id2", id)
+
+	id, err = FindDatasourceIDByName(context.Background(), "gamma", datasources)
+	require.NoError(t, err)
+	require.Equal(t, "", id)
+
+	// nil datasources
+	_, err = FindDatasourceIDByName(context.Background(), "alpha", nil)
+	require.Error(t, err)
+
+	// empty slice
+	id, err = FindDatasourceIDByName(context.Background(), "alpha", []DataSourceInfo{})
+	require.NoError(t, err)
+	require.Equal(t, "", id)
+
+	// empty name
+	id, err = FindDatasourceIDByName(context.Background(), "", datasources)
+	require.NoError(t, err)
+	require.Equal(t, "", id)
+
+	// name with spaces
+	datasourcesWithSpaces := []DataSourceInfo{
+		{ID: "id3", Name: "  Alpha  "},
+	}
+	id, err = FindDatasourceIDByName(context.Background(), "  alpha  ", datasourcesWithSpaces)
+	require.NoError(t, err)
+	require.Equal(t, "id3", id)
+
+	// duplicate names, should return first match
+	datasourcesDup := []DataSourceInfo{
+		{ID: "id4", Name: "Gamma"},
+		{ID: "id5", Name: "Gamma"},
+	}
+	id, err = FindDatasourceIDByName(context.Background(), "gamma", datasourcesDup)
+	require.NoError(t, err)
+	require.Equal(t, "id4", id)
+}
+
+func TestFindWorkbookIDByName(t *testing.T) {
+	t.Parallel()
+	workbooks := []WorkbookInfo{
+		{ID: "w1", Name: "Superstore"},
+		{ID: "w2", Name: "World Indicators"},
+	}
+
+	id, err := FindWorkbookIDByName(context.Background(), "superstore", workbooks)
+	require.NoError(t, err)
+	require.Equal(t, "w1", id)
+
+	id, err = FindWorkbookIDByName(context.Background(), "WORLD INDICATORS", workbooks)
+	require.NoError(t, err)
+	require.Equal(t, "w2", id)
+
+	id, err = FindWorkbookIDByName(context.Background(), "notfound", workbooks)
+	require.NoError(t, err)
+	require.Equal(t, "", id)
+
+	// nil workbooks
+	_, err = FindWorkbookIDByName(context.Background(), "superstore", nil)
+	require.Error(t, err)
+
+	// empty slice
+	id, err = FindWorkbookIDByName(context.Background(), "superstore", []WorkbookInfo{})
+	require.NoError(t, err)
+	require.Equal(t, "", id)
+
+	// empty name
+	id, err = FindWorkbookIDByName(context.Background(), "", workbooks)
+	require.NoError(t, err)
+	require.Equal(t, "", id)
+
+	// name with spaces
+	workbooksWithSpaces := []WorkbookInfo{
+		{ID: "w3", Name: "  Superstore  "},
+	}
+	id, err = FindWorkbookIDByName(context.Background(), "  superstore  ", workbooksWithSpaces)
+	require.NoError(t, err)
+	require.Equal(t, "w3", id)
+
+	// duplicate names, should return first match
+	workbooksDup := []WorkbookInfo{
+		{ID: "w4", Name: "Gamma"},
+		{ID: "w5", Name: "Gamma"},
+	}
+	id, err = FindWorkbookIDByName(context.Background(), "gamma", workbooksDup)
+	require.NoError(t, err)
+	require.Equal(t, "w4", id)
 }

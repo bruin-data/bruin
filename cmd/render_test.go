@@ -279,7 +279,8 @@ func TestModifyExtractor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			extractor := modifyExtractor(tt.args.params, &pipeline.Pipeline{}, tt.args.task)
+			extractor, err := modifyExtractor(tt.args.params, &pipeline.Pipeline{}, tt.args.task)
+			require.NoError(t, err)
 			qry, err := extractor.ExtractQueriesFromString(tt.args.query)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantQuery, qry[0].Query)

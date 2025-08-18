@@ -11,6 +11,20 @@ import (
 	"github.com/spf13/afero"
 )
 
+type Contact struct {
+	Type    string `json:"type" yaml:"type,omitempty"`
+	Address string `json:"address" yaml:"address,omitempty"`
+}
+
+type Domain struct {
+	Name         string     `json:"name" yaml:"name,omitempty"`
+	Description  string     `json:"description" yaml:"description,omitempty"`
+	ParentDomain string     `json:"parent_domain" yaml:"parent_domain,omitempty"`
+	Owners       []string   `json:"owners" yaml:"owners,omitempty"`
+	Tags         []string   `json:"tags" yaml:"tags,omitempty"`
+	Contact      []*Contact `json:"contact" yaml:"contact,omitempty"`
+}
+
 type Attribute struct {
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"description" yaml:"description"`
@@ -20,6 +34,7 @@ type Attribute struct {
 type Entity struct {
 	Name        string                `json:"name" yaml:"name"`
 	Description string                `json:"description" yaml:"description"`
+	Domains     []string              `json:"domains" yaml:"domains,omitempty"`
 	Attributes  map[string]*Attribute `json:"attributes" yaml:"attributes"`
 }
 
@@ -41,6 +56,7 @@ type GlossaryReader struct {
 
 type Glossary struct {
 	Entities []*Entity `yaml:"entities" json:"entities"`
+	Domains  []*Domain `yaml:"domains,omitempty" json:"domains"`
 }
 
 func (g *Glossary) GetEntity(name string) *Entity {
@@ -53,8 +69,19 @@ func (g *Glossary) GetEntity(name string) *Entity {
 	return nil
 }
 
+func (g *Glossary) GetDomain(name string) *Domain {
+	for _, domain := range g.Domains {
+		if domain.Name == name {
+			return domain
+		}
+	}
+
+	return nil
+}
+
 type glossaryYaml struct {
 	Entities map[string]*Entity `yaml:"entities"`
+	Domains  map[string]*Domain `yaml:"domains"`
 }
 
 func (g *Glossary) Merge(anotherGlossary *Glossary) {
@@ -62,7 +89,12 @@ func (g *Glossary) Merge(anotherGlossary *Glossary) {
 		g.Entities = make([]*Entity, 0)
 	}
 
+	if g.Domains == nil {
+		g.Domains = make([]*Domain, 0)
+	}
+
 	g.Entities = append(g.Entities, anotherGlossary.Entities...)
+	g.Domains = append(g.Domains, anotherGlossary.Domains...)
 }
 
 func (r *GlossaryReader) GetGlossary(pipelinePath string) (*Glossary, error) {
@@ -130,7 +162,19 @@ func LoadGlossaryFromFile(path string) (*Glossary, error) {
 		idx++
 	}
 
+	domains := make([]*Domain, len(glossary.Domains))
+	idx = 0
+	for name, domain := range glossary.Domains {
+		if domain.Name == "" {
+			domain.Name = name
+		}
+
+		domains[idx] = domain
+		idx++
+	}
+
 	return &Glossary{
 		Entities: result,
+		Domains:  domains,
 	}, nil
 }

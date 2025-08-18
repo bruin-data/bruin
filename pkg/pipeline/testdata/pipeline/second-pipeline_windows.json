@@ -1,6 +1,9 @@
 {
   "legacy_id": "",
   "name": "first-pipeline",
+  "tags": [],
+  "domains": [],
+  "meta": {},
   "schedule": "",
   "snapshot": "",
   "start_date": "",
@@ -18,228 +21,244 @@
     "bigquery": false
   },
   "assets": [
-    {
-      "id": "eb9126984939a8f3e6e882cd0cd171af872274bd3dd18148b3d95afc01efa6b1",
-      "uri": "",
-      "name": "gcs-to-bq",
-      "description": "",
-      "type": "bq.transfer",
-      "tags": [],
-      "extends": null,
-      "executable_file": {
-        "name": "task.yml",
-        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
-        "content": "name: gcs-to-bq\r\ntype: bq.transfer\r\nparameters:\r\n  transfer_config_id: some-uuid\r\n  project_id: \"some-project-id\"\r\n  location: \"europe-west1\"\r\n"
-      },
-      "definition_file": {
-        "name": "task.yml",
-        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
-        "type": "yaml"
-      },
-      "parameters": {
-        "location": "europe-west1",
-        "project_id": "some-project-id",
-        "transfer_config_id": "some-uuid"
-      },
-      "connection": "",
-      "secrets": [],
-      "athena": null,
-      "upstreams": [],
-      "materialization": null,
-      "interval_modifiers": null,
-      "columns": [],
-      "custom_checks": [],
-      "image": "",
-      "instance": "",
-      "owner": "",
-      "metadata": {},
-      "snowflake": null
-    },
-    {
-      "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
-      "uri": "",
-      "name": "gcs-to-bq-2",
-      "description": "",
-      "type": "bq.transfer",
-      "tags": [],
-      "extends": null,
-      "executable_file": {
-        "name": "task.yml",
-        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
-        "content": "name: gcs-to-bq-2\r\ntype: bq.transfer\r\nparameters:\r\n  transfer_config_id: \"some-uuid\"\r\n  project_id: \"a-new-project-id\"\r\n  location: \"europe-west1\"\r\n"
-      },
-      "definition_file": {
-        "name": "task.yml",
-        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
-        "type": "yaml"
-      },
-      "parameters": {
-        "location": "europe-west1",
-        "project_id": "a-new-project-id",
-        "transfer_config_id": "some-uuid"
-      },
-      "connection": "",
-      "secrets": [],
-      "upstreams": [],
-      "athena": null,
-      "materialization": null,
-      "interval_modifiers": null,
-      "columns": [],
-      "custom_checks": [],
-      "image": "",
-      "instance": "",
-      "owner": "",
-      "metadata": {},
-      "snowflake": null
-    },
-    {
-      "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
-      "uri": "",
-      "name": "some-python-task",
-      "description": "some description goes here",
-      "type": "python",
-      "tags": [
-        "tag1",
-        "tag2:value2"
-      ],
-      "extends": null,
-      "executable_file": {
-        "name": "testblockcomments.py",
-        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
-        "content": "print('hello world')"
-      },
-      "definition_file": {
-        "name": "testblockcomments.py",
-        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
-        "type": "comment"
-      },
-      "parameters": {
-        "param1": "first-parameter",
-        "param2": "second-parameter",
-        "param3": "third-parameter"
-      },
-      "connection": "",
-      "secrets": [
         {
-          "secret_key": "secret1",
-          "injected_key": "INJECTED_SECRET1"
-        },
-        {
-          "secret_key": "secret2",
-          "injected_key": "secret2"
-        }
-      ],
-      "athena": null,
-      "upstreams": [
-        {
-          "type": "asset",
-          "value": "task1",
-          "columns": [],
-          "mode": "full"
-        },
-        {
-          "type": "asset",
-          "value": "task2",
-          "columns": [],
-          "mode": "full"
-        },
-        {
-          "type": "asset",
-          "value": "task3",
-          "columns": [],
-          "mode": "full"
-        },
-        {
-          "type": "asset",
-          "value": "task4",
-          "columns": [],
-          "mode": "full"
-        },
-        {
-          "type": "asset",
-          "value": "task5",
-          "columns": [],
-          "mode": "full"
-        }
-      ],
-      "materialization": null,
-      "interval_modifiers": null,
-      "columns": [
-        {
-          "name": "col1",
-          "type": "string",
-          "description": "",
-          "entity_attribute": null,
-          "checks": [
-            {
-              "id": "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
-              "name": "not_null",
-              "value": null,
-              "blocking": true,
-              "description": ""
+            "id": "eb9126984939a8f3e6e882cd0cd171af872274bd3dd18148b3d95afc01efa6b1",
+            "uri": "",
+            "name": "gcs-to-bq",
+            "type": "bq.transfer",
+            "description": "",
+            "connection": "",
+            "tags": [],
+            "domains": [],
+            "meta": {},
+            "materialization": null,
+            "upstreams": [],
+            "image": "",
+            "instance": "",
+            "owner": "",
+            "executable_file": {
+                "name": "task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
+                "content": "name: gcs-to-bq\r\ntype: bq.transfer\r\nparameters:\r\n  transfer_config_id: some-uuid\r\n  project_id: \"some-project-id\"\r\n  location: \"europe-west1\"\r\n"
             },
-            {
-              "id": "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
-              "name": "positive",
-              "value": null,
-              "blocking": true,
-              "description": ""
+            "definition_file": {
+                "name": "task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
+                "type": "yaml"
             },
-            {
-              "id": "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
-              "name": "unique",
-              "value": null,
-              "blocking": true,
-              "description": ""
-            }
-          ],
-          "primary_key": false,
-          "update_on_merge": false,
-          "upstreams": []
+            "parameters": {
+                "location": "europe-west1",
+                "project_id": "some-project-id",
+                "transfer_config_id": "some-uuid"
+            },
+            "secrets": [],
+            "extends": null,
+            "columns": [],
+            "custom_checks": [],
+            "metadata": {},
+            "snowflake": null,
+            "athena": null,
+            "interval_modifiers": null
         },
         {
-          "name": "col2",
-          "type": "string",
-          "description": "",
-          "entity_attribute": null,
-          "checks": [
-            {
-              "id": "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
-              "name": "not_null",
-              "value": null,
-              "blocking": true,
-              "description": ""
+            "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
+            "uri": "",
+            "name": "gcs-to-bq-2",
+            "type": "bq.transfer",
+            "description": "",
+            "connection": "",
+            "tags": [],
+            "domains": [],
+            "meta": {},
+            "materialization": null,
+            "upstreams": [],
+            "image": "",
+            "instance": "",
+            "owner": "",
+            "executable_file": {
+                "name": "task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
+                "content": "name: gcs-to-bq-2\r\ntype: bq.transfer\r\nparameters:\r\n  transfer_config_id: \"some-uuid\"\r\n  project_id: \"a-new-project-id\"\r\n  location: \"europe-west1\"\r\n"
             },
-            {
-              "id": "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
-              "name": "unique",
-              "value": null,
-              "blocking": true,
-              "description": ""
-            }
-          ],
-          "primary_key": false,
-          "update_on_merge": false,
-          "upstreams": []
-        }
-      ],
-      "custom_checks": [
+            "definition_file": {
+                "name": "task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
+                "type": "yaml"
+            },
+            "parameters": {
+                "location": "europe-west1",
+                "project_id": "a-new-project-id",
+                "transfer_config_id": "some-uuid"
+            },
+            "secrets": [],
+            "extends": null,
+            "columns": [],
+            "custom_checks": [],
+            "metadata": {},
+            "snowflake": null,
+            "athena": null,
+            "interval_modifiers": null
+        },
         {
-          "id": "a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc",
-          "name": "check1",
-          "description": "test description",
-          "query": "select 5",
-          "value": 16,
-          "blocking": false
+            "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
+            "uri": "",
+            "name": "some-python-task",
+            "type": "python",
+            "description": "some description goes here",
+            "connection": "",
+            "tags": [
+                "tag1",
+                "tag2:value2"
+            ],
+            "domains": [],
+            "meta": {},
+            "materialization": null,
+            "upstreams": [
+                {
+                    "type": "asset",
+                    "value": "task1",
+                    "columns": [],
+                    "mode": "full"
+                },
+                {
+                    "type": "asset",
+                    "value": "task2",
+                    "columns": [],
+                    "mode": "full"
+                },
+                {
+                    "type": "asset",
+                    "value": "task3",
+                    "columns": [],
+                    "mode": "full"
+                },
+                {
+                    "type": "asset",
+                    "value": "task4",
+                    "columns": [],
+                    "mode": "full"
+                },
+                {
+                    "type": "asset",
+                    "value": "task5",
+                    "columns": [],
+                    "mode": "full"
+                }
+            ],
+            "image": "python:3.11",
+            "instance": "b1.nano",
+            "owner": "jane.doe@getbruin.com",
+            "executable_file": {
+                "name": "testblockcomments.py",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
+                "content": "print('hello world')"
+            },
+            "definition_file": {
+                "name": "testblockcomments.py",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
+                "type": "comment"
+            },
+            "parameters": {
+                "param1": "first-parameter",
+                "param2": "second-parameter",
+                "param3": "third-parameter"
+            },
+            "secrets": [
+                {
+                    "secret_key": "secret1",
+                    "injected_key": "INJECTED_SECRET1"
+                },
+                {
+                    "secret_key": "secret2",
+                    "injected_key": "secret2"
+                }
+            ],
+            "extends": null,
+            "columns": [
+                {
+                    "entity_attribute": null,
+                    "name": "col1",
+                    "type": "string",
+                    "description": "",
+                    "tags": [],
+                    "primary_key": false,
+                    "update_on_merge": false,
+                    "nullable": true,
+                    "owner": "",
+                    "domains": [],
+                    "meta": {},
+                    "checks": [
+                        {
+                            "id": "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
+                            "name": "not_null",
+                            "value": null,
+                            "blocking": true,
+                            "description": ""
+                        },
+                        {
+                            "id": "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
+                            "name": "positive",
+                            "value": null,
+                            "blocking": true,
+                            "description": ""
+                        },
+                        {
+                            "id": "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
+                            "name": "unique",
+                            "value": null,
+                            "blocking": true,
+                            "description": ""
+                        }
+                    ],
+                    "upstreams": []
+                },
+                {
+                    "entity_attribute": null,
+                    "name": "col2",
+                    "type": "string",
+                    "description": "",
+                    "tags": [],
+                    "primary_key": false,
+                    "update_on_merge": false,
+                    "nullable": true,
+                    "owner": "",
+                    "domains": [],
+                    "meta": {},
+                    "checks": [
+                        {
+                            "id": "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
+                            "name": "not_null",
+                            "value": null,
+                            "blocking": true,
+                            "description": ""
+                        },
+                        {
+                            "id": "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
+                            "name": "unique",
+                            "value": null,
+                            "blocking": true,
+                            "description": ""
+                        }
+                    ],
+                    "upstreams": []
+                }
+            ],
+            "custom_checks": [
+                {
+                    "id": "a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc",
+                    "name": "check1",
+                    "description": "test description",
+                    "value": 16,
+                    "blocking": false,
+                    "query": "select 5"
+                }
+            ],
+            "metadata": {},
+            "snowflake": null,
+            "athena": null,
+            "interval_modifiers": null
         }
-      ],
-      "image": "python:3.11",
-      "instance": "b1.nano",
-      "owner": "jane.doe@getbruin.com",
-      "metadata": {},
-      "snowflake": null
-    }
-  ],
+    ],
   "notifications": {
     "slack": [],
     "discord": [],

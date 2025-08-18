@@ -1,5 +1,5 @@
 import pytest
-from sqlglot import parse_one
+from sqlglot import parse_one, exp
 from sqlglot.optimizer import optimize
 
 from .main import (
@@ -2263,3 +2263,141 @@ def test_is_single_select_query():
     result = is_single_select_query(query, "mysql")
     assert result["is_single_select"] is False
     assert result["error"] == ""
+
+
+def test_merge_parts():
+    """Test merge_parts function with various table formats including SQL Server hints."""
+    from sqlglot import parse_one
+    from .main import merge_parts
+
+    # Test simple table name
+    query = "SELECT * FROM users"
+    parsed = parse_one(query, dialect="bigquery")
+    table = parsed.find(exp.Table)
+    assert merge_parts(table) == "users"
+
+    # Test table with schema
+    query = "SELECT * FROM myschema.users"
+    parsed = parse_one(query, dialect="bigquery")
+    table = parsed.find(exp.Table)
+    assert merge_parts(table) == "myschema.users"
+
+    # Test table with catalog and schema
+    query = "SELECT * FROM mycatalog.myschema.users"
+    parsed = parse_one(query, dialect="bigquery")
+    table = parsed.find(exp.Table)
+    assert merge_parts(table) == "mycatalog.myschema.users"
+
+    # Test SQL Server table with nolock hint - this is the key test case
+    query = "SELECT * FROM Warehouse.schema.FactTable(nolock)"
+    parsed = parse_one(query, dialect="tsql")
+    table = parsed.find(exp.Table)
+    assert merge_parts(table) == "Warehouse.schema.FactTable"
+
+    # Test SQL Server table with multiple hints
+    query = "SELECT * FROM sales.orders(nolock, nowait)"
+    parsed = parse_one(query, dialect="tsql")
+    table = parsed.find(exp.Table)
+    assert merge_parts(table) == "sales.orders"
+
+    # Test SQL Server table with hints and brackets
+    query = "SELECT * FROM mytable.[dbo].[my_fact](nolock)"
+    parsed = parse_one(query, dialect="tsql")
+    table = parsed.find(exp.Table)
+    assert merge_parts(table) == "mytable.dbo.my_fact"
+
+    # Test SQL Server simple table with hint
+    query = "SELECT * FROM employees(nolock)"
+    parsed = parse_one(query, dialect="tsql")
+    table = parsed.find(exp.Table)
+    assert merge_parts(table) == "employees"
+
+    # Test in a JOIN context
+    query = """
+    SELECT * FROM 
+        sales.customers c
+        JOIN sales.orders(nolock) o ON c.id = o.customer_id
+    """
+    parsed = parse_one(query, dialect="tsql")
+    tables = list(parsed.find_all(exp.Table))
+    assert len(tables) == 2
+    assert merge_parts(tables[0]) == "sales.customers"
+    assert merge_parts(tables[1]) == "sales.orders"
+
+
+def test_get_table_name():
+    """Test get_table_name function with various table formats and dialects."""
+    from sqlglot import parse_one
+    from .main import get_table_name
+
+    # Test simple table name
+    query = "SELECT * FROM users"
+    parsed = parse_one(query, dialect="bigquery")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "users"
+
+    # Test table with schema
+    query = "SELECT * FROM myschema.users"
+    parsed = parse_one(query, dialect="bigquery")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "myschema.users"
+
+    # Test table with catalog and schema
+    query = "SELECT * FROM mycatalog.myschema.users"
+    parsed = parse_one(query, dialect="bigquery")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "mycatalog.myschema.users"
+
+    # Test SQL Server table with nolock hint
+    query = "SELECT * FROM Warehouse.schema.FactTable(nolock)"
+    parsed = parse_one(query, dialect="tsql")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "Warehouse.schema.FactTable"
+
+    # Test SQL Server table with multiple hints
+    query = "SELECT * FROM sales.orders(nolock, nowait)"
+    parsed = parse_one(query, dialect="tsql")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "sales.orders"
+
+    # Test SQL Server simple table with hint
+    query = "SELECT * FROM employees(nolock)"
+    parsed = parse_one(query, dialect="tsql")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "employees"
+
+    # Test BigQuery backticked table names
+    query = "SELECT * FROM `project.dataset.table`"
+    parsed = parse_one(query, dialect="bigquery")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "project.dataset.table"
+
+    # Test PostgreSQL quoted identifiers
+    query = 'SELECT * FROM "public"."users"'
+    parsed = parse_one(query, dialect="postgres")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "public.users"
+
+    # Test MySQL backticked identifiers
+    query = "SELECT * FROM `database`.`table`"
+    parsed = parse_one(query, dialect="mysql")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "database.table"
+
+    # Test Snowflake uppercase handling
+    query = "SELECT * FROM DATABASE.SCHEMA.TABLE"
+    parsed = parse_one(query, dialect="snowflake")
+    table = parsed.find(exp.Table)
+    assert get_table_name(table) == "DATABASE.SCHEMA.TABLE"
+
+    # Test complex SQL Server query with multiple tables
+    query = """
+    SELECT * FROM 
+        Database1.schema.Table1(nolock) t1
+        JOIN Database2.schema.Table2(nolock) t2 ON t1.id = t2.id
+    """
+    parsed = parse_one(query, dialect="tsql")
+    tables = list(parsed.find_all(exp.Table))
+    assert len(tables) == 2
+    assert get_table_name(tables[0]) == "Database1.schema.Table1"
+    assert get_table_name(tables[1]) == "Database2.schema.Table2"

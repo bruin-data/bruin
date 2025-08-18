@@ -24,6 +24,8 @@ var platformConnectionMap = map[string]string{
 	"bigquery":  "google_cloud_platform",
 	"snowflake": "snowflake",
 	"postgres":  "postgres",
+	"redshift":  "redshift",
+	"athena":    "athena",
 }
 
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {
@@ -151,5 +153,43 @@ func TestCloudIntegration(t *testing.T) {
 		t.Logf("Postgres platform is available - running integration tests")
 
 		runTestsInDirectory(t, postgresDir, "Postgres")
+	})
+
+	t.Run("Redshift", func(t *testing.T) {
+		t.Parallel()
+
+		if !availablePlatforms["redshift"] {
+			t.Skip("Skipping Redshift tests - no connection configured")
+			return
+		}
+
+		redshiftDir := filepath.Join(currentFolder, "redshift")
+		require.DirExists(t, redshiftDir, "Redshift test directory should exist")
+
+		testFile := filepath.Join(redshiftDir, "redshift_test.go")
+		require.FileExists(t, testFile, "Redshift test file should exist")
+
+		t.Logf("Redshift platform is available - running integration tests")
+
+		runTestsInDirectory(t, redshiftDir, "Redshift")
+	})
+
+	t.Run("Athena", func(t *testing.T) {
+		t.Parallel()
+
+		if !availablePlatforms["athena"] {
+			t.Skip("Skipping Athena tests - no connection configured")
+			return
+		}
+
+		athenaDir := filepath.Join(currentFolder, "athena")
+		require.DirExists(t, athenaDir, "Athena test directory should exist")
+
+		testFile := filepath.Join(athenaDir, "athena_test.go")
+		require.FileExists(t, testFile, "Athena test file should exist")
+
+		t.Logf("Athena platform is available - running integration tests")
+
+		runTestsInDirectory(t, athenaDir, "Athena")
 	})
 }

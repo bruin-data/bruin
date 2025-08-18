@@ -23,6 +23,7 @@ var (
 
 	faint          = color.New(color.Faint).SprintFunc()
 	infoPrinter    = color.New(color.Bold)
+	summaryPrinter = color.New()
 	errorPrinter   = color.New(color.FgRed, color.Bold)
 	warningPrinter = color.New(color.FgYellow, color.Bold)
 	successPrinter = color.New(color.FgGreen, color.Bold)
@@ -52,7 +53,11 @@ var (
 
 func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMutator {
 	return func(ctx context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
-		renderer = renderer.CloneForAsset(ctx, p, a)
+		var err error
+		renderer, err = renderer.CloneForAsset(ctx, p, a)
+		if err != nil {
+			return nil, fmt.Errorf("error creating renderer for asset %s: %w", a.Name, err)
+		}
 		for key, value := range a.Parameters {
 			renderedValue, err := renderer.Render(value)
 			if err != nil {
@@ -68,6 +73,7 @@ func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMu
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {
 		overrides := map[string]any{}
+
 		for _, variable := range variables {
 			parsed, err := parseVariable(variable)
 			if err != nil {
@@ -105,8 +111,10 @@ func parseVariable(variable string) (map[string]any, error) {
 	}
 
 	key := strings.TrimSpace(segments[0])
+	valueStr := segments[1]
+
 	var value any
-	if err := json.Unmarshal([]byte(segments[1]), &value); err != nil {
+	if err := json.Unmarshal([]byte(valueStr), &value); err != nil {
 		return nil, err
 	}
 	return map[string]any{key: value}, nil

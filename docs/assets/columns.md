@@ -42,8 +42,13 @@ Each column will have the following keys:
 | `name`            | String  | yes  | The name of the column                                                          |
 | `type`            | String  | no   | The column type in the DB                                                       |
 | `description`     | String  | no   | The description for the column                                                  |
+| `tags`            | String[]| no   | Tags applied to the column for categorization and filtering                     |
 | `primary_key`     | Bool    | no   | Whether the column is a primary key                                             |
 | `update_on_merge` | Bool    | no   | Whether the column should be updated with [`merge`](./materialization.md#merge) |
+| `nullable`        | Bool    | no   | Whether the column can contain NULL values                                      |
+| `owner`           | String  | no   | The owner of the column for governance and lineage                              |
+| `domains`         | String[]| no   | Business domains the column belongs to                                          |
+| `meta`            | Map     | no   | Additional metadata for the column                                              |
 | `checks`          | Check[] | no   | The quality checks defined for the column                                       |
 
 ### Quality Checks

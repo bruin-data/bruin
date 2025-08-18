@@ -37,6 +37,14 @@ const (
 	AssetTypeBigqueryQuerySensor    = AssetType("bq.sensor.query")
 	AssetTypeBigquerySource         = AssetType("bq.source")
 	AssetTypeBigquerySeed           = AssetType("bq.seed")
+	AssetTypeSnowflakeSource        = AssetType("sf.source")
+	AssetTypePostgresSource         = AssetType("pg.source")
+	AssetTypeRedshiftSource         = AssetType("rs.source")
+	AssetTypeMsSQLSource            = AssetType("ms.source")
+	AssetTypeDatabricksSource       = AssetType("databricks.source")
+	AssetTypeSynapseSource          = AssetType("synapse.source")
+	AssetTypeAthenaSource           = AssetType("athena.source")
+	AssetTypeDuckDBSource           = AssetType("duckdb.source")
 	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
 	AssetTypeDuckDBSeed             = AssetType("duckdb.seed")
 	AssetTypeDuckDBQuerySensor      = AssetType("duckdb.sensor.query")
@@ -68,9 +76,15 @@ const (
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeClickHouseQuerySensor  = AssetType("clickhouse.sensor.query")
+	AssetTypeClickHouseSource       = AssetType("clickhouse.source")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
+	AssetTypeTrinoQuery             = AssetType("trino.sql")
+	AssetTypeTrinoQuerySensor       = AssetType("trino.sensor.query")
+	AssetTypeOracleQuery            = AssetType("oracle.sql")
+	AssetTypeOracleSource           = AssetType("oracle.source")
 	AssetTypeLooker                 = AssetType("looker")
+	AssetTypeLookerStudio           = AssetType("looker_studio")
 	AssetTypePowerBI                = AssetType("powerbi")
 	AssetTypeQlikSense              = AssetType("qliksense")
 	AssetTypeQlikView               = AssetType("qlikview")
@@ -83,6 +97,7 @@ const (
 	AssetTypeModeBI                 = AssetType("modebi")
 	AssetTypeRedash                 = AssetType("redash")
 	AssetTypeGoodData               = AssetType("gooddata")
+	AssetTypeS3KeySensor            = AssetType("s3.sensor.key_sensor")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
@@ -129,10 +144,11 @@ var defaultMapping = map[string]string{
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
 	"emr_serverless":        "emr_serverless-default",
+	"trino":                 "trino-default",
+	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
-	"oracle":                "oracle-default",
 	"solidgate":             "solidgate-default",
 	"smartsheet":            "smartsheet-default",
 	"sftp":                  "sftp-default",
@@ -252,7 +268,7 @@ type DiscordNotification struct {
 func (n Notifications) MarshalJSON() ([]byte, error) {
 	slack := make([]SlackNotification, 0, len(n.Slack))
 	MSTeams := make([]MSTeamsNotification, 0, len(n.MSTeams))
-	discord := make([]DiscordNotification, 0, len(n.MSTeams))
+	discord := make([]DiscordNotification, 0, len(n.Discord))
 	for _, s := range n.Slack {
 		if !reflect.ValueOf(s).IsZero() {
 			slack = append(slack, s)
@@ -504,8 +520,13 @@ type Column struct {
 	Name            string            `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Type            string            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
 	Description     string            `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Tags            EmptyStringArray  `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	PrimaryKey      bool              `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
+	Nullable        DefaultTrueBool   `json:"nullable" yaml:"nullable,omitempty" mapstructure:"nullable"`
+	Owner           string            `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Domains         EmptyStringArray  `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta            EmptyStringMap    `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
 	Extends         string            `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 	Checks          []ColumnCheck     `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
 	Upstreams       []*UpstreamColumn `json:"upstreams" yaml:"-" mapstructure:"-"`
@@ -524,40 +545,55 @@ func (c *Column) HasCheck(check string) bool {
 type AssetType string
 
 var AssetTypeConnectionMapping = map[AssetType]string{
-	AssetTypeBigqueryQuery:         "google_cloud_platform",
-	AssetTypeBigqueryTableSensor:   "google_cloud_platform",
-	AssetTypeBigquerySeed:          "google_cloud_platform",
-	AssetTypeBigquerySource:        "google_cloud_platform",
-	AssetTypeBigqueryQuerySensor:   "google_cloud_platform",
+	AssetTypeBigqueryQuery:       "google_cloud_platform",
+	AssetTypeBigqueryTableSensor: "google_cloud_platform",
+	AssetTypeBigquerySeed:        "google_cloud_platform",
+	AssetTypeBigquerySource:      "google_cloud_platform",
+	AssetTypeBigqueryQuerySensor: "google_cloud_platform",
+
 	AssetTypeSnowflakeQuery:        "snowflake",
 	AssetTypeSnowflakeQuerySensor:  "snowflake",
 	AssetTypeSnowflakeSeed:         "snowflake",
+	AssetTypeSnowflakeSource:       "snowflake",
 	AssetTypePostgresQuery:         "postgres",
 	AssetTypePostgresSeed:          "postgres",
 	AssetTypePostgresQuerySensor:   "postgres",
+	AssetTypePostgresSource:        "postgres",
 	AssetTypeRedshiftQuery:         "redshift",
 	AssetTypeRedshiftSeed:          "redshift",
 	AssetTypeRedshiftQuerySensor:   "redshift",
+	AssetTypeRedshiftSource:        "redshift",
 	AssetTypeMsSQLQuery:            "mssql",
 	AssetTypeMsSQLSeed:             "mssql",
 	AssetTypeMsSQLQuerySensor:      "mssql",
+	AssetTypeMsSQLSource:           "mssql",
 	AssetTypeDatabricksQuery:       "databricks",
 	AssetTypeDatabricksSeed:        "databricks",
 	AssetTypeDatabricksQuerySensor: "databricks",
+	AssetTypeDatabricksSource:      "databricks",
 	AssetTypeSynapseQuery:          "synapse",
 	AssetTypeSynapseSeed:           "synapse",
 	AssetTypeSynapseQuerySensor:    "synapse",
+	AssetTypeSynapseSource:         "synapse",
 	AssetTypeAthenaQuery:           "athena",
 	AssetTypeAthenaSeed:            "athena",
 	AssetTypeAthenaSQLSensor:       "athena",
+	AssetTypeAthenaSource:          "athena",
 	AssetTypeDuckDBQuery:           "duckdb",
 	AssetTypeDuckDBSeed:            "duckdb",
 	AssetTypeDuckDBQuerySensor:     "duckdb",
+	AssetTypeDuckDBSource:          "duckdb",
 	AssetTypeClickHouse:            "clickhouse",
 	AssetTypeClickHouseSeed:        "clickhouse",
 	AssetTypeClickHouseQuerySensor: "clickhouse",
+	AssetTypeClickHouseSource:      "clickhouse",
 	AssetTypeEMRServerlessSpark:    "emr_serverless",
 	AssetTypeEMRServerlessPyspark:  "emr_serverless",
+	AssetTypeTrinoQuery:            "trino",
+	AssetTypeTrinoQuerySensor:      "trino",
+	AssetTypeOracleQuery:           "oracle",
+	AssetTypeOracleSource:          "oracle",
+	AssetTypeS3KeySensor:           "aws",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -571,6 +607,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"synapse":    AssetTypeSynapseQuery,
 	"duckdb":     AssetTypeDuckDBQuery,
 	"clickhouse": AssetTypeClickHouse,
+	"oracle":     AssetTypeOracleQuery,
 }
 
 type SecretMapping struct {
@@ -671,6 +708,8 @@ type Asset struct { //nolint:recvcheck
 	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
 	Tags              EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains           EmptyStringArray   `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta              EmptyStringMap     `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
 	Materialization   Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
 	Upstreams         []Upstream         `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
 	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
@@ -693,13 +732,15 @@ type Asset struct { //nolint:recvcheck
 	downstream []*Asset
 }
 
+//nolint:recvcheck
 type TimeModifier struct {
-	Months      int `json:"months" yaml:"months,omitempty" mapstructure:"months"`
-	Days        int `json:"days" yaml:"days,omitempty" mapstructure:"days"`
-	Hours       int `json:"hours" yaml:"hours,omitempty" mapstructure:"hours"`
-	Minutes     int `json:"minutes" yaml:"minutes,omitempty" mapstructure:"minutes"`
-	Seconds     int `json:"seconds" yaml:"seconds,omitempty" mapstructure:"seconds"`
-	CronPeriods int `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
+	Months      int    `json:"months" yaml:"months,omitempty" mapstructure:"months"`
+	Days        int    `json:"days" yaml:"days,omitempty" mapstructure:"days"`
+	Hours       int    `json:"hours" yaml:"hours,omitempty" mapstructure:"hours"`
+	Minutes     int    `json:"minutes" yaml:"minutes,omitempty" mapstructure:"minutes"`
+	Seconds     int    `json:"seconds" yaml:"seconds,omitempty" mapstructure:"seconds"`
+	CronPeriods int    `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
+	Template    string `json:"template" yaml:"template,omitempty" mapstructure:"template"`
 }
 
 func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
@@ -712,6 +753,16 @@ func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("invalid time modifier format: %s", modifier)
 	}
 
+	// Check if it's a Jinja template
+	if strings.Contains(modifier, "{{") || strings.Contains(modifier, "{%") {
+		t.Template = modifier
+		return nil
+	}
+
+	return t.parseTimeModifier(modifier)
+}
+
+func (t *TimeModifier) parseTimeModifier(modifier string) error {
 	suffix := modifier[len(modifier)-1]
 	numeric := modifier[:len(modifier)-1]
 
@@ -738,10 +789,33 @@ func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// RendererInterface is used to avoid circular dependencies.
+type RendererInterface interface {
+	Render(template string) (string, error)
+}
+
+func (t TimeModifier) ResolveTemplateToNew(renderer RendererInterface) (TimeModifier, error) {
+	if t.Template == "" {
+		return t, nil
+	}
+
+	rendered, err := renderer.Render(t.Template)
+	if err != nil {
+		return t, fmt.Errorf("failed to render interval modifier template: %w", err)
+	}
+
+	newModifier := TimeModifier{}
+	rendered = strings.TrimSpace(rendered)
+	if err := newModifier.parseTimeModifier(rendered); err != nil {
+		return t, fmt.Errorf("failed to parse rendered template result '%s': %w", rendered, err)
+	}
+
+	return newModifier, nil
+}
+
 func (t TimeModifier) MarshalJSON() ([]byte, error) {
-	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0 {
-		return []byte("null" +
-			""), nil
+	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0 && t.Template == "" {
+		return []byte("null"), nil
 	}
 
 	type Alias TimeModifier
@@ -1034,7 +1108,15 @@ func (a *Asset) GetNameIfItWasSetFromItsPath(foundPipeline *Pipeline) (string, e
 		}
 	}
 
-	name := strings.ReplaceAll(relativePath, string(filepath.Separator), ".")
+	parts := strings.Split(relativePath, string(filepath.Separator))
+	for i, part := range parts {
+		if part == "assets" {
+			parts = parts[i+1:]
+			break
+		}
+	}
+
+	name := strings.Join(parts, ".")
 
 	switch {
 	case strings.HasSuffix(name, ".asset.yml"):
@@ -1207,6 +1289,9 @@ func (mp *MetadataPush) HasAnyEnabled() bool {
 type Pipeline struct {
 	LegacyID           string                 `json:"legacy_id" yaml:"id" mapstructure:"id"`
 	Name               string                 `json:"name" yaml:"name" mapstructure:"name"`
+	Tags               EmptyStringArray       `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains            EmptyStringArray       `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta               EmptyStringMap         `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
 	Schedule           Schedule               `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
 	StartDate          string                 `json:"start_date" yaml:"start_date" mapstructure:"start_date"`
 	DefinitionFile     DefinitionFile         `json:"definition_file"`
@@ -1713,7 +1798,6 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		pipeline.TasksByType[task.Type] = append(pipeline.TasksByType[task.Type], task)
 		pipeline.tasksByName[task.Name] = task
 	}
-
 	var entities []*glossary.Entity
 	if b.GlossaryReader != nil {
 		entities, err = b.GlossaryReader.GetEntities(pathToPipeline)
@@ -1934,6 +2018,8 @@ func (a *Asset) IsSQLAsset() bool {
 		AssetTypeAthenaQuery:     true,
 		AssetTypeDuckDBQuery:     true,
 		AssetTypeClickHouse:      true,
+		AssetTypeTrinoQuery:      true,
+		AssetTypeOracleQuery:     true,
 	}
 
 	return sqlAssetTypes[a.Type]
@@ -1990,6 +2076,10 @@ func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeli
 }
 
 func (t TimeModifier) MarshalYAML() (interface{}, error) {
+	if t.Template != "" {
+		return t.Template, nil
+	}
+
 	switch {
 	case t.Days != 0 && t.Months == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
 		return fmt.Sprintf("%dd", t.Days), nil

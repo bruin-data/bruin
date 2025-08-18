@@ -206,6 +206,13 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
 
+	var validuntil string
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		validuntil = "TIMESTAMP '9999-12-31 00:00:00'"
+	} else {
+		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
+	}
+
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
@@ -213,7 +220,7 @@ CREATE TABLE %s AS
 SELECT
   CURRENT_TIMESTAMP AS _valid_from,
   src.*,
-  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,
+  %s AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
@@ -221,6 +228,47 @@ FROM (
 COMMIT;`,
 		asset.Name,
 		asset.Name,
+		validuntil,
+		strings.TrimSpace(query),
+	)
+
+	return strings.TrimSpace(stmt), nil
+}
+
+func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Materialization.IncrementalKey == "" {
+		return "", errors.New("incremental_key is required for SCD2 strategy")
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
+	}
+
+	var validuntil string
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		validuntil = "TIMESTAMP '9999-12-31 00:00:00'"
+	} else {
+		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
+	}
+
+	stmt := fmt.Sprintf(
+		`BEGIN TRANSACTION;
+DROP TABLE IF EXISTS %s;
+CREATE TABLE %s AS
+SELECT
+  %s AS _valid_from,
+  src.*,
+  %s AS _valid_until,
+  TRUE AS _is_current
+FROM (
+%s
+) AS src;
+COMMIT;`,
+		asset.Name,
+		asset.Name,
+		asset.Materialization.IncrementalKey,
+		validuntil,
 		strings.TrimSpace(query),
 	)
 
@@ -228,6 +276,10 @@ COMMIT;`,
 }
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		return buildRedshiftSCD2ByColumnQuery(asset, query)
+	}
+
 	query = strings.TrimRight(query, ";")
 	var (
 		primaryKeys      = make([]string, 0, 4)
@@ -326,39 +378,12 @@ WHEN NOT MATCHED BY TARGET THEN
 	return strings.TrimSpace(queryStr), nil
 }
 
-func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
-	if asset.Materialization.IncrementalKey == "" {
-		return "", errors.New("incremental_key is required for SCD2 strategy")
-	}
-
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 {
-		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
-	}
-
-	stmt := fmt.Sprintf(
-		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s;
-CREATE TABLE %s AS
-SELECT
-  %s AS _valid_from,
-  src.*,
-  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,
-  TRUE AS _is_current
-FROM (
-%s
-) AS src;
-COMMIT;`,
-		asset.Name,
-		asset.Name,
-		asset.Materialization.IncrementalKey,
-		strings.TrimSpace(query),
-	)
-
-	return strings.TrimSpace(stmt), nil
-}
-
 func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
+	// Route to Redshift-specific implementation for Redshift assets
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		return buildRedshiftSCD2QueryByTime(asset, query)
+	}
+
 	query = strings.TrimRight(query, ";")
 
 	if asset.Materialization.IncrementalKey == "" {
@@ -452,6 +477,236 @@ WHEN NOT MATCHED BY TARGET THEN
 		asset.Materialization.IncrementalKey,
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
+	)
+
+	return strings.TrimSpace(queryStr), nil
+}
+
+// Redshift-specific SCD2 functions - Redshift has different SQL syntax requirements compared to PostgreSQL.
+func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimRight(query, ";")
+	var (
+		primaryKeys  = make([]string, 0, 4)
+		compareConds = make([]string, 0, 12)
+		insertCols   = make([]string, 0, 12)
+		insertValues = make([]string, 0, 12)
+	)
+
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		insertCols = append(insertCols, col.Name)
+		insertValues = append(insertValues, "source."+col.Name)
+		if !col.PrimaryKey {
+			compareConds = append(compareConds,
+				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+		}
+	}
+
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
+			asset.Materialization.Strategy)
+	}
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+	insertValues = append(insertValues, ":session_timestamp", "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
+
+	// Build ON condition for MERGE
+	onConditions := make([]string, 0, len(primaryKeys))
+	for _, pk := range primaryKeys {
+		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
+	}
+	onCondition := strings.Join(onConditions, " AND ")
+
+	tempTableName := "__bruin_scd2_tmp_" + helpers.PrefixGenerator()
+
+	var matchedCondition string
+	if len(compareConds) > 0 {
+		matchedCondition = strings.Join(compareConds, " OR ")
+	} else {
+		matchedCondition = "FALSE"
+	}
+
+	// Step 1: Create temp table with new data
+	// Step 2: Update existing records that changed
+	// Step 3: Insert new/changed records
+	// Step 4: Update records not in source (expired)
+	queryStr := fmt.Sprintf(`
+BEGIN TRANSACTION;
+
+SET session_timestamp = CURRENT_TIMESTAMP;
+
+-- Create temp table with source data
+CREATE TEMP TABLE %s AS 
+SELECT *, TRUE AS _is_current FROM (%s) AS src;
+
+-- Update existing records that have changes
+UPDATE %s AS target
+SET _valid_until = :session_timestamp, _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND EXISTS (
+    SELECT 1 FROM %s AS source
+    WHERE %s AND (%s)
+  );
+
+-- Update records that are no longer in source (expired)
+UPDATE %s AS target
+SET _valid_until = :session_timestamp, _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND NOT EXISTS (
+    SELECT 1 FROM %s AS source
+    WHERE %s
+  );
+
+-- Insert new records and new versions of changed records
+INSERT INTO %s (%s)
+SELECT %s
+FROM %s AS source
+WHERE NOT EXISTS (
+  SELECT 1 FROM %s AS target 
+  WHERE %s AND target._is_current = TRUE
+);
+
+DROP TABLE %s;
+COMMIT;`,
+		tempTableName,
+		strings.TrimSpace(query),
+		asset.Name,
+		tempTableName,
+		onCondition,
+		matchedCondition,
+		asset.Name,
+		tempTableName,
+		onCondition,
+		asset.Name,
+		strings.Join(insertCols, ", "),
+		strings.Join(insertValues, ", "),
+		tempTableName,
+		asset.Name,
+		onCondition,
+		tempTableName,
+	)
+
+	return strings.TrimSpace(queryStr), nil
+}
+
+func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimRight(query, ";")
+
+	if asset.Materialization.IncrementalKey == "" {
+		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
+	}
+
+	var (
+		primaryKeys  = make([]string, 0, 4)
+		insertCols   = make([]string, 0, 12)
+		insertValues = make([]string, 0, 12)
+	)
+	for _, col := range asset.Columns {
+		switch col.Name {
+		case "_valid_from", "_valid_until", "_is_current":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		if col.Name == asset.Materialization.IncrementalKey {
+			lcType := strings.ToLower(col.Type)
+			if lcType != "timestamp" && lcType != "date" {
+				return "", errors.New("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
+			}
+		}
+		insertCols = append(insertCols, col.Name)
+		insertValues = append(insertValues, "source."+col.Name)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+	}
+
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf(
+			"materialization strategy %s requires the primary_key field to be set on at least one column",
+			asset.Materialization.Strategy,
+		)
+	}
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+	insertValues = append(insertValues,
+		"source."+asset.Materialization.IncrementalKey,
+		"TIMESTAMP '9999-12-31 00:00:00'",
+		"TRUE",
+	)
+
+	// Build ON condition
+	onConditions := make([]string, 0, len(primaryKeys))
+	for _, pk := range primaryKeys {
+		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
+	}
+	onCondition := strings.Join(onConditions, " AND ")
+
+	tempTableName := "__bruin_scd2_time_tmp_" + helpers.PrefixGenerator()
+
+	queryStr := fmt.Sprintf(`
+BEGIN TRANSACTION;
+
+-- Create temp table with source data
+CREATE TEMP TABLE %s AS 
+SELECT *, TRUE AS _is_current FROM (%s) AS src;
+
+-- Update existing records where source timestamp is newer
+UPDATE %s AS target
+SET _valid_until = source.%s, _is_current = FALSE
+FROM %s AS source
+WHERE %s
+  AND target._is_current = TRUE
+  AND target._valid_from < source.%s;
+
+-- Update records that are no longer in source (expired)
+UPDATE %s AS target
+SET _valid_until = CURRENT_TIMESTAMP, _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND NOT EXISTS (
+    SELECT 1 FROM %s AS source
+    WHERE %s
+  );
+
+-- Insert new records and new versions of changed records
+INSERT INTO %s (%s)
+SELECT %s
+FROM %s AS source
+WHERE NOT EXISTS (
+  SELECT 1 FROM %s AS target 
+  WHERE %s AND target._is_current = TRUE
+)
+OR EXISTS (
+  SELECT 1 FROM %s AS target
+  WHERE %s AND target._is_current = FALSE 
+  AND target._valid_until = source.%s
+);
+
+DROP TABLE %s;
+COMMIT;`,
+		tempTableName,
+		strings.TrimSpace(query),
+		asset.Name,
+		asset.Materialization.IncrementalKey,
+		tempTableName,
+		onCondition,
+		asset.Materialization.IncrementalKey,
+		asset.Name,
+		tempTableName,
+		onCondition,
+		asset.Name,
+		strings.Join(insertCols, ", "),
+		strings.Join(insertValues, ", "),
+		tempTableName,
+		asset.Name,
+		onCondition,
+		asset.Name,
+		onCondition,
+		asset.Materialization.IncrementalKey,
+		tempTableName,
 	)
 
 	return strings.TrimSpace(queryStr), nil

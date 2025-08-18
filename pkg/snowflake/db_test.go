@@ -185,6 +185,95 @@ func TestDB_Select(t *testing.T) {
 	}
 }
 
+func TestDB_SelectOnlyLastResult(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		mockConnection func(mock sqlmock.Sqlmock)
+		query          query.Query
+		want           [][]interface{}
+		wantErr        bool
+		errorMessage   string
+	}{
+		{
+			name: "single statement returns rows",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery("SELECT 1").
+					WillReturnRows(sqlmock.NewRows([]string{"one"}).AddRow(1))
+			},
+			query: query.Query{Query: "SELECT 1"},
+			want:  [][]interface{}{{int64(1)}},
+		},
+		{
+			name: "multi-statement returns only last result set",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				rows1 := sqlmock.NewRows([]string{"a"}).AddRow(1)
+				rows2 := sqlmock.NewRows([]string{"b"}).AddRow(2).AddRow(3)
+				mock.ExpectQuery("SELECT 1; SELECT 2").
+					WillReturnRows(rows1, rows2)
+			},
+			query: query.Query{Query: "SELECT 1; SELECT 2"},
+			want:  [][]interface{}{{int64(2)}, {int64(3)}},
+		},
+		{
+			name: "error on query",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery("SELECT fail").
+					WillReturnError(errors.New("query error"))
+			},
+			query:        query.Query{Query: "SELECT fail"},
+			wantErr:      true,
+			errorMessage: "query error",
+		},
+		{
+			name: "error on columns",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows([]string{"a"}).AddRow(1)
+				rows.RowError(0, errors.New("columns error"))
+				mock.ExpectQuery("SELECT 1").WillReturnRows(rows)
+			},
+			query:        query.Query{Query: "SELECT 1"},
+			wantErr:      true,
+			errorMessage: "columns error",
+		},
+		{
+			name: "no rows in last result set",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				rows1 := sqlmock.NewRows([]string{"a"}).AddRow(1)
+				rows2 := sqlmock.NewRows([]string{"b"}) // no rows
+				mock.ExpectQuery("SELECT 1; SELECT 2").WillReturnRows(rows1, rows2)
+			},
+			query: query.Query{Query: "SELECT 1; SELECT 2"},
+			want:  [][]interface{}{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			tt.mockConnection(mock)
+			db := DB{conn: sqlxDB}
+
+			got, err := db.SelectOnlyLastResult(context.Background(), &tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMessage)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 func TestDB_Ping(t *testing.T) {
 	t.Parallel()
 
@@ -723,6 +812,7 @@ FROM
     TESTDB.INFORMATION_SCHEMA.TABLES
 WHERE
     table_type IN \('BASE TABLE', 'VIEW'\)
+AND table_schema != 'INFORMATION_SCHEMA'
 ORDER BY table_schema, table_name;`).
 					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
 						AddRow("SCHEMA1", "TABLE1").
@@ -758,6 +848,7 @@ FROM
     TESTDB.INFORMATION_SCHEMA.TABLES
 WHERE
     table_type IN \('BASE TABLE', 'VIEW'\)
+AND table_schema != 'INFORMATION_SCHEMA'
 ORDER BY table_schema, table_name;`).
 					WillReturnError(errors.New("connection error"))
 			},

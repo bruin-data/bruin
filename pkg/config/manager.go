@@ -46,6 +46,7 @@ type Connections struct {
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
+	MotherDuck          []MotherduckConnection          `yaml:"motherduck,omitempty" json:"motherduck,omitempty" mapstructure:"motherduck"`
 	ClickHouse          []ClickHouseConnection          `yaml:"clickhouse,omitempty" json:"clickhouse,omitempty" mapstructure:"clickhouse"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
 	GitHub              []GitHubConnection              `yaml:"github,omitempty" json:"github,omitempty" mapstructure:"github"`
@@ -68,9 +69,11 @@ type Connections struct {
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
+	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
 	Pinterest           []PinterestConnection           `yaml:"pinterest,omitempty" json:"pinterest,omitempty" mapstructure:"pinterest"`
 	Trustpilot          []TrustpilotConnection          `yaml:"trustpilot,omitempty" json:"trustpilot,omitempty" mapstructure:"trustpilot"`
 	QuickBooks          []QuickBooksConnection          `yaml:"quickbooks,omitempty" json:"quickbooks,omitempty" mapstructure:"quickbooks"`
+	Wise                []WiseConnection                `yaml:"wise,omitempty" json:"wise,omitempty" mapstructure:"wise"`
 	Zoom                []ZoomConnection                `yaml:"zoom,omitempty" json:"zoom,omitempty" mapstructure:"zoom"`
 	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
@@ -88,13 +91,24 @@ type Connections struct {
 	Attio               []AttioConnection               `yaml:"attio,omitempty" json:"attio,omitempty" mapstructure:"attio"`
 	Sftp                []SFTPConnection                `yaml:"sftp,omitempty" json:"sftp,omitempty" mapstructure:"sftp"`
 	ISOCPulse           []ISOCPulseConnection           `yaml:"isoc_pulse,omitempty" json:"isoc_pulse,omitempty" mapstructure:"isoc_pulse"`
+	InfluxDB            []InfluxDBConnection            `yaml:"influxdb,omitempty" json:"influxdb,omitempty" mapstructure:"influxdb"`
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
+	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
 
 type ConnectionGetter interface {
 	GetConnection(name string) any
+}
+
+type ConnectionDetailsGetter interface {
+	GetConnectionDetails(name string) any
+}
+
+type ConnectionAndDetailsGetter interface {
+	ConnectionGetter
+	ConnectionDetailsGetter
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {
@@ -166,20 +180,6 @@ type Environment struct {
 	SchemaPrefix string       `yaml:"schema_prefix,omitempty" json:"schema_prefix" mapstructure:"schema_prefix"`
 }
 
-func (e *Environment) GetSecretByKey(key string) (string, error) {
-	v, ok := e.Connections.byKey[key]
-	if !ok {
-		return "", nil
-	}
-
-	if v, ok := v.(*GenericConnection); ok {
-		return v.Value, nil
-	}
-
-	res, err := json.Marshal(v)
-	return string(res), err
-}
-
 type EnvContextKey string
 
 const (
@@ -223,10 +223,6 @@ func (c *Config) GetEnvironmentNames() []string {
 	}
 
 	return envs
-}
-
-func (c *Config) GetSecretByKey(key string) (string, error) {
-	return c.SelectedEnvironment.GetSecretByKey(key)
 }
 
 func (c *Config) Persist() error {
@@ -279,8 +275,13 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	}
 	configLocation := filepath.Dir(absoluteConfigPath)
 
-	// Make duckdb paths absolute
-	for _, env := range config.Environments {
+	for envName, env := range config.Environments {
+		// Check if Connections is nil and return an error
+		if env.Connections == nil {
+			return nil, fmt.Errorf("environment '%s' has no connections defined", envName)
+		}
+
+		// Make duckdb paths absolute
 		for i, conn := range env.Connections.DuckDB {
 			if filepath.IsAbs(conn.Path) {
 				continue
@@ -743,6 +744,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Pipedrive = append(env.Connections.Pipedrive, conn)
+	case "clickup":
+		var conn ClickupConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Clickup = append(env.Connections.Clickup, conn)
 	case "mixpanel":
 		var conn MixpanelConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -750,6 +758,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Mixpanel = append(env.Connections.Mixpanel, conn)
+	case "wise":
+		var conn WiseConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Wise = append(env.Connections.Wise, conn)
 	case "pinterest":
 		var conn PinterestConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -892,6 +907,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.ISOCPulse = append(env.Connections.ISOCPulse, conn)
+	case "influxdb":
+		var conn InfluxDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.InfluxDB = append(env.Connections.InfluxDB, conn)
 	case "tableau":
 		var conn TableauConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1018,6 +1040,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Kinesis = removeConnection(env.Connections.Kinesis, connectionName)
 	case "pipedrive":
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
+	case "clickup":
+		env.Connections.Clickup = removeConnection(env.Connections.Clickup, connectionName)
 	case "mixpanel":
 		env.Connections.Mixpanel = removeConnection(env.Connections.Mixpanel, connectionName)
 	case "pinterest":
@@ -1026,6 +1050,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Trustpilot = removeConnection(env.Connections.Trustpilot, connectionName)
 	case "quickbooks":
 		env.Connections.QuickBooks = removeConnection(env.Connections.QuickBooks, connectionName)
+	case "wise":
+		env.Connections.Wise = removeConnection(env.Connections.Wise, connectionName)
 	case "zoom":
 		env.Connections.Zoom = removeConnection(env.Connections.Zoom, connectionName)
 	case "emr_serverless":
@@ -1060,6 +1086,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Sftp = removeConnection(env.Connections.Sftp, connectionName)
 	case "isoc_pulse":
 		env.Connections.ISOCPulse = removeConnection(env.Connections.ISOCPulse, connectionName)
+	case "influxdb":
+		env.Connections.InfluxDB = removeConnection(env.Connections.InfluxDB, connectionName)
 	case "tableau":
 		env.Connections.Tableau = removeConnection(env.Connections.Tableau, connectionName)
 	default:
@@ -1323,4 +1351,52 @@ func (c *Config) EnvironmentExists(name string) bool {
 	}
 	_, exists := c.Environments[name]
 	return exists
+}
+
+// CloneEnvironment creates a copy of an existing environment with a new name.
+// If the source environment does not exist or the target name already exists, an error is returned.
+// The schemaPrefix argument is optional and will override the source environment's schema prefix if provided.
+func (c *Config) CloneEnvironment(sourceName, targetName, schemaPrefix string) error {
+	if sourceName == "" {
+		return errors.New("source environment name cannot be empty")
+	}
+	if targetName == "" {
+		return errors.New("target environment name cannot be empty")
+	}
+
+	if c.Environments == nil {
+		return fmt.Errorf("environment '%s' does not exist", sourceName)
+	}
+
+	sourceEnv, exists := c.Environments[sourceName]
+	if !exists {
+		return fmt.Errorf("environment '%s' does not exist", sourceName)
+	}
+
+	if _, exists := c.Environments[targetName]; exists {
+		return fmt.Errorf("environment '%s' already exists", targetName)
+	}
+
+	// Create a new environment by copying the source
+	targetEnv := Environment{
+		Connections:  &Connections{},
+		SchemaPrefix: sourceEnv.SchemaPrefix,
+	}
+
+	// Override schema prefix if provided
+	if schemaPrefix != "" {
+		targetEnv.SchemaPrefix = schemaPrefix
+	}
+
+	// Copy all connections from source to target
+	if sourceEnv.Connections != nil {
+		err := targetEnv.Connections.MergeFrom(sourceEnv.Connections)
+		if err != nil {
+			return fmt.Errorf("failed to copy connections: %w", err)
+		}
+	}
+
+	c.Environments[targetName] = targetEnv
+
+	return nil
 }

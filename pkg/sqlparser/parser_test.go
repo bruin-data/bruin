@@ -1,3 +1,4 @@
+//nolint:paralleltest
 package sqlparser
 
 import (
@@ -9,8 +10,6 @@ import (
 )
 
 func TestGetLineageForRunner(t *testing.T) {
-	t.Parallel()
-
 	lineage, err := NewSQLParser(true)
 	defer lineage.Close() //nolint
 
@@ -653,8 +652,6 @@ GROUP BY 1`,
 }
 
 func TestSqlParser_GetTables(t *testing.T) {
-	t.Parallel()
-
 	s, err := NewSQLParser(true)
 	defer s.Close() //nolint
 
@@ -796,8 +793,6 @@ COMMIT;`,
 }
 
 func TestSqlParser_RenameTables(t *testing.T) {
-	t.Parallel()
-
 	s, err := NewSQLParser(true)
 	defer s.Close() //nolint
 	require.NoError(t, err)
@@ -828,6 +823,14 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			},
 			want: "SELECT * FROM raw_dev.items",
 		},
+		{
+			name:  `SELECT from unnest`,
+			query: "SELECT d FROM `raw.mytable` join unnest(json_extract_array(values.domains)) as d",
+			tableMappings: map[string]string{
+				"raw.mytable": "raw_dev.mytable",
+			},
+			want: "SELECT d FROM `mytable`, UNNEST(JSON_EXTRACT_ARRAY(values.domains, '$')) AS d",
+		},
 	}
 
 	for _, tt := range tests { //nolint
@@ -848,8 +851,6 @@ func TestSqlParser_RenameTables(t *testing.T) {
 }
 
 func TestSqlParser_AddLimit(t *testing.T) { //nolint
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		query    string
@@ -916,8 +917,6 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 }
 
 func TestGetMissingDependenciesForAsset(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name          string
 		asset         *pipeline.Asset
@@ -1047,8 +1046,6 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 }
 
 func TestSqlParser_IsSingleSelectQuery(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name             string
 		query            string

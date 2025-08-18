@@ -159,7 +159,7 @@ bruin run --only main
 
 ## Metadata Push
 
-Metadata push is a feature that allows you to push metadata to the destination database/data catalog if supported. Currently, we support BigQuery as the catalog.
+Metadata push is a feature that allows you to push metadata to the destination database/data catalog if supported. Currently, we support BigQuery and Postgres as the catalog.
 
 There are two ways to push metadata:
 1. You can set the `--push-metadata` flag to `true` when running the pipeline/asset.

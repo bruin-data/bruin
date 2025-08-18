@@ -135,12 +135,15 @@ export default withMermaid({
                     {text: "Clickhouse", link: "/platforms/clickhouse"},
                     {text: "Databricks", link: "/platforms/databricks"},
                     {text: "DuckDB", link: "/platforms/duckdb"},
+                    {text: "MotherDuck", link: "/platforms/motherduck"},
+                    {text: "Oracle", link: "/platforms/oracle"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
                     {text: "Microsoft SQL Server", link: "/platforms/mssql"},
                     {text: "Postgres", link: "/platforms/postgres"},
                     {text: "Redshift", link: "/platforms/redshift"},
                     {text: "Snowflake", link: "/platforms/snowflake"},
                     {text: "Synapse", link: "/platforms/synapse"},
+                    {text: "Trino", link: "/platforms/trino"},
                     {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                 ],
             },
@@ -156,6 +159,9 @@ export default withMermaid({
                             {text: "Ingestr", link: "/assets/ingestr"},
                             {text: "Python", link: "/assets/python"},
                             {text: "Sensor", link: "/assets/sensor"},
+                            {text: "Dashboard", link: "/assets/dashboard", items: [
+                                {text: "Tableau", link: "/assets/tableau-refresh.md"},
+                            ]},
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
@@ -186,6 +192,7 @@ export default withMermaid({
                             {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Attio", link: "/ingestion/attio.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
+                            {text: "ClickUp", link: "/ingestion/clickup.md"},
                             {text: "DB2", link: "/ingestion/db2.md"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Elasticsearch", link: "/ingestion/elasticsearch.md"},
@@ -198,6 +205,7 @@ export default withMermaid({
                             {text: "Google Analytics", link: "/ingestion/google_analytics.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
+                            {text: "InfluxDB", link: "/ingestion/influxdb.md"},
                             {text: "Internet Society Pulse", link: "/ingestion/isoc_pulse.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
                             {text: "Kinesis", link: "/ingestion/kinesis.md"},
@@ -225,6 +233,7 @@ export default withMermaid({
                             {text: "Slack", link: "/ingestion/slack.md"},
                             {text: "SQLite", link: "/ingestion/sqlite"},
                             {text: "TikTok Ads", link: "/ingestion/tiktokads.md"},
+                            {text: "Wise", link: "/ingestion/wise.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                             {text: "Zoom", link: "/ingestion/zoom"},
                         ],
@@ -259,13 +268,23 @@ export default withMermaid({
                     {text: "Environments", link: "/commands/environments"},
                     {text: "Format", link: "/commands/format"},
                     {text: "Init", link: "/commands/init"},
+                    {text: "Import", link: "/commands/import"},
                     {text: "Lineage", link: "/commands/lineage"},
+                    {text: "Patch", link: "/commands/patch"},
                     {text: "Render", link: "/commands/render"},
                     {text: "Run", link: "/commands/run"},
                     {text: "Query", link: "/commands/query"},
                     {text: "Validate", link: "/commands/validate"},
                 ],
 
+            },
+            {
+                text: "Secret Providers",
+                collapsed: false,
+                items: [
+                    {text: "Overview", link: "/secrets/overview"},
+                    {text: "Hashicorp Vault", link: "/secrets/vault"}
+                ]
             },
             {
                 text: "Bruin Cloud",

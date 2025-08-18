@@ -206,6 +206,16 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "stripekey",
 				},
 			},
+			InfluxDB: []InfluxDBConnection{
+				{
+					Name:   "influxdb-1",
+					Host:   "influxdb-host",
+					Token:  "influxdb-token",
+					Org:    "influxdb-org",
+					Bucket: "influxdb-bucket",
+					Secure: "true",
+				},
+			},
 			Appsflyer: []AppsflyerConnection{
 				{
 					Name:   "conn19",
@@ -364,6 +374,9 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:               "gcs-1",
 					ServiceAccountFile: "/path/to/service_account.json",
+					BucketName:         "my-bucket",
+					PathToFile:         "/folder1/file.csv",
+					Layout:             "my_layout",
 				},
 			},
 			ApplovinMax: []ApplovinMaxConnection{
@@ -393,6 +406,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "token-123",
 				},
 			},
+			Clickup: []ClickupConnection{
+				{
+					Name:     "clickup-1",
+					APIToken: "token_123",
+				},
+			},
 			QuickBooks: []QuickBooksConnection{
 				{
 					Name:         "quickbooks-1",
@@ -415,6 +434,12 @@ func TestLoadFromFile(t *testing.T) {
 					Password:  "secret-123",
 					ProjectID: "12345",
 					Server:    "eu",
+				},
+			},
+			Wise: []WiseConnection{
+				{
+					Name:   "wise-1",
+					APIKey: "token-123",
 				},
 			},
 			Trustpilot: []TrustpilotConnection{
@@ -479,12 +504,12 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Oracle: []OracleConnection{
 				{
-					Name:     "oracle-1",
-					Username: "username-123",
-					Password: "password-123",
-					Host:     "host-123",
-					Port:     "1234",
-					DBName:   "dbname-123",
+					Name:        "oracle-1",
+					Username:    "username-123",
+					Password:    "password-123",
+					Host:        "host-123",
+					Port:        "1234",
+					ServiceName: "service-123",
 				},
 			},
 			Phantombuster: []PhantombusterConnection{
@@ -606,6 +631,15 @@ func TestLoadFromFile(t *testing.T) {
 				},
 			},
 			wantErr: assert.NoError,
+		},
+		{
+			name: "environment with no connections should error",
+			args: args{
+				path: "testdata/no_connections.yml",
+			},
+			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				return assert.ErrorContains(t, err, "environment 'default' has no connections defined")
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -1856,6 +1890,14 @@ environments:
           service_account_json: "{\"key10\": \"value10\"}"
           project_id: "my-project"`
 
+	envConfigContentMalformedConnections := `default_environment: default
+environments:
+    default:
+    connections:
+            duckdb:
+                - name: duckdb-default
+                  path: duckdb.db`
+
 	expectedConfig := &Config{
 		DefaultEnvironmentName:  "dev",
 		SelectedEnvironmentName: "dev",
@@ -1912,6 +1954,15 @@ environments:
 			configFilePath: "testdata/nonexistent.yml",
 			want:           nil,
 			wantErr:        assert.Error,
+		},
+		{
+			name:           "environment with no connections should error",
+			envConfig:      envConfigContentMalformedConnections,
+			configFilePath: "testdata/nonexistent.yml",
+			want:           nil,
+			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				return assert.ErrorContains(t, err, "environment 'default' has no connections defined")
+			},
 		},
 	}
 

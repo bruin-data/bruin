@@ -3,6 +3,7 @@ package mssql
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -82,6 +83,74 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	}
 
 	return result, err
+}
+
+func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	queryString := queryObj.String()
+	rows, err := db.conn.QueryContext(ctx, queryString)
+	if err != nil {
+		errorMessage := err.Error()
+		return nil, errors.Wrap(errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  ")), "failed to execute query")
+	}
+	defer rows.Close()
+
+	// Get column information
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get column names")
+	}
+
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get column types")
+	}
+
+	// Extract column names and types
+	columns := make([]string, len(cols))
+	columnTypeNames := make([]string, len(columnTypes))
+	copy(columns, cols)
+	for i, colType := range columnTypes {
+		columnTypeNames[i] = colType.DatabaseTypeName()
+	}
+
+	// Collect rows
+	var result [][]interface{}
+	for rows.Next() {
+		rowColumns := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i := range rowColumns {
+			columnPointers[i] = &rowColumns[i]
+		}
+
+		if err := rows.Scan(columnPointers...); err != nil {
+			return nil, errors.Wrap(err, "failed to scan row values")
+		}
+
+		result = append(result, rowColumns)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating rows")
+	}
+
+	queryResult := &query.QueryResult{
+		Columns:     columns,
+		Rows:        result,
+		ColumnTypes: columnTypeNames,
+	}
+	return queryResult, nil
+}
+
+func (db *DB) Ping(ctx context.Context) error {
+	q := query.Query{
+		Query: "SELECT 1",
+	}
+	err := db.RunQueryWithoutResult(ctx, &q)
+	if err != nil {
+		return errors.Wrap(err, "failed to run test query on SQL Server connection")
+	}
+
+	return nil
 }
 
 func (db *DB) Limit(query string, limit int64) string {
@@ -241,4 +310,79 @@ ORDER BY ORDINAL_POSITION;
 	}
 
 	return columns, nil
+}
+
+func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	// Get the current database name from config
+	currentDB := db.config.Database
+	if currentDB == "" {
+		return nil, errors.New("database name not configured")
+	}
+
+	q := fmt.Sprintf(`
+USE [%s];
+SELECT
+    TABLE_SCHEMA,
+    TABLE_NAME
+FROM
+    INFORMATION_SCHEMA.TABLES
+WHERE
+    TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+    AND TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+ORDER BY TABLE_SCHEMA, TABLE_NAME;
+`, currentDB)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query SQL Server information_schema: %w", err)
+	}
+
+	summary := &ansisql.DBDatabase{
+		Name:    currentDB,
+		Schemas: []*ansisql.DBSchema{},
+	}
+	schemas := make(map[string]*ansisql.DBSchema)
+
+	for _, row := range result {
+		if len(row) != 2 {
+			continue
+		}
+
+		schemaName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		tableName, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		// Create schema if it doesn't exist
+		if _, exists := schemas[schemaName]; !exists {
+			schema := &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+			schemas[schemaName] = schema
+		}
+
+		// Add table to schema
+		table := &ansisql.DBTable{
+			Name:    tableName,
+			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+		}
+		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
+	}
+
+	for _, schema := range schemas {
+		summary.Schemas = append(summary.Schemas, schema)
+	}
+
+	// Sort schemas by name
+	sort.Slice(summary.Schemas, func(i, j int) bool {
+		return summary.Schemas[i].Name < summary.Schemas[j].Name
+	})
+
+	return summary, nil
 }

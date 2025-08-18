@@ -1,6 +1,9 @@
 {
   "legacy_id": "",
   "name": "integration_test",
+  "tags": [],
+  "domains": [],
+  "meta": {},
   "schedule": "",
   "start_date": "",
   "definition_file": {
@@ -20,6 +23,8 @@
       "description": "",
       "connection": "",
       "tags": [],
+      "domains": [],
+      "meta": {},
       "materialization": null,
       "upstreams": [
         {
@@ -72,6 +77,8 @@
       "description": "",
       "connection": "",
       "tags": [],
+      "domains": [],
+      "meta": {},
       "materialization": null,
       "upstreams": [],
       "image": "",
@@ -114,6 +121,8 @@
       "description": "",
       "connection": "",
       "tags": [],
+      "domains": [],
+      "meta": {},
       "materialization": null,
       "upstreams": [],
       "image": "",
@@ -156,6 +165,8 @@
       "description": "",
       "connection": "",
       "tags": [],
+      "domains": [],
+      "meta": {},
       "materialization": {
         "type": "table",
         "strategy": "",
@@ -208,8 +219,13 @@
           "name": "total_games",
           "type": "integer",
           "description": "the games",
+          "tags": [],
           "primary_key": false,
           "update_on_merge": false,
+          "nullable": true,
+          "owner": "",
+          "domains": [],
+          "meta": {},
           "checks": [
             {
               "id": "df9255080865c27b164a7de36a0a26bcc00345dddd66849d96aa96a2c68266ea",

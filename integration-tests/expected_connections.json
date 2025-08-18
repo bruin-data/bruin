@@ -17,6 +17,14 @@
         {
           "name": "duckdb-variables",
           "path": "duckdb-files/variables.db"
+        },
+        {
+          "name": "duckdb-scd2-by-column",
+          "path": "duckdb-files/scd2-by-column.db"
+        },
+        {
+          "name": "duckdb-scd2-by-time",
+          "path": "duckdb-files/scd2-by-time.db"
         }
       ],
       "chess": [
@@ -48,6 +56,14 @@
           {
             "name": "duckdb-variables",
             "path": "duckdb-files/variables.db"
+          },
+          {
+            "name": "duckdb-scd2-by-column",
+            "path": "duckdb-files/scd2-by-column.db"
+          },
+          {
+            "name": "duckdb-scd2-by-time",
+            "path": "duckdb-files/scd2-by-time.db"
           }
         ],
         "chess": [
@@ -437,28 +453,6 @@
       },
       "schema_prefix": ""
     },
-    "env-scd2-col-duckdb": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "scd2-by-col-duckdb",
-            "path": "integration-tests/duckdb-files/scd2-by-col-duckdb.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
-    "env-scd2-time-duckdb": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "scd2-by-time-duckdb",
-            "path": "integration-tests/duckdb-files/scd2-by-time-duckdb.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
     "env-validate-with-exclude-tag": {
       "connections": {
         "duckdb": [
@@ -469,9 +463,39 @@
         ]
       },
       "schema_prefix": ""
+    },
+    "env-continue": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-continue",
+            "path": "duckdb-files/continue.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-scd2-by-column": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-scd2-by-column",
+            "path": "duckdb-files/scd2-by-column.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-scd2-by-time": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-scd2-by-time",
+            "path": "duckdb-files/scd2-by-time.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     }
   }
 }
-      
-
-

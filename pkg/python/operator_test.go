@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -46,9 +47,14 @@ type mockSecretFinder struct {
 	mock.Mock
 }
 
-func (m *mockSecretFinder) GetSecretByKey(key string) (string, error) {
-	args := m.Called(key)
-	return args.String(0), args.Error(1)
+func (m *mockSecretFinder) GetConnection(name string) any {
+	args := m.Called(name)
+	return args.String(0)
+}
+
+func (m *mockSecretFinder) GetConnectionDetails(name string) any {
+	args := m.Called(name)
+	return args.String(0)
 }
 
 func TestLocalOperator_RunTask(t *testing.T) {
@@ -170,8 +176,12 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
 					Return("", &NoRequirementsFoundError{})
 
-				msf.On("GetSecretByKey", "key1").Return("value1", nil)
-				msf.On("GetSecretByKey", "key2").Return("value2", nil)
+				msf.On("GetConnection", "key1").Return(config.GenericConnection{
+					Value: "value1",
+				})
+				msf.On("GetConnection", "key2").Return(config.GenericConnection{
+					Value: "value2",
+				})
 
 				runner.On("Run", mock.Anything, &executionContext{
 					repo:            repo,

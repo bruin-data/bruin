@@ -9,6 +9,9 @@ import (
 type Config struct {
 	ServiceAccountFile string
 	ServiceAccountJSON string
+	BucketName         string
+	PathToFile         string
+	Layout             string
 }
 
 func (c Config) GetIngestrURI() (string, error) {
@@ -27,8 +30,11 @@ func (c Config) GetIngestrURI() (string, error) {
 			base64.StdEncoding.EncodeToString([]byte(c.ServiceAccountJSON)),
 		)
 	}
+	params.Set("layout", c.Layout)
 	uri := url.URL{
 		Scheme:   "gs",
+		Host:     c.BucketName,
+		Path:     c.PathToFile,
 		RawQuery: params.Encode(),
 	}
 	return uri.String(), nil

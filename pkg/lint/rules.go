@@ -50,6 +50,7 @@ const (
 
 	pipelineConcurrencyMustBePositive = "Pipeline concurrency must be 1 or greater"
 	assetTierMustBeBetweenOneAndFive  = "Asset tier must be between 1 and 5"
+	secretMappingKeyMustExist         = "Secrets must have a `key` attribute"
 
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
@@ -673,6 +674,44 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 	return issues, nil
 }
 
+// ValidateDuplicateTags checks for duplicate tags within an asset and its columns.
+// It performs case-insensitive comparisons to find duplicates and returns issues
+// for any repeated tags found either on the asset itself or within individual
+// columns.
+func ValidateDuplicateTags(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
+
+	tagSet := make(map[string]bool)
+	for _, tag := range asset.Tags {
+		key := strings.ToLower(tag)
+		if tagSet[key] {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Duplicate asset tag '%s' found", tag),
+			})
+		} else {
+			tagSet[key] = true
+		}
+	}
+
+	for _, column := range asset.Columns {
+		columnTagSet := make(map[string]bool)
+		for _, tag := range column.Tags {
+			key := strings.ToLower(tag)
+			if columnTagSet[key] {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("Duplicate tag '%s' found in column '%s'", tag, column.Name),
+				})
+			} else {
+				columnTagSet[key] = true
+			}
+		}
+	}
+
+	return issues, nil
+}
+
 func ValidateAssetDirectoryExist(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	var issues []*Issue
 
@@ -1094,7 +1133,10 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 			return issues, nil
 		}
 
-		assetRenderer := renderer.CloneForAsset(ctx, p, asset)
+		assetRenderer, err := renderer.CloneForAsset(ctx, p, asset)
+		if err != nil {
+			return nil, err
+		}
 
 		for _, check := range asset.CustomChecks {
 			if strings.TrimSpace(check.Query) == "" {
@@ -1199,6 +1241,39 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 	return issues, nil
 }
 
+func (g *GlossaryChecker) EnsureParentDomainsExistInGlossary(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	var err error
+
+	foundGlossary := g.foundGlossary
+	if g.foundGlossary == nil {
+		foundGlossary, err = g.gr.GetGlossary(p.DefinitionFile.Path)
+		if err != nil {
+			g.foundGlossary = &glossary.Glossary{Entities: make([]*glossary.Entity, 0)}
+			return issues, err
+		}
+
+		if foundGlossary != nil && g.cacheFoundGlossary {
+			g.foundGlossary = foundGlossary
+		}
+	}
+
+	for _, domain := range foundGlossary.Domains {
+		if domain.ParentDomain == "" {
+			continue
+		}
+
+		parentDomain := foundGlossary.GetDomain(domain.ParentDomain)
+		if parentDomain == nil {
+			issues = append(issues, &Issue{
+				Description: fmt.Sprintf("Parent domain '%s' for domain '%s' does not exist in the glossary", domain.ParentDomain, domain.Name),
+			})
+		}
+	}
+
+	return issues, nil
+}
+
 type sqlParser interface {
 	UsedTables(sql, dialect string) ([]string, error)
 	GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error)
@@ -1233,7 +1308,12 @@ func (u UsedTableValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeli
 func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	missingDeps, err := u.parser.GetMissingDependenciesForAsset(asset, p, u.renderer.CloneForAsset(ctx, p, asset))
+	assetRenderer, err := u.renderer.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return nil, err
+	}
+
+	missingDeps, err := u.parser.GetMissingDependenciesForAsset(asset, p, assetRenderer)
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -1255,6 +1335,11 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	return issues, nil
 }
 
+func (u UsedTableValidatorRule) ValidateCrossPipeline(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
+	// This rule doesn't need cross-pipeline validation
+	return []*Issue{}, nil
+}
+
 func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
@@ -1274,8 +1359,7 @@ func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, err
 
 func EnsurePipelineConcurrencyIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-
-	if p.Concurrency < 1 {
+	if p.Concurrency <= 0 {
 		issues = append(issues, &Issue{
 			Description: pipelineConcurrencyMustBePositive,
 		})
@@ -1292,6 +1376,83 @@ func EnsureAssetTierIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipe
 			Task:        asset,
 			Description: assetTierMustBeBetweenOneAndFive,
 		})
+	}
+
+	return issues, nil
+}
+
+func EnsureSecretMappingsHaveKeyForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for _, m := range asset.Secrets {
+		if strings.TrimSpace(m.SecretKey) == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: secretMappingKeyMustExist,
+			})
+		}
+	}
+	return issues, nil
+}
+
+// ValidateCrossPipelineURIDependencies validates all URI dependencies across all pipelines
+// and returns warnings for any URI dependencies that cannot be resolved or duplicate URIs.
+func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	// Create a map of all available URIs across all pipelines and track duplicates
+	availableURIs := make(map[string]*pipeline.Asset)
+	uriToAssets := make(map[string][]*pipeline.Asset)
+
+	for _, pl := range pipelines {
+		for _, asset := range pl.Assets {
+			if asset.URI != "" {
+				availableURIs[asset.URI] = asset
+				uriToAssets[asset.URI] = append(uriToAssets[asset.URI], asset)
+			}
+		}
+	}
+
+	// Check for duplicate URIs
+	for uri, assets := range uriToAssets {
+		if len(assets) > 1 {
+			// Report duplicate URI issue for the first asset
+			assetNames := make([]string, len(assets))
+			for i, asset := range assets {
+				assetNames[i] = asset.Name
+			}
+			issues = append(issues, &Issue{
+				Task:        assets[0],
+				Description: fmt.Sprintf("Duplicate URI '%s' found across multiple assets: %s", uri, strings.Join(assetNames, ", ")),
+			})
+		}
+	}
+
+	// Check each asset in all pipelines for URI dependencies
+	for _, pl := range pipelines {
+		for _, asset := range pl.Assets {
+			for _, dep := range asset.Upstreams {
+				if dep.Type != "uri" {
+					continue
+				}
+
+				if dep.Value == "" {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "URI dependency cannot be empty",
+					})
+					continue
+				}
+
+				// Check if the URI exists in any of the available pipelines
+				if _, exists := availableURIs[dep.Value]; !exists {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: fmt.Sprintf("Cross-pipeline URI dependency '%s' not found in any available pipeline", dep.Value),
+					})
+				}
+			}
+		}
 	}
 
 	return issues, nil

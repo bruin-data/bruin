@@ -125,6 +125,72 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	return result, err
 }
 
+func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	if err := db.initializeDB(); err != nil {
+		return nil, err
+	}
+
+	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create snowflake context")
+	}
+
+	queryString := query.String()
+	rows, err := db.conn.QueryContext(ctx, queryString)
+	if err == nil {
+		err = rows.Err()
+	}
+	if err != nil {
+		errorMessage := err.Error()
+		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
+	}
+
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var result [][]interface{}
+
+	for {
+		cols, err := rows.Columns()
+		if err != nil {
+			return nil, err
+		}
+
+		currentResult := [][]interface{}{}
+
+		for rows.Next() {
+			columns := make([]interface{}, len(cols))
+			columnPointers := make([]interface{}, len(cols))
+			for i := range columns {
+				columnPointers[i] = &columns[i]
+			}
+
+			if err := rows.Scan(columnPointers...); err != nil {
+				return nil, err
+			}
+			currentResult = append(currentResult, columns)
+		}
+
+		// Check for row errors after reading all rows in this result set
+		if rows.Err() != nil {
+			return nil, rows.Err()
+		}
+
+		// Overwrite result — so only the last result set remains
+		result = currentResult
+
+		if !rows.NextResultSet() {
+			break
+		}
+	}
+
+	return result, nil
+}
+
 func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	if err := db.initializeDB(); err != nil {
 		return false, err
@@ -939,7 +1005,8 @@ SELECT
 FROM
     %s.INFORMATION_SCHEMA.TABLES
 WHERE
-    table_type IN ('BASE TABLE', 'VIEW')
+    table_type IN ('BASE TABLE', 'VIEW') 
+AND table_schema != 'INFORMATION_SCHEMA'
 ORDER BY table_schema, table_name;
 `, databaseName)
 

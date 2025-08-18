@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"cloud.google.com/go/bigquery"
+	datatransfer "cloud.google.com/go/bigquery/datatransfer/apiv1"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -103,6 +104,33 @@ func NewDB(c *Config) (*Client, error) {
 
 func (d *Client) GetIngestrURI() (string, error) {
 	return d.config.GetIngestrURI()
+}
+
+func (d *Client) ProjectID() string {
+	return d.config.ProjectID
+}
+
+func (d *Client) Location() string {
+	return d.config.Location
+}
+
+func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Client, error) {
+	options := []option.ClientOption{
+		option.WithScopes(scopes...),
+	}
+
+	switch {
+	case d.config.CredentialsJSON != "":
+		options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
+	case d.config.CredentialsFilePath != "":
+		options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
+	case d.config.Credentials != nil:
+		options = append(options, option.WithCredentials(d.config.Credentials))
+	default:
+		return nil, errors.New("no credentials provided for Data Transfer client")
+	}
+
+	return datatransfer.NewClient(ctx, options...)
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
@@ -208,6 +236,38 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	result.ColumnTypes = columnTypes
 
 	return result, nil
+}
+
+func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
+	q := d.client.Query(queryObj.String())
+	q.DryRun = true
+
+	if d.client.Location != "" {
+		q.Location = d.client.Location
+	}
+
+	job, err := q.Run(ctx)
+	if err != nil {
+		return nil, formatError(err)
+	}
+
+	status := job.LastStatus()
+	if status == nil {
+		return nil, errors.New("missing job status for dry run")
+	}
+	if status.Err() != nil {
+		return nil, status.Err()
+	}
+	if status.Statistics == nil {
+		return nil, errors.New("missing statistics in dry run status")
+	}
+
+	qs, ok := status.Statistics.Details.(*bigquery.QueryStatistics)
+	if !ok || qs == nil {
+		return nil, errors.New("missing query statistics details in dry run status")
+	}
+
+	return qs, nil
 }
 
 type NoMetadataUpdatedError struct{}
@@ -418,7 +478,12 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 		var apiErr *googleapi.Error
 		if errors.As(err, &apiErr) && apiErr.Code == 404 {
 			if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
-				return fmt.Errorf("failed to create dataset '%s': %w", datasetName, err)
+				var createApiErr *googleapi.Error //nolint:stylecheck
+				if errors.As(err, &createApiErr) && createApiErr.Code == 409 {
+					// Dataset already exists (created by another process), ignore this error
+				} else {
+					return fmt.Errorf("failed to create dataset '%s': %w", datasetName, err)
+				}
 			}
 			datasetNameCache.Store(cacheKey, true)
 		} else {
@@ -481,8 +546,7 @@ func (d *Client) BuildTableExistsQuery(tableName string) (string, error) {
 	}
 
 	// Use EXISTS to return true or false
-	query := fmt.Sprintf(`
-		SELECT EXISTS (SELECT 1 FROM %s WHERE table_name = '%s')`, datasetRef, targetTable)
+	query := fmt.Sprintf("SELECT COUNT(*) FROM `%s` WHERE table_name = '%s'", datasetRef, targetTable)
 
 	return strings.TrimSpace(query), nil
 }

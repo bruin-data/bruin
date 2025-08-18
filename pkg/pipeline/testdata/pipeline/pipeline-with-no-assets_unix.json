@@ -1,6 +1,9 @@
 {
     "legacy_id": "",
     "name": "pipeline-with-no-assets",
+    "tags": [],
+    "domains": [],
+    "meta": {},
     "schedule": "",
     "start_date": "",
     "definition_file": {

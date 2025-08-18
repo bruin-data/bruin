@@ -1,0 +1,8 @@
+name: best-pipe
+
+default_connections:
+  duckdb: "duckdb-scd2-by-column"
+
+
+
+

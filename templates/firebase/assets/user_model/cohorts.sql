@@ -85,5 +85,3 @@ GROUP BY 1,2
 {%- for dim in dimensions -%}
   ,{{ loop.index + 2 }}
 {%- endfor %}
-
-;
