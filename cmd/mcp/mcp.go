@@ -225,7 +225,7 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 	}
 
 	switch toolName {
-	case "get_bruin_info":
+	case "bruin_get_overview":
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -238,7 +238,7 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 				},
 			},
 		}
-	case "get_docs_tree":
+	case "bruin_get_docs_tree":
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -251,7 +251,7 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 				},
 			},
 		}
-	case "get_doc_content":
+	case "bruin_get_doc_content":
 		// Extract filename parameter
 		args, ok := params["arguments"].(map[string]interface{})
 		if !ok {
