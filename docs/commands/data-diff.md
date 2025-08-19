@@ -37,7 +37,7 @@ table td:first-child {
 |------|------|---------|-------------|
 | `--connection`, `-c` | str | - | Name of the default connection to use when connection is not specified in table arguments |
 | `--tolerance`, `-t` | float | `0.001` | Tolerance percentage for considering values equal. Values with percentage difference below this threshold are considered equal |
-| `--config-file` | str | `.bruin.yml` | The path to the .bruin.yml configuration file |
+| `--config-file` | str | `.bruin.yml` | Optional path to the .bruin.yml configuration file . Other [secret backends](../secrets/overview.md) Can be used .|
 | `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
 
 ## Table Identifier Format
@@ -230,4 +230,4 @@ Either use the format `connection:table` or add the `--connection` flag.
 ### Error: "failed to get connection"
 The specified connection name doesn't exist in your configuration.
 
-Check your `.bruin.yml` file for available connections.
+Check your `.bruin.yml` or other [secrets backend](../secrets/overview.md) file for available connections.

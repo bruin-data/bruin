@@ -20,7 +20,7 @@ This command will:
 - Create a project named `my-pipeline`.
 - Generate a folder called `my-pipeline` containing the following:
     - An `assets` folder
-    - `.bruin.yml` file (where you will add connection and credentials )
+    - `.bruin.yml` file (where you will add connection and credentials. There's other ways to provide credentials/secrets, see [Secrets](../../secrets/overview.md))
     - `pipeline.yml` file to manage your pipeline.
 
 
@@ -81,6 +81,9 @@ environments:
             - "vadimer2"
 
 ```
+
+_Bear_ in mind, There's other ways to provide credentials/secrets, see [Secrets](../../secrets/overview.md)
+
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
 ```bash
 bruin run assets/players.asset.yml

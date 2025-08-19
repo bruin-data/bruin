@@ -2,7 +2,7 @@
 
 Bruin has various commands to handle connections via its CLI. 
 
-The connections are stored in a gitignored file called `.bruin.yml`, and while it is possible to edit this file directly, Bruin CLI offers convenience methods to manage connections.
+Bruin CLI offers convenience methods to manage connections when we are using `.bruin.yml` as our [secrets backend](../secrets/overview.md).
 
 ## List Connections
 
