@@ -93,7 +93,7 @@ func ImportDatabase() *cli.Command {
 
 func ImportScheduledQueries() *cli.Command {
 	return &cli.Command{
-		Name:  "scheduledqueries",
+		Name:  "bq-scheduled-queries",
 		Usage: "Import BigQuery scheduled queries as Bruin assets",
 		Description: `Import BigQuery scheduled queries from the Data Transfer Service as individual Bruin assets.
 
