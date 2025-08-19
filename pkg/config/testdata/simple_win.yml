@@ -215,6 +215,10 @@ environments:
         - name: "linkedinads-1"
           access_token: "access-token-123"
           account_ids: "account-id-123,account-id-456"
+      revenuecat:
+        - name: "revenuecat-1"
+          api_key: "rc_api_key_123"
+          project_id: "proj_123456789"
       linear:
         - name: "linear-1"
           api_key: "api-key-123"

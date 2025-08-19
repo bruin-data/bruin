@@ -364,6 +364,13 @@ func TestLoadFromFile(t *testing.T) {
 					AccountIds:  "account-id-123,account-id-456",
 				},
 			},
+			RevenueCat: []RevenueCatConnection{
+				{
+					Name:      "revenuecat-1",
+					APIKey:    "rc_api_key_123",
+					ProjectID: "proj_123456789",
+				},
+			},
 			Linear: []LinearConnection{
 				{
 					Name:   "linear-1",
