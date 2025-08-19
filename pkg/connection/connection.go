@@ -57,6 +57,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
+	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/sftp"
@@ -116,6 +117,7 @@ type Manager struct {
 	AppStore             map[string]*appstore.Client
 	LinkedInAds          map[string]*linkedinads.Client
 	Linear               map[string]*linear.Client
+	RevenueCat           map[string]*revenuecat.Client
 	ClickHouse           map[string]*clickhouse.Client
 	GCS                  map[string]*gcs.Client
 	ApplovinMax          map[string]*applovinmax.Client
@@ -1288,6 +1290,27 @@ func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedIn
 	return nil
 }
 
+func (m *Manager) AddRevenueCatConnectionFromConfig(connection *config.RevenueCatConnection) error {
+	m.mutex.Lock()
+	if m.RevenueCat == nil {
+		m.RevenueCat = make(map[string]*revenuecat.Client)
+	}
+	m.mutex.Unlock()
+	client, err := revenuecat.NewClient(revenuecat.Config{
+		ApiKey:    connection.ApiKey,
+		ProjectId: connection.ProjectId,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.RevenueCat[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddLinearConnectionFromConfig(connection *config.LinearConnection) error {
 	m.mutex.Lock()
 	if m.Linear == nil {
@@ -2041,6 +2064,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.RevenueCat, connectionManager.AddRevenueCatConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Linear, connectionManager.AddLinearConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)

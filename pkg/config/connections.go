@@ -618,6 +618,16 @@ func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }
 
+type RevenueCatConnection struct {
+	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ApiKey    string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	ProjectId string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+}
+
+func (c RevenueCatConnection) GetName() string {
+	return c.Name
+}
+
 type LinearConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
