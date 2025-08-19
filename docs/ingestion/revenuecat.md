@@ -23,7 +23,7 @@ type: ingestr
 
 parameters:
   source_connection: revenuecat
-  source_table: 'subscribers'
+  source_table: 'customers'
 
   destination: postgres
 ```
