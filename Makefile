@@ -1,4 +1,4 @@
-NAME=bruin
+NAME=bruin$(shell if [ "$(shell go env GOOS)" = "windows" ]; then echo .exe; fi)
 BUILD_DIR ?= bin
 BUILD_SRC=.
 
