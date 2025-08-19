@@ -40,7 +40,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ ubuntu-latest ]
+        platform: [ ubuntu-latest, windows-2022 ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -73,16 +73,154 @@ jobs:
       - name: Install winget
         if: matrix.platform == 'windows-2022'
         uses: Cyberboss/install-winget@v1
+      
+      - name: Debug - Pre-build environment
+        run: |
+          echo "=== PRE-BUILD DEBUGGING ==="
+          echo "Working directory: $(pwd)"
+          echo "Platform: ${{ matrix.platform }}"
+          echo "Files in current directory:"
+          ls -la
+          echo ""
+          echo "Go version:"
+          go version
+          echo ""
+          echo "Go environment:"
+          go env GOROOT GOPATH GOCACHE
+          echo ""
+          echo "Checking for existing bin directory:"
+          if [ -d "bin" ]; then
+            echo "bin directory exists"
+            ls -la bin/
+          else
+            echo "bin directory does not exist"
+          fi
+
       - name: Build Bruin executable
         run: |
+          echo "=== BUILDING BRUIN ==="
           mkdir -p bin
           if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
+            echo "Building for Windows..."
             go build -o bin/bruin.exe .
           else
+            echo "Building for Unix..."
             go build -o bin/bruin .
           fi
+          echo "Build completed"
         shell: bash
-      - run: make integration-test
+
+      - name: Debug - Post-build verification
+        run: |
+          echo "=== POST-BUILD DEBUGGING ==="
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la
+          echo ""
+          echo "Bin directory contents:"
+          if [ -d "bin" ]; then
+            ls -la bin/
+            echo ""
+            echo "Binary file details:"
+            if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
+              if [ -f "bin/bruin.exe" ]; then
+                echo "✅ bruin.exe exists"
+                file bin/bruin.exe
+                ls -la bin/bruin.exe
+              else
+                echo "❌ bruin.exe does not exist"
+              fi
+            else
+              if [ -f "bin/bruin" ]; then
+                echo "✅ bruin exists"
+                file bin/bruin
+                ls -la bin/bruin
+              else
+                echo "❌ bruin does not exist"
+              fi
+            fi
+          else
+            echo "❌ bin directory does not exist"
+          fi
+          echo ""
+          echo "Integration tests directory:"
+          if [ -d "integration-tests" ]; then
+            echo "integration-tests directory exists"
+            echo "Files in integration-tests:"
+            ls -la integration-tests/
+            echo ""
+            echo "Checking binary path from integration-tests perspective:"
+            cd integration-tests
+            echo "Current directory: $(pwd)"
+            if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
+              if [ -f "../bin/bruin.exe" ]; then
+                echo "✅ Binary accessible from integration-tests: ../bin/bruin.exe"
+                ls -la ../bin/bruin.exe
+              else
+                echo "❌ Binary NOT accessible from integration-tests: ../bin/bruin.exe"
+                echo "Parent directory contents:"
+                ls -la ../
+              fi
+            else
+              if [ -f "../bin/bruin" ]; then
+                echo "✅ Binary accessible from integration-tests: ../bin/bruin"
+                ls -la ../bin/bruin
+              else
+                echo "❌ Binary NOT accessible from integration-tests: ../bin/bruin"
+                echo "Parent directory contents:"
+                ls -la ../
+              fi
+            fi
+            cd ..
+          else
+            echo "❌ integration-tests directory does not exist"
+          fi
+
+      - name: Debug - Test execution context
+        run: |
+          echo "=== TEST EXECUTION CONTEXT ==="
+          echo "Current directory: $(pwd)"
+          echo "PATH environment:"
+          echo $PATH
+          echo ""
+          echo "Checking if bruin is in PATH:"
+          if command -v bruin >/dev/null 2>&1; then
+            echo "✅ bruin found in PATH at: $(which bruin)"
+          else
+            echo "❌ bruin not found in PATH"
+          fi
+          echo ""
+          echo "Searching for any bruin files:"
+          find . -name "*bruin*" -type f 2>/dev/null | head -10
+          echo ""
+          echo "Testing binary execution:"
+          if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
+            if [ -f "bin/bruin.exe" ]; then
+              echo "Testing: ./bin/bruin.exe --version"
+              ./bin/bruin.exe --version || echo "Binary execution failed"
+            fi
+          else
+            if [ -f "bin/bruin" ]; then
+              echo "Testing: ./bin/bruin --version"
+              ./bin/bruin --version || echo "Binary execution failed"
+            fi
+          fi
+
+      - name: Run integration tests with debug output
+        run: |
+          echo "=== RUNNING INTEGRATION TESTS ==="
+          echo "Current directory: $(pwd)"
+          echo "Binary location:"
+          if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
+            echo "Expected: bin/bruin.exe"
+            ls -la bin/bruin.exe || echo "Binary not found"
+          else
+            echo "Expected: bin/bruin"
+            ls -la bin/bruin || echo "Binary not found"
+          fi
+          echo ""
+          echo "Running integration tests..."
+          make integration-test
         shell: bash
 
   dockerBuild:
