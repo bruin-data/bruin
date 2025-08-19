@@ -30,12 +30,16 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Always `ingestr` for RevenueCat.
 - `source_connection`: The RevenueCat connection name defined in `.bruin.yml`.
-- `source_table`: Name of the RevenueCat table to ingest (`projects`, `customers`, `products`,).
-- `projects`: Fetches projects.
+- `source_table`: Name of the RevenueCat table to ingest.
+- `destination`: The destination connection name.
+
+## Available Source Tables
+
+- `projects`: Fetches all projects from your RevenueCat account.
 - `customers`: Fetches all customers with nested purchases and subscriptions data.
 - `products`: Fetches all products configured in your RevenueCat project.
-
-- `destination`: The destination connection name.
+- `entitlements`: Fetches all entitlements configured in your RevenueCat project.
+- `offerings`: Fetches all offerings configured in your RevenueCat project.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

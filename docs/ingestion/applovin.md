@@ -33,9 +33,16 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For AppLovin, it will be always `ingestr`.
 - `source_connection`: The name of the AppLovin connection defined in `.bruin.yml`.
-- `source_table`: The name of the table in AppLovin to ingest. You can find the available source tables [here](https://bruin-data.github.io/ingestr/supported-sources/applovin.html#tables).
+- `source_table`: The name of the table in AppLovin to ingest.
 - `destination`: The name of the destination connection.
 
+## Available Source Tables
+
+- `publisher-report`: Provides daily metrics from the report end point using the report_type publisher.
+- `advertiser-report`: Provides daily metrics from the report end point using the report_type advertiser.
+- `advertiser-probabilistic-report`: Provides daily metrics from the probabilisticReport end point using the report_type advertiser.
+- `advertiser-ska-report`: Provides daily metrics from the skaReport end point using the report_type advertiser.
+- `custom:{endpoint}:{report_type}:{columns}`: Custom reports with specified endpoint, report type, and columns.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

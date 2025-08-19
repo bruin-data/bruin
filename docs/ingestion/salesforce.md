@@ -37,9 +37,26 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For Salesforce, it will be always `ingestr`.
 - `source_connection`: The name of the Salesforce connection defined in `.bruin.yml`.
-- `source_table`: The name of the table in Salesforce to ingest. You can find the available source tables [here](https://bruin-data.github.io/ingestr/supported-sources/salesforce.html#tables).
+- `source_table`: The name of the table in Salesforce to ingest.
 - `destination`: The name of the destination connection.
 
+## Available Source Tables
+
+- `user`: Refers to an individual who has access to a Salesforce org or instance.
+- `user_role`: A standard object that represents a role within the organization's hierarchy.
+- `opportunity`: Represents a sales opportunity for a specific account or contact.
+- `opportunity_line_item`: Represents individual line items or products associated with an Opportunity.
+- `opportunity_contact_role`: Represents the association between an Opportunity and a Contact.
+- `account`: Individual or organization that interacts with your business.
+- `contact`: An individual person associated with an account or organization.
+- `lead`: Prospective customer/individual/org. that has shown interest in a company's products/services.
+- `campaign`: Marketing initiative or project designed to achieve specific goals.
+- `campaign_member`: Association between a Contact or Lead and a Campaign.
+- `product`: For managing and organizing your product-related data.
+- `pricebook`: Used to manage product pricing and create price books.
+- `pricebook_entry`: Represents a specific price for a product in a price book.
+- `task`: Used to track and manage various activities and tasks.
+- `event`: Used to track and manage calendar-based events.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

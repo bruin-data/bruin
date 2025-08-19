@@ -37,7 +37,14 @@ parameters:
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Attio connection defined in .bruin.yml.
 - `source_table`: The name of the data table in Attio that you want to ingest.
-  You can find the available source tables in Attio [here](https://bruin-data.github.io/ingestr/supported-sources/attio.html#tables)
+
+## Available Source Tables
+
+- `objects`: Objects are the data types used to store facts about your customers. Fetches all objects.
+- `records:{object_api_slug}`: Fetches all records of an object. For example: `records:companies`.
+- `lists`: Fetches all lists.
+- `list_entries:{list_id}`: Lists all items in a specific list. For example: `list_entries:8abc-123-456-789d-123`.
+- `all_list_entries:{object_api_slug}`: Fetches all the lists for an object, and then fetches all the entries from that list.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

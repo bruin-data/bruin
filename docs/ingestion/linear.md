@@ -29,8 +29,30 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Always `ingestr` for Linear.
 - `source_connection`: The Linear connection name defined in `.bruin.yml`.
-- `source_table`: Name of the Linear table to ingest (`issues`, `projects`, `teams`, or `users`).
+- `source_table`: Name of the Linear table to ingest.
 - `destination`: The destination connection name.
+
+## Available Source Tables
+
+- `issues`: Fetches all issues from your Linear workspace.
+- `users`: Fetches users from your workspace.
+- `workflow_states`: Fetches workflow states used in your Linear workspace.
+- `cycles`: Fetches cycle information and planning data.
+- `attachments`: Fetches file attachments associated with issues.
+- `comments`: Fetches comments on issues and other entities.
+- `documents`: Fetches documents created in Linear.
+- `external_users`: Fetches information about external users.
+- `initiative`: Fetches initiative data for high-level planning.
+- `integrations`: Fetches integration configurations.
+- `labels`: Fetches labels used for categorizing issues.
+- `project_updates`: Fetches updates posted to projects.
+- `team_memberships`: Fetches team membership information.
+- `initiative_to_project`: Fetches relationships between initiatives and projects.
+- `project_milestone`: Retrieves Linear project milestones and checkpoints.
+- `project_status`: Fetches project status information.
+- `projects`: Fetches project-level data.
+- `teams`: Fetches information about the teams configured in Linear.
+- `organization`: Fetches organization-level information.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

@@ -45,9 +45,17 @@ parameters:
 - type: Specifies the type of the asset. It will be always ingestr type for Asana.
 - connection: This is the destination connection.
 - source_connection: The name of the Asana connection defined in .bruin.yml.
-- source_table: The name of the data table in Asana you want to ingest. 
+- source_table: The name of the data table in Asana you want to ingest.
 
-You can find a list of supported tables [here](https://bruin-data.github.io/ingestr/supported-sources/asana.html#tables).
+## Available Source Tables
+
+- `workspaces`: Information about people, materials, or assets required to complete a task or project successfully.
+- `projects`: Collections of tasks and related information.
+- `tasks`: Tasks within a project. Only tasks that belong to a project can be ingested.
+- `tags`: Labels that can be attached to tasks, projects, or conversations to help categorize and organize them.
+- `stories`: Updates or comments that team members can add to a task or project.
+- `teams`: Groups of individuals who work together to complete projects and tasks.
+- `users`: Individuals who have access to the Asana platform.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

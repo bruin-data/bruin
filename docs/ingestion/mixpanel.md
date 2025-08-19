@@ -40,6 +40,11 @@ parameters:
 - `source_table`: Name of the Mixpanel table to ingest.
 - `destination`: The destination connection name.
 
+## Available Source Tables
+
+- `events`: Retrieves events data.
+- `profiles`: Retrieves Mixpanel user profiles and attributes.
+
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
 bruin run assets/mixpanel_ingestion.yml
