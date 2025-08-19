@@ -52,7 +52,15 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
-      - run: make test
+      - run: |
+          for i in {1..50}; do
+            echo "=== Test run $i/50 ==="
+            make test
+            if [ $? -ne 0 ]; then
+              echo "Test failed on run $i"
+              exit 1
+            fi
+          done
 
 
   end2end:
