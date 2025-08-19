@@ -222,6 +222,7 @@ export default withMermaid({
                             {text: "Pinterest", link: "/ingestion/pinterest"},
                             {text: "Trustpilot", link: "/ingestion/trustpilot"},
                             {text: "QuickBooks", link: "/ingestion/quickbooks"},
+                            {text: "Revenuecat", link: "/ingestion/revenuecat"},
                             {text: "Salesforce", link: "/ingestion/salesforce"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
@@ -236,6 +237,7 @@ export default withMermaid({
                             {text: "Wise", link: "/ingestion/wise.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                             {text: "Zoom", link: "/ingestion/zoom"},
+                            {text: "Revenuecat", link: "/ingestion/revenuecat"},
                         ],
                     },
                     {text: "Destinations", link: "/ingestion/destinations.md"}
