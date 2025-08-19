@@ -463,11 +463,6 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 			continue
 		}
 
-		// if the used table contains a full name with multiple dots treat it as an absolute reference, ignore it
-		if strings.Count(usedTable, ".") > 1 {
-			continue
-		}
-
 		// if the table is in the dependency list already, move on
 		if _, ok := depsNameMap[usedTable]; ok {
 			continue
