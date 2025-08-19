@@ -1297,8 +1297,8 @@ func (m *Manager) AddRevenueCatConnectionFromConfig(connection *config.RevenueCa
 	}
 	m.mutex.Unlock()
 	client, err := revenuecat.NewClient(revenuecat.Config{
-		ApiKey:    connection.ApiKey,
-		ProjectId: connection.ProjectId,
+		APIKey:    connection.APIKey,
+		ProjectID: connection.ProjectID,
 	})
 	if err != nil {
 		return err

@@ -2246,6 +2246,26 @@
         "sub_domain"
       ]
     },
+    "RevenueCatConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "project_id"
+      ]
+    },
     "ZoomConnection": {
       "properties": {
         "name": {
