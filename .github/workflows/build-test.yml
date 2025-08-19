@@ -130,6 +130,19 @@ jobs:
           echo "Build completed"
         shell: bash
 
+      - name: Rename binary for Windows compatibility
+        if: matrix.platform == 'windows-2022'
+        run: |
+          echo "=== RENAMING BINARY FOR WINDOWS ==="
+          if (Test-Path "bin/bruin") {
+            Move-Item "bin/bruin" "bin/bruin.exe"
+            Write-Host "✅ Renamed bin/bruin to bin/bruin.exe"
+          } else {
+            Write-Host "❌ bin/bruin not found"
+            exit 1
+          }
+        shell: pwsh
+
       - name: Debug - Post-build verification
         if: matrix.platform == 'ubuntu-latest'
         run: |
@@ -190,11 +203,11 @@ jobs:
             Get-ChildItem bin/ | ForEach-Object { Write-Host "  - $($_.Name)" }
             Write-Host ""
             Write-Host "Binary file details:"
-            if (Test-Path "bin/bruin") {
-              Write-Host "✅ bruin exists"
-              Get-ChildItem bin/bruin | Select-Object Name, Length, LastWriteTime
+            if (Test-Path "bin/bruin.exe") {
+              Write-Host "✅ bruin.exe exists"
+              Get-ChildItem bin/bruin.exe | Select-Object Name, Length, LastWriteTime
             } else {
-              Write-Host "❌ bruin does not exist"
+              Write-Host "❌ bruin.exe does not exist"
             }
           } else {
             Write-Host "❌ bin directory does not exist"
@@ -209,11 +222,11 @@ jobs:
             Write-Host "Checking binary path from integration-tests perspective:"
             Set-Location integration-tests
             Write-Host "Current directory: $(Get-Location)"
-            if (Test-Path "../bin/bruin") {
-              Write-Host "✅ Binary accessible from integration-tests: ../bin/bruin"
-              Get-ChildItem ../bin/bruin | Select-Object Name, Length, LastWriteTime
+            if (Test-Path "../bin/bruin.exe") {
+              Write-Host "✅ Binary accessible from integration-tests: ../bin/bruin.exe"
+              Get-ChildItem ../bin/bruin.exe | Select-Object Name, Length, LastWriteTime
             } else {
-              Write-Host "❌ Binary NOT accessible from integration-tests: ../bin/bruin"
+              Write-Host "❌ Binary NOT accessible from integration-tests: ../bin/bruin.exe"
               Write-Host "Parent directory contents:"
               Get-ChildItem ../ | ForEach-Object { Write-Host "  - $($_.Name)" }
             }
@@ -248,6 +261,19 @@ jobs:
           fi
         shell: bash
 
+      - name: Run integration tests with debug output
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          echo "=== RUNNING INTEGRATION TESTS ==="
+          echo "Current directory: $(pwd)"
+          echo "Binary location:"
+          echo "Expected: bin/bruin"
+          ls -la bin/bruin || echo "Binary not found"
+          echo ""
+          echo "Running integration tests..."
+          make integration-test
+        shell: bash
+
       - name: Debug - Test execution context (Windows)
         if: matrix.platform == 'windows-2022'
         run: |
@@ -277,28 +303,15 @@ jobs:
           }
         shell: pwsh
 
-      - name: Run integration tests with debug output
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          echo "=== RUNNING INTEGRATION TESTS ==="
-          echo "Current directory: $(pwd)"
-          echo "Binary location:"
-          echo "Expected: bin/bruin"
-          ls -la bin/bruin || echo "Binary not found"
-          echo ""
-          echo "Running integration tests..."
-          make integration-test
-        shell: bash
-
       - name: Run integration tests with debug output (Windows)
         if: matrix.platform == 'windows-2022'
         run: |
           Write-Host "=== RUNNING INTEGRATION TESTS ==="
           Write-Host "Current directory: $(Get-Location)"
           Write-Host "Binary location:"
-          Write-Host "Expected: bin/bruin"
-          if (Test-Path "bin/bruin") {
-            Get-ChildItem bin/bruin | Select-Object Name, Length, LastWriteTime
+          Write-Host "Expected: bin/bruin.exe"
+          if (Test-Path "bin/bruin.exe") {
+            Get-ChildItem bin/bruin.exe | Select-Object Name, Length, LastWriteTime
           } else {
             Write-Host "Binary not found"
           }

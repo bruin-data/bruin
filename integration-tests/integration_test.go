@@ -122,7 +122,9 @@ func TestIndividualTasks(t *testing.T) {
 	}
 
 	executable := "bruin"
-	
+	if runtime.GOOS == "windows" {
+		executable = "bruin.exe"
+	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
 
 	tests := []struct {
@@ -1043,7 +1045,9 @@ func TestWorkflowTasks(t *testing.T) {
 	}
 
 	executable := "bruin"
-	
+	if runtime.GOOS == "windows" {
+		executable = "bruin.exe"
+	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
 
 	tempdir := t.TempDir()
@@ -1767,7 +1771,9 @@ func TestIngestrTasks(t *testing.T) {
 	}
 
 	executable := "bruin"
-	
+	if runtime.GOOS == "windows" {
+		executable = "bruin.exe"
+	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
 
 	tests := []struct {
