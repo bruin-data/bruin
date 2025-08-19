@@ -130,19 +130,6 @@ jobs:
           echo "Build completed"
         shell: bash
 
-      - name: Rename binary for Windows compatibility
-        if: matrix.platform == 'windows-2022'
-        run: |
-          echo "=== RENAMING BINARY FOR WINDOWS ==="
-          if (Test-Path "bin/bruin") {
-            Move-Item "bin/bruin" "bin/bruin.exe"
-            Write-Host "✅ Renamed bin/bruin to bin/bruin.exe"
-          } else {
-            Write-Host "❌ bin/bruin not found"
-            exit 1
-          }
-        shell: pwsh
-
       - name: Debug - Post-build verification
         if: matrix.platform == 'ubuntu-latest'
         run: |

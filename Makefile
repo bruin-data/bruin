@@ -2,6 +2,11 @@ NAME=bruin
 BUILD_DIR ?= bin
 BUILD_SRC=.
 
+# Add .exe extension on Windows
+ifeq ($(OS),Windows_NT)
+	NAME := $(NAME).exe
+endif
+
 NO_COLOR=\033[0m
 OK_COLOR=\033[32;01m
 ERROR_COLOR=\033[31;01m
