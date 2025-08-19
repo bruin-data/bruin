@@ -31,7 +31,7 @@ parameters:
 - `type`: Always `ingestr` for RevenueCat.
 - `source_connection`: The RevenueCat connection name defined in `.bruin.yml`.
 - `source_table`: Name of the RevenueCat table to ingest (`projects`, `customers`, `products`,).
-- `projects`: Fetches all projects from your RevenueCat account.
+- `projects`: Fetches projects.
 - `customers`: Fetches all customers with nested purchases and subscriptions data.
 - `products`: Fetches all products configured in your RevenueCat project.
 
