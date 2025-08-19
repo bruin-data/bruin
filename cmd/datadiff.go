@@ -71,6 +71,7 @@ func DataDiffCmd() *cli.Command {
 	var configFilePath string
 	var tolerance float64
 	var schemaOnly bool
+	var failIfDiff bool
 
 	return &cli.Command{
 		Name:    "data-diff",
@@ -101,6 +102,11 @@ func DataDiffCmd() *cli.Command {
 				Name:        "schema-only",
 				Usage:       "Compare only table schemas without analyzing row counts or column distributions",
 				Destination: &schemaOnly,
+			},
+			&cli.BoolFlag{
+				Name:        "fail-if-diff",
+				Usage:       "Return a non-zero exit code if differences are found",
+				Destination: &failIfDiff,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -178,8 +184,8 @@ func DataDiffCmd() *cli.Command {
 
 			if schemaComparison != nil {
 				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.Writer)
-				if hasDifferences {
-					return cli.Exit("", 1) // Exit with code 1 when differences are found
+				if hasDifferences && failIfDiff {
+					return cli.Exit("", 1) // Exit with code 1 when differences are found and flag is set
 				}
 			} else {
 				fmt.Fprintf(c.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
