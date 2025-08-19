@@ -547,6 +547,12 @@
           },
           "type": "array"
         },
+        "revenuecat": {
+          "items": {
+            "$ref": "#/$defs/RevenueCatConnection"
+          },
+          "type": "array"
+        },
         "personio": {
           "items": {
             "$ref": "#/$defs/PersonioConnection"
