@@ -73,15 +73,7 @@ jobs:
       - name: Install winget
         if: matrix.platform == 'windows-2022'
         uses: Cyberboss/install-winget@v1
-      - run: |
-          for i in {1..50}; do
-            echo "=== Test run $i/50 ==="
-            make integration-test
-            if [ $? -ne 0 ]; then
-              echo "Test failed on run $i"
-              exit 1
-            fi
-          done
+      - run: make integration-test
         shell: bash
 
   dockerBuild:
