@@ -14,6 +14,8 @@ This command is particularly useful for:
 bruin data-diff [FLAGS] <table1> <table2>
 ```
 
+By default, this command exits with a status code of `0` even when differences are found. Use `--fail-if-diff` to exit with a non-zero code when differences are detected.
+
 **Arguments:**
 
 - **table1:** The first table to compare. Can be specified as `connection:table` or just `table` if using a default connection.
@@ -36,6 +38,7 @@ table td:first-child {
 | `--connection`, `-c` | str | - | Name of the default connection to use when connection is not specified in table arguments |
 | `--tolerance`, `-t` | float | `0.001` | Tolerance percentage for considering values equal. Values with percentage difference below this threshold are considered equal |
 | `--config-file` | str | `.bruin.yml` | The path to the .bruin.yml configuration file |
+| `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
 
 ## Table Identifier Format
 

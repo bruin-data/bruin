@@ -41,12 +41,15 @@ bruin data-diff [command options]
 
 Compares data between two environments or sources. Table names can be provided as 'connection:table' or just 'table' if a default connection is set via --connection flag.
 
+By default, the command exits with code 0 even when differences are detected. Use --fail-if-diff to exit with a non-zero code when differences are found.
+
 Flags:
 Flag	Alias	Description
 --connection value	-c value	Name of the default connection to use, if not specified in the table argument (e.g. conn:table)
 --config-file value		The path to the .bruin.yml file [$BRUIN_CONFIG_FILE]
 --tolerance value	-t value	Tolerance percentage for considering values equal (default: 0.001%). Values with percentage difference below this threshold are considered equal. (default: 0.001)
 --schema-only		Compare only table schemas without analyzing row counts or column distributions (default: false)
+--fail-if-diff                          Return a non-zero exit code if differences are found (default: false)
 --help	-h	Show help
 
 ------
