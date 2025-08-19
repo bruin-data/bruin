@@ -29,8 +29,16 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Always `ingestr` for ClickUp.
 - `source_connection`: The ClickUp connection name defined in `.bruin.yml`.
-- `source_table`: Name of the ClickUp table to ingest. You can find the available source tables in ClickUp [here](https://bruin-data.github.io/ingestr/supported-sources/clickup.html#tables).
+- `source_table`: Name of the ClickUp table to ingest.
 - `destination`: The destination connection name.
+
+## Available Source Tables
+
+- `user`: The authorised user profile.
+- `teams`: Workspaces available to the authenticated user.
+- `spaces`: Spaces available within a workspace.
+- `lists`: Lists contained in each space.
+- `tasks`: Tasks belonging to each list.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

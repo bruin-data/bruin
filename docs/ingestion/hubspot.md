@@ -38,7 +38,17 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the hubspot connection defined in .bruin.yml.
-- `source_table`: The name of the data table in hubspot that you want to ingest. For example, `companies` is a data table in hubspot that you may want to ingest. You can find the available source tables in hubspot [here](https://bruin-data.github.io/ingestr/supported-sources/hubspot.html#tables).
+- `source_table`: The name of the data table in hubspot that you want to ingest. For example, `companies` is a data table in hubspot that you may want to ingest.
+
+## Available Source Tables
+
+- `companies`: Retrieves information about organizations.
+- `contacts`: Retrieves information about visitors, potential customers, and leads.
+- `deals`: Retrieves deal records and tracks deal progress.
+- `tickets`: Handles requests for help from customers or users.
+- `products`: Retrieves pricing information of products.
+- `quotes`: Retrieves price proposals that salespeople can create and send.
+- `schemas`: Returns all object schemas that have been defined for your account.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

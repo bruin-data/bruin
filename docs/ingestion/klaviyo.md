@@ -38,8 +38,25 @@ parameters:
 - `type`: Specifies the type of the asset. It will be always ingestr type for Klaviyo.
 - `connection`: This is the destination connection. 
 - `source_connection`: The name of the Klaviyo connection defined in .bruin.yml.
-- `source_table`: The name of the data table in klaviyo you want to ingest. For example, `events` would ingest data related to events. You can find the available source tables in Klaviyo [here](https://bruin-data.github.io/ingestr/supported-sources/klaviyo.html#available-tables).
+- `source_table`: The name of the data table in klaviyo you want to ingest. For example, `events` would ingest data related to events.
 
+## Available Source Tables
+
+- `events`: Retrieves all events in an account.
+- `profiles`: Retrieves all profiles in an account.
+- `campaigns`: Retrieves all campaigns in an account.
+- `metrics`: Retrieves all metrics in an account.
+- `tags`: Retrieves all tags in an account.
+- `coupons`: Retrieves all coupons in an account.
+- `catalog-variants`: Retrieves all variants in an account.
+- `catalog-categories`: Retrieves all catalog categories in an account.
+- `catalog-items`: Retrieves all catalog items in an account.
+- `flows`: Retrieves all flows in an account.
+- `lists`: Retrieves all lists in an account.
+- `images`: Retrieves all images in an account.
+- `segments`: Retrieves all segments in an account.
+- `forms`: Retrieves all forms in an account.
+- `templates`: Retrieves all templates in an account.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

@@ -55,6 +55,15 @@ parameters:
 - source_connection: The name of the AppStore connection defined in .bruin.yml.
 - source_table: The name of the table in AppStore Connect API that you want to ingest. The table is of the form `<kind>:<app_id>[,<app_id>]`. Where `kind` is a report type and `<app_id>` is the ID of your app. Multiple App IDs can be specified by delimiting them with a comma.
 
+## Available Source Tables
+
+- `app-downloads-detailed`: App download analytics including first-time downloads, redownloads, updates, and more.
+- `app-store-discovery-and-engagement-detailed`: App Store discovery and engagement metrics including data about user engagement with your app's icons, product pages, in-app event pages, and other install sheets.
+- `app-sessions-detailed`: App Session provides insights on how often people open your app, and how long they spend in your app.
+- `app-store-installation-and-deletion-detailed`: App installation and deletion metrics including device to estimate the number of times people install and delete your App Store apps.
+- `app-store-purchases-detailed`: App purchase analytics including revenue, payment methods, and content details.
+- `app-crashes-expanded`: App crash analytics including crash counts, device information, and version details.
+
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
 bruin run assets/appstore_integration.asset.yml

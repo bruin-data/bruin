@@ -41,8 +41,14 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the GitHub connection defined in .bruin.yml.
-- `source_table`: The name of the table in GitHub you want to ingest. You can find the available source tables in GitHub [here](https://bruin-data.github.io/ingestr/supported-sources/github.html#tables).
+- `source_table`: The name of the table in GitHub you want to ingest.
 
+## Available Source Tables
+
+- `issues`: Retrieves GitHub issues along with their comments and reactions.
+- `pull_requests`: Retrieves pull requests with comments and reactions.
+- `repo_events`: Retrieves recent repository events.
+- `stargazers`: Retrieves stargazers.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     
