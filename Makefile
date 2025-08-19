@@ -1,4 +1,4 @@
-NAME=bruin
+NAME=bruin$(shell if [ "$(shell go env GOOS)" = "windows" ]; then echo .exe; fi)
 BUILD_DIR ?= bin
 BUILD_SRC=.
 
@@ -24,6 +24,7 @@ deps: tools
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
 	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
+	@echo "Building from folder $(pwd) and into $(BUILD_DIR)/$(NAME)"
 
 build-no-duckdb: deps
 	@echo "$(OK_COLOR)==> Building the application without DuckDB support...$(NO_COLOR)"
