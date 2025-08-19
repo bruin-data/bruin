@@ -8,7 +8,7 @@ USER bruin
 
 ARG VERSION=latest
 
-RUN curl -LsSf https://getbruin.com/install/bruin-cli | sh -s -- -d ${VERSION}
+RUN curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${VERSION}
 
 ENV PATH="/home/bruin/.local/bin:${PATH}"
 
