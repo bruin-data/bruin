@@ -75,6 +75,7 @@ jobs:
         uses: Cyberboss/install-winget@v1
       
       - name: Debug - Pre-build environment
+        if: matrix.platform == 'ubuntu-latest'
         run: |
           echo "=== PRE-BUILD DEBUGGING ==="
           echo "Working directory: $(pwd)"
@@ -95,6 +96,31 @@ jobs:
           else
             echo "bin directory does not exist"
           fi
+        shell: bash
+
+      - name: Debug - Pre-build environment (Windows)
+        if: matrix.platform == 'windows-2022'
+        run: |
+          Write-Host "=== PRE-BUILD DEBUGGING ==="
+          Write-Host "Working directory: $(Get-Location)"
+          Write-Host "Platform: ${{ matrix.platform }}"
+          Write-Host "Files in current directory:"
+          Get-ChildItem | ForEach-Object { Write-Host "  - $($_.Name)" }
+          Write-Host ""
+          Write-Host "Go version:"
+          go version
+          Write-Host ""
+          Write-Host "Go environment:"
+          go env GOROOT GOPATH GOCACHE
+          Write-Host ""
+          Write-Host "Checking for existing bin directory:"
+          if (Test-Path "bin") {
+            Write-Host "bin directory exists"
+            Get-ChildItem bin/ | ForEach-Object { Write-Host "  - $($_.Name)" }
+          } else {
+            Write-Host "bin directory does not exist"
+          }
+        shell: pwsh
 
       - name: Build Bruin executable
         run: |
@@ -111,6 +137,7 @@ jobs:
         shell: bash
 
       - name: Debug - Post-build verification
+        if: matrix.platform == 'ubuntu-latest'
         run: |
           echo "=== POST-BUILD DEBUGGING ==="
           echo "Current directory: $(pwd)"
@@ -122,22 +149,12 @@ jobs:
             ls -la bin/
             echo ""
             echo "Binary file details:"
-            if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
-              if [ -f "bin/bruin.exe" ]; then
-                echo "✅ bruin.exe exists"
-                file bin/bruin.exe
-                ls -la bin/bruin.exe
-              else
-                echo "❌ bruin.exe does not exist"
-              fi
+            if [ -f "bin/bruin" ]; then
+              echo "✅ bruin exists"
+              file bin/bruin
+              ls -la bin/bruin
             else
-              if [ -f "bin/bruin" ]; then
-                echo "✅ bruin exists"
-                file bin/bruin
-                ls -la bin/bruin
-              else
-                echo "❌ bruin does not exist"
-              fi
+              echo "❌ bruin does not exist"
             fi
           else
             echo "❌ bin directory does not exist"
@@ -152,31 +169,68 @@ jobs:
             echo "Checking binary path from integration-tests perspective:"
             cd integration-tests
             echo "Current directory: $(pwd)"
-            if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
-              if [ -f "../bin/bruin.exe" ]; then
-                echo "✅ Binary accessible from integration-tests: ../bin/bruin.exe"
-                ls -la ../bin/bruin.exe
-              else
-                echo "❌ Binary NOT accessible from integration-tests: ../bin/bruin.exe"
-                echo "Parent directory contents:"
-                ls -la ../
-              fi
+            if [ -f "../bin/bruin" ]; then
+              echo "✅ Binary accessible from integration-tests: ../bin/bruin"
+              ls -la ../bin/bruin
             else
-              if [ -f "../bin/bruin" ]; then
-                echo "✅ Binary accessible from integration-tests: ../bin/bruin"
-                ls -la ../bin/bruin
-              else
-                echo "❌ Binary NOT accessible from integration-tests: ../bin/bruin"
-                echo "Parent directory contents:"
-                ls -la ../
-              fi
+              echo "❌ Binary NOT accessible from integration-tests: ../bin/bruin"
+              echo "Parent directory contents:"
+              ls -la ../
             fi
             cd ..
           else
             echo "❌ integration-tests directory does not exist"
           fi
+        shell: bash
+
+      - name: Debug - Post-build verification (Windows)
+        if: matrix.platform == 'windows-2022'
+        run: |
+          Write-Host "=== POST-BUILD DEBUGGING ==="
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Files in current directory:"
+          Get-ChildItem | ForEach-Object { Write-Host "  - $($_.Name)" }
+          Write-Host ""
+          Write-Host "Bin directory contents:"
+          if (Test-Path "bin") {
+            Get-ChildItem bin/ | ForEach-Object { Write-Host "  - $($_.Name)" }
+            Write-Host ""
+            Write-Host "Binary file details:"
+            if (Test-Path "bin/bruin.exe") {
+              Write-Host "✅ bruin.exe exists"
+              Get-ChildItem bin/bruin.exe | Select-Object Name, Length, LastWriteTime
+            } else {
+              Write-Host "❌ bruin.exe does not exist"
+            }
+          } else {
+            Write-Host "❌ bin directory does not exist"
+          }
+          Write-Host ""
+          Write-Host "Integration tests directory:"
+          if (Test-Path "integration-tests") {
+            Write-Host "integration-tests directory exists"
+            Write-Host "Files in integration-tests:"
+            Get-ChildItem integration-tests/ | ForEach-Object { Write-Host "  - $($_.Name)" }
+            Write-Host ""
+            Write-Host "Checking binary path from integration-tests perspective:"
+            Set-Location integration-tests
+            Write-Host "Current directory: $(Get-Location)"
+            if (Test-Path "../bin/bruin.exe") {
+              Write-Host "✅ Binary accessible from integration-tests: ../bin/bruin.exe"
+              Get-ChildItem ../bin/bruin.exe | Select-Object Name, Length, LastWriteTime
+            } else {
+              Write-Host "❌ Binary NOT accessible from integration-tests: ../bin/bruin.exe"
+              Write-Host "Parent directory contents:"
+              Get-ChildItem ../ | ForEach-Object { Write-Host "  - $($_.Name)" }
+            }
+            Set-Location ..
+          } else {
+            Write-Host "❌ integration-tests directory does not exist"
+          }
+        shell: pwsh
 
       - name: Debug - Test execution context
+        if: matrix.platform == 'ubuntu-latest'
         run: |
           echo "=== TEST EXECUTION CONTEXT ==="
           echo "Current directory: $(pwd)"
@@ -194,34 +248,70 @@ jobs:
           find . -name "*bruin*" -type f 2>/dev/null | head -10
           echo ""
           echo "Testing binary execution:"
-          if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
-            if [ -f "bin/bruin.exe" ]; then
-              echo "Testing: ./bin/bruin.exe --version"
-              ./bin/bruin.exe --version || echo "Binary execution failed"
-            fi
-          else
-            if [ -f "bin/bruin" ]; then
-              echo "Testing: ./bin/bruin --version"
-              ./bin/bruin --version || echo "Binary execution failed"
-            fi
+          if [ -f "bin/bruin" ]; then
+            echo "Testing: ./bin/bruin --version"
+            ./bin/bruin --version || echo "Binary execution failed"
           fi
+        shell: bash
+
+      - name: Debug - Test execution context (Windows)
+        if: matrix.platform == 'windows-2022'
+        run: |
+          Write-Host "=== TEST EXECUTION CONTEXT ==="
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "PATH environment:"
+          $env:PATH -split ';' | ForEach-Object { Write-Host "  - $_" }
+          Write-Host ""
+          Write-Host "Checking if bruin is in PATH:"
+          $bruinPath = Get-Command bruin.exe -ErrorAction SilentlyContinue
+          if ($bruinPath) {
+            Write-Host "✅ bruin.exe found in PATH at: $($bruinPath.Source)"
+          } else {
+            Write-Host "❌ bruin.exe not found in PATH"
+          }
+          Write-Host ""
+          Write-Host "Searching for any bruin files:"
+          Get-ChildItem -Recurse -Name "*bruin*" -ErrorAction SilentlyContinue | Select-Object -First 10 | ForEach-Object { Write-Host "  - $_" }
+          Write-Host ""
+          Write-Host "Testing binary execution:"
+          if (Test-Path "bin/bruin.exe") {
+            Write-Host "Testing: .\bin\bruin.exe --version"
+            .\bin\bruin.exe --version
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Binary execution failed"
+            }
+          }
+        shell: pwsh
 
       - name: Run integration tests with debug output
+        if: matrix.platform == 'ubuntu-latest'
         run: |
           echo "=== RUNNING INTEGRATION TESTS ==="
           echo "Current directory: $(pwd)"
           echo "Binary location:"
-          if [[ "${{ matrix.platform }}" == "windows-2022" ]]; then
-            echo "Expected: bin/bruin.exe"
-            ls -la bin/bruin.exe || echo "Binary not found"
-          else
-            echo "Expected: bin/bruin"
-            ls -la bin/bruin || echo "Binary not found"
-          fi
+          echo "Expected: bin/bruin"
+          ls -la bin/bruin || echo "Binary not found"
           echo ""
           echo "Running integration tests..."
           make integration-test
         shell: bash
+
+      - name: Run integration tests with debug output (Windows)
+        if: matrix.platform == 'windows-2022'
+        run: |
+          Write-Host "=== RUNNING INTEGRATION TESTS ==="
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Binary location:"
+          Write-Host "Expected: bin/bruin.exe"
+          if (Test-Path "bin/bruin.exe") {
+            Get-ChildItem bin/bruin.exe | Select-Object Name, Length, LastWriteTime
+          } else {
+            Write-Host "Binary not found"
+          }
+          Write-Host ""
+          Write-Host "Running integration tests..."
+          make integration-test
+        shell: pwsh
 
   dockerBuild:
     runs-on: ubuntu-latest
