@@ -105,7 +105,7 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
+	@go test -tags="no_duckdb_arrow" -race -cover -count=1 -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
