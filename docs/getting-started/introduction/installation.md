@@ -25,13 +25,13 @@ In addition, there are some optional components:
 Use `curl` to install Bruin on macOS, Linux or Windows:
 
 ```shell
-curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
+curl -LsSf https://getbruin.com/install/bruin-cli | sh
 ```
 
 Or you can also use `wget` to install Bruin:
 
 ```shell
-wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
+wget -qO- https://getbruin.com/install/bruin-cli | sh
 ```
 
 > [!NOTE]
@@ -70,5 +70,5 @@ When installing the Bruin CLI, you may encounter a `'Permission Denied'` error. 
 To resolve this, ensure that you have the necessary write permissions for the `~/.local/bin` directory. You can do this by running the following command with sudo:
 
 ```shell
-curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sudo sh
+curl -LsSf https://getbruin.com/install/bruin-cli | sudo sh
 ```
