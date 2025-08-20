@@ -197,6 +197,7 @@ export default withMermaid({
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Elasticsearch", link: "/ingestion/elasticsearch.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
+                            {text: "Fluxx", link: "/ingestion/fluxx.md"},
                             {text: "GCP Spanner", link: "/ingestion/spanner.md"},
                             {text: "GitHub", link: "/ingestion/github.md"},
                             {text: "Google Cloud Storage", link: "/ingestion/gcs.md"},
