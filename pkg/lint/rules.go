@@ -1060,7 +1060,7 @@ func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, 
 
 func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	if asset.Type != pipeline.AssetTypeBigqueryTableSensor && asset.Type != pipeline.AssetTypeSnowflakeTableSensor {
+	if asset.Type != pipeline.AssetTypeBigqueryTableSensor && asset.Type != pipeline.AssetTypeSnowflakeTableSensor && asset.Type != pipeline.AssetTypePostgresTableSensor {
 		return issues, nil
 	}
 

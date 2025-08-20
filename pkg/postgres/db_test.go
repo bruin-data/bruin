@@ -471,3 +471,82 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 		})
 	}
 }
+
+func TestDB_BuildTableExistsQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		c           *Client
+		tableName   string
+		wantQuery   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "invalid format - empty component",
+			c:           &Client{config: &Config{Database: "test_db"}},
+			tableName:   ".test_table",
+			wantErr:     true,
+			errContains: "table name must be in format schema.table, '.test_table' given",
+		},
+		{
+			name:        "invalid format - empty component 2",
+			c:           &Client{config: &Config{Database: "test_db"}},
+			tableName:   ".",
+			wantErr:     true,
+			errContains: "table name must be in format schema.table, '.' given",
+		},
+		{
+			name:        "invalid format - too few components",
+			c:           &Client{config: &Config{Database: "test_db"}},
+			tableName:   "single",
+			wantErr:     true,
+			errContains: "table name must be in format schema.table, 'single' given",
+		},
+		{
+			name:        "invalid format - empty table name",
+			c:           &Client{config: &Config{Database: "test_db"}},
+			tableName:   "",
+			wantQuery:   "",
+			wantErr:     true,
+			errContains: "table name must be in format schema.table, '' given",
+		},
+		{
+			name:        "invalid format - too many components",
+			c:           &Client{config: &Config{Database: "test_db"}},
+			tableName:   "a.b.c.d",
+			wantErr:     true,
+			errContains: "table name must be in format schema.table, 'a.b.c.d' given",
+		},
+		{
+			name:      "valid schema.table format",
+			c:         &Client{config: &Config{Database: "test_db"}},
+			tableName: "test_schema.test_table",
+			wantQuery: "SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = 'test_schema' AND tablename = 'TEST_TABLE'",
+			wantErr:   false,
+		},
+		{
+			name:      "valid schema.table format with mixed case",
+			c:         &Client{config: &Config{Database: "test_db"}},
+			tableName: "TestSchema.TestTable",
+			wantQuery: "SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = 'testschema' AND tablename = 'TESTTABLE'",
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotQuery, err := tt.c.BuildTableExistsQuery(tt.tableName)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantQuery, gotQuery)
+		})
+	}
+}

@@ -414,6 +414,82 @@ func TestPostgresWorkflows(t *testing.T) {
 			},
 		},
 		{
+			name: "table-sensor",
+			workflow: e2e.Workflow{
+				Name: "table-sensor",
+				Steps: []e2e.Task{
+					{
+						Name:    "table-sensor: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS dataset.datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "table-sensor: confirm the table is dropped",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT * FROM dataset.datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"relation", "does not exist"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: run the table sensor",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "10", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"[dataset.sensor] Poking: dataset.datatable", "Failed: dataset.sensor"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: create the table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/create_table.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: dataset.datatable"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: run the table sensor",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "10", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"[dataset.sensor] Poking: dataset.datatable", "Finished: dataset.sensor"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "postgres-metadata-push",
 			workflow: e2e.Workflow{
 				Name: "postgres-metadata-push",
