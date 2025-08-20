@@ -1,50 +1,52 @@
 # Fluxx
-
 [Fluxx](https://www.fluxx.io/) is a cloud-based grants management platform designed to streamline and automate the entire grantmaking process for foundations, corporations, governments, and other funding organizations.
 
-ingestr supports Fluxx as a source.
+Bruin supports Fluxx as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Fluxx into your data warehouse.
 
-## URI format
+In order to set up Fluxx connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `instance`, `client_id`, and `client_secret`. For details on how to obtain these credentials, please refer to your Fluxx administrator.
 
-The URI format for Fluxx is:
+Follow the steps below to correctly set up Fluxx as a data source and run ingestion.
 
-```plaintext
-fluxx://<instance>?client_id=<client_id>&client_secret=<client_secret>
+### Step 1: Add a connection to .bruin.yml file
+
+To connect to Fluxx, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
+
+```yaml
+connections:
+  fluxx:
+    - name: "my-fluxx"
+      instance: "mycompany.preprod"
+      client_id: "your_client_id"
+      client_secret: "your_client_secret"
 ```
-
-URI parameters:
 
 - `instance`: Your Fluxx instance subdomain (e.g., `mycompany.preprod` for `https://mycompany.preprod.fluxxlabs.com`)
 - `client_id`: OAuth 2.0 client ID for authentication
 - `client_secret`: OAuth 2.0 client secret for authentication
 
-## Example usage
+### Step 2: Create an asset file for data ingestion
 
-### Basic usage - all fields
+To ingest data from Fluxx, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., fluxx_ingestion.yml) inside the assets folder and add the following content:
 
-Assuming your instance is `myorg.preprod`, you can ingest grant requests into DuckDB using:
+```yaml
+name: public.fluxx
+type: ingestr
+connection: postgres
 
-```bash
-ingestr ingest \
---source-uri 'fluxx://myorg.preprod?client_id=your_client_id&client_secret=your_client_secret' \
---source-table 'grant_request' \
---dest-uri duckdb:///fluxx.duckdb \
---dest-table 'raw.grant_request'
+parameters:
+  source_connection: my-fluxx
+  source_table: 'grant_request'
+
+  destination: postgres
 ```
 
-### Custom field selection
+- `name`: The name of the asset.
+- `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
+- `connection`: This is the destination connection, which defines where the data should be stored. For example: "postgres" indicates that the ingested data will be stored in a PostgreSQL database.
+- `source_connection`: The name of the Fluxx connection defined in .bruin.yml.
+- `source_table`: The name of the data table in Fluxx you want to ingest. For example, "grant_request" would ingest data related to grant requests. You can find the available source tables below.
 
-You can select specific fields to ingest using the colon syntax:
-
-```bash
-ingestr ingest \
---source-uri 'fluxx://myorg.preprod?client_id=your_client_id&client_secret=your_client_secret' \
---source-table 'grant_request:id,amount_requested,amount_recommended,granted' \
---dest-uri duckdb:///fluxx.duckdb \
---dest-table 'raw.grant_request'
-```
-
-## Tables
+## Available Tables
 
 Fluxx source currently supports the following 50 tables:
 
@@ -107,6 +109,12 @@ Each resource contains numerous fields. You can:
 
 The field selection feature is particularly useful for large resources like `grant_request` which has over 300 fields.
 
+### Step 3: [Run](/commands/run) asset to ingest data
+```     
+bruin run assets/fluxx_ingestion.yml
+```
+As a result of this command, Bruin will ingest data from the given Fluxx table into your Postgres database.
+
 ## Authentication
 
 Fluxx uses OAuth 2.0 with client credentials flow. To obtain credentials:
@@ -114,18 +122,3 @@ Fluxx uses OAuth 2.0 with client credentials flow. To obtain credentials:
 1. Contact your Fluxx administrator to create an API client
 2. You'll receive a `client_id` and `client_secret`
 3. Note your Fluxx instance subdomain (the part before `.fluxxlabs.com`)
-
-## Setup
-
-To connect to Fluxx, you need to provide the following configuration:
-
-```yaml
-connections:
-  fluxx:
-    - name: "my_fluxx"
-      instance: "mycompany.preprod"
-      client_id: "your_client_id"
-      client_secret: "your_client_secret"
-```
-
-Once configured, you can reference this connection in your pipeline assets using the `connection` parameter.
