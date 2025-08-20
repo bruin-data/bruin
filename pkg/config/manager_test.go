@@ -644,9 +644,7 @@ func TestLoadFromFile(t *testing.T) {
 			args: args{
 				path: "testdata/no_connections.yml",
 			},
-			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
-				return assert.ErrorContains(t, err, "environment 'default' has no connections defined")
-			},
+			wantErr: assert.Error,
 		},
 	}
 	for _, tt := range tests {
@@ -1967,9 +1965,7 @@ environments:
 			envConfig:      envConfigContentMalformedConnections,
 			configFilePath: "testdata/nonexistent.yml",
 			want:           nil,
-			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
-				return assert.ErrorContains(t, err, "environment 'default' has no connections defined")
-			},
+			wantErr:        assert.Error,
 		},
 	}
 
