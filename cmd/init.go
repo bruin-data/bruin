@@ -266,13 +266,8 @@ func Init() *cli.Command {
 				var targetDir string
 
 				if c.IsSet("in-place") {
-					// Initialize in current directory
-					var err error
-					targetDir, err = os.Getwd()
-					if err != nil {
-						errorPrinter.Printf("Failed to get current directory: %v\n", err)
-						return cli.Exit("", 1)
-					}
+					// Initialize in given directory
+					targetDir = inputPath
 				} else {
 					// Create a bruin root directory
 					if err := os.MkdirAll("bruin", 0o755); err != nil {
