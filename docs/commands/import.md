@@ -47,7 +47,7 @@ table td:first-child {
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--connection`, `-c` | string | - | **Required.** Name of the connection to use as defined in `.bruin.yml` |
+| `--connection`, `-c` | string | - | **Required.** Name of the connection to use as defined in `.bruin.yml` (or other [secrets backend](../secrets/overview.md)) |
 | `--schema`, `-s` | string | - | Filter by specific schema name |
 | `--no-columns`, `-n` | bool | `false` | Skip filling column metadata from database schema |
 | `--environment`, `--env` | string | - | Target environment name as defined in `.bruin.yml` |
@@ -68,7 +68,7 @@ table td:first-child {
 
 ### How It Works
 
-1. **Connection Setup**: Uses your existing connection configuration from `.bruin.yml`
+1. **Connection Setup**: Uses your existing connection configuration from `.bruin.yml` (or any other [secrets backend](../secrets/overview.md))
 2. **Database Scanning**: Retrieves database summary including schemas and tables
 3. **Filtering**: Applies database and schema filters if specified
 4. **Asset Creation**: Creates YAML asset files with naming pattern `{schema}.{table}.asset.yml`
@@ -151,7 +151,7 @@ columns:
 ### Prerequisites
 
 1. **Pipeline Directory**: The target pipeline path must exist
-2. **Connection Configuration**: The specified connection must be defined in `.bruin.yml`
+2. **Connection Configuration**: The specified connection must be defined in `.bruin.yml` (or any other [secrets backend](../secrets/overview.md))
 3. **Database Access**: The connection must have read permissions on the target database/schemas
 4. **Assets Directory**: Will be created automatically if it doesn't exist
 
@@ -173,7 +173,7 @@ Warning: Could not fill columns for public.table_name: connection does not suppo
 
 Common errors and solutions:
 
-- **Connection not found**: Verify the connection name exists in your `.bruin.yml`
+- **Connection not found**: Verify the connection name exists in your `.bruin.yml` (or any other [secrets backend](../secrets/overview.md))
 - **Database access denied**: Check connection credentials and permissions
 - **Schema not found**: Verify the schema name exists in the target database
 - **Pipeline path invalid**: Ensure the target directory exists and is writable
@@ -229,7 +229,7 @@ The command presents an interactive dual-pane interface where you can:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--connection`, `-c` | string | - | **Required.** Name of the BigQuery connection to use as defined in `.bruin.yml` |
+| `--connection`, `-c` | string | - | **Required.** Name of the BigQuery connection to use as defined in `.bruin.yml` (or any other [secrets backend](../secrets/overview.md)) |
 | `--environment`, `--env` | string | - | Target environment name as defined in `.bruin.yml` |
 | `--config-file` | string | - | Path to the `.bruin.yml` file. Can also be set via `BRUIN_CONFIG_FILE` environment variable |
 | `--project-id`, `-p` | string | - | BigQuery project ID (uses connection config if not specified) |
@@ -237,7 +237,7 @@ The command presents an interactive dual-pane interface where you can:
 
 ### How It Works
 
-1. **Authentication**: Uses your BigQuery connection credentials from `.bruin.yml`
+1. **Authentication**: Uses your BigQuery connection credentials from `.bruin.yml` (or any other [secrets backend](../secrets/overview.md))
 2. **Regional Scanning**: Searches across all BigQuery regions in parallel for scheduled queries (unless specific location provided)
 3. **Interactive Selection**: Displays found queries in a user-friendly TUI with preview
 4. **Asset Generation**: Creates `.sql` files with the query content and appropriate metadata
@@ -310,7 +310,7 @@ GROUP BY date
 
 ### Prerequisites
 
-1. **BigQuery Connection**: A BigQuery connection must be configured in `.bruin.yml`
+1. **BigQuery Connection**: A BigQuery connection must be configured in `.bruin.yml` (or other [secrets backend](../secrets/overview.md))
 2. **Data Transfer API**: The BigQuery Data Transfer API must be enabled in your GCP project
 3. **Permissions**: Your service account needs:
    - `bigquery.transfers.get` permission

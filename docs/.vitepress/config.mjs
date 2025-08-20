@@ -257,6 +257,14 @@ export default withMermaid({
                 ],
             },
             {
+                text: "Secret Providers",
+                collapsed: false,
+                items: [
+                    {text: "Overview", link: "/secrets/overview"},
+                    {text: "Hashicorp Vault", link: "/secrets/vault"}
+                ]
+            },
+            {
                 text: "CI/CD Integration",
                 collapsed: false,
                 items: [{text: "Github Actions", link: "/cicd/github-action"}],
@@ -280,14 +288,6 @@ export default withMermaid({
                     {text: "Validate", link: "/commands/validate"},
                 ],
 
-            },
-            {
-                text: "Secret Providers",
-                collapsed: false,
-                items: [
-                    {text: "Overview", link: "/secrets/overview"},
-                    {text: "Hashicorp Vault", link: "/secrets/vault"}
-                ]
             },
             {
                 text: "Bruin Cloud",
