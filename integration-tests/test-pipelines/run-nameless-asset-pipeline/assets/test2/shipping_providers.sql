@@ -4,7 +4,7 @@ materialization:
   type: table
 
 depends:
-   - createSchema
+   - create_schema
 columns:
   - name: provider_id
     type: INTEGER
