@@ -726,6 +726,12 @@
             "$ref": "#/$defs/TrinoConnection"
           },
           "type": "array"
+        },
+        "fluxx": {
+          "items": {
+            "$ref": "#/$defs/FluxxConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -2288,6 +2294,30 @@
         "client_id",
         "client_secret",
         "account_id"
+      ]
+    },
+    "FluxxConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "instance",
+        "client_id",
+        "client_secret"
       ]
     }
   }

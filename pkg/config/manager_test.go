@@ -594,6 +594,14 @@ func TestLoadFromFile(t *testing.T) {
 					AccountID:    "accid",
 				},
 			},
+			Fluxx: []FluxxConnection{
+				{
+					Name:         "fluxx-1",
+					Instance:     "test-instance",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+				},
+			},
 		},
 	}
 
@@ -1000,6 +1008,18 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Fluxx connection",
+			envName:  "default",
+			connType: "fluxx",
+			connName: "fluxx-conn",
+			creds: map[string]interface{}{
+				"instance":      "mycompany.preprod",
+				"client_id":     "test-client-id",
+				"client_secret": "test-client-secret",
+			},
+			expectedErr: false,
+		},
+		{
 			name:        "Add Invalid connection",
 			envName:     "default",
 			connType:    "invalid",
@@ -1052,6 +1072,12 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Generic, 1)
 					assert.Equal(t, tt.connName, env.Connections.Generic[0].Name)
 					assert.Equal(t, tt.creds["value"], env.Connections.Generic[0].Value)
+				case "fluxx":
+					assert.Len(t, env.Connections.Fluxx, 1)
+					assert.Equal(t, tt.connName, env.Connections.Fluxx[0].Name)
+					assert.Equal(t, tt.creds["instance"], env.Connections.Fluxx[0].Instance)
+					assert.Equal(t, tt.creds["client_id"], env.Connections.Fluxx[0].ClientID)
+					assert.Equal(t, tt.creds["client_secret"], env.Connections.Fluxx[0].ClientSecret)
 				}
 			}
 		})
