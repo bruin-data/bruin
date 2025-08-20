@@ -1887,7 +1887,7 @@ func (m *Manager) AddFluxxConnectionFromConfig(connection *config.FluxxConnectio
 	}
 	m.mutex.Unlock()
 
-	client, err := fluxx.NewClient(fluxx.Config{
+	client, err := fluxx.NewClient(&fluxx.Config{
 		Instance:     connection.Instance,
 		ClientID:     connection.ClientID,
 		ClientSecret: connection.ClientSecret,
