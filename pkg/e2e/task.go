@@ -52,7 +52,6 @@ func (s *Task) Run() error {
 				time.Sleep(1 * time.Second)
 				continue
 			}
-			// Always show error details regardless of silent mode
 			fmt.Println("Command: ", s.Command, strings.Join(s.Args, " "))
 			fmt.Println("Actual Output: ", s.Actual.Output)
 			fmt.Println("Actual Error: ", s.Actual.Error)
