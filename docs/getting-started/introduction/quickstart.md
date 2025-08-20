@@ -82,7 +82,7 @@ environments:
 
 ```
 
-_Bear_ in mind, There's other ways to provide credentials/secrets, see [Secrets](../../secrets/overview.md)
+_Bear_ in mind, There are other ways to provide credentials and secrets. See [Secrets](../../secrets/overview.md).
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
 ```bash

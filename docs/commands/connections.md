@@ -2,7 +2,7 @@
 
 Bruin has various commands to handle connections via its CLI. 
 
-Bruin CLI offers convenience methods to manage connections when we are using `.bruin.yml` as our [secrets backend](../secrets/overview.md).
+Bruin CLI offers convenience methods to manage connections when using `.bruin.yml` as our [secrets backend](../secrets/overview.md).
 
 ## List Connections
 
@@ -116,7 +116,7 @@ This command runs a simple validation check for the connection.
 bruin connections test --name <connection-name> [--env <environment>]
 ```
 
-If no environment flag (`--env`) is provided, the default environment from your `.bruin.yml` will be used.
+If no environment flag (`--env`) is provided, the default environment from our `.bruin.yml` will be used.
 
 ### Flags
 

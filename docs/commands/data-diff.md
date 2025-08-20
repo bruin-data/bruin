@@ -37,7 +37,7 @@ table td:first-child {
 |------|------|---------|-------------|
 | `--connection`, `-c` | str | - | Name of the default connection to use when connection is not specified in table arguments |
 | `--tolerance`, `-t` | float | `0.001` | Tolerance percentage for considering values equal. Values with percentage difference below this threshold are considered equal |
-| `--config-file` | str | `.bruin.yml` | Optional path to the .bruin.yml configuration file . Other [secret backends](../secrets/overview.md) Can be used .|
+| `--config-file` | str | `.bruin.yml` | Optional path to the `.bruin.yml` configuration file . Other [secret backends](../secrets/overview.md) can be used.|
 | `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
 
 ## Table Identifier Format

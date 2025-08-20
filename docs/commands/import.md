@@ -310,7 +310,7 @@ GROUP BY date
 
 ### Prerequisites
 
-1. **BigQuery Connection**: A BigQuery connection must be configured in `.bruin.yml` (or any other [secrets backend](../secrets/overview.md))
+1. **BigQuery Connection**: A BigQuery connection must be configured in `.bruin.yml` (or other [secrets backend](../secrets/overview.md))
 2. **Data Transfer API**: The BigQuery Data Transfer API must be enabled in your GCP project
 3. **Permissions**: Your service account needs:
    - `bigquery.transfers.get` permission
