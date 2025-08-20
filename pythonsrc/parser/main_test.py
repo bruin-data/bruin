@@ -1949,6 +1949,31 @@ def test_get_tables_trailing_semicolon():
     assert get_tables(query, dialect) == expected
 
 
+def test_get_tables_tsql():
+    dialect = "tsql"
+
+    query = """
+use MY_DWH;
+
+select * from table1;
+
+select * from schema2.table1;
+
+select * from OTHER_DWH..some_table;
+
+select * from SOME_OTHER_DWH.dbo.my_table;
+"""
+    expected = {
+        "tables": [
+            "MY_DWH.dbo.table1",
+            "MY_DWH.schema2.table1",
+            "OTHER_DWH.dbo.some_table",
+            "SOME_OTHER_DWH.dbo.my_table",
+        ]
+    }
+    assert get_tables(query, dialect) == expected
+
+
 def test_add_limit():
     query = """
     SELECT DISTINCT product_id, product_name, price, stock, created_at
