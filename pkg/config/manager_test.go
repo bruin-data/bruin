@@ -1967,7 +1967,7 @@ environments:
 			envConfig:      envConfigContentMalformedConnections,
 			configFilePath: "testdata/nonexistent.yml",
 			want:           nil,
-			wantErr: 		assert.Error,
+			wantErr:        assert.Error,
 		},
 	}
 
