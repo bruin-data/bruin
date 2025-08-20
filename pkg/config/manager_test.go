@@ -594,6 +594,14 @@ func TestLoadFromFile(t *testing.T) {
 					AccountID:    "accid",
 				},
 			},
+			Fluxx: []FluxxConnection{
+				{
+					Name:         "fluxx-1",
+					Instance:     "test-instance",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+				},
+			},
 		},
 	}
 
