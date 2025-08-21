@@ -40,7 +40,6 @@ func (s *Task) Run() error {
 	if s.Retries == 0 {
 		s.Retries = 1
 	}
-	log.Printf("Running task: %s", s.Name)
 
 	for attempt := 1; attempt <= s.Retries; attempt++ {
 		if s.Retries > 1 {

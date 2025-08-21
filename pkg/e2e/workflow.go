@@ -23,11 +23,8 @@ type Workflow struct {
 }
 
 func (w *Workflow) Run() error {
-	log.Printf("Starting workflow: %s", w.Name)
-
 	if w.Name == "" {
 		w.Name = "workflow-" + uuid.New().String()
-		log.Printf("Generated new workflow name: %s", w.Name)
 	}
 
 	for _, task := range w.Steps {
@@ -42,6 +39,5 @@ func (w *Workflow) Run() error {
 		}
 	}
 
-	log.Printf("Completed workflow: %s", w.Name)
 	return nil
 }
