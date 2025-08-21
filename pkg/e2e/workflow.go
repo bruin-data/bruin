@@ -24,7 +24,6 @@ type Workflow struct {
 }
 
 func (w *Workflow) Run() error {
-
 	silent := os.Getenv("SILENT") == "1"
 	if !silent {
 		log.Printf("Starting workflow: %s", w.Name)
