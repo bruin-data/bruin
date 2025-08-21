@@ -43,7 +43,7 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 	}
 
 	for _, dep := range missingDeps {
-		foundMissingUpstream := p.GetAssetByName(dep)
+		foundMissingUpstream := p.GetAssetByNameCaseInsensitive(dep)
 		if foundMissingUpstream == nil {
 			continue
 		}
