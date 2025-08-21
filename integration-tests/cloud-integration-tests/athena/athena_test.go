@@ -471,7 +471,7 @@ func TestAthenaWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: run the table sensor",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "15", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "5", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 1,
@@ -489,7 +489,7 @@ func TestAthenaWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Contains: []string{"Finished: dataset.datatable"},
+							Contains: []string{"Finished: datatable"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -504,6 +504,20 @@ func TestAthenaWorkflows(t *testing.T) {
 						Expected: e2e.Output{
 							ExitCode: 0,
 							Contains: []string{"[table-sensor] Poking: datatable", "Finished: table-sensor"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"No data available"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,

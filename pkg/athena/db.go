@@ -380,17 +380,13 @@ ORDER BY table_schema, table_name;
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 	tableComponents := strings.Split(tableName, ".")
-	for _, component := range tableComponents {
-		if component == "" {
-			return "", fmt.Errorf("table name must be in table format, '%s' given", tableName)
-		}
-	}
-
+	
 	if len(tableComponents) != 1 {
 		return "", fmt.Errorf("table name must be in table format, '%s' given", tableName)
 	}
 
 	tableName = strings.ToLower(tableComponents[0])
+	schemaName := db.config.Database
 
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
