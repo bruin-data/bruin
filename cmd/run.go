@@ -564,6 +564,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage: "plain log output for this run.",
 			},
 			&cli.BoolFlag{
+				Name:  "verbose",
+				Usage: "print verbose output including SQL queries",
+			},
+			&cli.BoolFlag{
 				Name:   "minimal-logs",
 				Usage:  "skip initial pipeline analysis logs for this run",
 				Hidden: true,
@@ -654,6 +658,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
+			runCtx = context.WithValue(runCtx, executor.KeyVerbose, c.Bool("verbose"))
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
