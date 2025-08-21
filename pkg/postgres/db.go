@@ -785,7 +785,7 @@ func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
 	}
 
 	schemaName := strings.ToLower(tableComponents[0])
-	targetTable := strings.ToUpper(tableComponents[1])
+	targetTable := strings.ToLower(tableComponents[1])
 
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = '%s' AND tablename = '%s'",
