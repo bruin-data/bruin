@@ -418,7 +418,7 @@ func TestRedshiftWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: drop the table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS dataset.datatable;"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS dataset.datatable;"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 1,
@@ -430,7 +430,7 @@ func TestRedshiftWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: confirm the table is dropped",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT * FROM dataset.datatable;"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT * FROM dataset.datatable;"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 1,
@@ -486,7 +486,7 @@ func TestRedshiftWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: drop the table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS dataset.datatable;"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS dataset.datatable;"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 1,
