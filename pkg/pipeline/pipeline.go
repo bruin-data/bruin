@@ -1540,7 +1540,7 @@ func (p *Pipeline) ensureTaskNameMapIsFilled() {
 
 	p.tasksByName = make(map[string]*Asset)
 	for _, asset := range p.Assets {
-		p.tasksByName[strings.ToLower(asset.Name)] = asset
+		p.tasksByName[asset.Name] = asset
 	}
 }
 
@@ -1572,7 +1572,7 @@ func (p *Pipeline) GetAssetByNameCaseInsensitive(assetName string) *Asset {
 func (p *Pipeline) GetAssetByName(assetName string) *Asset {
 	p.ensureTaskNameMapIsFilled()
 
-	asset, ok := p.tasksByName[strings.ToLower(assetName)]
+	asset, ok := p.tasksByName[assetName]
 	if !ok {
 		return nil
 	}
