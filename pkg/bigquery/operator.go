@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -112,6 +113,17 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		err = conn.DropTableOnMismatch(ctx, t.Name, t)
 		if err != nil {
 			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)
+		}
+	}
+
+	// Print SQL query in verbose mode
+	if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
+		if w, ok := writer.(io.Writer); ok {
+			queryPreview := strings.TrimSpace(q.Query)
+			if len(queryPreview) > 5000 {
+				queryPreview = queryPreview[:5000] + "\n... (truncated)"
+			}
+			fmt.Fprintf(w, "Executing SQL query:\n%s\n\n", queryPreview)
 		}
 	}
 
