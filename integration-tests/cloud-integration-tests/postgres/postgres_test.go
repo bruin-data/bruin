@@ -486,6 +486,20 @@ func TestPostgresWorkflows(t *testing.T) {
 							e2e.AssertByContains,
 						},
 					},
+					{
+						Name:    "table-sensor: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "DROP TABLE IF EXISTS dataset.datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"field descriptions are not available"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
 				},
 			},
 		},
