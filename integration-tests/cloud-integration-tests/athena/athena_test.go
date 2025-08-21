@@ -435,6 +435,98 @@ func TestAthenaWorkflows(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "table-sensor",
+			workflow: e2e.Workflow{
+				Name: "table-sensor",
+				Steps: []e2e.Task{
+					{
+						Name:    "table-sensor: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"Table not found"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: confirm the table is dropped",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "SELECT * FROM datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"Table", "does not exist"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: run the table sensor",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "5", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"[table-sensor] Poking: datatable", "Failed: table-sensor"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: create the table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/create_table.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: datatable"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: run the table sensor",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "10", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"[table-sensor] Poking: datatable", "Finished: table-sensor"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "table-sensor: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE datatable;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"No data available"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
