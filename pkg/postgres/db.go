@@ -779,7 +779,7 @@ func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
 			return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
 		}
 	}
-	
+
 	var schemaName string
 	switch len(tableComponents) {
 	case 1:
