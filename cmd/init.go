@@ -262,6 +262,7 @@ func Init() *cli.Command {
 
 			var bruinYmlPath string
 			repoRoot, err := git.FindRepoFromPath(".")
+			//nolint:nestif
 			if err != nil {
 				var targetDir string
 
@@ -290,8 +291,15 @@ func Init() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				bruinYmlPath = filepath.Join("bruin", ".bruin.yml")
-				inputPath = filepath.Join("bruin", inputPath)
+				if c.IsSet("in-place") {
+					// When using --in-place, use current directory for .bruin.yml and inputPath.
+					bruinYmlPath = filepath.Join(targetDir, ".bruin.yml")
+					inputPath = filepath.Join(targetDir, inputPath)
+				} else {
+					// When not using --in-place, use bruin subdirectory.
+					bruinYmlPath = filepath.Join("bruin", ".bruin.yml")
+					inputPath = filepath.Join("bruin", inputPath)
+				}
 			} else {
 				bruinYmlPath = filepath.Join(repoRoot.Path, ".bruin.yml")
 			}
