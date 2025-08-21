@@ -1062,6 +1062,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	fmt.Println(tree.String())
 }
 
+//nolint:maintidx
 func SetupExecutors(
 	s *scheduler.Scheduler,
 	conn config.ConnectionAndDetailsGetter,
