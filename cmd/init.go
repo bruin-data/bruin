@@ -213,7 +213,12 @@ func Init() *cli.Command {
 			"[template name to be used: %s] [name of the folder where the pipeline will be created]",
 			strings.Join(templateList, "|"),
 		),
-		Flags: []cli.Flag{},
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "in-place",
+				Usage: "initializes the template without creating a bruin repository parent folder",
+			},
+		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 
@@ -257,24 +262,44 @@ func Init() *cli.Command {
 
 			var bruinYmlPath string
 			repoRoot, err := git.FindRepoFromPath(".")
+			//nolint:nestif
 			if err != nil {
-				// Not in a git repo, create a bruin root directory
-				if err := os.MkdirAll("bruin", 0o755); err != nil {
-					errorPrinter.Printf("Failed to create the bruin root folder: %v\n", err)
-					return cli.Exit("", 1)
+				var targetDir string
+
+				if c.IsSet("in-place") {
+					// Initialize in given directory
+					targetDir, err = os.Getwd()
+					if err != nil {
+						errorPrinter.Printf("Failed to get current working directory: %v\n", err)
+						return cli.Exit("", 1)
+					}
+				} else {
+					// Create a bruin root directory
+					if err := os.MkdirAll("bruin", 0o755); err != nil {
+						errorPrinter.Printf("Failed to create the bruin root folder: %v\n", err)
+						return cli.Exit("", 1)
+					}
+					targetDir = "bruin"
 				}
 
-				// Initialize git repository in the bruin directory
+				// Initialize git repository in the target directory
 				cmd := exec.Command("git", "init")
-				cmd.Dir = "bruin"
+				cmd.Dir = targetDir
 				out, err := cmd.CombinedOutput()
 				if err != nil {
-					errorPrinter.Printf("Could not initialize git repository in bruin folder: %s\n", string(out))
+					errorPrinter.Printf("Could not initialize git repository in %s: %s\n", targetDir, string(out))
 					return cli.Exit("", 1)
 				}
 
-				bruinYmlPath = filepath.Join("bruin", ".bruin.yml")
-				inputPath = filepath.Join("bruin", inputPath)
+				if c.IsSet("in-place") {
+					// When using --in-place, use current directory for .bruin.yml and inputPath.
+					bruinYmlPath = filepath.Join(targetDir, ".bruin.yml")
+					inputPath = filepath.Join(targetDir, inputPath)
+				} else {
+					// When not using --in-place, use bruin subdirectory.
+					bruinYmlPath = filepath.Join("bruin", ".bruin.yml")
+					inputPath = filepath.Join("bruin", inputPath)
+				}
 			} else {
 				bruinYmlPath = filepath.Join(repoRoot.Path, ".bruin.yml")
 			}
