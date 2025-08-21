@@ -385,8 +385,8 @@ func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 		return "", fmt.Errorf("table name must be in table format, '%s' given", tableName)
 	}
 
-	tableName = strings.ToLower(tableComponents[0])
-	schemaName := db.config.Database
+	tableName = tableComponents[0]
+	schemaName := db.config.Database // db.config.Database returns TABLE_SCHEMA
 
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
