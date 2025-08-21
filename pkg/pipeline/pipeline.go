@@ -53,6 +53,7 @@ const (
 	AssetTypePostgresQuery          = AssetType("pg.sql")
 	AssetTypePostgresSeed           = AssetType("pg.seed")
 	AssetTypePostgresQuerySensor    = AssetType("pg.sensor.query")
+	AssetTypePostgresTableSensor    = AssetType("pg.sensor.table")
 	AssetTypeRedshiftQuery          = AssetType("rs.sql")
 	AssetTypeRedshiftSeed           = AssetType("rs.seed")
 	AssetTypeRedshiftQuerySensor    = AssetType("rs.sensor.query")
@@ -560,6 +561,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypePostgresQuery:         "postgres",
 	AssetTypePostgresSeed:          "postgres",
 	AssetTypePostgresQuerySensor:   "postgres",
+	AssetTypePostgresTableSensor:   "postgres",
 	AssetTypePostgresSource:        "postgres",
 	AssetTypeRedshiftQuery:         "redshift",
 	AssetTypeRedshiftSeed:          "redshift",
