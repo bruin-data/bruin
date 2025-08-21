@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/google/uuid"
 )
@@ -23,8 +24,17 @@ type Workflow struct {
 }
 
 func (w *Workflow) Run() error {
+
+	silent := os.Getenv("SILENT") == "1"
+	if !silent {
+		log.Printf("Starting workflow: %s", w.Name)
+	}
+
 	if w.Name == "" {
 		w.Name = "workflow-" + uuid.New().String()
+		if !silent {
+			log.Printf("Generated new workflow name: %s", w.Name)
+		}
 	}
 
 	for _, task := range w.Steps {
@@ -39,5 +49,8 @@ func (w *Workflow) Run() error {
 		}
 	}
 
+	if !silent {
+		log.Printf("Completed workflow: %s", w.Name)
+	}
 	return nil
 }
