@@ -320,7 +320,7 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			name:      "valid table format with mixed case",
 			db:        &DB{config: &Config{Database: "test_db"}},
 			tableName: "TestTable",
-			wantQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'test_db' AND table_name = 'testtable'",
+			wantQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'test_db' AND table_name = 'TestTable'",
 			wantErr:   false,
 		},
 	}
