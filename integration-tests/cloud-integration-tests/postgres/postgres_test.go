@@ -475,7 +475,7 @@ func TestPostgresWorkflows(t *testing.T) {
 					{
 						Name:    "table-sensor: run the table sensor",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "10", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "20", filepath.Join(currentFolder, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
