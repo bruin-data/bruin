@@ -522,14 +522,14 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			name:      "valid schema.table format",
 			c:         &Client{config: &Config{Database: "test_db"}},
 			tableName: "test_schema.test_table",
-			wantQuery: "SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = 'test_schema' AND tablename = 'TEST_TABLE'",
+			wantQuery: "SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = 'test_schema' AND tablename = 'test_table'",
 			wantErr:   false,
 		},
 		{
 			name:      "valid schema.table format with mixed case",
 			c:         &Client{config: &Config{Database: "test_db"}},
 			tableName: "TestSchema.TestTable",
-			wantQuery: "SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = 'testschema' AND tablename = 'TESTTABLE'",
+			wantQuery: "SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = 'testschema' AND tablename = 'testtable'",
 			wantErr:   false,
 		},
 	}
