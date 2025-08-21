@@ -1059,9 +1059,9 @@ func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, 
 }
 
 var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
-	pipeline.AssetTypeBigqueryTableSensor: true,
+	pipeline.AssetTypeBigqueryTableSensor:  true,
 	pipeline.AssetTypeSnowflakeTableSensor: true,
-	pipeline.AssetTypeAthenaTableSensor: true,
+	pipeline.AssetTypeAthenaTableSensor:    true,
 }
 
 func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

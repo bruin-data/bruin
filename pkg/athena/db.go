@@ -380,7 +380,7 @@ ORDER BY table_schema, table_name;
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 	tableComponents := strings.Split(tableName, ".")
-	
+
 	if len(tableComponents) != 1 {
 		return "", fmt.Errorf("table name must be in table format, '%s' given", tableName)
 	}
