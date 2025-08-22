@@ -139,7 +139,7 @@ parameters:
     table: string
 ```
 **Parameters**:
-- `table`: In `database_idschema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id`, the database will be taken from the database configuration in the `.bruin.yml`. 
+- `table`: In `database_idschema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id` is provided, the database will be taken from the database configuration in the `.bruin.yml`. 
 
 
 ### `sf.sensor.query`
