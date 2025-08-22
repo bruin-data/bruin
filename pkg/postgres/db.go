@@ -773,14 +773,6 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 }
 
 func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
-	// Check if this is a Redshift config by checking the type
-	if _, isRedshift := c.config.(*RedShiftConfig); isRedshift {
-		return c.BuildTableExistsQueryForRedshift(tableName)
-	}
-	return c.BuildTableExistsQueryForPostgres(tableName)
-}
-
-func (c *Client) BuildTableExistsQueryForPostgres(tableName string) (string, error) {
 	tableComponents := strings.Split(tableName, ".")
 	for _, component := range tableComponents {
 		if component == "" {
@@ -803,35 +795,6 @@ func (c *Client) BuildTableExistsQueryForPostgres(tableName string) (string, err
 
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = '%s' AND tablename = '%s'",
-		schemaName,
-		targetTable,
-	)
-	return strings.TrimSpace(query), nil
-}
-
-func (c *Client) BuildTableExistsQueryForRedshift(tableName string) (string, error) {
-	tableComponents := strings.Split(tableName, ".")
-	for _, component := range tableComponents {
-		if component == "" {
-			return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
-		}
-	}
-
-	var schemaName string
-	switch len(tableComponents) {
-	case 1:
-		schemaName = "public"
-		tableName = tableComponents[0]
-	case 2:
-		schemaName = tableComponents[0]
-		tableName = tableComponents[1]
-	default:
-		return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
-	}
-	targetTable := tableName
-
-	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM SVV_TABLES WHERE schemaname = '%s' AND tablename = '%s'",
 		schemaName,
 		targetTable,
 	)
