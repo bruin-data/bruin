@@ -134,16 +134,18 @@ B,LinkedIn,SDE 2,2024-01-01
 Sensors are a special type of assets that are used to wait on certain external signals.
 
 
-Checks if a table exists in BigQuery, runs every 5 minutes until this table is available.
+Checks if a table exists in Athena, runs every 5 minutes until this table is available.
 
 ```yaml
 name: string
 type: string
 parameters:
     table: string
+    poke_interval: int (optional)
 ```
 **Parameters**:
 - `table`: `table_id` format. `catalogue_id` and `database_id` are then taken from the configuration in `bruin.yml`.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 
 ### `athena.sensor.query`
@@ -155,10 +157,12 @@ name: string
 type: string
 parameters:
     query: string
+    poke_interval: int (optional)
 ```
 
 **Parameters**:
 - `query`: Query you expect to return any results
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
 

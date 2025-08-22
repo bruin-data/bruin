@@ -130,16 +130,18 @@ join marketing.attribution as a
 Sensors are a special type of assets that are used to wait on certain external signals.
 
 
-Checks if a table exists in BigQuery, runs every 5 minutes until this table is available.
+Checks if a table exists in Snowflake, runs every 5 minutes until this table is available.
 
 ```yaml
 name: string
 type: string
 parameters:
     table: string
+    poke_interval: int (optional)
 ```
 **Parameters**:
 - `table`: In `database_idschema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id` is provided, the database will be taken from the database configuration in the `.bruin.yml`. 
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
 
 
 ### `sf.sensor.query`
@@ -152,10 +154,12 @@ name: string
 type: string
 parameters:
     query: string
+    poke_interval: int (optional)
 ```
 
 **Parameters:**
 - `query`: Query you expect to return any results
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
 
 #### Example: Partitioned upstream table
 Checks if the data available in upstream table for end date of the run.

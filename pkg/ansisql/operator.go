@@ -97,7 +97,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 				return errors.New("Sensor didn't return the expected result")
 			}
 
-			pokeInterval := helpers.GetPokeInterval(ctx, t)
+			pokeInterval := helpers.GetPokeInterval(ctx, t) //defaults to 30 seconds
 			time.Sleep(time.Duration(pokeInterval) * time.Second)
 			if printerExists {
 				fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
@@ -204,7 +204,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 				return errors.New("Sensor didn't return the expected result")
 			}
 
-			pokeInterval := helpers.GetPokeInterval(ctx, t)
+			pokeInterval := helpers.GetPokeInterval(ctx, t) //defaults to 30 seconds
 			time.Sleep(time.Duration(pokeInterval) * time.Second)
 			if printerExists {
 				fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
