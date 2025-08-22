@@ -1062,6 +1062,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeBigqueryTableSensor:  true,
 	pipeline.AssetTypeSnowflakeTableSensor: true,
 	pipeline.AssetTypeAthenaTableSensor:    true,
+	pipeline.AssetTypeRedshiftTableSensor:  true,
 }
 
 func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

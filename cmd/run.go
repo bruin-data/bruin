@@ -1185,6 +1185,11 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeMain] = pgTableSensor
+		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
+		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypePostgresQuery || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
