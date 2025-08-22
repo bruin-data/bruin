@@ -951,7 +951,7 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			name:      "valid database.schema.table format",
 			db:        &DB{config: &Config{Database: "test_db"}},
 			tableName: "other_db.test_schema.test_table",
-			wantQuery: "SELECT COUNT(*) FROM TEST_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'",
+			wantQuery: "SELECT COUNT(*) FROM OTHER_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'",
 			wantErr:   false,
 		},
 	}

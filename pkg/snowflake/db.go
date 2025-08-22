@@ -1073,21 +1073,21 @@ func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 		}
 	}
 
-	if db.config.Database == "" {
-		return "", errors.New("no database name provided")
-	}
-
-	databaseName := strings.ToUpper(db.config.Database)
-
+	var databaseName string
 	var schemaRef, targetTable string
 
 	switch len(tableComponents) {
 	case 2:
 		// schema.table → use default database from config.
+		if db.config.Database == "" {
+			return "", errors.New("no database name provided")
+		}
+		databaseName = strings.ToUpper(db.config.Database)
 		schemaRef = databaseName + ".INFORMATION_SCHEMA.TABLES"
 		targetTable = tableComponents[1]
 	case 3:
 		// database.schema.table
+		databaseName = strings.ToUpper(tableComponents[0])
 		schemaRef = databaseName + ".INFORMATION_SCHEMA.TABLES"
 		targetTable = tableComponents[2]
 	default:
