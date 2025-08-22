@@ -42,7 +42,7 @@ integration-test: build
 	@mkdir -p integration-tests/logs/runs
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 .
+	@cd integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 .
 
 integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
@@ -57,7 +57,7 @@ integration-test-light: build
 	@mkdir -p integration-tests/logs/runs
 	@echo "$(OK_COLOR)==> Running integration tests (skipping ingestr tasks)...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
+	@cd integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
 
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git
@@ -66,7 +66,7 @@ integration-test-cloud: build
 	@rm integration-tests/cloud-integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests/cloud-integration-tests && go test -count=1 -v .
+	@cd integration-tests/cloud-integration-tests && env SILENT=1 go test -count=1 -v .
 
 clean:
 	@rm -rf ./bin
