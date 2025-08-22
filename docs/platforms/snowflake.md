@@ -125,6 +125,23 @@ join marketing.attribution as a
     using(user_id)
 ```
 
+### `sf.sensor.table`
+
+Sensors are a special type of assets that are used to wait on certain external signals.
+
+
+Checks if a table exists in BigQuery, runs every 5 minutes until this table is available.
+
+```yaml
+name: string
+type: string
+parameters:
+    table: string
+```
+**Parameters**:
+- `table`: In `database_idschema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id`, the database will be taken from the database configuration in the `.bruin.yml`. 
+
+
 ### `sf.sensor.query`
 
 
