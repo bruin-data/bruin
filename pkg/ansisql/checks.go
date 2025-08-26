@@ -61,7 +61,7 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 
 	s, ok := q.(selector)
 	if !ok {
-		return errors.New("connection does not implement selector interface")
+		return errors.Errorf("connection '%s' cannot be used for the check '%s'", connectionName, c.checkName)
 	}
 
 	res, err := s.Select(ctx, c.queryInstance)

@@ -173,7 +173,7 @@ func TestNewTableSensorNoTableExistsChecker(t *testing.T) {
 		},
 	})
 
-	assert.ErrorContains(t, err, "does not implement TableExistsChecker interface")
+	assert.ErrorContains(t, err, "Connection 'gcp-default' cannot be used for sensor on 'test.table'")
 }
 
 func TestNewTableSensorBuildTableExistsQueryError(t *testing.T) {
