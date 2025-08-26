@@ -55,16 +55,29 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 	if err != nil {
 		return err
 	}
-
+    
 	awsConn, ok := ks.connection.GetConnection(connName).(*config.AwsConnection)
-	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not an AWS connection", connName)
+	
+	 secretKey := ""
+	 accessKey := ""
+	if ok{
+		secretKey = awsConn.SecretKey
+		accessKey = awsConn.AccessKey
+	}else {
+		s3Conn, ok := ks.connection.GetConnection(connName).(*config.S3Connection)
+		if !ok {
+			return errors.Errorf("'%s' either does not exist or is not an AWS connection", connName)
+		}
+		secretKey = s3Conn.SecretAccessKey
+		accessKey = s3Conn.AccessKeyID
 	}
+
+	
 
 	// Load base config without forcing region
 	cfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			awsConn.AccessKey, awsConn.SecretKey, "",
+			accessKey, secretKey, "",
 		)),
 	)
 	if err != nil {
