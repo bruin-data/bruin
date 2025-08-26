@@ -21,11 +21,11 @@ import (
 )
 
 type KeySensor struct {
-	connection config.ConnectionGetter
+	connection config.ConnectionAndDetailsGetter
 	sensorMode string
 }
 
-func NewKeySensor(conn config.ConnectionGetter, sensorMode string) *KeySensor {
+func NewKeySensor(conn config.ConnectionAndDetailsGetter, sensorMode string) *KeySensor {
 	return &KeySensor{
 		connection: conn,
 		sensorMode: sensorMode,
@@ -56,17 +56,21 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		return err
 	}
 
-	awsConn, ok := ks.connection.GetConnection(connName).(*config.AwsConnection)
+	connDetails := ks.connection.GetConnectionDetails(connName)
+	if connDetails == nil {
+		return errors.Errorf("connection '%s' does not exist", connName)
+	}
 
+	awsConn, ok := connDetails.(*config.AwsConnection)
 	var secretKey string
 	var accessKey string
 	if ok {
 		secretKey = awsConn.SecretKey
 		accessKey = awsConn.AccessKey
 	} else {
-		s3Conn, ok := ks.connection.GetConnection(connName).(*config.S3Connection)
-		if !ok {
-			return errors.Errorf("'%s' either does not exist or is not an AWS connection", connName)
+		s3Conn, ok2 := connDetails.(*config.S3Connection)
+		if !ok2 {
+			return errors.Errorf("'%s' either does not exist or is not an AWS/S3 connection", connName)
 		}
 		secretKey = s3Conn.SecretAccessKey
 		accessKey = s3Conn.AccessKeyID
@@ -83,7 +87,10 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 	}
 
 	// If region is not set, discover it from the bucket
-	region := awsConn.Region
+	var region string
+	if awsConn != nil {
+		region = awsConn.Region
+	}
 	if region == "" {
 		tmpCfg := cfg
 		tmpCfg.Region = "us-east-1" // fallback for discovery
