@@ -332,7 +332,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	destConnectionInst, ok := destConnection.(pipelineConnection)
 	if !ok {
-		return errors.New("destination connection does not implement pipelineConnection, please create an issue in Bruin repo: https://github.com/bruin-data/bruin")
+		return errors.Errorf("destination connection %s cannot is not supported by ingestr or doesn't exist", destConnectionName)
 	}
 
 	destURI, err := destConnectionInst.GetIngestrURI()

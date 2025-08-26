@@ -13,7 +13,7 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
       google_cloud_platform:
         - name: "connection_name"
           project_id: "project-id"
-          
+          location: 'your-gcp-region' # see https://cloud.google.com/compute/docs/regions-zones
           # you can either specify a path to the service account file
           service_account_file: "path/to/file.json"
           

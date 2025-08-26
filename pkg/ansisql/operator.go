@@ -158,7 +158,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	tableChecker, ok := conn.(TableExistsChecker)
 	if !ok {
-		return errors.Errorf("'%s' does not implement TableExistsChecker interface", connName)
+		return errors.Errorf("Connection '%s' cannot be used for sensor on '%s'", connName, tableName)
 	}
 
 	qq, err := tableChecker.BuildTableExistsQuery(tableName)
