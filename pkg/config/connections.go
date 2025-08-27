@@ -790,7 +790,7 @@ type SalesforceConnection struct {
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
 	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
 	Token    string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
-	Domain   string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
+	Domain   string `yaml:"domain" json:"domain" mapstructure:"domain"`
 }
 
 func (c SalesforceConnection) GetName() string {

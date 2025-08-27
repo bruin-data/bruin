@@ -18,8 +18,6 @@ func (c *Config) GetIngestrURI() string {
 	params.Add("username", c.Username)
 	params.Add("password", c.Password)
 	params.Add("token", c.Token)
-	if c.Domain != "" {
-		params.Add("domain", c.Domain)
-	}
+	params.Add("domain", c.Domain)
 	return baseURL + "?" + params.Encode()
 }
