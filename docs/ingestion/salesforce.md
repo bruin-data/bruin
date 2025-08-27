@@ -3,7 +3,7 @@
 
 Bruin supports Salesforce as a source for [ingestr assets](/assets/ingestr), and you can use it to ingest data from Salesforce into your data platform.
 
-To set up a Salesforce connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `username`, `password` and `token`. You can obtain your security token by logging into your Salesforce account and navigating to the user settings under "Reset My Security Token."
+To set up a Salesforce connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `username`, `password`, `token` and `domain`. You can obtain your security token by logging into your Salesforce account and navigating to the user settings under "Reset My Security Token."
 
 Follow the steps below to set up Salesforce correctly as a data source and run ingestion.
 ### Step 1: Add a connection to the .bruin.yml file
@@ -14,10 +14,12 @@ connections:
               username: "user_123"
               password: "pass_123"
               token: "token_123"
+              domain: "your-domain.my.salesforce.com"
 ```
 - `username` is your Salesforce account username.
 - `password` is your Salesforce account password.
 - `token` is your Salesforce security token.
+- `domain` is your Salesforce domain (e.g., "your-company.my.salesforce.com").
 
 ### Step 2: Create an asset file for data ingestion
 To ingest data from Salesforce, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., salesforce_ingestion.yml) inside the assets folder and add the following content:

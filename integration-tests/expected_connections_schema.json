@@ -1864,7 +1864,11 @@
         },
         "token": {
           "type": "string"
+        },
+        "domain": {
+          "type":"string"
         }
+        
       },
       "additionalProperties": false,
       "type": "object",
@@ -1872,7 +1876,8 @@
         "name",
         "username",
         "password",
-        "token"
+        "token",
+        "domain"
       ]
     },
     "ShopifyConnection": {

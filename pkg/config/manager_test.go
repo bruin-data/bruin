@@ -491,6 +491,7 @@ func TestLoadFromFile(t *testing.T) {
 					Username: "username-123",
 					Password: "password-123",
 					Token:    "token-123",
+					Domain:   "mydomain.my.salesforce.com",
 				},
 			},
 			SQLite: []SQLiteConnection{

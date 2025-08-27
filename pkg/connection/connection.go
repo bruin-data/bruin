@@ -1680,6 +1680,7 @@ func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.Salesforc
 		Username: connection.Username,
 		Password: connection.Password,
 		Token:    connection.Token,
+		Domain:   connection.Domain,
 	})
 	if err != nil {
 		return err

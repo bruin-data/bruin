@@ -305,6 +305,7 @@ environments:
           username: "username-123"
           password: "password-123"
           token: "token-123"
+          domain: "mydomain.my.salesforce.com"
       sqlite:
         - name: "sqlite-1"
           path: "C:\\path\\to\\sqlite.db"
