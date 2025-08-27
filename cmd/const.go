@@ -12,7 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/fatih/color"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/spf13/afero"
 )
 
@@ -21,12 +21,13 @@ var PipelineDefinitionFiles = []string{"pipeline.yml", "pipeline.yaml"}
 var (
 	fs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
 
-	faint          = color.New(color.Faint).SprintFunc()
-	infoPrinter    = color.New(color.Bold)
-	summaryPrinter = color.New()
-	errorPrinter   = color.New(color.FgRed, color.Bold)
-	warningPrinter = color.New(color.FgYellow, color.Bold)
-	successPrinter = color.New(color.FgGreen, color.Bold)
+	// Legacy style functions for compatibility
+	faint          = ui.FaintStyle.Render
+	infoPrinter    = ui.NewInfoPrinter()
+	summaryPrinter = ui.NewPlainPrinter()
+	errorPrinter   = ui.NewErrorPrinter()
+	warningPrinter = ui.NewWarningPrinter()
+	successPrinter = ui.NewSuccessPrinter()
 
 	assetsDirectoryNames = []string{"tasks", "assets"}
 

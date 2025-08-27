@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/spf13/afero"
 )
 
 func BenchmarkInternalParsePipeline(b *testing.B) {
 	r := ParseCommand{
 		builder:      DefaultPipelineBuilder,
-		errorPrinter: errorPrinter,
+		errorPrinter: ui.GetLegacyErrorColor(),
 	}
 
 	for range [10]int{} {
@@ -33,7 +34,7 @@ func BenchmarkInternalParsePipeline(b *testing.B) {
 func BenchmarkInternalParseAsset(b *testing.B) {
 	r := ParseCommand{
 		builder:      DefaultPipelineBuilder,
-		errorPrinter: errorPrinter,
+		errorPrinter: ui.GetLegacyErrorColor(),
 	}
 
 	for range [10]int{} {
@@ -52,7 +53,7 @@ func BenchmarkInternalParseAsset(b *testing.B) {
 func BenchmarkInternalParsePipelineWithoutColumnLineage(b *testing.B) {
 	r := ParseCommand{
 		builder:      DefaultPipelineBuilder,
-		errorPrinter: errorPrinter,
+		errorPrinter: ui.GetLegacyErrorColor(),
 	}
 
 	for range [10]int{} {
@@ -71,7 +72,7 @@ func BenchmarkInternalParsePipelineWithoutColumnLineage(b *testing.B) {
 func BenchmarkInternalParseAssetWithoutColumnLineage(b *testing.B) {
 	r := ParseCommand{
 		builder:      DefaultPipelineBuilder,
-		errorPrinter: errorPrinter,
+		errorPrinter: ui.GetLegacyErrorColor(),
 	}
 
 	for range [10]int{} {

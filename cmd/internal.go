@@ -21,6 +21,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/bruin-data/bruin/templates"
 	color2 "github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -67,7 +68,7 @@ func ParseAsset() *cli.Command {
 		Action: func(ctx context.Context, c *cli.Command) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
-				errorPrinter: errorPrinter,
+				errorPrinter: ui.GetLegacyErrorColor(),
 			}
 
 			return r.Run(ctx, c.Args().Get(0), c.Bool("column-lineage"))
@@ -98,7 +99,7 @@ func ParsePipeline() *cli.Command {
 		Action: func(ctx context.Context, c *cli.Command) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
-				errorPrinter: errorPrinter,
+				errorPrinter: ui.GetLegacyErrorColor(),
 			}
 
 			return r.ParsePipeline(ctx, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))

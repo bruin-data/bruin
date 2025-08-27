@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/fatih/color"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/pkg/errors"
 )
 
@@ -22,14 +22,7 @@ type (
 	}
 )
 
-var (
-	faint           = color.New(color.Faint).SprintFunc()
-	successPrinter  = color.New(color.FgGreen)
-	pipelinePrinter = color.New(color.FgBlue, color.Bold)
-	taskNamePrinter = color.New(color.FgWhite, color.Bold)
-	issuePrinter    = color.New(color.FgRed)
-	warningPrinter  = color.New(color.FgYellow)
-)
+// Removed global variables - using ui package styles directly
 
 func (l *Printer) PrintIssues(analysis *PipelineAnalysisResult) {
 	for _, pipelineIssues := range analysis.Pipelines {
@@ -48,13 +41,13 @@ func (l *Printer) PrintJSON(analysis *PipelineAnalysisResult) error {
 }
 
 func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues) {
-	successPrinter.Println()
+	fmt.Println() // Empty line before pipeline
 
 	pipelineDirectory := l.relativePipelinePath(pipelineIssues.Pipeline)
-	pipelinePrinter.Printf("Pipeline: %s %s\n", pipelineIssues.Pipeline.Name, faint(fmt.Sprintf("(%s)", pipelineDirectory)))
+	fmt.Printf("Pipeline: %s\n", ui.FormatPipelineName(pipelineIssues.Pipeline.Name, pipelineDirectory))
 
 	if len(pipelineIssues.Issues) == 0 {
-		successPrinter.Println("  No issues found")
+		fmt.Printf("  %s\n", ui.FormatSuccess("No issues found"))
 		return
 	}
 
@@ -83,15 +76,15 @@ func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues) {
 
 	printGenericIssues(genericIssues)
 	if len(genericIssues) > 0 && len(taskIssueMap) > 0 {
-		issuePrinter.Println()
+		fmt.Println()
 	}
 
 	for task, summary := range taskIssueMap {
 		relativeTaskPath := pipelineIssues.Pipeline.RelativeAssetPath(task)
-		taskNamePrinter.Printf("  %s %s\n", task.Name, faint(fmt.Sprintf("(%s)", relativeTaskPath)))
+		fmt.Printf("  %s\n", ui.FormatAssetName(task.Name, relativeTaskPath))
 		printAssetIssues(summary)
 
-		issuePrinter.Println()
+		fmt.Println()
 	}
 }
 
@@ -119,21 +112,27 @@ func printGenericIssues(genericIssues map[Rule][]*Issue) {
 
 	printedIssueCount := 0
 	for rule, issues := range genericIssues {
-		pp := issuePrinter
-		if rule.GetSeverity() == ValidatorSeverityWarning {
-			pp = warningPrinter
-		}
-
 		for _, issue := range issues {
 			printedIssueCount++
 
-			connector := "├──"
-			if printedIssueCount == totalIssueCount {
-				connector = "└──"
+			connector := ui.TreeConnector(printedIssueCount == totalIssueCount)
+			isLast := printedIssueCount == totalIssueCount
+			
+			var messageFormat string
+			if rule.GetSeverity() == ValidatorSeverityWarning {
+				messageFormat = fmt.Sprintf("    %s %s %s\n", 
+					connector, 
+					ui.WarningStyle.Render(issue.Description), 
+					ui.FaintStyle.Render(fmt.Sprintf("(%s)", rule.Name())))
+			} else {
+				messageFormat = fmt.Sprintf("    %s %s %s\n", 
+					connector, 
+					ui.ErrorStyle.Render(issue.Description), 
+					ui.FaintStyle.Render(fmt.Sprintf("(%s)", rule.Name())))
 			}
-
-			pp.Printf("    %s %s %s\n", connector, issue.Description, faint(fmt.Sprintf("(%s)", rule.Name())))
-			printIssueContext(pp, issue.Context, printedIssueCount == totalIssueCount)
+			
+			fmt.Print(messageFormat)
+			printIssueContext(rule.GetSeverity(), issue.Context, isLast)
 		}
 	}
 }
@@ -144,35 +143,45 @@ func printAssetIssues(assetIssues []*ruleIssue) {
 		rule := ruleIssue.rule
 		issue := ruleIssue.issue
 
-		pp := issuePrinter
+		connector := ui.TreeConnector(index == issueCount-1)
+		isLast := index == issueCount-1
+		
+		var messageFormat string
 		if rule.GetSeverity() == ValidatorSeverityWarning {
-			pp = warningPrinter
+			messageFormat = fmt.Sprintf("    %s %s %s\n", 
+				connector, 
+				ui.WarningStyle.Render(issue.Description), 
+				ui.FaintStyle.Render(fmt.Sprintf("(%s)", rule.Name())))
+		} else {
+			messageFormat = fmt.Sprintf("    %s %s %s\n", 
+				connector, 
+				ui.ErrorStyle.Render(issue.Description), 
+				ui.FaintStyle.Render(fmt.Sprintf("(%s)", rule.Name())))
 		}
-
-		connector := "├──"
-		if index == issueCount-1 {
-			connector = "└──"
-		}
-
-		pp.Printf("    %s %s %s\n", connector, issue.Description, faint(fmt.Sprintf("(%s)", rule.Name())))
-		printIssueContext(pp, issue.Context, index == issueCount-1)
+		
+		fmt.Print(messageFormat)
+		printIssueContext(rule.GetSeverity(), issue.Context, isLast)
 	}
 }
 
-func printIssueContext(printer *color.Color, context []string, lastIssue bool) {
+func printIssueContext(severity ValidatorSeverity, context []string, lastIssue bool) {
 	issueCount := len(context)
-	beginning := "│"
-	if lastIssue {
-		beginning = " "
+	beginning := ui.TreePipe(lastIssue)
+
+	var contextStyle = ui.FaintStyle
+	if severity == ValidatorSeverityWarning {
+		contextStyle = ui.WarningStyle
+	} else if severity == ValidatorSeverityCritical {
+		contextStyle = ui.ErrorStyle
 	}
 
 	for index, row := range context {
-		connector := "├─"
-		if index == issueCount-1 {
-			connector = "└─"
-		}
-
-		printer.Printf("    %s   %s %s\n", beginning, connector, padLinesIfMultiline(row, 11))
+		connector := ui.TreeConnector(index == issueCount-1)
+		
+		fmt.Printf("    %s   %s %s\n", 
+			beginning, 
+			connector, 
+			contextStyle.Render(padLinesIfMultiline(row, 11)))
 	}
 }
 

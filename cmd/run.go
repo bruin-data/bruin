@@ -48,6 +48,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/trino"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -153,7 +154,7 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 		return
 	}
 
-	fmt.Println("\n" + strings.Repeat("=", 50) + "\n")
+	fmt.Println("\n" + ui.SeparatorStyle.Render(strings.Repeat("═", 50)) + "\n")
 
 	for _, assetName := range assetOrder {
 		results := assetResults[assetName]
@@ -161,29 +162,29 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 
 		// Asset name with status
 		var assetStatus string
-		var assetColor *color.Color
+		var statusType ui.StatusType
 
 		if mainResult == nil { // nolint:gocritic
 			// Asset not executed
 			assetStatus = "SKIP"
-			assetColor = color.New(color.Faint)
+			statusType = ui.StatusSkip
 		} else if mainResult.Error == nil {
 			// Check if this is upstream failed
 			_, isUpstreamFailed := find(upstreamFailedTasks, mainResult.Instance)
 
 			if isUpstreamFailed {
 				assetStatus = "UPSTREAM FAILED"
-				assetColor = color.New(color.FgYellow)
+				statusType = ui.StatusUpstreamFailed
 			} else {
 				assetStatus = "PASS"
-				assetColor = color.New(color.FgGreen)
+				statusType = ui.StatusSuccess
 			}
 		} else {
 			assetStatus = "FAIL"
-			assetColor = color.New(color.FgRed)
+			statusType = ui.StatusError
 		}
 
-		fmt.Printf("%s %s ", assetColor.Sprint(assetStatus), assetName)
+		fmt.Printf("%s %s ", ui.FormatStatus(statusType, assetStatus), assetName)
 
 		// Print dots for quality checks
 		checkCount := 0
@@ -194,18 +195,18 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 
 			checkCount++
 			if result == nil { // nolint:gocritic
-				fmt.Print(faint("."))
+				fmt.Print(ui.FormatCheckResult(ui.StatusSkip))
 			} else if result.Error == nil {
 				// Check if upstream failed
 				_, isUpstreamFailed := find(upstreamFailedTasks, result.Instance)
 
 				if isUpstreamFailed {
-					fmt.Print(color.New(color.FgYellow).Sprint("U"))
+					fmt.Print(ui.FormatCheckResult(ui.StatusUpstreamFailed))
 				} else {
-					fmt.Print(color.New(color.FgGreen).Sprint("."))
+					fmt.Print(ui.FormatCheckResult(ui.StatusSuccess))
 				}
 			} else {
-				fmt.Print(color.New(color.FgRed).Sprint("F"))
+				fmt.Print(ui.FormatCheckResult(ui.StatusError))
 			}
 		}
 
@@ -234,25 +235,21 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 
 	// Header with status and task count
 	if hasFailures {
-		summaryPrinter.Printf("\n\nbruin run completed with %s in %s\n\n",
-			color.New(color.FgRed).Sprint("failures"),
-			duration.Truncate(time.Millisecond).String())
+		fmt.Print(ui.FormatExecutionSummary("bruin run completed with failures", true, duration.Truncate(time.Millisecond).String()))
 	} else {
-		summaryPrinter.Printf("\n\nbruin run completed %s in %s\n\n",
-			color.New(color.FgGreen).Sprint("successfully"),
-			duration.Truncate(time.Millisecond).String())
+		fmt.Print(ui.FormatExecutionSummary("bruin run completed successfully", false, duration.Truncate(time.Millisecond).String()))
 	}
 
 	// Assets executed (only actual assets, not including quality checks)
 	if summary.Assets.HasAny() {
 		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 {
-			summaryPrinter.Printf(" %s Assets executed      %s\n",
-				color.New(color.FgRed).Sprint("✗"),
+			fmt.Printf(" %s Assets executed      %s\n",
+				ui.ErrorIcon,
 				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped))
 		} else {
-			summaryPrinter.Printf(" %s Assets executed      %s\n",
-				color.New(color.FgGreen).Sprint("✓"),
-				color.New(color.FgGreen).Sprintf("%d succeeded", summary.Assets.Succeeded))
+			fmt.Printf(" %s Assets executed      %s\n",
+				ui.SuccessIcon,
+				ui.SuccessStyle.Render(fmt.Sprintf("%d succeeded", summary.Assets.Succeeded)))
 		}
 	}
 
@@ -262,13 +259,13 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 	totalCheckSkipped := summary.ColumnChecks.Skipped + summary.CustomChecks.Skipped
 	if totalChecks > 0 {
 		if totalCheckFailures > 0 || totalCheckSkipped > 0 {
-			summaryPrinter.Printf(" %s Quality checks       %s\n",
-				color.New(color.FgRed).Sprint("✗"),
+			fmt.Printf(" %s Quality checks       %s\n",
+				ui.ErrorIcon,
 				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped))
 		} else {
-			summaryPrinter.Printf(" %s Quality checks       %s\n",
-				color.New(color.FgGreen).Sprint("✓"),
-				color.New(color.FgGreen).Sprintf("%d succeeded", summary.ColumnChecks.Succeeded+summary.CustomChecks.Succeeded))
+			fmt.Printf(" %s Quality checks       %s\n",
+				ui.SuccessIcon,
+				ui.SuccessStyle.Render(fmt.Sprintf("%d succeeded", summary.ColumnChecks.Succeeded+summary.CustomChecks.Succeeded)))
 		}
 	}
 
@@ -276,12 +273,12 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 	if summary.MetadataPush.HasAny() {
 		metadataExecuted := summary.MetadataPush.Succeeded + summary.MetadataPush.Failed
 		if summary.MetadataPush.Failed > 0 {
-			summaryPrinter.Printf(" %s Metadata pushed      %s\n",
-				color.New(color.FgRed).Sprint("✗"),
+			fmt.Printf(" %s Metadata pushed      %s\n",
+				ui.ErrorIcon,
 				formatCount(metadataExecuted, summary.MetadataPush.Failed))
 		} else {
-			summaryPrinter.Printf(" %s Metadata pushed      %d\n",
-				color.New(color.FgGreen).Sprint("✓"), metadataExecuted)
+			fmt.Printf(" %s Metadata pushed      %d\n",
+				ui.SuccessIcon, metadataExecuted)
 		}
 	}
 }
@@ -291,36 +288,36 @@ func formatCount(total, failed int) string {
 		return strconv.Itoa(total)
 	}
 	succeeded := total - failed
-	return fmt.Sprintf("%s / %s",
-		color.New(color.FgRed).Sprintf("%d failed", failed),
-		color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
+	return ui.FormatProgressStats(succeeded, failed, 0)
 }
 
 func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) string {
 	succeeded := total - failed - failedDueToChecks - skipped
 
+	// Handle the simple case where everything succeeded
+	if failed == 0 && failedDueToChecks == 0 && skipped == 0 {
+		return strconv.Itoa(succeeded)
+	}
+
 	var parts []string
+	if succeeded > 0 {
+		parts = append(parts, ui.SuccessStyle.Render(fmt.Sprintf("%d succeeded", succeeded)))
+	}
 	if failed > 0 {
-		parts = append(parts, color.New(color.FgRed).Sprintf("%d failed", failed))
+		parts = append(parts, ui.ErrorStyle.Render(fmt.Sprintf("%d failed", failed)))
 	}
 	if failedDueToChecks > 0 {
-		parts = append(parts, color.New(color.FgYellow).Sprintf("%d failed due to checks", failedDueToChecks))
-	}
-	if succeeded > 0 {
-		parts = append(parts, color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
+		parts = append(parts, ui.WarningStyle.Render(fmt.Sprintf("%d failed due to checks", failedDueToChecks)))
 	}
 	if skipped > 0 {
-		parts = append(parts, color.New(color.Faint).Sprintf("%d skipped", skipped))
+		parts = append(parts, ui.FaintStyle.Render(fmt.Sprintf("%d skipped", skipped)))
 	}
 
 	if len(parts) == 0 {
 		return "0"
 	}
-	if len(parts) == 1 && failed == 0 && failedDueToChecks == 0 && skipped == 0 {
-		return strconv.Itoa(succeeded)
-	}
 
-	return strings.Join(parts, " / ")
+	return strings.Join(parts, ui.FaintStyle.Render(" / "))
 }
 
 func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) ExecutionSummary {

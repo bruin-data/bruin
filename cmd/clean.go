@@ -13,6 +13,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -75,7 +76,7 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
-		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+		fmt.Print(ui.FormatError(fmt.Sprintf("Failed to find the git repository root: %v", err)))
 		return cli.Exit("", 1)
 	}
 

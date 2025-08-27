@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/jedib0t/go-pretty/v6/table"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -272,7 +273,7 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment,
 
 	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 	if err != nil {
-		errorPrinter.Printf("Failed to load or create the config file: %v\n", err)
+		fmt.Print(ui.FormatError(fmt.Sprintf("Failed to load or create the config file: %v", err)))
 		return cli.Exit("", 1)
 	}
 
@@ -281,7 +282,7 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment,
 			// Check if the specified environment exists
 			env, exists := cm.Environments[environment]
 			if !exists {
-				errorPrinter.Printf("Environment '%s' not found.\n", environment)
+				fmt.Print(ui.FormatError(fmt.Sprintf("Environment '%s' not found.", environment)))
 				return cli.Exit("", 1)
 			}
 
@@ -318,7 +319,7 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment,
 	if environment != "" {
 		env, exists := cm.Environments[environment]
 		if !exists {
-			errorPrinter.Printf("Environment '%s' not found.\n", environment)
+			fmt.Print(ui.FormatError(fmt.Sprintf("Environment '%s' not found.", environment)))
 			return cli.Exit("", 1)
 		}
 
@@ -370,7 +371,7 @@ func printErrorForOutput(output string, err error) {
 	if output == "json" {
 		printErrorJSON(err)
 	} else {
-		errorPrinter.Println(err.Error())
+		fmt.Print(ui.FormatError(err.Error()))
 	}
 }
 

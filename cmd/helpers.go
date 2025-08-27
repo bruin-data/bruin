@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v3"
 )
@@ -43,7 +44,7 @@ func switchEnvironment(env string, force bool, cm *config.Config, stdin io.ReadC
 
 	err := cm.SelectEnvironment(env)
 	if err != nil {
-		errorPrinter.Printf("Failed to use the environment '%s': %v\n", env, err)
+		fmt.Print(ui.FormatError(fmt.Sprintf("Failed to use the environment '%s': %v", env, err)))
 		return cli.Exit("", 1)
 	}
 
@@ -119,7 +120,7 @@ func printErrors(errs []error, output string, message string) {
 		}
 		fmt.Println(string(js))
 	} else {
-		errorPrinter.Printf("%s: %v\n", message, fmt.Sprint(errs))
+		fmt.Print(ui.FormatError(fmt.Sprintf("%s: %v", message, fmt.Sprint(errs))))
 	}
 }
 
@@ -127,7 +128,7 @@ func printError(err error, output string, message string) {
 	if output == "json" {
 		printErrorJSON(err)
 	} else {
-		errorPrinter.Printf("%s: %v\n", message, err)
+		fmt.Print(ui.FormatError(fmt.Sprintf("%s: %v", message, err)))
 	}
 }
 
@@ -152,7 +153,7 @@ func printSuccessForOutput(output string, message string) {
 		}
 		fmt.Println(string(jsonData))
 	} else {
-		successPrinter.Printf("%s\n", message)
+		fmt.Print(ui.FormatSuccess(message))
 	}
 }
 
@@ -169,6 +170,6 @@ func printWarningForOutput(output string, message string) {
 		}
 		fmt.Println(string(jsonData))
 	} else {
-		warningPrinter.Printf("%s\n", message)
+		fmt.Print(ui.FormatWarning(message))
 	}
 }

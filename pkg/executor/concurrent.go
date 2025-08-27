@@ -11,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/fatih/color"
 )
 
@@ -23,8 +24,9 @@ var (
 		color.FgGreen + color.Faint,
 		color.FgYellow,
 	}
-	faint        = color.New(color.Faint).SprintFunc()
-	whitePrinter = color.New(color.FgWhite, color.Faint).SprintfFunc()
+	// Legacy support for existing functionality
+	faint        = ui.FaintStyle.Render
+	whitePrinter = ui.FaintStyle.Render
 	plainColor   = color.New()
 	greenColor   = color.New(color.FgGreen)
 	redColor     = color.New(color.FgRed)
@@ -99,18 +101,22 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 	for task := range taskChannel {
 		w.printLock.Lock()
 
-		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
+		timestampStr := ui.FaintStyle.Render(fmt.Sprintf("[%s]", time.Now().Format(timeFormat)))
 		if w.formatOpts.NoColor {
 			w.printer = plainColor
 		}
-		runningPrinter := w.printer
+		
+		var runningMessage string
 		if !w.formatOpts.NoColor {
-			runningPrinter = color.New(color.Faint)
-		}
-		if w.formatOpts.DoNotLogTimestamp {
-			fmt.Printf("%s\n", runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+			runningMessage = ui.FormatStatus(ui.StatusRunning, fmt.Sprintf("Running:  %s", task.GetHumanID()))
 		} else {
-			fmt.Printf("%s %s\n", timestampStr, runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+			runningMessage = fmt.Sprintf("Running:  %s", task.GetHumanID())
+		}
+		
+		if w.formatOpts.DoNotLogTimestamp {
+			fmt.Printf("%s\n", runningMessage)
+		} else {
+			fmt.Printf("%s %s\n", timestampStr, runningMessage)
 		}
 		w.printLock.Unlock()
 
@@ -128,28 +134,34 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		err := w.executor.RunSingleTask(executionCtx, task)
 
 		duration := time.Since(start)
-		durationString := fmt.Sprintf("(%s)", duration.Truncate(time.Millisecond).String())
+		durationString := ui.FaintStyle.Render(fmt.Sprintf("(%s)", duration.Truncate(time.Millisecond).String()))
 		w.printLock.Lock()
 
-		printerInstance := w.printer
-		if !w.formatOpts.NoColor {
-			if err != nil {
-				printerInstance = redColor
-			} else {
-				printerInstance = greenColor
-			}
+		var statusType ui.StatusType
+		var res string
+		if err != nil {
+			statusType = ui.StatusError
+			res = "Failed"
+		} else {
+			statusType = ui.StatusSuccess
+			res = "Finished"
 		}
 
-		res := "Finished"
-		if err != nil {
-			res = "Failed"
+		var resultMessage string
+		if !w.formatOpts.NoColor {
+			resultMessage = fmt.Sprintf("%s: %s %s",
+				ui.FormatStatus(statusType, res),
+				task.GetHumanID(),
+				durationString)
+		} else {
+			resultMessage = fmt.Sprintf("%s: %s %s", res, task.GetHumanID(), durationString)
 		}
 
 		if w.formatOpts.DoNotLogTimestamp {
-			fmt.Printf("%s\n", printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+			fmt.Printf("%s\n", resultMessage)
 		} else {
-			timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
-			fmt.Printf("%s %s\n", timestampStr, printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+			timestampStr := ui.FaintStyle.Render(fmt.Sprintf("[%s]", time.Now().Format(timeFormat)))
+			fmt.Printf("%s %s\n", timestampStr, resultMessage)
 		}
 		w.printLock.Unlock()
 		results <- &scheduler.TaskExecutionResult{

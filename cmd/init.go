@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/pkg/ui"
 	"github.com/bruin-data/bruin/templates"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
@@ -241,7 +242,7 @@ func Init() *cli.Command {
 
 			_, err = templates.Templates.ReadDir(templateName)
 			if err != nil {
-				errorPrinter.Printf("Template '%s' not found\n", templateName)
+				fmt.Print(ui.FormatError(fmt.Sprintf("Template '%s' not found", templateName)))
 				return cli.Exit("", 1)
 			}
 
@@ -256,7 +257,7 @@ func Init() *cli.Command {
 
 			dir, _ := filepath.Split(inputPath)
 			if dir != "" {
-				errorPrinter.Printf("Traversing up or down in the folder structure is not allowed, provide base folder name only.\n")
+				fmt.Print(ui.FormatError("Traversing up or down in the folder structure is not allowed, provide base folder name only."))
 				return cli.Exit("", 1)
 			}
 
@@ -270,13 +271,13 @@ func Init() *cli.Command {
 					// Initialize in given directory
 					targetDir, err = os.Getwd()
 					if err != nil {
-						errorPrinter.Printf("Failed to get current working directory: %v\n", err)
+						fmt.Print(ui.FormatError(fmt.Sprintf("Failed to get current working directory: %v", err)))
 						return cli.Exit("", 1)
 					}
 				} else {
 					// Create a bruin root directory
 					if err := os.MkdirAll("bruin", 0o755); err != nil {
-						errorPrinter.Printf("Failed to create the bruin root folder: %v\n", err)
+						fmt.Print(ui.FormatError(fmt.Sprintf("Failed to create the bruin root folder: %v", err)))
 						return cli.Exit("", 1)
 					}
 					targetDir = "bruin"
@@ -287,7 +288,7 @@ func Init() *cli.Command {
 				cmd.Dir = targetDir
 				out, err := cmd.CombinedOutput()
 				if err != nil {
-					errorPrinter.Printf("Could not initialize git repository in %s: %s\n", targetDir, string(out))
+					fmt.Print(ui.FormatError(fmt.Sprintf("Could not initialize git repository in %s: %s", targetDir, string(out))))
 					return cli.Exit("", 1)
 				}
 
@@ -306,7 +307,7 @@ func Init() *cli.Command {
 
 			centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
 			if err != nil {
-				errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
+				fmt.Print(ui.FormatError(fmt.Sprintf("Could not write .bruin.yml file: %v", err)))
 				return err
 			}
 
@@ -315,19 +316,19 @@ func Init() *cli.Command {
 			templateBruinContent, err := templates.Templates.ReadFile(templateBruinPath)
 			if err == nil { // Only process if file exists
 				if err := mergeTemplateConfig(centralConfig, templateBruinContent); err != nil {
-					errorPrinter.Printf("%v\n", err)
+					fmt.Print(ui.FormatError(fmt.Sprintf("%v", err)))
 					return err
 				}
 
 				// Write back the updated config
 				configBytes, err := yaml.Marshal(centralConfig)
 				if err != nil {
-					errorPrinter.Printf("Could not marshal .bruin.yml: %v\n", err)
+					fmt.Print(ui.FormatError(fmt.Sprintf("Could not marshal .bruin.yml: %v", err)))
 					return err
 				}
 
 				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
-					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
+					fmt.Print(ui.FormatError(fmt.Sprintf("Could not write .bruin.yml file: %v", err)))
 					return err
 				}
 			}
@@ -364,24 +365,24 @@ func Init() *cli.Command {
 				// ignore the error
 				err = os.MkdirAll(absolutePath, os.ModePerm)
 				if err != nil {
-					errorPrinter.Printf("Could not create the %s folder: %v\n", absolutePath, err)
+					fmt.Print(ui.FormatError(fmt.Sprintf("Could not create the %s folder: %v", absolutePath, err)))
 					return err
 				}
 
 				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
 				if err != nil {
-					errorPrinter.Printf("Could not write the %s file: %v\n", filepath.Join(absolutePath, baseName), err)
+					fmt.Print(ui.FormatError(fmt.Sprintf("Could not write the %s file: %v", filepath.Join(absolutePath, baseName), err)))
 					return err
 				}
 
 				return nil
 			})
 			if err != nil {
-				errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
+				fmt.Print(ui.FormatError(fmt.Sprintf("Could not copy template %s: %s", templateName, err)))
 				return cli.Exit("", 1)
 			}
 
-			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
+			fmt.Print(ui.FormatSuccess(fmt.Sprintf("\n\nA new '%s' pipeline created successfully in folder '%s'.", templateName, inputPath)))
 			infoPrinter.Println("\nYou can run the following commands to get started:")
 			infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
 
