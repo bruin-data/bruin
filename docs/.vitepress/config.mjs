@@ -67,6 +67,7 @@ export default withMermaid({
                             {text: "Policies", link: "/getting-started/policies"},
                             {text: "Developer Environments", link: "/getting-started/devenv"},
                             {text: "Variables", link: "/getting-started/pipeline-variables"},
+                            {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
                         ]
                     },
                     {text: "Concepts", link: "/getting-started/concepts"},
