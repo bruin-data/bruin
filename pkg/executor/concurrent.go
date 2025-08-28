@@ -163,7 +163,6 @@ type workerWriter struct {
 	w                 io.Writer
 	task              *pipeline.Asset
 	sprintfFunc       func(format string, a ...interface{}) string
-	worker            string
 	DoNotLogTimestamp bool
 }
 
