@@ -14,8 +14,7 @@ To use Bruin MCP in Cursor IDE, go to Settings > Tools and Integrations:
   "mcpServers": {
     "bruin": {
       "command": "bruin",
-      "args": ["mcp"],
-      "env": {}
+      "args": ["mcp"]
     }
   }
 }
@@ -29,6 +28,11 @@ After completing the setup, the AI assistant in Cursor IDE will automatically ha
 - Learning about supported data sources and their configurations
 - Understanding asset types and properties
 - Using Bruin commands correctly
+- Connecting to databases using existing connections
+- Running SQL queries against connected databases
+- Performing data ingestion tasks
+- Creating tables in target databases
+- Building complete data pipelines
 
 ## Example Usage
 
@@ -38,6 +42,10 @@ Once MCP setup is complete, you can ask questions in Cursor IDE like:
 - "How is a pipeline.yml file configured?"
 - "What data sources do you support?"
 - "How do I set up a Snowflake connection?"
+- "Connect to my PostgreSQL database and run a query"
+- "Create a table in my data warehouse"
+- "Help me build a data pipeline for ingesting CSV files"
+- "Run data quality checks on my tables"
 
-The AI assistant will answer these questions using up-to-date Bruin documentation and provide you with accurate examples.
+The AI assistant will answer these questions using up-to-date Bruin documentation and provide you with accurate examples. It can also execute Bruin commands directly to help you connect to databases, run queries, perform ingestion tasks, and create complete data pipelines.
 
