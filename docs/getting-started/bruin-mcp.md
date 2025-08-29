@@ -1,13 +1,13 @@
 # Bruin MCP (Model Context Protocol)
 
-Bruin MCP is a feature that acts as a bridge between AI editors (like Cursor) and the Bruin CLI. This feature allows AI assistants to directly access Bruin documentation and provide better assistance when creating pipelines.
+Bruin MCP is an integration layer that connects AI editors (like Cursor) with Bruin CLI. It enables AI assistants to directly access Bruin documentation and provide better guidance when building pipelines
 
 
 ## Setup in Claude Code
 
-To use Bruin MCP in Claude Code, run the following command (works in bash, zsh, and other shells):
+To use Bruin MCP in Claude Code, run the following command in your terminal:
 
-```bash
+```
 claude mcp add bruin -- bruin mcp
 ```
 
