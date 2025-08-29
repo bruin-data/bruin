@@ -3,6 +3,14 @@
 Bruin MCP is a feature that acts as a bridge between AI editors (like Cursor) and the Bruin CLI. This feature allows AI assistants to directly access Bruin documentation and provide better assistance when creating pipelines.
 
 
+## Setup in Claude Code
+
+To use Bruin MCP in Claude Code, run the following command (works in bash, zsh, and other shells):
+
+```bash
+claude mcp add bruin -- bruin mcp
+```
+
 ## Setup in Cursor IDE
 
 To use Bruin MCP in Cursor IDE, go to Settings > Tools and Integrations:
@@ -38,14 +46,24 @@ After completing the setup, the AI assistant in Cursor IDE will automatically ha
 
 Once MCP setup is complete, you can ask questions in Cursor IDE like:
 
-- "How do I create an asset for BigQuery in Bruin?"
-- "How is a pipeline.yml file configured?"
-- "What data sources do you support?"
-- "How do I set up a Snowflake connection?"
-- "Connect to my PostgreSQL database and run a query"
-- "Create a table in my data warehouse"
-- "Help me build a data pipeline for ingesting CSV files"
-- "Run data quality checks on my tables"
+- "How do I create a BigQuery asset in Bruin?"
+- "How is a pipeline.yml file configured in Bruin?"
+- "What data sources does Bruin support for ingestion?"
+- "How do I set up a Snowflake connection in Bruin?"
+- "How can I connect to my PostgreSQL database and run a query with Bruin?"
+- "How do I create a table in my data warehouse using Bruin?"
+- "How can I build a data pipeline in Bruin for ingesting CSV files?"
+- "How do I run data quality checks on my tables in Bruin?"
+
+Or you can give direct commands like:
+
+- "Create a BigQuery asset in Bruin"
+- "Configure a pipeline.yml file in Bruin"
+- "Show me the data sources Bruin supports for ingestion"
+- "Set up a Snowflake connection in Bruin"
+- "Connect to my PostgreSQL database and run a query with Bruin"
+- "Create a table in my data warehouse using Bruin"
+- "Build a data pipeline in Bruin for ingesting CSV files"
+- "Run data quality checks on my tables in BVruin"
 
 The AI assistant will answer these questions using up-to-date Bruin documentation and provide you with accurate examples. It can also execute Bruin commands directly to help you connect to databases, run queries, perform ingestion tasks, and create complete data pipelines.
-
