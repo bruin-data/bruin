@@ -42,7 +42,12 @@ parameters:
 ```
 
 - `source_connection`: name of the Zoom connection defined in `.bruin.yml`.
-- `source_table`: Zoom table to ingest. For more information, [read here](https://bruin-data.github.io/ingestr/supported-sources/zoom.html)
+- `source_table`: Zoom table to ingest. Available tables:
+
+Table    PK    Inc Key    Inc Strategy    Details
+meetings    id    start_time    merge    Retrieve all valid previous meetings, live meetings, and upcoming scheduled meetings for all users in the given Zoom account. Permissions required: meeting:read:admin,meeting:read, Granular permissions, meeting:read:list_meetings,meeting:read:list_meetings:admin
+users    id    –    merge    Retrieve a list of users in your account. Permissions required: user:read, user:write, user:read:admin, user:write:admin, Granular permissions: user:read:list_users:admin, Prerequisites: A Pro or higher plan.
+participants    id    join_time    merge    Return a report of a past meeting that had participants, including the host. It only returns data for meetings within the last 6 months.Permissions required: report:read:admin. Granular permissions: report:read:list_meeting_participants:admin. Prerequisites: A Pro or higher plan.
 - `destination`: name of the destination connection.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
