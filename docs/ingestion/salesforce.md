@@ -44,21 +44,23 @@ parameters:
 
 ## Available Source Tables
 
-- `user`: Refers to an individual who has access to a Salesforce org or instance.
-- `user_role`: A standard object that represents a role within the organization's hierarchy.
-- `opportunity`: Represents a sales opportunity for a specific account or contact.
-- `opportunity_line_item`: Represents individual line items or products associated with an Opportunity.
-- `opportunity_contact_role`: Represents the association between an Opportunity and a Contact.
-- `account`: Individual or organization that interacts with your business.
-- `contact`: An individual person associated with an account or organization.
-- `lead`: Prospective customer/individual/org. that has shown interest in a company's products/services.
-- `campaign`: Marketing initiative or project designed to achieve specific goals.
-- `campaign_member`: Association between a Contact or Lead and a Campaign.
-- `product`: For managing and organizing your product-related data.
-- `pricebook`: Used to manage product pricing and create price books.
-- `pricebook_entry`: Represents a specific price for a product in a price book.
-- `task`: Used to track and manage various activities and tasks.
-- `event`: Used to track and manage calendar-based events.
+Table    PK    Inc Key    Inc Strategy    Details
+user    -    -    replace    Refers to an individual who has access to a Salesforce org or instance.
+user_role    -    -    replace    A standard object that represents a role within the organization's hierarchy.
+opportunity    id    last_timestamp    merge    Represents a sales opportunity for a specific account or contact.
+opportunity_line_item    id    last_timestamp    merge    Represents individual line items or products associated with an Opportunity.
+opportunity_contact_role    id    last_timestamp    merge    Represents the association between an Opportunity and a Contact.
+account    id    last_timestamp    merge    Individual or organization that interacts with your business.
+contact    id    -    replace    An individual person associated with an account or organization.
+lead    id    -    replace    Prospective customer/individual/org. that has shown interest in a company's products/services.
+campaign    id    -    replace    Marketing initiative or project designed to achieve specific goals.
+campaign_member    id    last_timestamp    merge    Association between a Contact or Lead and a Campaign.
+product    id    -    replace    For managing and organizing your product-related data.
+pricebook    id    -    replace    Used to manage product pricing and create price books.
+pricebook_entry    id    -    replace    Represents a specific price for a product in a price book.
+task    id    last_timestamp    merge    Used to track and manage various activities and tasks.
+event    id    last_timestamp    merge    Used to track and manage calendar-based events.
+custom:<custom_object_name>    -    -    replace    Track and store data that's unique to your organization.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     
