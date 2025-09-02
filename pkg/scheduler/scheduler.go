@@ -143,6 +143,7 @@ type RunConfig struct {
 	ConfigFilePath         string   `json:"configFilePath"`
 	SensorMode             string   `json:"sensorMode"`
 	ApplyIntervalModifiers bool     `json:"applyIntervalModifiers"`
+	Annotations            string   `json:"annotations"`
 }
 
 type PipelineAssetState struct {

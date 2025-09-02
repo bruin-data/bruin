@@ -116,6 +116,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
+	if err := ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name); err != nil {
+		return err
+	}
+
 	// Print SQL query in verbose mode
 	if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
 		if w, ok := writer.(io.Writer); ok {
@@ -133,6 +137,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	q, err = o.devEnv.Modify(ctx, p, t, q)
 	if err != nil {
+		return err
+	}
+
+	if err := ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name); err != nil {
 		return err
 	}
 

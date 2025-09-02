@@ -582,6 +582,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage: "timeout for the entire pipeline run in seconds",
 				Value: 604800, // 7 days default
 			},
+			&cli.StringFlag{
+				Name:  "query-annotations",
+				Usage: "JSON string containing annotations to be added as comments to queries",
+			},
 		},
 		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -608,6 +612,7 @@ func Run(isDebug *bool) *cli.Command {
 				ConfigFilePath:         c.String("config-file"),
 				SensorMode:             c.String("sensor-mode"),
 				ApplyIntervalModifiers: c.Bool("apply-interval-modifiers"),
+				Annotations:            c.String("query-annotations"),
 			}
 
 			var startDate, endDate time.Time
@@ -664,6 +669,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigQueryAnnotations, runConfig.Annotations)
 
 			preview, err := GetPipeline(runCtx, inputPath, runConfig, logger, pipeline.WithOnlyPipeline())
 			if err != nil {
