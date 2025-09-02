@@ -46,7 +46,9 @@ parameters:
 
 ## Available Source Tables
 
-- `<base_id>/<table_name>`: Airtable tables are used in the format of base ID and table name (example: `appXYZ/employee`).
+| Table                      | PK | Inc Key | Inc Strategy | Details                                                                          |
+|----------------------------|----|---------|--------------|--------------------------------------------------------------------|
+| `<base_id>/<table_name>`   | -  | -       | replace      | Airtable tables are used in the format of base ID and table name (example: `appXYZ/employee`). |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

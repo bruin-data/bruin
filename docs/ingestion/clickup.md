@@ -34,11 +34,13 @@ parameters:
 
 ## Available Source Tables
 
-- `user`: The authorised user profile.
-- `teams`: Workspaces available to the authenticated user.
-- `spaces`: Spaces available within a workspace.
-- `lists`: Lists contained in each space.
-- `tasks`: Tasks belonging to each list.
+| Table | PK | Inc Key | Inc Strategy | Details |
+| ----- | -- | ------- | ------------ | ------- |
+| `user` | id | - | merge | The authorised user profile |
+| `teams` | id | - | merge | Workspaces available to the authenticated user. In ClickUp, a "team" in the API is equivalent to a workspace, which is the highest-level container for all spaces, folders, lists, and tasks |
+| `spaces` | id | - | merge | Spaces available within a workspace. Spaces are major sections used to organize work, such as departments, projects, or business units. Each space can contain folders, lists, and tasks |
+| `lists` | id | - | merge | Lists contained in each space. Lists are collections of tasks, often representing projects, sprints, or workflow stages |
+| `tasks` | id | date_updated | merge | Tasks belonging to each list |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

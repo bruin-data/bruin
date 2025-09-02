@@ -53,7 +53,30 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Zendesk connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Zendesk that you want to ingest. You can find the available source tables in Zendesk [here](https://bruin-data.github.io/ingestr/supported-sources/zendesk.html#tables)
+- `source_table`: The name of the data table in Zendesk that you want to ingest. Available tables:
+
+Table    PK    Inc Key    Inc Strategy    Details
+tickets    id    updated_at    merge    Retrieves all tickets, which are the means through which customers communicate with agents
+ticket_metrics    -    –    replace    Retrieves various metrics about one or more tickets.
+ticket_metric_events    id    time    append    Retrieves ticket metric events that occurred on or after the start time
+ticket_forms    -    -    replace    Retrieves all ticket forms
+users    -    –    replace    Retrieves all users
+groups    -    –    replace    Retrieves groups of support agents
+organizations    -    –    replace    Retrieves organizations
+brands    -    –    replace    Retrieves all brands for your account
+sla_policies    -    –    replace    Retrieves different SLA policies.
+activities    -    –    replace    Retrieves ticket activities affecting the agent.
+automations    -    –    replace    Retrieves the automations for the current account
+targets    -    –    replace    Retrieves targets where as targets are data from Zendesk to external applications like Slack when a ticket is updated or created.
+calls    id    updated_at    merge    Retrieves all calls specific to channels
+addresses    -    –    replace    Retrieves addresses information
+greetings    -    –    replace    Retrieves all default or customs greetings
+phone_numbers    -    –    replace    Retrieves all available phone numbers.
+settings    -    –    replace    Retrieves account settings related to Zendesk voice accounts
+lines    -    –    replace    Retrieves all available lines, such as phone numbers and digital lines, in your Zendesk voice account.
+agents_activity    -    –    replace    Retrieves activity information for agents
+legs_incremental    id    updated_at    merge    Retrieves detailed information about each agent involved in a call.
+chats    id    update_timestamp/updated_timestamp    merge    Retrieves available chats.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

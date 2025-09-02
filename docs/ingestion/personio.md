@@ -38,15 +38,20 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For Personio, it will be always `ingestr`.
 - `source_connection`: The name of the Personio connection defined in `.bruin.yml`.
-- `source_table`: The name of the table in Personio to ingest. Available tables are:
-  - `employees` : Retrieves company employees details
-  - `absences` : Retrieves absence periods for absences tracked in days
-  - `absence_types` : Retrieves list of various types of employee absences
-  - `attendances` : Retrieves attendance records for each employee
-  - `projects` : Retrieves a list of all company projects
-  - `document_categories` : Retrieves all document categories of the company
-  - `employees_absences_balance` : Retrieves the absence balance for a specific employee
-  - `custom_reports_list` : Retrieves metadata about existing custom reports in your Personio account, such as report name, report type, report date / timeframe.
+- `source_table`: The name of the table in Personio to ingest.
+
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| employees | id | last_modified_at | merge | Retrieves company employees details. |
+| absence_types | id | – | replace | Retrieves list of various types of employee absences Retrieves absence periods for absences tracked in days. |
+| absences | id | updated_at | merge | Fetches absence periods for absences with time unit set to days. |
+| attendances | id | updated_at | merge | Retrieves attendance records for each employee |
+| projects | id | – | replace | Retrieves a list of all company projects |
+| document_categories | id | – | replace | Retrieves all document categories of the company |
+| custom_reports_list | id | – | replace | Retrieves metadata about existing custom reports in your Personio account, such as report name, report type, report date / timeframe. |
+| employees_absences_balance | [employee_id,id] | – | merge | Retrieves the absence balance for a specific employee |
 - `destination`: The name of the destination connection.
 
 

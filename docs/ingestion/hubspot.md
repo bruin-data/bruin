@@ -42,13 +42,15 @@ parameters:
 
 ## Available Source Tables
 
-- `companies`: Retrieves information about organizations.
-- `contacts`: Retrieves information about visitors, potential customers, and leads.
-- `deals`: Retrieves deal records and tracks deal progress.
-- `tickets`: Handles requests for help from customers or users.
-- `products`: Retrieves pricing information of products.
-- `quotes`: Retrieves price proposals that salespeople can create and send.
-- `schemas`: Returns all object schemas that have been defined for your account.
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------| 
+| companies | - | - | replace | Retrieves information about organizations. |
+| contacts | - | - | replace | Retrieves information about visitors, potential customers, and leads. |
+| deals | - | - | replace | Retrieves deal records and tracks deal progress. |
+| tickets | - | - | replace | Handles requests for help from customers or users. |
+| products | - | - | replace | Retrieves pricing information of products. |
+| quotes | - | - | replace | Retrieves price proposals that salespeople can create and send. |
+| schemas | id | - | merge | Returns all object schemas that have been defined for your account. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

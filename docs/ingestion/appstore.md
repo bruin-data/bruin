@@ -57,12 +57,14 @@ parameters:
 
 ## Available Source Tables
 
-- `app-downloads-detailed`: App download analytics including first-time downloads, redownloads, updates, and more.
-- `app-store-discovery-and-engagement-detailed`: App Store discovery and engagement metrics including data about user engagement with your app's icons, product pages, in-app event pages, and other install sheets.
-- `app-sessions-detailed`: App Session provides insights on how often people open your app, and how long they spend in your app.
-- `app-store-installation-and-deletion-detailed`: App installation and deletion metrics including device to estimate the number of times people install and delete your App Store apps.
-- `app-store-purchases-detailed`: App purchase analytics including revenue, payment methods, and content details.
-- `app-crashes-expanded`: App crash analytics including crash counts, device information, and version details.
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------| -------------|---------|
+| app-downloads-detailed | [App Apple Identifier,App Name, App Version,Campaign,Date,Device,Download Type,Page Title,Page Type,Platform Version,Pre-Order,Source Info,Source Type,Territory] | processing_date | merge | App download analytics including first-time downloads, redownloads, updates, and more. |
+| app-store-discovery-and-engagement-detailed | [App Apple Identifier,App Name,Campaign,Date,Device,Engagement Type,Event,Page Title,Page Type,Platform Version,Source Info,Source Type,Territory] | processing_date | merge | App Store discovery and engagement metrics including data about user engagement with your app's icons, product pages, in-app event pages, and other install sheets. |
+| app-sessions-detailed | [Date,App Name,App Apple Identifier,App Version,Device,Platform Version,Source Type,Source Info,Campaign,Page Type,Page Title,App Download Date,Territory] | processing_date | merge | App Session provides insights on how often people open your app, and how long they spend in your app. |
+| app-store-installation-and-deletion-detailed | [App Apple Identifier,App Download Date,App Name,App Version,Campaign,Counts,Date,Device,Download Type,Event,Page Title,Page Type,Platform Version,Source Info,Source Type,Territory,Unique Devices] | processing_date | merge | App installation and deletion metrics including device to estimate the number of times people install and delete your App Store apps. |
+| app-store-purchases-detailed | [App Apple Identifier,App Download Date,App Name,Campaign,Content Apple Identifier,Content Name,Date,Device,Page Title,Page Type,Payment Method,Platform Version,Pre-Order,Purchase Type,Source Info,Source Type,Territory] | processing_date | merge | App purchase analytics including revenue, payment methods, and content details. |
+| app-crashes-expanded | [App Name,App Version,Build,Date,Device,Platform,Release Type,Territory] | processing_date | merge | App crash analytics including crash counts, device information, and version details. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

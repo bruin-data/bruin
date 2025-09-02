@@ -45,9 +45,11 @@ parameters:
 
 ## Available Source Tables
 
-- `profiles`: Retrieves player profiles based on a list of player usernames.
-- `games`: Retrieves players games for specified players.
-- `archives`: Retrieves the URLs to game archives for specified players.
+| Table     | PK | Inc Key | Inc Strategy | Details                                                          |
+|-----------|----|---------|--------------|-----------------------------------------------------------------|
+| profiles  | -  | -       | replace      | Retrieves player profiles based on a list of player usernames. |
+| games     | -  | -       | replace      | Retrieves players games for specified players.                 |
+| archives  | -  | -       | replace      | Retrieves the URLs to game archives for specified players.     |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

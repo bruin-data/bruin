@@ -40,9 +40,13 @@ parameters:
 
 ## Available Source Tables
 
-- `currencies`: Retrieves list of available currencies with ISO 4217 codes and names.
-- `latest`: Fetches latest exchange rates for all currencies.
-- `exchange_rates`: Retrieves historical exchange rates for specified date range.
+Frankfurter source allows ingesting the following sources into separate tables:
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| currencies | - | – | replace | Retrieves list of available currencies with ISO 4217 codes and names |
+| latest | ["date", "currency_code", "base_currency"] | – | merge | Fetches latest exchange rates for all currencies |
+| exchange_rates | ["date", "currency_code", "base_currency"] | date | merge | Retrieves historical exchange rates for specified date range |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

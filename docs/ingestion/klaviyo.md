@@ -42,21 +42,23 @@ parameters:
 
 ## Available Source Tables
 
-- `events`: Retrieves all events in an account.
-- `profiles`: Retrieves all profiles in an account.
-- `campaigns`: Retrieves all campaigns in an account.
-- `metrics`: Retrieves all metrics in an account.
-- `tags`: Retrieves all tags in an account.
-- `coupons`: Retrieves all coupons in an account.
-- `catalog-variants`: Retrieves all variants in an account.
-- `catalog-categories`: Retrieves all catalog categories in an account.
-- `catalog-items`: Retrieves all catalog items in an account.
-- `flows`: Retrieves all flows in an account.
-- `lists`: Retrieves all lists in an account.
-- `images`: Retrieves all images in an account.
-- `segments`: Retrieves all segments in an account.
-- `forms`: Retrieves all forms in an account.
-- `templates`: Retrieves all templates in an account.
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| events | id | datetime | merge | Retrieves all events in an account where each event represents an action taken by a profile such as a password reset or a product order. |
+| profiles | id | updated | merge | Retrieves all profiles in an account where each profile includes details like organization, job title, email and other attributes. |
+| campaigns | id | updated_at | merge | Retrieves all campaigns in an account where each campaign is a targeted message sent to a specific audience. |
+| metrics | id | updated | merge | Retrieves all metrics in an account where each metric represents a category of events or actions a person can take. |
+| tags | id | – | replace | Retrieves all tags in an account. |
+| coupons | id | – | replace | Retrieves all coupons in an account. |
+| catalog-variants | id | updated | merge | Retrieves all variants in an account. |
+| catalog-categories | id | updated | merge | Retrieves all catalog categories in an account. |
+| catalog-items | id | updated | merge | Retrieves all catalog items in an account. |
+| flows | id | updated | merge | Retrieves all flows in an account where flow is a sequence of automated actions that is triggered when a person performs a specific action. |
+| lists | id | updated | merge | Retrieves all lists in an account. |
+| images | id | updated_at | merge | Retrieves all images in an account. |
+| segments | id | updated | merge | Retrieves all segments in an account where segment is a dynamic list that contains profiles meeting a certain set of conditions. |
+| forms | id | updated_at | merge | Retrieves all forms in an account. |
+| templates | id | updated | merge | Retrieves all templates in an account. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

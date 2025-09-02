@@ -34,7 +34,12 @@ parameters:
 ```
 
 - `source_connection`: name of the Pinterest connection defined in `.bruin.yml`.
-- `source_table`: Pinterest table to ingest. Available tables are listed in the [Ingestr documentation](https://github.com/bruin-data/ingestr/blob/main/docs/supported-sources/pinterest.md#tables).
+- `source_table`: Pinterest table to ingest. Available tables:
+
+| Table  | PK | Inc Key    | Inc Strategy | Details                    |
+|--------|----|-----------|--------------|-----------------------------|
+| pins   | id | created_at | merge        | Retrieves a list of pins.   |
+| boards | id | created_at | merge        | Retrieves a list of boards. |
 - `destination`: name of the destination connection.
 
 ### Step 3: [Run](/commands/run) asset to ingest data

@@ -42,12 +42,16 @@ parameters:
 
 ## Available Source Tables
 
-- `campaigns`: Retrieves campaign data with various fields.
-- `ad_sets`: Retrieves ad set data with various fields.
-- `ads`: Retrieves ad data with various fields.
-- `ad_creatives`: Retrieves ad creative data with various fields.
-- `leads`: Retrieves lead data with various fields.
-- `facebook_insights`: Retrieves insights data with configurable dimensions and metrics.
+Facebook Ads source allows ingesting the following sources into separate tables:
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| campaigns | id | – | replace | Retrieves campaign data with fields: id, updated_time, created_time, name, status, effective_status, objective, start_time, stop_time, daily_budget, lifetime_budget |
+| ad_sets | id | – | replace | Retrieves ad set data with fields: id, updated_time, created_time, name, status, effective_status, campaign_id, start_time, end_time, daily_budget, lifetime_budget, optimization_goal, promoted_object, billing_event, bid_amount, bid_strategy, targeting |
+| ads | id | - | replace | Retrieves ad data with fields: id, updated_time, created_time, name, status, effective_status, adset_id, campaign_id, creative, targeting, tracking_specs, conversion_specs |
+| ad_creatives | id | - | replace | Retrieves ad creative data with fields: id, name, status, thumbnail_url, object_story_spec, effective_object_story_id, call_to_action_type, object_type, template_url, url_tags, instagram_actor_id, product_set_id |
+| leads | id | - | replace | Retrieves lead data with fields: id, created_time, ad_id, ad_name, adset_id, adset_name, campaign_id, campaign_name, form_id, field_data |
+| facebook_insights | date_start | date_start | merge | Retrieves insights data with fields: campaign_id, adset_id, ad_id, date_start, date_stop, reach, impressions, frequency, clicks, unique_clicks, ctr, unique_ctr, cpc, cpm, cpp, spend, actions, action_values, cost_per_action_type, website_ctr, account_currency, ad_click_actions, ad_name, adset_name, campaign_name, country, dma, full_view_impressions, full_view_reach, inline_link_click_ctr, outbound_clicks, social_spend, conversions, video_thruplay_watched_actions |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

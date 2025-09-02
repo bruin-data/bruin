@@ -40,6 +40,12 @@ parameters:
 - `source_connection`: The name of the LinkedIn Ads connection defined in `.bruin.yml`.
 - `source_table`: The name of the table in LinkedIn Ads to ingest. Currently, we only support custom reports based on specified dimensions and metrics.
 
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| custom | [dimension, date] or [dimension, start_date, end_date] | date (daily) or start_date (monthly) | merge | Custom reports allow you to retrieve data based on specific dimensions and metrics. |
+
 Custom Table Format:
 `custom:<dimensions>:<metrics>`
 

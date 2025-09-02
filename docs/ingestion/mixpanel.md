@@ -42,8 +42,10 @@ parameters:
 
 ## Available Source Tables
 
-- `events`: Retrieves events data.
-- `profiles`: Retrieves Mixpanel user profiles and attributes.
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| events | distinct_id | time | merge | Retrieves events data |
+| profiles | distinct_id | last_seen | merge | Retrieves Mixpanel user profiles and attributes. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
