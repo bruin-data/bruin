@@ -62,10 +62,12 @@ name: string
 type: string
 parameters:
     query: string
+    poke_interval: int (optional)
 ```
 
 **Parameters**:
 - `query`: Query you expect to return any results
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
 

@@ -886,3 +886,89 @@ ORDER BY table_schema, table_name;`).
 		})
 	}
 }
+
+func TestDB_BuildTableExistsQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		db          *DB
+		tableName   string
+		wantQuery   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "invalid format - empty component",
+			db:          &DB{config: &Config{Database: "test_db"}},
+			tableName:   ".test_table",
+			wantErr:     true,
+			errContains: "table name must be in schema.table or database.schema.table format, '.test_table' given",
+		},
+		{
+			name:        "invalid format - empty component 2",
+			db:          &DB{config: &Config{Database: "test_db"}},
+			tableName:   ".",
+			wantErr:     true,
+			errContains: "table name must be in schema.table or database.schema.table format, '.' given",
+		},
+		{
+			name:        "invalid format - too few components",
+			db:          &DB{config: &Config{Database: "test_db"}},
+			tableName:   "single",
+			wantErr:     true,
+			errContains: "table name must be in schema.table or database.schema.table format, 'single' given",
+		},
+		{
+			name:        "invalid format - empty table name",
+			db:          &DB{config: &Config{Database: "test_db"}},
+			tableName:   "",
+			wantQuery:   "",
+			wantErr:     true,
+			errContains: "table name must be in schema.table or database.schema.table format, '' given",
+		},
+		{
+			name:        "invalid format - empty database name",
+			db:          &DB{config: &Config{Database: ""}},
+			tableName:   "test_schema.test_table",
+			wantErr:     true,
+			errContains: "no database name provided",
+		},
+		{
+			name:        "invalid format - too many components",
+			db:          &DB{config: &Config{Database: "test_db"}},
+			tableName:   "a.b.c.d",
+			wantErr:     true,
+			errContains: "table name must be in schema.table or database.schema.table format, 'a.b.c.d' given",
+		},
+		{
+			name:      "valid schema.table format",
+			db:        &DB{config: &Config{Database: "test_db"}},
+			tableName: "test_schema.test_table",
+			wantQuery: "SELECT COUNT(*) FROM TEST_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'",
+			wantErr:   false,
+		},
+		{
+			name:      "valid database.schema.table format",
+			db:        &DB{config: &Config{Database: "test_db"}},
+			tableName: "other_db.test_schema.test_table",
+			wantQuery: "SELECT COUNT(*) FROM OTHER_DB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'",
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotQuery, err := tt.db.BuildTableExistsQuery(tt.tableName)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantQuery, gotQuery)
+		})
+	}
+}

@@ -1192,13 +1192,15 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 			},
 			query: "SELECT id, col1, col2, col3, col4 from source_table",
 			want: "^BEGIN TRANSACTION;\n\n" +
-				"SET session_timestamp = CURRENT_TIMESTAMP;\n\n" +
+				"-- Capture the timestamp once for the entire transaction\n" +
+				"CREATE TEMP TABLE _ts AS \n" +
+				"SELECT CURRENT_TIMESTAMP AS session_timestamp;\n\n" +
 				"-- Create temp table with source data\n" +
 				"CREATE TEMP TABLE __bruin_scd2_tmp_.+ AS \n" +
 				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, col1, col2, col3, col4 from source_table\\) AS src;\n\n" +
 				"-- Update existing records that have changes\n" +
 				"UPDATE my\\.asset AS target\n" +
-				"SET _valid_until = :session_timestamp, _is_current = FALSE\n" +
+				"SET _valid_until = \\(SELECT session_timestamp FROM _ts\\), _is_current = FALSE\n" +
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
@@ -1206,7 +1208,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Update records that are no longer in source \\(expired\\)\n" +
 				"UPDATE my\\.asset AS target\n" +
-				"SET _valid_until = :session_timestamp, _is_current = FALSE\n" +
+				"SET _valid_until = \\(SELECT session_timestamp FROM _ts\\), _is_current = FALSE\n" +
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND NOT EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
@@ -1214,7 +1216,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
 				"INSERT INTO my\\.asset \\(id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.id, source\\.col1, source\\.col2, source\\.col3, source\\.col4, :session_timestamp, TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"SELECT source\\.id, source\\.col1, source\\.col2, source\\.col3, source\\.col4, \\(SELECT session_timestamp FROM _ts\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
 				"FROM __bruin_scd2_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM my\\.asset AS target \n" +
@@ -1241,13 +1243,15 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 			},
 			query: "SELECT id, category, name, price from source_table",
 			want: "^BEGIN TRANSACTION;\n\n" +
-				"SET session_timestamp = CURRENT_TIMESTAMP;\n\n" +
+				"-- Capture the timestamp once for the entire transaction\n" +
+				"CREATE TEMP TABLE _ts AS \n" +
+				"SELECT CURRENT_TIMESTAMP AS session_timestamp;\n\n" +
 				"-- Create temp table with source data\n" +
 				"CREATE TEMP TABLE __bruin_scd2_tmp_.+ AS \n" +
 				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, category, name, price from source_table\\) AS src;\n\n" +
 				"-- Update existing records that have changes\n" +
 				"UPDATE my\\.asset AS target\n" +
-				"SET _valid_until = :session_timestamp, _is_current = FALSE\n" +
+				"SET _valid_until = \\(SELECT session_timestamp FROM _ts\\), _is_current = FALSE\n" +
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
@@ -1255,7 +1259,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Update records that are no longer in source \\(expired\\)\n" +
 				"UPDATE my\\.asset AS target\n" +
-				"SET _valid_until = :session_timestamp, _is_current = FALSE\n" +
+				"SET _valid_until = \\(SELECT session_timestamp FROM _ts\\), _is_current = FALSE\n" +
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND NOT EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
@@ -1263,7 +1267,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
 				"INSERT INTO my\\.asset \\(id, category, name, price, _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.id, source\\.category, source\\.name, source\\.price, :session_timestamp, TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"SELECT source\\.id, source\\.category, source\\.name, source\\.price, \\(SELECT session_timestamp FROM _ts\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
 				"FROM __bruin_scd2_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM my\\.asset AS target \n" +

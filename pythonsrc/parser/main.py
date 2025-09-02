@@ -146,7 +146,103 @@ def get_table_name(table: exp.Table):
     return db_name + schema_name + table_name
 
 
+def get_table_name_with_context(table: exp.Table, current_database: str):
+    """
+    Get table name with database context applied for T-SQL.
+    If the table doesn't have a catalog (database), use the current database from USE statement.
+    """
+    db_name = ""
+    schema_name = ""
+
+    # Check if table already has a catalog (database)
+    if hasattr(table, "catalog") and table.catalog:
+        db_name = table.catalog + "."
+        # If catalog is specified but schema is empty (e.g., OTHER_DWH..some_table)
+        # use default "dbo" schema
+        if hasattr(table, "db") and table.db:
+            schema_name = table.db + "."
+        else:
+            schema_name = "dbo."
+    else:
+        # Use current database from USE statement
+        db_name = current_database + "."
+        # Check if table has a schema
+        if hasattr(table, "db") and table.db:
+            schema_name = table.db + "."
+        else:
+            # If no schema, use default "dbo" schema
+            schema_name = "dbo."
+
+    # Handle case where table name is inside an Anonymous expression (e.g., SQL Server's table(nolock))
+    table_name = table.name
+    if not table_name and hasattr(table, "this"):
+        if isinstance(table.this, exp.Anonymous):
+            # Extract the function name part (e.g., "TableName" from "TableName(nolock)")
+            if isinstance(table.this.this, exp.Identifier):
+                table_name = table.this.this.name
+            else:
+                table_name = str(table.this.this)
+        elif isinstance(table.this, exp.Identifier):
+            table_name = table.this.this
+
+    return db_name + schema_name + table_name
+
+
+def get_tables_tsql(query: str):
+    """
+    T-SQL specific implementation of get_tables that handles USE statements
+    and expands table references with the current database context.
+    """
+    try:
+        parsed = parse(query, dialect="tsql")
+        if parsed is None:
+            return {"tables": [], "error": "unable to parse query"}
+    except Exception as e:
+        return {"tables": [], "error": str(e)}
+
+    tables = []
+    current_database = None
+
+    # Track the current database from USE statements
+    for parsedSingle in parsed:
+        if parsedSingle is None:
+            continue
+        # Check if this is a USE statement
+        if isinstance(parsedSingle, exp.Use):
+            # Extract the database name from the USE statement
+            if hasattr(parsedSingle, "this") and parsedSingle.this:
+                current_database = (
+                    parsedSingle.this.name
+                    if hasattr(parsedSingle.this, "name")
+                    else str(parsedSingle.this)
+                )
+        else:
+            try:
+                extracted = extract_tables(parsedSingle)
+                tables.extend(extracted)
+            except Exception as e:
+                return {"tables": [], "error": str(e)}
+
+    # Process table names, applying current database context
+    table_names = []
+    for table in tables:
+        if current_database:
+            table_name = get_table_name_with_context(table, current_database)
+        else:
+            table_name = get_table_name(table)
+        table_names.append(table_name)
+
+    return {
+        "tables": sorted(list(set(table_names))),
+    }
+
+
 def get_tables(query: str, dialect: str):
+    # Delegate to T-SQL specific implementation if dialect is tsql
+    if dialect == "tsql":
+        return get_tables_tsql(query)
+
+    # Standard implementation for other dialects
     try:
         parsed = parse(query, dialect=dialect)
         if parsed is None:

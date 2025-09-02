@@ -40,7 +40,16 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Adjust connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Adjust that you want to ingest. For example, `creatives` is the table of Adjust that you want to ingest. You can find the available source tables in Adjust [here](https://bruin-data.github.io/ingestr/supported-sources/adjust.html#tables).
+- `source_table`: The name of the data table in Adjust that you want to ingest. For example, `creatives` is the table of Adjust that you want to ingest.
+
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+| ----- | -- | ------- | ------------ | ------- |
+| `campaigns` | id | created | merge | Retrieves data for a campaign, showing the app's revenue and network costs over multiple days. |
+| `creatives` | id | created | merge | Retrieves data for a creative assets, detailing the app's revenue and network costs across multiple days. |
+| `events` | id | created | merge | Retrieves data for events and event slugs. |
+| `custom` | id | created | merge | Retrieves custom data based on the dimensions and metrics specified. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

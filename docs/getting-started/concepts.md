@@ -101,7 +101,7 @@ A connection is a set of credentials that enable Bruin to communicate with an ex
 
 Platform specific connections have specific schemas, and "generic" connections are built as key-value pairs to inject secrets into your assets from outside. 
 
-Connections are defined in the `.bruin.yml` file locally. A connection has a name and the credentials.
+Connections are defined in the `.bruin.yml` file locally, although other [secrets backends](../secrets/overview.md) can be used. A connection has a name and the credentials.
 
 When you run a pipeline, Bruin will find this file in the repo root, parse the connections there, build client objects internally to interact with these external platforms and then run your assets.
 

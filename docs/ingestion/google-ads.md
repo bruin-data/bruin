@@ -57,11 +57,24 @@ parameters:
 - type: Specifies the type of the asset. It will be always ingestr type for Google Ads.
 - connection: This is the destination connection.
 - source_connection: The name of the Google Ads connection defined in .bruin.yml.
-- source_table: The name of the resource in Google Ads you want to ingest. 
+- source_table: The name of the resource in Google Ads you want to ingest. You can also request a custom report by specifying the source table as `daily:{resource}:{dimensions}:{metrics}`.
 
-You can find a list of supported tables [here](https://bruin-data.github.io/ingestr/supported-sources/google-ads.html#tables).
+## Available Source Tables
 
-You can also request a custom report by specifying the source table as `daily:{resource}:{dimensions}:{metrics}`. See [ingestr googleads docs](https://bruin-data.github.io/ingestr/supported-sources/google-ads.html#custom-reports) for more information.
+- `account_report_daily`: Provides daily metrics aggregated at the account level.
+- `campaign_report_daily`: Provides daily metrics aggregated at the campaign level.
+- `ad_group_report_daily`: Provides daily metrics aggregated at the ad group level.
+- `ad_report_daily`: Provides daily metrics aggregated at the ad level.
+- `audience_report_daily`: Provides daily metrics aggregated at the audience level.
+- `keyword_report_daily`: Provides daily metrics aggregated at the keyword level.
+- `click_report_daily`: Provides daily metrics on clicks.
+- `landing_page_report_daily`: Provides daily metrics on landing page performance.
+- `search_keyword_report_daily`: Provides daily metrics on search keywords.
+- `search_term_report_daily`: Provides daily metrics on search terms.
+- `lead_form_submission_data_report_daily`: Provides daily metrics on lead form submissions.
+- `local_services_lead_report_daily`: Provides daily metrics on local services leads.
+- `local_services_lead_conversations_report_daily`: Provides daily metrics on local services lead conversations.
+- `daily:{resource_name}:{dimensions}:{metrics}`: Custom reports with specified resource, dimensions, and metrics.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

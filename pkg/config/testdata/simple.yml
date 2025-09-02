@@ -214,6 +214,10 @@ environments:
         - name: "linkedinads-1"
           access_token: "access-token-123"
           account_ids: "account-id-123,account-id-456"
+      revenuecat:
+        - name: "revenuecat-1"
+          api_key: "rc_api_key_123"
+          project_id: "proj_123456789"
       linear:
         - name: "linear-1"
           api_key: "api-key-123"
@@ -301,6 +305,7 @@ environments:
           username: "username-123"
           password: "password-123"
           token: "token-123"
+          domain: "mydomain.my.salesforce.com"
       sqlite:
         - name: "sqlite-1"
           path: "C:\\path\\to\\sqlite.db"
@@ -366,6 +371,11 @@ environments:
           org: "influxdb-org"
           bucket: "influxdb-bucket"
           secure: "true"
+      fluxx:
+        - name: "fluxx-1"
+          instance: "test-instance"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
 
   prod:
     connections:

@@ -15,6 +15,20 @@
   --vp-c-brand-1: #d95f5f;
   --vp-c-brand-2: #e18080;
   --vp-c-brand-3: #d95f5f;
+
+  --vp-layout-max-width: 1600px;
+}
+
+.VPDoc:not(.has-sidebar) .container {
+  max-width: 1584px !important;
+}
+
+.VPDoc:not(.has-sidebar) .content {
+  max-width: 1264px !important;
+}
+
+.VPDoc.has-aside .content-container {
+  max-width: 1168px !important;
 }
 
 html.dark .vp-code-dark {
@@ -34,5 +48,5 @@ html:not(.dark) .vp-code-dark {
 }
 
 .VPSidebarItem .text {
-  /*padding-top: 0.1rem !important;*/
+  padding-top: 0.1rem !important;
 }

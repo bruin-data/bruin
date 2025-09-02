@@ -35,6 +35,7 @@ type contextKey int
 const (
 	KeyPrinter contextKey = iota
 	KeyIsDebug contextKey = iota
+	KeyVerbose contextKey = iota
 	ContextLogger
 
 	timeFormat = "2006-01-02 15:04:05"
@@ -116,10 +117,10 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		start := time.Now()
 
 		printer := &workerWriter{
-			w:           os.Stdout,
-			task:        task.GetAsset(),
-			sprintfFunc: w.printer.SprintfFunc(),
-			worker:      w.id,
+			w:                 os.Stdout,
+			task:              task.GetAsset(),
+			sprintfFunc:       w.printer.SprintfFunc(),
+			DoNotLogTimestamp: w.formatOpts.DoNotLogTimestamp,
 		}
 
 		executionCtx := context.WithValue(ctx, KeyPrinter, printer)
@@ -159,15 +160,20 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 }
 
 type workerWriter struct {
-	w           io.Writer
-	task        *pipeline.Asset
-	sprintfFunc func(format string, a ...interface{}) string
-	worker      string
+	w                 io.Writer
+	task              *pipeline.Asset
+	sprintfFunc       func(format string, a ...interface{}) string
+	DoNotLogTimestamp bool
 }
 
 func (w *workerWriter) Write(p []byte) (int, error) {
-	timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
-	formatted := fmt.Sprintf("%s %s", timestampStr, w.sprintfFunc("[%s] %s", w.task.Name, string(p)))
+	var formatted string
+	if w.DoNotLogTimestamp {
+		formatted = w.sprintfFunc("[%s] %s", w.task.Name, string(p))
+	} else {
+		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
+		formatted = fmt.Sprintf("%s %s", timestampStr, w.sprintfFunc("[%s] %s", w.task.Name, string(p)))
+	}
 
 	n, err := w.w.Write([]byte(formatted))
 	if err != nil {

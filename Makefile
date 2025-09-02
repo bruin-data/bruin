@@ -1,4 +1,4 @@
-NAME=bruin
+NAME=bruin$(shell if [ "$(shell go env GOOS)" = "windows" ]; then echo .exe; fi)
 BUILD_DIR ?= bin
 BUILD_SRC=.
 
@@ -42,9 +42,9 @@ integration-test: build
 	@mkdir -p integration-tests/logs/runs
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 .
+	@cd integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 .
 
-integration-test-individual: build
+integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
 	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
 	@touch integration-tests/.git
@@ -55,39 +55,9 @@ integration-test-individual: build
 	@mkdir -p integration-tests/logs
 	@mkdir -p integration-tests/logs/exports
 	@mkdir -p integration-tests/logs/runs
-	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@echo "$(OK_COLOR)==> Running integration tests (skipping ingestr tasks)...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIndividualTasks github.com/bruin-data/bruin/integration-tests
-
-integration-test-workflow: build
-	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
-	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
-	@touch integration-tests/.git
-	@touch integration-tests/bruin
-	@rm -rf integration-tests/.git
-	@rm integration-tests/bruin
-	@rm -rf integration-tests/logs
-	@mkdir -p integration-tests/logs
-	@mkdir -p integration-tests/logs/exports
-	@mkdir -p integration-tests/logs/runs
-	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
-	@cd integration-tests && git init
-	@cd integration-tests && go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestWorkflowTasks github.com/bruin-data/bruin/integration-tests
-
-integration-test-ingestr: build
-	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
-	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
-	@touch integration-tests/.git
-	@touch integration-tests/bruin
-	@rm -rf integration-tests/.git
-	@rm integration-tests/bruin
-	@rm -rf integration-tests/logs
-	@mkdir -p integration-tests/logs
-	@mkdir -p integration-tests/logs/exports
-	@mkdir -p integration-tests/logs/runs
-	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
-	@cd integration-tests && git init
-	@cd integration-tests && INCLUDE_INGESTR=1 go test -tags="no_duckdb_arrow" -v -count=1 -run ^TestIngestrTasks github.com/bruin-data/bruin/integration-tests
+	@cd integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
 
 integration-test-cloud: build
 	@touch integration-tests/cloud-integration-tests/.git
@@ -96,7 +66,7 @@ integration-test-cloud: build
 	@rm integration-tests/cloud-integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests/cloud-integration-tests && go test -count=1 -v .
+	@cd integration-tests/cloud-integration-tests && env SILENT=1 go test -count=1 -v .
 
 clean:
 	@rm -rf ./bin

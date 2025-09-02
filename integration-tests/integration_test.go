@@ -1025,7 +1025,6 @@ func TestIndividualTasks(t *testing.T) {
 			}
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
-			t.Logf("Task '%s' completed successfully", tt.task.Name)
 		})
 	}
 }
@@ -1751,7 +1750,6 @@ func TestWorkflowTasks(t *testing.T) {
 			err := tt.workflow.Run()
 
 			require.NoError(t, err, "Workflow %s failed: %v", tt.workflow.Name, err)
-			t.Logf("Workflow '%s' completed successfully", tt.workflow.Name)
 		})
 	}
 }
@@ -1858,7 +1856,6 @@ func TestIngestrTasks(t *testing.T) {
 			}
 			err := tt.task.Run()
 			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
-			t.Logf("Task '%s' completed successfully", tt.task.Name)
 		})
 	}
 }

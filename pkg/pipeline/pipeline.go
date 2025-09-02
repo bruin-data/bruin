@@ -32,6 +32,7 @@ const (
 	AssetTypeSnowflakeQuery         = AssetType("sf.sql")
 	AssetTypeSnowflakeSeed          = AssetType("sf.seed")
 	AssetTypeSnowflakeQuerySensor   = AssetType("sf.sensor.query")
+	AssetTypeSnowflakeTableSensor   = AssetType("sf.sensor.table")
 	AssetTypeBigqueryQuery          = AssetType("bq.sql")
 	AssetTypeBigqueryTableSensor    = AssetType("bq.sensor.table")
 	AssetTypeBigqueryQuerySensor    = AssetType("bq.sensor.query")
@@ -52,11 +53,13 @@ const (
 	AssetTypePostgresQuery          = AssetType("pg.sql")
 	AssetTypePostgresSeed           = AssetType("pg.seed")
 	AssetTypePostgresQuerySensor    = AssetType("pg.sensor.query")
+	AssetTypePostgresTableSensor    = AssetType("pg.sensor.table")
 	AssetTypeRedshiftQuery          = AssetType("rs.sql")
 	AssetTypeRedshiftSeed           = AssetType("rs.seed")
 	AssetTypeRedshiftQuerySensor    = AssetType("rs.sensor.query")
 	AssetTypeAthenaQuery            = AssetType("athena.sql")
 	AssetTypeAthenaSQLSensor        = AssetType("athena.sensor.query")
+	AssetTypeAthenaTableSensor      = AssetType("athena.sensor.table")
 	AssetTypeAthenaSeed             = AssetType("athena.seed")
 	AssetTypeMsSQLQuery             = AssetType("ms.sql")
 	AssetTypeMsSQLSeed              = AssetType("ms.seed")
@@ -553,11 +556,13 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 
 	AssetTypeSnowflakeQuery:        "snowflake",
 	AssetTypeSnowflakeQuerySensor:  "snowflake",
+	AssetTypeSnowflakeTableSensor:  "snowflake",
 	AssetTypeSnowflakeSeed:         "snowflake",
 	AssetTypeSnowflakeSource:       "snowflake",
 	AssetTypePostgresQuery:         "postgres",
 	AssetTypePostgresSeed:          "postgres",
 	AssetTypePostgresQuerySensor:   "postgres",
+	AssetTypePostgresTableSensor:   "postgres",
 	AssetTypePostgresSource:        "postgres",
 	AssetTypeRedshiftQuery:         "redshift",
 	AssetTypeRedshiftSeed:          "redshift",
@@ -578,6 +583,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeAthenaQuery:           "athena",
 	AssetTypeAthenaSeed:            "athena",
 	AssetTypeAthenaSQLSensor:       "athena",
+	AssetTypeAthenaTableSensor:     "athena",
 	AssetTypeAthenaSource:          "athena",
 	AssetTypeDuckDBQuery:           "duckdb",
 	AssetTypeDuckDBSeed:            "duckdb",

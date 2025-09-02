@@ -43,7 +43,7 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 	}
 
 	for _, dep := range missingDeps {
-		foundMissingUpstream := p.GetAssetByName(dep)
+		foundMissingUpstream := p.GetAssetByNameCaseInsensitive(dep)
 		if foundMissingUpstream == nil {
 			continue
 		}
@@ -64,23 +64,17 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 }
 
 // Returns: status ("updated", "skipped", "failed").
-func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager interface{}) (string, error) {
+func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager config.ConnectionGetter) (string, error) {
 	var conn interface{}
 	var err error
 
-	//
 	if manager != nil {
-		managerInterface, ok := manager.(config.ConnectionGetter)
-		if !ok {
-			return fillStatusFailed, errors.New("manager does not implement GetConnection")
-		}
-
 		connName, err := pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
 		if err != nil {
 			return fillStatusFailed, err
 		}
 
-		conn = managerInterface.GetConnection(connName)
+		conn = manager.GetConnection(connName)
 		if conn == nil {
 			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s'", pp.Asset.Name)
 		}

@@ -1064,3 +1064,46 @@ ORDER BY table_schema, table_name;
 
 	return summary, nil
 }
+
+func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
+		}
+	}
+
+	var databaseName string
+	var schemaRef, targetTable string
+
+	switch len(tableComponents) {
+	case 2:
+		// schema.table → use default database from config.
+		if db.config.Database == "" {
+			return "", errors.New("no database name provided")
+		}
+		databaseName = strings.ToUpper(db.config.Database)
+		schemaRef = databaseName + ".INFORMATION_SCHEMA.TABLES"
+		targetTable = tableComponents[1]
+	case 3:
+		// database.schema.table
+		databaseName = strings.ToUpper(tableComponents[0])
+		schemaRef = databaseName + ".INFORMATION_SCHEMA.TABLES"
+		targetTable = tableComponents[2]
+	default:
+		return "", fmt.Errorf("table name must be in schema.table or database.schema.table format, '%s' given", tableName)
+	}
+
+	// Snowflake stores unquoted identifiers in uppercase.
+	schemaName := strings.ToUpper(tableComponents[len(tableComponents)-2])
+	targetTable = strings.ToUpper(targetTable)
+
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM %s WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'",
+		schemaRef,
+		schemaName,
+		targetTable,
+	)
+
+	return strings.TrimSpace(query), nil
+}

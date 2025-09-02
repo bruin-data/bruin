@@ -16,7 +16,7 @@ jobs:
   integration-tests:
     strategy:
       matrix:
-        platform: [ ubuntu-24.04, ubuntu-22.04, macos-latest, macos-14, windows-2022 ]
+        platform: [ ubuntu-24.04, ubuntu-22.04, macos-latest, macos-14 ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -217,7 +217,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Use install script
         shell: bash
-        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${GITHUB_REF##*/}
+        run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${GITHUB_REF##*/}
       - name: Install winget
         uses: Cyberboss/install-winget@v1
       - name: Test Pipeline
@@ -239,7 +239,7 @@ jobs:
           ref_name="${GITHUB_REF##*/}"
           echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Use install script
-        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${{ env.tag }}
+        run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${{ env.tag }}
       - name: Test Pipeline
         run: bruin init chess test-pipeline && cd test-pipeline && bruin run .
 

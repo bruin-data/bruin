@@ -564,6 +564,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage: "plain log output for this run.",
 			},
 			&cli.BoolFlag{
+				Name:  "verbose",
+				Usage: "print verbose output including SQL queries",
+			},
+			&cli.BoolFlag{
 				Name:   "minimal-logs",
 				Usage:  "skip initial pipeline analysis logs for this run",
 				Hidden: true,
@@ -654,6 +658,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
+			runCtx = context.WithValue(runCtx, executor.KeyVerbose, c.Bool("verbose"))
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
@@ -1057,6 +1062,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	fmt.Println(tree.String())
 }
 
+//nolint:maintidx
 func SetupExecutors(
 	s *scheduler.Scheduler,
 	conn config.ConnectionAndDetailsGetter,
@@ -1144,6 +1150,7 @@ func SetupExecutors(
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh), parser)
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		pgTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 		pgMetadataPushOperator := postgres.NewMetadataPushOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
@@ -1168,6 +1175,11 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypePostgresQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresQuerySensor][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
+
+		mainExecutors[pipeline.AssetTypePostgresTableSensor][scheduler.TaskInstanceTypeMain] = pgTableSensor
+		mainExecutors[pipeline.AssetTypePostgresTableSensor][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
+		mainExecutors[pipeline.AssetTypePostgresTableSensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeMain] = pgQuerySensor
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -1202,6 +1214,7 @@ func SetupExecutors(
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
 
 		sfQuerySensor := snowflake.NewQuerySensor(conn, wholeFileExtractor, 30)
+		sfTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		sfMetadataPushOperator := snowflake.NewMetadataPushOperator(conn)
 
@@ -1212,6 +1225,11 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeSnowflakeQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
 		mainExecutors[pipeline.AssetTypeSnowflakeQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeMetadataPush] = sfMetadataPushOperator
+
+		mainExecutors[pipeline.AssetTypeSnowflakeTableSensor][scheduler.TaskInstanceTypeMain] = sfTableSensor
+		mainExecutors[pipeline.AssetTypeSnowflakeTableSensor][scheduler.TaskInstanceTypeMetadataPush] = sfMetadataPushOperator
+		mainExecutors[pipeline.AssetTypeSnowflakeTableSensor][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
+		mainExecutors[pipeline.AssetTypeSnowflakeTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeSnowflakeSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeSnowflakeSeed][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
@@ -1314,9 +1332,11 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeCustomCheck] = ingestrCustomCheckRunner
 	}
 
+	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, athena.NewMaterializer(fullRefresh))
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
+		athenaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeMain] = athenaOperator
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
@@ -1325,6 +1345,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
 		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeAthenaTableSensor][scheduler.TaskInstanceTypeMain] = athenaTableSensor
+		mainExecutors[pipeline.AssetTypeAthenaTableSensor][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
+		mainExecutors[pipeline.AssetTypeAthenaTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeAthenaQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner

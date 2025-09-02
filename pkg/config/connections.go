@@ -618,6 +618,16 @@ func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }
 
+type RevenueCatConnection struct {
+	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey    string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	ProjectID string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+}
+
+func (c RevenueCatConnection) GetName() string {
+	return c.Name
+}
+
 type LinearConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
@@ -780,6 +790,7 @@ type SalesforceConnection struct {
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
 	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
 	Token    string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Domain   string `yaml:"domain" json:"domain" mapstructure:"domain"`
 }
 
 func (c SalesforceConnection) GetName() string {
@@ -953,5 +964,16 @@ func (c TrinoConnection) GetName() string {
 }
 
 func (c TableauConnection) GetName() string {
+	return c.Name
+}
+
+type FluxxConnection struct {
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Instance     string `yaml:"instance,omitempty" json:"instance" mapstructure:"instance"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+}
+
+func (c FluxxConnection) GetName() string {
 	return c.Name
 }

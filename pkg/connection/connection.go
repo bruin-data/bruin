@@ -29,6 +29,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/fluxx"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
@@ -57,6 +58,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
+	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/sftp"
@@ -116,6 +118,7 @@ type Manager struct {
 	AppStore             map[string]*appstore.Client
 	LinkedInAds          map[string]*linkedinads.Client
 	Linear               map[string]*linear.Client
+	RevenueCat           map[string]*revenuecat.Client
 	ClickHouse           map[string]*clickhouse.Client
 	GCS                  map[string]*gcs.Client
 	ApplovinMax          map[string]*applovinmax.Client
@@ -130,6 +133,7 @@ type Manager struct {
 	Wise                 map[string]*wise.Client
 	Zoom                 map[string]*zoom.Client
 	Frankfurter          map[string]*frankfurter.Client
+	Fluxx                map[string]*fluxx.Client
 	EMRSeverless         map[string]*emr_serverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
 	AppLovin             map[string]*applovin.Client
@@ -1288,6 +1292,27 @@ func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedIn
 	return nil
 }
 
+func (m *Manager) AddRevenueCatConnectionFromConfig(connection *config.RevenueCatConnection) error {
+	m.mutex.Lock()
+	if m.RevenueCat == nil {
+		m.RevenueCat = make(map[string]*revenuecat.Client)
+	}
+	m.mutex.Unlock()
+	client, err := revenuecat.NewClient(revenuecat.Config{
+		APIKey:    connection.APIKey,
+		ProjectID: connection.ProjectID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.RevenueCat[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddLinearConnectionFromConfig(connection *config.LinearConnection) error {
 	m.mutex.Lock()
 	if m.Linear == nil {
@@ -1655,6 +1680,7 @@ func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.Salesforc
 		Username: connection.Username,
 		Password: connection.Password,
 		Token:    connection.Token,
+		Domain:   connection.Domain,
 	})
 	if err != nil {
 		return err
@@ -1855,6 +1881,29 @@ func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.Frankfur
 	return nil
 }
 
+func (m *Manager) AddFluxxConnectionFromConfig(connection *config.FluxxConnection) error {
+	m.mutex.Lock()
+	if m.Fluxx == nil {
+		m.Fluxx = make(map[string]*fluxx.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := fluxx.NewClient(&fluxx.Config{
+		Instance:     connection.Instance,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Fluxx[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2041,6 +2090,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.RevenueCat, connectionManager.AddRevenueCatConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Linear, connectionManager.AddLinearConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)
@@ -2058,6 +2108,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)

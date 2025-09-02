@@ -34,9 +34,14 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For AppLovin Max, it will be always `ingestr`.
 - `source_connection`: The name of the AppLovin Max connection defined in `.bruin.yml`.
-- `source_table`: The name of the table in AppLovin Max to ingest. Currently, we only support [user_ad_revenue](https://developers.applovin.com/en/max/reporting-apis/user-level-ad-revenue-api/). The format is `<table_name>:<application_ids>` where `application_ids` is a comma-separated list of application IDs.
+- `source_table`: The name of the table in AppLovin Max to ingest. The format is `<table_name>:<application_ids>` where `application_ids` is a comma-separated list of application IDs.
 - `destination`: The name of the destination connection.
 
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+| ----- | -- | ------- | ------------ | ------- |
+| `user_ad_revenue` | partition_date (extracts date-only portion from the timestamp-based date column) | partition_date | merge | Provides daily metrics from the user level ad revenue API. User-level revenue data is available eight hours after UTC day end. So, for example, data for UTC 2025-01-01 is available on UTC 2025-01-02 after 08:00. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

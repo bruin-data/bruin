@@ -67,6 +67,7 @@ export default withMermaid({
                             {text: "Policies", link: "/getting-started/policies"},
                             {text: "Developer Environments", link: "/getting-started/devenv"},
                             {text: "Variables", link: "/getting-started/pipeline-variables"},
+                            {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
                         ]
                     },
                     {text: "Concepts", link: "/getting-started/concepts"},
@@ -199,6 +200,7 @@ export default withMermaid({
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Elasticsearch", link: "/ingestion/elasticsearch.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
+                            {text: "Fluxx", link: "/ingestion/fluxx.md"},
                             {text: "GCP Spanner", link: "/ingestion/spanner.md"},
                             {text: "GitHub", link: "/ingestion/github.md"},
                             {text: "Google Cloud Storage", link: "/ingestion/gcs.md"},
@@ -224,6 +226,7 @@ export default withMermaid({
                             {text: "Pinterest", link: "/ingestion/pinterest"},
                             {text: "Trustpilot", link: "/ingestion/trustpilot"},
                             {text: "QuickBooks", link: "/ingestion/quickbooks"},
+                            {text: "Revenuecat", link: "/ingestion/revenuecat"},
                             {text: "Salesforce", link: "/ingestion/salesforce"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
@@ -238,6 +241,7 @@ export default withMermaid({
                             {text: "Wise", link: "/ingestion/wise.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                             {text: "Zoom", link: "/ingestion/zoom"},
+                            
                         ],
                     },
                     {text: "Destinations", link: "/ingestion/destinations.md"}
@@ -254,6 +258,14 @@ export default withMermaid({
                     {text: "Column Checks", link: "/quality/available_checks"},
                     {text: "Custom Checks", link: "/quality/custom"},
                 ],
+            },
+            {
+                text: "Secret Providers",
+                collapsed: false,
+                items: [
+                    {text: "Overview", link: "/secrets/overview"},
+                    {text: "Hashicorp Vault", link: "/secrets/vault"}
+                ]
             },
             {
                 text: "CI/CD Integration",
@@ -279,14 +291,6 @@ export default withMermaid({
                     {text: "Validate", link: "/commands/validate"},
                 ],
 
-            },
-            {
-                text: "Secret Providers",
-                collapsed: false,
-                items: [
-                    {text: "Overview", link: "/secrets/overview"},
-                    {text: "Hashicorp Vault", link: "/secrets/vault"}
-                ]
             },
             {
                 text: "Bruin Cloud",

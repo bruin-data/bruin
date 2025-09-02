@@ -38,7 +38,16 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the  Facebook Ads connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Facebook Ads you want to ingest. For example, `ads` would ingest data related to ads. You can find the available source tables in Facebook Ads [here](https://bruin-data.github.io/ingestr/supported-sources/facebook-ads.html#tables).
+- `source_table`: The name of the data table in Facebook Ads you want to ingest. For example, `ads` would ingest data related to ads.
+
+## Available Source Tables
+
+- `campaigns`: Retrieves campaign data with various fields.
+- `ad_sets`: Retrieves ad set data with various fields.
+- `ads`: Retrieves ad data with various fields.
+- `ad_creatives`: Retrieves ad creative data with various fields.
+- `leads`: Retrieves lead data with various fields.
+- `facebook_insights`: Retrieves insights data with configurable dimensions and metrics.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

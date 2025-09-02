@@ -13,7 +13,7 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
       google_cloud_platform:
         - name: "connection_name"
           project_id: "project-id"
-          
+          location: 'your-gcp-region' # see https://cloud.google.com/compute/docs/regions-zones
           # you can either specify a path to the service account file
           service_account_file: "path/to/file.json"
           
@@ -86,10 +86,11 @@ name: string
 type: string
 parameters:
     table: string
+    poke_interval: int (optional)
 ```
 **Parameters**:
 - `table`: `project-id.dataset_id.table_id` format, requires all of the identifiers as a full name.
-
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Examples
 ```yaml
@@ -109,10 +110,12 @@ name: string
 type: string
 parameters:
     query: string
+    poke_interval: int (optional)
 ```
 
 **Parameters**:
 - `query`: Query you expect to return any results
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
 

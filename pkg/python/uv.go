@@ -39,7 +39,7 @@ var AvailablePythonVersions = map[string]bool{
 const (
 	UvVersion               = "0.6.16"
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.13.85"
+	ingestrVersion          = "0.13.91"
 	sqlfluffVersion         = "3.4.1"
 )
 
@@ -332,7 +332,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	destConnectionInst, ok := destConnection.(pipelineConnection)
 	if !ok {
-		return errors.New("destination connection does not implement pipelineConnection, please create an issue in Bruin repo: https://github.com/bruin-data/bruin")
+		return errors.Errorf("destination connection %s is not supported by ingestr or doesn't exist", destConnectionName)
 	}
 
 	destURI, err := destConnectionInst.GetIngestrURI()

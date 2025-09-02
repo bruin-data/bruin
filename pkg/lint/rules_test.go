@@ -1752,7 +1752,7 @@ func TestEnsureBigQueryTableSensorHasTableParameter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureBigQueryTableSensorHasTableParameterForASingleAsset)(ctx, tt.p)
+			got, err := CallFuncForEveryAsset(EnsureTableSensorHasTableParameterForASingleAsset)(ctx, tt.p)
 			if !tt.wantErr(t, err) {
 				return
 			}

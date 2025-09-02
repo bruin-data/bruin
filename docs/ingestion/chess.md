@@ -41,7 +41,13 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Chess connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Chess that you want to ingest. For example, `profiles` is the table of Chess that you want to ingest. You can find the available source tables in Chess [here](https://bruin-data.github.io/ingestr/supported-sources/chess.html#tables).
+- `source_table`: The name of the data table in Chess that you want to ingest. For example, `profiles` is the table of Chess that you want to ingest.
+
+## Available Source Tables
+
+- `profiles`: Retrieves player profiles based on a list of player usernames.
+- `games`: Retrieves players games for specified players.
+- `archives`: Retrieves the URLs to game archives for specified players.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

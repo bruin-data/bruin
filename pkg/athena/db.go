@@ -377,3 +377,22 @@ ORDER BY table_schema, table_name;
 
 	return summary, nil
 }
+
+func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+
+	if len(tableComponents) != 1 {
+		return "", fmt.Errorf("table name must be in table format, '%s' given", tableName)
+	}
+
+	tableName = tableComponents[0]
+	schemaName := db.config.Database // db.config.Database returns TABLE_SCHEMA
+
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
+		schemaName,
+		tableName,
+	)
+
+	return strings.TrimSpace(query), nil
+}

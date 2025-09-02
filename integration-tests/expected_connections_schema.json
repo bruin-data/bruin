@@ -547,6 +547,12 @@
           },
           "type": "array"
         },
+        "revenuecat": {
+          "items": {
+            "$ref": "#/$defs/RevenueCatConnection"
+          },
+          "type": "array"
+        },
         "personio": {
           "items": {
             "$ref": "#/$defs/PersonioConnection"
@@ -718,6 +724,12 @@
         "trino": {
           "items": {
             "$ref": "#/$defs/TrinoConnection"
+          },
+          "type": "array"
+        },
+        "fluxx": {
+          "items": {
+            "$ref": "#/$defs/FluxxConnection"
           },
           "type": "array"
         }
@@ -1852,7 +1864,11 @@
         },
         "token": {
           "type": "string"
+        },
+        "domain": {
+          "type":"string"
         }
+        
       },
       "additionalProperties": false,
       "type": "object",
@@ -1860,7 +1876,8 @@
         "name",
         "username",
         "password",
-        "token"
+        "token",
+        "domain"
       ]
     },
     "ShopifyConnection": {
@@ -2240,6 +2257,26 @@
         "sub_domain"
       ]
     },
+    "RevenueCatConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "project_id"
+      ]
+    },
     "ZoomConnection": {
       "properties": {
         "name": {
@@ -2262,6 +2299,30 @@
         "client_id",
         "client_secret",
         "account_id"
+      ]
+    },
+    "FluxxConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "instance",
+        "client_id",
+        "client_secret"
       ]
     }
   }

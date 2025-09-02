@@ -36,10 +36,13 @@ parameters:
 - `type`: Specifies the type of the asset. As Frankfurter is an `ingestr` asset, this should be set to `ingestr`. 
 - `connection`: The destination connection where the data will be stored. Here `duckdb-default` refers to the database defined in `.bruin.yml`.
 - `source_connection`: The name of the Frankfurter connection defined in `.bruin.yml`.
-- `source_table`: The name of the Frankfurter table you want to ingest. Frankfurter provides the following tables:
-    - `latest`: Contains the latest exchange rates for all supported currencies.
-    - `exchange_rates`: Includes historical exchange rate data, allowing you to query rates across a defined date range.
-    - `currencies`: Provides a list of all supported currencies available in the Frankfurter API.
+- `source_table`: The name of the Frankfurter table you want to ingest.
+
+## Available Source Tables
+
+- `currencies`: Retrieves list of available currencies with ISO 4217 codes and names.
+- `latest`: Fetches latest exchange rates for all currencies.
+- `exchange_rates`: Retrieves historical exchange rates for specified date range.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

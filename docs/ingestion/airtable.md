@@ -44,6 +44,10 @@ parameters:
 - `source_connection`: The name of the airtable connection defined in .bruin.yml.
 - `source_table`: The name of the data table in airtable that you want to ingest. For example, `details` is the table of airtable that you want to ingest.
 
+## Available Source Tables
+
+- `<base_id>/<table_name>`: Airtable tables are used in the format of base ID and table name (example: `appXYZ/employee`).
+
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     
 bruin run assets/airtable_ingestion.yml

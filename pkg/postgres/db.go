@@ -771,3 +771,32 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 
 	return nil
 }
+
+func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+		}
+	}
+
+	var schemaName string
+	switch len(tableComponents) {
+	case 1:
+		schemaName = "public"
+		tableName = tableComponents[0]
+	case 2:
+		schemaName = tableComponents[0]
+		tableName = tableComponents[1]
+	default:
+		return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+	}
+	targetTable := tableName
+
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE schemaname = '%s' AND tablename = '%s'",
+		schemaName,
+		targetTable,
+	)
+	return strings.TrimSpace(query), nil
+}

@@ -62,6 +62,7 @@ type Connections struct {
 	GoogleAds           []GoogleAdsConnection           `yaml:"googleads,omitempty" json:"googleads,omitempty" mapstructure:"googleads"`
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
+	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
 	Linear              []LinearConnection              `yaml:"linear,omitempty" json:"linear,omitempty" mapstructure:"linear"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
 	ApplovinMax         []ApplovinMaxConnection         `yaml:"applovinmax,omitempty" json:"applovinmax,omitempty" mapstructure:"applovinmax"`
@@ -94,6 +95,7 @@ type Connections struct {
 	InfluxDB            []InfluxDBConnection            `yaml:"influxdb,omitempty" json:"influxdb,omitempty" mapstructure:"influxdb"`
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
 	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
+	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -695,6 +697,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.LinkedInAds = append(env.Connections.LinkedInAds, conn)
+	case "revenuecat":
+		var conn RevenueCatConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.RevenueCat = append(env.Connections.RevenueCat, conn)
 	case "linear":
 		var conn LinearConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -921,6 +930,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Tableau = append(env.Connections.Tableau, conn)
+	case "fluxx":
+		var conn FluxxConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Fluxx = append(env.Connections.Fluxx, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1090,6 +1106,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.InfluxDB = removeConnection(env.Connections.InfluxDB, connectionName)
 	case "tableau":
 		env.Connections.Tableau = removeConnection(env.Connections.Tableau, connectionName)
+	case "fluxx":
+		env.Connections.Fluxx = removeConnection(env.Connections.Fluxx, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1202,6 +1220,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Attio, source.Attio)
 	mergeConnectionList(&c.ISOCPulse, source.ISOCPulse)
 	mergeConnectionList(&c.Tableau, source.Tableau)
+	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	c.buildConnectionKeyMap()
 	return nil
 }
