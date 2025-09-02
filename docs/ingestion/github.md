@@ -45,10 +45,14 @@ parameters:
 
 ## Available Source Tables
 
-- `issues`: Retrieves GitHub issues along with their comments and reactions.
-- `pull_requests`: Retrieves pull requests with comments and reactions.
-- `repo_events`: Retrieves recent repository events.
-- `stargazers`: Retrieves stargazers.
+GitHub source allows ingesting the following sources into separate tables:
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| issues | - | – | replace | Retrieves GitHub issues along with their comments and reactions. Full reload on each run |
+| pull_requests | - | – | replace | Retrieves pull requests with comments and reactions. Full reload on each run |
+| repo_events | id | created_at | merge | Retrieves recent repository events. Appends only new events using created_at filter. Only events from the past 30 days allowed |
+| stargazers | - | – | replace | Retrieves stargazers. Full reload on each run |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     
