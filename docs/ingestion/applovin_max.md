@@ -39,7 +39,9 @@ parameters:
 
 ## Available Source Tables
 
-- `user_ad_revenue`: Provides daily metrics from the user level ad revenue API.
+| Table | PK | Inc Key | Inc Strategy | Details |
+| ----- | -- | ------- | ------------ | ------- |
+| `user_ad_revenue` | partition_date (extracts date-only portion from the timestamp-based date column) | partition_date | merge | Provides daily metrics from the user level ad revenue API. User-level revenue data is available eight hours after UTC day end. So, for example, data for UTC 2025-01-01 is available on UTC 2025-01-02 after 08:00. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     
