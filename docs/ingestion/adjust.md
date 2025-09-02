@@ -44,10 +44,12 @@ parameters:
 
 ## Available Source Tables
 
-- `campaigns`: Retrieves data for a campaign, showing the app's revenue and network costs over multiple days.
-- `creatives`: Retrieves data for a creative assets, detailing the app's revenue and network costs across multiple days.
-- `events`: Retrieves data for events and event slugs.
-- `custom`: Retrieves custom data based on the dimensions and metrics specified.
+| Table | PK | Inc Key | Inc Strategy | Details |
+| ----- | -- | ------- | ------------ | ------- |
+| `campaigns` | id | created | merge | Retrieves data for a campaign, showing the app's revenue and network costs over multiple days. |
+| `creatives` | id | created | merge | Retrieves data for a creative assets, detailing the app's revenue and network costs across multiple days. |
+| `events` | id | created | merge | Retrieves data for events and event slugs. |
+| `custom` | id | created | merge | Retrieves custom data based on the dimensions and metrics specified. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     
