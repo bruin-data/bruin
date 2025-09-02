@@ -40,11 +40,13 @@ parameters:
 
 ## Available Source Tables
 
-- `objects`: Objects are the data types used to store facts about your customers. Fetches all objects.
-- `records:{object_api_slug}`: Fetches all records of an object. For example: `records:companies`.
-- `lists`: Fetches all lists.
-- `list_entries:{list_id}`: Lists all items in a specific list. For example: `list_entries:8abc-123-456-789d-123`.
-- `all_list_entries:{object_api_slug}`: Fetches all the lists for an object, and then fetches all the entries from that list.
+| Table | PK | Inc Key | Inc Strategy | Details |
+| ----- | -- | ------- | ------------ | ------- |
+| `objects` | - | - | replace | Objects are the data types used to store facts about your customers. Fetches all objects. Full reload on each run. |
+| `records:{object_api_slug}` | - | - | replace | Fetches all records of an object. For example: records:companies. Full reload on each run. |
+| `lists` | - | - | replace | Fetches all lists. Full reload on each run. |
+| `list_entries:{list_id}` | - | - | replace | Lists all items in a specific list. For example: list_entries:8abc-123-456-789d-123. Full reload on each run. |
+| `all_list_entries:{object_api_slug}` | - | - | replace | Fetches all the lists for an object, and then fetches all the entries from that list. For example: all_list_entries:companies. Full reload on each run. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     
