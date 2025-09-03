@@ -34,7 +34,7 @@
       "image": "",
       "instance": "",
       "owner": "",
-      "start_date": "",
+      "start_date": "2024-01-01",
       "executable_file": {
         "name": "country.sql",
         "path": "test-pipelines/parse-asset-extends/assets/country.sql",
