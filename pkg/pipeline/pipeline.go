@@ -712,6 +712,7 @@ type Asset struct { //nolint:recvcheck
 	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Type              AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
 	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	StartDate         string             `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
 	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
 	Tags              EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	Domains           EmptyStringArray   `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
@@ -721,7 +722,6 @@ type Asset struct { //nolint:recvcheck
 	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
 	Instance          string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
 	Owner             string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
-	StartDate         string             `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
 	Tier              int                `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
 	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
 	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
@@ -1167,7 +1167,7 @@ func (a *Asset) FormatContent() ([]byte, error) {
 
 	yamlConfig := buf.Bytes()
 
-	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization", "secrets", "parameters", "start_date"}
+	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization", "secrets", "parameters"}
 	for _, key := range keysToAddSpace {
 		yamlConfig = bytes.ReplaceAll(yamlConfig, []byte("\n"+key+":"), []byte("\n\n"+key+":"))
 	}
