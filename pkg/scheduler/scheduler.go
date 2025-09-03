@@ -310,6 +310,7 @@ type Scheduler struct {
 	runID string
 }
 
+// GetAssetCountWithTasksPending returns the number of assets that have tasks (wether checks, main or metadata pushes) pending.
 func (s *Scheduler) GetAssetCountWithTasksPending() int {
 	assets := make(map[string]bool)
 	for _, instance := range s.taskInstances {
