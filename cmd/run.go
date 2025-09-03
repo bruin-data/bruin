@@ -830,7 +830,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
 			if shouldValidate {
-				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
+				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, connectionManager); err != nil {
 					return err
 				}
 			}
@@ -1016,8 +1016,8 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager config.ConnectionGetter) error {
-	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
+func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, connectionManager config.ConnectionGetter) error {
+	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, nil, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err
@@ -1026,7 +1026,7 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 
 	rules = lint.FilterRulesBySpeed(rules, true)
 
-	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, parser)
+	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, nil)
 	res, err := linter.LintPipelines(ctx, []*pipeline.Pipeline{foundPipeline})
 	err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
 	if err != nil {

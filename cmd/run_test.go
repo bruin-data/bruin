@@ -1310,7 +1310,7 @@ func TestCheckLintFunc(t *testing.T) {
 				SelectedEnvironment:     defaultEnv,
 			}
 			connectionManager, _ := connection.NewManagerFromConfig(cfg)
-			err := CheckLint(ctx, tt.foundPipeline, tt.pipelinePath, logger, nil, connectionManager)
+			err := CheckLint(ctx, tt.foundPipeline, tt.pipelinePath, logger, connectionManager)
 			require.NoError(t, err, "Expected no error but got one")
 		})
 	}
