@@ -14,6 +14,7 @@
     "image": "",
     "instance": "",
     "owner": "",
+    "start_date": "",
     "executable_file": {
       "name": "chess_profiles.asset.yml",
       "path": "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml",

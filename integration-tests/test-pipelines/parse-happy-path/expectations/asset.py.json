@@ -21,6 +21,7 @@
     "image": "python:3.11",
     "instance": "",
     "owner": "",
+    "start_date": "",
     "executable_file": {
       "name": "asset.py",
       "path": "test-pipelines/parse-happy-path/assets/asset.py",

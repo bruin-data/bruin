@@ -40,12 +40,13 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+          "mode": "full"
         }
       ],
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "country.sql",
         "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/country.sql",
@@ -126,7 +127,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+          "mode": "full"
         },
         {
           "type": "asset",
@@ -149,12 +150,13 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+          "mode": "full"
         }
       ],
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "example.sql",
         "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",
@@ -277,12 +279,13 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+          "mode": "full"
         }
       ],
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "people.sql",
         "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/people.sql",
@@ -383,6 +386,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "users.sql",
         "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/users.sql",
