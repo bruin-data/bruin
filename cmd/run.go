@@ -765,13 +765,6 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
-			if shouldValidate {
-				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
-					return err
-				}
-			}
-
 			foundPipeline := pipelineInfo.Pipeline
 
 			if runConfig.Downstream {
@@ -825,6 +818,13 @@ func Run(isDebug *bool) *cli.Command {
 				if err := ApplyAllFilters(context.Background(), filter, s, foundPipeline); err != nil { //nolint:contextcheck
 					errorPrinter.Printf("Failed to filter assets: %v\n", err)
 					return cli.Exit("", 1)
+				}
+			}
+
+			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
+			if shouldValidate {
+				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
+					return err
 				}
 			}
 
