@@ -552,4 +552,3 @@ func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
 	assert.True(t, strings.Contains(executedQuery.Query, `"version":"1.0"`))
 	assert.True(t, strings.Contains(executedQuery.Query, "SELECT * FROM orders"))
 }
-
