@@ -822,7 +822,8 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			if s.InstanceCountByStatus(scheduler.Pending) == 0 {
+			icount := s.InstanceCountByStatus(scheduler.Pending)
+			if icount == 0 {
 				warningPrinter.Println("No tasks to run.")
 				return nil
 			}
@@ -1583,7 +1584,11 @@ func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p 
 		return nil
 	}
 	s.MarkAll(scheduler.Skipped)
-	s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
+	err := s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
+	if err != nil {
+		return err
+	}
+
 	if f.IncludeTag != "" {
 		return errors.New("you cannot use the '--tag' flag when running a single asset")
 	}

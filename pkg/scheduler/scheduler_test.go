@@ -374,7 +374,7 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 
 	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
 	s.MarkAll(Succeeded)
-	s.MarkAsset(t12, Pending, true)
+	_ = s.MarkAsset(t12, Pending, true)
 
 	s.Kickstart()
 
@@ -405,6 +405,29 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 		Instance: ti4,
 	})
 	assert.True(t, finished)
+}
+
+func TestScheduler_MarkTasksDoubleAsset(t *testing.T) {
+	t.Parallel()
+
+	t12 := &pipeline.Asset{
+		Name: "task12",
+	}
+	t13 := &pipeline.Asset{
+		Name: "task12",
+	}
+
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			t12,
+			t13,
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+	s.MarkAll(Skipped)
+	err := s.MarkAsset(t12, Pending, true)
+	assert.ErrorContains(t, err, "multiple instances found for the given asset name")
 }
 
 func TestScheduler_WillRunTaskOfType(t *testing.T) {
@@ -484,8 +507,8 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 
 	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
 	s.MarkAll(Succeeded)
-	s.MarkAsset(t12, Pending, true)
-	s.MarkAsset(t1000, Pending, true)
+	_ = s.MarkAsset(t12, Pending, true)
+	_ = s.MarkAsset(t1000, Pending, true)
 
 	assert.Equal(t, 10, s.InstanceCount())
 	assert.Equal(t, 6, s.InstanceCountByStatus(Pending))

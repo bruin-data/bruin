@@ -330,13 +330,18 @@ func (s *Scheduler) MarkAll(status TaskInstanceStatus) {
 	}
 }
 
-func (s *Scheduler) MarkAsset(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) {
+func (s *Scheduler) MarkAsset(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) error {
 	instancesByType := s.taskNameMap[task.Name]
-	for _, instance := range instancesByType {
+
+	for taskType, instance := range instancesByType {
+		if taskType == TaskInstanceTypeMain && len(instance) > 1 {
+			return errors.New("multiple instances found for the given asset name " + task.Name)
+		}
 		for _, i := range instance {
 			s.MarkTaskInstance(i, status, downstream)
 		}
 	}
+	return nil
 }
 
 func (s *Scheduler) MarkPendingInstancesByType(instanceType TaskInstanceType, status TaskInstanceStatus) {
