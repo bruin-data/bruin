@@ -584,7 +584,7 @@ func Run(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:  "query-annotations",
-				Usage: "JSON string containing annotations to be added as comments to queries",
+				Usage: fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
 			},
 		},
 		DisableSliceFlagSeparator: true,
