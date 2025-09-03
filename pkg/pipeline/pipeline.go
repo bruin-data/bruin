@@ -713,6 +713,7 @@ type Asset struct { //nolint:recvcheck
 	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Type              AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
 	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	StartDate         string             `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
 	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
 	Tags              EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	Domains           EmptyStringArray   `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`

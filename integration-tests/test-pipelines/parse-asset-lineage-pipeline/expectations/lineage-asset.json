@@ -60,6 +60,7 @@
     "image": "",
     "instance": "",
     "owner": "",
+    "start_date": "",
     "executable_file": {
       "name": "example.sql",
       "path": "test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",

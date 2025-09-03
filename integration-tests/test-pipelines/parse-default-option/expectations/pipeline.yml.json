@@ -37,6 +37,7 @@
       "image": "python:3.11",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "asset.py",
         "path": "test-pipelines/parse-default-option/assets/asset.py",
@@ -84,6 +85,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "chess_games.asset.yml",
         "path": "test-pipelines/parse-default-option/assets/chess_games.asset.yml",
@@ -128,6 +130,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "chess_profiles.asset.yml",
         "path": "test-pipelines/parse-default-option/assets/chess_profiles.asset.yml",
@@ -192,6 +195,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "player_summary.sql",
         "path": "test-pipelines/parse-default-option/assets/player_summary.sql",

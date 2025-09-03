@@ -50,6 +50,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "country.sql",
         "path": "test-pipelines/parse-lineage-pipeline/assets/country.sql",
@@ -172,6 +173,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "example.sql",
         "path": "test-pipelines/parse-lineage-pipeline/assets/example.sql",
@@ -323,6 +325,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "people.sql",
         "path": "test-pipelines/parse-lineage-pipeline/assets/people.sql",
@@ -446,6 +449,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "users.sql",
         "path": "test-pipelines/parse-lineage-pipeline/assets/users.sql",
