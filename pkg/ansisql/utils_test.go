@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 )
@@ -54,7 +55,7 @@ func TestAddAnnotationComment(t *testing.T) {
 
 			ctx := context.Background()
 			if tt.annotations != "" {
-				ctx = context.WithValue(ctx, "query-annotations", tt.annotations)
+				ctx = context.WithValue(ctx, pipeline.RunConfigQueryAnnotations, tt.annotations)
 			}
 
 			q := &query.Query{Query: tt.query}

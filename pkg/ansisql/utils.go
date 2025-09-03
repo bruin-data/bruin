@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 )
 
-func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipeline string) error {
-	annotations, ok := ctx.Value("query-annotations").(string)
+func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) error {
+	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
+	
 	if !ok || annotations == "" {
 		return nil
 	}
@@ -23,7 +25,7 @@ func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskTy
 	finalAnnotations := map[string]interface{}{
 		"asset":    assetName,
 		"type":     taskType,
-		"pipeline": pipeline,
+		"pipeline": pipelineName,
 	}
 
 	for k, v := range userAnnotations {
