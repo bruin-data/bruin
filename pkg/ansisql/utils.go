@@ -41,7 +41,7 @@ func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskTy
 	}
 
 	comment := fmt.Sprintf("-- @bruin.config: %s\n", string(finalJSON))
-	
+
 	// Return a new query with the annotation prepended
 	return &query.Query{
 		Query: comment + q.Query,
