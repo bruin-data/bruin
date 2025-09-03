@@ -45,15 +45,21 @@ This command will ingest data from the specified Internet Society Pulse metric i
 
 ## Supported Metrics and Tables
 
-You can ingest a variety of metrics from Internet Society Pulse. The `source_table` parameter supports the following (see [full list](https://bruin-data.github.io/ingestr/supported-sources/isoc-pulse.html#tables)):
-
-- `https` (global HTTPS adoption)
-- `https:US` (country-specific, e.g., US)
-- `https:topsites` (top sites data)
-- `ipv6` (global IPv6 adoption)
-- `roa:4:US` (ROA IPv4 data by country)
-- `net_loss:shutdown:IN` (internet shutdowns in India)
-- ...and more
+| Metric | Description | Country Support | Additional Options | PK | Inc Key | Inc Strategy |
+|--------|-------------|-----------------|-------------------|----|---------|--------------| 
+| dnssec_adoption | DNSSEC adoption metrics for specific domains | No | Domain name | date | date | merge |
+| dnssec_tld_adoption | DNSSEC adoption metrics for top-level domains | Yes | Country code | date | date | merge |
+| dnssec_validation | DNSSEC validation metrics | Yes | Country code | date | date | merge |
+| http | HTTP protocol metrics | No | None | date | date | merge |
+| http3 | HTTP/3 protocol metrics | No | None | date | date | merge |
+| https | HTTPS adoption metrics | Yes | topsites, Country code | date | date | merge |
+| ipv6 | IPv6 adoption metrics | Yes | topsites, Country code | date | date | merge |
+| net_loss | Internet disconnection metrics | Yes | Shutdown type, Country code | date | date | merge |
+| resilience | Internet resilience metrics | Yes | Country code | date | date | merge |
+| roa | Route Origin Authorization metrics | Yes | IP version (4/6), Country code | date | date | merge |
+| rov | Route Origin Validation metrics | No | None | date | date | merge |
+| tls | TLS protocol metrics | No | None | date | date | merge |
+| tls13 | TLS 1.3 protocol metrics | No | None | date | date | merge |
 
 Refer to the [Pulse documentation](https://bruin-data.github.io/ingestr/supported-sources/isoc-pulse.html#tables) for the full list and parameter syntax.
 

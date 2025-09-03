@@ -35,11 +35,13 @@ parameters:
 
 ## Available Source Tables
 
-- `projects`: Fetches all projects from your RevenueCat account.
-- `customers`: Fetches all customers with nested purchases and subscriptions data.
-- `products`: Fetches all products configured in your RevenueCat project.
-- `entitlements`: Fetches all entitlements configured in your RevenueCat project.
-- `offerings`: Fetches all offerings configured in your RevenueCat project.
+| Table        | PK | Inc Key | Inc Strategy | Details                                                                      |
+|--------------|----|---------|--------------|--------------------------------------------------------------------|
+| projects     | id | -       | merge        | Fetches all projects from your RevenueCat account.                          |
+| customers    | id | -       | merge        | Fetches all customers with nested purchases and subscriptions data.         |
+| products     | id | -       | merge        | Fetches all products configured in your RevenueCat project.                 |
+| entitlements | id | -       | merge        | Fetches all entitlements configured in your RevenueCat project.             |
+| offerings    | id | -       | merge        | Fetches all offerings configured in your RevenueCat project.                |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

@@ -43,7 +43,13 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: "postgres" indicates that the ingested data will be stored in a PostgreSQL database.
 - `source_connection`: The name of the Solidgate connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Solidgate you want to ingest. You can find the available source tables in Solidgate [here](https://bruin-data.github.io/ingestr/supported-sources/solidgate.html#tables)
+- `source_table`: The name of the data table in Solidgate you want to ingest. Available tables:
+
+Table    PK    Inc Key    Inc Strategy    Details
+subscriptions    id    updated_at    merge    Provides a comprehensive view of customer subscriptions, including subscription IDs, statuses, and key timestamps such as creation, update, and expiration dates
+apm_orders    order_id    updated_at    merge    Provides essential information for anti-fraud purposes, including order IDs, transaction statuses, amounts, currencies, and payment methods, along with crucial customer details such as email addresses
+card_orders    order_id    updated_at    merge    Provides detailed information on orders processed via card payments, including transaction data, payment status, and customer details
+financial_entries    id    created_at    merge    Provides a detailed transaction-level breakdown of financial records
 
 
 ### Step 3: [Run](/commands/run) asset to ingest data

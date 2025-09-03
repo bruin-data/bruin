@@ -34,7 +34,12 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For Wise, it will be always `ingestr`
 - `source_connection`: The name of the Wise connection defined in `.bruin.yml`
-- `source_table`: The name of the table in Wise to ingest. Available tables can be found [here](https://bruin-data.github.io/ingestr/supported-sources/wise.html#tables)
+- `source_table`: The name of the table in Wise to ingest. Available tables:
+
+Table    PK    Inc Key    Inc Strategy    Details
+profiles    id    –    merge    Retrieves all profiles associated with the user.
+transfers    id    created    merge    Lists all transfers for including status and details associated with the user.
+balances    id    modificationTime    merge    Retrieve the user's multi-currency account balance accounts. It returns all balance accounts the profile has.
 - `destination`: The name of the destination connection.
 
 ### Step 3: [Run](/commands/run) asset to ingest data

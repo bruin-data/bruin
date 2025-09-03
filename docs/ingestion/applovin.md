@@ -38,11 +38,13 @@ parameters:
 
 ## Available Source Tables
 
-- `publisher-report`: Provides daily metrics from the report end point using the report_type publisher.
-- `advertiser-report`: Provides daily metrics from the report end point using the report_type advertiser.
-- `advertiser-probabilistic-report`: Provides daily metrics from the probabilisticReport end point using the report_type advertiser.
-- `advertiser-ska-report`: Provides daily metrics from the skaReport end point using the report_type advertiser.
-- `custom:{endpoint}:{report_type}:{columns}`: Custom reports with specified endpoint, report type, and columns.
+| Table | PK | Inc Key | Inc Strategy | Details |
+| ----- | -- | ------- | ------------ | ------- |
+| `publisher-report` | day | day | merge | Provides daily metrics from the report end point using the report_type publisher |
+| `advertiser-report` | day | day | merge | Provides daily metrics from the report end point using the report_type advertiser |
+| `advertiser-probabilistic-report` | day | day | merge | Provides daily metrics from the probabilisticReport end point using the report_type advertiser |
+| `advertiser-ska-report` | day | day | merge | Provides daily metrics from the skaReport end point using the report_type advertiser |
+| `custom:{endpoint}:{report_type}:{columns}` | day | day | merge | Custom reports with specified endpoint, report type, and columns |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

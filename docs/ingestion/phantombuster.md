@@ -37,8 +37,15 @@ parameters:
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the phantombuster connection defined in .bruin.yml.
 - `source_table`: The name of the data table in PhantomBuster that you want to ingest.
-  For now, we only support `completed_phantoms` tables followed by an agent ID. For example:
-  `completed_phantoms:<agentid>`. An Agent ID is a unique identifier for a specific Phantom.
+
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| completed_phantoms:<agent_id> | container_id | ended_at | merge | Gets all containers associated to a specified agent. Where agent id is a unique identifier for a specific Phantom which can be found in URI of a specific phantom. |
+
+For now, we only support `completed_phantoms` tables followed by an agent ID. For example:
+`completed_phantoms:<agentid>`. An Agent ID is a unique identifier for a specific Phantom.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     
