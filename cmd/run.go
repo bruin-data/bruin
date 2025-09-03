@@ -827,15 +827,8 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			shouldValidate := !c.Bool("no-validation")
-			if shouldValidate {
-				var validateOnlyAssetLevel bool
-				if s.GetAssetCountWithTasksPending() < 2 {
-					validateOnlyAssetLevel = true
-				}
-
-				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, connectionManager, validateOnlyAssetLevel); err != nil {
-					return err
-				}
+			if err := Validate(shouldValidate, s, CheckLint, runCtx, pipelineInfo.Pipeline, inputPath, logger); err != nil {
+				return err
 			}
 
 			sendTelemetry(s, c)
@@ -1019,7 +1012,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, connectionManager config.ConnectionGetter, validateOnlyAssetLevel bool) error {
+func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, validateOnlyAssetLevel bool) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, nil, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
