@@ -80,6 +80,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 	q.Query = materialized
+
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
 		renderedQueries, err := extractor.ExtractQueriesFromString(materialized)
 		if err != nil {
@@ -116,14 +117,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	if err := ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name); err != nil {
+	annotatedQuery, err := ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name)
+	if err != nil {
 		return err
 	}
 
 	// Print SQL query in verbose mode
 	if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
 		if w, ok := writer.(io.Writer); ok {
-			queryPreview := strings.TrimSpace(q.Query)
+			queryPreview := strings.TrimSpace(annotatedQuery.Query)
 			if len(queryPreview) > 5000 {
 				queryPreview = queryPreview[:5000] + "\n... (truncated)"
 			}
@@ -132,7 +134,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if o.devEnv == nil {
-		return conn.RunQueryWithoutResult(ctx, q)
+		return conn.RunQueryWithoutResult(ctx, annotatedQuery)
 	}
 
 	q, err = o.devEnv.Modify(ctx, p, t, q)
@@ -140,11 +142,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	if err := ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name); err != nil {
+	annotatedQuery, err = ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name)
+	if err != nil {
 		return err
 	}
 
-	err = conn.RunQueryWithoutResult(ctx, q)
+	err = conn.RunQueryWithoutResult(ctx, annotatedQuery)
 	if err != nil {
 		return err
 	}

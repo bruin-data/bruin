@@ -3,8 +3,10 @@ package bigquery
 import (
 	"context"
 	"io"
+	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -439,3 +441,115 @@ func TestBasicOperator_RunTask_WithRenderer(t *testing.T) {
 		})
 	}
 }
+
+func TestBasicOperator_QueryAnnotations_Default(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	extractor := new(mockExtractor)
+	mat := new(mockMaterializer)
+
+	mat.On("IsFullRefresh").Return(false)
+	client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
+
+	extractor.On("ExtractQueriesFromString", "SELECT * FROM users").
+		Return([]*query.Query{{Query: "SELECT * FROM users"}}, nil)
+
+	mat.On("Render", mock.Anything, "SELECT * FROM users").
+		Return("SELECT * FROM users", nil)
+	mat.On("LogIfFullRefreshAndDDL", mock.Anything, mock.Anything).
+		Return(nil)
+	var executedQuery *query.Query
+	client.On("RunQueryWithoutResult", mock.Anything, mock.AnythingOfType("*query.Query")).
+		Run(func(args mock.Arguments) {
+			executedQuery = args.Get(1).(*query.Query)
+		}).Return(nil)
+
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "gcp-default").Return(client)
+
+	o := BasicOperator{
+		connection:   conn,
+		extractor:    extractor,
+		materializer: mat,
+	}
+
+	asset := &pipeline.Asset{
+		Name: "test_asset",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "test-file.sql",
+			Content: "SELECT * FROM users",
+		},
+	}
+
+	ctx := context.WithValue(context.Background(), pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
+
+	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "test_pipeline"}, asset)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, executedQuery)
+
+	expectedComment := `-- @bruin.config: {"asset":"test_asset","pipeline":"test_pipeline","type":"main"}`
+	assert.True(t, strings.HasPrefix(executedQuery.Query, expectedComment))
+	assert.True(t, strings.Contains(executedQuery.Query, "SELECT * FROM users"))
+}
+
+func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	extractor := new(mockExtractor)
+	mat := new(mockMaterializer)
+
+	mat.On("IsFullRefresh").Return(false)
+	client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
+
+	extractor.On("ExtractQueriesFromString", "SELECT * FROM orders").
+		Return([]*query.Query{{Query: "SELECT * FROM orders"}}, nil)
+
+	mat.On("Render", mock.Anything, "SELECT * FROM orders").
+		Return("SELECT * FROM orders", nil)
+	mat.On("LogIfFullRefreshAndDDL", mock.Anything, mock.Anything).
+		Return(nil)
+	var executedQuery *query.Query
+	client.On("RunQueryWithoutResult", mock.Anything, mock.AnythingOfType("*query.Query")).
+		Run(func(args mock.Arguments) {
+			executedQuery = args.Get(1).(*query.Query)
+		}).Return(nil)
+
+	conn := new(mockConnectionFetcher)
+	conn.On("GetConnection", "gcp-default").Return(client)
+
+	o := BasicOperator{
+		connection:   conn,
+		extractor:    extractor,
+		materializer: mat,
+	}
+
+	asset := &pipeline.Asset{
+		Name: "orders_asset",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "orders.sql",
+			Content: "SELECT * FROM orders",
+		},
+	}
+	customAnnotations := `{"environment":"test","owner":"data_team","version":"1.0"}`
+	ctx := context.WithValue(context.Background(), pipeline.RunConfigQueryAnnotations, customAnnotations)
+
+	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "orders_pipeline"}, asset)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, executedQuery)
+
+	assert.True(t, strings.HasPrefix(executedQuery.Query, "-- @bruin.config:"))
+	assert.True(t, strings.Contains(executedQuery.Query, `"asset":"orders_asset"`))
+	assert.True(t, strings.Contains(executedQuery.Query, `"pipeline":"orders_pipeline"`))
+	assert.True(t, strings.Contains(executedQuery.Query, `"type":"main"`))
+	assert.True(t, strings.Contains(executedQuery.Query, `"environment":"test"`))
+	assert.True(t, strings.Contains(executedQuery.Query, `"owner":"data_team"`))
+	assert.True(t, strings.Contains(executedQuery.Query, `"version":"1.0"`))
+	assert.True(t, strings.Contains(executedQuery.Query, "SELECT * FROM orders"))
+}
+
