@@ -826,11 +826,11 @@ func Run(isDebug *bool) *cli.Command {
 				return nil
 			}
 
-			countAssets := s.GetAssetCountWithTasksPending()
+			_ = s.GetAssetCountWithTasksPending()
 
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
 			if shouldValidate {
-				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, connectionManager); err != nil {
+				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, connectionManager, false); err != nil {
 					return err
 				}
 			}
@@ -1016,7 +1016,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, connectionManager config.ConnectionGetter) error {
+func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, connectionManager config.ConnectionGetter, validateAssetLevel bool) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, nil, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
@@ -1025,6 +1025,9 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 	rules = append(rules, SeedAssetsValidator)
 
 	rules = lint.FilterRulesBySpeed(rules, true)
+	if validateAssetLevel {
+		rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
+	}
 
 	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, nil)
 	res, err := linter.LintPipelines(ctx, []*pipeline.Pipeline{foundPipeline})
