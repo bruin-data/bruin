@@ -821,6 +821,13 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
+			if s.InstanceCountByStatus(scheduler.Pending) == 0 {
+				warningPrinter.Println("No tasks to run.")
+				return nil
+			}
+
+			countAssets := s.GetAssetCountWithTasksPending()
+
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
 			if shouldValidate {
 				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
@@ -828,10 +835,6 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			if s.InstanceCountByStatus(scheduler.Pending) == 0 {
-				warningPrinter.Println("No tasks to run.")
-				return nil
-			}
 			sendTelemetry(s, c)
 			infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
 			infoPrinter.Printf("\n%s\n\n", executionStartLog)

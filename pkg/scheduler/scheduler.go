@@ -310,6 +310,17 @@ type Scheduler struct {
 	runID string
 }
 
+func (s *Scheduler) GetAssetCountWithTasksPending() int {
+	assets := make(map[string]bool)
+	for _, instance := range s.taskInstances {
+		if instance.GetStatus() == Pending {
+			assets[instance.GetAsset().ID] = true
+		}
+	}
+
+	return len(assets)
+}
+
 func (s *Scheduler) InstanceCount() int {
 	return len(s.taskInstances)
 }

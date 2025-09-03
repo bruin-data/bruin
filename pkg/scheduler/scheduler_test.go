@@ -407,6 +407,38 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 	assert.True(t, finished)
 }
 
+func Test_GetAssetCountWithTasksPending(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{
+				Name: "task11",
+			},
+			{
+				Name: "task21",
+			},
+			{
+				Name: "task12",
+				CustomChecks: []pipeline.CustomCheck{
+					{
+						Name: "check1",
+					},
+					{
+						Name: "check1",
+					},
+				},
+			},
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+	s.MarkAll(Succeeded)
+	s.MarkAsset(p.Assets[2], Pending, true)
+
+	assert.Equal(t, 1, s.GetAssetCountWithTasksPending())
+}
+
 func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	t.Parallel()
 
