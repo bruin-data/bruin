@@ -10,16 +10,22 @@ import (
 	"github.com/pkg/errors"
 )
 
+const DefaultQueryAnnotations = "default"
+
 func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) error {
 	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
-	
 	if !ok || annotations == "" {
 		return nil
 	}
 
 	var userAnnotations map[string]interface{}
-	if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
-		return errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
+	userAnnotations = make(map[string]interface{})
+
+	// If not "default", try to parse as JSON
+	if annotations != DefaultQueryAnnotations {
+		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
+			return errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
+		}
 	}
 
 	finalAnnotations := map[string]interface{}{
