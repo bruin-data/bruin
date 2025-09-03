@@ -407,6 +407,184 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 	assert.True(t, finished)
 }
 
+func Test_GetAssetCountWithTasksPending(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		pipeline         *pipeline.Pipeline
+		markAssets       []int // indices of assets to mark as Pending
+		want             int
+		checkInstanceIDs []string
+	}{
+		{
+			name: "single asset with pending tasks",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						ID:   "task11",
+						Name: "task11",
+					},
+					{
+						ID:   "task21",
+						Name: "task21",
+					},
+					{
+						Name: "task12",
+						ID:   "task12",
+						CustomChecks: []pipeline.CustomCheck{
+							{
+								ID: "check1",
+							},
+							{
+								ID: "check1",
+							},
+						},
+					},
+				},
+			},
+			markAssets:       []int{2},
+			want:             1,
+			checkInstanceIDs: []string{},
+		},
+		{
+			name: "2 asset with checks tasks",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						ID:   "task11",
+						Name: "task11",
+					},
+					{
+						ID:   "task21",
+						Name: "task21",
+						CustomChecks: []pipeline.CustomCheck{
+							{
+								ID: "check1",
+							},
+							{
+								ID: "check1",
+							},
+						},
+					},
+					{
+						ID:   "task12",
+						Name: "task12",
+						CustomChecks: []pipeline.CustomCheck{
+							{
+								ID: "check1",
+							},
+							{
+								ID: "check1",
+							},
+						},
+					},
+				},
+			},
+			markAssets:       []int{1, 2},
+			want:             2,
+			checkInstanceIDs: []string{},
+		},
+		{
+			name: "only checks of 1 asset",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						ID:   "task11",
+						Name: "task11",
+					},
+					{
+						ID:   "task21",
+						Name: "task21",
+						CustomChecks: []pipeline.CustomCheck{
+							{
+								ID: "check1",
+							},
+							{
+								ID: "check2",
+							},
+						},
+					},
+					{
+						ID:   "task12",
+						Name: "task12",
+						CustomChecks: []pipeline.CustomCheck{
+							{
+								ID: "check3",
+							},
+							{
+								ID: "check4",
+							},
+						},
+					},
+				},
+			},
+			markAssets:       []int{},
+			want:             1,
+			checkInstanceIDs: []string{"check1", "check2"},
+		},
+		{
+			name: " checks of 2 asset",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						ID:   "task11",
+						Name: "task11",
+					},
+					{
+						ID:   "task21",
+						Name: "task21",
+						CustomChecks: []pipeline.CustomCheck{
+							{
+								ID: "check1",
+							},
+							{
+								ID: "check2",
+							},
+						},
+					},
+					{
+						ID:   "task12",
+						Name: "task12",
+						CustomChecks: []pipeline.CustomCheck{
+							{
+								ID: "check3",
+							},
+							{
+								ID: "check4",
+							},
+						},
+					},
+				},
+			},
+			markAssets:       []int{},
+			want:             2,
+			checkInstanceIDs: []string{"check1", "check2", "check3"},
+		},
+		// Add more cases as needed
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := NewScheduler(zap.NewNop().Sugar(), tt.pipeline, "test")
+			s.MarkAll(Skipped)
+			for _, idx := range tt.markAssets {
+				s.MarkAsset(tt.pipeline.Assets[idx], Pending, false)
+			}
+
+			for _, id := range tt.checkInstanceIDs {
+				err := s.MarkCheckInstancesByID(id, Pending)
+				if err != nil {
+					t.Errorf("failed to mark check instance %q as pending: %v", id, err)
+				}
+			}
+
+			assert.Equal(t, tt.want, s.GetAssetCountWithTasksPending())
+		})
+	}
+}
+
 func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	t.Parallel()
 

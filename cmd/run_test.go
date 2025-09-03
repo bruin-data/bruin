@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/spf13/afero"
@@ -1277,40 +1277,8 @@ func TestCheckLintFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
-			defaultEnv := &config.Environment{
-				Connections: &config.Connections{
-					GoogleCloudPlatform: []config.GoogleCloudPlatformConnection{
-						{
-							Name:               "conn1",
-							ServiceAccountJSON: "bla-bla",
-						},
-					},
-				},
-			}
-			cfg := &config.Config{
-				Environments: map[string]config.Environment{
-					"default": {
-						Connections: &config.Connections{
-							Snowflake: []config.SnowflakeConnection{
-								{
-									Name:      "dummy",
-									Account:   "dummy-account",
-									Username:  "dummy-username",
-									Password:  "dummy-password",
-									Database:  "dummy-database",
-									Schema:    "dummy-schema",
-									Warehouse: "dummy-warehouse",
-								},
-							},
-						},
-					},
-				},
-				SelectedEnvironmentName: "default",
-				DefaultEnvironmentName:  "snowflake-default",
-				SelectedEnvironment:     defaultEnv,
-			}
-			connectionManager, _ := connection.NewManagerFromConfig(cfg)
-			err := CheckLint(ctx, tt.foundPipeline, tt.pipelinePath, logger, nil, connectionManager)
+
+			err := CheckLint(ctx, tt.foundPipeline, tt.pipelinePath, logger, false)
 			require.NoError(t, err, "Expected no error but got one")
 		})
 	}
@@ -1435,5 +1403,80 @@ func TestReadState(t *testing.T) {
 				assert.Equal(t, tt.expectedRunConfig, runConfig)
 			}
 		})
+	}
+}
+
+type mockAssetCounter struct {
+	count int
+}
+
+func (m *mockAssetCounter) GetAssetCountWithTasksPending() int {
+	return m.count
+}
+
+func TestValidate_ShouldValidateFalse_ReturnsNil(t *testing.T) {
+	t.Parallel()
+	err := Validate(false, &mockAssetCounter{count: 1}, nil, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
+	if err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+func TestValidate_AssetsPending_CallsLintCheckerWithFalse(t *testing.T) {
+	t.Parallel()
+	called := false
+	var validateOnlyAssetLevel bool
+
+	lintChecker := func(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, voal bool) error {
+		called = true
+		validateOnlyAssetLevel = voal
+		return nil
+	}
+
+	err := Validate(true, &mockAssetCounter{count: 2}, lintChecker, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
+	if err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+	if !called {
+		t.Error("expected lintChecker to be called")
+	}
+	if validateOnlyAssetLevel {
+		t.Error("expected validateOnlyAssetLevel to be false when assets are pending")
+	}
+}
+
+func TestValidate_NoAssetsPending_CallsLintCheckerWithTrue(t *testing.T) {
+	t.Parallel()
+	called := false
+	var validateOnlyAssetLevel bool
+
+	lintChecker := func(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, voal bool) error {
+		called = true
+		validateOnlyAssetLevel = voal
+		return nil
+	}
+
+	err := Validate(true, &mockAssetCounter{count: 0}, lintChecker, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
+	if err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+	if !called {
+		t.Error("expected lintChecker to be called")
+	}
+	if !validateOnlyAssetLevel {
+		t.Error("expected validateOnlyAssetLevel to be true when no assets are pending")
+	}
+}
+
+func TestValidate_LintCheckerReturnsError_PropagatesError(t *testing.T) {
+	t.Parallel()
+	expectedErr := errors.New("lint error")
+	lintChecker := func(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, voal bool) error {
+		return expectedErr
+	}
+
+	err := Validate(true, &mockAssetCounter{count: 0}, lintChecker, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("expected %v, got %v", expectedErr, err)
 	}
 }
