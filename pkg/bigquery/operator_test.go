@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockExtractor struct {
@@ -255,7 +256,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -336,7 +337,7 @@ func TestMetadataPushOperator_Run(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -436,7 +437,7 @@ func TestBasicOperator_RunTask_WithRenderer(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -487,12 +488,12 @@ func TestBasicOperator_QueryAnnotations_Default(t *testing.T) {
 
 	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "test_pipeline"}, asset)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, executedQuery)
 
 	expectedComment := `-- @bruin.config: {"asset":"test_asset","pipeline":"test_pipeline","type":"main"}`
 	assert.True(t, strings.HasPrefix(executedQuery.Query, expectedComment))
-	assert.True(t, strings.Contains(executedQuery.Query, "SELECT * FROM users"))
+	assert.Contains(t, executedQuery.Query, "SELECT * FROM users")
 }
 
 func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
@@ -540,15 +541,15 @@ func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
 
 	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "orders_pipeline"}, asset)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, executedQuery)
 
 	assert.True(t, strings.HasPrefix(executedQuery.Query, "-- @bruin.config:"))
-	assert.True(t, strings.Contains(executedQuery.Query, `"asset":"orders_asset"`))
-	assert.True(t, strings.Contains(executedQuery.Query, `"pipeline":"orders_pipeline"`))
-	assert.True(t, strings.Contains(executedQuery.Query, `"type":"main"`))
-	assert.True(t, strings.Contains(executedQuery.Query, `"environment":"test"`))
-	assert.True(t, strings.Contains(executedQuery.Query, `"owner":"data_team"`))
-	assert.True(t, strings.Contains(executedQuery.Query, `"version":"1.0"`))
-	assert.True(t, strings.Contains(executedQuery.Query, "SELECT * FROM orders"))
+	assert.Contains(t, executedQuery.Query, `"asset":"orders_asset"`)
+	assert.Contains(t, executedQuery.Query, `"pipeline":"orders_pipeline"`)
+	assert.Contains(t, executedQuery.Query, `"type":"main"`)
+	assert.Contains(t, executedQuery.Query, `"environment":"test"`)
+	assert.Contains(t, executedQuery.Query, `"owner":"data_team"`)
+	assert.Contains(t, executedQuery.Query, `"version":"1.0"`)
+	assert.Contains(t, executedQuery.Query, "SELECT * FROM orders")
 }

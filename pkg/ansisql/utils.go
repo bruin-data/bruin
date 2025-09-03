@@ -17,10 +17,7 @@ func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskTy
 	if !ok || annotations == "" {
 		return q, nil
 	}
-
-	var userAnnotations map[string]interface{}
-	userAnnotations = make(map[string]interface{})
-
+	userAnnotations := make(map[string]interface{})
 	// If not "default", try to parse as JSON
 	if annotations != DefaultQueryAnnotations {
 		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
