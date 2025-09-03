@@ -12,10 +12,10 @@ import (
 
 const DefaultQueryAnnotations = "default"
 
-func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) error {
+func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) (*query.Query, error) {
 	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
 	if !ok || annotations == "" {
-		return nil
+		return q, nil
 	}
 
 	var userAnnotations map[string]interface{}
@@ -24,7 +24,7 @@ func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskTy
 	// If not "default", try to parse as JSON
 	if annotations != DefaultQueryAnnotations {
 		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
-			return errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
+			return nil, errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
 		}
 	}
 
@@ -40,11 +40,13 @@ func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskTy
 
 	finalJSON, err := json.Marshal(finalAnnotations)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal final annotations")
+		return nil, errors.Wrap(err, "failed to marshal final annotations")
 	}
 
 	comment := fmt.Sprintf("-- @bruin.config: %s\n", string(finalJSON))
-	q.Query = comment + q.Query
-
-	return nil
+	
+	// Return a new query with the annotation prepended
+	return &query.Query{
+		Query: comment + q.Query,
+	}, nil
 }

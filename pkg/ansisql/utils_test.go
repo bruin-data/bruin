@@ -59,22 +59,27 @@ func TestAddAnnotationComment(t *testing.T) {
 			}
 
 			q := &query.Query{Query: tt.query}
-			err := AddAnnotationComment(ctx, q, "test-asset", "main", "test-pipeline")
+			resultQuery, err := AddAnnotationComment(ctx, q, "test-asset", "main", "test-pipeline")
 
 			if tt.expectError {
 				assert.Error(t, err)
+				assert.Nil(t, resultQuery)
 			} else {
 				assert.NoError(t, err)
+				assert.NotNil(t, resultQuery)
+				// Original query should remain unchanged
+				assert.Equal(t, tt.query, q.Query)
+				
 				if tt.name == "valid JSON annotations" {
-					// Check that the query starts with the comment and contains the required fields
-					assert.Contains(t, q.Query, "-- @bruin.config:")
-					assert.Contains(t, q.Query, `"asset":"test-asset"`)
-					assert.Contains(t, q.Query, `"type":"main"`)
-					assert.Contains(t, q.Query, `"pipeline":"test-pipeline"`)
-					assert.Contains(t, q.Query, `"project":"test"`)
-					assert.Contains(t, q.Query, "SELECT * FROM table")
+					// Check that the result query starts with the comment and contains the required fields
+					assert.Contains(t, resultQuery.Query, "-- @bruin.config:")
+					assert.Contains(t, resultQuery.Query, `"asset":"test-asset"`)
+					assert.Contains(t, resultQuery.Query, `"type":"main"`)
+					assert.Contains(t, resultQuery.Query, `"pipeline":"test-pipeline"`)
+					assert.Contains(t, resultQuery.Query, `"project":"test"`)
+					assert.Contains(t, resultQuery.Query, "SELECT * FROM table")
 				} else {
-					assert.Equal(t, tt.expected, q.Query)
+					assert.Equal(t, tt.expected, resultQuery.Query)
 				}
 			}
 		})
