@@ -316,30 +316,30 @@ type athena struct {
 }
 
 type taskDefinition struct {
-	Name              string            `yaml:"name"`
-	URI               string            `yaml:"uri"`
-	Description       string            `yaml:"description"`
-	Type              string            `yaml:"type"`
-	RunFile           string            `yaml:"run"`
-	Depends           depends           `yaml:"depends"`
-	Parameters        map[string]string `yaml:"parameters"`
-	Connections       map[string]string `yaml:"connections"`
-	Secrets           []secretMapping   `yaml:"secrets"`
-	Connection        string            `yaml:"connection"`
-	Image             string            `yaml:"image"`
-	Instance          string            `yaml:"instance"`
-	Materialization   materialization   `yaml:"materialization"`
-	Owner             string            `yaml:"owner"`
-	StartDate         string            `yaml:"start_date"`
-	Extends           []string          `yaml:"extends"`
-	Columns           []column          `yaml:"columns"`
-	CustomChecks      []customCheck     `yaml:"custom_checks"`
-	Tags              []string          `yaml:"tags"`
-	Snowflake         snowflake         `yaml:"snowflake"`
-	Athena            athena            `yaml:"athena"`
-	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
-	Domains           []string          `yaml:"domains"`
-	Meta              map[string]string `yaml:"meta"`
+    Name              string            `yaml:"name"`
+    URI               string            `yaml:"uri"`
+    Description       string            `yaml:"description"`
+    Type              string            `yaml:"type"`
+    RunFile           string            `yaml:"run"`
+    Depends           depends           `yaml:"depends"`
+    Parameters        map[string]string `yaml:"parameters"`
+    Connections       map[string]string `yaml:"connections"`
+    Secrets           []secretMapping   `yaml:"secrets"`
+    Connection        string            `yaml:"connection"`
+    Image             string            `yaml:"image"`
+    Instance          string            `yaml:"instance"`
+    Materialization   materialization   `yaml:"materialization"`
+    Owner             string            `yaml:"owner"`
+    StartDate         string            `yaml:"start_date"`
+    Extends           []string          `yaml:"extends"`
+    Columns           []column          `yaml:"columns"`
+    CustomChecks      []customCheck     `yaml:"custom_checks"`
+    Tags              []string          `yaml:"tags"`
+    Snowflake         snowflake         `yaml:"snowflake"`
+    Athena            athena            `yaml:"athena"`
+    IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
+    Domains           []string          `yaml:"domains"`
+    Meta              map[string]string `yaml:"meta"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -490,19 +490,19 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		}
 	}
 
-	task := Asset{
-		ID:                hash(definition.Name),
-		URI:               definition.URI,
-		Name:              definition.Name,
-		Description:       definition.Description,
-		Type:              AssetType(definition.Type),
-		Parameters:        definition.Parameters,
-		Connection:        definition.Connection,
-		Secrets:           make([]SecretMapping, len(definition.Secrets)),
-		Upstreams:         upstreams,
-		ExecutableFile:    ExecutableFile{},
-		Materialization:   mat,
-		Image:             definition.Image,
+		task := Asset{
+			ID:                hash(definition.Name),
+			URI:               definition.URI,
+			Name:              definition.Name,
+			Description:       definition.Description,
+			Type:              AssetType(definition.Type),
+			Parameters:        definition.Parameters,
+			Connection:        definition.Connection,
+			Secrets:           make([]SecretMapping, len(definition.Secrets)),
+			Upstreams:         upstreams,
+			ExecutableFile:    ExecutableFile{},
+			Materialization:   mat,
+			Image:             definition.Image,
 		Instance:          definition.Instance,
 		Owner:             definition.Owner,
 		StartDate:         definition.StartDate,

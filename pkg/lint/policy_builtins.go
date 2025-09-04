@@ -400,7 +400,7 @@ var builtinRules = map[string]validators{
 	"pipeline-has-notifications": {
 		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 			notifs := pipeline.Notifications
-			if len(notifs.Discord) > 0 || len(notifs.MSTeams) > 0 || len(notifs.Slack) > 0 {
+			if len(notifs.Discord) > 0 || len(notifs.MSTeams) > 0 || len(notifs.Slack) > 0 || len(notifs.Webhook) > 0 {
 				return nil, nil
 			}
 			return []*Issue{

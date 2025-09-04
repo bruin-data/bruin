@@ -276,7 +276,8 @@
                 "success": true,
                 "failure": true
             }
-        ]
+        ],
+        "webhook": []
     },
     "catchup": false,
     "metadata_push": {
