@@ -1469,25 +1469,25 @@ func TestSkipAssetsWithFutureStartDate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			p := &pipeline.Pipeline{Assets: tt.assets}
 			s := scheduler.NewScheduler(zaptest.NewLogger(t).Sugar(), p, "test")
-			
+
 			filter := &Filter{FullRefresh: tt.fullRefresh}
-			
+
 			err := SkipAssetsWithFutureStartDate(context.Background(), filter, s, p)
 			require.NoError(t, err)
-			
+
 			// Check which assets were marked as skipped
 			skippedInstances := s.GetTaskInstancesByStatus(scheduler.Skipped)
 			skippedAssetNames := make([]string, 0)
-			
+
 			for _, instance := range skippedInstances {
 				if instance.GetType() == scheduler.TaskInstanceTypeMain {
 					skippedAssetNames = append(skippedAssetNames, instance.GetAsset().Name)
 				}
 			}
-			
+
 			assert.ElementsMatch(t, tt.expected, skippedAssetNames)
 		})
 	}

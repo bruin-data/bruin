@@ -3,4 +3,4 @@ schedule: "@daily"
 start_date: "2023-01-01"
 
 default_connections:
-  google_cloud_platform: "test-gcp"
+  duckdb: "duckdb-start-date-test"

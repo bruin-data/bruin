@@ -1689,7 +1689,7 @@ func SkipAssetsWithFutureStartDate(ctx context.Context, f *Filter, s *scheduler.
 
 		if startDate.After(now) {
 			s.MarkAsset(asset, scheduler.Skipped, false)
-			warningPrinter.Printf("Skipping asset '%s': start_date (%s) is in the future (current time: %s)\n", 
+			warningPrinter.Printf("Skipping asset '%s': start_date (%s) is in the future (current time: %s)\n",
 				asset.Name, startDate.Format("2006-01-02 15:04:05"), now.Format("2006-01-02 15:04:05"))
 			skippedCount++
 		}
