@@ -3217,11 +3217,11 @@ func TestValidateAssetSeedValidation_CaseInsensitive(t *testing.T) {
 			t.Parallel()
 			tempDir := t.TempDir()
 			assetDir := filepath.Join(tempDir, "assets")
-			require.NoError(t, os.MkdirAll(assetDir, 0755))
-			
+			require.NoError(t, os.MkdirAll(assetDir, 0o755))
+
 			tt.asset.DefinitionFile.Path = filepath.Join(assetDir, "test.asset.yml")
 			csvPath := filepath.Join(assetDir, "test.csv")
-			require.NoError(t, os.WriteFile(csvPath, []byte(tt.csvData), 0644))
+			require.NoError(t, os.WriteFile(csvPath, []byte(tt.csvData), 0o644))
 
 			got, err := ValidateAssetSeedValidation(ctx, &pipeline.Pipeline{}, tt.asset)
 			require.NoError(t, err)
