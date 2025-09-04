@@ -37,8 +37,6 @@ const (
 	KeyIsDebug contextKey = iota
 	KeyVerbose contextKey = iota
 	ContextLogger
-
-	// Log timestamps should include only the time (no date)
 	timeFormat = "15:04:05"
 )
 
