@@ -521,12 +521,12 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 				return issues, nil
 			}
 			for _, header := range headers {
-				columnMap[header] = true
+				columnMap[strings.ToLower(header)] = true
 			}
 		}
 
 		for _, column := range asset.Columns {
-			if !columnMap[column.Name] {
+			if !columnMap[strings.ToLower(column.Name)] {
 				issues = append(issues, &Issue{
 					Task:        asset,
 					Description: fmt.Sprintf("Column '%s' is defined in the asset but does not exist in the CSV", column.Name),
