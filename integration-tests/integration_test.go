@@ -1872,7 +1872,7 @@ func TestIngestrTasks(t *testing.T) {
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{"bruin run completed", "Skipping asset 'test.future_start_date_skip': start_date", "is in the future", "Total skipped: 1 assets with future start_date during full-refresh"},
+					Contains: []string{"bruin run completed", "Skipping asset 'test.future_start_date_skip': start_date", "is in the future", "Total skipped: 2 assets with future start_date during full-refresh"},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
