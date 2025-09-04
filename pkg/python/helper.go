@@ -84,6 +84,16 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 			if ok && applyModifiers {
 				startTime = pipeline.ModifyDate(startTimeInstance, asset.IntervalModifiers.Start)
 			}
+
+			// Asset-level start_date overrides global start date ONLY when full-refresh is enabled
+			fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)
+			if asset.StartDate != "" && fullRefresh != nil && fullRefresh.(bool) {
+				assetStartTime, err := time.Parse("2006-01-02", asset.StartDate)
+				if err == nil {
+					startTime = assetStartTime
+				}
+			}
+
 			cmdArgs = append(cmdArgs, "--interval-start", startTime.Format(time.RFC3339))
 		}
 	}

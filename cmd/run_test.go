@@ -1422,6 +1422,77 @@ func TestValidate_ShouldValidateFalse_ReturnsNil(t *testing.T) {
 	}
 }
 
+func TestSkipAssetsWithFutureStartDate(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		fullRefresh bool
+		assets      []*pipeline.Asset
+		expected    []string // expected skipped asset names
+	}{
+		{
+			name:        "full refresh disabled - no assets skipped",
+			fullRefresh: false,
+			assets: []*pipeline.Asset{
+				{Name: "asset1", StartDate: time.Now().Add(24 * time.Hour).Format("2006-01-02")},
+				{Name: "asset2", StartDate: time.Now().Add(-24 * time.Hour).Format("2006-01-02")},
+			},
+			expected: []string{},
+		},
+		{
+			name:        "full refresh enabled - future start_date assets skipped",
+			fullRefresh: true,
+			assets: []*pipeline.Asset{
+				{Name: "asset1", StartDate: time.Now().Add(24 * time.Hour).Format("2006-01-02")},
+				{Name: "asset2", StartDate: time.Now().Add(-24 * time.Hour).Format("2006-01-02")},
+				{Name: "asset3", StartDate: ""},
+			},
+			expected: []string{"asset1"},
+		},
+		{
+			name:        "full refresh enabled - invalid start_date ignored",
+			fullRefresh: true,
+			assets: []*pipeline.Asset{
+				{Name: "asset1", StartDate: "invalid-date"},
+				{Name: "asset2", StartDate: time.Now().Add(-24 * time.Hour).Format("2006-01-02")},
+			},
+			expected: []string{},
+		},
+		{
+			name:        "full refresh enabled - no assets",
+			fullRefresh: true,
+			assets:      []*pipeline.Asset{},
+			expected:    []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: tt.assets}
+			s := scheduler.NewScheduler(zaptest.NewLogger(t).Sugar(), p, "test")
+
+			filter := &Filter{FullRefresh: tt.fullRefresh}
+
+			err := SkipAssetsWithFutureStartDate(context.Background(), filter, s, p)
+			require.NoError(t, err)
+
+			// Check which assets were marked as skipped
+			skippedInstances := s.GetTaskInstancesByStatus(scheduler.Skipped)
+			skippedAssetNames := make([]string, 0)
+
+			for _, instance := range skippedInstances {
+				if instance.GetType() == scheduler.TaskInstanceTypeMain {
+					skippedAssetNames = append(skippedAssetNames, instance.GetAsset().Name)
+				}
+			}
+
+			assert.ElementsMatch(t, tt.expected, skippedAssetNames)
+		})
+	}
+}
+
 func TestValidate_AssetsPending_CallsLintCheckerWithFalse(t *testing.T) {
 	t.Parallel()
 	called := false
