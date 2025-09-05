@@ -1493,15 +1493,38 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 		expectedStartDate time.Time
 		expectedEndDate   time.Time
 	}{
+		// 1. Minimal data: Nothing available (empty pipeline, empty flags)
 		{
 			fullRefresh:       true,
-			name:              "Full refresh with start_date and end_date flags should override pipeline start_date",
-			pipelineStartDate: "2023-01-01",
-			flagStartDate:     "2024-01-01",
-			flagEndDate:       "2024-01-31",
-			expectedStartDate: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
-			expectedEndDate:   time.Date(2024, 1, 31, 23, 59, 59, 999999999, time.UTC),
+			name:              "Full refresh with empty pipeline start_date and no flags should use yesterday",
+			pipelineStartDate: "",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			}(),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
 		},
+		{
+			fullRefresh:       false,
+			name:              "Non-full refresh without start_date flag should use yesterday",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			}(),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		// 2. Only pipeline data available
 		{
 			fullRefresh:       true,
 			name:              "Full refresh without start_date flag should use pipeline default start_date",
@@ -1509,8 +1532,12 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			flagStartDate:     "",
 			flagEndDate:       "",
 			expectedStartDate: time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC),
-			expectedEndDate:   time.Now().AddDate(0, 0, -1).Add(24*time.Hour - time.Nanosecond),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
 		},
+		// 3. Only single flag available
 		{
 			fullRefresh:       true,
 			name:              "Full refresh with only start_date flag should use flag for start and pipeline date for end",
@@ -1518,7 +1545,10 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			flagStartDate:     "2024-02-01",
 			flagEndDate:       "",
 			expectedStartDate: time.Date(2022, 06, 15, 0, 0, 0, 0, time.UTC),
-			expectedEndDate:   time.Now().AddDate(0, 0, -1).Add(24*time.Hour - time.Nanosecond),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
 		},
 		{
 			fullRefresh:       true,
@@ -1530,14 +1560,30 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			expectedEndDate:   time.Date(2024, 2, 28, 0, 0, 0, 0, time.UTC),
 		},
 		{
-			fullRefresh:       true,
-			name:              "Full refresh with empty pipeline start_date and no flags should use yesterday",
-			pipelineStartDate: "",
-			flagStartDate:     "",
+			fullRefresh:       false,
+			name:              "Non-full refresh with only start_date flag",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "2024-05-10",
 			flagEndDate:       "",
-			expectedStartDate: time.Now().AddDate(0, 0, -1),
-			expectedEndDate:   time.Now().AddDate(0, 0, -1).Add(24*time.Hour - time.Nanosecond),
+			expectedStartDate: time.Date(2024, 5, 10, 0, 0, 0, 0, time.UTC),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
 		},
+		{
+			fullRefresh:       false,
+			name:              "Non-full refresh with only end_date flag",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "2024-05-20",
+			expectedStartDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			}(),
+			expectedEndDate:   time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC),
+		},
+		// 4. Both flags available but pipeline empty
 		{
 			fullRefresh:       true,
 			name:              "Full refresh with empty pipeline start_date but flags provided",
@@ -1546,6 +1592,25 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			flagEndDate:       "2024-04-30",
 			expectedStartDate: time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC),
 			expectedEndDate:   time.Date(2024, 4, 30, 0, 0, 0, 0, time.UTC),
+		},
+		// 5. Full data: Pipeline + both flags available
+		{
+			fullRefresh:       true,
+			name:              "Full refresh with start_date and end_date flags should override pipeline start_date",
+			pipelineStartDate: "2023-01-01",
+			flagStartDate:     "2024-01-01",
+			flagEndDate:       "2024-01-31",
+			expectedStartDate: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 1, 31, 23, 59, 59, 999999999, time.UTC),
+		},
+		{
+			fullRefresh:       false,
+			name:              "Non-full refresh with flags should override pipeline start_date",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "2024-03-01",
+			flagEndDate:       "2024-03-31",
+			expectedStartDate: time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC),
 		},
 		{
 			fullRefresh:       true,
@@ -1564,42 +1629,6 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			flagEndDate:       "2024-05-31",
 			expectedStartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			expectedEndDate:   time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-		},
-		{
-			fullRefresh:       false,
-			name:              "Non-full refresh without start_date flag should use yesterday",
-			pipelineStartDate: "2023-06-15",
-			flagStartDate:     "",
-			flagEndDate:       "",
-			expectedStartDate: time.Now().AddDate(0, 0, -1),
-			expectedEndDate:   time.Now().AddDate(0, 0, -1).Add(24*time.Hour - time.Nanosecond),
-		},
-		{
-			fullRefresh:       false,
-			name:              "Non-full refresh with flags should override pipeline start_date",
-			pipelineStartDate: "2023-06-15",
-			flagStartDate:     "2024-03-01",
-			flagEndDate:       "2024-03-31",
-			expectedStartDate: time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
-			expectedEndDate:   time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC),
-		},
-		{
-			fullRefresh:       false,
-			name:              "Non-full refresh with only start_date flag",
-			pipelineStartDate: "2023-06-15",
-			flagStartDate:     "2024-05-10",
-			flagEndDate:       "",
-			expectedStartDate: time.Date(2024, 5, 10, 0, 0, 0, 0, time.UTC),
-			expectedEndDate:   time.Now().AddDate(0, 0, -1).Add(24*time.Hour - time.Nanosecond),
-		},
-		{
-			fullRefresh:       false,
-			name:              "Non-full refresh with only end_date flag",
-			pipelineStartDate: "2023-06-15",
-			flagStartDate:     "",
-			flagEndDate:       "2024-05-20",
-			expectedStartDate: time.Now().AddDate(0, 0, -1),
-			expectedEndDate:   time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC),
 		},
 	}
 
