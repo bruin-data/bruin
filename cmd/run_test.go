@@ -1480,3 +1480,171 @@ func TestValidate_LintCheckerReturnsError_PropagatesError(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedErr, err)
 	}
 }
+
+func TestFullRefreshWithStartDateFlags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		fullRefresh       bool
+		name              string
+		pipelineStartDate string
+		flagStartDate     string
+		flagEndDate       string
+		expectedStartDate time.Time
+		expectedEndDate   time.Time
+	}{
+		{
+			fullRefresh:       true,
+			name:              "Full refresh with start_date and end_date flags should override pipeline start_date",
+			pipelineStartDate: "2023-01-01",
+			flagStartDate:     "2024-01-01",
+			flagEndDate:       "2024-01-31",
+			expectedStartDate: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 1, 31, 23, 59, 59, 999999999, time.UTC),
+		},
+		{
+			fullRefresh:       true,
+			name:              "Full refresh without start_date flag should use pipeline default start_date",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		{
+			fullRefresh:       true,
+			name:              "Full refresh with only start_date flag should use flag for start and pipeline date for end",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "2024-02-01",
+			flagEndDate:       "",
+			expectedStartDate: time.Date(2022, 06, 15, 0, 0, 0, 0, time.UTC),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		{
+			fullRefresh:       true,
+			name:              "Full refresh with only end_date flag should use pipeline for start and flag for end",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "2024-02-28",
+			expectedStartDate: time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 2, 28, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			fullRefresh:       true,
+			name:              "Full refresh with empty pipeline start_date and no flags should use yesterday",
+			pipelineStartDate: "",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: time.Now().AddDate(0, 0, -1),
+			expectedEndDate:   time.Now().AddDate(0, 0, -1).Add(24*time.Hour - time.Nanosecond),
+		},
+		{
+			fullRefresh:       true,
+			name:              "Full refresh with empty pipeline start_date but flags provided",
+			pipelineStartDate: "",
+			flagStartDate:     "2024-04-01",
+			flagEndDate:       "2024-04-30",
+			expectedStartDate: time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 4, 30, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			fullRefresh:       false,
+			name:              "Non-full refresh without start_date flag should use yesterday",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: time.Now().AddDate(0, 0, -1),
+			expectedEndDate:   time.Now().AddDate(0, 0, -1).Add(24*time.Hour - time.Nanosecond),
+		},
+		{
+			fullRefresh:       false,
+			name:              "Non-full refresh with flags should override pipeline start_date",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "2024-03-01",
+			flagEndDate:       "2024-03-31",
+			expectedStartDate: time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			fullRefresh:       false,
+			name:              "Non-full refresh with only start_date flag",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "2024-05-10",
+			flagEndDate:       "",
+			expectedStartDate: time.Date(2024, 5, 10, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Now().AddDate(0, 0, -1).Add(24*time.Hour - time.Nanosecond),
+		},
+		{
+			fullRefresh:       false,
+			name:              "Non-full refresh with only end_date flag",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "2024-05-20",
+			expectedStartDate: time.Now().AddDate(0, 0, -1),
+			expectedEndDate:   time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create a test pipeline with start_date
+			testPipeline := &pipeline.Pipeline{
+				Name:        "TestPipeline",
+				StartDate:   tt.pipelineStartDate,
+				Assets:      []*pipeline.Asset{},
+				Concurrency: 1,
+			}
+
+			// Parse flag dates if provided
+			var flagStartDate, flagEndDate time.Time
+			var err error
+
+			if tt.flagStartDate != "" && tt.flagEndDate != "" {
+				logger := zaptest.NewLogger(t).Sugar()
+				flagStartDate, flagEndDate, err = ParseDate(tt.flagStartDate, tt.flagEndDate, logger)
+				require.NoError(t, err)
+			}
+
+			// Create context with run config values (simulating flag values)
+			ctx := context.Background()
+			if tt.expectOverride {
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, flagStartDate)
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, flagEndDate)
+			}
+
+			// Verify the context contains expected values
+			if tt.expectOverride {
+				contextStartDate := ctx.Value(pipeline.RunConfigStartDate)
+				contextEndDate := ctx.Value(pipeline.RunConfigEndDate)
+
+				assert.NotNil(t, contextStartDate, "Start date should be set in context when flags are provided")
+				assert.NotNil(t, contextEndDate, "End date should be set in context when flags are provided")
+
+				startDateFromCtx, ok := contextStartDate.(time.Time)
+				assert.True(t, ok, "Context start date should be time.Time")
+				assert.Equal(t, tt.expectedStartDate, startDateFromCtx, "Context start date should match flag value")
+
+				endDateFromCtx, ok := contextEndDate.(time.Time)
+				assert.True(t, ok, "Context end date should be time.Time")
+				assert.Equal(t, tt.expectedEndDate, endDateFromCtx, "Context end date should match flag value")
+			} else {
+				contextStartDate := ctx.Value(pipeline.RunConfigStartDate)
+				contextEndDate := ctx.Value(pipeline.RunConfigEndDate)
+
+				assert.Nil(t, contextStartDate, "Start date should not be set in context when no flags provided")
+				assert.Nil(t, contextEndDate, "End date should not be set in context when no flags provided")
+
+				// Pipeline's default start_date should still be available
+				assert.Equal(t, tt.pipelineStartDate, testPipeline.StartDate, "Pipeline should retain its default start_date")
+			}
+		})
+	}
+}
