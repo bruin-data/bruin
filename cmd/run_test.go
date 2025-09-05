@@ -1636,7 +1636,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			flagStartDate:     "2024-01-01",
 			flagEndDate:       "2024-01-31",
 			expectedStartDate: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
-			expectedEndDate:   time.Date(2024, 1, 31, 23, 59, 59, 999999999, time.UTC),
+			expectedEndDate:   time.Date(2024, 1, 31,0, 0, 0, 0, time.UTC),
 		},
 		{
 			fullRefresh:       true,
