@@ -709,7 +709,6 @@ func Run(isDebug *bool) *cli.Command {
 				SingleTask:        task,
 				ExcludeTag:        runConfig.ExcludeTag,
 				singleCheckID:     singleCheckID,
-				FullRefresh:       runConfig.FullRefresh,
 			}
 			var pipelineState *scheduler.PipelineState
 			if c.Bool("continue") {
@@ -1570,7 +1569,6 @@ type Filter struct {
 	SingleTask        *pipeline.Asset
 	ExcludeTag        string
 	singleCheckID     string
-	FullRefresh       bool // Whether full refresh is enabled
 }
 
 func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -1669,39 +1667,6 @@ func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 	return nil
 }
 
-func SkipAssetsWithFutureStartDate(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
-	if !f.FullRefresh {
-		return nil
-	}
-
-	now := time.Now()
-	var skippedCount int
-
-	for _, asset := range p.Assets {
-		if asset.StartDate == "" {
-			continue
-		}
-
-		startDate, err := date.ParseTime(asset.StartDate)
-		if err != nil {
-			continue
-		}
-
-		if startDate.After(now) {
-			s.MarkAsset(asset, scheduler.Skipped, false)
-			warningPrinter.Printf("Skipping asset '%s': start_date (%s) is in the future (current time: %s)\n",
-				asset.Name, startDate.Format("2006-01-02 15:04:05"), now.Format("2006-01-02 15:04:05"))
-			skippedCount++
-		}
-	}
-
-	if skippedCount > 0 {
-		warningPrinter.Printf("Total skipped: %d assets with future start_date during full-refresh\n", skippedCount)
-	}
-
-	return nil
-}
-
 type FilterMutator func(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error
 
 func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -1712,7 +1677,6 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 		HandleIncludeTags,
 		HandleExcludeTags,
 		FilterTaskTypes,
-		SkipAssetsWithFutureStartDate,
 		SkipAllTasksIfSingleCheck,
 	}
 

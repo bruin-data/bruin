@@ -1846,40 +1846,6 @@ func TestIngestrTasks(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "start-date-future-normal-run",
-			task: e2e.Task{
-				Name:    "start-date-future-normal-run",
-				Command: binary,
-				Args:    []string{"run", "--env", "env-start-date-test", filepath.Join(currentFolder, "test-pipelines/start-date-parameter-test")},
-				Env:     []string{},
-				Expected: e2e.Output{
-					ExitCode: 0,
-					Contains: []string{"bruin run completed", "Finished: test.future_start_date_skip"},
-				},
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-					e2e.AssertByContains,
-				},
-			},
-		},
-		{
-			name: "start-date-future-full-refresh-skip",
-			task: e2e.Task{
-				Name:    "start-date-future-full-refresh-skip",
-				Command: binary,
-				Args:    []string{"run", "--env", "env-start-date-test", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/start-date-parameter-test")},
-				Env:     []string{},
-				Expected: e2e.Output{
-					ExitCode: 0,
-					Contains: []string{"bruin run completed", "Skipping asset 'test.future_start_date_skip': start_date", "is in the future", "Total skipped: 2 assets with future start_date during full-refresh"},
-				},
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-					e2e.AssertByContains,
-				},
-			},
-		},
 	}
 
 	for _, tt := range tests {
