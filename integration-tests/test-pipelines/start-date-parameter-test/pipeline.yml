@@ -1,6 +1,0 @@
-name: start-date-parameter-test
-schedule: "@daily"
-start_date: "2023-01-01"
-
-default_connections:
-  duckdb: "duckdb-start-date-test"

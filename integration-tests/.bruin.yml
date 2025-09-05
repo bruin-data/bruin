@@ -235,9 +235,3 @@ environments:
       duckdb:
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
-
-  env-start-date-test:
-    connections:
-      duckdb:
-        - name: "duckdb-start-date-test"
-          path: "duckdb-files/start-date-test.db"

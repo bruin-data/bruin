@@ -130,14 +130,6 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		return r, nil
 	}
 
-	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)
-	if asset.StartDate != "" && fullRefresh != nil && fullRefresh.(bool) {
-		assetStartTime, err := time.Parse("2006-01-02", asset.StartDate)
-		if err == nil {
-			startDate = assetStartTime
-		}
-	}
-
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
 		tempContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string))
