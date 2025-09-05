@@ -37,8 +37,7 @@ const (
 	KeyIsDebug contextKey = iota
 	KeyVerbose contextKey = iota
 	ContextLogger
-
-	timeFormat = "2006-01-02 15:04:05"
+	timeFormat = "15:04:05"
 )
 
 type FormattingOptions struct {
