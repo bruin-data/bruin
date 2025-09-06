@@ -68,3 +68,51 @@ notifications:
       success: true
       failure: true
 ```
+
+## Webhook
+
+> [!INFO]
+> You need to create a Webhook connection in Bruin Cloud before you can use webhook notifications. You can do this by navigating to the `Connections` tab in the Bruin Cloud UI and adding a Webhook connection pointing to your endpoint.
+
+Webhook notifications are generic and can target any HTTP endpoint you configure via a connection.
+
+The full spec for Webhook notifications is like this:
+```yaml
+notifications:
+  webhook:
+    - connection: "the-name-of-the-webhook-connection"
+      success: true
+      failure: true
+```
+
+Details:
+- Method: POST
+- Auth: Basic Auth (configure username/password in the Webhook connection)
+- Body: JSON
+- Headers: `Content-Type: application/json`
+
+Example payloads
+
+Success
+```json
+{
+  "pipeline": "daily_orders",
+  "asset": null,
+  "column": null,
+  "check": null,
+  "run_id": "2025-09-03T12:34:56Z-8f3a2c",
+  "status": "success"
+}
+```
+
+Column check failure
+```json
+{
+  "pipeline": "daily_orders",
+  "asset": "orders_curated",
+  "column": "order_id",
+  "check": "not_null",
+  "run_id": "2025-09-03T00:00:00Z-42b1de",
+  "status": "failure"
+}
+```

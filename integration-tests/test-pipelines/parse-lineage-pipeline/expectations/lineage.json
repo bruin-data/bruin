@@ -550,7 +550,8 @@
   "notifications": {
     "slack": [],
     "ms_teams": [],
-    "discord": []
+    "discord": [],
+    "webhook": []
   },
   "catchup": false,
   "metadata_push": {

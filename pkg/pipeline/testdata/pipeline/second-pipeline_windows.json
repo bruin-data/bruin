@@ -262,7 +262,8 @@
   "notifications": {
     "slack": [],
     "discord": [],
-    "ms_teams": []
+    "ms_teams": [],
+    "webhook": []
   },
   "catchup": false,
   "commit": "",
