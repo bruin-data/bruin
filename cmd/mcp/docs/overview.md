@@ -1,76 +1,97 @@
 Bruin is a CLI tool that allows users to ingest data from many different sources, transform data using SQL and Python, run data quality checks, compare table outputs, and more. If you are reading this documentation it means Bruin CLI is already installed, therefore you can run all the relevant commands.
-Some CLI commands:
 
-# Command: Run
+## Core Commands
+
+### Command: Run
 bruin run [FLAGS] [path to the pipeline/asset]
-Flags:
-Flag	Type	Default	Description
---downstream	bool	false	Run all downstream tasks as well.
---workers	int	16	Number of workers to run tasks in parallel.
---start-date	str	Beginning of yesterday	The start date of the range the pipeline will run for. Format: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, or YYYY-MM-DD HH:MM:SS.ffffff
---end-date	str	End of yesterday	The end date of the range the pipeline will run for. Format: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, or YYYY-MM-DD HH:MM:SS.ffffff
---environment	str	-	The environment to use.
---push-metadata	bool	false	Push metadata to the destination database if supported (currently BigQuery).
---force	bool	false	Do not ask for confirmation in a production environment.
---full-refresh	bool	false	Truncate the table before running.
---apply-interval-modifiers	bool	false	Apply interval modifiers.
---continue	bool	false	Continue from the last failed asset.
---tag	str	-	Pick assets with the given tag.
+**Flags:**
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--downstream` | bool | false | Run all downstream tasks as well |
+| `--workers` | int | 16 | Number of workers to run tasks in parallel |
+| `--start-date` | str | Beginning of yesterday | Start date range (YYYY-MM-DD format) |
+| `--end-date` | str | End of yesterday | End date range (YYYY-MM-DD format) |
+| `--environment` | str | - | The environment to use |
+| `--push-metadata` | bool | false | Push metadata to destination database (BigQuery) |
+| `--force` | bool | false | Skip confirmation in production |
+| `--full-refresh` | bool | false | Truncate table before running |
+| `--apply-interval-modifiers` | bool | false | Apply interval modifiers |
+| `--continue` | bool | false | Continue from last failed asset |
+| `--tag` | str | - | Pick assets with given tag |
 
-# Command: Query
+### Command: Query
 bruin query --connection my_connection --query "SELECT * FROM table"
 
-# Command: Init (Create Project)
-bruin init  [template name to be used: athena|chess|clickhouse|default|duckdb|duckdb-example|duckdb-lineage|firebase|frankfurter|gorgias|gsheet-bigquery|gsheet-duckdb|notion|python|redshift|shopify-bigquery|shopify-duckdb] [name of the folder where the pipeline will be created]
+### Command: Init (Create Project)
+bruin init [template] [folder-name]
 
-# Command: Connections
+**Available templates:**
+- **Database platforms**: athena, clickhouse, duckdb, redshift
+- **Cloud platforms**: firebase, gsheet-bigquery, gsheet-duckdb, shopify-bigquery, shopify-duckdb
+- **Examples**: chess, duckdb-example, duckdb-lineage, frankfurter, gorgias, notion, python
+- **Default**: default (basic template)
+
+### Command: Connections
 bruin connections list
+bruin connections add
+bruin connections ping [connection-name]
 
-# Command: Validate
+### Command: Validate
 bruin validate [path to pipelines/pipeline/asset] [flags]
 
-Flags:
-Flag	Alias	Description
---environment	-e, --env	Specifies the environment to use for validation.
---force	-f	Forces validation even if the environment is a production environment.
---output [format]	-o	Specifies the output type, possible values: plain, json.
---fast		Runs only fast validation rules, excludes some important rules such as query validation.
+**Flags:**
+| Flag | Alias | Description |
+|------|-------|-------------|
+| `--environment` | `-e, --env` | Environment to use for validation |
+| `--force` | `-f` | Force validation in production environment |
+| `--output [format]` | `-o` | Output format: plain, json |
+| `--fast` | | Fast validation only (excludes query validation) |
 
-# Command: Data Diff
+### Command: Lint
+bruin lint [path to pipeline/asset]
+
+### Command: Format
+bruin format [path to pipeline/asset]
+
+### Command: Lineage
+bruin lineage [path to pipeline/asset]
+
+### Command: Data Diff
 bruin data-diff [command options]
 
 Compares data between two environments or sources. Table names can be provided as 'connection:table' or just 'table' if a default connection is set via --connection flag.
 
 By default, the command exits with code 0 even when differences are detected. Use --fail-if-diff to exit with a non-zero code when differences are found.
 
-Flags:
-Flag	Alias	Description
---connection value	-c value	Name of the default connection to use, if not specified in the table argument (e.g. conn:table)
---config-file value		The path to the .bruin.yml file [$BRUIN_CONFIG_FILE]
---tolerance value	-t value	Tolerance percentage for considering values equal (default: 0.001%). Values with percentage difference below this threshold are considered equal. (default: 0.001)
---schema-only		Compare only table schemas without analyzing row counts or column distributions (default: false)
---fail-if-diff                          Return a non-zero exit code if differences are found (default: false)
---help	-h	Show help
+**Flags:**
+| Flag | Alias | Description |
+|------|-------|-------------|
+| `--connection value` | `-c value` | Default connection name (e.g. conn:table) |
+| `--config-file value` | | Path to .bruin.yml file |
+| `--tolerance value` | `-t value` | Tolerance percentage for equality (default: 0.001%) |
+| `--schema-only` | | Compare only schemas, not data |
+| `--fail-if-diff` | | Exit with non-zero code if differences found |
+| `--help` | `-h` | Show help |
 
 ------
 
 A bruin pipeline looks like:
-```yaml
-pipeline-folder\
-    pipeline.yml -> defines a pipeline
-    assets\ -> contains all the assets of this pipeline
-        asset1.sql
-        folder1\
-            asset2.sql
-            asset3.py
-        asset4.asset.yml
+```
+pipeline-folder/
+├── pipeline.yml          # Pipeline configuration
+└── assets/               # Asset definitions
+    ├── asset1.sql        # SQL asset
+    ├── folder1/
+    │   ├── asset2.sql    # Nested SQL asset
+    │   └── asset3.py     # Python asset
+    └── asset4.asset.yml  # YAML-defined asset
 ```
 
 Example pipeline.yml file:
 ```yaml
 id: pipeline-name
 schedule: hourly # cron statement or daily, hourly, weekly, monthly
-start_date: "2024-01-01" # 
+start_date: "2024-01-01" # Pipeline start date 
 notifications:
     slack:
         - channel: internal-pipelines
@@ -84,7 +105,7 @@ default_connections:
 
 An example Bruin Asset YAML:
 ```yaml
-name: schema.table
+# name: schema.table (not required if same as assets/schema/table.sql)
 type: bq.sql
 description: here's some description
 owner: sabri.karagonen@getbruin.com
@@ -96,8 +117,6 @@ tags:
 domains:
   - domain1
   - domain2
-
-owner: John Doe
 
 meta:
   random_key: random_value
@@ -125,10 +144,37 @@ columns:
 ```
 
 
-* A Bruin pipeline always contains a pipeline.yml file and a group of assets in the assets folder next to it. If you are creating a new pipeline you must adhere this rule.
-* If you need credentials always check the available connections using `bruin connections list` command.
-* You can and you should run `bruin validate` often when you change something in the assets or add new assets or pipelines.
-* If the connection is not defined for an asset, you can find the default connection name for the pipeline in pipeline.yml file in the respective parent folder.
-* Avoid running a pipeline unless it's asked for. Run almost always an asset, not a pipeline!
-* Use full paths to run / validate assets.
-* Feel free to always run `bruin --help` for any command or flag. Every subcommand has its own help.
+## Key Concepts
+
+**Assets** are the building blocks of Bruin pipelines. They can be:
+- **SQL files** (`.sql`) - Database queries and transformations
+- **Python files** (`.py`) - Custom Python logic and data processing
+- **YAML files** (`.asset.yml`) - Asset definitions with metadata
+
+**Pipelines** group related assets together and define how they should be executed, scheduled, and connected to databases.
+
+## Best Practices
+
+### **Project Structure**
+* A Bruin pipeline always contains a `pipeline.yml` file and a group of assets in the `assets/` folder
+* **YAML assets must end with `.asset.yml`** (not just `.yml`) to distinguish from other config files
+* **Keep only assets in `/assets` folder** - create separate folders like `/analyses` or `/queries` for other files
+* **For standalone SQL files**: Add `-- connection: connection_name` at the beginning of the file to specify database connection
+
+### **Development Workflow**
+* **Run individual assets, not entire pipelines** unless specifically requested
+* **Validate frequently** with `bruin validate` when making changes
+* **Format your code** with `bruin format` for consistency
+* **Check connections** with `bruin connections list` when you need credentials
+* **Get help** with `bruin help`, `bruin run help`, or `bruin query help` for any command or flag
+
+### **Connections**
+* If connection is not defined for an asset, check the `default_connections` in `pipeline.yml`
+* Use `bruin connections ping [name]` to test if a connection is working
+
+### **Common Workflows**
+1. **Create new project**: `bruin init [template] [folder-name]`
+2. **Add connection**: `bruin connections add`
+3. **Validate setup**: `bruin validate [path]`
+4. **Run asset**: `bruin run [path/to/asset.sql]`
+5. **Check lineage**: `bruin lineage [path]`
