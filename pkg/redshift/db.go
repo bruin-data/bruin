@@ -8,12 +8,22 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 )
 
+type PostgresClientCreator interface {
+	NewClient(ctx context.Context, config postgres.RedShiftConfig) (*postgres.Client, error)
+}
+
+type DefaultPostgresClientCreator struct{}
+
+func (d *DefaultPostgresClientCreator) NewClient(ctx context.Context, config postgres.RedShiftConfig) (*postgres.Client, error) {
+	return postgres.NewClient(ctx, config)
+}
+
 type TableSensorClient struct {
 	*postgres.Client
 }
 
-func NewTableSensorClient(ctx context.Context, c postgres.RedShiftConfig) (*TableSensorClient, error) {
-	postgresClient, err := postgres.NewClient(ctx, c)
+func NewTableSensorClient(ctx context.Context, c postgres.RedShiftConfig, creator PostgresClientCreator) (*TableSensorClient, error) {
+	postgresClient, err := creator.NewClient(ctx, c)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Redshift table sensor client: %w", err)
 	}
