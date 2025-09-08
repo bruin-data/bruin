@@ -3161,3 +3161,71 @@ func TestValidateCrossPipelineURIDependencies(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateAssetSeedValidation_CaseInsensitive(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		csvData string
+		want    []*Issue
+	}{
+		{
+			name: "case insensitive - lowercase asset, uppercase CSV",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "./test.csv",
+				},
+				Columns: []pipeline.Column{
+					{Name: "name"},
+					{Name: "email"},
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			csvData: "NAME,EMAIL\nJohn,john@test.com",
+			want:    []*Issue{},
+		},
+		{
+			name: "case insensitive - uppercase asset, lowercase CSV",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "./test.csv",
+				},
+				Columns: []pipeline.Column{
+					{Name: "NAME"},
+					{Name: "EMAIL"},
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			csvData: "name,email\nJohn,john@test.com",
+			want:    []*Issue{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tempDir := t.TempDir()
+			assetDir := filepath.Join(tempDir, "assets")
+			require.NoError(t, os.MkdirAll(assetDir, 0o755))
+
+			tt.asset.DefinitionFile.Path = filepath.Join(assetDir, "test.asset.yml")
+			csvPath := filepath.Join(assetDir, "test.csv")
+			require.NoError(t, os.WriteFile(csvPath, []byte(tt.csvData), 0o644))
+
+			got, err := ValidateAssetSeedValidation(ctx, &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

@@ -582,6 +582,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage: "timeout for the entire pipeline run in seconds",
 				Value: 604800, // 7 days default
 			},
+			&cli.StringFlag{
+				Name:  "query-annotations",
+				Usage: fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
+			},
 		},
 		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -608,6 +612,7 @@ func Run(isDebug *bool) *cli.Command {
 				ConfigFilePath:         c.String("config-file"),
 				SensorMode:             c.String("sensor-mode"),
 				ApplyIntervalModifiers: c.Bool("apply-interval-modifiers"),
+				Annotations:            c.String("query-annotations"),
 			}
 
 			var startDate, endDate time.Time
@@ -664,6 +669,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigQueryAnnotations, runConfig.Annotations)
 
 			preview, err := GetPipeline(runCtx, inputPath, runConfig, logger, pipeline.WithOnlyPipeline())
 			if err != nil {
@@ -759,13 +765,6 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
-			if shouldValidate {
-				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
-					return err
-				}
-			}
-
 			foundPipeline := pipelineInfo.Pipeline
 
 			if runConfig.Downstream {
@@ -826,6 +825,12 @@ func Run(isDebug *bool) *cli.Command {
 				warningPrinter.Println("No tasks to run.")
 				return nil
 			}
+
+			shouldValidate := !c.Bool("no-validation")
+			if err := Validate(shouldValidate, s, CheckLint, runCtx, pipelineInfo.Pipeline, inputPath, logger); err != nil {
+				return err
+			}
+
 			sendTelemetry(s, c)
 			infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
 			infoPrinter.Printf("\n%s\n\n", executionStartLog)
@@ -1007,8 +1012,8 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager config.ConnectionGetter) error {
-	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
+func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, validateOnlyAssetLevel bool) error {
+	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, nil, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err
@@ -1016,8 +1021,11 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 	rules = append(rules, SeedAssetsValidator)
 
 	rules = lint.FilterRulesBySpeed(rules, true)
+	if validateOnlyAssetLevel {
+		rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
+	}
 
-	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, parser)
+	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger, nil)
 	res, err := linter.LintPipelines(ctx, []*pipeline.Pipeline{foundPipeline})
 	err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
 	if err != nil {
@@ -1678,4 +1686,22 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 		}
 	}
 	return nil
+}
+
+type assetCounter interface {
+	GetAssetCountWithTasksPending() int
+}
+
+type lintChecker func(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, validateOnlyAssetLevel bool) error
+
+func Validate(shouldvalidate bool, assetCounter assetCounter, lintChecker lintChecker, ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger) error {
+	if !shouldvalidate {
+		return nil
+	}
+
+	if assetCounter.GetAssetCountWithTasksPending() > 0 {
+		return lintChecker(ctx, foundPipeline, pipelinePath, logger, false)
+	}
+
+	return lintChecker(ctx, foundPipeline, pipelinePath, logger, true)
 }

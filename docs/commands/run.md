@@ -54,6 +54,7 @@ table td:first-child {
 | `--no-color` | bool | `false` | Plain log output for this run. |
 | `--minimal-logs` | bool | `false` | Skip initial pipeline analysis logs for this run. |
 | `--var` | []str | - | Override pipeline [variables](/getting-started/pipeline-variables.md) with custom values. |
+| `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and task type, or provide custom JSON for additional fields. **BigQuery only.** |
 
 
 
@@ -154,6 +155,16 @@ bruin run --only checks
 Run only the main tasks and not the quality checks:
 ```bash
 bruin run --only main
+```
+
+Run with default query annotations:
+```bash
+bruin run path/to/your/asset.sql --query-annotations default
+```
+
+Run with custom JSON annotations:
+```bash
+bruin run path/to/your/asset.sql --query-annotations '{"environment":"prod","team":"data","version":"1.2"}'
 ```
 
 

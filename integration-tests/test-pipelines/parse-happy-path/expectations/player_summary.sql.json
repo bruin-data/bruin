@@ -34,6 +34,7 @@
     "image": "",
     "instance": "",
     "owner": "",
+    "start_date": "",
     "executable_file": {
       "name": "player_summary.sql",
       "path": "test-pipelines/parse-happy-path/assets/player_summary.sql",

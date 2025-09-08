@@ -30,6 +30,7 @@
             "image": "",
             "instance": "",
             "owner": "",
+            "start_date": "",
             "executable_file": {
                 "name": "task.yml",
                 "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test1/task.yml",
@@ -69,6 +70,7 @@
             "image": "",
             "instance": "",
             "owner": "",
+            "start_date": "",
             "executable_file": {
                 "name": "task.yml",
                 "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test2/task.yml",
@@ -142,6 +144,7 @@
             "image": "python:3.11",
             "instance": "b1.nano",
             "owner": "jane.doe@getbruin.com",
+            "start_date": "",
             "executable_file": {
                 "name": "testblockcomments.py",
                 "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/testblockcomments.py",
