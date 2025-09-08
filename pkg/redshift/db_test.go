@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type MockPostgresClientCreator struct {
@@ -23,6 +24,7 @@ func (m *MockPostgresClientCreator) NewClient(ctx context.Context, config postgr
 }
 
 func TestNewTableSensorClient(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		config         postgres.RedShiftConfig
@@ -73,19 +75,20 @@ func TestNewTableSensorClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			mockCreator := &MockPostgresClientCreator{}
 			tt.mockSetup(mockCreator)
 
 			client, err := NewTableSensorClient(context.TODO(), tt.config, mockCreator)
 
 			if tt.expectError {
-				assert.Error(t, err, "Expected an error")
+				require.Error(t, err, "Expected an error")
 				if tt.expectedError != "" {
 					assert.Contains(t, err.Error(), tt.expectedError, "Error should contain expected message")
 				}
 				assert.Nil(t, client, "Client should be nil when error occurs")
 			} else {
-				assert.NoError(t, err, "Expected no error")
+				require.NoError(t, err, "Expected no error")
 				if tt.validateClient != nil {
 					tt.validateClient(t, client)
 				}
@@ -97,6 +100,7 @@ func TestNewTableSensorClient(t *testing.T) {
 }
 
 func TestTableSensorClient_BuildTableExistsQuery(t *testing.T) {
+	t.Parallel()
 	// Create a mock table sensor client
 	client := &TableSensorClient{}
 
@@ -140,14 +144,15 @@ func TestTableSensorClient_BuildTableExistsQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := client.BuildTableExistsQuery(tt.tableName)
 
 			if tt.expectError {
-				assert.Error(t, err, "Expected error but got none")
+				require.Error(t, err, "Expected error but got none")
 				return
 			}
 
-			assert.NoError(t, err, "Unexpected error")
+			require.NoError(t, err, "Unexpected error")
 			assert.Equal(t, tt.expected, result, "Query should match expected output")
 		})
 	}
