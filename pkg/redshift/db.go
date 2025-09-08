@@ -54,9 +54,8 @@ func (c *TableSensorClient) BuildTableExistsQuery(tableName string) (string, err
 	}
 	targetTable := tableName
 
-	// Use Redshift-specific system table SVV_TABLES instead of pg_catalog.pg_tables
 	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM SVV_TABLES WHERE schemaname = '%s' AND tablename = '%s'",
+		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
 		schemaName,
 		targetTable,
 	)
