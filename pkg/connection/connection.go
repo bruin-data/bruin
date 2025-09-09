@@ -24,6 +24,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/db2"
+	"github.com/bruin-data/bruin/pkg/docebo"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
@@ -111,6 +112,7 @@ type Manager struct {
 	Slack                map[string]*slack.Client
 	Asana                map[string]*asana.Client
 	DynamoDB             map[string]*dynamodb.Client
+	Docebo               map[string]*docebo.Client
 	Zendesk              map[string]*zendesk.Client
 	GoogleAds            map[string]*googleads.Client
 	TikTokAds            map[string]*tiktokads.Client
@@ -1151,6 +1153,32 @@ func (m *Manager) AddDynamoDBConnectionFromConfig(connection *config.DynamoDBCon
 	return nil
 }
 
+func (m *Manager) AddDoceboConnectionFromConfig(connection *config.DoceboConnection) error {
+	m.mutex.Lock()
+	if m.Docebo == nil {
+		m.Docebo = make(map[string]*docebo.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := docebo.NewClient(docebo.Config{
+		BaseURL:      connection.BaseURL,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		Username:     connection.Username,
+		Password:     connection.Password,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Docebo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddGoogleAdsConnectionFromConfig(connection *config.GoogleAdsConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2084,6 +2112,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.Slack, connectionManager.AddSlackConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Asana, connectionManager.AddAsanaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DynamoDB, connectionManager.AddDynamoDBConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Docebo, connectionManager.AddDoceboConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zendesk, connectionManager.AddZendeskConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAds, connectionManager.AddGoogleAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.TikTokAds, connectionManager.AddTikTokAdsConnectionFromConfig, &wg, &errList, &mu)

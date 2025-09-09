@@ -511,6 +511,12 @@
           },
           "type": "array"
         },
+        "docebo": {
+          "items": {
+            "$ref": "#/$defs/DoceboConnection"
+          },
+          "type": "array"
+        },
         "googleads": {
           "items": {
             "$ref": "#/$defs/GoogleAdsConnection"
@@ -844,6 +850,38 @@
         "access_key_id",
         "secret_access_key",
         "region"
+      ]
+    },
+    "DoceboConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "base_url",
+        "client_id",
+        "client_secret",
+        "username",
+        "password"
       ]
     },
     "EMRServerlessConnection": {

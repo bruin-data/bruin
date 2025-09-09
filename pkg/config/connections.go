@@ -561,6 +561,19 @@ func (c DynamoDBConnection) GetName() string {
 	return c.Name
 }
 
+type DoceboConnection struct {
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	BaseURL      string `yaml:"base_url,omitempty" json:"base_url" mapstructure:"base_url"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password     string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+}
+
+func (c DoceboConnection) GetName() string {
+	return c.Name
+}
+
 type GoogleAdsConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	CustomerID         string `yaml:"customer_id,omitempty" json:"customer_id" mapstructure:"customer_id"`

@@ -197,6 +197,7 @@ export default withMermaid({
                             {text: "Chess", link: "/ingestion/chess.md"},
                             {text: "ClickUp", link: "/ingestion/clickup.md"},
                             {text: "DB2", link: "/ingestion/db2.md"},
+                            {text: "Docebo", link: "/ingestion/docebo"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Elasticsearch", link: "/ingestion/elasticsearch.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},

@@ -163,6 +163,13 @@ environments:
           access_key_id: "access-key-786"
           secret_access_key: "shhh,secret"
           region: "ap-south-1"
+      docebo:
+        - name: "docebo-test"
+          base_url: "https://mycompany.docebosaas.com"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
+          username: "admin"
+          password: "admin-password"
       zendesk:
         - name: conn25
           api_token: "zendeskKey"
