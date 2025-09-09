@@ -29,5 +29,5 @@ func (w *TableSensorConnectionWrapper) GetConnection(name string) any {
 		return conn
 	}
 
-	return &TableSensorClient{Client: postgresClient}
+	return &TableSensorClient{PostgresClient: postgresClient}
 }

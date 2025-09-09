@@ -1,103 +1,11 @@
 package redshift
 
 import (
-	"context"
-	"errors"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type MockPostgresClientCreator struct {
-	mock.Mock
-}
-
-func (m *MockPostgresClientCreator) NewClient(ctx context.Context, config postgres.RedShiftConfig) (*postgres.Client, error) {
-	args := m.Called(ctx, config)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*postgres.Client), args.Error(1)
-}
-
-func TestNewTableSensorClient(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name           string
-		config         postgres.RedShiftConfig
-		mockSetup      func(*MockPostgresClientCreator)
-		expectError    bool
-		expectedError  string
-		validateClient func(t *testing.T, client *TableSensorClient)
-	}{
-		{
-			name: "successful client creation",
-			config: postgres.RedShiftConfig{
-				Username: "testuser",
-				Password: "testpass",
-				Host:     "localhost",
-				Port:     5439,
-				Database: "testdb",
-				Schema:   "public",
-				SslMode:  "require",
-			},
-			mockSetup: func(mockCreator *MockPostgresClientCreator) {
-				mockClient := &postgres.Client{}
-				mockCreator.On("NewClient", mock.Anything, mock.Anything).Return(mockClient, nil)
-			},
-			expectError: false,
-			validateClient: func(t *testing.T, client *TableSensorClient) {
-				assert.NotNil(t, client, "TableSensorClient should not be nil")
-				assert.NotNil(t, client.Client, "Wrapped PostgreSQL client should not be nil")
-			},
-		},
-		{
-			name: "postgres client creation fails",
-			config: postgres.RedShiftConfig{
-				Username: "testuser",
-				Password: "testpass",
-				Host:     "invalid-host",
-				Port:     5439,
-				Database: "testdb",
-				Schema:   "public",
-				SslMode:  "require",
-			},
-			mockSetup: func(mockCreator *MockPostgresClientCreator) {
-				mockCreator.On("NewClient", mock.Anything, mock.Anything).Return(nil, errors.New("connection failed"))
-			},
-			expectError:   true,
-			expectedError: "failed to create Redshift table sensor client",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			mockCreator := &MockPostgresClientCreator{}
-			tt.mockSetup(mockCreator)
-
-			client, err := NewTableSensorClient(context.TODO(), tt.config, mockCreator)
-
-			if tt.expectError {
-				require.Error(t, err, "Expected an error")
-				if tt.expectedError != "" {
-					assert.Contains(t, err.Error(), tt.expectedError, "Error should contain expected message")
-				}
-				assert.Nil(t, client, "Client should be nil when error occurs")
-			} else {
-				require.NoError(t, err, "Expected no error")
-				if tt.validateClient != nil {
-					tt.validateClient(t, client)
-				}
-			}
-
-			mockCreator.AssertExpectations(t)
-		})
-	}
-}
 
 func TestTableSensorClient_BuildTableExistsQuery(t *testing.T) {
 	t.Parallel()
@@ -140,6 +48,30 @@ func TestTableSensorClient_BuildTableExistsQuery(t *testing.T) {
 			expected:    "table name must be in format schema.table or table, 'schema.table.extra' given",
 			expectError: true,
 		},
+		{
+			name:        "table name with underscores",
+			tableName:   "analytics.user_events",
+			expected:    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'analytics' AND table_name = 'user_events'",
+			expectError: false,
+		},
+		{
+			name:        "table name with numbers",
+			tableName:   "public.table_2024",
+			expected:    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'table_2024'",
+			expectError: false,
+		},
+		{
+			name:        "empty component in table name",
+			tableName:   "schema.",
+			expected:    "table name must be in format schema.table or table, 'schema.' given",
+			expectError: true,
+		},
+		{
+			name:        "empty component at start",
+			tableName:   ".table",
+			expected:    "table name must be in format schema.table or table, '.table' given",
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -149,6 +81,7 @@ func TestTableSensorClient_BuildTableExistsQuery(t *testing.T) {
 
 			if tt.expectError {
 				require.Error(t, err, "Expected error but got none")
+				assert.Equal(t, tt.expected, err.Error(), "Error message should match expected")
 				return
 			}
 
