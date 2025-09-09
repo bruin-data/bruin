@@ -307,6 +307,16 @@ func TestLoadFromFile(t *testing.T) {
 					Region:          "ap-south-1",
 				},
 			},
+			Docebo: []DoceboConnection{
+				{
+					Name:         "docebo-test",
+					BaseURL:      "https://mycompany.docebosaas.com",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					Username:     "admin",
+					Password:     "admin-password",
+				},
+			},
 			Zendesk: []ZendeskConnection{
 				{
 					Name:      "conn25",

@@ -59,6 +59,7 @@ type Connections struct {
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
 	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
+	Docebo              []DoceboConnection              `yaml:"docebo,omitempty" json:"docebo,omitempty" mapstructure:"docebo"`
 	GoogleAds           []GoogleAdsConnection           `yaml:"googleads,omitempty" json:"googleads,omitempty" mapstructure:"googleads"`
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
@@ -661,7 +662,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.DynamoDB = append(env.Connections.DynamoDB, conn)
-
+	case "docebo":
+		var conn DoceboConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Docebo = append(env.Connections.Docebo, conn)
 	case "googleads":
 		var conn GoogleAdsConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1032,6 +1039,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Asana = removeConnection(env.Connections.Asana, connectionName)
 	case "dynamodb":
 		env.Connections.DynamoDB = removeConnection(env.Connections.DynamoDB, connectionName)
+	case "docebo":
+		env.Connections.Docebo = removeConnection(env.Connections.Docebo, connectionName)
 	case "googleads":
 		env.Connections.GoogleAds = removeConnection(env.Connections.GoogleAds, connectionName)
 	case "tiktokads":
