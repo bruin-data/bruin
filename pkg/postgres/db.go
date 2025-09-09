@@ -139,7 +139,12 @@ func (c *Client) Ping(ctx context.Context) error {
 }
 
 func (c *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
-	rows, err := c.connection.Query(ctx, query.ToExplainQuery())
+	// Wrap the query in a PostgreSQL test pattern that doesn't execute
+	testQuery := fmt.Sprintf(`DO $TEST$ BEGIN RETURN;
+    %s
+END; $TEST$;`, query.String())
+
+	rows, err := c.connection.Query(ctx, testQuery)
 	if err == nil {
 		err = rows.Err()
 	}
@@ -249,7 +254,7 @@ func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 	}
 
 	q := `
-SELECT 
+SELECT
     column_name,
     data_type,
     is_nullable,
@@ -441,7 +446,7 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 
 	// Get table schema using information_schema
 	schemaQuery := `
-	SELECT 
+	SELECT
 		column_name,
 		data_type,
 		is_nullable,
@@ -449,7 +454,7 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 		character_maximum_length,
 		numeric_precision,
 		numeric_scale
-	FROM information_schema.columns 
+	FROM information_schema.columns
 	WHERE table_name = $1
 	ORDER BY ordinal_position`
 
@@ -558,7 +563,7 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 func (c *Client) fetchNumericalStats(ctx context.Context, tableName, columnName string) (*diff.NumericalStatistics, error) {
 	stats := &diff.NumericalStatistics{}
 	query := fmt.Sprintf(`
-        SELECT 
+        SELECT
             COUNT(*) as count,
             COUNT(*) - COUNT(%s) as null_count,
             MIN(%s) as min_val,
@@ -595,7 +600,7 @@ func (c *Client) fetchNumericalStats(ctx context.Context, tableName, columnName 
 func (c *Client) fetchStringStats(ctx context.Context, tableName, columnName string) (*diff.StringStatistics, error) {
 	stats := &diff.StringStatistics{}
 	query := fmt.Sprintf(`
-        SELECT 
+        SELECT
             COUNT(*) as count,
             COUNT(*) - COUNT(%s) as null_count,
             COUNT(DISTINCT %s) as distinct_count,
@@ -629,7 +634,7 @@ func (c *Client) fetchStringStats(ctx context.Context, tableName, columnName str
 func (c *Client) fetchBooleanStats(ctx context.Context, tableName, columnName string) (*diff.BooleanStatistics, error) {
 	stats := &diff.BooleanStatistics{}
 	query := fmt.Sprintf(`
-        SELECT 
+        SELECT
             COUNT(*) as count,
             COUNT(*) - COUNT(%s) as null_count,
             COUNT(CASE WHEN %s = true THEN 1 END) as true_count,
@@ -656,7 +661,7 @@ func (c *Client) fetchBooleanStats(ctx context.Context, tableName, columnName st
 func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName string) (*diff.DateTimeStatistics, error) {
 	stats := &diff.DateTimeStatistics{}
 	query := fmt.Sprintf(`
-        SELECT 
+        SELECT
             COUNT(*) as count,
             COUNT(*) - COUNT(%s) as null_count,
             COUNT(DISTINCT %s) as unique_count,
@@ -698,7 +703,7 @@ func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName s
 func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName string) (*diff.JSONStatistics, error) {
 	stats := &diff.JSONStatistics{}
 	query := fmt.Sprintf(`
-        SELECT 
+        SELECT
             COUNT(*) as count,
             COUNT(*) - COUNT(%s) as null_count
         FROM %s`,
