@@ -39,6 +39,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/redshift"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/secrets"
@@ -1160,6 +1161,7 @@ func SetupExecutors(
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		pgTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 		pgMetadataPushOperator := postgres.NewMetadataPushOperator(conn)
+		rsTableSensor := redshift.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -1192,6 +1194,11 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeMain] = pgQuerySensor
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypeRedshiftQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeMain] = rsTableSensor
+		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
+		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypePostgresQuery || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {

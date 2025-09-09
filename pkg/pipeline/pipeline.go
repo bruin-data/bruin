@@ -57,6 +57,7 @@ const (
 	AssetTypeRedshiftQuery          = AssetType("rs.sql")
 	AssetTypeRedshiftSeed           = AssetType("rs.seed")
 	AssetTypeRedshiftQuerySensor    = AssetType("rs.sensor.query")
+	AssetTypeRedshiftTableSensor    = AssetType("rs.sensor.table")
 	AssetTypeAthenaQuery            = AssetType("athena.sql")
 	AssetTypeAthenaSQLSensor        = AssetType("athena.sensor.query")
 	AssetTypeAthenaTableSensor      = AssetType("athena.sensor.table")
@@ -569,6 +570,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeRedshiftSeed:          "redshift",
 	AssetTypeRedshiftQuerySensor:   "redshift",
 	AssetTypeRedshiftSource:        "redshift",
+	AssetTypeRedshiftTableSensor:   "redshift",
 	AssetTypeMsSQLQuery:            "mssql",
 	AssetTypeMsSQLSeed:             "mssql",
 	AssetTypeMsSQLQuerySensor:      "mssql",
