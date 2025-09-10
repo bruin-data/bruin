@@ -74,7 +74,7 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	res = res[1 : sz-1]
 
 	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as STRING) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
-	
+
 	q := &query.Query{Query: qq}
 	annotatedQuery, err := ansisql.AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "accepted_values", ti.Pipeline.Name)
 	if err != nil {
