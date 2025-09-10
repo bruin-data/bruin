@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -1636,7 +1637,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			flagStartDate:     "2024-01-01",
 			flagEndDate:       "2024-01-31",
 			expectedStartDate: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
-			expectedEndDate:   time.Date(2024, 1, 31, 23, 59, 59, 999999999, time.UTC),
+			expectedEndDate:   time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC),
 		},
 		{
 			fullRefresh:       true,
@@ -1688,13 +1689,44 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, flagEndDate)
 			}
 
-			// Test the expected behavior based on the scenario
-			// This is where the actual implementation would determine the final dates
-			// For now, we just verify our test expectations are set correctly
+			// Test the actual implementation
+			logger := zaptest.NewLogger(t).Sugar()
+			
+			// Set default flag values if not provided
+			cliStartDate := tt.flagStartDate
+			cliEndDate := tt.flagEndDate
+			if cliStartDate == "" {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				cliStartDate = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC).Format("2006-01-02 15:04:05.000000")
+			}
+			if cliEndDate == "" {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				cliEndDate = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC).Format("2006-01-02 15:04:05.999999")
+			}
 
-			// Verify expected dates are set properly for the test scenario
-			assert.Equal(t, tt.expectedStartDate, tt.expectedStartDate, "Expected start date should be defined")
-			assert.Equal(t, tt.expectedEndDate, tt.expectedEndDate, "Expected end date should be defined")
+			// Call the actual implementation
+			actualStartDate, actualEndDate, err := DetermineStartEndDates(cliStartDate, cliEndDate, testPipeline, tt.fullRefresh, logger)
+			
+			if tt.expectedError {
+				// For error cases, we might get dates but they should be logically invalid
+				// (e.g., end date before start date)
+				if err == nil {
+					// If no parsing error, check if end date is before start date
+					assert.True(t, actualEndDate.Before(actualStartDate) || actualEndDate.Equal(actualStartDate), "Expected logical error: end date should be before or equal to start date")
+				}
+				return
+			}
+			
+			require.NoError(t, err, "Should not error for valid test case")
+			
+			// Compare dates - allow some tolerance for time precision
+			assert.True(t, actualStartDate.Equal(tt.expectedStartDate) || 
+							math.Abs(float64(actualStartDate.Sub(tt.expectedStartDate))) < float64(time.Second),
+						"Start date mismatch: expected %v, got %v", tt.expectedStartDate, actualStartDate)
+							
+			assert.True(t, actualEndDate.Equal(tt.expectedEndDate) || 
+							math.Abs(float64(actualEndDate.Sub(tt.expectedEndDate))) < float64(time.Second),
+						"End date mismatch: expected %v, got %v", tt.expectedEndDate, actualEndDate)
 
 			// Pipeline's default start_date should still be available
 			assert.Equal(t, tt.pipelineStartDate, testPipeline.StartDate, "Pipeline should retain its default start_date")

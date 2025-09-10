@@ -736,6 +736,20 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
+			// Re-determine start/end dates based on pipeline configuration and full-refresh flag
+			startDate, endDate, err = DetermineStartEndDates(runConfig.StartDate, runConfig.EndDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			if err != nil {
+				return err
+			}
+
+			// Update renderer with the finalized start/end dates
+			renderer = jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, runID, nil)
+			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
+
+			// Update context with the finalized dates
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+
 			// handle log files
 			executionStartLog := "Starting execution..."
 			if !c.Bool("minimal-logs") {
@@ -994,6 +1008,40 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 		errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 		errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
 		return time.Time{}, time.Time{}, err
+	}
+
+	return startDate, endDate, nil
+}
+
+func DetermineStartEndDates(cliStartDate, cliEndDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, time.Time, error) {
+	var startDate, endDate time.Time
+	var err error
+
+	// Start date logic
+	if fullRefresh && pipeline != nil && pipeline.StartDate != "" {
+		startDate, err = date.ParseTime(pipeline.StartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
+		}
+		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
+	} else {
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	}
+
+	// End date logic (always use CLI flag if provided)
+	endDate, err = date.ParseTime(cliEndDate)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	logger.Debug("Using CLI end_date: ", cliEndDate)
+
+	// Validate that end date is not before start date
+	if endDate.Before(startDate) {
+		return time.Time{}, time.Time{}, fmt.Errorf("end date '%s' cannot be before start date '%s'", cliEndDate, startDate.Format("2006-01-02 15:04:05"))
 	}
 
 	return startDate, endDate, nil
