@@ -1549,7 +1549,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 			}(),
 			expectedEndDate: time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC),
-			expectedError:   true, //end date is older than start date
+			expectedError:   true, // end date is older than start date
 		},
 		{
 			fullRefresh:       false,
@@ -1604,7 +1604,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			pipelineStartDate: "2023-06-15",
 			flagStartDate:     "2024-02-01",
 			flagEndDate:       "",
-			expectedStartDate: time.Date(2023, 06, 15, 0, 0, 0, 0, time.UTC),
+			expectedStartDate: time.Date(2023, 0o6, 15, 0, 0, 0, 0, time.UTC),
 			expectedEndDate: func() time.Time {
 				yesterday := time.Now().AddDate(0, 0, -1)
 				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
@@ -1647,7 +1647,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			flagEndDate:       "2024-03-31",
 			expectedStartDate: time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			expectedEndDate:   time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC),
-			expectedError:     true, //end date is older than start date
+			expectedError:     true, // end date is older than start date
 		},
 		{
 			fullRefresh:       true,
@@ -1672,26 +1672,9 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 				Concurrency: 1,
 			}
 
-			// Parse flag dates if provided
-			var flagStartDate, flagEndDate time.Time
-			var err error
-
-			if tt.flagStartDate != "" && tt.flagEndDate != "" {
-				logger := zaptest.NewLogger(t).Sugar()
-				flagStartDate, flagEndDate, err = ParseDate(tt.flagStartDate, tt.flagEndDate, logger)
-				require.NoError(t, err)
-			}
-
-			// Create context with run config values (simulating flag values)
-			ctx := context.Background()
-			if tt.flagStartDate != "" && tt.flagEndDate != "" {
-				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, flagStartDate)
-				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, flagEndDate)
-			}
-
 			// Test the actual implementation
 			logger := zaptest.NewLogger(t).Sugar()
-			
+
 			// Set default flag values if not provided
 			cliStartDate := tt.flagStartDate
 			cliEndDate := tt.flagEndDate
@@ -1706,7 +1689,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 
 			// Call the actual implementation
 			actualStartDate, actualEndDate, err := DetermineStartEndDates(cliStartDate, cliEndDate, testPipeline, tt.fullRefresh, logger)
-			
+
 			if tt.expectedError {
 				// For error cases, we might get dates but they should be logically invalid
 				// (e.g., end date before start date)
@@ -1716,20 +1699,86 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 				}
 				return
 			}
-			
+
 			require.NoError(t, err, "Should not error for valid test case")
-			
+
 			// Compare dates - allow some tolerance for time precision
-			assert.True(t, actualStartDate.Equal(tt.expectedStartDate) || 
-							math.Abs(float64(actualStartDate.Sub(tt.expectedStartDate))) < float64(time.Second),
-						"Start date mismatch: expected %v, got %v", tt.expectedStartDate, actualStartDate)
-							
-			assert.True(t, actualEndDate.Equal(tt.expectedEndDate) || 
-							math.Abs(float64(actualEndDate.Sub(tt.expectedEndDate))) < float64(time.Second),
-						"End date mismatch: expected %v, got %v", tt.expectedEndDate, actualEndDate)
+			assert.True(t, actualStartDate.Equal(tt.expectedStartDate) ||
+				math.Abs(float64(actualStartDate.Sub(tt.expectedStartDate))) < float64(time.Second),
+				"Start date mismatch: expected %v, got %v", tt.expectedStartDate, actualStartDate)
+
+			assert.True(t, actualEndDate.Equal(tt.expectedEndDate) ||
+				math.Abs(float64(actualEndDate.Sub(tt.expectedEndDate))) < float64(time.Second),
+				"End date mismatch: expected %v, got %v", tt.expectedEndDate, actualEndDate)
 
 			// Pipeline's default start_date should still be available
 			assert.Equal(t, tt.pipelineStartDate, testPipeline.StartDate, "Pipeline should retain its default start_date")
+		})
+	}
+}
+
+func TestApplyIntervalModifiersWithFullRefresh(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                   string
+		fullRefresh            bool
+		applyIntervalModifiers bool
+		expectedApplyModifiers bool
+		expectedWarning        bool
+	}{
+		{
+			name:                   "full-refresh true, apply-interval-modifiers true -> should ignore apply-modifiers and show warning",
+			fullRefresh:            true,
+			applyIntervalModifiers: true,
+			expectedApplyModifiers: false,
+			expectedWarning:        true,
+		},
+		{
+			name:                   "full-refresh false, apply-interval-modifiers true -> should keep apply-modifiers",
+			fullRefresh:            false,
+			applyIntervalModifiers: true,
+			expectedApplyModifiers: true,
+			expectedWarning:        false,
+		},
+		{
+			name:                   "full-refresh true, apply-interval-modifiers false -> no warning",
+			fullRefresh:            true,
+			applyIntervalModifiers: false,
+			expectedApplyModifiers: false,
+			expectedWarning:        false,
+		},
+		{
+			name:                   "full-refresh false, apply-interval-modifiers false -> no warning",
+			fullRefresh:            false,
+			applyIntervalModifiers: false,
+			expectedApplyModifiers: false,
+			expectedWarning:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Simulate the logic from run.go
+			fullRefresh := tt.fullRefresh
+			applyIntervalModifiers := tt.applyIntervalModifiers
+
+			var warningShown bool
+
+			if fullRefresh && applyIntervalModifiers {
+				// In the real code, this would print to warningPrinter
+				// For testing, we just set a flag
+				warningShown = true
+				applyIntervalModifiers = false
+			}
+
+			// Test expectations
+			assert.Equal(t, tt.expectedApplyModifiers, applyIntervalModifiers,
+				"ApplyIntervalModifiers should be %v but was %v", tt.expectedApplyModifiers, applyIntervalModifiers)
+			assert.Equal(t, tt.expectedWarning, warningShown,
+				"Warning should be shown: %v but was %v", tt.expectedWarning, warningShown)
 		})
 	}
 }

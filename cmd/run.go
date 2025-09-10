@@ -455,6 +455,18 @@ var (
 	}
 )
 
+func ignoreApplyIntervalModifiers(c *cli.Command) (fullRefresh bool, applyIntervalModifiers bool) {
+	fullRefresh = c.Bool("full-refresh")
+	applyIntervalModifiers = c.Bool("apply-interval-modifiers")
+
+	if fullRefresh && applyIntervalModifiers {
+		warningPrinter.Println("Warning: --apply-interval-modifiers flag is ignored when --full-refresh is enabled.")
+		applyIntervalModifiers = false
+	}
+
+	return fullRefresh, applyIntervalModifiers
+}
+
 func Run(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "run",
@@ -592,7 +604,8 @@ func Run(isDebug *bool) *cli.Command {
 			defer RecoverFromPanic()
 
 			logger := makeLogger(*isDebug)
-			// Initialize runConfig with values from cli.Context
+			fullRefresh, applyIntervalModifiers := ignoreApplyIntervalModifiers(c)
+
 			runConfig := &scheduler.RunConfig{
 				Downstream:             c.Bool("downstream"),
 				StartDate:              c.String("start-date"),
@@ -602,7 +615,7 @@ func Run(isDebug *bool) *cli.Command {
 				Force:                  c.Bool("force"),
 				PushMetadata:           c.Bool("push-metadata"),
 				NoLogFile:              c.Bool("no-log-file"),
-				FullRefresh:            c.Bool("full-refresh"),
+				FullRefresh:            fullRefresh,
 				UsePip:                 c.Bool("use-pip"),
 				Tag:                    c.String("tag"),
 				ExcludeTag:             c.String("exclude-tag"),
@@ -611,7 +624,7 @@ func Run(isDebug *bool) *cli.Command {
 				ExpUseWingetForUv:      c.Bool("exp-use-winget-for-uv"),
 				ConfigFilePath:         c.String("config-file"),
 				SensorMode:             c.String("sensor-mode"),
-				ApplyIntervalModifiers: c.Bool("apply-interval-modifiers"),
+				ApplyIntervalModifiers: applyIntervalModifiers,
 				Annotations:            c.String("query-annotations"),
 			}
 
@@ -661,7 +674,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, applyIntervalModifiers)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 			runCtx = context.WithValue(runCtx, executor.KeyVerbose, c.Bool("verbose"))
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
