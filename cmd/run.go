@@ -1052,11 +1052,6 @@ func DetermineStartEndDates(cliStartDate, cliEndDate string, pipeline *pipeline.
 	}
 	logger.Debug("Using CLI end_date: ", cliEndDate)
 
-	// Validate that end date is not before start date
-	if endDate.Before(startDate) {
-		return time.Time{}, time.Time{}, fmt.Errorf("end date '%s' cannot be before start date '%s'", cliEndDate, startDate.Format("2006-01-02 15:04:05"))
-	}
-
 	return startDate, endDate, nil
 }
 
