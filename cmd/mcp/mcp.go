@@ -13,6 +13,8 @@ import (
 
 	"github.com/bruin-data/bruin/docs/ingestion"
 	"github.com/bruin-data/bruin/docs/platforms"
+	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v3"
 )
 
@@ -66,6 +68,10 @@ func runMCPServer(debug bool) error {
 	if debug {
 		fmt.Fprintf(os.Stderr, "MCP server ready, waiting for requests...\n")
 	}
+
+	telemetry.SendEvent("mcp_server_start", analytics.Properties{
+		"debug_mode": debug,
+	})
 
 	// Main loop: read requests from stdin, process them, write responses to stdout
 	for scanner.Scan() {
