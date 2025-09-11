@@ -42,6 +42,7 @@ const (
 
 type FormattingOptions struct {
 	DoNotLogTimestamp bool
+	DoNotLogTaskName  bool
 	NoColor           bool
 }
 
@@ -163,14 +164,21 @@ type workerWriter struct {
 	task              *pipeline.Asset
 	sprintfFunc       func(format string, a ...interface{}) string
 	DoNotLogTimestamp bool
+	DoNotLogTaskName  bool
 }
 
 func (w *workerWriter) Write(p []byte) (int, error) {
 	var formatted string
-	if w.DoNotLogTimestamp {
+	timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
+
+	switch {
+	case w.DoNotLogTaskName && w.DoNotLogTimestamp:
+		formatted = string(p)
+	case w.DoNotLogTaskName:
+		formatted = fmt.Sprintf("%s %s", timestampStr, string(p))
+	case w.DoNotLogTimestamp:
 		formatted = w.sprintfFunc("[%s] %s", w.task.Name, string(p))
-	} else {
-		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
+	default:
 		formatted = fmt.Sprintf("%s %s", timestampStr, w.sprintfFunc("[%s] %s", w.task.Name, string(p)))
 	}
 
