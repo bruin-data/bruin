@@ -76,7 +76,7 @@ join marketing.attribution as a
 Sensors are a special type of assets that are used to wait on certain external signals.
 
 
-Checks if a table exists in Postgres, runs every 5 minutes until this table is available.
+Checks if a table exists in Postgres, runs by default every 30 seconds until this table is available.
 
 ```yaml
 name: string
@@ -93,7 +93,7 @@ parameters:
 
 ### `pg.sensor.query`
 
-Checks if a query returns any results in Postgres, runs every 5 minutes until this query returns any results.
+Checks if a query returns any results in Postgres, runs by default every 30 seconds until this query returns any results.
 
 ```yaml
 name: string
