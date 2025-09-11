@@ -197,10 +197,10 @@ func TestDB_BuildTableExistsQuery(t *testing.T) {
 			errContains: "table name must be in format schema.table, 'a.b.c.d' given",
 		},
 		{
-			name:      "invalid table format - no schema",
-			c:         &DB{config: &Config{Catalog: "test_db"}},
-			tableName: "test_table",
-			wantErr:   true,
+			name:        "invalid table format - no schema",
+			c:           &DB{config: &Config{Catalog: "test_db"}},
+			tableName:   "test_table",
+			wantErr:     true,
 			errContains: "table name must be in format schema.table, 'test_table' given",
 		},
 		{

@@ -277,7 +277,7 @@ func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
 
 	schemaName := tableComponents[0]
 	targetTable := tableComponents[1]
-	
+
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
 		schemaName,
