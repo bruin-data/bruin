@@ -1076,7 +1076,7 @@ func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *p
 	if !ok {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: fmt.Sprintf("%s table sensor requires a `table` parameter", asset.Type),
+			Description: "BigQuery table sensor requires a `table` parameter",
 		})
 		return issues, nil
 	}
@@ -1085,7 +1085,7 @@ func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *p
 	if len(tableItems) != 2 && len(tableItems) != 3 {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: fmt.Sprintf("%s table sensor `table` parameter must be either in the format `dataset.table` or `project.dataset.table`", asset.Type),
+			Description: "BigQuery table sensor `table` parameter must be either in the format `dataset.table` or `project.dataset.table`",
 		})
 	}
 	return issues, nil
