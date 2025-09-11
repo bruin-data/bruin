@@ -866,6 +866,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			formatOpts := executor.FormattingOptions{
 				DoNotLogTimestamp: c.Bool("no-timestamp"),
+				DoNotLogTaskName:  preview.RunningForAnAsset,
 				NoColor:           c.Bool("no-color"),
 			}
 
