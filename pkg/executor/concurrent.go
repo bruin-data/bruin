@@ -121,6 +121,7 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 			task:              task.GetAsset(),
 			sprintfFunc:       w.printer.SprintfFunc(),
 			DoNotLogTimestamp: w.formatOpts.DoNotLogTimestamp,
+			DoNotLogTaskName:  w.formatOpts.DoNotLogTaskName,
 		}
 
 		executionCtx := context.WithValue(ctx, KeyPrinter, printer)
