@@ -191,6 +191,7 @@ type Notifications struct {
 	Slack   []SlackNotification   `yaml:"slack" json:"slack" mapstructure:"slack"`
 	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams" mapstructure:"ms_teams"`
 	Discord []DiscordNotification `yaml:"discord" json:"discord" mapstructure:"discord"`
+	Webhook []WebhookNotification `yaml:"webhook" json:"webhook" mapstructure:"webhook"`
 }
 
 type DefaultTrueBool struct { //nolint:recvcheck
@@ -270,10 +271,16 @@ type DiscordNotification struct {
 	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
 }
 
+type WebhookNotification struct {
+	Connection         string `yaml:"connection" json:"connection" mapstructure:"connection"`
+	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
+}
+
 func (n Notifications) MarshalJSON() ([]byte, error) {
 	slack := make([]SlackNotification, 0, len(n.Slack))
 	MSTeams := make([]MSTeamsNotification, 0, len(n.MSTeams))
 	discord := make([]DiscordNotification, 0, len(n.Discord))
+	webhook := make([]WebhookNotification, 0, len(n.Webhook))
 	for _, s := range n.Slack {
 		if !reflect.ValueOf(s).IsZero() {
 			slack = append(slack, s)
@@ -289,15 +296,22 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 			discord = append(discord, s)
 		}
 	}
+	for _, s := range n.Webhook {
+		if !reflect.ValueOf(s).IsZero() {
+			webhook = append(webhook, s)
+		}
+	}
 
 	return json.Marshal(struct {
 		Slack   []SlackNotification   `json:"slack"`
 		MSTeams []MSTeamsNotification `json:"ms_teams"`
 		Discord []DiscordNotification `json:"discord"`
+		Webhook []WebhookNotification `json:"webhook"`
 	}{
 		Slack:   slack,
 		MSTeams: MSTeams,
 		Discord: discord,
+		Webhook: webhook,
 	})
 }
 
