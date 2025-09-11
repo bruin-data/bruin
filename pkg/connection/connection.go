@@ -32,6 +32,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fluxx"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
+	"github.com/bruin-data/bruin/pkg/fundraiseup"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
@@ -136,6 +137,7 @@ type Manager struct {
 	Zoom                 map[string]*zoom.Client
 	Frankfurter          map[string]*frankfurter.Client
 	Fluxx                map[string]*fluxx.Client
+	FundraiseUp          map[string]*fundraiseup.Client
 	EMRSeverless         map[string]*emr_serverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
 	AppLovin             map[string]*applovin.Client
@@ -1932,6 +1934,27 @@ func (m *Manager) AddFluxxConnectionFromConfig(connection *config.FluxxConnectio
 	return nil
 }
 
+func (m *Manager) AddFundraiseUpConnectionFromConfig(connection *config.FundraiseUpConnection) error {
+	m.mutex.Lock()
+	if m.FundraiseUp == nil {
+		m.FundraiseUp = make(map[string]*fundraiseup.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := fundraiseup.NewClient(fundraiseup.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.FundraiseUp[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2138,6 +2161,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)
