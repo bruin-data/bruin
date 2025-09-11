@@ -613,6 +613,12 @@ func TestLoadFromFile(t *testing.T) {
 					ClientSecret: "test-client-secret",
 				},
 			},
+			FundraiseUp: []FundraiseUpConnection{
+				{
+					Name:   "fundraiseup-1",
+					APIKey: "test-api-key",
+				},
+			},
 		},
 	}
 
@@ -1031,6 +1037,16 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add FundraiseUp connection",
+			envName:  "default",
+			connType: "fundraiseup",
+			connName: "fundraiseup-conn",
+			creds: map[string]interface{}{
+				"api_key": "test-api-key",
+			},
+			expectedErr: false,
+		},
+		{
 			name:        "Add Invalid connection",
 			envName:     "default",
 			connType:    "invalid",
@@ -1089,6 +1105,10 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.creds["instance"], env.Connections.Fluxx[0].Instance)
 					assert.Equal(t, tt.creds["client_id"], env.Connections.Fluxx[0].ClientID)
 					assert.Equal(t, tt.creds["client_secret"], env.Connections.Fluxx[0].ClientSecret)
+				case "fundraiseup":
+					assert.Len(t, env.Connections.FundraiseUp, 1)
+					assert.Equal(t, tt.connName, env.Connections.FundraiseUp[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.FundraiseUp[0].APIKey)
 				}
 			}
 		})

@@ -97,6 +97,7 @@ type Connections struct {
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
 	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
+	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -944,6 +945,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Fluxx = append(env.Connections.Fluxx, conn)
+	case "fundraiseup":
+		var conn FundraiseUpConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.FundraiseUp = append(env.Connections.FundraiseUp, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1117,6 +1125,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Tableau = removeConnection(env.Connections.Tableau, connectionName)
 	case "fluxx":
 		env.Connections.Fluxx = removeConnection(env.Connections.Fluxx, connectionName)
+	case "fundraiseup":
+		env.Connections.FundraiseUp = removeConnection(env.Connections.FundraiseUp, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1230,6 +1240,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.ISOCPulse, source.ISOCPulse)
 	mergeConnectionList(&c.Tableau, source.Tableau)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
+	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
 	c.buildConnectionKeyMap()
 	return nil
 }
