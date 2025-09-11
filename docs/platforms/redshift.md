@@ -93,6 +93,24 @@ parameters:
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
+### `redshift.sensor.table`
+
+Sensors are a special type of assets that are used to wait on certain external signals.
+
+
+Checks if a table exists in Redshift, runs by default every 30 seconds until this table is available.
+
+```yaml
+name: string
+type: string
+parameters:
+    table: string
+    poke_interval: int (optional)
+```
+**Parameters**:
+- `table`: `schema_id.table_id` or (for default schema `public`) `table_id` format.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
+
 
 #### Example: Partitioned upstream table
 
