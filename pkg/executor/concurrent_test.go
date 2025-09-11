@@ -98,11 +98,11 @@ func TestWorkerWriter_Write(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		input             []byte
-		doNotLogTimestamp bool
-		doNotLogTaskName  bool
-		expectedContains  []string
+		name                string
+		input               []byte
+		doNotLogTimestamp   bool
+		doNotLogTaskName    bool
+		expectedContains    []string
 		expectedNotContains []string
 	}{
 		{
@@ -113,27 +113,27 @@ func TestWorkerWriter_Write(t *testing.T) {
 			expectedContains:  []string{"[", "]", "[test-task]", "hello world\n"},
 		},
 		{
-			name:              "without timestamp, with task name",
-			input:             []byte("hello world\n"),
-			doNotLogTimestamp: true,
-			doNotLogTaskName:  false,
-			expectedContains:  []string{"[test-task]", "hello world\n"},
+			name:                "without timestamp, with task name",
+			input:               []byte("hello world\n"),
+			doNotLogTimestamp:   true,
+			doNotLogTaskName:    false,
+			expectedContains:    []string{"[test-task]", "hello world\n"},
 			expectedNotContains: []string{"[20", "[21", "[22", "[23"},
 		},
 		{
-			name:              "with timestamp, without task name",
-			input:             []byte("hello world\n"),
-			doNotLogTimestamp: false,
-			doNotLogTaskName:  true,
-			expectedContains:  []string{"[", "]", "hello world\n"},
+			name:                "with timestamp, without task name",
+			input:               []byte("hello world\n"),
+			doNotLogTimestamp:   false,
+			doNotLogTaskName:    true,
+			expectedContains:    []string{"[", "]", "hello world\n"},
 			expectedNotContains: []string{"[test-task]"},
 		},
 		{
-			name:              "without timestamp and task name",
-			input:             []byte("hello world\n"),
-			doNotLogTimestamp: true,
-			doNotLogTaskName:  true,
-			expectedContains:  []string{"hello world\n"},
+			name:                "without timestamp and task name",
+			input:               []byte("hello world\n"),
+			doNotLogTimestamp:   true,
+			doNotLogTaskName:    true,
+			expectedContains:    []string{"hello world\n"},
 			expectedNotContains: []string{"[test-task]", "[20", "[21", "[22", "[23"},
 		},
 		{
@@ -155,7 +155,7 @@ func TestWorkerWriter_Write(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			
+
 			w := &workerWriter{
 				w:                 &buf,
 				task:              task,
