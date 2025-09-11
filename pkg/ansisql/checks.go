@@ -271,7 +271,13 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 		qq = fmt.Sprintf("SELECT count(*) FROM (%s) AS t", qq)
 	}
 
-	return NewCountableQueryCheck(c.conn, expected, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := AddCustomCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Check.Name, ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
+	return NewCountableQueryCheck(c.conn, expected, annotatedQuery, ti.Check.Name, func(count int64) error {
 		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, expected)
 	}).CustomCheck(ctx, ti)
 }
