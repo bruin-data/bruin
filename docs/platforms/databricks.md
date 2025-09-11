@@ -20,6 +20,38 @@ In order to work with Databricks you can add as a configuration item to `connect
           schema: "your-databricks-schema"
 ```
 
+#### Step 1: Generate a token
+
+Click on your Databricks username in the top bar, and then select "Settings" from the dropdown menu. Click on the "Developer" tab in the column "Settings" on the left. Next to "Access tokens," click "Manage." Click the "Generate new token" button. Enter Token Details and click "Generate".
+
+#### Step 2: Retrieve HTTP path
+
+Click on "SQL Warehouses" in the bar on the left. Select your warehouse from the list. Click on "Connection details" towards the top of the page. Then copy the HTTP path. It should look something like /sql/1.0/warehouses/3748325bf498i274
+
+#### Step 3: Retrieve host
+
+The host URL is typically visible in the browser's address bar. It should look something like: {databricks-instance}.cloud.databricks.com.
+
+Alternatively, you can find the host URL in the workspace settings.
+
+#### Step 4: Enter port, catalog and schema
+
+Databricks APIs and SQL warehouse endpoints use 443 (HTTPS). So port will usually be 443. The catalog and schema can be found under the section "Catalog" in the bar on the left. 
+
+The Databricks configuration in `.bruin.yml` should like something like this:
+
+```yaml
+    connections:
+      databricks:
+        - name: databricks-default
+          token: XXXXXXXXXXXXXXX
+          path: /sql/1.0/warehouses/3748325bf498i274
+          host: dbc-example-host.cloud.databricks.com
+          port: 443
+          catalog: default
+          schema: example_schema
+```
+
 ## Databricks Assets
 
 ### `databricks.sql`
