@@ -74,14 +74,7 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	res = res[1 : sz-1]
 
 	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as STRING) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
-
-	q := &query.Query{Query: qq}
-	annotatedQuery, err := ansisql.AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "accepted_values", ti.Pipeline.Name)
-	if err != nil {
-		return errors.Wrap(err, "failed to add annotation comment")
-	}
-
-	return ansisql.NewCountableQueryCheck(c.conn, 0, annotatedQuery, "accepted_values", func(count int64) error {
+	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "accepted_values", func(count int64) error {
 		return errors.Errorf("column %s has %d rows that are not in the accepted values", ti.Column.Name, count)
 	}).Check(ctx, ti)
 }
