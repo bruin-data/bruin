@@ -1031,18 +1031,30 @@ func DetermineStartDates(cliStartDate, cliEndDate string, pipeline *pipeline.Pip
 	var err error
 
 	// Start date logic
-	if fullRefresh && pipeline != nil && pipeline.StartDate != "" {
-		startDate, err = date.ParseTime(pipeline.StartDate)
-		if err != nil {
-			return time.Time{}, time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
-		}
-		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
-	} else {
+	if !fullRefresh {
 		startDate, err = date.ParseTime(cliStartDate)
 		if err != nil {
 			return time.Time{}, time.Time{}, err
 		}
 		logger.Debug("Using CLI start_date: ", cliStartDate)
+	} else if pipeline == nil {
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	} else if pipeline.StartDate == "" {
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	} else {
+		startDate, err = date.ParseTime(pipeline.StartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
+		}
+		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
 	}
 
 	// End date logic (always use CLI flag if provided)
