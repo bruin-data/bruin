@@ -93,9 +93,7 @@ func TestWorkerWriter_Write(t *testing.T) {
 		Name: "test-task",
 	}
 
-	sprintfFunc := func(format string, a ...interface{}) string {
-		return fmt.Sprintf(format, a...)
-	}
+	sprintfFunc := fmt.Sprintf
 
 	tests := []struct {
 		name                string
@@ -154,6 +152,7 @@ func TestWorkerWriter_Write(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf bytes.Buffer
 
 			w := &workerWriter{
@@ -166,7 +165,7 @@ func TestWorkerWriter_Write(t *testing.T) {
 
 			n, err := w.Write(tt.input)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, len(tt.input), n)
 
 			output := buf.String()
@@ -187,9 +186,7 @@ func TestWorkerWriter_Write_WriteError(t *testing.T) {
 		Name: "test-task",
 	}
 
-	sprintfFunc := func(format string, a ...interface{}) string {
-		return fmt.Sprintf(format, a...)
-	}
+	sprintfFunc := fmt.Sprintf
 
 	mockWriter := &mockWriter{
 		writeError: assert.AnError,
@@ -205,7 +202,7 @@ func TestWorkerWriter_Write_WriteError(t *testing.T) {
 
 	n, err := w.Write([]byte("test"))
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, assert.AnError, err)
 	assert.Equal(t, 0, n)
 }
@@ -217,9 +214,7 @@ func TestWorkerWriter_Write_ShortWrite(t *testing.T) {
 		Name: "test-task",
 	}
 
-	sprintfFunc := func(format string, a ...interface{}) string {
-		return fmt.Sprintf(format, a...)
-	}
+	sprintfFunc := fmt.Sprintf
 
 	mockWriter := &mockWriter{
 		shortWrite: true,
@@ -235,7 +230,7 @@ func TestWorkerWriter_Write_ShortWrite(t *testing.T) {
 
 	n, err := w.Write([]byte("test"))
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, io.ErrShortWrite, err)
 	assert.Equal(t, 2, n) // mockWriter writes half the bytes
 }
