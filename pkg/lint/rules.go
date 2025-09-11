@@ -1059,10 +1059,11 @@ func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, 
 }
 
 var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
-	pipeline.AssetTypeBigqueryTableSensor:  true,
-	pipeline.AssetTypeSnowflakeTableSensor: true,
-	pipeline.AssetTypeAthenaTableSensor:    true,
-	pipeline.AssetTypeRedshiftTableSensor:  true,
+	pipeline.AssetTypeBigqueryTableSensor:   true,
+	pipeline.AssetTypeSnowflakeTableSensor:  true,
+	pipeline.AssetTypeAthenaTableSensor:     true,
+	pipeline.AssetTypeRedshiftTableSensor:   true,
+	pipeline.AssetTypeDatabricksTableSensor: true,
 }
 
 func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -1087,7 +1088,6 @@ func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *p
 			Description: "BigQuery table sensor `table` parameter must be either in the format `dataset.table` or `project.dataset.table`",
 		})
 	}
-
 	return issues, nil
 }
 
