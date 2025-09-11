@@ -89,7 +89,7 @@ parameters:
 Sensors are a special type of assets that are used to wait on certain external signals.
 
 
-Checks if a table exists in Postgres, runs by default every 30 seconds until this table is available.
+Checks if a table exists in Databricks, runs by default every 30 seconds until this table is available.
 
 ```yaml
 name: string
