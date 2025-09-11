@@ -28,7 +28,13 @@ func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 		*ti.Check.Value.String,
 	)
 
-	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "pattern", func(count int64) error {
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := ansisql.AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "pattern", ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
+	return ansisql.NewCountableQueryCheck(c.conn, 0, annotatedQuery, "pattern", func(count int64) error {
 		return errors.Errorf("column %s has %d values that don't satisfy the pattern %s", ti.Column.Name, count, *ti.Check.Value.String)
 	}).Check(ctx, ti)
 }
