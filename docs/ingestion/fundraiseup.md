@@ -20,14 +20,14 @@ connections:
 ```
 :::
 
-You can also use environment variables in your connections.yml by using the `{{ env_var("ENV_VAR_NAME") }}` syntax.
+You can also use environment variables in your connections.yml by using the `{{ "{{ env_var(\"ENV_VAR_NAME\") }}" }}` syntax.
 
 For example:
 ```yaml
 connections:
   fundraiseup:
     - name: "my_fundraiseup"
-      api_key: "{{ env_var('FUNDRAISEUP_API_KEY') }}"
+      api_key: "{{ "{{ env_var('FUNDRAISEUP_API_KEY') }}" }}"
 ```
 
 ## Supported Data Assets
