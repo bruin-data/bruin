@@ -750,7 +750,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Re-determine start/end dates based on pipeline configuration and full-refresh flag
-			startDate, endDate, err = DetermineStartEndDates(runConfig.StartDate, runConfig.EndDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			startDate, endDate, err = DetermineStartDates(runConfig.StartDate, runConfig.EndDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
 			if err != nil {
 				return err
 			}
@@ -1026,7 +1026,7 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 	return startDate, endDate, nil
 }
 
-func DetermineStartEndDates(cliStartDate, cliEndDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, time.Time, error) {
+func DetermineStartDates(cliStartDate, cliEndDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, time.Time, error) {
 	var startDate, endDate time.Time
 	var err error
 

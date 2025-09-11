@@ -1688,7 +1688,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			}
 
 			// Call the actual implementation
-			actualStartDate, actualEndDate, err := DetermineStartEndDates(cliStartDate, cliEndDate, testPipeline, tt.fullRefresh, logger)
+			actualStartDate, actualEndDate, err := DetermineStartDates(cliStartDate, cliEndDate, testPipeline, tt.fullRefresh, logger)
 
 			if tt.expectedError {
 				// For error cases, we might get dates but they should be logically invalid
