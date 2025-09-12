@@ -451,7 +451,7 @@ func TestPostgresWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 1,
-							Contains: []string{"[dataset.sensor] Poking: dataset.datatable", "Failed: dataset.sensor"},
+							Contains: []string{"Poking: dataset.datatable", "Failed: dataset.sensor"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -479,7 +479,7 @@ func TestPostgresWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Contains: []string{"[dataset.sensor] Poking: dataset.datatable", "Finished: dataset.sensor"},
+							Contains: []string{"Poking: dataset.datatable", "Finished: dataset.sensor"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
