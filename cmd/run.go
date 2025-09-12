@@ -1264,7 +1264,7 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseSeed) ||
-		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer(fullRefresh))
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer(fullRefresh))
 
@@ -1273,6 +1273,8 @@ func SetupExecutors(
 
 		msQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		synapseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+
+		msTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeMain] = msOperator
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
@@ -1289,6 +1291,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeMain] = msQuerySensor
 		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeMsSQLTableSensor][scheduler.TaskInstanceTypeMain] = msTableSensor
+		mainExecutors[pipeline.AssetTypeMsSQLTableSensor][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+		mainExecutors[pipeline.AssetTypeMsSQLTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeColumnCheck] = synapseCheckRunner

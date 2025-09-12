@@ -42,6 +42,7 @@ const (
 	AssetTypePostgresSource         = AssetType("pg.source")
 	AssetTypeRedshiftSource         = AssetType("rs.source")
 	AssetTypeMsSQLSource            = AssetType("ms.source")
+	AssetTypeMsSQLTableSensor       = AssetType("ms.sensor.table")
 	AssetTypeDatabricksSource       = AssetType("databricks.source")
 	AssetTypeSynapseSource          = AssetType("synapse.source")
 	AssetTypeAthenaSource           = AssetType("athena.source")
@@ -590,6 +591,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMsSQLQuery:            "mssql",
 	AssetTypeMsSQLSeed:             "mssql",
 	AssetTypeMsSQLQuerySensor:      "mssql",
+	AssetTypeMsSQLTableSensor:      "mssql",
 	AssetTypeMsSQLSource:           "mssql",
 	AssetTypeDatabricksQuery:       "databricks",
 	AssetTypeDatabricksSeed:        "databricks",

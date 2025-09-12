@@ -54,6 +54,25 @@ from monthly_sales
 order by order_year, order_month;
 ```
 
+### `ms.sensor.table`
+
+Sensors are a special type of assets that are used to wait on certain external signals.
+
+Checks if a table exists in MSSQL, runs by default every 30 seconds until this table is available.
+
+```yaml
+name: string
+type: string
+parameters:
+    table: string
+    poke_interval: int (optional)
+```
+**Parameters**:
+- `table`: `schema_id.table_id` or (for default schema `dbo`) `table_id` format.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
+
+
+
 ### `ms.sensor.query`
 
 Checks if a query returns any results in SQL Server, runs every 5 minutes until this query returns any results.
