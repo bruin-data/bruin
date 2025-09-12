@@ -140,7 +140,7 @@ parameters:
     poke_interval: int (optional)
 ```
 **Parameters**:
-- `table`: In `database_idschema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id` is provided, the database will be taken from the database configuration in the `.bruin.yml`. 
+- `table`: In `database_id.schema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id` is provided, the database will be taken from the database configuration in the `.bruin.yml`. 
 - `poke_interval`: The interval between retries in seconds (default 30 seconds). 
 
 

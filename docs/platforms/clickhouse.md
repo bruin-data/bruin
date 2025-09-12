@@ -92,9 +92,26 @@ GROUP BY driver_id
 ORDER BY average_rating DESC;
 ```
 
+### `clickhouse.sensor.table`
+
+Sensors are a special type of assets that are used to wait on certain external signals.
+
+
+Checks if a table exists in Clickhouse, runs by default every 30 seconds until this table is available.
+
+```yaml
+name: string
+type: string
+parameters:
+    table: string
+    poke_interval: int (optional)
+```
+**Parameters**:
+- `table`: `database.table_id` or (if using `default` database or a database specified in config file) `table_id` format.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
 ### `clickhouse.sensor.query`
 
-Checks if a query returns any results in Clickhouse, runs every 5 minutes until this query returns any results.
+Checks if a query returns any results in Clickhouse, runs by default every 30 seconds until this query returns any results.
 
 ```yaml
 name: string

@@ -131,7 +131,7 @@ parameters:
     poke_interval: int (optional)
 ```
 **Parameters**:
-- `table`: `schema_id.table_id` or (for default schema `public`) `table_id` format.
+- `table`: `schema_id.table_id`.
 - `poke_interval`: The interval between retries in seconds (default 30 seconds). 
 
 
