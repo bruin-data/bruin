@@ -65,10 +65,6 @@ func MCPCmd() *cli.Command {
 func runMCPServer(debug bool) error {
 	scanner := bufio.NewScanner(os.Stdin)
 
-	if debug {
-		fmt.Fprintf(os.Stderr, "MCP server ready, waiting for requests...\n")
-	}
-
 	telemetry.SendEvent("mcp_server_start", analytics.Properties{
 		"debug_mode": debug,
 	})
@@ -232,6 +228,9 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 
 	switch toolName {
 	case "bruin_get_overview":
+		telemetry.SendEvent("mcp_tool_call", analytics.Properties{
+			"tool_name": "bruin_get_overview",
+		})
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -245,6 +244,9 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 			},
 		}
 	case "bruin_get_docs_tree":
+		telemetry.SendEvent("mcp_tool_call", analytics.Properties{
+			"tool_name": "bruin_get_docs_tree",
+		})
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -282,6 +284,11 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 				},
 			}
 		}
+
+		telemetry.SendEvent("mcp_tool_call", analytics.Properties{
+			"tool_name": "bruin_get_doc_content",
+			"filename":  filename,
+		})
 
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
