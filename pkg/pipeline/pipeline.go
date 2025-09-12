@@ -45,6 +45,7 @@ const (
 	AssetTypeMsSQLTableSensor       = AssetType("ms.sensor.table")
 	AssetTypeDatabricksSource       = AssetType("databricks.source")
 	AssetTypeSynapseSource          = AssetType("synapse.source")
+	AssetTypeSynapseTableSensor     = AssetType("synapse.sensor.table")
 	AssetTypeAthenaSource           = AssetType("athena.source")
 	AssetTypeDuckDBSource           = AssetType("duckdb.source")
 	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
