@@ -65,6 +65,43 @@ parameters:
 ::: info NOTE
 For YAML-style assets, variables can only be used in the value context of `parameter` field.
 :::
+## Example
+
+::: code-group
+```yaml [pipeline.yml]
+name: udharan
+variables:
+  config:
+    type: object
+    properties:
+      name:
+        type: string
+      version:
+        type: object
+    default:
+      name: bruin
+      version: 1.0.0
+```
+:::
+
+::: code-group
+```bruin-sql [asset.sql]
+/* @bruin
+name: myschema.example
+type: duckdb.sql
+@bruin */
+
+SELECT 
+  '{{ var.config.name }}' as name,
+  '{{ var.config.version }}' as version;
+```
+:::
+
+When run, the rendered query will like the following:
+```sql
+SELECT 'bruin' as name, '1.0.0' as version;
+```
+
 ## Built-in variables
 
 Bruin injects several variables automatically:
