@@ -386,3 +386,33 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 
 	return summary, nil
 }
+
+func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+		}
+	}
+
+	var schemaName, targetTable string
+
+	switch len(tableComponents) {
+	case 1:
+		schemaName = "dbo"
+		targetTable = tableComponents[0]
+	case 2:
+		schemaName = tableComponents[0]
+		targetTable = tableComponents[1]
+	default:
+		return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+	}
+
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
+		schemaName,
+		targetTable,
+	)
+
+	return strings.TrimSpace(query), nil
+}
