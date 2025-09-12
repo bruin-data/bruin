@@ -1408,6 +1408,7 @@ func SetupExecutors(
 		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, clickhouse.NewMaterializer(fullRefresh))
 		checkRunner := clickhouse.NewColumnCheckOperator(conn)
 		clickHouseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		clickHouseTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeMain] = clickHouseOperator
 		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
@@ -1420,6 +1421,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeClickHouseQuerySensor][scheduler.TaskInstanceTypeMain] = clickHouseQuerySensor
 		mainExecutors[pipeline.AssetTypeClickHouseQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
 		mainExecutors[pipeline.AssetTypeClickHouseQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeClickHouseTableSensor][scheduler.TaskInstanceTypeMain] = clickHouseTableSensor
+		mainExecutors[pipeline.AssetTypeClickHouseTableSensor][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
+		mainExecutors[pipeline.AssetTypeClickHouseTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeClickHouse {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = checkRunner

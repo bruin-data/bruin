@@ -81,6 +81,7 @@ const (
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeClickHouseQuerySensor  = AssetType("clickhouse.sensor.query")
+	AssetTypeClickHouseTableSensor  = AssetType("clickhouse.sensor.table")
 	AssetTypeClickHouseSource       = AssetType("clickhouse.source")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
@@ -611,6 +612,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeClickHouse:            "clickhouse",
 	AssetTypeClickHouseSeed:        "clickhouse",
 	AssetTypeClickHouseQuerySensor: "clickhouse",
+	AssetTypeClickHouseTableSensor: "clickhouse",
 	AssetTypeClickHouseSource:      "clickhouse",
 	AssetTypeEMRServerlessSpark:    "emr_serverless",
 	AssetTypeEMRServerlessPyspark:  "emr_serverless",

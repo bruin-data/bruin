@@ -59,3 +59,7 @@ func (c *Config) GetIngestrURI() string {
 
 	return uri.String()
 }
+
+func (c *Config) GetDatabase() string {
+	return c.Database
+}
