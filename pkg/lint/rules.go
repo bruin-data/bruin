@@ -1067,6 +1067,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeClickHouseTableSensor: true,
 	pipeline.AssetTypeMsSQLTableSensor:      true,
 	pipeline.AssetTypePostgresTableSensor:   true,
+	pipeline.AssetTypeSynapseTableSensor:    true,
 }
 
 func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
