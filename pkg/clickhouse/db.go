@@ -36,6 +36,7 @@ type Client struct {
 type ClickHouseConfig interface {
 	ToClickHouseOptions() *click_house.Options
 	GetIngestrURI() string
+	GetDatabase() string
 }
 
 type connection interface {
@@ -333,16 +334,26 @@ func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
 	tableComponents := strings.Split(tableName, ".")
 	for _, component := range tableComponents {
 		if component == "" {
-			return "", fmt.Errorf("table name must be in format schema.table, '%s' given", tableName)
+			return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
 		}
 	}
 
-	if len(tableComponents) != 2 {
-		return "", fmt.Errorf("table name must be in format schema.table, '%s' given", tableName)
-	}
+	var schemaName, targetTable string
 
-	schemaName := tableComponents[0]
-	targetTable := tableComponents[1]
+	switch len(tableComponents) {
+	case 1:
+		if c.config.GetDatabase() == "" {
+			schemaName = "default"
+		} else {
+			schemaName = c.config.GetDatabase()
+		}
+		targetTable = tableComponents[0]
+	case 2:
+		schemaName = tableComponents[0]
+		targetTable = tableComponents[1]
+	default:
+		return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+	}
 
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) FROM system.tables WHERE database = '%s' AND name = '%s'",
