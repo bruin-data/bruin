@@ -11,6 +11,8 @@ environments:
           path: "duckdb-files/scd2-by-column.db"
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
+        - name: "duckdb-start-date-flags"
+          path: "duckdb-files/start-date-flags.db"
       chess:
         - name: "chess-default"
           players:
@@ -136,6 +138,11 @@ environments:
       duckdb:
         - name: "duckdb-run-seed-data"
           path: "duckdb-files/run-seed-data.db"
+  env-start-date-flags:
+    connections:
+      duckdb:
+        - name: "duckdb-start-date-flags"
+          path: "duckdb-files/start-date-flags.db"
   env-ingestr:
     connections:
       duckdb:

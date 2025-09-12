@@ -456,6 +456,18 @@ var (
 	}
 )
 
+func ignoreApplyIntervalModifiers(c *cli.Command) (fullRefresh bool, applyIntervalModifiers bool) {
+	fullRefresh = c.Bool("full-refresh")
+	applyIntervalModifiers = c.Bool("apply-interval-modifiers")
+
+	if fullRefresh && applyIntervalModifiers {
+		warningPrinter.Println("Warning: --apply-interval-modifiers flag is ignored when --full-refresh is enabled.")
+		applyIntervalModifiers = false
+	}
+
+	return fullRefresh, applyIntervalModifiers
+}
+
 func Run(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "run",
@@ -593,7 +605,8 @@ func Run(isDebug *bool) *cli.Command {
 			defer RecoverFromPanic()
 
 			logger := makeLogger(*isDebug)
-			// Initialize runConfig with values from cli.Context
+			fullRefresh, applyIntervalModifiers := ignoreApplyIntervalModifiers(c)
+
 			runConfig := &scheduler.RunConfig{
 				Downstream:             c.Bool("downstream"),
 				StartDate:              c.String("start-date"),
@@ -603,7 +616,7 @@ func Run(isDebug *bool) *cli.Command {
 				Force:                  c.Bool("force"),
 				PushMetadata:           c.Bool("push-metadata"),
 				NoLogFile:              c.Bool("no-log-file"),
-				FullRefresh:            c.Bool("full-refresh"),
+				FullRefresh:            fullRefresh,
 				UsePip:                 c.Bool("use-pip"),
 				Tag:                    c.String("tag"),
 				ExcludeTag:             c.String("exclude-tag"),
@@ -612,7 +625,7 @@ func Run(isDebug *bool) *cli.Command {
 				ExpUseWingetForUv:      c.Bool("exp-use-winget-for-uv"),
 				ConfigFilePath:         c.String("config-file"),
 				SensorMode:             c.String("sensor-mode"),
-				ApplyIntervalModifiers: c.Bool("apply-interval-modifiers"),
+				ApplyIntervalModifiers: applyIntervalModifiers,
 				Annotations:            c.String("query-annotations"),
 			}
 
@@ -662,7 +675,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, applyIntervalModifiers)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 			runCtx = context.WithValue(runCtx, executor.KeyVerbose, c.Bool("verbose"))
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
@@ -736,6 +749,20 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return err
 			}
+
+			// Re-determine start/end dates based on pipeline configuration and full-refresh flag
+			startDate, endDate, err = DetermineStartDates(runConfig.StartDate, runConfig.EndDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			if err != nil {
+				return err
+			}
+
+			// Update renderer with the finalized start/end dates
+			renderer = jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, runID, nil)
+			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
+
+			// Update context with the finalized dates
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 
 			// handle log files
 			executionStartLog := "Starting execution..."
@@ -997,6 +1024,48 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 		errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
 		return time.Time{}, time.Time{}, err
 	}
+
+	return startDate, endDate, nil
+}
+
+func DetermineStartDates(cliStartDate, cliEndDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, time.Time, error) {
+	var startDate, endDate time.Time
+	var err error
+
+	// Start date logic
+	switch {
+	case !fullRefresh:
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	case pipeline == nil:
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	case pipeline.StartDate == "":
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	default:
+		startDate, err = date.ParseTime(pipeline.StartDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
+		}
+		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
+	}
+
+	// End date logic (always use CLI flag if provided)
+	endDate, err = date.ParseTime(cliEndDate)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	logger.Debug("Using CLI end_date: ", cliEndDate)
 
 	return startDate, endDate, nil
 }
