@@ -25,6 +25,10 @@
         {
           "name": "duckdb-scd2-by-time",
           "path": "duckdb-files/scd2-by-time.db"
+        },
+        {
+          "name": "duckdb-start-date-flags",
+          "path": "duckdb-files/start-date-flags.db"
         }
       ],
       "chess": [
@@ -64,6 +68,10 @@
           {
             "name": "duckdb-scd2-by-time",
             "path": "duckdb-files/scd2-by-time.db"
+          },
+          {
+            "name": "duckdb-start-date-flags",
+            "path": "duckdb-files/start-date-flags.db"
           }
         ],
         "chess": [
@@ -492,6 +500,17 @@
           {
             "name": "duckdb-scd2-by-time",
             "path": "duckdb-files/scd2-by-time.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-start-date-flags": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-start-date-flags",
+            "path": "duckdb-files/start-date-flags.db"
           }
         ]
       },

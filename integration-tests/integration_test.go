@@ -1035,10 +1035,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "start-date-flags-validate-flag-used",
 			task: e2e.Task{
-				Name:    "start-date-flags-validate-flag-used",
-				Command: binary,
-				Args:    []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
-				Env:     []string{},
+				Name:          "start-date-flags-validate-flag-used",
+				Command:       binary,
+				Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
+				Env:           []string{},
 				SkipJSONNodes: []string{`"connectionName"`, `"query"`},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -1070,10 +1070,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "start-date-flags-validate-pipeline-used",
 			task: e2e.Task{
-				Name:    "start-date-flags-validate-pipeline-used",
-				Command: binary,
-				Args:    []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
-				Env:     []string{},
+				Name:          "start-date-flags-validate-pipeline-used",
+				Command:       binary,
+				Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
+				Env:           []string{},
 				SkipJSONNodes: []string{`"connectionName"`, `"query"`},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -1105,10 +1105,10 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "start-date-flags-validate-no-flag-uses-pipeline",
 			task: e2e.Task{
-				Name:    "start-date-flags-validate-no-flag-uses-pipeline",
-				Command: binary,
-				Args:    []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
-				Env:     []string{},
+				Name:          "start-date-flags-validate-no-flag-uses-pipeline",
+				Command:       binary,
+				Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
+				Env:           []string{},
 				SkipJSONNodes: []string{`"connectionName"`, `"query"`},
 				Expected: e2e.Output{
 					ExitCode: 0,
