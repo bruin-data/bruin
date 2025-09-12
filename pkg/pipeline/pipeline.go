@@ -67,6 +67,7 @@ const (
 	AssetTypeMsSQLQuerySensor       = AssetType("ms.sensor.query")
 	AssetTypeDatabricksQuery        = AssetType("databricks.sql")
 	AssetTypeDatabricksSeed         = AssetType("databricks.seed")
+	AssetTypeDatabricksTableSensor  = AssetType("databricks.sensor.table")
 	AssetTypeDatabricksQuerySensor  = AssetType("databricks.sensor.query")
 	AssetTypeSynapseQuery           = AssetType("synapse.sql")
 	AssetTypeSynapseSeed            = AssetType("synapse.seed")
@@ -593,6 +594,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDatabricksSeed:        "databricks",
 	AssetTypeDatabricksQuerySensor: "databricks",
 	AssetTypeDatabricksSource:      "databricks",
+	AssetTypeDatabricksTableSensor: "databricks",
 	AssetTypeSynapseQuery:          "synapse",
 	AssetTypeSynapseSeed:           "synapse",
 	AssetTypeSynapseQuerySensor:    "synapse",

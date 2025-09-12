@@ -262,3 +262,27 @@ ORDER BY schema_name, table_name;
 
 	return summary, nil
 }
+
+func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in format schema.table, '%s' given", tableName)
+		}
+	}
+
+	if len(tableComponents) != 2 {
+		return "", fmt.Errorf("table name must be in format schema.table, '%s' given", tableName)
+	}
+
+	schemaName := tableComponents[0]
+	targetTable := tableComponents[1]
+
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
+		schemaName,
+		targetTable,
+	)
+
+	return strings.TrimSpace(query), nil
+}

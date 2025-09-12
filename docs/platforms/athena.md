@@ -134,7 +134,7 @@ B,LinkedIn,SDE 2,2024-01-01
 Sensors are a special type of assets that are used to wait on certain external signals.
 
 
-Checks if a table exists in Athena, runs every 5 minutes until this table is available.
+Checks if a table exists in Athena, runs by default every 30 seconds until this table is available.
 
 ```yaml
 name: string
@@ -150,7 +150,7 @@ parameters:
 
 ### `athena.sensor.query`
 
-Checks if a query returns any results in Athena, runs every 5 minutes until this query returns any results.
+Checks if a query returns any results in Athena, runs by default every 30 seconds until this query returns any results.
 
 ```yaml
 name: string
