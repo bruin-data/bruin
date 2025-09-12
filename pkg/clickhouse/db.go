@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	click_house "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -326,4 +327,28 @@ ORDER BY database, name;
 	})
 
 	return summary, nil
+}
+
+func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in format schema.table, '%s' given", tableName)
+		}
+	}
+
+	if len(tableComponents) != 2 {
+		return "", fmt.Errorf("table name must be in format schema.table, '%s' given", tableName)
+	}
+
+	schemaName := tableComponents[0]
+	targetTable := tableComponents[1]
+
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM system.tables WHERE database = '%s' AND name = '%s'",
+		schemaName,
+		targetTable,
+	)
+
+	return strings.TrimSpace(query), nil
 }
