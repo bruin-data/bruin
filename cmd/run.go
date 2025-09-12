@@ -1274,6 +1274,8 @@ func SetupExecutors(
 		msQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		synapseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 
+		msTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeMain] = msOperator
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
@@ -1289,6 +1291,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeMain] = msQuerySensor
 		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeMsSQLTableSensor][scheduler.TaskInstanceTypeMain] = msTableSensor
+		mainExecutors[pipeline.AssetTypeMsSQLTableSensor][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+		mainExecutors[pipeline.AssetTypeMsSQLTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeColumnCheck] = synapseCheckRunner
