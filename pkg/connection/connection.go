@@ -10,6 +10,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
+	"github.com/bruin-data/bruin/pkg/anthropic"
 	"github.com/bruin-data/bruin/pkg/applovin"
 	"github.com/bruin-data/bruin/pkg/applovinmax"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
@@ -98,6 +99,7 @@ type Manager struct {
 	Gorgias              map[string]*gorgias.Client
 	Klaviyo              map[string]*klaviyo.Client
 	Adjust               map[string]*adjust.Client
+	Anthropic            map[string]*anthropic.Client
 	Athena               map[string]*athena.DB
 	Aws                  map[string]*config.AwsConnection
 	FacebookAds          map[string]*facebookads.Client
@@ -654,6 +656,29 @@ func (m *Manager) AddAdjustConnectionFromConfig(connection *config.AdjustConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Adjust[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddAnthropicConnectionFromConfig(connection *config.AnthropicConnection) error {
+	m.mutex.Lock()
+	if m.Anthropic == nil {
+		m.Anthropic = make(map[string]*anthropic.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := anthropic.NewClient(anthropic.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Anthropic[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2120,6 +2145,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.Gorgias, connectionManager.AddGorgiasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Klaviyo, connectionManager.AddKlaviyoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Adjust, connectionManager.AddAdjustConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Anthropic, connectionManager.AddAnthropicConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)

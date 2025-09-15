@@ -40,6 +40,7 @@ type Connections struct {
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
 	Klaviyo             []KlaviyoConnection             `yaml:"klaviyo,omitempty" json:"klaviyo,omitempty" mapstructure:"klaviyo"`
 	Adjust              []AdjustConnection              `yaml:"adjust,omitempty" json:"adjust,omitempty" mapstructure:"adjust"`
+	Anthropic           []AnthropicConnection           `yaml:"anthropic,omitempty" json:"anthropic,omitempty" mapstructure:"anthropic"`
 	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
@@ -558,6 +559,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Adjust = append(env.Connections.Adjust, conn)
+	case "anthropic":
+		var conn AnthropicConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Anthropic = append(env.Connections.Anthropic, conn)
 	case "stripe":
 		var conn StripeConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1017,6 +1025,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Klaviyo = removeConnection(env.Connections.Klaviyo, connectionName)
 	case "adjust":
 		env.Connections.Adjust = removeConnection(env.Connections.Adjust, connectionName)
+	case "anthropic":
+		env.Connections.Anthropic = removeConnection(env.Connections.Anthropic, connectionName)
 	case "generic":
 		env.Connections.Generic = removeConnection(env.Connections.Generic, connectionName)
 	case "facebookads":
