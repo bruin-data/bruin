@@ -39,6 +39,22 @@
         "access_token"
       ]
     },
+    "AnthropicConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AppLovinConnection": {
       "properties": {
         "name": {
@@ -394,6 +410,12 @@
         "adjust": {
           "items": {
             "$ref": "#/$defs/AdjustConnection"
+          },
+          "type": "array"
+        },
+        "anthropic": {
+          "items": {
+            "$ref": "#/$defs/AnthropicConnection"
           },
           "type": "array"
         },
