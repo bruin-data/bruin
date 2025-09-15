@@ -1,9 +1,20 @@
 package anthropic
 
+import (
+	"net/url"
+)
+
 type Config struct {
 	APIKey string
 }
 
 func (c *Config) GetIngestrURI() string {
-	return "anthropic://?api_key=" + c.APIKey
+	params := url.Values{}
+	params.Set("api_key", c.APIKey)
+
+	uri := url.URL{
+		Scheme:   "anthropic",
+		RawQuery: params.Encode(),
+	}
+	return uri.String()
 }
