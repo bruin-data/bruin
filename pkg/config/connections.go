@@ -335,6 +335,15 @@ func (c AdjustConnection) GetName() string {
 	return c.Name
 }
 
+type AnthropicConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c AnthropicConnection) GetName() string {
+	return c.Name
+}
+
 type FacebookAdsConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
