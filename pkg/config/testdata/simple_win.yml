@@ -119,6 +119,9 @@ environments:
       adjust:
         - name: conn16
           api_key: "adjustokey"
+      anthropic:
+        - name: "anthropic-1"
+          api_key: "test-api-key"
       facebookads:
         - name: conn17
           access_token: "Facebookkey"
