@@ -1097,9 +1097,7 @@ func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline
 	return issues, nil
 }
 
-// getPlatformNameFromAssetType returns a human-readable platform name from an asset type
 func getPlatformNameFromAssetType(assetType pipeline.AssetType) string {
-	// Map asset types to human-readable platform names
 	platformNames := map[pipeline.AssetType]string{
 		pipeline.AssetTypeBigqueryTableSensor:   "BigQuery",
 		pipeline.AssetTypeSnowflakeTableSensor:  "Snowflake",
@@ -1120,48 +1118,48 @@ func getPlatformNameFromAssetType(assetType pipeline.AssetType) string {
 	return string(assetType)
 }
 
-// validateTableNameFormat validates table name format based on database type
 func validateTableNameFormat(assetType pipeline.AssetType, tableName string) string {
 	tableItems := strings.Split(tableName, ".")
 	platformName := getPlatformNameFromAssetType(assetType)
 
-	// Check for empty components
 	for _, component := range tableItems {
 		if component == "" {
 			return fmt.Sprintf("%s table sensor `table` parameter contains empty components, '%s' given", platformName, tableName)
 		}
 	}
 
-	switch assetType {
-	case pipeline.AssetTypeBigqueryTableSensor:
+	switch platformName {
+	case "BigQuery":
 		if len(tableItems) != 2 && len(tableItems) != 3 {
 			return fmt.Sprintf("%s table sensor `table` parameter must be in format `dataset.table` or `project.dataset.table`, '%s' given", platformName, tableName)
 		}
-	case pipeline.AssetTypeSnowflakeTableSensor:
+	case "Snowflake":
 		if len(tableItems) != 2 && len(tableItems) != 3 {
 			return fmt.Sprintf("%s table sensor `table` parameter must be in format `schema.table` or `database.schema.table`, '%s' given", platformName, tableName)
 		}
-	case pipeline.AssetTypeDatabricksTableSensor:
+	case "Databricks":
 		if len(tableItems) != 2 {
 			return fmt.Sprintf("%s table sensor `table` parameter must be in format `schema.table`, '%s' given", platformName, tableName)
 		}
-	case pipeline.AssetTypeAthenaTableSensor:
+	case "Athena":
 		if len(tableItems) != 1 {
 			return fmt.Sprintf("%s table sensor `table` parameter must be in format `table`, '%s' given", platformName, tableName)
 		}
-	case pipeline.AssetTypePostgresTableSensor, pipeline.AssetTypeRedshiftTableSensor, pipeline.AssetTypeMsSQLTableSensor:
+	case "PostgreSQL", "Redshift", "MS SQL":
 		if len(tableItems) > 2 {
 			return fmt.Sprintf("%s table sensor `table` parameter must be in format `table` or `schema.table`, '%s' given", platformName, tableName)
 		}
-	case pipeline.AssetTypeClickHouseTableSensor:
+	case "ClickHouse":
 		if len(tableItems) > 2 {
 			return fmt.Sprintf("%s table sensor `table` parameter must be in format `table` or `schema.table`, '%s' given", platformName, tableName)
 		}
-	case pipeline.AssetTypeSynapseTableSensor:
+	case "Synapse":
 		// Synapse uses MS SQL format
 		if len(tableItems) > 2 {
 			return fmt.Sprintf("%s table sensor `table` parameter must be in format `table` or `schema.table`, '%s' given", platformName, tableName)
 		}
+	default:
+		return fmt.Sprintf("Table sensor is not supported for this asset type %s", assetType)
 	}
 
 	return "" // No validation error
