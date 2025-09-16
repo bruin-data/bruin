@@ -65,7 +65,7 @@ export default withMermaid({
                         items: [
                             {text: "Glossary", link: "/getting-started/glossary"},
                             {text: "Policies", link: "/getting-started/policies"},
-                            {text: "Developer Environments", link: "/getting-started/devenv"},
+                            {text: "Environments", link: "/getting-started/devenv"},
                             {text: "Variables", link: "/getting-started/pipeline-variables"},
                             {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
                         ]
@@ -301,6 +301,7 @@ export default withMermaid({
                 collapsed: false,
                 items: [
                     {text: "Overview", link: "/cloud/overview"},
+                    {text: "Developer Environments", link: "/cloud/developer-environments"},
                     {text: "Cross-pipeline dependencies", link: "/cloud/cross-pipeline"},
                     {text: "dbt Projects", link: "/cloud/dbt"},
                     {text: "Notifications", link: "/cloud/notifications"},
