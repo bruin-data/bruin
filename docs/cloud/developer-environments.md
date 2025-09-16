@@ -50,7 +50,3 @@ Developer Environments use Personal Access Token (PAT) to access your bruin git 
 - Click `Save` to complete the process.
 
 Developer Environments are now ready for use.
-
-### Pipeline Secrets
-
-## Usage
