@@ -1081,7 +1081,7 @@ func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline
 		platformName := getPlatformNameFromAssetType(asset.Type)
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: fmt.Sprintf("%s table sensor requires a `table` parameter", platformName),
+			Description: platformName + " table sensor requires a `table` parameter",
 		})
 		return issues, nil
 	}
