@@ -34,7 +34,7 @@ Snowflake currently supports both password-based authentication as well as key-b
 
 Open your terminal and run the following command to create a key pair. If you’re using a mac, OpenSSL should be installed by default, so no additional setup is required. For Linux or Windows, you may need to [install OpenSSL first](https://docs.openssl.org/3.4/man7/ossl-guide-introduction/).
 
-```terminal
+```bash
 openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
 openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
 ```
