@@ -24,7 +24,6 @@ export default withMermaid({
     title: "Bruin CLI",
     description: "Open-source multi-language data pipelines",
     base: "/bruin/",
-    cleanUrls: true,
     head: [
         [
             "script",
