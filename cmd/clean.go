@@ -50,13 +50,29 @@ func CleanCmd() *cli.Command {
 }
 
 type CleanCommand struct {
+	cm         user.ConfigManager
+	fs         afero.Fs
 	infoPrinter  printer
 	errorPrinter printer
 }
 
+func NewCleanCommand(
+	cm user.ConfigManager,
+	fs afero.Fs,
+	infoPrinter printer,
+	errorPrinter printer,
+) *CleanCommand {
+	return &CleanCommand{
+		cm:           cm,
+		fs:           fs,
+		infoPrinter:  infoPrinter,
+		errorPrinter: errorPrinter,
+	}
+}
+
+
 func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
-	cm := user.NewConfigManager(afero.NewOsFs())
-	bruinHomeDirAbsPath, err := cm.EnsureAndGetBruinHomeDir()
+	bruinHomeDirAbsPath, err := r.cm.EnsureAndGetBruinHomeDir()
 	if err != nil {
 		return errors.Wrap(err, "failed to get bruin home directory")
 	}
@@ -68,14 +84,14 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 		}
 	}
 
-	err = cm.RecreateHomeDir()
+	err = r.cm.RecreateHomeDir()
 	if err != nil {
 		return errors.Wrap(err, "failed to recreate the home directory")
 	}
 
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
-		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+		r.errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
 		return cli.Exit("", 1)
 	}
 
@@ -87,11 +103,11 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 	}
 
 	if len(contents) == 0 {
-		infoPrinter.Println("No log files found, nothing to clean up...")
+		r.infoPrinter.Println("No log files found, nothing to clean up...")
 		return nil
 	}
 
-	infoPrinter.Printf("Found %d log files, cleaning them up...\n", len(contents))
+	r.infoPrinter.Printf("Found %d log files, cleaning them up...\n", len(contents))
 
 	for _, f := range contents {
 		err := os.Remove(f)
@@ -100,7 +116,7 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 		}
 	}
 
-	infoPrinter.Printf("Successfully removed %d log files.\n", len(contents))
+	r.infoPrinter.Printf("Successfully removed %d log files.\n", len(contents))
 
 	return nil
 }
