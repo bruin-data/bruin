@@ -119,7 +119,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Severity:         ValidatorSeverityCritical,
 			AssetValidator:   EnsureSnowflakeSensorHasQueryParameterForASingleAsset,
 			ApplicableLevels: []Level{LevelAsset},
-		},&SimpleRule{
+		}, &SimpleRule{
 			Identifier:       "valid-bigquery-query-sensor",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
