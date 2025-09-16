@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/spf13/afero"
@@ -214,4 +216,78 @@ func TestCleanCommand_Run(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCleanCommand_cleanUvCache(t *testing.T) {
+	t.Parallel()
+
+	// Test case: uv binary does not exist
+	t.Run("uv binary does not exist", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a temporary directory that doesn't contain uv
+		tempDir := t.TempDir()
+		output := []string{}
+		printer := &mockOutputPrinter{output: &output}
+
+		cmd := &CleanCommand{
+			infoPrinter:  printer,
+			errorPrinter: printer,
+		}
+
+		err := cmd.cleanUvCache(tempDir)
+
+		require.NoError(t, err)
+		assert.Contains(t, *printer.output, "UV is not installed yet. Nothing to clean.")
+	})
+}
+
+func TestCleanCommand_confirmUvCacheClean(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		input          string
+		expectedResult bool
+	}{
+		{"user confirms with 'y'", "y\n", true},
+		{"user confirms with 'yes'", "yes\n", true},
+		{"user confirms with 'Y'", "Y\n", true},
+		{"user cancels with 'n'", "n\n", false},
+		{"user cancels with 'no'", "no\n", false},
+		{"user cancels with empty input", "\n", false},
+		{"user cancels with random text", "maybe\n", false},
+		{"user cancels with whitespace", "  n  \n", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := []string{}
+			cmd := &CleanCommand{
+				errorPrinter: &mockOutputPrinter{output: &output},
+			}
+
+			reader := strings.NewReader(tt.input)
+			result := cmd.confirmUvCacheClean(reader)
+
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+func TestCleanCommand_confirmUvCacheClean_Error(t *testing.T) {
+	t.Parallel()
+
+	output := []string{}
+	cmd := &CleanCommand{
+		errorPrinter: &mockOutputPrinter{output: &output},
+	}
+
+	// Broken reader that always errors
+	brokenReader := iotest.ErrReader(errors.New("simulated read error"))
+
+	result := cmd.confirmUvCacheClean(brokenReader)
+
+	assert.False(t, result)
+	assert.Len(t, output, 1)
+	assert.Contains(t, output[0], "Error reading input")
 }

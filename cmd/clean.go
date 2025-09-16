@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -187,7 +188,7 @@ func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 	}
 
 	// Prompt user for confirmation
-	if !r.confirmUvCacheClean() {
+	if !r.confirmUvCacheClean(os.Stdin) {
 		r.infoPrinter.Println("UV cache cleaning cancelled by user.")
 		return nil
 	}
@@ -204,11 +205,11 @@ func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 	return nil
 }
 
-func (r *CleanCommand) confirmUvCacheClean() bool {
-	reader := bufio.NewReader(os.Stdin)
+func (r *CleanCommand) confirmUvCacheClean(reader io.Reader) bool {
+	bufReader := bufio.NewReader(reader)
 	fmt.Print("Are you sure you want to clean uv cache? (y/N): ")
 
-	response, err := reader.ReadString('\n')
+	response, err := bufReader.ReadString('\n')
 	if err != nil {
 		r.errorPrinter.Printf("Error reading input: %v\n", err)
 		return false
