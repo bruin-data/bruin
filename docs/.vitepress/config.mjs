@@ -301,6 +301,7 @@ export default withMermaid({
                 collapsed: false,
                 items: [
                     {text: "Overview", link: "/cloud/overview"},
+                    {text: "Developer Environments", link: "/cloud/developer-environments"},
                     {text: "Cross-pipeline dependencies", link: "/cloud/cross-pipeline"},
                     {text: "dbt Projects", link: "/cloud/dbt"},
                     {text: "Notifications", link: "/cloud/notifications"},
