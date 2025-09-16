@@ -6,7 +6,7 @@ Author and deploy your pipelines, all without leaving your browser.
 
 ## Configuration
 
-In order to use developer environments, you need to atleast have a git secret configured.
+In order to use developer environments, you need to at least have a git secret configured.
 
 ### Git Secret 
 
@@ -39,7 +39,7 @@ Developer Environments use Personal Access Token (PAT) to access your bruin git 
 ---
 - Click on `Team Settings` from the Team Selector Dropdown. <p>![Dropdown](/public/dev-env/dropdown-team-settings.png)</p>
 - Scroll Down to `Git Secrets` Section and add
-    - Token Name. We recommended giving it the same name as the one you used when generating the token.
+    - Token Name. We recommend giving it the same name as the one you used when generating the token.
     - Username of the account that created the token.
     - Token itself
 <p>
