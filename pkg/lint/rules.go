@@ -1070,7 +1070,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeSynapseTableSensor:    true,
 }
 
-func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+func ValdiateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if !TableSensorAllowedAssetTypes[asset.Type] {
 		return issues, nil
@@ -1080,44 +1080,66 @@ func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *p
 	if !ok {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "BigQuery table sensor requires a `table` parameter",
+			Description: fmt.Sprintf("%s table sensor requires a `table` parameter", asset.Type),
 		})
 		return issues, nil
 	}
-	tableItems := strings.Split(table, ".")
 
-	if len(tableItems) != 2 && len(tableItems) != 3 {
+	// Validate table name format based on database type
+	validationError := validateTableNameFormat(asset.Type, table)
+	if validationError != "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "BigQuery table sensor `table` parameter must be either in the format `dataset.table` or `project.dataset.table`",
+			Description: validationError,
 		})
 	}
 	return issues, nil
 }
 
-func EnsureBigQueryQuerySensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-	if asset.Type != pipeline.AssetTypeBigqueryQuerySensor {
-		return issues, nil
+// validateTableNameFormat validates table name format based on database type
+func validateTableNameFormat(assetType pipeline.AssetType, tableName string) string {
+	tableItems := strings.Split(tableName, ".")
+
+	// Check for empty components
+	for _, component := range tableItems {
+		if component == "" {
+			return fmt.Sprintf("%s table sensor `table` parameter contains empty components, '%s' given", assetType, tableName)
+		}
 	}
 
-	query, ok := asset.Parameters["query"]
-	if !ok {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "BigQuery query sensor requires a `query` parameter",
-		})
-		return issues, nil
+	switch assetType {
+	case pipeline.AssetTypeBigqueryTableSensor:
+		if len(tableItems) != 2 && len(tableItems) != 3 {
+			return fmt.Sprintf("%s table sensor `table` parameter must be in format `dataset.table` or `project.dataset.table`, '%s' given", assetType, tableName)
+		}
+	case pipeline.AssetTypeSnowflakeTableSensor:
+		if len(tableItems) != 2 && len(tableItems) != 3 {
+			return fmt.Sprintf("%s table sensor `table` parameter must be in format `schema.table` or `database.schema.table`, '%s' given", assetType, tableName)
+		}
+	case pipeline.AssetTypeDatabricksTableSensor:
+		if len(tableItems) != 2 {
+			return fmt.Sprintf("%s table sensor `table` parameter must be in format `schema.table`, '%s' given", assetType, tableName)
+		}
+	case pipeline.AssetTypeAthenaTableSensor:
+		if len(tableItems) != 2 {
+			return fmt.Sprintf("%s table sensor `table` parameter must be in format `database.table`, '%s' given", assetType, tableName)
+		}
+	case pipeline.AssetTypePostgresTableSensor, pipeline.AssetTypeRedshiftTableSensor, pipeline.AssetTypeMsSQLTableSensor:
+		if len(tableItems) > 2 {
+			return fmt.Sprintf("%s table sensor `table` parameter must be in format `table` or `schema.table`, '%s' given", assetType, tableName)
+		}
+	case pipeline.AssetTypeClickHouseTableSensor:
+		if len(tableItems) > 2 {
+			return fmt.Sprintf("%s table sensor `table` parameter must be in format `table` or `database.table`, '%s' given", assetType, tableName)
+		}
+	case pipeline.AssetTypeSynapseTableSensor:
+		// Synapse uses MS SQL format
+		if len(tableItems) > 2 {
+			return fmt.Sprintf("%s table sensor `table` parameter must be in format `table` or `schema.table`, '%s' given", assetType, tableName)
+		}
 	}
 
-	if query == "" {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "BigQuery query sensor requires a `query` parameter that is not empty",
-		})
-	}
-
-	return issues, nil
+	return "" // No validation error
 }
 
 // ValidateCustomCheckQueryDryRun validates CustomCheck.Query using a dry-run against the DB.
