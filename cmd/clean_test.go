@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- Mock ConfigManager ---
+const testRepoRoot = "/test-repo"
+
+// --- Mock ConfigManager ---.
 type mockConfigManager struct {
 	bruinHomeDir string
 	homeDirErr   error
@@ -27,7 +29,7 @@ func (m *mockConfigManager) RecreateHomeDir() error {
 	return m.recreateErr
 }
 
-// --- Mock GitFinder ---
+// --- Mock GitFinder ---.
 type mockGitFinder struct {
 	repo *git.Repo
 	err  error
@@ -37,7 +39,7 @@ func (m *mockGitFinder) Repo(path string) (*git.Repo, error) {
 	return m.repo, m.err
 }
 
-// --- Mock filesystem that fails on Remove ---
+// --- Mock filesystem that fails on Remove ---.
 type mockFailingFs struct {
 	afero.Fs
 	removeErr error
@@ -47,7 +49,7 @@ func (m *mockFailingFs) Remove(name string) error {
 	return m.removeErr
 }
 
-// --- Mock printer to capture output ---
+// --- Mock printer to capture output ---.
 type mockOutputPrinter struct {
 	output *[]string
 }
@@ -63,6 +65,7 @@ func (m *mockOutputPrinter) Println(args ...interface{}) {
 }
 
 func TestCleanCommand_Run(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		inputPath      string
@@ -86,8 +89,8 @@ func TestCleanCommand_Run(t *testing.T) {
 			inputPath: ".",
 			setupMocks: func(t *testing.T) (afero.Fs, *mockConfigManager, *mockGitFinder, string) {
 				fs := afero.NewMemMapFs()
-				repoRoot := "/test-repo"
-				fs.MkdirAll(path.Join(repoRoot, LogsFolder), 0755)
+				repoRoot := testRepoRoot
+				require.NoError(t, fs.MkdirAll(path.Join(repoRoot, LogsFolder), 0o755))
 				return fs, &mockConfigManager{
 					bruinHomeDir: "/test-bruin-home",
 					recreateErr:  errors.New("failed to recreate the home directory"),
@@ -112,8 +115,8 @@ func TestCleanCommand_Run(t *testing.T) {
 			inputPath: ".",
 			setupMocks: func(t *testing.T) (afero.Fs, *mockConfigManager, *mockGitFinder, string) {
 				fs := afero.NewMemMapFs()
-				repoRoot := "/test-repo"
-				fs.MkdirAll(path.Join(repoRoot, LogsFolder), 0755)
+				repoRoot := testRepoRoot
+				require.NoError(t, fs.MkdirAll(path.Join(repoRoot, LogsFolder), 0o755))
 				return fs, &mockConfigManager{
 						bruinHomeDir: "/test-bruin-home",
 					}, &mockGitFinder{
@@ -127,13 +130,14 @@ func TestCleanCommand_Run(t *testing.T) {
 			inputPath: ".",
 			setupMocks: func(t *testing.T) (afero.Fs, *mockConfigManager, *mockGitFinder, string) {
 				fs := afero.NewMemMapFs()
-				repoRoot := "/test-repo"
+				repoRoot := testRepoRoot
 				logsFolder := path.Join(repoRoot, LogsFolder)
-				fs.MkdirAll(logsFolder, 0755)
+				require.NoError(t, fs.MkdirAll(logsFolder, 0o755))
 				logFiles := []string{"test1.log", "test2.log", "test3.log"}
 				for _, f := range logFiles {
 					file, _ := fs.Create(path.Join(logsFolder, f))
-					file.WriteString("test log content")
+					_, err := file.WriteString("test log content")
+					require.NoError(t, err)
 					file.Close()
 				}
 				return fs, &mockConfigManager{
@@ -155,11 +159,12 @@ func TestCleanCommand_Run(t *testing.T) {
 					Fs:        afero.NewMemMapFs(),
 					removeErr: errors.New("permission denied"),
 				}
-				repoRoot := "/test-repo"
+				repoRoot := testRepoRoot
 				logsFolder := path.Join(repoRoot, LogsFolder)
-				fs.MkdirAll(logsFolder, 0755)
+				require.NoError(t, fs.MkdirAll(logsFolder, 0o755))
 				file, _ := fs.Create(path.Join(logsFolder, "test1.log"))
-				file.WriteString("test log content")
+				_, err := file.WriteString("test log content")
+				require.NoError(t, err)
 				file.Close()
 				return fs, &mockConfigManager{
 						bruinHomeDir: "/test-bruin-home",
@@ -170,18 +175,18 @@ func TestCleanCommand_Run(t *testing.T) {
 			expectedErr: "failed to remove file",
 		},
 		{
-			name:       "successful cleanup with uv cache",
-			inputPath:  ".",
+			name:         "successful cleanup with uv cache",
+			inputPath:    ".",
 			cleanUvCache: true,
 			setupMocks: func(t *testing.T) (afero.Fs, *mockConfigManager, *mockGitFinder, string) {
 				fs := afero.NewMemMapFs()
-				repoRoot := "/test-repo"
-				fs.MkdirAll(path.Join(repoRoot, LogsFolder), 0755)
+				repoRoot := testRepoRoot
+				require.NoError(t, fs.MkdirAll(path.Join(repoRoot, LogsFolder), 0o755))
 				return fs, &mockConfigManager{
-					bruinHomeDir: "/test-bruin-home",
-				}, &mockGitFinder{
-					repo: &git.Repo{Path: repoRoot},
-				}, repoRoot
+						bruinHomeDir: "/test-bruin-home",
+					}, &mockGitFinder{
+						repo: &git.Repo{Path: repoRoot},
+					}, repoRoot
 			},
 			expectedOutput: []string{"No log files found, nothing to clean up..."},
 		},
@@ -189,6 +194,7 @@ func TestCleanCommand_Run(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			fs, mockCM, mockGF, repoRoot := tt.setupMocks(t)
 
 			output := []string{}
