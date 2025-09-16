@@ -14,10 +14,23 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/user"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 )
+
+type colorPrinter struct {
+	c *color.Color
+}
+
+func (p *colorPrinter) Printf(format string, args ...interface{}) {
+	p.c.Printf(format, args...) // ignore return values
+}
+
+func (p *colorPrinter) Println(args ...interface{}) {
+	p.c.Println(args...)
+}
 
 func CleanCmd() *cli.Command {
 	return &cli.Command{
@@ -37,87 +50,118 @@ func CleanCmd() *cli.Command {
 				inputPath = "."
 			}
 
-			r := CleanCommand{
-				infoPrinter:  infoPrinter,
-				errorPrinter: errorPrinter,
-			}
+			r := NewCleanCommand(
+				user.NewConfigManager(afero.NewOsFs()),     // cm
+				&git.RepoFinder{},                          // gitFinder
+				afero.NewOsFs(),                            // fs
+				&colorPrinter{c: color.New(color.FgGreen)}, // infoPrinter
+				&colorPrinter{c: color.New(color.FgRed)},   // errorPrinter
+			)
 
-			return r.Run(inputPath, c.Bool("uv-cache"))
+			err := r.Run(inputPath, c.Bool("uv-cache"))
+			if err != nil {
+				return cli.Exit("", 1)
+			}
+			return nil
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
 	}
 }
 
-type CleanCommand struct {
-	cm         user.ConfigManager
-	fs         afero.Fs
-	infoPrinter  printer
-	errorPrinter printer
+type ConfigManager interface {
+	EnsureAndGetBruinHomeDir() (string, error)
+	RecreateHomeDir() error
 }
 
-func NewCleanCommand(
-	cm user.ConfigManager,
-	fs afero.Fs,
-	infoPrinter printer,
-	errorPrinter printer,
-) *CleanCommand {
+type GitFinder interface {
+	Repo(path string) (*git.Repo, error)
+}
+
+type Printer interface {
+	Printf(format string, a ...interface{})
+	Println(a ...interface{})
+}
+
+type CleanCommand struct {
+	cm           ConfigManager
+	gitFinder    GitFinder
+	fs           afero.Fs
+	infoPrinter  Printer
+	errorPrinter Printer
+}
+
+func NewCleanCommand(cm ConfigManager, gitFinder GitFinder, fs afero.Fs, info Printer, errPrinter Printer) *CleanCommand {
 	return &CleanCommand{
 		cm:           cm,
+		gitFinder:    gitFinder,
 		fs:           fs,
-		infoPrinter:  infoPrinter,
-		errorPrinter: errorPrinter,
+		infoPrinter:  info,
+		errorPrinter: errPrinter,
 	}
 }
 
-
 func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
-	bruinHomeDirAbsPath, err := r.cm.EnsureAndGetBruinHomeDir()
+	bruinHomeDir, err := r.cm.EnsureAndGetBruinHomeDir()
 	if err != nil {
 		return errors.Wrap(err, "failed to get bruin home directory")
 	}
 
-	// Clean uv caches if requested
 	if cleanUvCache {
-		if err := r.cleanUvCache(bruinHomeDirAbsPath); err != nil {
+		if err := r.cleanUvCache(bruinHomeDir); err != nil {
 			return err
 		}
 	}
 
-	err = r.cm.RecreateHomeDir()
-	if err != nil {
+	if err := r.cm.RecreateHomeDir(); err != nil {
 		return errors.Wrap(err, "failed to recreate the home directory")
 	}
 
-	repoRoot, err := git.FindRepoFromPath(inputPath)
+	repoRoot, err := r.gitFinder.Repo(inputPath)
 	if err != nil {
 		r.errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
-		return cli.Exit("", 1)
+		return errors.Wrap(err, "failed to find the git repository root")
 	}
 
 	logsFolder := path.Join(repoRoot.Path, LogsFolder)
 
-	contents, err := filepath.Glob(logsFolder + "/*.log")
+	// Check if logs folder exists
+	exists, err := afero.Exists(r.fs, logsFolder)
 	if err != nil {
-		return errors.Wrap(err, "failed to find the logs folder")
+		return errors.Wrap(err, "failed to check logs folder")
 	}
 
-	if len(contents) == 0 {
+	if !exists {
 		r.infoPrinter.Println("No log files found, nothing to clean up...")
 		return nil
 	}
 
-	r.infoPrinter.Printf("Found %d log files, cleaning them up...\n", len(contents))
+	// Read directory contents
+	entries, err := afero.ReadDir(r.fs, logsFolder)
+	if err != nil {
+		return errors.Wrap(err, "failed to read logs folder")
+	}
 
-	for _, f := range contents {
-		err := os.Remove(f)
-		if err != nil {
-			return errors.Wrapf(err, "failed to remove file: %s", f)
+	// Filter for .log files
+	var logFiles []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".log") {
+			logFiles = append(logFiles, path.Join(logsFolder, entry.Name()))
 		}
 	}
 
-	r.infoPrinter.Printf("Successfully removed %d log files.\n", len(contents))
+	if len(logFiles) == 0 {
+		r.infoPrinter.Println("No log files found, nothing to clean up...")
+		return nil
+	}
 
+	r.infoPrinter.Printf("Found %d log files, cleaning them up...\n", len(logFiles))
+	for _, f := range logFiles {
+		if err := r.fs.Remove(f); err != nil {
+			return errors.Wrapf(err, "failed to remove file: %s", f)
+		}
+	}
+	r.infoPrinter.Printf("Successfully removed %d log files.\n", len(logFiles))
 	return nil
 }
 
@@ -132,7 +176,7 @@ func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 
 	// Check if uv binary exists
 	if _, err := os.Stat(uvBinaryPath); os.IsNotExist(err) {
-		infoPrinter.Println("UV is not installed yet. Nothing to clean.")
+		r.infoPrinter.Println("UV is not installed yet. Nothing to clean.")
 		return nil
 	}
 
@@ -144,11 +188,11 @@ func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 
 	// Prompt user for confirmation
 	if !r.confirmUvCacheClean() {
-		infoPrinter.Println("UV cache cleaning cancelled by user.")
+		r.infoPrinter.Println("UV cache cleaning cancelled by user.")
 		return nil
 	}
 
-	infoPrinter.Println("Cleaning uv caches...")
+	r.infoPrinter.Println("Cleaning uv caches...")
 
 	cleanCmd := exec.Command(uvBinaryPath, "cache", "clean")
 	output, err := cleanCmd.CombinedOutput()
@@ -156,7 +200,7 @@ func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 		return errors.Wrapf(err, "failed to clean uv cache: %s", string(output))
 	}
 
-	infoPrinter.Println("Successfully cleaned uv caches.")
+	r.infoPrinter.Println("Successfully cleaned uv caches.")
 	return nil
 }
 
@@ -166,7 +210,7 @@ func (r *CleanCommand) confirmUvCacheClean() bool {
 
 	response, err := reader.ReadString('\n')
 	if err != nil {
-		errorPrinter.Printf("Error reading input: %v\n", err)
+		r.errorPrinter.Printf("Error reading input: %v\n", err)
 		return false
 	}
 
