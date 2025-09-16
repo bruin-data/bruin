@@ -1658,101 +1658,7 @@ func TestEnsureBigqueryQuerySensorHasQueryParameter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureBigQueryQuerySensorHasTableParameterForASingleAsset)(ctx, tt.p)
-			if !tt.wantErr(t, err) {
-				return
-			}
-
-			// I am doing this because I don't care if I get a nil or empty slice
-			if tt.want != nil {
-				gotMessages := make([]string, len(got))
-				for i, issue := range got {
-					gotMessages[i] = issue.Description
-				}
-
-				assert.Equal(t, tt.want, gotMessages)
-			} else {
-				assert.Equal(t, []*Issue{}, got)
-			}
-		})
-	}
-}
-
-func TestEnsureBigQueryTableSensorHasTableParameter(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		p       *pipeline.Pipeline
-		want    []string
-		wantErr assert.ErrorAssertionFunc
-	}{
-		{
-			name: "no table param",
-			p: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "task1",
-						Type: pipeline.AssetTypeBigqueryTableSensor,
-					},
-				},
-			},
-			wantErr: assert.NoError,
-			want:    []string{"BigQuery table sensor requires a `table` parameter"},
-		},
-		{
-			name: "table param exists but empty",
-			p: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "task1",
-						Type: pipeline.AssetTypeBigqueryTableSensor,
-						Parameters: map[string]string{
-							"table": "",
-						},
-					},
-				},
-			},
-			wantErr: assert.NoError,
-			want:    []string{"BigQuery table sensor `table` parameter must be either in the format `dataset.table` or `project.dataset.table`"},
-		},
-		{
-			name: "table param exists with dataset.table, valid",
-			p: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "task1",
-						Type: pipeline.AssetTypeBigqueryTableSensor,
-						Parameters: map[string]string{
-							"table": "a.b",
-						},
-					},
-				},
-			},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "no issues",
-			p: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "task1",
-						Type: pipeline.AssetTypeBigqueryTableSensor,
-						Parameters: map[string]string{
-							"table": "a.b.c",
-						},
-					},
-				},
-			},
-			wantErr: assert.NoError,
-		},
-	}
-	ctx := context.Background()
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			got, err := CallFuncForEveryAsset(EnsureTableSensorHasTableParameterForASingleAsset)(ctx, tt.p)
+			got, err := CallFuncForEveryAsset(EnsureBigQueryQuerySensorHasQueryParameterForASingleAsset)(ctx, tt.p)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -3226,6 +3132,465 @@ func TestValidateAssetSeedValidation_CaseInsensitive(t *testing.T) {
 			got, err := ValidateAssetSeedValidation(ctx, &pipeline.Pipeline{}, tt.asset)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestValidateTableSensorTableParameter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    []string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		// BigQuery tests
+		{
+			name: "BigQuery - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+			},
+			want:    []string{"BigQuery table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "BigQuery - empty table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+				Parameters: map[string]string{
+					"table": "",
+				},
+			},
+			want:    []string{"BigQuery table sensor `table` parameter contains empty components, '' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "BigQuery - invalid format (single component)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+				Parameters: map[string]string{
+					"table": "dataset",
+				},
+			},
+			want:    []string{"BigQuery table sensor `table` parameter must be in format `dataset.table` or `project.dataset.table`, 'dataset' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "BigQuery - invalid format (too many components)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+				Parameters: map[string]string{
+					"table": "project.dataset.table.extra",
+				},
+			},
+			want:    []string{"BigQuery table sensor `table` parameter must be in format `dataset.table` or `project.dataset.table`, 'project.dataset.table.extra' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "BigQuery - valid dataset.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+				Parameters: map[string]string{
+					"table": "dataset.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "BigQuery - valid project.dataset.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+				Parameters: map[string]string{
+					"table": "project.dataset.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Snowflake tests
+		{
+			name: "Snowflake - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSnowflakeTableSensor,
+			},
+			want:    []string{"Snowflake table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Snowflake - invalid format (single component)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSnowflakeTableSensor,
+				Parameters: map[string]string{
+					"table": "schema",
+				},
+			},
+			want:    []string{"Snowflake table sensor `table` parameter must be in format `schema.table` or `database.schema.table`, 'schema' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Snowflake - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSnowflakeTableSensor,
+				Parameters: map[string]string{
+					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Snowflake - valid database.schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSnowflakeTableSensor,
+				Parameters: map[string]string{
+					"table": "database.schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Databricks tests
+		{
+			name: "Databricks - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeDatabricksTableSensor,
+			},
+			want:    []string{"Databricks table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Databricks - invalid format (single component)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeDatabricksTableSensor,
+				Parameters: map[string]string{
+					"table": "table",
+				},
+			},
+			want:    []string{"Databricks table sensor `table` parameter must be in format `schema.table`, 'table' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Databricks - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeDatabricksTableSensor,
+				Parameters: map[string]string{
+					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Athena tests
+		{
+			name: "Athena - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeAthenaTableSensor,
+			},
+			want:    []string{"Athena table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Athena - invalid format (too many components)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeAthenaTableSensor,
+				Parameters: map[string]string{
+					"table": "database.table",
+				},
+			},
+			want:    []string{"Athena table sensor `table` parameter must be in format `table`, 'database.table' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Athena - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeAthenaTableSensor,
+				Parameters: map[string]string{
+					"table": "table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// PostgreSQL tests
+		{
+			name: "PostgreSQL - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypePostgresTableSensor,
+			},
+			want:    []string{"PostgreSQL table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "PostgreSQL - invalid format (too many components)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypePostgresTableSensor,
+				Parameters: map[string]string{
+					"table": "schema.table.extra",
+				},
+			},
+			want:    []string{"PostgreSQL table sensor `table` parameter must be in format `table` or `schema.table`, 'schema.table.extra' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "PostgreSQL - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypePostgresTableSensor,
+				Parameters: map[string]string{
+					"table": "table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "PostgreSQL - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypePostgresTableSensor,
+				Parameters: map[string]string{
+					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Redshift tests
+		{
+			name: "Redshift - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeRedshiftTableSensor,
+			},
+			want:    []string{"Redshift table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Redshift - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeRedshiftTableSensor,
+				Parameters: map[string]string{
+					"table": "table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Redshift - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeRedshiftTableSensor,
+				Parameters: map[string]string{
+					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// MS SQL tests
+		{
+			name: "MS SQL - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeMsSQLTableSensor,
+			},
+			want:    []string{"MS SQL table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "MS SQL - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeMsSQLTableSensor,
+				Parameters: map[string]string{
+					"table": "table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "MS SQL - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeMsSQLTableSensor,
+				Parameters: map[string]string{
+					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// ClickHouse tests
+		{
+			name: "ClickHouse - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeClickHouseTableSensor,
+			},
+			want:    []string{"ClickHouse table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "ClickHouse - invalid format (too many components)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeClickHouseTableSensor,
+				Parameters: map[string]string{
+					"table": "database.table.extra",
+				},
+			},
+			want:    []string{"ClickHouse table sensor `table` parameter must be in format `table` or `schema.table`, 'database.table.extra' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "ClickHouse - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeClickHouseTableSensor,
+				Parameters: map[string]string{
+					"table": "table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "ClickHouse - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeClickHouseTableSensor,
+				Parameters: map[string]string{
+					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Synapse tests
+		{
+			name: "Synapse - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSynapseTableSensor,
+			},
+			want:    []string{"Synapse table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Synapse - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSynapseTableSensor,
+				Parameters: map[string]string{
+					"table": "table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Synapse - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeSynapseTableSensor,
+				Parameters: map[string]string{
+					"table": "schema.table",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Non-table sensor asset types (should be skipped)
+		{
+			name: "Non-table sensor asset type is skipped",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryQuery,
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
+		// Edge cases
+		{
+			name: "Empty components in table name",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+				Parameters: map[string]string{
+					"table": "dataset..table",
+				},
+			},
+			want:    []string{"BigQuery table sensor `table` parameter contains empty components, 'dataset..table' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Leading/trailing dots",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeBigqueryTableSensor,
+				Parameters: map[string]string{
+					"table": ".dataset.table",
+				},
+			},
+			want:    []string{"BigQuery table sensor `table` parameter contains empty components, '.dataset.table' given"},
+			wantErr: assert.NoError,
+		},
+	}
+
+	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := CallFuncForEveryAsset(ValidateTableSensorTableParameter)(ctx, p)
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			// Convert issues to strings for comparison
+			if tt.want != nil {
+				gotMessages := make([]string, len(got))
+				for i, issue := range got {
+					gotMessages[i] = issue.Description
+				}
+				assert.Equal(t, tt.want, gotMessages)
+			} else {
+				assert.Equal(t, []*Issue{}, got)
+			}
 		})
 	}
 }
