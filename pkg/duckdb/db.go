@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -198,6 +199,13 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 				rowCount = int64(val)
 			case float64:
 				rowCount = int64(val)
+			case string:
+				// Handle string representation of numbers
+				parsed, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse row count string '%s' for table '%s': %w", val, tableName, err)
+				}
+				rowCount = parsed
 			default:
 				return nil, fmt.Errorf("unexpected row count type for table '%s': got %T with value %v", tableName, val, val)
 			}

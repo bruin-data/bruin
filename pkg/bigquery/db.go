@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -572,6 +573,13 @@ func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 				rowCount = int64(val)
 			case float64:
 				rowCount = int64(val)
+			case string:
+				// Handle string representation of numbers (common with BigQuery)
+				parsed, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse row count string '%s' for table '%s': %w", val, tableName, err)
+				}
+				rowCount = parsed
 			default:
 				return nil, fmt.Errorf("unexpected row count type for table '%s': got %T with value %v", tableName, val, val)
 			}
