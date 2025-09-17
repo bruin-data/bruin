@@ -455,16 +455,16 @@ var (
 	}
 )
 
-func ignoreApplyIntervalModifiers(c *cli.Command) (fullRefresh bool, applyIntervalModifiers bool) {
-	fullRefresh = c.Bool("full-refresh")
-	applyIntervalModifiers = c.Bool("apply-interval-modifiers")
+func getApplyIntervalModifiers(c *cli.Command) bool {
+	fullRefresh := c.Bool("full-refresh")
+	applyIntervalModifiers := c.Bool("apply-interval-modifiers")
 
 	if fullRefresh && applyIntervalModifiers {
 		warningPrinter.Println("Warning: --apply-interval-modifiers flag is ignored when --full-refresh is enabled.")
-		applyIntervalModifiers = false
+		return false
 	}
 
-	return fullRefresh, applyIntervalModifiers
+	return applyIntervalModifiers
 }
 
 func Run(isDebug *bool) *cli.Command {
@@ -604,7 +604,8 @@ func Run(isDebug *bool) *cli.Command {
 			defer RecoverFromPanic()
 
 			logger := makeLogger(*isDebug)
-			fullRefresh, applyIntervalModifiers := ignoreApplyIntervalModifiers(c)
+			fullRefresh := c.Bool("full-refresh")
+			applyIntervalModifiers := getApplyIntervalModifiers(c)
 
 			runConfig := &scheduler.RunConfig{
 				Downstream:             c.Bool("downstream"),
@@ -749,8 +750,14 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
-			// Re-determine start/end dates based on pipeline configuration and full-refresh flag
-			startDate, endDate, err = DetermineStartDates(runConfig.StartDate, runConfig.EndDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			// Re-determine start date based on pipeline configuration and full-refresh flag
+			startDate, err = DetermineStartDate(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			if err != nil {
+				return err
+			}
+
+			// Parse end date directly from CLI
+			endDate, err = date.ParseTime(runConfig.EndDate)
 			if err != nil {
 				return err
 			}
@@ -1026,8 +1033,8 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 	return startDate, endDate, nil
 }
 
-func DetermineStartDates(cliStartDate, cliEndDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, time.Time, error) {
-	var startDate, endDate time.Time
+func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, error) {
+	var startDate time.Time
 	var err error
 
 	// Start date logic
@@ -1035,37 +1042,30 @@ func DetermineStartDates(cliStartDate, cliEndDate string, pipeline *pipeline.Pip
 	case !fullRefresh:
 		startDate, err = date.ParseTime(cliStartDate)
 		if err != nil {
-			return time.Time{}, time.Time{}, err
+			return time.Time{}, err
 		}
 		logger.Debug("Using CLI start_date: ", cliStartDate)
 	case pipeline == nil:
 		startDate, err = date.ParseTime(cliStartDate)
 		if err != nil {
-			return time.Time{}, time.Time{}, err
+			return time.Time{}, err
 		}
 		logger.Debug("Using CLI start_date: ", cliStartDate)
 	case pipeline.StartDate == "":
 		startDate, err = date.ParseTime(cliStartDate)
 		if err != nil {
-			return time.Time{}, time.Time{}, err
+			return time.Time{}, err
 		}
 		logger.Debug("Using CLI start_date: ", cliStartDate)
 	default:
 		startDate, err = date.ParseTime(pipeline.StartDate)
 		if err != nil {
-			return time.Time{}, time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
+			return time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
 		}
 		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
 	}
 
-	// End date logic (always use CLI flag if provided)
-	endDate, err = date.ParseTime(cliEndDate)
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	logger.Debug("Using CLI end_date: ", cliEndDate)
-
-	return startDate, endDate, nil
+	return startDate, nil
 }
 
 func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger logger.Logger) (time.Time, time.Time, string, error) {

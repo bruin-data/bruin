@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -1688,12 +1689,15 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			}
 
 			// Call the actual implementation
-			actualStartDate, actualEndDate, err := DetermineStartDates(cliStartDate, cliEndDate, testPipeline, tt.fullRefresh, logger)
+			actualStartDate, err := DetermineStartDate(cliStartDate, testPipeline, tt.fullRefresh, logger)
+
+			// Parse end date separately
+			actualEndDate, endDateErr := date.ParseTime(cliEndDate)
 
 			if tt.expectedError {
 				// For error cases, we might get dates but they should be logically invalid
 				// (e.g., end date before start date)
-				if err == nil {
+				if err == nil && endDateErr == nil {
 					// If no parsing error, check if end date is before start date
 					assert.True(t, actualEndDate.Before(actualStartDate) || actualEndDate.Equal(actualStartDate), "Expected logical error: end date should be before or equal to start date")
 				}
@@ -1701,6 +1705,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			}
 
 			require.NoError(t, err, "Should not error for valid test case")
+			require.NoError(t, endDateErr, "Should not error for valid end date")
 
 			// Compare dates - allow some tolerance for time precision
 			assert.True(t, actualStartDate.Equal(tt.expectedStartDate) ||
