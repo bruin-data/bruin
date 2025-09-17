@@ -52,7 +52,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
-      - run: make test
+      - run: make test-coverage
 
 
   end2end:
@@ -73,8 +73,31 @@ jobs:
       - name: Install winget
         if: matrix.platform == 'windows-2022'
         uses: Cyberboss/install-winget@v1
-      - run: make integration-test
+      - run: make integration-test-coverage
         shell: bash
+
+  coverage-report:
+    needs: [test, end2end]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Go 
+        uses: antontroshin/setup-go@windows-go-mod-cache
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
+      - name: Generate Coverage Report
+        run: make coverage-report
+      - name: Upload Coverage Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage_unit.out
+            coverage_integration.out
+            coverage_data/
 
   dockerBuild:
     runs-on: ubuntu-latest

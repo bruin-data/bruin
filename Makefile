@@ -14,7 +14,7 @@ OS_ARCH:=$(shell go env GOOS)_$(shell go env GOARCH)
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations integration-test-cloud
+.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations integration-test-cloud test-coverage integration-test-coverage coverage-report
 all: clean deps test build
 
 deps: tools
@@ -68,6 +68,29 @@ integration-test-cloud: build
 	@cd integration-tests && git init
 	@cd integration-tests/cloud-integration-tests && env SILENT=1 go test -count=1 -v .
 
+integration-test-coverage: build
+	@echo "$(OK_COLOR)==> Building coverage-instrumented binary...$(NO_COLOR)"
+	@go build -cover -tags="no_duckdb_arrow" -o "$(BUILD_DIR)/$(NAME)-cover" "$(BUILD_SRC)"
+	@rm -rf coverage_data
+	@mkdir -p coverage_data
+	@rm -rf integration-tests/duckdb-files
+	@mkdir -p integration-tests/duckdb-files
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@rm -rf integration-tests/logs
+	@mkdir -p integration-tests/logs
+	@mkdir -p integration-tests/logs/exports
+	@mkdir -p integration-tests/logs/runs
+	@echo "$(OK_COLOR)==> Running integration tests with coverage...$(NO_COLOR)"
+	@cp "$(BUILD_DIR)/$(NAME)-cover" "$(BUILD_DIR)/$(NAME)"
+	@cd integration-tests && git init
+	@cd integration-tests && GOCOVERDIR=../coverage_data env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
+	@echo "$(OK_COLOR)==> Converting integration coverage data...$(NO_COLOR)"
+	@go tool covdata textfmt -i=coverage_data -o coverage_integration.out
+	@echo "$(OK_COLOR)==> Integration test coverage completed$(NO_COLOR)"
+
 clean:
 	@rm -rf ./bin
 
@@ -75,7 +98,11 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
+	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests')
+
+test-coverage:
+	@echo "$(OK_COLOR)==> Running unit tests with coverage$(NO_COLOR)"
+	@go test -tags="no_duckdb_arrow" -race -cover -coverprofile=coverage_unit.out -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
@@ -147,6 +174,38 @@ refresh-integration-expectations: build
 	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expected_connections_schema.json
 	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expected_connections.json
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
+
+coverage-report: test-coverage
+	@echo "$(OK_COLOR)==> Building coverage-instrumented binary for integration tests...$(NO_COLOR)"
+	@go build -cover -tags="no_duckdb_arrow" -o "$(BUILD_DIR)/$(NAME)-cover" "$(BUILD_SRC)"
+	@rm -rf coverage_data
+	@mkdir -p coverage_data
+	@rm -rf integration-tests/duckdb-files
+	@mkdir -p integration-tests/duckdb-files
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@rm -rf integration-tests/logs
+	@mkdir -p integration-tests/logs
+	@mkdir -p integration-tests/logs/exports
+	@mkdir -p integration-tests/logs/runs
+	@echo "$(OK_COLOR)==> Running integration tests with coverage...$(NO_COLOR)"
+	@cp "$(BUILD_DIR)/$(NAME)-cover" "$(BUILD_DIR)/$(NAME)"
+	@cd integration-tests && git init
+	@cd integration-tests && GOCOVERDIR=../coverage_data env SILENT=1 go test -tags="no_duckdb_arrow" -v -count=1 -run "^(TestIndividualTasks|TestWorkflowTasks)" .
+	@echo "$(OK_COLOR)==> Converting integration coverage data...$(NO_COLOR)"
+	@go tool covdata textfmt -i=coverage_data -o coverage_integration.out
+	@echo "$(OK_COLOR)==> Generating combined coverage report...$(NO_COLOR)"
+	@echo "📊 Coverage Summary"
+	@echo "=================="
+	@echo "Unit Tests:"
+	@go tool cover -func=coverage_unit.out | tail -1
+	@echo ""
+	@echo "Integration Tests:"
+	@go tool cover -func=coverage_integration.out | tail -1
+	@echo ""
+	@echo "$(OK_COLOR)==> Coverage report completed$(NO_COLOR)"
 
 # sometimes vendoring doesn't move the precompiled library
 duck-db-static-lib:
