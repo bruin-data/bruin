@@ -455,7 +455,7 @@ var (
 	}
 )
 
-func getApplyIntervalModifiers(c *cli.Command) bool {
+func setApplyIntervalModifiers(c *cli.Command) bool {
 	fullRefresh := c.Bool("full-refresh")
 	applyIntervalModifiers := c.Bool("apply-interval-modifiers")
 
@@ -605,7 +605,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			logger := makeLogger(*isDebug)
 			fullRefresh := c.Bool("full-refresh")
-			applyIntervalModifiers := getApplyIntervalModifiers(c)
+			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
 			runConfig := &scheduler.RunConfig{
 				Downstream:             c.Bool("downstream"),
