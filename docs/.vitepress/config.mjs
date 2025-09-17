@@ -41,6 +41,19 @@ export default withMermaid({
             gtag('config', 'G-VB8J5FETV5');`,
         ],
     ],
+    transformPageData(pageData) {
+        // Build the canonical URL for each page
+        const canonicalUrl = `https://getbruin.com/docs/bruin/${pageData.relativePath}`
+          .replace(/index\.md$/, '')
+          .replace(/\.md$/, '.html');
+        
+        // Add canonical link to every page's head
+        pageData.frontmatter.head ??= [];
+        pageData.frontmatter.head.push([
+          'link',
+          { rel: 'canonical', href: canonicalUrl }
+        ]);
+    },
     themeConfig: {
         outline: "deep",
         search: {
