@@ -176,7 +176,7 @@ func printWarningForOutput(output string, message string) {
 	}
 }
 
-// Asset type to connection type mapping
+// Asset type to connection type mapping.
 var assetTypeToConnectionMap = map[string]string{
 	"duckdb.sql":        "duckdb",
 	"duckdb.seed":       "duckdb",
@@ -214,6 +214,8 @@ var assetTypeToConnectionMap = map[string]string{
 	"spanner.source":    "spanner",
 }
 
+const unknownConnectionType = "unknown"
+
 var knownConnections = []string{
 	"duckdb", "bigquery", "postgres", "snowflake", "mysql", "mssql",
 	"clickhouse", "athena", "databricks", "oracle", "sqlite", "trino",
@@ -222,24 +224,24 @@ var knownConnections = []string{
 
 func getConnectionTypeFromAssetType(assetType string) string {
 	if assetType == "" {
-		return "unknown"
+		return unknownConnectionType
 	}
 
 	if connType, exists := assetTypeToConnectionMap[assetType]; exists {
 		return connType
 	}
 
-	return "unknown"
+	return unknownConnectionType
 }
 
 func getConnectionType(conn interface{}) string {
 	if conn == nil {
-		return "unknown"
+		return unknownConnectionType
 	}
 
 	connType := reflect.TypeOf(conn)
 	if connType == nil {
-		return "unknown"
+		return unknownConnectionType
 	}
 
 	if connType.Kind() == reflect.Ptr {
@@ -254,7 +256,7 @@ func getConnectionType(conn interface{}) string {
 		}
 	}
 
-	return "unknown"
+	return unknownConnectionType
 }
 
 func formatValue(val interface{}, connectionType string) string {
@@ -269,15 +271,15 @@ func formatValue(val interface{}, connectionType string) string {
 		case float32:
 			return fmt.Sprintf("%g", v)
 		case int64:
-			return fmt.Sprintf("%d", v)
+			return strconv.FormatInt(v, 10)
 		case int32:
-			return fmt.Sprintf("%d", v)
+			return strconv.FormatInt(int64(v), 10)
 		case int:
-			return fmt.Sprintf("%d", v)
+			return strconv.Itoa(v)
 		case string:
 			return v
 		case bool:
-			return fmt.Sprintf("%t", v)
+			return strconv.FormatBool(v)
 		default:
 			return fmt.Sprintf("%v", val)
 		}
@@ -289,15 +291,15 @@ func formatValue(val interface{}, connectionType string) string {
 	case float32:
 		return fmt.Sprintf("%g", v)
 	case int64:
-		return fmt.Sprintf("%d", v)
+		return strconv.FormatInt(v, 10)
 	case int32:
-		return fmt.Sprintf("%d", v)
+		return strconv.FormatInt(int64(v), 10)
 	case int:
-		return fmt.Sprintf("%d", v)
+		return strconv.Itoa(v)
 	case string:
 		return v
 	case bool:
-		return fmt.Sprintf("%t", v)
+		return strconv.FormatBool(v)
 	default:
 		rv := reflect.ValueOf(val)
 		if rv.Kind() == reflect.Struct {
@@ -344,7 +346,7 @@ func formatValue(val interface{}, connectionType string) string {
 						}
 
 						divisor := 1.0
-						for i := 0; i < scaleInt; i++ {
+						for range scaleInt {
 							divisor *= 10
 						}
 						return fmt.Sprintf("%g", floatValue/divisor)
@@ -365,7 +367,7 @@ func formatValue(val interface{}, connectionType string) string {
 				if scale, err := strconv.Atoi(scaleStr); err == nil {
 					if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
 						divisor := 1.0
-						for i := 0; i < scale; i++ {
+						for range scale {
 							divisor *= 10
 						}
 						return fmt.Sprintf("%g", value/divisor)
