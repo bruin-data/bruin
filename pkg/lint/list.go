@@ -119,12 +119,18 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Severity:         ValidatorSeverityCritical,
 			AssetValidator:   EnsureSnowflakeSensorHasQueryParameterForASingleAsset,
 			ApplicableLevels: []Level{LevelAsset},
-		},
-		&SimpleRule{
-			Identifier:       "valid-bigquery-table-sensor",
+		}, &SimpleRule{
+			Identifier:       "valid-bigquery-query-sensor",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
-			AssetValidator:   EnsureTableSensorHasTableParameterForASingleAsset,
+			AssetValidator:   EnsureBigQueryQuerySensorHasQueryParameterForASingleAsset,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
+			Identifier:       "valid-table-sensor-table",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateTableSensorTableParameter,
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{

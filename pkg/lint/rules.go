@@ -1070,7 +1070,19 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeSynapseTableSensor:    true,
 }
 
-func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+var platformNames = map[pipeline.AssetType]string{
+	pipeline.AssetTypeBigqueryTableSensor:   "BigQuery",
+	pipeline.AssetTypeSnowflakeTableSensor:  "Snowflake",
+	pipeline.AssetTypeDatabricksTableSensor: "Databricks",
+	pipeline.AssetTypeAthenaTableSensor:     "Athena",
+	pipeline.AssetTypePostgresTableSensor:   "PostgreSQL",
+	pipeline.AssetTypeRedshiftTableSensor:   "Redshift",
+	pipeline.AssetTypeMsSQLTableSensor:      "MS SQL",
+	pipeline.AssetTypeClickHouseTableSensor: "ClickHouse",
+	pipeline.AssetTypeSynapseTableSensor:    "Synapse",
+}
+
+func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if !TableSensorAllowedAssetTypes[asset.Type] {
 		return issues, nil
@@ -1078,24 +1090,103 @@ func EnsureTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *p
 
 	table, ok := asset.Parameters["table"]
 	if !ok {
+		platformName := platformNames[asset.Type]
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "BigQuery table sensor requires a `table` parameter",
+			Description: platformName + " table sensor requires a `table` parameter",
 		})
 		return issues, nil
 	}
-	tableItems := strings.Split(table, ".")
 
-	if len(tableItems) != 2 && len(tableItems) != 3 {
+	// Validate table name format based on database type
+	validationError := validateTableNameFormat(asset.Type, table)
+	if validationError != "" {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "BigQuery table sensor `table` parameter must be either in the format `dataset.table` or `project.dataset.table`",
+			Description: validationError,
 		})
 	}
 	return issues, nil
 }
 
-func EnsureBigQueryQuerySensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+type TableNameValidationRule struct {
+	MinComponents int
+	MaxComponents int
+	FormatDesc    string
+}
+
+var tableNameValidationRules = map[string]TableNameValidationRule{
+	"BigQuery": {
+		MinComponents: 2,
+		MaxComponents: 3,
+		FormatDesc:    "`dataset.table` or `project.dataset.table`",
+	},
+	"Snowflake": {
+		MinComponents: 2,
+		MaxComponents: 3,
+		FormatDesc:    "`schema.table` or `database.schema.table`",
+	},
+	"Databricks": {
+		MinComponents: 2,
+		MaxComponents: 2,
+		FormatDesc:    "`schema.table`",
+	},
+	"Athena": {
+		MinComponents: 1,
+		MaxComponents: 1,
+		FormatDesc:    "`table`",
+	},
+	"PostgreSQL": {
+		MinComponents: 1,
+		MaxComponents: 2,
+		FormatDesc:    "`table` or `schema.table`",
+	},
+	"Redshift": {
+		MinComponents: 1,
+		MaxComponents: 2,
+		FormatDesc:    "`table` or `schema.table`",
+	},
+	"MS SQL": {
+		MinComponents: 1,
+		MaxComponents: 2,
+		FormatDesc:    "`table` or `schema.table`",
+	},
+	"ClickHouse": {
+		MinComponents: 1,
+		MaxComponents: 2,
+		FormatDesc:    "`table` or `schema.table`",
+	},
+	"Synapse": {
+		MinComponents: 1,
+		MaxComponents: 2,
+		FormatDesc:    "`table` or `schema.table`",
+	},
+}
+
+func validateTableNameFormat(assetType pipeline.AssetType, tableName string) string {
+	tableItems := strings.Split(tableName, ".")
+	platformName := platformNames[assetType]
+
+	for _, component := range tableItems {
+		if component == "" {
+			return fmt.Sprintf("%s table sensor `table` parameter contains empty components, '%s' given", platformName, tableName)
+		}
+	}
+
+	rule, exists := tableNameValidationRules[platformName]
+	if !exists {
+		return fmt.Sprintf("Table sensor is not supported for this asset type %s", assetType)
+	}
+
+	componentCount := len(tableItems)
+	if componentCount < rule.MinComponents || componentCount > rule.MaxComponents {
+		return fmt.Sprintf("%s table sensor `table` parameter must be in format %s, '%s' given", platformName, rule.FormatDesc, tableName)
+	}
+
+	return ""
+}
+
+func EnsureBigQueryQuerySensorHasQueryParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type != pipeline.AssetTypeBigqueryQuerySensor {
 		return issues, nil
