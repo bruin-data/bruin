@@ -1,0 +1,4 @@
+name: start-date-flags-test
+start_date: "2023-06-15"
+default_connections:
+    duckdb: "duckdb-start-date-flags"

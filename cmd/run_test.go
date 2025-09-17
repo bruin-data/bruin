@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"errors"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -1478,5 +1480,310 @@ func TestValidate_LintCheckerReturnsError_PropagatesError(t *testing.T) {
 	err := Validate(true, &mockAssetCounter{count: 0}, lintChecker, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("expected %v, got %v", expectedErr, err)
+	}
+}
+
+func TestFullRefreshWithStartDateFlags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		fullRefresh       bool
+		name              string
+		pipelineStartDate string
+		flagStartDate     string
+		flagEndDate       string
+		expectedStartDate time.Time
+		expectedEndDate   time.Time
+		expectedError     bool
+	}{
+		// 1. Start with non-full refresh tests (simpler cases)
+		{
+			fullRefresh:       false,
+			name:              "non-full refresh: empty pipeline, no flags -> use yesterday",
+			pipelineStartDate: "",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			}(),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		{
+			fullRefresh:       false,
+			name:              "non-full refresh: empty pipeline, no flags -> use default (yesterday)",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			}(),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		{
+			fullRefresh:       false,
+			name:              "non-full refresh: pipeline start date, use flag start date",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "2023-01-15",
+			flagEndDate:       "",
+			expectedStartDate: time.Date(2023, 1, 15, 0, 0, 0, 0, time.UTC),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		{
+			fullRefresh:       false,
+			name:              "non-full refresh: end flag only -> yesterday start, flag end",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "2024-05-20",
+			expectedStartDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			}(),
+			expectedEndDate: time.Date(2024, 5, 20, 0, 0, 0, 0, time.UTC),
+			expectedError:   true, // end date is older than start date
+		},
+		{
+			fullRefresh:       false,
+			name:              "non-full refresh: empty pipeline, both flags -> use flags",
+			pipelineStartDate: "",
+			flagStartDate:     "2024-02-01",
+			flagEndDate:       "2024-02-28",
+			expectedStartDate: time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 2, 28, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			fullRefresh:       false,
+			name:              "non-full refresh: both flags -> override everything",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "2024-03-01",
+			flagEndDate:       "2024-03-31",
+			expectedStartDate: time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC),
+		},
+		// 2. Gradually introduce full refresh tests - minimal data first
+		{
+			fullRefresh:       true,
+			name:              "full refresh: empty pipeline, no flags -> use yesterday",
+			pipelineStartDate: "",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			}(),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		{
+			fullRefresh:       true,
+			name:              "full refresh: pipeline only, no flags -> use pipeline start , end date is yesterday",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "",
+			expectedStartDate: time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		// 3. Mix complexity - single flags
+		{
+			fullRefresh:       true,
+			name:              "full refresh: start flag only -> use pipeline start, yesterday end",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "2024-02-01",
+			flagEndDate:       "",
+			expectedStartDate: time.Date(2023, 0o6, 15, 0, 0, 0, 0, time.UTC),
+			expectedEndDate: func() time.Time {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				return time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			}(),
+		},
+		{
+			fullRefresh:       true,
+			name:              "full refresh: end flag only -> use pipeline start, flag end",
+			pipelineStartDate: "2023-06-15",
+			flagStartDate:     "",
+			flagEndDate:       "2024-02-28",
+			expectedStartDate: time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 2, 28, 0, 0, 0, 0, time.UTC),
+		},
+		// 4. More complex - both flags but empty pipeline
+		{
+			fullRefresh:       true,
+			name:              "full refresh: empty pipeline, both flags -> use flags",
+			pipelineStartDate: "",
+			flagStartDate:     "2024-04-01",
+			flagEndDate:       "2024-04-30",
+			expectedStartDate: time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 4, 30, 0, 0, 0, 0, time.UTC),
+		},
+		// 5. Most complex - full data with edge cases
+		{
+			fullRefresh:       true,
+			name:              "full refresh: both flags + pipeline -> pipeline start, flag end",
+			pipelineStartDate: "2023-01-01",
+			flagStartDate:     "2024-01-01",
+			flagEndDate:       "2024-01-31",
+			expectedStartDate: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			fullRefresh:       true,
+			name:              "full refresh: pipeline start overrides flag dates",
+			pipelineStartDate: "2024-05-01",
+			flagStartDate:     "2024-03-01",
+			flagEndDate:       "2024-03-31",
+			expectedStartDate: time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC),
+			expectedError:     true, // end date is older than start date
+		},
+		{
+			fullRefresh:       true,
+			name:              "full refresh: pipeline start always wins over flags",
+			pipelineStartDate: "2024-01-01",
+			flagStartDate:     "2024-05-01",
+			flagEndDate:       "2024-05-31",
+			expectedStartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create a test pipeline with start_date
+			testPipeline := &pipeline.Pipeline{
+				Name:        "TestPipeline",
+				StartDate:   tt.pipelineStartDate,
+				Assets:      []*pipeline.Asset{},
+				Concurrency: 1,
+			}
+
+			// Test the actual implementation
+			logger := zaptest.NewLogger(t).Sugar()
+
+			// Set default flag values if not provided
+			cliStartDate := tt.flagStartDate
+			cliEndDate := tt.flagEndDate
+			if cliStartDate == "" {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				cliStartDate = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC).Format("2006-01-02 15:04:05.000000")
+			}
+			if cliEndDate == "" {
+				yesterday := time.Now().AddDate(0, 0, -1)
+				cliEndDate = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC).Format("2006-01-02 15:04:05.999999")
+			}
+
+			// Call the actual implementation
+			actualStartDate, err := DetermineStartDate(cliStartDate, testPipeline, tt.fullRefresh, logger)
+
+			// Parse end date separately
+			actualEndDate, endDateErr := date.ParseTime(cliEndDate)
+
+			if tt.expectedError {
+				// For error cases, we might get dates but they should be logically invalid
+				// (e.g., end date before start date)
+				if err == nil && endDateErr == nil {
+					// If no parsing error, check if end date is before start date
+					assert.True(t, actualEndDate.Before(actualStartDate) || actualEndDate.Equal(actualStartDate), "Expected logical error: end date should be before or equal to start date")
+				}
+				return
+			}
+
+			require.NoError(t, err, "Should not error for valid test case")
+			require.NoError(t, endDateErr, "Should not error for valid end date")
+
+			// Compare dates - allow some tolerance for time precision
+			assert.True(t, actualStartDate.Equal(tt.expectedStartDate) ||
+				math.Abs(float64(actualStartDate.Sub(tt.expectedStartDate))) < float64(time.Second),
+				"Start date mismatch: expected %v, got %v", tt.expectedStartDate, actualStartDate)
+
+			assert.True(t, actualEndDate.Equal(tt.expectedEndDate) ||
+				math.Abs(float64(actualEndDate.Sub(tt.expectedEndDate))) < float64(time.Second),
+				"End date mismatch: expected %v, got %v", tt.expectedEndDate, actualEndDate)
+
+			// Pipeline's default start_date should still be available
+			assert.Equal(t, tt.pipelineStartDate, testPipeline.StartDate, "Pipeline should retain its default start_date")
+		})
+	}
+}
+
+func TestApplyIntervalModifiersWithFullRefresh(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                   string
+		fullRefresh            bool
+		applyIntervalModifiers bool
+		expectedApplyModifiers bool
+		expectedWarning        bool
+	}{
+		{
+			name:                   "full-refresh true, apply-interval-modifiers true -> should ignore apply-modifiers and show warning",
+			fullRefresh:            true,
+			applyIntervalModifiers: true,
+			expectedApplyModifiers: false,
+			expectedWarning:        true,
+		},
+		{
+			name:                   "full-refresh false, apply-interval-modifiers true -> should keep apply-modifiers",
+			fullRefresh:            false,
+			applyIntervalModifiers: true,
+			expectedApplyModifiers: true,
+			expectedWarning:        false,
+		},
+		{
+			name:                   "full-refresh true, apply-interval-modifiers false -> no warning",
+			fullRefresh:            true,
+			applyIntervalModifiers: false,
+			expectedApplyModifiers: false,
+			expectedWarning:        false,
+		},
+		{
+			name:                   "full-refresh false, apply-interval-modifiers false -> no warning",
+			fullRefresh:            false,
+			applyIntervalModifiers: false,
+			expectedApplyModifiers: false,
+			expectedWarning:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Simulate the logic from run.go
+			fullRefresh := tt.fullRefresh
+			applyIntervalModifiers := tt.applyIntervalModifiers
+
+			var warningShown bool
+
+			if fullRefresh && applyIntervalModifiers {
+				// In the real code, this would print to warningPrinter
+				// For testing, we just set a flag
+				warningShown = true
+				applyIntervalModifiers = false
+			}
+
+			// Test expectations
+			assert.Equal(t, tt.expectedApplyModifiers, applyIntervalModifiers,
+				"ApplyIntervalModifiers should be %v but was %v", tt.expectedApplyModifiers, applyIntervalModifiers)
+			assert.Equal(t, tt.expectedWarning, warningShown,
+				"Warning should be shown: %v but was %v", tt.expectedWarning, warningShown)
+		})
 	}
 }

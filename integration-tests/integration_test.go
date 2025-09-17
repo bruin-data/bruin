@@ -1740,6 +1740,101 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "start_date_flags_workflow",
+			workflow: e2e.Workflow{
+				Name: "start_date_flags_workflow",
+				Steps: []e2e.Task{
+					{
+						Name:    "start-date-flags: run with start-date and end-date",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture", "Finished: date_range_analysis"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:          "start-date-flags: validate flag was used",
+						Command:       binary,
+						Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
+						Env:           []string{},
+						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/flag_start_date_used.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+					{
+						Name:    "start-date-flags: run with full-refresh override",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture", "Finished: date_range_analysis"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:          "start-date-flags: validate pipeline was used",
+						Command:       binary,
+						Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
+						Env:           []string{},
+						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/pipeline_start_date_used.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+					{
+						Name:    "start-date-flags: run with full-refresh no start-date flag",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture", "Finished: date_range_analysis"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:          "start-date-flags: validate pipeline start-date used when no flag",
+						Command:       binary,
+						Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
+						Env:           []string{},
+						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/pipeline_start_date_no_flag.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
