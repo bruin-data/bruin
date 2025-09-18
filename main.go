@@ -74,6 +74,7 @@ func main() {
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
 			cmd.Import(),
+			cmd.CalculatorCmd(),
 			mcp.MCPCmd(),
 			versionCommand,
 		},

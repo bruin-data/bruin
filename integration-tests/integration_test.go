@@ -1015,6 +1015,38 @@ func TestIndividualTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "calculator-add",
+			task: e2e.Task{
+				Name:    "calculator-add",
+				Command: binary,
+				Args:    []string{"calculator"},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"5 + 3 = 8"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "calculator-multiply",
+			task: e2e.Task{
+				Name:    "calculator-multiply",
+				Command: binary,
+				Args:    []string{"calculator", "--operation", "multiply", "--a", "4", "--b", "7"},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"4 * 7 = 28"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
