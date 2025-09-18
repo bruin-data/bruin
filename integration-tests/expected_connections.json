@@ -515,6 +515,17 @@
         ]
       },
       "schema_prefix": ""
+    },
+    "env-float-test": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-float-test",
+            "path": "duckdb-files/float-test.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     }
   }
 }

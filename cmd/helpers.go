@@ -264,27 +264,32 @@ func formatValue(val interface{}, connectionType string) string {
 		return ""
 	}
 
-	if connectionType != "duckdb" {
-		switch v := val.(type) {
-		case float64:
-			return fmt.Sprintf("%g", v)
-		case float32:
-			return fmt.Sprintf("%g", v)
-		case int64:
-			return strconv.FormatInt(v, 10)
-		case int32:
-			return strconv.FormatInt(int64(v), 10)
-		case int:
-			return strconv.Itoa(v)
-		case string:
-			return v
-		case bool:
-			return strconv.FormatBool(v)
-		default:
-			return fmt.Sprintf("%v", val)
-		}
+	if connectionType == "duckdb" {
+		return formatValueForDuckDB(val)
 	}
 
+	switch v := val.(type) {
+	case float64:
+		return fmt.Sprintf("%g", v)
+	case float32:
+		return fmt.Sprintf("%g", v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case int32:
+		return strconv.FormatInt(int64(v), 10)
+	case int:
+		return strconv.Itoa(v)
+	case string:
+		return v
+	case bool:
+		return strconv.FormatBool(v)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+
+func formatValueForDuckDB(val interface{}) string {
 	switch v := val.(type) {
 	case float64:
 		return fmt.Sprintf("%g", v)
@@ -388,7 +393,7 @@ func formatValue(val interface{}, connectionType string) string {
 		if rv.Kind() == reflect.Slice && rv.Len() == 1 {
 			elem := rv.Index(0)
 			if elem.CanInterface() {
-				return formatValue(elem.Interface(), connectionType)
+				return formatValue(elem.Interface(), "duckdb")
 			}
 		}
 
