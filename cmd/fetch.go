@@ -192,7 +192,11 @@ func Query() *cli.Command {
 					for _, row := range result.Rows {
 						rowStrings := make([]string, len(row))
 						for i, val := range row {
-							rowStrings[i] = fmt.Sprintf("%v", val)
+							if val == nil {
+								rowStrings[i] = "<nil>"
+							} else {
+								rowStrings[i] = fmt.Sprintf("%v", val)
+							}
 						}
 						if err = writer.Write(rowStrings); err != nil {
 							return handleError(output, errors.Wrap(err, "failed to write CSV row"))
