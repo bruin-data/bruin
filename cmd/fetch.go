@@ -193,7 +193,7 @@ func Query() *cli.Command {
 						rowStrings := make([]string, len(row))
 						for i, val := range row {
 							if val == nil {
-								rowStrings[i] = "<nil>"
+								rowStrings[i] = ""
 							} else {
 								rowStrings[i] = fmt.Sprintf("%v", val)
 							}
@@ -577,7 +577,11 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	for _, row := range results.Rows {
 		rowStrings := make([]string, len(row))
 		for i, val := range row {
-			rowStrings[i] = fmt.Sprintf("%v", val)
+			if val == nil {
+				rowStrings[i] = ""
+			} else {
+				rowStrings[i] = fmt.Sprintf("%v", val)
+			}
 		}
 		if err = writer.Write(rowStrings); err != nil {
 			return "", err
