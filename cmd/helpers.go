@@ -288,7 +288,6 @@ func formatValue(val interface{}, connectionType string) string {
 	}
 }
 
-
 func formatValueForDuckDB(val interface{}) string {
 	switch v := val.(type) {
 	case float64:
