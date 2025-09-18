@@ -451,6 +451,35 @@ var builtinRules = map[string]validators{
 	"query-matches-columns": {
 		Asset: noopAssetValidator,
 	},
+	"meta-keys-must-be-strings": {
+		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			var issues []*Issue
+
+			// Validate asset meta keys
+			for key := range asset.Meta {
+				if key == "" {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Asset meta keys cannot be empty strings",
+					})
+				}
+			}
+
+			// Validate column meta keys
+			for _, col := range asset.Columns {
+				for key := range col.Meta {
+					if key == "" {
+						issues = append(issues, &Issue{
+							Task:        asset,
+							Description: "Column '" + col.Name + "' meta keys cannot be empty strings",
+						})
+					}
+				}
+			}
+
+			return issues, nil
+		},
+	},
 }
 
 func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
