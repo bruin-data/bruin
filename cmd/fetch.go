@@ -139,8 +139,6 @@ func Query() *cli.Command {
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 				}
-				// Determine connection type from asset type (more reliable than reflection)
-				// Fall back to reflection if assetType is empty (direct query mode)
 				var connectionType string
 				if assetType != "" {
 					connectionType = getConnectionTypeFromAssetType(string(assetType))
