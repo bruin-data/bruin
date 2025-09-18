@@ -84,5 +84,6 @@ func main() {
 
 	if err != nil {
 		cli.HandleExitCoder(err)
+		os.Exit(1)
 	}
 }
