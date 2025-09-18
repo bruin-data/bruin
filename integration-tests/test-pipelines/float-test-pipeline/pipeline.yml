@@ -1,0 +1,10 @@
+name: float-test-pipeline
+description: Test pipeline for float value formatting across different connection modes
+
+default_connections:
+  duckdb: "duckdb-float-test"
+
+assets:
+  - name: float_test_asset
+    type: duckdb.sql
+    path: assets/float_test_asset.sql

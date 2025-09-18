@@ -1015,6 +1015,54 @@ func TestIndividualTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "query-float-direct-connection",
+			task: e2e.Task{
+				Name:    "query-float-direct-connection",
+				Command: binary,
+				Args:    []string{"query", "--connection", "duckdb-default", "--query", "SELECT 1.5 as float_value, 2.0 as another_float, 3.14159 as pi"},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"1.5", "2", "3.14159"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "query-float-different-connection",
+			task: e2e.Task{
+				Name:    "query-float-different-connection",
+				Command: binary,
+				Args:    []string{"query", "--connection", "duckdb-variables", "--query", "SELECT 4.5 as custom_float, 5.0 as another_custom, 0.001 as small_float"},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"4.5", "5", "0.001"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "query-float-complex-values",
+			task: e2e.Task{
+				Name:    "query-float-complex-values",
+				Command: binary,
+				Args:    []string{"query", "--connection", "duckdb-default", "--query", "SELECT 123.456 as complex_float, 0.0001 as very_small, 999.999 as large_decimal"},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"123.456", "0.0001", "999.999"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

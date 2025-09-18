@@ -124,6 +124,7 @@ func Query() *cli.Command {
 
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
+			//nolint:nestif
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
@@ -138,11 +139,18 @@ func Query() *cli.Command {
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 				}
+				var connectionType string
+				if assetType != "" {
+					connectionType = getConnectionTypeFromAssetType(string(assetType))
+				} else {
+					connectionType = getConnectionType(conn)
+				}
+
 				// Output result based on format specified
 				inputPath := c.String("asset")
 				var resultsPath string
 				if c.Bool("export") {
-					resultsPath, err = exportResultsToCSV(result, inputPath)
+					resultsPath, err = exportResultsToCSV(result, inputPath, connectionType)
 					if err != nil {
 						return handleError(c.String("output"), errors.Wrap(err, "failed to export results to CSV"))
 					}
@@ -152,7 +160,7 @@ func Query() *cli.Command {
 				output := c.String("output")
 				switch output {
 				case outputFormatPlain:
-					printTable(result.Columns, result.Rows)
+					printTable(result.Columns, result.Rows, connectionType)
 				case "json":
 					type jsonResponse struct {
 						Columns  []map[string]string `json:"columns"`
@@ -192,7 +200,7 @@ func Query() *cli.Command {
 					for _, row := range result.Rows {
 						rowStrings := make([]string, len(row))
 						for i, val := range row {
-							rowStrings[i] = fmt.Sprintf("%v", val)
+							rowStrings[i] = formatValue(val, connectionType)
 						}
 						if err = writer.Write(rowStrings); err != nil {
 							return handleError(output, errors.Wrap(err, "failed to write CSV row"))
@@ -444,7 +452,7 @@ func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlpar
 	return limitedQuery
 }
 
-func printTable(columnNames []string, rows [][]interface{}) {
+func printTable(columnNames []string, rows [][]interface{}, connectionType string) {
 	if len(rows) == 0 {
 		fmt.Println("No data available")
 		return
@@ -462,7 +470,7 @@ func printTable(columnNames []string, rows [][]interface{}) {
 	for _, row := range rows {
 		rowData := make(table.Row, len(row))
 		for i, cell := range row {
-			rowData[i] = fmt.Sprintf("%v", cell)
+			rowData[i] = formatValue(cell, connectionType)
 		}
 		t.AppendRow(rowData)
 	}
@@ -539,7 +547,7 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs, con
 	}, nil
 }
 
-func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, error) {
+func exportResultsToCSV(results *query.QueryResult, inputPath string, connectionType string) (string, error) {
 	if inputPath == "" {
 		inputPath = "."
 	}
@@ -573,7 +581,7 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	for _, row := range results.Rows {
 		rowStrings := make([]string, len(row))
 		for i, val := range row {
-			rowStrings[i] = fmt.Sprintf("%v", val)
+			rowStrings[i] = formatValue(val, connectionType)
 		}
 		if err = writer.Write(rowStrings); err != nil {
 			return "", err

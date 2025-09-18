@@ -242,3 +242,9 @@ environments:
       duckdb:
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
+  
+  env-float-test:
+    connections:
+      duckdb:
+        - name: "duckdb-float-test"
+          path: "duckdb-files/float-test.db"
