@@ -290,3 +290,278 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolin
 		assert.Empty(t, issues, "This test alone cannot distinguish between working and broken cloneForAsset")
 	})
 }
+
+func TestMetaKeysMustBeStrings(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	t.Run("returns no issues when meta keys are valid strings", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+			Meta: map[string]string{
+				"data_classification": "confidential",
+				"business_owner":      "finance-team",
+				"retention_days":      "365",
+			},
+			Columns: []pipeline.Column{
+				{
+					Name: "id",
+					Meta: map[string]string{
+						"pii":           "true",
+						"encryption":    "required",
+						"source_system": "user-service",
+					},
+				},
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		validator := lint.GetBuiltinRule("meta-keys-must-be-strings")
+		issues, err := validator.Asset(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("returns issues when asset has empty meta keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+			Meta: map[string]string{
+				"":                    "empty_key_value",
+				"data_classification": "confidential",
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		validator := lint.GetBuiltinRule("meta-keys-must-be-strings")
+		issues, err := validator.Asset(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "Asset meta keys cannot be empty strings", issues[0].Description)
+	})
+
+	t.Run("returns issues when columns have empty meta keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+			Columns: []pipeline.Column{
+				{
+					Name: "user_id",
+					Meta: map[string]string{
+						"":    "empty_key_value",
+						"pii": "true",
+					},
+				},
+				{
+					Name: "email",
+					Meta: map[string]string{
+						"":           "empty_key_in_second_column",
+						"encryption": "required",
+					},
+				},
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		validator := lint.GetBuiltinRule("meta-keys-must-be-strings")
+		issues, err := validator.Asset(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		require.Len(t, issues, 2)
+
+		// Check that all issues mention the correct column names
+		issueDescriptions := make([]string, len(issues))
+		for i, issue := range issues {
+			issueDescriptions[i] = issue.Description
+		}
+
+		assert.Contains(t, issueDescriptions, "Column 'user_id' meta keys cannot be empty strings")
+		assert.Contains(t, issueDescriptions, "Column 'email' meta keys cannot be empty strings")
+	})
+
+	t.Run("returns issues for both asset and column empty meta keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+			Meta: map[string]string{
+				"":                    "empty_asset_key",
+				"data_classification": "confidential",
+			},
+			Columns: []pipeline.Column{
+				{
+					Name: "id",
+					Meta: map[string]string{
+						"":    "empty_column_key",
+						"pii": "true",
+					},
+				},
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		validator := lint.GetBuiltinRule("meta-keys-must-be-strings")
+		issues, err := validator.Asset(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		require.Len(t, issues, 2)
+
+		issueDescriptions := make([]string, len(issues))
+		for i, issue := range issues {
+			issueDescriptions[i] = issue.Description
+		}
+
+		assert.Contains(t, issueDescriptions, "Asset meta keys cannot be empty strings")
+		assert.Contains(t, issueDescriptions, "Column 'id' meta keys cannot be empty strings")
+	})
+
+	t.Run("returns no issues when meta maps are empty", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+			Meta: map[string]string{},
+			Columns: []pipeline.Column{
+				{
+					Name: "id",
+					Meta: map[string]string{},
+				},
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		validator := lint.GetBuiltinRule("meta-keys-must-be-strings")
+		issues, err := validator.Asset(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("returns no issues when meta maps are nil", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+			Meta: nil,
+			Columns: []pipeline.Column{
+				{
+					Name: "id",
+					Meta: nil,
+				},
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		validator := lint.GetBuiltinRule("meta-keys-must-be-strings")
+		issues, err := validator.Asset(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("handles mixed valid and invalid meta keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+			Meta: map[string]string{
+				"valid_key_1": "value1",
+				"":            "empty_key",
+				"valid_key_2": "value2",
+				"valid_key_3": "value3",
+			},
+			Columns: []pipeline.Column{
+				{
+					Name: "mixed_column",
+					Meta: map[string]string{
+						"valid":         "value",
+						"":              "empty",
+						"another_valid": "another_value",
+					},
+				},
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		validator := lint.GetBuiltinRule("meta-keys-must-be-strings")
+		issues, err := validator.Asset(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		require.Len(t, issues, 2) // 1 asset empty key + 1 column empty key
+
+		issueDescriptions := make([]string, len(issues))
+		for i, issue := range issues {
+			issueDescriptions[i] = issue.Description
+		}
+
+		// Should have 1 asset-level issue
+		assetIssues := 0
+		for _, desc := range issueDescriptions {
+			if desc == "Asset meta keys cannot be empty strings" {
+				assetIssues++
+			}
+		}
+		assert.Equal(t, 1, assetIssues)
+
+		// Should have 1 column-level issue
+		assert.Contains(t, issueDescriptions, "Column 'mixed_column' meta keys cannot be empty strings")
+	})
+
+	t.Run("validates multiple columns with empty meta keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+			Columns: []pipeline.Column{
+				{
+					Name: "col1",
+					Meta: map[string]string{
+						"": "empty_key_col1",
+					},
+				},
+				{
+					Name: "col2",
+					Meta: map[string]string{
+						"valid": "value",
+					},
+				},
+				{
+					Name: "col3",
+					Meta: map[string]string{
+						"": "empty_key_col3",
+					},
+				},
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		validator := lint.GetBuiltinRule("meta-keys-must-be-strings")
+		issues, err := validator.Asset(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		require.Len(t, issues, 2)
+
+		issueDescriptions := make([]string, len(issues))
+		for i, issue := range issues {
+			issueDescriptions[i] = issue.Description
+		}
+
+		assert.Contains(t, issueDescriptions, "Column 'col1' meta keys cannot be empty strings")
+		assert.Contains(t, issueDescriptions, "Column 'col3' meta keys cannot be empty strings")
+	})
+}

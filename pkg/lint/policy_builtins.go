@@ -482,6 +482,11 @@ var builtinRules = map[string]validators{
 	},
 }
 
+// GetBuiltinRule returns a builtin rule by name for testing purposes
+func GetBuiltinRule(name string) validators {
+	return builtinRules[name]
+}
+
 func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 		issues := make([]*Issue, 0)
