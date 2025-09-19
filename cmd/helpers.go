@@ -75,7 +75,7 @@ func RecoverFromPanic() {
 		for b.Scan() {
 			log.Println(b.Text())
 		}
-		os.Exit(1)
+		panic(err) // Re-panic to propagate the error.
 	}
 }
 
