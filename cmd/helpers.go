@@ -175,7 +175,6 @@ func printWarningForOutput(output string, message string) {
 }
 
 // convertDuckDBDecimal converts a DuckDB decimal string to a readable decimal format.
-// Format: "{5 2 99999}" (width, scale, value) -> "999.99"
 func convertDuckDBDecimal(parts []string) (string, bool) {
 	if len(parts) != 3 {
 		return "", false
@@ -204,7 +203,7 @@ func convertDuckDBDecimal(parts []string) (string, bool) {
 	}
 
 	divisor := int64(1)
-	for i := int64(0); i < scale; i++ {
+	for range scale {
 		divisor *= 10
 	}
 
@@ -213,7 +212,6 @@ func convertDuckDBDecimal(parts []string) (string, bool) {
 }
 
 // convertPostgreSQLDecimal converts a PostgreSQL decimal string to a readable decimal format.
-// Format: "{3142 -3 false finite true}" (value, scale, is_negative, is_finite, is_valid) -> "3.142"
 func convertPostgreSQLDecimal(parts []string) (string, bool) {
 	if len(parts) != 5 {
 		return "", false
@@ -236,7 +234,7 @@ func convertPostgreSQLDecimal(parts []string) (string, bool) {
 	}
 
 	divisor := int64(1)
-	for i := int64(0); i < -scale; i++ {
+	for range -scale {
 		divisor *= 10
 	}
 
