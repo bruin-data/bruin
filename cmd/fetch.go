@@ -124,6 +124,7 @@ func Query() *cli.Command {
 
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
+			//nolint:nestif
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
