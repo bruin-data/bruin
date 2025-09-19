@@ -949,6 +949,9 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 					Description: "Materialization strategy 'delete+insert' requires the 'incremental_key' field to be set",
 				})
 			}
+		case pipeline.MaterializationStrategyTruncateInsert:
+			// truncate+insert doesn't require any special fields
+			return issues, nil
 		case pipeline.MaterializationStrategyMerge:
 			if len(asset.Columns) == 0 {
 				issues = append(issues, &Issue{

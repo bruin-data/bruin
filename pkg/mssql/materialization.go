@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -17,12 +18,13 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
 	},
 	pipeline.MaterializationTypeTable: {
-		pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
-		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
-		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
+		pipeline.MaterializationStrategyTruncateInsert: ansisql.BuildTruncateInsertQuery,
+		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
+		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
 	},
 }
 

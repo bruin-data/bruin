@@ -22,15 +22,16 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
 	},
 	pipeline.MaterializationTypeTable: {
-		pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
-		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
-		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
-		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
-		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2ByTimeQuery,
+		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
+		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
+		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
+		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:   buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByTime:     buildSCD2ByTimeQuery,
 	},
 }
 
@@ -63,6 +64,15 @@ func buildIncrementalQuery(task *pipeline.Asset, query, location string) ([]stri
 		"DROP TABLE IF EXISTS " + tempTableName,
 	}
 
+	return queries, nil
+}
+
+func buildTruncateInsertQuery(task *pipeline.Asset, query, location string) ([]string, error) {
+	// Athena doesn't support TRUNCATE for external tables, use DELETE instead
+	queries := []string{
+		"DELETE FROM " + task.Name,
+		fmt.Sprintf("INSERT INTO %s %s", task.Name, query),
+	}
 	return queries, nil
 }
 

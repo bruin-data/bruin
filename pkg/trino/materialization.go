@@ -32,15 +32,16 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
 	},
 	pipeline.MaterializationTypeTable: {
-		pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
-		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
-		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
-		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
-		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2QueryByTime,
+		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
+		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
+		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
+		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:   buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByTime:     buildSCD2QueryByTime,
 	},
 }
 
@@ -86,6 +87,17 @@ SELECT * FROM (%s) AS new_data;`,
 
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	return errorMaterializer(asset, query)
+}
+
+func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, error) {
+	// Trino may not support TRUNCATE for all connectors, use DELETE as fallback
+	queries := []string{
+		"BEGIN",
+		"DELETE FROM " + asset.Name,
+		fmt.Sprintf("INSERT INTO %s %s", asset.Name, strings.TrimSuffix(query, ";")),
+		"COMMIT",
+	}
+	return strings.Join(queries, ";\n") + ";", nil
 }
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {

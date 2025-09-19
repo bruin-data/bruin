@@ -148,6 +148,21 @@ COMMIT;`,
 			query:   "SELECT 1 as id",
 			wantErr: true,
 		},
+		{
+			name: "truncate+insert materialization",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyTruncateInsert,
+				},
+			},
+			query: "SELECT 1 as id, 'test' as name",
+			want: `BEGIN TRANSACTION;
+TRUNCATE TABLE my.asset;
+INSERT INTO my.asset SELECT 1 as id, 'test' as name;
+COMMIT;`,
+		},
 
 		{
 			name: "merge with primary keys",
