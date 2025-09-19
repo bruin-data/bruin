@@ -124,6 +124,7 @@ func Query() *cli.Command {
 
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
+			//nolint:nestif
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
@@ -192,7 +193,11 @@ func Query() *cli.Command {
 					for _, row := range result.Rows {
 						rowStrings := make([]string, len(row))
 						for i, val := range row {
-							rowStrings[i] = fmt.Sprintf("%v", val)
+							if val == nil {
+								rowStrings[i] = ""
+							} else {
+								rowStrings[i] = fmt.Sprintf("%v", val)
+							}
 						}
 						if err = writer.Write(rowStrings); err != nil {
 							return handleError(output, errors.Wrap(err, "failed to write CSV row"))
@@ -573,7 +578,11 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	for _, row := range results.Rows {
 		rowStrings := make([]string, len(row))
 		for i, val := range row {
-			rowStrings[i] = fmt.Sprintf("%v", val)
+			if val == nil {
+				rowStrings[i] = ""
+			} else {
+				rowStrings[i] = fmt.Sprintf("%v", val)
+			}
 		}
 		if err = writer.Write(rowStrings); err != nil {
 			return "", err
