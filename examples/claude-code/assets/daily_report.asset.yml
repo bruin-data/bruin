@@ -1,0 +1,25 @@
+name: daily_report
+type: agent.claude_code
+description: Generate a daily report using Claude AI
+owner: reports@company.com
+tags:
+  - daily
+  - reporting
+  - ai
+
+parameters:
+  prompt: |
+    Generate a daily report for {{start_date}}.
+    
+    Pipeline Information:
+    - Pipeline: {{pipeline}}
+    - Run ID: {{run_id}}
+    - Processing window: {{start_datetime}} to {{end_datetime}}
+    
+    Please analyze the data and provide:
+    1. Key metrics for the day
+    2. Comparison with previous day ({{start_date | add_days(-1)}})
+    3. Any notable trends or anomalies
+    4. Action items for tomorrow ({{end_date | add_days(1)}})
+    
+    Format as a concise executive summary.
