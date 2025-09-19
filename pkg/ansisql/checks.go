@@ -41,6 +41,12 @@ func (c *CountableQueryCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 		return err
 	}
 
+	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, c.queryInstance, ti.GetAsset().Name, ti.Column.Name, c.checkName, ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+	c.queryInstance = annotatedQuery
+
 	return c.check(ctx, conn)
 }
 
@@ -49,6 +55,12 @@ func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.Cus
 	if err != nil {
 		return err
 	}
+
+	annotatedQuery, err := AddCustomCheckAnnotationComment(ctx, c.queryInstance, ti.GetAsset().Name, c.checkName, ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+	c.queryInstance = annotatedQuery
 
 	return c.check(ctx, conn)
 }
@@ -113,6 +125,7 @@ func NewUniqueCheck(conn config.ConnectionGetter) *UniqueCheck {
 
 func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT COUNT(%s) - COUNT(DISTINCT %s) FROM %s", ti.Column.Name, ti.Column.Name, ti.GetAsset().Name)
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
@@ -133,6 +146,7 @@ func NewPositiveCheck(conn config.ConnectionGetter) *PositiveCheck {
 
 func (c *PositiveCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s <= 0", ti.GetAsset().Name, ti.Column.Name)
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
@@ -153,6 +167,7 @@ func NewNonNegativeCheck(conn config.ConnectionGetter) *NonNegativeCheck {
 
 func (c *NonNegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < 0", ti.GetAsset().Name, ti.Column.Name)
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
@@ -173,6 +188,7 @@ func NewNegativeCheck(conn config.ConnectionGetter) *NegativeCheck {
 
 func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s >= 0", ti.GetAsset().Name, ti.Column.Name)
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
@@ -209,6 +225,7 @@ func (c *MinCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance)
 	}
 
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < %s", ti.GetAsset().Name, ti.Column.Name, threshold)
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
@@ -232,6 +249,7 @@ func (c *MaxCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance)
 	}
 
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s > %s", ti.GetAsset().Name, ti.Column.Name, threshold)
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
