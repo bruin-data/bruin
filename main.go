@@ -34,8 +34,8 @@ func main() {
 	telemetry.TelemetryKey = telemetryKey
 	telemetry.OptOut = optOut
 	telemetry.AppVersion = v.Version
-	client := telemetry.Init()
-	defer client.Close()
+	telemetry.Init()
+	defer telemetry.Close()
 
 	versionCommand := cmd.VersionCmd(v.Commit)
 
@@ -84,6 +84,8 @@ func main() {
 
 	if err != nil {
 		cli.HandleExitCoder(err)
+		telemetry.Close() // Manually close telemetry client to avoid resource leak.
+		//nolint:gocritic
 		os.Exit(1)
 	}
 }

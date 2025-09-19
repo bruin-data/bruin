@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v3"
 )
@@ -75,6 +76,9 @@ func RecoverFromPanic() {
 		for b.Scan() {
 			log.Println(b.Text())
 		}
+
+		// Close telemetry client manually before exiting to prevent resource leak.
+		telemetry.Close()
 		os.Exit(1)
 	}
 }

@@ -23,15 +23,17 @@ type contextKey string
 
 var TelemetryKey string
 var (
-	OptOut     = false
-	AppVersion = ""
-	RunID      = ""
-	client     analytics.Client
-	lock       sync.Mutex
+	OptOut       = false
+	AppVersion   = ""
+	RunID        = ""
+	client       analytics.Client
+	globalClient io.Closer
+	lock         sync.Mutex
 )
 
 func Init() io.Closer {
 	client = analytics.New(TelemetryKey, url)
+	globalClient = client
 
 	return client
 }
@@ -130,4 +132,11 @@ func ErrorCommand(ctx context.Context, cmd *cli.Command, err error) error {
 		"duration_ms": time.Since(startTime).Milliseconds(),
 	})
 	return nil
+}
+
+// This function can be called from anywhere to ensure proper cleanup.
+func Close() {
+	if globalClient != nil {
+		globalClient.Close()
+	}
 }
