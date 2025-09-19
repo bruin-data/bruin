@@ -100,10 +100,10 @@ func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 	}
 
 	finalAnnotations := map[string]interface{}{
-		"asset_name":         assetName,
-		"type":               "custom_check",
-		"custom_check_name":  checkName,
-		"pipeline":           pipelineName,
+		"asset_name":        assetName,
+		"type":              "custom_check",
+		"custom_check_name": checkName,
+		"pipeline":          pipelineName,
 	}
 
 	for k, v := range userAnnotations {

@@ -92,10 +92,16 @@ func NewNotNullCheck(conn config.ConnectionGetter) *NotNullCheck {
 func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s IS NULL", ti.GetAsset().Name, ti.Column.Name)
 
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "not_null", ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
 	return (&CountableQueryCheck{
 		conn:                c.conn,
 		expectedQueryResult: 0,
-		queryInstance:       &query.Query{Query: qq},
+		queryInstance:       annotatedQuery,
 		checkName:           "not_null",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d null values", ti.Column.Name, count)
@@ -113,9 +119,16 @@ func NewUniqueCheck(conn config.ConnectionGetter) *UniqueCheck {
 
 func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT COUNT(%s) - COUNT(DISTINCT %s) FROM %s", ti.Column.Name, ti.Column.Name, ti.GetAsset().Name)
+
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "unique", ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: &query.Query{Query: qq},
+		queryInstance: annotatedQuery,
 		checkName:     "unique",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d non-unique values", ti.Column.Name, count)
@@ -133,9 +146,16 @@ func NewPositiveCheck(conn config.ConnectionGetter) *PositiveCheck {
 
 func (c *PositiveCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s <= 0", ti.GetAsset().Name, ti.Column.Name)
+
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "positive", ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: &query.Query{Query: qq},
+		queryInstance: annotatedQuery,
 		checkName:     "positive",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d non-positive values", ti.Column.Name, count)
@@ -153,9 +173,16 @@ func NewNonNegativeCheck(conn config.ConnectionGetter) *NonNegativeCheck {
 
 func (c *NonNegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < 0", ti.GetAsset().Name, ti.Column.Name)
+
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "non_negative", ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: &query.Query{Query: qq},
+		queryInstance: annotatedQuery,
 		checkName:     "non_negative",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d negative values", ti.Column.Name, count)
@@ -173,9 +200,16 @@ func NewNegativeCheck(conn config.ConnectionGetter) *NegativeCheck {
 
 func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s >= 0", ti.GetAsset().Name, ti.Column.Name)
+
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "negative", ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: &query.Query{Query: qq},
+		queryInstance: annotatedQuery,
 		checkName:     "negative",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d non negative values", ti.Column.Name, count)
@@ -202,6 +236,7 @@ type MinCheck struct {
 
 func NewMinCheck(conn config.ConnectionGetter) *MinCheck { return &MinCheck{conn: conn} }
 
+//nolint:dupl
 func (c *MinCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	threshold, err := thresholdSQLValue(ti.Check.Value.Int, ti.Check.Value.Float, ti.Check.Value.String, "min")
 	if err != nil {
@@ -209,9 +244,16 @@ func (c *MinCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance)
 	}
 
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < %s", ti.GetAsset().Name, ti.Column.Name, threshold)
+
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "min", ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: &query.Query{Query: qq},
+		queryInstance: annotatedQuery,
 		checkName:     "min",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d values below minimum %s", ti.Column.Name, count, ti.Check.Value.ToString())
@@ -225,6 +267,7 @@ type MaxCheck struct {
 
 func NewMaxCheck(conn config.ConnectionGetter) *MaxCheck { return &MaxCheck{conn: conn} }
 
+//nolint:dupl
 func (c *MaxCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	threshold, err := thresholdSQLValue(ti.Check.Value.Int, ti.Check.Value.Float, ti.Check.Value.String, "max")
 	if err != nil {
@@ -232,9 +275,16 @@ func (c *MaxCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance)
 	}
 
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s > %s", ti.GetAsset().Name, ti.Column.Name, threshold)
+
+	q := &query.Query{Query: qq}
+	annotatedQuery, err := AddColumnCheckAnnotationComment(ctx, q, ti.GetAsset().Name, ti.Column.Name, "max", ti.Pipeline.Name)
+	if err != nil {
+		return errors.Wrap(err, "failed to add annotation comment")
+	}
+
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: &query.Query{Query: qq},
+		queryInstance: annotatedQuery,
 		checkName:     "max",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d values above maximum %s", ti.Column.Name, count, ti.Check.Value.ToString())
