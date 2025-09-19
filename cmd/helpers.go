@@ -199,6 +199,10 @@ func convertDuckDBDecimal(parts []string) (string, bool) {
 
 	// Convert integer value to decimal representation
 	// value = 99999, scale = 2 -> 999.99
+	if value == 0 {
+		return "0", true
+	}
+
 	divisor := int64(1)
 	for i := int64(0); i < scale; i++ {
 		divisor *= 10
@@ -227,6 +231,10 @@ func convertPostgreSQLDecimal(parts []string) (string, bool) {
 	}
 
 	// PostgreSQL scale is negative (e.g., -3 means divide by 1000)
+	if value == 0 {
+		return "0", true
+	}
+
 	divisor := int64(1)
 	for i := int64(0); i < -scale; i++ {
 		divisor *= 10
