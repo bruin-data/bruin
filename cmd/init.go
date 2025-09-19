@@ -227,6 +227,7 @@ func Init() *cli.Command {
 				m, err := p.Run()
 				if err != nil {
 					fmt.Printf("Error running the select: %v\n", err)
+					telemetry.Close() // Close telemetry manually before exit.
 					os.Exit(1)
 				}
 
