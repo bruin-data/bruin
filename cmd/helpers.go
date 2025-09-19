@@ -75,9 +75,7 @@ func RecoverFromPanic() {
 		for b.Scan() {
 			log.Println(b.Text())
 		}
-		// Don't call os.Exit(1) here - let the error propagate to main
-		// This allows defer statements in main/run to execute properly
-		panic(err) // Re-panic to propagate the error
+		panic(err) // Re-panic to propagate the error.
 	}
 }
 
