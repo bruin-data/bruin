@@ -193,11 +193,7 @@ func Query() *cli.Command {
 					for _, row := range result.Rows {
 						rowStrings := make([]string, len(row))
 						for i, val := range row {
-							if val == nil {
-								rowStrings[i] = ""
-							} else {
-								rowStrings[i] = fmt.Sprintf("%v", val)
-							}
+							rowStrings[i] = convertValueToString(val)
 						}
 						if err = writer.Write(rowStrings); err != nil {
 							return handleError(output, errors.Wrap(err, "failed to write CSV row"))
@@ -467,7 +463,7 @@ func printTable(columnNames []string, rows [][]interface{}) {
 	for _, row := range rows {
 		rowData := make(table.Row, len(row))
 		for i, cell := range row {
-			rowData[i] = fmt.Sprintf("%v", cell)
+			rowData[i] = convertValueToString(cell)
 		}
 		t.AppendRow(rowData)
 	}
@@ -578,11 +574,7 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	for _, row := range results.Rows {
 		rowStrings := make([]string, len(row))
 		for i, val := range row {
-			if val == nil {
-				rowStrings[i] = ""
-			} else {
-				rowStrings[i] = fmt.Sprintf("%v", val)
-			}
+			rowStrings[i] = convertValueToString(val)
 		}
 		if err = writer.Write(rowStrings); err != nil {
 			return "", err
