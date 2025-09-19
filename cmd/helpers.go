@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -170,5 +171,58 @@ func printWarningForOutput(output string, message string) {
 		fmt.Println(string(jsonData))
 	} else {
 		warningPrinter.Printf("%s\n", message)
+	}
+}
+
+// convertValueToString converts an interface{} value to a string representation,
+// properly handling DuckDB decimal types and other special cases.
+func convertValueToString(val interface{}) string {
+	if val == nil {
+		return ""
+	}
+
+	// Check if this is a DuckDB decimal by looking at the string representation
+	valStr := fmt.Sprintf("%v", val)
+	if strings.HasPrefix(valStr, "{") && strings.HasSuffix(valStr, "}") {
+		// This looks like a DuckDB decimal string: "{5 2 99999}"
+		content := strings.Trim(valStr, "{}")
+		parts := strings.Fields(content)
+		if len(parts) == 3 {
+			// Parse width, scale, value
+			if _, err1 := strconv.ParseInt(parts[0], 10, 64); err1 == nil {
+				if scale, err2 := strconv.ParseInt(parts[1], 10, 64); err2 == nil {
+					if value, err3 := strconv.ParseInt(parts[2], 10, 64); err3 == nil {
+						// Convert integer value to decimal representation
+						// value = 99999, scale = 2 -> 999.99
+						divisor := int64(1)
+						for i := int64(0); i < scale; i++ {
+							divisor *= 10
+						}
+
+						decimalValue := float64(value) / float64(divisor)
+						return strconv.FormatFloat(decimalValue, 'f', int(scale), 64)
+					}
+				}
+			}
+		}
+	}
+
+	// Handle other numeric types
+	switch v := val.(type) {
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case int32:
+		return strconv.FormatInt(int64(v), 10)
+	case int:
+		return strconv.FormatInt(int64(v), 10)
+	case bool:
+		return strconv.FormatBool(v)
+	default:
+		// Fallback to fmt.Sprintf for any other types
+		return fmt.Sprintf("%v", val)
 	}
 }
