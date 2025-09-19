@@ -1,0 +1,12 @@
+id: claude-code-example
+schedule: daily
+start_date: "2024-01-01"
+
+notifications:
+  slack:
+    - channel: data-pipeline-alerts
+      success: false
+
+# Example pipeline demonstrating the agent.claude_code asset type
+# This pipeline can include regular data processing tasks alongside
+# AI-powered analysis using Claude
