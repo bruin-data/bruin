@@ -338,6 +338,7 @@ const (
 	MaterializationStrategyNone             MaterializationStrategy        = ""
 	MaterializationStrategyCreateReplace    MaterializationStrategy        = "create+replace"
 	MaterializationStrategyDeleteInsert     MaterializationStrategy        = "delete+insert"
+	MaterializationStrategyTruncateInsert   MaterializationStrategy        = "truncate+insert"
 	MaterializationStrategyAppend           MaterializationStrategy        = "append"
 	MaterializationStrategyMerge            MaterializationStrategy        = "merge"
 	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
@@ -351,6 +352,7 @@ const (
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyCreateReplace,
 	MaterializationStrategyDeleteInsert,
+	MaterializationStrategyTruncateInsert,
 	MaterializationStrategyAppend,
 	MaterializationStrategyMerge,
 	MaterializationStrategyTimeInterval,

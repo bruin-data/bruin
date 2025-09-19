@@ -22,13 +22,14 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
 	},
 	pipeline.MaterializationTypeTable: {
-		pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
-		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-		pipeline.MaterializationStrategyMerge:         errorMaterializer,
-		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
-		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
+		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
+		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
+		pipeline.MaterializationStrategyMerge:          errorMaterializer,
+		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 	},
 }
 
@@ -75,6 +76,15 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 		"DROP TABLE IF EXISTS " + tempTableName,
 	}
 
+	return queries, nil
+}
+
+func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, error) {
+	// ClickHouse doesn't support transactions, so we return individual statements
+	queries := []string{
+		"TRUNCATE TABLE " + task.Name,
+		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
+	}
 	return queries, nil
 }
 

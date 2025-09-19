@@ -1002,6 +1002,27 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "test-truncate-insert-validate",
+			task: e2e.Task{
+				Name:       "test-truncate-insert-validate",
+				Command:    binary,
+				Args:       []string{"validate", filepath.Join(currentFolder, "test-pipelines/duckdb-truncate-insert-validate")},
+				WorkingDir: currentFolder,
+				Env:        []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"Successfully validated 1 asset",
+						"all good",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "skip-python-assets-without-bruin-header",
 			task: e2e.Task{
 				Name:    "skip-python-assets-without-bruin-header",

@@ -47,6 +47,7 @@ The type of the materialization, can be one of the following:
 The strategy used for the materialization, can be one of the following:
 - `create+replace`: overwrite the existing table with the new version.
 - `delete+insert`: incrementally update the table by only refreshing a certain partition.
+- `truncate+insert`: truncate the entire table and insert new data (full refresh without DROP/CREATE).
 - `append`: only append the new data to the table, never overwrite.
 - `merge`: merge the existing records with the new records, requires a primary key to be set.
 - `time_interval`: incrementally load time-based data within specific time windows.
@@ -133,6 +134,34 @@ materialization:
 select 1 as UserId, 'Alice' as Name
 union all
 select 2 as UserId, 'Bob' as Name
+```
+
+### `truncate+insert`
+`truncate+insert` strategy is useful for full table replacement when you want to clear all existing data and insert fresh data. Unlike `create+replace`, this strategy maintains the existing table structure (schema, permissions, indices, etc.) and only removes the data.
+
+This strategy is more efficient than `delete+insert` for full table refreshes because:
+- TRUNCATE is generally faster than DELETE for removing all rows
+- It doesn't require an `incremental_key`
+- It maintains table metadata and permissions
+
+Here's an example of an asset with `truncate+insert` materialization:
+```bruin-sql
+/* @bruin
+
+name: dashboard.daily_snapshot
+type: bq.sql
+
+materialization:
+    type: table
+    strategy: truncate+insert
+
+@bruin */
+
+select 
+    current_date as snapshot_date,
+    count(*) as total_users,
+    sum(revenue) as total_revenue
+from users
 ```
 
 ### `append`

@@ -1,0 +1,4 @@
+name: truncate_insert_validate
+
+default_connections:
+  duckdb: "duckdb-default"

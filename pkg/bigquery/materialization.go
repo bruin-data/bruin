@@ -17,15 +17,16 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
 	},
 	pipeline.MaterializationTypeTable: {
-		pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
-		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-		pipeline.MaterializationStrategyMerge:         mergeMaterializer,
-		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
-		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
-		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2QueryByTime,
+		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
+		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
+		pipeline.MaterializationStrategyMerge:          mergeMaterializer,
+		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:   buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByTime:     buildSCD2QueryByTime,
 	},
 }
 
@@ -42,6 +43,15 @@ func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
 
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
+}
+
+func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error) {
+	// BigQuery doesn't support transactions, so we execute as separate statements
+	queries := []string{
+		"TRUNCATE TABLE " + task.Name,
+		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
+	}
+	return strings.Join(queries, ";\n"), nil
 }
 
 func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -22,13 +23,14 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
 	},
 	pipeline.MaterializationTypeTable: {
-		pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
-		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
-		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
-		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
+		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
+		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
+		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
+		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 	},
 }
 
@@ -62,6 +64,26 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 		fmt.Sprintf("\nDELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP VIEW IF EXISTS " + tempTableName,
+	}
+
+	return queries, nil
+}
+
+func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, error) {
+	// Use the shared ansisql implementation and split the result into individual queries
+	result, err := ansisql.BuildTruncateInsertQuery(task, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Split the combined query into individual statements for Databricks
+	// Remove the trailing semicolon and split by ";\n"
+	result = strings.TrimSuffix(result, ";")
+	queries := strings.Split(result, ";\n")
+
+	// Clean up each query
+	for i := range queries {
+		queries[i] = strings.TrimSpace(queries[i])
 	}
 
 	return queries, nil
