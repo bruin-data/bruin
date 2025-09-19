@@ -29,9 +29,6 @@ jobs:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - run: make test
-      - name: Install winget
-        if: matrix.platform == 'windows-2022'
-        uses: Cyberboss/install-winget@v1
       - run: make integration-test
         shell: bash
 
@@ -218,8 +215,6 @@ jobs:
       - name: Use install script
         shell: bash
         run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${GITHUB_REF##*/}
-      - name: Install winget
-        uses: Cyberboss/install-winget@v1
       - name: Test Pipeline
         shell: bash
         run: /c/Users/runneradmin/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && /c/Users/runneradmin/.local/bin/bruin.exe run .
