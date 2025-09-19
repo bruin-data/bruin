@@ -227,7 +227,7 @@ func Init() *cli.Command {
 				m, err := p.Run()
 				if err != nil {
 					fmt.Printf("Error running the select: %v\n", err)
-					os.Exit(1)
+					return cli.Exit("", 1) // Use cli.Exit instead of os.Exit
 				}
 
 				if m, ok := m.(model); ok {

@@ -19,6 +19,13 @@ var (
 )
 
 func main() {
+	err := run()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	isDebug := false
 	color.NoColor = false
 	var optOut bool
@@ -80,9 +87,5 @@ func main() {
 		DisableSliceFlagSeparator: true,
 	}
 
-	err := app.Run(context.Background(), os.Args)
-
-	if err != nil {
-		cli.HandleExitCoder(err)
-	}
+	return app.Run(context.Background(), os.Args)
 }
