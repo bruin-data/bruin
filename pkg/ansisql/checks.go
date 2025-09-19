@@ -104,12 +104,10 @@ func NewNotNullCheck(conn config.ConnectionGetter) *NotNullCheck {
 func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s IS NULL", ti.GetAsset().Name, ti.Column.Name)
 
-	q := &query.Query{Query: qq}
-
 	return (&CountableQueryCheck{
 		conn:                c.conn,
 		expectedQueryResult: 0,
-		queryInstance:       q,
+		queryInstance:       &query.Query{Query: qq},
 		checkName:           "not_null",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d null values", ti.Column.Name, count)
@@ -128,11 +126,9 @@ func NewUniqueCheck(conn config.ConnectionGetter) *UniqueCheck {
 func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT COUNT(%s) - COUNT(DISTINCT %s) FROM %s", ti.Column.Name, ti.Column.Name, ti.GetAsset().Name)
 
-	q := &query.Query{Query: qq}
-
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: q,
+		queryInstance: &query.Query{Query: qq},
 		checkName:     "unique",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d non-unique values", ti.Column.Name, count)
@@ -151,11 +147,9 @@ func NewPositiveCheck(conn config.ConnectionGetter) *PositiveCheck {
 func (c *PositiveCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s <= 0", ti.GetAsset().Name, ti.Column.Name)
 
-	q := &query.Query{Query: qq}
-
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: q,
+		queryInstance: &query.Query{Query: qq},
 		checkName:     "positive",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d non-positive values", ti.Column.Name, count)
@@ -174,11 +168,9 @@ func NewNonNegativeCheck(conn config.ConnectionGetter) *NonNegativeCheck {
 func (c *NonNegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < 0", ti.GetAsset().Name, ti.Column.Name)
 
-	q := &query.Query{Query: qq}
-
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: q,
+		queryInstance: &query.Query{Query: qq},
 		checkName:     "non_negative",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d negative values", ti.Column.Name, count)
@@ -197,11 +189,9 @@ func NewNegativeCheck(conn config.ConnectionGetter) *NegativeCheck {
 func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s >= 0", ti.GetAsset().Name, ti.Column.Name)
 
-	q := &query.Query{Query: qq}
-
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: q,
+		queryInstance: &query.Query{Query: qq},
 		checkName:     "negative",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d non negative values", ti.Column.Name, count)
@@ -236,11 +226,9 @@ func (c *MinCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance)
 
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < %s", ti.GetAsset().Name, ti.Column.Name, threshold)
 
-	q := &query.Query{Query: qq}
-
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: q,
+		queryInstance: &query.Query{Query: qq},
 		checkName:     "min",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d values below minimum %s", ti.Column.Name, count, ti.Check.Value.ToString())
@@ -262,11 +250,9 @@ func (c *MaxCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance)
 
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s > %s", ti.GetAsset().Name, ti.Column.Name, threshold)
 
-	q := &query.Query{Query: qq}
-
 	return (&CountableQueryCheck{
 		conn:          c.conn,
-		queryInstance: q,
+		queryInstance: &query.Query{Query: qq},
 		checkName:     "max",
 		customError: func(count int64) error {
 			return errors.Errorf("column '%s' has %d values above maximum %s", ti.Column.Name, count, ti.Check.Value.ToString())
@@ -303,9 +289,7 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 		qq = fmt.Sprintf("SELECT count(*) FROM (%s) AS t", qq)
 	}
 
-	q := &query.Query{Query: qq}
-
-	return NewCountableQueryCheck(c.conn, expected, q, ti.Check.Name, func(count int64) error {
+	return NewCountableQueryCheck(c.conn, expected, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
 		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, expected)
 	}).CustomCheck(ctx, ti)
 }
