@@ -84,5 +84,8 @@ func main() {
 
 	if err != nil {
 		cli.HandleExitCoder(err)
+		// Close the telemetry client manually as the defer is not called on os.Exit(1)
+		client.Close()
+		os.Exit(1) //nolint:gocritic
 	}
 }
