@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -319,9 +320,18 @@ func TestConvertValueToString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := convertValueToString(tt.input)
+			// Use appropriate connection type based on test case
+			var connType string
+			if strings.Contains(tt.name, "DuckDB") {
+				connType = "*duck.Client"
+			} else if strings.Contains(tt.name, "PostgreSQL") {
+				connType = "*postgres.Client"
+			} else {
+				connType = "*duck.Client" // default
+			}
+			result := convertValueToStringWithConnection(tt.input, connType)
 			if result != tt.expected {
-				t.Errorf("convertValueToString() = %v, want %v", result, tt.expected)
+				t.Errorf("convertValueToStringWithConnection() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
@@ -333,65 +343,88 @@ func TestConvertValueToStringEdgeCases(t *testing.T) {
 		name     string
 		input    interface{}
 		expected string
+		connType string
 	}{
 		{
 			name:     "negative DuckDB decimal",
 			input:    "{3 2 -299}",
 			expected: "-2.99",
+			connType: "*duck.Client",
 		},
 		{
 			name:     "zero DuckDB decimal",
 			input:    "{3 2 0}",
 			expected: "0",
+			connType: "*duck.Client",
 		},
 		{
 			name:     "large DuckDB decimal",
 			input:    "{10 2 1234567890}",
 			expected: "12345678.90",
+			connType: "*duck.Client",
+		},
+		{
+			name:     "non-decimal braces with 3 parts",
+			input:    "{2 a b}",
+			expected: "{2 a b}",
+			connType: "*duck.Client",
+		},
+		{
+			name:     "non-decimal braces with 5 parts",
+			input:    "{2 a b c d}",
+			expected: "{2 a b c d}",
+			connType: "*duck.Client",
 		},
 		{
 			name:     "negative PostgreSQL decimal",
 			input:    "{-3142 -3 false finite true}",
 			expected: "-3.142",
+			connType: "*postgres.Client",
 		},
 		{
 			name:     "zero PostgreSQL decimal",
 			input:    "{0 -3 false finite true}",
 			expected: "0",
+			connType: "*postgres.Client",
 		},
 		{
 			name:     "large PostgreSQL decimal",
 			input:    "{1234567890 -2 false finite true}",
 			expected: "12345678.90",
+			connType: "*postgres.Client",
 		},
 		{
 			name:     "empty string",
 			input:    "",
 			expected: "",
+			connType: "*duck.Client",
 		},
 		{
 			name:     "string with only braces",
 			input:    "{}",
 			expected: "{}",
+			connType: "*duck.Client",
 		},
 		{
 			name:     "string with single space in braces",
 			input:    "{ }",
 			expected: "{ }",
+			connType: "*duck.Client",
 		},
 		{
 			name:     "string with multiple spaces in braces",
 			input:    "{   }",
 			expected: "{   }",
+			connType: "*duck.Client",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := convertValueToString(tt.input)
+			result := convertValueToStringWithConnection(tt.input, tt.connType)
 			if result != tt.expected {
-				t.Errorf("convertValueToString() = %v, want %v", result, tt.expected)
+				t.Errorf("convertValueToStringWithConnection() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

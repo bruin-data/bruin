@@ -243,32 +243,37 @@ func convertPostgreSQLDecimal(parts []string) (string, bool) {
 	return strconv.FormatFloat(decimalValue, 'f', int(-scale), 64), true
 }
 
-// convertValueToString converts an interface{} value to a string representation,
-// properly handling DuckDB and PostgreSQL decimal types and other special cases.
+func convertValueToStringWithConnection(val interface{}, connType string) string {
+	if val == nil {
+		return ""
+	}
+
+	// Check if this is a database decimal by looking at the string representation.
+	valStr := fmt.Sprintf("%v", val)
+	if strings.HasPrefix(valStr, "{") && strings.HasSuffix(valStr, "}") {
+		content := strings.Trim(valStr, "{}")
+		parts := strings.Fields(content)
+
+		if len(parts) == 3 && strings.Contains(connType, "duck.Client") {
+			if result, ok := convertDuckDBDecimal(parts); ok {
+				return result
+			}
+		}
+		if len(parts) == 5 && (strings.Contains(connType, "postgres.Client") || strings.Contains(connType, "redshift.Client")) {
+			if result, ok := convertPostgreSQLDecimal(parts); ok {
+				return result
+			}
+		}
+	}
+
+	return convertValueToString(val)
+}
+
 func convertValueToString(val interface{}) string {
 	if val == nil {
 		return ""
 	}
 
-	// Check if this is a database decimal by looking at the string representation
-	valStr := fmt.Sprintf("%v", val)
-	if strings.HasPrefix(valStr, "{") && strings.HasSuffix(valStr, "}") {
-		// This looks like a database decimal string
-		content := strings.Trim(valStr, "{}")
-		parts := strings.Fields(content)
-
-		// Try DuckDB format first
-		if result, ok := convertDuckDBDecimal(parts); ok {
-			return result
-		}
-
-		// Try PostgreSQL format
-		if result, ok := convertPostgreSQLDecimal(parts); ok {
-			return result
-		}
-	}
-
-	// Handle other numeric types
 	switch v := val.(type) {
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64)
@@ -283,7 +288,6 @@ func convertValueToString(val interface{}) string {
 	case bool:
 		return strconv.FormatBool(v)
 	default:
-		// Fallback to fmt.Sprintf for any other types
 		return fmt.Sprintf("%v", val)
 	}
 }
