@@ -7,8 +7,8 @@ materialization:
   strategy: create+replace
   
 interval_modifiers:
-  start: '{% if start_datetime|date_format("%d") == "01" %}-30d{% else %}-2h{% endif %}'
-  end: '{% if end_datetime|date_format("%d") == "01" %}-1d{% else %}1h{% endif %}'
+  start: "2h"
+  end: "-25h"
 
 columns:
   - name: id

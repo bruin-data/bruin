@@ -7,8 +7,8 @@ materialization:
   strategy: create+replace
   
 interval_modifiers:
-  start: '{% if start_timestamp|date_format("%H") == "00" %}-2h{% else %}0{% endif %}'
-  end: '{% if end_timestamp|date_format("%H") == "23" %}-1h{% else %}1h{% endif %}'
+  start: "{{ '2' }}h"
+  end: "{{ '-25' }}h"
 
 columns:
   - name: id

@@ -242,3 +242,15 @@ environments:
       duckdb:
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
+  
+  env-static-modifiers:
+    connections:
+      duckdb:
+        - name: "duckdb-static-modifiers"
+          path: "duckdb-files/static-modifiers.db"
+
+  env-invalid-interval-jinja-modifiers:
+    connections:
+      duckdb:
+        - name: "duckdb-invalid-interval-jinja-modifiers"
+          path: "duckdb-files/invalid-interval-jinja-modifiers.db"

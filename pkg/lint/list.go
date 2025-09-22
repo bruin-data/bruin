@@ -240,8 +240,8 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 		},
 		&SimpleRule{
 			Identifier:       "interval-modifiers-valid-dates",
-			Fast:             false, // This rule requires template rendering, so it's not fast
-			Severity:         ValidatorSeverityWarning,
+			Fast:             true, // Template rendering is fast - just string processing
+			Severity:         ValidatorSeverityCritical,
 			AssetValidator:   ValidateIntervalModifiersDates,
 			ApplicableLevels: []Level{LevelAsset},
 		},
