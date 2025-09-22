@@ -623,7 +623,7 @@ func TestIndividualTasks(t *testing.T) {
 				Args:    []string{"run", "--env", "env-run-use-uv", "--use-uv", filepath.Join(currentFolder, "test-pipelines/run-use-uv-pipeline")},
 				Env:     []string{},
 				Expected: e2e.Output{
-					ExitCode: 0,
+					ExitCode: 1,
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
