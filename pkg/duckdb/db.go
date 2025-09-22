@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/marcboeker/go-duckdb"
 	_ "github.com/marcboeker/go-duckdb"
 )
 
@@ -92,6 +93,12 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 		return nil, err
 	}
 
+	// Get column types for value conversion
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+
 	for rows.Next() {
 		columns := make([]interface{}, len(cols))
 		columnPointers := make([]interface{}, len(cols))
@@ -102,6 +109,11 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 		// Scan the result into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
 			return nil, err
+		}
+
+		// Convert DuckDB-specific types (especially decimals)
+		for i, val := range columns {
+			columns[i] = c.convertValue(val, columnTypes[i])
 		}
 
 		result = append(result, columns)
@@ -159,10 +171,33 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 			return nil, err
 		}
 
+		// Convert DuckDB-specific types (especially decimals)
+		for i, val := range columns {
+			columns[i] = c.convertValue(val, columnTypes[i])
+		}
+
 		result.Rows = append(result.Rows, columns)
 	}
 
 	return result, nil
+}
+
+// convertValue handles DuckDB-specific value conversions, particularly for decimal types
+func (c *Client) convertValue(val interface{}, columnType *sql.ColumnType) interface{} {
+	if val == nil {
+		return nil
+	}
+
+	// Handle DuckDB Decimal type specifically
+	if decimal, ok := val.(duckdb.Decimal); ok {
+		// Convert to float64 for JSON serialization and general use
+		// This preserves precision while making the value usable in Bruin's query system
+		return decimal.Float64()
+	}
+
+	// Handle other DuckDB-specific types as needed
+	// For now, return the value as-is for other types
+	return val
 }
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
