@@ -322,11 +322,12 @@ func TestConvertValueToString(t *testing.T) {
 			t.Parallel()
 			// Use appropriate connection type based on test case
 			var connType string
-			if strings.Contains(tt.name, "DuckDB") {
+			switch {
+			case strings.Contains(tt.name, "DuckDB"):
 				connType = "*duck.Client"
-			} else if strings.Contains(tt.name, "PostgreSQL") {
+			case strings.Contains(tt.name, "PostgreSQL"):
 				connType = "*postgres.Client"
-			} else {
+			default:
 				connType = "*duck.Client" // default
 			}
 			result := convertValueToStringWithConnection(tt.input, connType)
