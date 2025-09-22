@@ -1,3 +1,9 @@
 name: static-invalid-interval
 
+default_connections:
+  duckdb: "duckdb-static-invalid-interval"
 
+environments:
+  default:
+    connections:
+      duckdb: "duckdb-static-invalid-interval"

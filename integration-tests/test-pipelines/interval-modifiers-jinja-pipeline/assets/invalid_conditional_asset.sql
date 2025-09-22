@@ -5,7 +5,7 @@ type: duckdb.sql
 materialization:
   type: table
   strategy: create+replace
-  
+
 interval_modifiers:
   start: "2h"
   end: "-25h"
@@ -22,8 +22,7 @@ columns:
     type: TIMESTAMP
     description: "When the item was created"
 @bruin */
-
-SELECT 
+SELECT
     1 AS id,
     'Test Item' AS name,
     TIMESTAMP '2025-01-15 12:00:00' AS created_at
