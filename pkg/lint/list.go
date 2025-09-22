@@ -238,6 +238,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			CrossPipelineValidator: ValidateCrossPipelineURIDependencies,
 			ApplicableLevels:       []Level{LevelCrossPipeline},
 		},
+		&SimpleRule{
+			Identifier:       "interval-modifiers-valid-dates",
+			Fast:             true, // Template rendering is fast - just string processing
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateIntervalModifiersDates,
+			ApplicableLevels: []Level{LevelAsset},
+		},
 	}
 
 	if parser != nil {

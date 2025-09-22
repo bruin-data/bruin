@@ -515,6 +515,28 @@
         ]
       },
       "schema_prefix": ""
+    },
+    "env-static-modifiers": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-static-modifiers",
+            "path": "duckdb-files/static-modifiers.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-static-invalid-interval": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-static-invalid-interval",
+            "path": "duckdb-files/static-invalid-interval.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     }
   }
 }

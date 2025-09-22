@@ -195,6 +195,12 @@ environments:
         - name: "duckdb-interval-modifiers"
           path: "duckdb-files/interval-modifiers.db"
 
+  env-static-invalid-interval:
+    connections:
+      duckdb:
+        - name: "duckdb-static-invalid-interval"
+          path: "duckdb-files/static-invalid-interval.db"
+
   env-render-template-this:
     connections:
       duckdb:
@@ -242,3 +248,9 @@ environments:
       duckdb:
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
+  
+  env-static-modifiers:
+    connections:
+      duckdb:
+        - name: "duckdb-static-modifiers"
+          path: "duckdb-files/static-modifiers.db"

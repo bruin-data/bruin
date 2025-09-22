@@ -1,0 +1,9 @@
+name: interval-modifiers-jinja-pipeline
+
+default_connections:
+  duckdb: "duckdb-interval-modifiers-jinja"
+
+environments:
+  default:
+    connections:
+      duckdb: "duckdb-interval-modifiers-jinja"
