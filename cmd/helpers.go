@@ -186,7 +186,7 @@ func convertDuckDBDecimal(parts []string) (string, bool) {
 		return "", false
 	}
 
-	scale, err2 := strconv.ParseInt(parts[1], 10, 64)
+	scale, err2 := strconv.ParseInt(parts[1], 10, 0)
 	if err2 != nil {
 		return "", false
 	}
@@ -223,7 +223,7 @@ func convertPostgreSQLDecimal(parts []string) (string, bool) {
 		return "", false
 	}
 
-	scale, err2 := strconv.ParseInt(parts[1], 10, 64)
+	scale, err2 := strconv.ParseInt(parts[1], 10, 0)
 	if err2 != nil {
 		return "", false
 	}
@@ -240,7 +240,8 @@ func convertPostgreSQLDecimal(parts []string) (string, bool) {
 
 	decimalValue := float64(value) / float64(divisor)
 	// Use absolute scale for precision
-	return strconv.FormatFloat(decimalValue, 'f', int(-scale), 64), true
+	absScale := -scale
+	return strconv.FormatFloat(decimalValue, 'f', int(absScale), 64), true
 }
 
 func convertValueToStringWithConnection(val interface{}, connType string) string {
