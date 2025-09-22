@@ -2,8 +2,10 @@ package lint
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lineage"
@@ -451,6 +453,109 @@ var builtinRules = map[string]validators{
 	"query-matches-columns": {
 		Asset: noopAssetValidator,
 	},
+	"interval-modifiers-valid-dates": {
+		Asset: ValidateIntervalModifiersDates,
+	},
+}
+
+// ValidateIntervalModifiersDates checks if the end date is earlier than the start date after applying interval modifiers
+func ValidateIntervalModifiersDates(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	// Skip validation if no interval modifiers are defined
+
+	// Skip validation if no interval modifiers are defined
+	if asset.IntervalModifiers.Start.Template == "" && asset.IntervalModifiers.End.Template == "" &&
+		asset.IntervalModifiers.Start.Hours == 0 && asset.IntervalModifiers.Start.Minutes == 0 &&
+		asset.IntervalModifiers.Start.Seconds == 0 && asset.IntervalModifiers.Start.Days == 0 &&
+		asset.IntervalModifiers.Start.Months == 0 &&
+		asset.IntervalModifiers.End.Hours == 0 && asset.IntervalModifiers.End.Minutes == 0 &&
+		asset.IntervalModifiers.End.Seconds == 0 && asset.IntervalModifiers.End.Days == 0 &&
+		asset.IntervalModifiers.End.Months == 0 {
+		return issues, nil
+	}
+
+	// Get start and end dates from context, or use default dates for linting
+	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+	if !ok {
+		// Use default dates for linting validation
+		startDate = time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
+	}
+
+	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+	if !ok {
+		// Use default dates for linting validation
+		endDate = time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC)
+	}
+
+	// Create a temporary renderer to resolve templates
+	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, p.Name, "validation-run", nil)
+
+	// Resolve start modifier
+	resolvedStartModifier, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(renderer)
+	if err != nil {
+		// If template resolution fails, we can't validate - skip
+		return issues, nil
+	}
+
+	// Resolve end modifier
+	resolvedEndModifier, err := asset.IntervalModifiers.End.ResolveTemplateToNew(renderer)
+	if err != nil {
+		// If template resolution fails, we can't validate - skip
+		return issues, nil
+	}
+
+	// Apply modifiers to get final dates
+	finalStartDate := pipeline.ModifyDate(startDate, resolvedStartModifier)
+	finalEndDate := pipeline.ModifyDate(endDate, resolvedEndModifier)
+
+	// Check if end date is earlier than start date
+	if finalEndDate.Before(finalStartDate) {
+		issues = append(issues, &Issue{
+			Task: asset,
+			Description: fmt.Sprintf("Interval modifiers result in end date (%s) being earlier than start date (%s)",
+				finalEndDate.Format("2006-01-02 15:04:05"),
+				finalStartDate.Format("2006-01-02 15:04:05")),
+			Context: []string{
+				fmt.Sprintf("Original start date: %s", startDate.Format("2006-01-02 15:04:05")),
+				fmt.Sprintf("Original end date: %s", endDate.Format("2006-01-02 15:04:05")),
+				fmt.Sprintf("Start modifier: %s", formatTimeModifier(resolvedStartModifier)),
+				fmt.Sprintf("End modifier: %s", formatTimeModifier(resolvedEndModifier)),
+			},
+		})
+	}
+
+	return issues, nil
+}
+
+// formatTimeModifier creates a human-readable string representation of a TimeModifier
+func formatTimeModifier(modifier pipeline.TimeModifier) string {
+	if modifier.Template != "" {
+		return fmt.Sprintf("template: %s", modifier.Template)
+	}
+
+	parts := make([]string, 0)
+	if modifier.Months != 0 {
+		parts = append(parts, fmt.Sprintf("%dM", modifier.Months))
+	}
+	if modifier.Days != 0 {
+		parts = append(parts, fmt.Sprintf("%dd", modifier.Days))
+	}
+	if modifier.Hours != 0 {
+		parts = append(parts, fmt.Sprintf("%dh", modifier.Hours))
+	}
+	if modifier.Minutes != 0 {
+		parts = append(parts, fmt.Sprintf("%dm", modifier.Minutes))
+	}
+	if modifier.Seconds != 0 {
+		parts = append(parts, fmt.Sprintf("%ds", modifier.Seconds))
+	}
+
+	if len(parts) == 0 {
+		return "no change"
+	}
+
+	return strings.Join(parts, " ")
 }
 
 func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

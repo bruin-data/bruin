@@ -301,6 +301,24 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "interval-modifiers-validation",
+			task: e2e.Task{
+				Name:    "interval-modifiers-validation",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/interval-modifiers-jinja-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"1 warning", "interval-modifiers-valid-dates", "end date (2025-09-20 22:59:59) being earlier than start date (2025-09-21 02:00:00)"},
+				},
+				WorkingDir: currentFolder,
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "parse-whole-pipeline",
 			task: e2e.Task{
 				Name:          "parse-whole-pipeline",

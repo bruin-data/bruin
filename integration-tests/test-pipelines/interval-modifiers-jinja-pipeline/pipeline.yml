@@ -1,0 +1,10 @@
+name: interval-modifiers-jinja-pipeline
+
+default_connections:
+  duckdb: "duckdb-interval-modifiers-jinja"
+
+# Set default interval modifiers at pipeline level
+default:
+  interval_modifiers:
+    start: -1h    # Default 1-hour shift back for all assets
+    end: 1h       # Default 1-hour shift forward for all assets
