@@ -1294,7 +1294,8 @@
       "type": "object",
       "required": [
         "name",
-        "access_token"
+        "access_token",
+        "region"
       ]
     },
     "InfluxDBConnection": {
