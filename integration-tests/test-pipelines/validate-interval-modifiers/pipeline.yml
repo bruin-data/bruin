@@ -1,4 +1,4 @@
-name: interval-modifiers-jinja-pipeline
+name: validate-interval-modifiers
 
 default_connections:
   duckdb: "duckdb-interval-modifiers-jinja"

@@ -305,11 +305,11 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "interval-modifiers-validation",
 				Command: binary,
-				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/interval-modifiers-jinja-pipeline")},
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers")},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 1,
-					Contains: []string{"3 issues", "interval-modifiers-valid-dates", "end date (2025-09-20 22:59:59) being earlier than start date (2025-09-21 02:00:00)"},
+					Contains: []string{"4 issues", "interval-modifiers-valid-dates", "end date (2025-09-21 22:59:59) being earlier than start date (2025-09-22 02:00:00)"},
 				},
 				WorkingDir: currentFolder,
 				Asserts: []func(*e2e.Task) error{
@@ -323,47 +323,11 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "interval-modifiers-run-with-jinja",
 				Command: binary,
-				Args:    []string{"run", "--apply-interval-modifiers", "--start-date", "2025-09-21", "--end-date", "2025-09-20", filepath.Join(currentFolder, "test-pipelines/interval-modifiers-jinja-pipeline/assets/month_end_asset.sql")},
+				Args:    []string{"run", "--apply-interval-modifiers", "--start-date", "2025-09-21", "--end-date", "2025-09-20", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers/assets/month_end_asset.sql")},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 1,
-					Contains: []string{"3 issues", "interval-modifiers-valid-dates", "end date (2025-09-18 23:00:00) being earlier than start date (2025-09-21 02:00:00)"},
-				},
-				WorkingDir: currentFolder,
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-					e2e.AssertByContains,
-				},
-			},
-		},
-		{
-			name: "static-interval-modifiers-validation",
-			task: e2e.Task{
-				Name:    "static-interval-modifiers-validation",
-				Command: binary,
-				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/static-invalid-interval")},
-				Env:     []string{},
-				Expected: e2e.Output{
-					ExitCode: 1,
-					Contains: []string{"1 issue", "interval-modifiers-valid-dates", "end date (2025-09-21 21:59:59) being earlier than start date (2025-09-22 01:00:00)"},
-				},
-				WorkingDir: currentFolder,
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-					e2e.AssertByContains,
-				},
-			},
-		},
-		{
-			name: "run-interval-modifiers-validation",
-			task: e2e.Task{
-				Name:    "run-interval-modifiers-validation",
-				Command: binary,
-				Args:    []string{"run", "--apply-interval-modifiers", filepath.Join(currentFolder, "test-pipelines/static-invalid-interval")},
-				Env:     []string{},
-				Expected: e2e.Output{
-					ExitCode: 1,
-					Contains: []string{"issue", "interval-modifiers-valid-dates", "end date (2025-09-21 21:59:59) being earlier than start date (2025-09-22 01:00:00)"},
+					Contains: []string{"4 issues", "interval-modifiers-valid-dates", "end date (2025-09-18 23:00:00) being earlier than start date (2025-09-21 02:00:00)"},
 				},
 				WorkingDir: currentFolder,
 				Asserts: []func(*e2e.Task) error{
