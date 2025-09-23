@@ -242,3 +242,9 @@ environments:
       duckdb:
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
+
+  env-duckdb-decimal:
+    connections:
+      duckdb:
+        - name: "duckdb-decimal"
+          path: "duckdb-files/duckdb-decimal.db"

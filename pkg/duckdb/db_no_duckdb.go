@@ -63,8 +63,6 @@ func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	return nil, errDuckDBNotSupported
 }
 
-// convertValue handles DuckDB-specific value conversions, particularly for decimal types
 func (c *Client) convertValue(val interface{}, columnType *sql.ColumnType) interface{} {
-	// In the no-duckdb build, just return the value as-is
 	return val
 }

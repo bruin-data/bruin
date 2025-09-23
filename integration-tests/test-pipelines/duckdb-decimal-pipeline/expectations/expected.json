@@ -1,0 +1,53 @@
+{
+  "columns": [
+    {
+      "name": "integer_value",
+      "type": "INTEGER"
+    },
+    {
+      "name": "another_integer",
+      "type": "INTEGER"
+    },
+    {
+      "name": "large_integer",
+      "type": "INTEGER"
+    },
+    {
+      "name": "decimal_value",
+      "type": "DECIMAL(5,2)"
+    },
+    {
+      "name": "small_decimal",
+      "type": "DECIMAL(5,4)"
+    },
+    {
+      "name": "large_decimal",
+      "type": "DECIMAL(15,6)"
+    },
+    {
+      "name": "string_value",
+      "type": "VARCHAR"
+    },
+    {
+      "name": "boolean_value",
+      "type": "BOOLEAN"
+    },
+    {
+      "name": "null_value",
+      "type": "INTEGER"
+    }
+  ],
+  "rows": [
+    [
+      2,
+      3,
+      299,
+      123.45,
+      0.1234,
+      999999999.999999,
+      "test string",
+      true,
+      null
+    ]
+  ]
+}
