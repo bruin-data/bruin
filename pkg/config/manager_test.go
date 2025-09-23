@@ -172,6 +172,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "test-api-key",
 				},
 			},
+			Intercom: []IntercomConnection{
+				{
+					Name:        "intercom-1",
+					AccessToken: "test-access-token",
+					Region:      "us",
+				},
+			},
 			AthenaConnection: []AthenaConnection{
 				{
 					Name:             "conn14",
@@ -1053,6 +1060,17 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Intercom connection",
+			envName:  "default",
+			connType: "intercom",
+			connName: "intercom-conn",
+			creds: map[string]interface{}{
+				"access_token": "test-access-token",
+				"region":       "us",
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Add FundraiseUp connection",
 			envName:  "default",
 			connType: "fundraiseup",
@@ -1125,6 +1143,11 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Anthropic, 1)
 					assert.Equal(t, tt.connName, env.Connections.Anthropic[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.Anthropic[0].APIKey)
+				case "intercom":
+					assert.Len(t, env.Connections.Intercom, 1)
+					assert.Equal(t, tt.connName, env.Connections.Intercom[0].Name)
+					assert.Equal(t, tt.creds["access_token"], env.Connections.Intercom[0].AccessToken)
+					assert.Equal(t, tt.creds["region"], env.Connections.Intercom[0].Region)
 				case "fundraiseup":
 					assert.Len(t, env.Connections.FundraiseUp, 1)
 					assert.Equal(t, tt.connName, env.Connections.FundraiseUp[0].Name)

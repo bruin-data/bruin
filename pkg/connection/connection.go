@@ -43,6 +43,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/influxdb"
+	"github.com/bruin-data/bruin/pkg/intercom"
 	"github.com/bruin-data/bruin/pkg/isocpulse"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/kinesis"
@@ -100,6 +101,7 @@ type Manager struct {
 	Klaviyo              map[string]*klaviyo.Client
 	Adjust               map[string]*adjust.Client
 	Anthropic            map[string]*anthropic.Client
+	Intercom             map[string]*intercom.Client
 	Athena               map[string]*athena.DB
 	Aws                  map[string]*config.AwsConnection
 	FacebookAds          map[string]*facebookads.Client
@@ -679,6 +681,30 @@ func (m *Manager) AddAnthropicConnectionFromConfig(connection *config.AnthropicC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Anthropic[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddIntercomConnectionFromConfig(connection *config.IntercomConnection) error {
+	m.mutex.Lock()
+	if m.Intercom == nil {
+		m.Intercom = make(map[string]*intercom.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := intercom.NewClient(intercom.Config{
+		AccessToken: connection.AccessToken,
+		Region:      connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Intercom[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2146,6 +2172,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.Klaviyo, connectionManager.AddKlaviyoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Adjust, connectionManager.AddAdjustConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Anthropic, connectionManager.AddAnthropicConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Intercom, connectionManager.AddIntercomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)

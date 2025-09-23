@@ -460,6 +460,16 @@ func (c HubspotConnection) GetName() string {
 	return c.Name
 }
 
+type IntercomConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	Region      string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+}
+
+func (c IntercomConnection) GetName() string {
+	return c.Name
+}
+
 type GoogleSheetsConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
