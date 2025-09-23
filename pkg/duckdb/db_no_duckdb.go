@@ -63,6 +63,6 @@ func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	return nil, errDuckDBNotSupported
 }
 
-func (c *Client) convertValue(val interface{}, columnType *sql.ColumnType) interface{} {
+func (c *Client) convertValue(val interface{}) interface{} {
 	return val
 }
