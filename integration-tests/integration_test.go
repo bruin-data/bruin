@@ -309,7 +309,7 @@ func TestIndividualTasks(t *testing.T) {
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 1,
-					Contains: []string{"4 issues", "interval-modifiers-valid-dates", "end date (2025-09-21 22:59:59) being earlier than start date (2025-09-22 02:00:00)"},
+					Contains: []string{"4 issues", "interval-modifiers-valid-dates", "end date (2025-09-22 22:59:59) being earlier than start date (2025-09-23 02:00:00)"},
 				},
 				WorkingDir: currentFolder,
 				Asserts: []func(*e2e.Task) error{
@@ -323,11 +323,29 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "interval-modifiers-run-with-jinja",
 				Command: binary,
-				Args:    []string{"run", "--full-refresh", "--apply-interval-modifiers", "--start-date", "2025-09-21", "--end-date", "2025-09-20", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers/assets/month_end_asset.sql")},
+				Args:    []string{"render", "--full-refresh", "--apply-interval-modifiers", "--start-date", "2025-09-21", "--end-date", "2025-09-20", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers/assets/month_end_asset.sql")},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 1,
-					Contains: []string{"Warning: --apply-interval-modifiers flag is ignored when --full-refresh is enabled.", "4 issues", "interval-modifiers-valid-dates", "end date (2025-09-18 23:00:00) being earlier than start date (2025-09-21 02:00:00)"},
+					Contains: []string{"Warning: --apply-interval-modifiers flag is ignored when --full-refresh is enabled.", "No issues found", "Interval: 2024-01-01T00:00:00Z - 2025-09-20T00:00:00Z"},
+				},
+				WorkingDir: currentFolder,
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "full-refresh-interval-modifiers-jinja-behavior",
+			task: e2e.Task{
+				Name:    "full-refresh-interval-modifiers-jinja-behavior",
+				Command: binary,
+				Args:    []string{"run", "--full-refresh", "--apply-interval-modifiers", "--start-date", "2025-09-15", "--end-date", "2025-09-16", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers/assets/month_end_asset.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"2025-09-20T02:00:00.000000Z", "2025-09-22T23:00:00.000000Z"},
 				},
 				WorkingDir: currentFolder,
 				Asserts: []func(*e2e.Task) error{
