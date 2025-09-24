@@ -21,41 +21,25 @@
     [
       1,
       "Laptop",
-      {
-        "Width": 5,
-        "Scale": 2,
-        "Value": 99999
-      },
+      999.99,
       10
     ],
     [
       2,
       "Smartphone",
-      {
-        "Width": 5,
-        "Scale": 2,
-        "Value": 69999
-      },
+      699.99,
       50
     ],
     [
       3,
       "Headphones",
-      {
-        "Width": 5,
-        "Scale": 2,
-        "Value": 19999
-      },
+      199.99,
       100
     ],
     [
       4,
       "Monitor",
-      {
-        "Width": 5,
-        "Scale": 2,
-        "Value": 29999
-      },
+      299.99,
       25
     ]
   ],

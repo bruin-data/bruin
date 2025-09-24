@@ -1,0 +1,4 @@
+name: duckdb_decimal_test
+
+default_connections:
+  duckdb: "duckdb-decimal"

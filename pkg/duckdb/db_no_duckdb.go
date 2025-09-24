@@ -62,3 +62,7 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	return nil, errDuckDBNotSupported
 }
+
+func (c *Client) convertValue(val interface{}) interface{} {
+	return val
+}

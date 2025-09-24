@@ -1036,6 +1036,24 @@ func TestIndividualTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "query-duckdb-decimal-return-types",
+			task: e2e.Task{
+				Name:          "query-duckdb-decimal-return-types",
+				Command:       binary,
+				Args:          []string{"query", "--env", "env-duckdb-decimal", "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-decimal-pipeline/assets/simple_decimal_test.sql"), "--output", "json"},
+				Env:           []string{},
+				SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/duckdb-decimal-pipeline/expectations/expected.json")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputJSON,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

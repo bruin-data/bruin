@@ -515,6 +515,17 @@
         ]
       },
       "schema_prefix": ""
+    },
+    "env-duckdb-decimal": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-decimal",
+            "path": "duckdb-files/duckdb-decimal.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     }
   }
 }
