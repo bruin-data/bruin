@@ -254,3 +254,9 @@ environments:
       duckdb:
         - name: "duckdb-static-modifiers"
           path: "duckdb-files/static-modifiers.db"
+  
+  env-valid-time-window:
+    connections:
+      duckdb:
+        - name: "duckdb-valid-time-window"
+          path: "duckdb-files/valid-time-window.db"

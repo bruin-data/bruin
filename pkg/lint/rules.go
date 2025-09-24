@@ -1562,3 +1562,32 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 
 	return issues, nil
 }
+
+// EnsureValidTimeWindow checks that the start date is before the end date
+func EnsureValidTimeWindow(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	// Get start and end dates from context
+	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+	if !ok {
+		// If no start date in context, skip validation
+		return issues, nil
+	}
+
+	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+	if !ok {
+		// If no end date in context, skip validation
+		return issues, nil
+	}
+
+	// Check if start date is after end date
+	if startDate.After(endDate) {
+		issues = append(issues, &Issue{
+			Description: fmt.Sprintf("Start date (%s) must be before end date (%s)",
+				startDate.Format("2006-01-02 15:04:05"),
+				endDate.Format("2006-01-02 15:04:05")),
+		})
+	}
+
+	return issues, nil
+}

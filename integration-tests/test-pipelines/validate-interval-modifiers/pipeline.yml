@@ -1,9 +1,4 @@
 name: validate-interval-modifiers
 start_date: "2024-01-01"
 default_connections:
-  duckdb: "duckdb-interval-modifiers-jinja"
-
-environments:
-  default:
-    connections:
-      duckdb: "duckdb-interval-modifiers-jinja"
+  duckdb: "duckdb-valid-time-window"

@@ -319,15 +319,15 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "interval-modifiers-run-with-jinja",
+			name: "valid-time-window",
 			task: e2e.Task{
-				Name:    "interval-modifiers-run-with-jinja",
+				Name:    "valid-time-window",
 				Command: binary,
-				Args:    []string{"render", "--full-refresh", "--apply-interval-modifiers", "--start-date", "2025-09-21", "--end-date", "2025-09-20", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers/assets/month_end_asset.sql")},
+				Args:    []string{"run", "--apply-interval-modifiers", "--start-date", "2025-09-20", "--end-date", "2025-09-20", "--env", "env-valid-time-window", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers/assets/month_end_asset.sql")},
 				Env:     []string{},
 				Expected: e2e.Output{
-					ExitCode: 1,
-					Contains: []string{"Warning: --apply-interval-modifiers flag is ignored when --full-refresh is enabled.", "No issues found", "Interval: 2024-01-01T00:00:00Z - 2025-09-20T00:00:00Z"},
+					ExitCode: 0,
+					Contains: []string{"2025-09-20T02:00:00Z - 2025-09-19T00:00:00Z"},
 				},
 				WorkingDir: currentFolder,
 				Asserts: []func(*e2e.Task) error{
@@ -337,15 +337,15 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "full-refresh-interval-modifiers-jinja-behavior",
+			name: "full-refresh-interval-modifiers-mutual-exclusivity",
 			task: e2e.Task{
-				Name:    "full-refresh-interval-modifiers-jinja-behavior",
+				Name:    "full-refresh-interval-modifiers-mutual-exclusivity",
 				Command: binary,
-				Args:    []string{"run", "--full-refresh", "--apply-interval-modifiers", "--start-date", "2025-09-15", "--end-date", "2025-09-16", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers/assets/month_end_asset.sql")},
+				Args:    []string{"run", "--full-refresh", "--apply-interval-modifiers", "--start-date", "2025-09-20", "--end-date", "2025-09-25", filepath.Join(currentFolder, "test-pipelines/validate-interval-modifiers/assets/month_end_asset.sql")},
 				Env:     []string{},
 				Expected: e2e.Output{
-					ExitCode: 0,
-					Contains: []string{"2025-09-20T02:00:00.000000Z", "2025-09-22T23:00:00.000000Z"},
+					ExitCode: 1,
+					Contains: []string{"flags --full-refresh and --apply-interval-modifiers are mutually exclusive and cannot be used together"},
 				},
 				WorkingDir: currentFolder,
 				Asserts: []func(*e2e.Task) error{

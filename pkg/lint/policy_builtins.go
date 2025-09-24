@@ -519,7 +519,8 @@ func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx contex
 	}
 }
 
-// ValidateIntervalModifiersDates checks if the end date is earlier than the start date after applying interval modifiers
+// ValidateIntervalModifiersDates checks if interval modifiers would result in invalid date ranges
+// without actually rendering templates - just validates the logic
 func ValidateIntervalModifiersDates(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
@@ -547,26 +548,34 @@ func ValidateIntervalModifiersDates(ctx context.Context, p *pipeline.Pipeline, a
 		endDate = time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC)
 	}
 
-	// Create a temporary renderer to resolve templates
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, p.Name, "validation-run", nil)
-
-	// Resolve start modifier
-	resolvedStartModifier, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(renderer)
-	if err != nil {
-		// If template resolution fails, we can't validate - skip
+	// Check if templates are used - if so, we can't validate without rendering
+	if asset.IntervalModifiers.Start.Template != "" || asset.IntervalModifiers.End.Template != "" {
+		// For templates, we can only validate that they exist and are not empty
+		if asset.IntervalModifiers.Start.Template == "" && asset.IntervalModifiers.End.Template == "" {
+			// This case is already handled above
+		} else {
+			// Templates are present - we can't validate the actual date logic without rendering
+			// But we can check for obvious issues like empty templates
+			if asset.IntervalModifiers.Start.Template == "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Start interval modifier has empty template",
+				})
+			}
+			if asset.IntervalModifiers.End.Template == "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "End interval modifier has empty template",
+				})
+			}
+		}
 		return issues, nil
 	}
 
-	// Resolve end modifier
-	resolvedEndModifier, err := asset.IntervalModifiers.End.ResolveTemplateToNew(renderer)
-	if err != nil {
-		// If template resolution fails, we can't validate - skip
-		return issues, nil
-	}
-
+	// For non-template modifiers, we can validate the date logic directly
 	// Apply modifiers to get final dates
-	finalStartDate := pipeline.ModifyDate(startDate, resolvedStartModifier)
-	finalEndDate := pipeline.ModifyDate(endDate, resolvedEndModifier)
+	finalStartDate := pipeline.ModifyDate(startDate, asset.IntervalModifiers.Start)
+	finalEndDate := pipeline.ModifyDate(endDate, asset.IntervalModifiers.End)
 
 	// Check if end date is earlier than start date
 	if finalEndDate.Before(finalStartDate) {
@@ -578,13 +587,72 @@ func ValidateIntervalModifiersDates(ctx context.Context, p *pipeline.Pipeline, a
 			Context: []string{
 				fmt.Sprintf("Original start date: %s", startDate.Format("2006-01-02 15:04:05")),
 				fmt.Sprintf("Original end date: %s", endDate.Format("2006-01-02 15:04:05")),
-				fmt.Sprintf("Start modifier: %s", formatTimeModifier(resolvedStartModifier)),
-				fmt.Sprintf("End modifier: %s", formatTimeModifier(resolvedEndModifier)),
+				fmt.Sprintf("Start modifier: %s", formatTimeModifier(asset.IntervalModifiers.Start)),
+				fmt.Sprintf("End modifier: %s", formatTimeModifier(asset.IntervalModifiers.End)),
 			},
 		})
 	}
 
 	return issues, nil
+}
+
+// ValidateIntervalModifierTemplates validates that interval modifier templates are syntactically correct
+// without actually rendering them
+func ValidateIntervalModifierTemplates(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	// Check start modifier template
+	if asset.IntervalModifiers.Start.Template != "" {
+		if err := validateTemplateSyntax(asset.IntervalModifiers.Start.Template); err != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Invalid start interval modifier template: %v", err),
+			})
+		}
+	}
+
+	// Check end modifier template
+	if asset.IntervalModifiers.End.Template != "" {
+		if err := validateTemplateSyntax(asset.IntervalModifiers.End.Template); err != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Invalid end interval modifier template: %v", err),
+			})
+		}
+	}
+
+	return issues, nil
+}
+
+// validateTemplateSyntax checks if a Jinja template has valid syntax without rendering it
+func validateTemplateSyntax(template string) error {
+	// Basic syntax checks for common Jinja patterns
+	// This is a simplified validation - for full validation, we'd need to parse the template
+
+	// Check for balanced braces
+	openBraces := strings.Count(template, "{{")
+	closeBraces := strings.Count(template, "}}")
+	if openBraces != closeBraces {
+		return fmt.Errorf("unbalanced braces: %d opening, %d closing", openBraces, closeBraces)
+	}
+
+	// Check for balanced control structures
+	openBlocks := strings.Count(template, "{%")
+	closeBlocks := strings.Count(template, "%}")
+	if openBlocks != closeBlocks {
+		return fmt.Errorf("unbalanced control blocks: %d opening, %d closing", openBlocks, closeBlocks)
+	}
+
+	// Check for common syntax errors
+	if strings.Contains(template, "{{}}") {
+		return fmt.Errorf("empty expression block")
+	}
+
+	if strings.Contains(template, "{%%}") {
+		return fmt.Errorf("empty control block")
+	}
+
+	return nil
 }
 
 // formatTimeModifier creates a human-readable string representation of a TimeModifier

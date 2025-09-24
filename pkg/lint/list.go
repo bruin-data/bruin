@@ -238,12 +238,27 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			CrossPipelineValidator: ValidateCrossPipelineURIDependencies,
 			ApplicableLevels:       []Level{LevelCrossPipeline},
 		},
+		// Interval modifier validation is now done in run.go after dates are finalized
+		// &SimpleRule{
+		// 	Identifier:       "interval-modifiers-valid-dates",
+		// 	Fast:             true, // No template rendering - just date logic validation
+		// 	Severity:         ValidatorSeverityCritical,
+		// 	AssetValidator:   ValidateIntervalModifiersDates,
+		// 	ApplicableLevels: []Level{LevelAsset},
+		// },
+		// &SimpleRule{
+		// 	Identifier:       "interval-modifiers-valid-templates",
+		// 	Fast:             true, // Template syntax validation without rendering
+		// 	Severity:         ValidatorSeverityCritical,
+		// 	AssetValidator:   ValidateIntervalModifierTemplates,
+		// 	ApplicableLevels: []Level{LevelAsset},
+		// },
 		&SimpleRule{
-			Identifier:       "interval-modifiers-valid-dates",
-			Fast:             true, // Template rendering is fast - just string processing
+			Identifier:       "valid-time-window",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
-			AssetValidator:   ValidateIntervalModifiersDates,
-			ApplicableLevels: []Level{LevelAsset},
+			Validator:        EnsureValidTimeWindow,
+			ApplicableLevels: []Level{LevelPipeline},
 		},
 	}
 

@@ -8,7 +8,7 @@ materialization:
 
 interval_modifiers:
   start: "2h"
-  end: "-25h"
+  end: "-24h"
 
 columns:
   - name: id

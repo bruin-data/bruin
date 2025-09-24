@@ -527,6 +527,17 @@
       },
       "schema_prefix": ""
     },
+    "env-valid-time-window": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-valid-time-window",
+            "path": "duckdb-files/valid-time-window.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-static-invalid-interval": {
       "connections": {
         "duckdb": [

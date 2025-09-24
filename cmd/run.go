@@ -456,18 +456,6 @@ var (
 	}
 )
 
-func setApplyIntervalModifiers(c *cli.Command) bool {
-	fullRefresh := c.Bool("full-refresh")
-	applyIntervalModifiers := c.Bool("apply-interval-modifiers")
-
-	if fullRefresh && applyIntervalModifiers {
-		warningPrinter.Println("Warning: --apply-interval-modifiers flag is ignored when --full-refresh is enabled.")
-		return false
-	}
-
-	return applyIntervalModifiers
-}
-
 func Run(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "run",
@@ -604,9 +592,15 @@ func Run(isDebug *bool) *cli.Command {
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
 
-			logger := makeLogger(*isDebug)
+			// Validate mutual exclusivity of full-refresh and apply-interval-modifiers
 			fullRefresh := c.Bool("full-refresh")
-			applyIntervalModifiers := setApplyIntervalModifiers(c)
+			applyIntervalModifiers := c.Bool("apply-interval-modifiers")
+
+			if fullRefresh && applyIntervalModifiers {
+				return cli.Exit("flags --full-refresh and --apply-interval-modifiers are mutually exclusive and cannot be used together", 1)
+			}
+
+			logger := makeLogger(*isDebug)
 
 			runConfig := &scheduler.RunConfig{
 				Downstream:             c.Bool("downstream"),
@@ -763,6 +757,12 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
+			// Validate interval modifiers with finalized dates
+			if err := validateIntervalModifiersWithFinalizedDates(runCtx, pipelineInfo.Pipeline, logger); err != nil {
+				errorPrinter.Printf("Interval modifier validation failed: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
 			// Update renderer with the finalized start/end dates
 			renderer = jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, runID, nil)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
@@ -770,6 +770,8 @@ func Run(isDebug *bool) *cli.Command {
 			// Update context with the finalized dates
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+
+		
 
 			// handle log files
 			executionStartLog := "Starting execution..."
@@ -1068,6 +1070,100 @@ func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRe
 	}
 
 	return startDate, nil
+}
+
+// validateIntervalModifiersWithFinalizedDates validates interval modifiers using the finalized start/end dates
+func validateIntervalModifiersWithFinalizedDates(ctx context.Context, p *pipeline.Pipeline, logger logger.Logger) error {
+	// Get the finalized dates from context
+	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+	if !ok {
+		return fmt.Errorf("start date not found in context")
+	}
+
+	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+	if !ok {
+		return fmt.Errorf("end date not found in context")
+	}
+
+	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
+	if !ok {
+		applyModifiers = false
+	}
+
+	logger.Debugf("Validating interval modifiers with finalized dates - startDate=%s, endDate=%s, applyModifiers=%t",
+		startDate.Format(time.RFC3339), endDate.Format(time.RFC3339), applyModifiers)
+
+	// Check if start date is after end date (basic validation)
+	if startDate.After(endDate) {
+		return fmt.Errorf("start date (%s) must be before end date (%s)",
+			startDate.Format("2006-01-02 15:04:05"),
+			endDate.Format("2006-01-02 15:04:05"))
+	}
+
+	// Validate each asset's interval modifiers
+	for _, asset := range p.Assets {
+		if err := validateAssetIntervalModifiers(ctx, asset, startDate, endDate, applyModifiers, logger); err != nil {
+			return fmt.Errorf("asset %s: %w", asset.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// validateAssetIntervalModifiers validates interval modifiers for a single asset
+func validateAssetIntervalModifiers(ctx context.Context, asset *pipeline.Asset, startDate, endDate time.Time, applyModifiers bool, logger logger.Logger) error {
+	// Skip validation if no interval modifiers are defined
+	if asset.IntervalModifiers.Start.Template == "" && asset.IntervalModifiers.End.Template == "" &&
+		asset.IntervalModifiers.Start.Hours == 0 && asset.IntervalModifiers.Start.Minutes == 0 &&
+		asset.IntervalModifiers.Start.Seconds == 0 && asset.IntervalModifiers.Start.Days == 0 &&
+		asset.IntervalModifiers.Start.Months == 0 &&
+		asset.IntervalModifiers.End.Hours == 0 && asset.IntervalModifiers.End.Minutes == 0 &&
+		asset.IntervalModifiers.End.Seconds == 0 && asset.IntervalModifiers.End.Days == 0 &&
+		asset.IntervalModifiers.End.Months == 0 {
+		return nil
+	}
+
+	logger.Debugf("Validating interval modifiers for asset %s", asset.Name)
+
+	// If templates are used and applyModifiers is true, we need to render them
+	if (asset.IntervalModifiers.Start.Template != "" || asset.IntervalModifiers.End.Template != "") && applyModifiers {
+		// Create a temporary renderer to resolve templates
+		renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, "validation", "validation-run", nil)
+
+		// Resolve start modifier template
+		if asset.IntervalModifiers.Start.Template != "" {
+			resolvedStartModifier, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(renderer)
+			if err != nil {
+				return fmt.Errorf("failed to resolve start interval modifier template: %w", err)
+			}
+			asset.IntervalModifiers.Start = resolvedStartModifier
+		}
+
+		// Resolve end modifier template
+		if asset.IntervalModifiers.End.Template != "" {
+			resolvedEndModifier, err := asset.IntervalModifiers.End.ResolveTemplateToNew(renderer)
+			if err != nil {
+				return fmt.Errorf("failed to resolve end interval modifier template: %w", err)
+			}
+			asset.IntervalModifiers.End = resolvedEndModifier
+		}
+	}
+
+	// Apply modifiers to get final dates
+	finalStartDate := pipeline.ModifyDate(startDate, asset.IntervalModifiers.Start)
+	finalEndDate := pipeline.ModifyDate(endDate, asset.IntervalModifiers.End)
+
+	// Check if end date is earlier than start date
+	if finalEndDate.Before(finalStartDate) {
+		return fmt.Errorf("interval modifiers result in end date (%s) being earlier than start date (%s)",
+			finalEndDate.Format("2006-01-02 15:04:05"),
+			finalStartDate.Format("2006-01-02 15:04:05"))
+	}
+
+	logger.Debugf("Asset %s interval modifiers validated successfully - final start: %s, final end: %s",
+		asset.Name, finalStartDate.Format(time.RFC3339), finalEndDate.Format(time.RFC3339))
+
+	return nil
 }
 
 func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger logger.Logger) (time.Time, time.Time, string, error) {
