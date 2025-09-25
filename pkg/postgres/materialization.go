@@ -10,6 +10,15 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
+func quoteIdentifier(identifier string) string {
+	parts := strings.Split(identifier, ".")
+	quotedParts := make([]string, len(parts))
+	for i, part := range parts {
+		quotedParts[i] = fmt.Sprintf(`"%s"`, part)
+	}
+	return strings.Join(quotedParts, ".")
+}
+
 func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
 	return &pipeline.Materializer{
 		MaterializationMap: matMap,
@@ -59,11 +68,12 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+	quotedIncrementalKey := quoteIdentifier(mat.IncrementalKey)
 
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s\n", tempTableName, query),
-		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, quotedIncrementalKey, quotedIncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
 		"COMMIT",
@@ -87,18 +97,26 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	on := make([]string, 0, len(primaryKeys))
 	for _, key := range primaryKeys {
-		on = append(on, fmt.Sprintf("target.%s = source.%s", key, key))
+		on = append(on, fmt.Sprintf("target.%s = source.%s", quoteIdentifier(key), quoteIdentifier(key)))
 	}
 	onQuery := strings.Join(on, " AND ")
 
-	allColumnValues := strings.Join(columnNames, ", ")
+	// Quote all column names for INSERT clause
+	quotedColumnNames := make([]string, 0, len(columnNames))
+	quotedColumnValues := make([]string, 0, len(columnNames))
+	for _, col := range columnNames {
+		quotedColumnNames = append(quotedColumnNames, quoteIdentifier(col))
+		quotedColumnValues = append(quotedColumnValues, quoteIdentifier(col))
+	}
+	allColumnNamesStr := strings.Join(quotedColumnNames, ", ")
+	allColumnValuesStr := strings.Join(quotedColumnValues, ", ")
 
 	whenMatchedThenQuery := ""
 
 	if len(nonPrimaryKeys) > 0 {
 		matchedUpdateStatements := make([]string, 0, len(nonPrimaryKeys))
 		for _, col := range nonPrimaryKeys {
-			matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = source.%s", col, col))
+			matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = source.%s", quoteIdentifier(col), quoteIdentifier(col)))
 		}
 
 		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
@@ -109,7 +127,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		fmt.Sprintf("MERGE INTO %s target", asset.Name),
 		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
 		whenMatchedThenQuery,
-		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
+		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),
 	}
 
 	return strings.Join(mergeLines, "\n") + ";", nil
@@ -149,11 +167,12 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp || asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
+	quotedIncrementalKey := quoteIdentifier(asset.Materialization.IncrementalKey)
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,
-			asset.Materialization.IncrementalKey,
+			quotedIncrementalKey,
 			startVar,
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
@@ -171,15 +190,16 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnComments := []string{}
 
 	for _, col := range asset.Columns {
-		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+		quotedColName := quoteIdentifier(col.Name)
+		def := fmt.Sprintf("%s %s", quotedColName, col.Type)
 
 		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, col.Name)
+			primaryKeys = append(primaryKeys, quotedColName)
 		}
 		columnDefs = append(columnDefs, def)
 
 		if col.Description != "" {
-			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", asset.Name, col.Name, strings.ReplaceAll(col.Description, "'", "''"))
+			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", asset.Name, quotedColName, strings.ReplaceAll(col.Description, "'", "''"))
 			columnComments = append(columnComments, comment)
 		}
 	}
@@ -254,6 +274,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
 	}
 
+	quotedIncrementalKey := quoteIdentifier(asset.Materialization.IncrementalKey)
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
@@ -269,7 +290,7 @@ FROM (
 COMMIT;`,
 		asset.Name,
 		asset.Name,
-		asset.Materialization.IncrementalKey,
+		quotedIncrementalKey,
 		validuntil,
 		strings.TrimSpace(query),
 	)
@@ -292,20 +313,21 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	)
 
 	for _, col := range asset.Columns {
+		quotedColName := quoteIdentifier(col.Name)
 		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, col.Name)
+			primaryKeys = append(primaryKeys, quotedColName)
 		}
 		switch col.Name {
 		case "_is_current", "_valid_from", "_valid_until":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
-		insertCols = append(insertCols, col.Name)
-		insertValues = append(insertValues, "source."+col.Name)
+		insertCols = append(insertCols, quotedColName)
+		insertValues = append(insertValues, "source."+quotedColName)
 		if !col.PrimaryKey {
 			compareConds = append(compareConds,
-				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+				fmt.Sprintf("target.%s != source.%s", quotedColName, quotedColName))
 			compareCondsS1T1 = append(compareCondsS1T1,
-				fmt.Sprintf("t1.%[1]s != s1.%[1]s", col.Name))
+				fmt.Sprintf("t1.%s != s1.%s", quotedColName, quotedColName))
 		}
 	}
 
@@ -399,6 +421,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 		insertValues = make([]string, 0, 12)
 	)
 	for _, col := range asset.Columns {
+		quotedColName := quoteIdentifier(col.Name)
 		switch col.Name {
 		case "_valid_from", "_valid_until", "_is_current":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
@@ -409,11 +432,11 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 				return "", errors.New("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
 			}
 		}
-		insertCols = append(insertCols, col.Name)
-		insertValues = append(insertValues, "source."+col.Name)
+		insertCols = append(insertCols, quotedColName)
+		insertValues = append(insertValues, "source."+quotedColName)
 
 		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, col.Name)
+			primaryKeys = append(primaryKeys, quotedColName)
 		}
 	}
 
@@ -424,15 +447,16 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 		)
 	}
 	pkList := strings.Join(primaryKeys, ", ")
+	quotedIncrementalKey := quoteIdentifier(asset.Materialization.IncrementalKey)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(insertValues,
-		"source."+asset.Materialization.IncrementalKey,
+		"source."+quotedIncrementalKey,
 		"'9999-12-31 00:00:00'",
 		"TRUE",
 	)
 
 	for _, pk := range primaryKeys {
-		joinConds = append(joinConds, fmt.Sprintf("target.%[1]s = source.%[1]s", pk))
+		joinConds = append(joinConds, fmt.Sprintf("target.%s = source.%s", pk, pk))
 	}
 	joinConds = append(joinConds, "target._is_current AND source._is_current")
 	onCondition := strings.Join(joinConds, " AND ")
@@ -473,10 +497,10 @@ WHEN NOT MATCHED BY TARGET THEN
 		strings.TrimSpace(query),
 		tbl,
 		pkList,
-		asset.Materialization.IncrementalKey,
+		quotedIncrementalKey,
 		onCondition,
-		asset.Materialization.IncrementalKey,
-		asset.Materialization.IncrementalKey,
+		quotedIncrementalKey,
+		quotedIncrementalKey,
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
 	)
@@ -495,18 +519,19 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 	)
 
 	for _, col := range asset.Columns {
+		quotedColName := quoteIdentifier(col.Name)
 		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, col.Name)
+			primaryKeys = append(primaryKeys, quotedColName)
 		}
 		switch col.Name {
 		case "_is_current", "_valid_from", "_valid_until":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
-		insertCols = append(insertCols, col.Name)
-		insertValues = append(insertValues, "source."+col.Name)
+		insertCols = append(insertCols, quotedColName)
+		insertValues = append(insertValues, "source."+quotedColName)
 		if !col.PrimaryKey {
 			compareConds = append(compareConds,
-				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+				fmt.Sprintf("target.%s != source.%s", quotedColName, quotedColName))
 		}
 	}
 
@@ -611,6 +636,7 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 		insertValues = make([]string, 0, 12)
 	)
 	for _, col := range asset.Columns {
+		quotedColName := quoteIdentifier(col.Name)
 		switch col.Name {
 		case "_valid_from", "_valid_until", "_is_current":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
@@ -621,11 +647,11 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 				return "", errors.New("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
 			}
 		}
-		insertCols = append(insertCols, col.Name)
-		insertValues = append(insertValues, "source."+col.Name)
+		insertCols = append(insertCols, quotedColName)
+		insertValues = append(insertValues, "source."+quotedColName)
 
 		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, col.Name)
+			primaryKeys = append(primaryKeys, quotedColName)
 		}
 	}
 
@@ -635,9 +661,10 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 			asset.Materialization.Strategy,
 		)
 	}
+	quotedIncrementalKey := quoteIdentifier(asset.Materialization.IncrementalKey)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(insertValues,
-		"source."+asset.Materialization.IncrementalKey,
+		"source."+quotedIncrementalKey,
 		"TIMESTAMP '9999-12-31 00:00:00'",
 		"TRUE",
 	)
@@ -694,10 +721,10 @@ COMMIT;`,
 		tempTableName,
 		strings.TrimSpace(query),
 		asset.Name,
-		asset.Materialization.IncrementalKey,
+		quotedIncrementalKey,
 		tempTableName,
 		onCondition,
-		asset.Materialization.IncrementalKey,
+		quotedIncrementalKey,
 		asset.Name,
 		tempTableName,
 		onCondition,
@@ -709,7 +736,7 @@ COMMIT;`,
 		onCondition,
 		asset.Name,
 		onCondition,
-		asset.Materialization.IncrementalKey,
+		quotedIncrementalKey,
 		tempTableName,
 	)
 
