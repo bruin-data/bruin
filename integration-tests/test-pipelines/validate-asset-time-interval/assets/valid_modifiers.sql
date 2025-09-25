@@ -1,5 +1,5 @@
 /* @bruin
-name: start_end_modifier.example
+name: valid_modifiers.example
 interval_modifiers:
   start: 0h
   end: 0h

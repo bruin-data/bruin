@@ -1,7 +1,5 @@
-name: bruin-duckdb
+name: validate-asset-time-interval
 start_date: "2024-01-01"
 end_date: "2024-01-02"
 default_connections:
-    duckdb: "duckdb-default"
-default:
-    type: duckdb.sql
+    duckdb: "duckdb-validate-asset-time-interval"

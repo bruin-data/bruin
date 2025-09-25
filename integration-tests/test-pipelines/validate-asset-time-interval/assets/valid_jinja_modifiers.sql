@@ -1,8 +1,8 @@
 /* @bruin
-name: jinja.example
+name: valid_jinja.example
 interval_modifiers:
-  start: '{{ start_timestamp }}'
-  end: '{{ end_timestamp }}'
+  start: '{{ "-1d" }}'
+  end: '{{ "1d" }}'
 type: duckdb.sql
 materialization:
    type: table

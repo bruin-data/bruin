@@ -1054,6 +1054,23 @@ func TestIndividualTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "validate-asset-time-interval",
+			task: e2e.Task{
+				Name:    "validate-asset-time-interval",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-validate-asset-time-interval", "--apply-interval-modifiers", filepath.Join(currentFolder, "test-pipelines/validate-asset-time-interval")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{"bruin run completed", "Finished: valid_jinja_modifiers.jinja.example", "Finished: valid_modifiers.start_end_modifier.example"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
