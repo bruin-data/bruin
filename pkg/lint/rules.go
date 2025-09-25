@@ -1562,37 +1562,50 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 
 	return issues, nil
 }
+
 func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	
 	issues := make([]*Issue, 0)
 	renderer := jinja.NewRendererWithYesterday(p.Name, "some-run-id")
+
+	// Create a context with apply-interval-modifiers forced to true
+	validationCtx := context.Background()
+	validationCtx = context.WithValue(validationCtx, pipeline.RunConfigApplyIntervalModifiers, true)
 	
-	r, err := renderer.CloneForAsset(context.Background(), p, asset)
+	// Use pipeline's default dates or fallback to yesterday/today
+	startDate := ctx.Value(pipeline.RunConfigStartDate)
+	endDate := ctx.Value(pipeline.RunConfigEndDate)
+
+	
+	validationCtx = context.WithValue(validationCtx, pipeline.RunConfigStartDate, startDate)
+	validationCtx = context.WithValue(validationCtx, pipeline.RunConfigEndDate, endDate)
+	validationCtx = context.WithValue(validationCtx, pipeline.RunConfigRunID, "validation-run-id")
+
+	r, err := renderer.CloneForAsset(validationCtx, p, asset)
 	if err != nil {
 		return nil, err
 	}
 
-	startDate, err := r.Render("{{.StartDate}}")
+	renderedStartDate, err := r.Render("{{ start_date }}")
 	if err != nil {
 		return nil, err
 	}
 
-	endDate, err := r.Render("{{.EndDate}}")
+	renderedEndDate, err := r.Render("{{ end_date }}")
 	if err != nil {
 		return nil, err
 	}
 
-	renderedStartDate, err := time.Parse("2006-01-02 15:04:05", startDate)
+	parsedStartDate, err := time.Parse("2006-01-02", renderedStartDate)
 	if err != nil {
 		return nil, err
 	}
 	
-	renderedEndDate, err := time.Parse("2006-01-02 15:04:05", endDate)
+	parsedEndDate, err := time.Parse("2006-01-02", renderedEndDate)
 	if err != nil {
 		return nil, err
 	}
 
-	if renderedStartDate.After(renderedEndDate) {
+	if parsedStartDate.After(parsedEndDate) {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "start date is after end date for asset " + asset.Name,

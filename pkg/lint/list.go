@@ -238,6 +238,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			CrossPipelineValidator: ValidateCrossPipelineURIDependencies,
 			ApplicableLevels:       []Level{LevelCrossPipeline},
 		},
+		&SimpleRule{
+			Identifier:       "valid-time-interval",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureTimeIntervalIsValidForAsset,
+			ApplicableLevels: []Level{LevelAsset},
+		},
 	}
 
 	if parser != nil {
