@@ -1566,41 +1566,26 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	renderer := jinja.NewRendererWithYesterday(p.Name, "some-run-id")
-
-	// Create a context with apply-interval-modifiers forced to true
-	validationCtx := context.Background()
-	validationCtx = context.WithValue(validationCtx, pipeline.RunConfigApplyIntervalModifiers, true)
-	
-	// Use pipeline's default dates or fallback to yesterday/today
-	startDate := ctx.Value(pipeline.RunConfigStartDate)
-	endDate := ctx.Value(pipeline.RunConfigEndDate)
-
-	
-	validationCtx = context.WithValue(validationCtx, pipeline.RunConfigStartDate, startDate)
-	validationCtx = context.WithValue(validationCtx, pipeline.RunConfigEndDate, endDate)
-	validationCtx = context.WithValue(validationCtx, pipeline.RunConfigRunID, "validation-run-id")
-
-	r, err := renderer.CloneForAsset(validationCtx, p, asset)
+	r, err := renderer.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return nil, err
+	}
+	renderedStartDate, err := r.Render("{{ start_datetime }}")
 	if err != nil {
 		return nil, err
 	}
 
-	renderedStartDate, err := r.Render("{{ start_date }}")
+	renderedEndDate, err := r.Render("{{ end_datetime }}")
 	if err != nil {
 		return nil, err
 	}
 
-	renderedEndDate, err := r.Render("{{ end_date }}")
+	parsedStartDate, err := time.Parse("2006-01-02T15:04:05", renderedStartDate)
 	if err != nil {
 		return nil, err
 	}
 
-	parsedStartDate, err := time.Parse("2006-01-02", renderedStartDate)
-	if err != nil {
-		return nil, err
-	}
-	
-	parsedEndDate, err := time.Parse("2006-01-02", renderedEndDate)
+	parsedEndDate, err := time.Parse("2006-01-02T15:04:05", renderedEndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -1611,12 +1596,6 @@ func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline
 			Description: "start date is after end date for asset " + asset.Name,
 		})
 	}
-
-
-	ctx.Value(pipeline.RunConfigStartDate)
-	ctx.Value(pipeline.RunConfigEndDate)
-	ctx.Value(pipeline.RunConfigFullRefresh)
-	ctx.Value(pipeline.RunConfigApplyIntervalModifiers)
 
 	return issues, nil
 }
