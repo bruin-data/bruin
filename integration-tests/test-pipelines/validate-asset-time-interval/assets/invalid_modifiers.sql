@@ -1,8 +1,8 @@
 /* @bruin
 name: invalid_modifiers.example
 interval_modifiers:
-  start: 24h
-  end: -25h
+  start: 1d
+  end: -1d
 type: duckdb.sql
 materialization:
    type: table
