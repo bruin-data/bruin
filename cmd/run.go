@@ -21,6 +21,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
+	"github.com/bruin-data/bruin/pkg/claudecode"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/databricks"
@@ -1549,6 +1550,11 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeS3KeySensor) {
 		s3KeySensor := s3.NewKeySensor(conn, sensorMode)
 		mainExecutors[pipeline.AssetTypeS3KeySensor][scheduler.TaskInstanceTypeMain] = s3KeySensor
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeAgentClaudeCode) {
+		claudeCodeOperator := claudecode.NewClaudeCodeOperator(renderer)
+		mainExecutors[pipeline.AssetTypeAgentClaudeCode][scheduler.TaskInstanceTypeMain] = claudeCodeOperator
 	}
 
 	return mainExecutors, nil
