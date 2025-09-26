@@ -2,6 +2,50 @@
 
 Bruin supports integrating Tableau assets into your data pipelines. You can represent Tableau datasources, workbooks, worksheets, and dashboards as assets, and trigger refreshes for datasources and workbooks directly from your pipeline.
 
+## Connection
+
+In order to set up a Tableau connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
+
+Tableau supports two authentication methods:
+
+### Personal Access Token (Recommended)
+
+```yaml
+connections:
+  tableau:
+    - name: "connection_name"
+      host: "your-tableau-server.com"
+      site_id: "your-site-id"
+      personal_access_token_name: "your-token-name"
+      personal_access_token_secret: "your-token-secret"
+      api_version: "3.4" # optional, defaults to 3.4
+```
+
+### Username and Password
+
+```yaml
+connections:
+  tableau:
+    - name: "connection_name"
+      host: "your-tableau-server.com"
+      site_id: "your-site-id"
+      username: "your-username"
+      password: "your-password"
+      api_version: "3.4" # optional, defaults to 3.4
+```
+
+**Parameters:**
+- `name`: A unique name for this connection
+- `host`: Your Tableau Server hostname (without https://)
+- `site_id`: The site identifier (content URL) for your Tableau site
+- `personal_access_token_name`: Personal Access Token name (PAT authentication)
+- `personal_access_token_secret`: Personal Access Token secret (PAT authentication)
+- `username`: Your Tableau username (username/password authentication)
+- `password`: Your Tableau password (username/password authentication)
+- `api_version`: Tableau REST API version (optional, defaults to "3.4")
+
+> **Note:** Either Personal Access Token credentials (name and secret) or username/password credentials are required. Personal Access Token authentication is recommended for production environments.
+
 ## Supported Tableau Asset Types
 
 - `tableau.datasource` — Represents a Tableau data source (can be refreshed)
