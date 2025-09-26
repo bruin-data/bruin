@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery" //nolint:unused
@@ -15,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -1195,7 +1197,14 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: query.DefaultJinjaRenderer}
+			// Create a proper Jinja renderer with full context including start_date, end_date, etc.
+			// Use yesterday as the default date range, similar to other commands
+			yesterday := time.Now().AddDate(0, 0, -1)
+			startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
+			
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pp.Pipeline.Name, "asset-metadata-run", pp.Pipeline.Variables.Value())
+			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: renderer}
 			extractor, err := whole.CloneForAsset(ctx, pp.Pipeline, pp.Asset)
 			if err != nil {
 				printErrorJSON(err)
