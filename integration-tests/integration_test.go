@@ -1054,6 +1054,27 @@ func TestIndividualTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "validate-asset-time-interval",
+			task: e2e.Task{
+				Name:    "validate-asset-time-interval",
+				Command: binary,
+				Args:    []string{"validate", "--env", "env-validate-asset-time-interval", filepath.Join(currentFolder, "test-pipelines/validate-asset-time-interval")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"start date", "is after end date", "for asset invalid_jinja.example",
+						"start date", "is after end date", "for asset invalid_modifiers.example",
+						"Checked 1 pipeline and found", "2 issues",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

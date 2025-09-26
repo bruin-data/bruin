@@ -526,6 +526,17 @@
         ]
       },
       "schema_prefix": ""
+    },
+    "env-validate-asset-time-interval": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-validate-asset-time-interval",
+            "path": "duckdb-files/validate-asset-time-interval.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     }
   }
 }
