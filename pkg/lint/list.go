@@ -240,7 +240,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 		},
 		&SimpleRule{
 			Identifier:       "valid-time-interval",
-			Fast:             true,
+			Fast:             false,
 			Severity:         ValidatorSeverityCritical,
 			AssetValidator:   EnsureTimeIntervalIsValidForAsset,
 			ApplicableLevels: []Level{LevelAsset},
