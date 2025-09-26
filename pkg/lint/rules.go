@@ -1563,16 +1563,13 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 	return issues, nil
 }
 
-
-
-
 var intervalRenderer = jinja.NewRendererWithYesterday("some-pipeline", "some-run-id")
 
 func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	validationCtx := context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
-	
+
 	r, err := intervalRenderer.CloneForAsset(validationCtx, p, asset)
 	if err != nil {
 		return nil, err

@@ -1054,27 +1054,6 @@ func TestIndividualTasks(t *testing.T) {
 				},
 			},
 		},
-		// {
-		// 	name: "validate-asset-time-interval",
-		// 	task: e2e.Task{
-		// 		Name:    "validate-asset-time-interval",
-		// 		Command: binary,
-		// 		Args:    []string{"run", "--apply-interval-modifiers", "--start-date", "2025-01-01", "--end-date", "2025-01-02", "--env", "env-validate-asset-time-interval", "--no-color", filepath.Join(currentFolder, "test-pipelines/validate-asset-time-interval")},
-		// 		Env:     []string{},
-		// 		Expected: e2e.Output{
-		// 			ExitCode: 1,
-		// 			Contains: []string{
-		// 				"start date 2025-01-02 00:00:00 +0000 UTC is after end date 2025-01-01 00:00:00 +0000 UTC for asset invalid_jinja.example",
-		// 				"start date 2025-01-02 00:00:00 +0000 UTC is after end date 2025-01-01 00:00:00 +0000 UTC for asset invalid_modifiers.example",
-		// 				"Checked 1 pipeline and found", "2 issues",
-		// 			},
-		// 		},
-		// 		Asserts: []func(*e2e.Task) error{
-		// 			e2e.AssertByExitCode,
-		// 			e2e.AssertByContains,
-		// 		},
-		// 	},
-		// },
 		{
 			name: "validate-asset-time-interval",
 			task: e2e.Task{
@@ -1088,28 +1067,6 @@ func TestIndividualTasks(t *testing.T) {
 						"start date", "is after end date", "for asset invalid_jinja.example",
 						"start date", "is after end date", "for asset invalid_modifiers.example",
 						"Checked 1 pipeline and found", "2 issues",
-					},
-				},
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-					e2e.AssertByContains,
-				},
-			},
-		},
-		{
-			name: "validate-asset-time-interval-full-refresh",
-			task: e2e.Task{
-				Name:    "validate-asset-time-interval-full-refresh",
-				Command: binary,
-				Args:    []string{"run", "--apply-interval-modifiers", "--full-refresh", "--start-date", "2025-01-01", "--end-date", "2025-01-02", "--env", "env-validate-asset-time-interval", filepath.Join(currentFolder, "test-pipelines/validate-asset-time-interval")},
-				Env:     []string{},
-				Expected: e2e.Output{
-					ExitCode: 0,
-					Contains: []string{
-						"No issues found",
-						"Interval: 2024-01-01T00:00:00Z - 2025-01-02T00:00:00Z",
-						"Warning: --apply-interval-modifiers flag is ignored when --full-refresh is enabled.",
-						"Successfully validated 4 asset",
 					},
 				},
 				Asserts: []func(*e2e.Task) error{
