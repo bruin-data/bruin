@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -1195,7 +1196,8 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: query.DefaultJinjaRenderer}
+			renderer := jinja.NewRendererWithStartEndDates(&defaultStartDate, &defaultEndDate, pp.Pipeline.Name, "asset-metadata-run", pp.Pipeline.Variables.Value())
+			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: renderer}
 			extractor, err := whole.CloneForAsset(ctx, pp.Pipeline, pp.Asset)
 			if err != nil {
 				printErrorJSON(err)
