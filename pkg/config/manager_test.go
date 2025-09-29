@@ -632,6 +632,14 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "test-api-key",
 				},
 			},
+			Jira: []JiraConnection{
+				{
+					Name:     "jira-1",
+					Domain:   "company.atlassian.net",
+					Email:    "user@company.com",
+					APIToken: "test-api-token",
+				},
+			},
 		},
 	}
 
