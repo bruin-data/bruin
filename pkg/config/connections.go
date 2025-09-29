@@ -1018,3 +1018,14 @@ type FundraiseUpConnection struct {
 func (c FundraiseUpConnection) GetName() string {
 	return c.Name
 }
+
+type JiraConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Domain   string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
+	Email    string `yaml:"email,omitempty" json:"email" mapstructure:"email"`
+	APIToken string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+}
+
+func (c JiraConnection) GetName() string {
+	return c.Name
+}

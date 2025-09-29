@@ -229,6 +229,7 @@ export default withMermaid({
                             {text: "Intercom", link: "/ingestion/intercom.md"},
                             {text: "InfluxDB", link: "/ingestion/influxdb.md"},
                             {text: "Internet Society Pulse", link: "/ingestion/isoc_pulse.md"},
+                            {text: "Jira", link: "/ingestion/jira.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
                             {text: "Kinesis", link: "/ingestion/kinesis.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
