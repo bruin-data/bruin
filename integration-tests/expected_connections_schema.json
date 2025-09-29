@@ -772,6 +772,12 @@
             "$ref": "#/$defs/FundraiseUpConnection"
           },
           "type": "array"
+        },
+        "jira": {
+          "items": {
+            "$ref": "#/$defs/JiraConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -2431,6 +2437,30 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "JiraConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "domain",
+        "email",
+        "api_token"
       ]
     }
   }
