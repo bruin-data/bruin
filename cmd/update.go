@@ -18,14 +18,7 @@ func Update() *cli.Command {
 	return &cli.Command{
 		Name:  "update",
 		Usage: "Update Bruin CLI to the latest version",
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "force",
-				Usage: "Force update even if already on the latest version",
-			},
-		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			force := c.Bool("force")
 			
 			// Show current version before updating
 			currentVersion := c.Root().Version
@@ -51,10 +44,6 @@ func Update() *cli.Command {
 
 			// Create a pipe to sh
 			shCmd := exec.Command("sh")
-			if force {
-				// Set environment variable to force reinstall if needed
-				shCmd.Env = append(os.Environ(), "FORCE_INSTALL=1")
-			}
 
 			// Connect the download command output to sh input
 			downloadStdout, err := cmd.StdoutPipe()

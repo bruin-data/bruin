@@ -19,24 +19,12 @@ The update command downloads and runs the official Bruin installation script, wh
 
 This eliminates the need to manually visit the website and run the installation command each time you want to update.
 
-## Flags
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--force` | bool | false | Force update even if already on the latest version |
-
 ## Examples
 
-### Basic Update
+### Update to Latest Version
 Update to the latest version:
 ```shell
 bruin update
-```
-
-### Force Update
-Force reinstallation even if you're already on the latest version:
-```shell
-bruin update --force
 ```
 
 ## Prerequisites
