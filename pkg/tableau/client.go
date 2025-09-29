@@ -67,8 +67,15 @@ type listDatasourcesResponse struct {
 }
 
 type WorkbookInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID         string       `json:"id"`
+	Name       string       `json:"name"`
+	ContentURL string       `json:"contentUrl,omitempty"`
+	WebpageURL string       `json:"webpageUrl,omitempty"`
+	Project    ProjectInfo  `json:"project,omitempty"`
+	Owner      OwnerInfo    `json:"owner,omitempty"`
+	Tags       *TagsWrapper `json:"tags,omitempty"`
+	CreatedAt  string       `json:"createdAt,omitempty"`
+	UpdatedAt  string       `json:"updatedAt,omitempty"`
 }
 
 type listWorkbooksResponse struct {
@@ -100,7 +107,7 @@ func NewClient(c Config) (*Client, error) {
 	}
 
 	if c.APIVersion == "" {
-		c.APIVersion = "3.4"
+		c.APIVersion = "3.21" // Updated to more recent API version for better compatibility
 	}
 
 	return &Client{
@@ -311,6 +318,16 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 	return nil
 }
 
+// GetHost returns the Tableau host URL
+func (c *Client) GetHost() string {
+	return c.config.Host
+}
+
+// GetSiteID returns the Tableau site ID
+func (c *Client) GetSiteID() string {
+	return c.config.SiteID
+}
+
 func (c *Client) Ping(ctx context.Context) error {
 	if err := c.authenticate(ctx); err != nil {
 		return errors.Wrap(err, "failed to authenticate during ping")
@@ -426,4 +443,424 @@ func FindWorkbookIDByName(ctx context.Context, name string, workbooks []Workbook
 		}
 	}
 	return "", nil
+}
+
+// View represents a Tableau view/dashboard
+type ViewInfo struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	ContentURL   string        `json:"contentUrl"`
+	ViewURL      string        `json:"viewUrl,omitempty"`
+	WorkbookID   string        `json:"-"` // Set manually after fetching
+	WorkbookInfo *WorkbookInfo `json:"workbook,omitempty"`
+	Project      ProjectInfo   `json:"project,omitempty"`
+	Owner        OwnerInfo     `json:"owner,omitempty"`
+	Tags         *TagsWrapper  `json:"tags,omitempty"` // Tags are wrapped in an object
+	CreatedAt    string        `json:"createdAt,omitempty"`
+	UpdatedAt    string        `json:"updatedAt,omitempty"`
+}
+
+type ProjectInfo struct {
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	Description        string `json:"description,omitempty"`
+	ParentProjectID    string `json:"parentProjectId,omitempty"`
+	ContentPermissions string `json:"contentPermissions,omitempty"`
+}
+
+type OwnerInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type TagInfo struct {
+	Label string `json:"label"`
+}
+
+type TagsWrapper struct {
+	Tag []TagInfo `json:"tag,omitempty"`
+}
+
+type listViewsResponse struct {
+	Views struct {
+		View []ViewInfo `json:"view"`
+	} `json:"views"`
+	Pagination *PaginationInfo `json:"pagination,omitempty"`
+}
+
+type PaginationInfo struct {
+	PageNumber     string `json:"pageNumber"` // Tableau returns these as strings
+	PageSize       string `json:"pageSize"`
+	TotalAvailable string `json:"totalAvailable"`
+}
+
+// ConnectionInfo represents a data source connection in a workbook
+type ConnectionInfo struct {
+	ID             string `json:"id"`
+	Type           string `json:"type"`
+	ServerAddress  string `json:"serverAddress,omitempty"`
+	ServerPort     string `json:"serverPort,omitempty"`
+	DatabaseName   string `json:"databaseName,omitempty"`
+	UserName       string `json:"userName,omitempty"`
+	ConnectionType string `json:"connectionType,omitempty"`
+}
+
+// WorkbookConnection represents the connection details for a workbook
+type WorkbookConnection struct {
+	Datasource *DataSourceInfo `json:"datasource,omitempty"`
+	Connection *ConnectionInfo `json:"connection,omitempty"`
+}
+
+type listWorkbookConnectionsResponse struct {
+	Connections struct {
+		Connection []WorkbookConnection `json:"connection"`
+	} `json:"connections"`
+}
+
+// ExtendedWorkbookInfo represents detailed workbook information with connections
+type ExtendedWorkbookInfo struct {
+	WorkbookInfo
+	Connections []WorkbookConnection `json:"-"`
+	Views       []ViewInfo           `json:"-"`
+}
+
+// ProjectDetails represents detailed project information with hierarchy
+type ProjectDetails struct {
+	ProjectInfo
+	ParentProject *ProjectInfo  `json:"parentProject,omitempty"`
+	ChildProjects []ProjectInfo `json:"childProjects,omitempty"`
+}
+
+type listProjectsResponse struct {
+	Projects struct {
+		Project []ProjectInfo `json:"project"`
+	} `json:"projects"`
+	Pagination *PaginationInfo `json:"pagination,omitempty"`
+}
+
+// GetWorkbookViews returns all views (dashboards/worksheets) for a specific workbook
+func (c *Client) GetWorkbookViews(ctx context.Context, workbookID string) ([]ViewInfo, error) {
+	if err := c.authenticate(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to authenticate during get workbook views")
+	}
+
+	url := fmt.Sprintf("https://%s/api/%s/sites/%s/workbooks/%s/views",
+		c.config.Host, c.config.APIVersion, c.siteID, workbookID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create get views request")
+	}
+
+	req.Header.Set("X-Tableau-Auth", c.authToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to perform get views request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.Errorf("get views failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var viewsResp listViewsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&viewsResp); err != nil {
+		return nil, errors.Wrap(err, "failed to decode views response")
+	}
+
+	// Set workbook ID for each view
+	for i := range viewsResp.Views.View {
+		viewsResp.Views.View[i].WorkbookID = workbookID
+	}
+
+	return viewsResp.Views.View, nil
+}
+
+// ListAllViews returns all views (dashboards/worksheets) on the site
+func (c *Client) ListAllViews(ctx context.Context) ([]ViewInfo, error) {
+	if err := c.authenticate(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to authenticate during list all views")
+	}
+
+	var allViews []ViewInfo
+	pageNumber := 1
+	pageSize := 100 // Tableau default page size
+
+	for {
+		url := fmt.Sprintf("https://%s/api/%s/sites/%s/views?pageNumber=%d&pageSize=%d",
+			c.config.Host, c.config.APIVersion, c.siteID, pageNumber, pageSize)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create list views request")
+		}
+
+		req.Header.Set("X-Tableau-Auth", c.authToken)
+		req.Header.Set("Accept", "application/json")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to perform list views request")
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			// Provide more context about the error
+			errMsg := fmt.Sprintf("list views failed with status %d", resp.StatusCode)
+			if resp.StatusCode == http.StatusUnauthorized {
+				errMsg += " - authentication failed, check your PAT or credentials"
+			} else if resp.StatusCode == http.StatusForbidden {
+				errMsg += " - access denied, check permissions for this site"
+			} else if resp.StatusCode == http.StatusNotFound {
+				errMsg += " - endpoint not found, API version may be incompatible"
+			}
+			if len(body) > 0 {
+				errMsg += fmt.Sprintf(": %s", string(body))
+			}
+			return nil, errors.New(errMsg)
+		}
+
+		var viewsResp listViewsResponse
+		if err := json.NewDecoder(resp.Body).Decode(&viewsResp); err != nil {
+			resp.Body.Close()
+			return nil, errors.Wrap(err, "failed to decode views response")
+		}
+		resp.Body.Close()
+
+		// Add views to collection
+		allViews = append(allViews, viewsResp.Views.View...)
+
+		// Check if we have more pages
+		if viewsResp.Pagination != nil && viewsResp.Pagination.TotalAvailable != "" {
+			// Parse string pagination values
+			totalAvail := 0
+			fmt.Sscanf(viewsResp.Pagination.TotalAvailable, "%d", &totalAvail)
+
+			totalFetched := pageNumber * pageSize
+			if totalFetched >= totalAvail {
+				break
+			}
+		} else if len(viewsResp.Views.View) < pageSize {
+			// No pagination info, but we got fewer items than page size, so we're done
+			break
+		}
+
+		pageNumber++
+	}
+
+	return allViews, nil
+}
+
+// GetViewDetails fetches detailed information about a specific view
+func (c *Client) GetViewDetails(ctx context.Context, viewID string) (*ViewInfo, error) {
+	if err := c.authenticate(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to authenticate during get view details")
+	}
+
+	url := fmt.Sprintf("https://%s/api/%s/sites/%s/views/%s",
+		c.config.Host, c.config.APIVersion, c.siteID, viewID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create get view details request")
+	}
+
+	req.Header.Set("X-Tableau-Auth", c.authToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to perform get view details request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.Errorf("get view details failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var viewResp struct {
+		View ViewInfo `json:"view"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&viewResp); err != nil {
+		return nil, errors.Wrap(err, "failed to decode view details response")
+	}
+
+	return &viewResp.View, nil
+}
+
+// GetWorkbookDetails returns detailed information for a specific workbook
+func (c *Client) GetWorkbookDetails(ctx context.Context, workbookID string) (*WorkbookInfo, error) {
+	if err := c.authenticate(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to authenticate during get workbook details")
+	}
+
+	url := fmt.Sprintf("https://%s/api/%s/sites/%s/workbooks/%s",
+		c.config.Host, c.config.APIVersion, c.siteID, workbookID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create get workbook details request")
+	}
+
+	req.Header.Set("X-Tableau-Auth", c.authToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to perform get workbook details request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.Errorf("get workbook details failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var workbookResp struct {
+		Workbook WorkbookInfo `json:"workbook"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&workbookResp); err != nil {
+		return nil, errors.Wrap(err, "failed to decode workbook details response")
+	}
+
+	return &workbookResp.Workbook, nil
+}
+
+// GetWorkbookConnections returns all data source connections for a specific workbook
+func (c *Client) GetWorkbookConnections(ctx context.Context, workbookID string) ([]WorkbookConnection, error) {
+	if err := c.authenticate(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to authenticate during get workbook connections")
+	}
+
+	url := fmt.Sprintf("https://%s/api/%s/sites/%s/workbooks/%s/connections",
+		c.config.Host, c.config.APIVersion, c.siteID, workbookID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create get workbook connections request")
+	}
+
+	req.Header.Set("X-Tableau-Auth", c.authToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to perform get workbook connections request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.Errorf("get workbook connections failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var connectionsResp listWorkbookConnectionsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&connectionsResp); err != nil {
+		return nil, errors.Wrap(err, "failed to decode workbook connections response")
+	}
+
+	return connectionsResp.Connections.Connection, nil
+}
+
+// ListProjects returns all projects on the site
+func (c *Client) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
+	if err := c.authenticate(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to authenticate during list projects")
+	}
+
+	var allProjects []ProjectInfo
+	pageNumber := 1
+	pageSize := 100
+
+	for {
+		url := fmt.Sprintf("https://%s/api/%s/sites/%s/projects?pageNumber=%d&pageSize=%d",
+			c.config.Host, c.config.APIVersion, c.siteID, pageNumber, pageSize)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create list projects request")
+		}
+
+		req.Header.Set("X-Tableau-Auth", c.authToken)
+		req.Header.Set("Accept", "application/json")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to perform list projects request")
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, errors.Errorf("list projects failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		var projectsResp listProjectsResponse
+		if err := json.NewDecoder(resp.Body).Decode(&projectsResp); err != nil {
+			resp.Body.Close()
+			return nil, errors.Wrap(err, "failed to decode projects response")
+		}
+		resp.Body.Close()
+
+		allProjects = append(allProjects, projectsResp.Projects.Project...)
+
+		// Check if there are more pages
+		if projectsResp.Pagination == nil {
+			break
+		}
+
+		var totalAvailable int
+		fmt.Sscanf(projectsResp.Pagination.TotalAvailable, "%d", &totalAvailable)
+
+		if pageNumber*pageSize >= totalAvailable {
+			break
+		}
+
+		pageNumber++
+	}
+
+	return allProjects, nil
+}
+
+// GetProjectDetails returns detailed information for a specific project
+func (c *Client) GetProjectDetails(ctx context.Context, projectID string) (*ProjectInfo, error) {
+	if err := c.authenticate(ctx); err != nil {
+		return nil, errors.Wrap(err, "failed to authenticate during get project details")
+	}
+
+	url := fmt.Sprintf("https://%s/api/%s/sites/%s/projects/%s",
+		c.config.Host, c.config.APIVersion, c.siteID, projectID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create get project details request")
+	}
+
+	req.Header.Set("X-Tableau-Auth", c.authToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to perform get project details request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.Errorf("get project details failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var projectResp struct {
+		Project ProjectInfo `json:"project"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&projectResp); err != nil {
+		return nil, errors.Wrap(err, "failed to decode project details response")
+	}
+
+	return &projectResp.Project, nil
 }
