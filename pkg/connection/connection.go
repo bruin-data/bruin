@@ -45,6 +45,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/influxdb"
 	"github.com/bruin-data/bruin/pkg/intercom"
 	"github.com/bruin-data/bruin/pkg/isocpulse"
+	"github.com/bruin-data/bruin/pkg/jira"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/kinesis"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
@@ -142,6 +143,7 @@ type Manager struct {
 	Frankfurter          map[string]*frankfurter.Client
 	Fluxx                map[string]*fluxx.Client
 	FundraiseUp          map[string]*fundraiseup.Client
+	Jira                 map[string]*jira.Client
 	EMRSeverless         map[string]*emr_serverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
 	AppLovin             map[string]*applovin.Client
@@ -2006,6 +2008,27 @@ func (m *Manager) AddFundraiseUpConnectionFromConfig(connection *config.Fundrais
 	return nil
 }
 
+func (m *Manager) AddJiraConnectionFromConfig(connection *config.JiraConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Jira == nil {
+		m.Jira = make(map[string]*jira.Client)
+	}
+
+	client, err := jira.NewClient(jira.Config{
+		Domain:   connection.Domain,
+		Email:    connection.Email,
+		APIToken: connection.APIToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.Jira[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2215,6 +2238,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Jira, connectionManager.AddJiraConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)
