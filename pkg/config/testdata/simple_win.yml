@@ -393,6 +393,11 @@ environments:
       fundraiseup:
         - name: "fundraiseup-1"
           api_key: "test-api-key"
+      jira:
+        - name: "jira-1"
+          domain: "company.atlassian.net"
+          email: "user@company.com"
+          api_token: "test-api-token"
 
   prod:
     connections:
