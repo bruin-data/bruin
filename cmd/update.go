@@ -19,11 +19,10 @@ func Update() *cli.Command {
 		Name:  "update",
 		Usage: "Update Bruin CLI to the latest version",
 		Action: func(ctx context.Context, c *cli.Command) error {
-			
 			// Show current version before updating
 			currentVersion := c.Root().Version
 			infoPrinter.Printf("Current Bruin version: %s\n", currentVersion)
-			
+
 			// Check if we're on Windows and warn about using the right terminal
 			if runtime.GOOS == "windows" {
 				infoPrinter.Println("Note: If you're on Windows, make sure to run this command in Git Bash or WSL terminal.")
@@ -31,14 +30,15 @@ func Update() *cli.Command {
 
 			// Inform user what we're doing
 			infoPrinter.Println("Downloading and running the latest Bruin installation script...")
-			
+
 			// Determine which command to use for downloading
 			var cmd *exec.Cmd
-			if isCommandAvailable("curl") {
+			switch {
+			case isCommandAvailable("curl"):
 				cmd = exec.Command("curl", "-LsSf", "https://getbruin.com/install/cli")
-			} else if isCommandAvailable("wget") {
+			case isCommandAvailable("wget"):
 				cmd = exec.Command("wget", "-qO-", "https://getbruin.com/install/cli")
-			} else {
+			default:
 				return errors.New("neither curl nor wget is available - please install one of them to update Bruin")
 			}
 
@@ -89,7 +89,7 @@ func Update() *cli.Command {
 
 			successPrinter.Println("\nBruin CLI update completed successfully!")
 			infoPrinter.Println("You may need to restart your shell or run 'source ~/.bashrc' (or equivalent) to use the updated version.")
-			
+
 			return nil
 		},
 		Before: telemetry.BeforeCommand,
@@ -97,13 +97,13 @@ func Update() *cli.Command {
 	}
 }
 
-// isCommandAvailable checks if a command is available in the system PATH
+// isCommandAvailable checks if a command is available in the system PATH.
 func isCommandAvailable(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
 }
 
-// streamOutput streams data from reader to writer line by line
+// streamOutput streams data from reader to writer line by line.
 func streamOutput(reader io.Reader, writer io.Writer) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
