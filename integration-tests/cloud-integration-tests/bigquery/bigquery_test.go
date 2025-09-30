@@ -138,7 +138,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "create the initial products table",
 							Command: binary,
-							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/asset-query-pipeline/assets/products.sql")),
+							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-pipelines/asset-query-pipeline/assets/products.sql")),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -578,7 +578,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 					Name: "bigquery-dry-run-pipeline",
 					Steps: []e2e.Task{
 						{
-							Name:    "dry-run-pipeline: run the pipeline",
+							Name:    "dry-run-pipeline: run the asset",
 							Command: binary,
 							Args:    append(append([]string{"run"}, configFlags...), filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/dry_run_table.sql")),
 							Expected: e2e.Output{
@@ -589,9 +589,23 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:          "dry-run-pipeline: query the table",
+							Name:          "dry-run-pipeline: query the asset metadata",
 							Command:       binary,
 							Args:          append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/select.sql")),
+							SkipJSONNodes: []string{`"ProjectID"`},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								Output:   helpers.ReadFile(filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/expectations/results.json")),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByOutputJSON,
+							},
+						},
+						{
+							Name:    "dry-run-pipeline: query the sensor metadata",
+							Command: binary,
+							Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/select_sensor.asset.yml")),
 							SkipJSONNodes: []string{`"ProjectID"`},
 							Expected: e2e.Output{
 								ExitCode: 0,
