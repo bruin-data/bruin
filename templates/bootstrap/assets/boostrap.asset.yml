@@ -1,4 +1,4 @@
-name: bootstrap
+name: public.bootstrap
 type: duckdb.seed
 
 parameters:
