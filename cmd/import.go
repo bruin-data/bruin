@@ -528,9 +528,9 @@ func (d customDelegate) renderScheduledQueryItem(w io.Writer, m list.Model, inde
 		fmt.Fprintf(w, "%s\n%s", styledLine, descLine)
 	} else {
 		// Non-current item
-		titleColor := "#374151"
+		titleColor := colorGray
 		if isSelected {
-			titleColor = "#059669"
+			titleColor = colorSuccess
 		}
 
 		titleLine := lipgloss.NewStyle().
@@ -584,9 +584,9 @@ func (d customDelegate) renderTableauDashboardItem(w io.Writer, m list.Model, in
 		fmt.Fprintf(w, "%s\n%s", styledLine, descLine)
 	} else {
 		// Non-current item
-		titleColor := "#374151"
+		titleColor := colorGray
 		if isSelected {
-			titleColor = "#059669"
+			titleColor = colorSuccess
 		}
 
 		titleLine := lipgloss.NewStyle().
@@ -619,29 +619,42 @@ type scheduledQueryModel struct {
 	focusedPane   int // 0 for left pane, 1 for right pane
 }
 
+// Color constants for UI styling.
+const (
+	colorGray      = "#374151"
+	colorBlue      = "#4F46E5"
+	colorOrange    = "#FF6B35"
+	colorGreen     = "#10B981"
+	colorPurple    = "#A78BFA"
+	colorLightGray = "#9CA3AF"
+	colorDarkGray  = "#6B7280"
+	colorDarkBg    = "#1F2937"
+	colorSuccess   = "#059669"
+)
+
 // Styles for the UI.
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#FF6B35")).
+			Foreground(lipgloss.Color(colorOrange)).
 			MarginTop(1).
 			MarginBottom(1)
 
 	// Panel styles.
 	leftPanelStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#4F46E5")).
+			BorderForeground(lipgloss.Color(colorBlue)).
 			Padding(1)
 
 	rightPanelStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#FF6B35")).
+			BorderForeground(lipgloss.Color(colorOrange)).
 			Padding(0, 1)
 
 	// Status bar style.
 	statusBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#1F2937")).
-			Foreground(lipgloss.Color("#9CA3AF")).
+			Background(lipgloss.Color(colorDarkBg)).
+			Foreground(lipgloss.Color(colorLightGray)).
 			Padding(0, 1)
 )
 
@@ -769,7 +782,7 @@ func (m *scheduledQueryModel) updateRightPanelContent() {
 	currentIndex := m.list.Index()
 	if currentIndex >= len(m.queries) {
 		m.rightViewport.SetContent(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
+			Foreground(lipgloss.Color(colorDarkGray)).
 			Render("No query selected"))
 		return
 	}
@@ -779,9 +792,9 @@ func (m *scheduledQueryModel) updateRightPanelContent() {
 
 	sectionHeaderStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#A78BFA"))
+		Foreground(lipgloss.Color(colorPurple))
 
-	regularTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
+	regularTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorLightGray))
 
 	if query.DisplayName != "" {
 		content.WriteString(sectionHeaderStyle.Render("Name: "))
@@ -812,11 +825,11 @@ func (m *scheduledQueryModel) updateRightPanelContent() {
 
 	if strings.TrimSpace(query.Query) == "" {
 		noQueryStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
+			Foreground(lipgloss.Color(colorDarkGray)).
 			Italic(true).
 			Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#374151"))
+			BorderForeground(lipgloss.Color(colorGray))
 
 		content.WriteString(noQueryStyle.Render("-- No SQL query available --"))
 	} else {
@@ -865,7 +878,7 @@ func (m *scheduledQueryModel) View() string {
 	}
 
 	summary := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981")).
+		Foreground(lipgloss.Color(colorGreen)).
 		Bold(true).
 		Render(summaryText)
 
@@ -877,18 +890,18 @@ func (m *scheduledQueryModel) View() string {
 
 	leftTitle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#4F46E5")).
+		Foreground(lipgloss.Color(colorBlue)).
 		Padding(0, 1).
 		Render(leftPanelTitle)
 
 	// Panel styles with dynamic border colors based on focus
-	leftBorderColor := "#374151"
-	rightBorderColor := "#374151"
+	leftBorderColor := colorGray
+	rightBorderColor := colorGray
 
 	if m.focusedPane == 0 {
-		leftBorderColor = "#4F46E5"
+		leftBorderColor = colorBlue
 	} else if m.focusedPane == 1 {
-		rightBorderColor = "#FF6B35"
+		rightBorderColor = colorOrange
 	}
 
 	// Use the same height for both panels to ensure alignment
@@ -1158,7 +1171,7 @@ func searchLocationsInParallel(ctx context.Context, client *datatransfer.Client,
 		fmt.Printf("\n%s\n", summaryStyle.Render(message))
 	} else {
 		emptyStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
+			Foreground(lipgloss.Color(colorDarkGray)).
 			MarginTop(1)
 
 		fmt.Printf("\n%s\n", emptyStyle.Render("📭 No scheduled queries found in any region"))
@@ -1564,7 +1577,7 @@ Example:
 	}
 }
 
-// TableauDashboard represents a dashboard/view with its workbook information
+// TableauDashboard represents a dashboard/view with its workbook information.
 type TableauDashboard struct {
 	ViewID       string
 	ViewName     string
@@ -1583,7 +1596,7 @@ type TableauDashboard struct {
 	Connections  []tableau.WorkbookConnection // Added for connection tracking
 }
 
-// tableauDashboardItem implements list.Item interface for the TUI
+// tableauDashboardItem implements list.Item interface for the TUI.
 type tableauDashboardItem struct {
 	dashboard TableauDashboard
 	selected  bool
@@ -1614,7 +1627,7 @@ func (i tableauDashboardItem) FilterValue() string {
 	return i.Title() + " " + i.dashboard.WorkbookName + " " + i.dashboard.ProjectName
 }
 
-// tableauDashboardModel is the Bubbletea model for dashboard selection
+// tableauDashboardModel is the Bubbletea model for dashboard selection.
 type tableauDashboardModel struct {
 	dashboards    []TableauDashboard
 	list          list.Model
@@ -1739,7 +1752,7 @@ func (m *tableauDashboardModel) updateRightPanelContent() {
 	currentIndex := m.list.Index()
 	if currentIndex >= len(m.dashboards) {
 		m.rightViewport.SetContent(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
+			Foreground(lipgloss.Color(colorDarkGray)).
 			Render("No dashboard selected"))
 		return
 	}
@@ -1749,9 +1762,9 @@ func (m *tableauDashboardModel) updateRightPanelContent() {
 
 	sectionHeaderStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#A78BFA"))
+		Foreground(lipgloss.Color(colorPurple))
 
-	regularTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
+	regularTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorLightGray))
 
 	content.WriteString(sectionHeaderStyle.Render("Dashboard Details"))
 	content.WriteString("\n\n")
@@ -1838,7 +1851,7 @@ func (m *tableauDashboardModel) View() string {
 	}
 
 	summary := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981")).
+		Foreground(lipgloss.Color(colorGreen)).
 		Bold(true).
 		Render(summaryText)
 
@@ -1849,17 +1862,17 @@ func (m *tableauDashboardModel) View() string {
 
 	leftTitle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#4F46E5")).
+		Foreground(lipgloss.Color(colorBlue)).
 		Padding(0, 1).
 		Render(leftPanelTitle)
 
-	leftBorderColor := "#374151"
-	rightBorderColor := "#374151"
+	leftBorderColor := colorGray
+	rightBorderColor := colorGray
 
 	if m.focusedPane == 0 {
-		leftBorderColor = "#4F46E5"
+		leftBorderColor = colorBlue
 	} else if m.focusedPane == 1 {
-		rightBorderColor = "#FF6B35"
+		rightBorderColor = colorOrange
 	}
 
 	panelHeight := maxInt(m.list.Height()+4, m.rightViewport.Height+4)

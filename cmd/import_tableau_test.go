@@ -9,6 +9,7 @@ import (
 )
 
 func TestTableauDashboardItem(t *testing.T) {
+	t.Parallel()
 	dashboard := TableauDashboard{
 		ViewID:       "test-view-id",
 		ViewName:     "Test Dashboard",
@@ -23,6 +24,7 @@ func TestTableauDashboardItem(t *testing.T) {
 }
 
 func TestImportTableauDashboards(t *testing.T) {
+	t.Parallel()
 	cmd := ImportTableauDashboards()
 
 	// Test command basic properties
@@ -64,6 +66,7 @@ func TestImportTableauDashboards(t *testing.T) {
 }
 
 func TestGenerateAssetNameFromDashboard(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		dashboard TableauDashboard
@@ -110,6 +113,7 @@ func TestGenerateAssetNameFromDashboard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := generateAssetNameFromDashboard(tt.dashboard)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -117,6 +121,7 @@ func TestGenerateAssetNameFromDashboard(t *testing.T) {
 }
 
 func TestSanitizeFolderName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -161,6 +166,7 @@ func TestSanitizeFolderName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := sanitizeFolderName(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -168,6 +174,7 @@ func TestSanitizeFolderName(t *testing.T) {
 }
 
 func TestCreateDataSourceAssetName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -197,6 +204,7 @@ func TestCreateDataSourceAssetName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := createDataSourceAssetName(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -204,6 +212,7 @@ func TestCreateDataSourceAssetName(t *testing.T) {
 }
 
 func TestCreateWorkbookAssetName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -233,6 +242,7 @@ func TestCreateWorkbookAssetName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := createWorkbookAssetName(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})

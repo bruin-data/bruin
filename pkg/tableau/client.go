@@ -318,12 +318,12 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 	return nil
 }
 
-// GetHost returns the Tableau host URL
+// GetHost returns the Tableau host URL.
 func (c *Client) GetHost() string {
 	return c.config.Host
 }
 
-// GetSiteID returns the Tableau site ID
+// GetSiteID returns the Tableau site ID.
 func (c *Client) GetSiteID() string {
 	return c.config.SiteID
 }
@@ -445,7 +445,7 @@ func FindWorkbookIDByName(ctx context.Context, name string, workbooks []Workbook
 	return "", nil
 }
 
-// View represents a Tableau view/dashboard
+// View represents a Tableau view/dashboard.
 type ViewInfo struct {
 	ID           string        `json:"id"`
 	Name         string        `json:"name"`
@@ -494,7 +494,7 @@ type PaginationInfo struct {
 	TotalAvailable string `json:"totalAvailable"`
 }
 
-// ConnectionInfo represents a data source connection in a workbook
+// ConnectionInfo represents a data source connection in a workbook.
 type ConnectionInfo struct {
 	ID             string `json:"id"`
 	Type           string `json:"type"`
@@ -505,7 +505,7 @@ type ConnectionInfo struct {
 	ConnectionType string `json:"connectionType,omitempty"`
 }
 
-// WorkbookConnection represents the connection details for a workbook
+// WorkbookConnection represents the connection details for a workbook.
 type WorkbookConnection struct {
 	Datasource *DataSourceInfo `json:"datasource,omitempty"`
 	Connection *ConnectionInfo `json:"connection,omitempty"`
@@ -517,14 +517,14 @@ type listWorkbookConnectionsResponse struct {
 	} `json:"connections"`
 }
 
-// ExtendedWorkbookInfo represents detailed workbook information with connections
+// ExtendedWorkbookInfo represents detailed workbook information with connections.
 type ExtendedWorkbookInfo struct {
 	WorkbookInfo
 	Connections []WorkbookConnection `json:"-"`
 	Views       []ViewInfo           `json:"-"`
 }
 
-// ProjectDetails represents detailed project information with hierarchy
+// ProjectDetails represents detailed project information with hierarchy.
 type ProjectDetails struct {
 	ProjectInfo
 	ParentProject *ProjectInfo  `json:"parentProject,omitempty"`
@@ -538,7 +538,7 @@ type listProjectsResponse struct {
 	Pagination *PaginationInfo `json:"pagination,omitempty"`
 }
 
-// GetWorkbookViews returns all views (dashboards/worksheets) for a specific workbook
+// GetWorkbookViews returns all views (dashboards/worksheets) for a specific workbook.
 func (c *Client) GetWorkbookViews(ctx context.Context, workbookID string) ([]ViewInfo, error) {
 	if err := c.authenticate(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate during get workbook views")
@@ -579,7 +579,7 @@ func (c *Client) GetWorkbookViews(ctx context.Context, workbookID string) ([]Vie
 	return viewsResp.Views.View, nil
 }
 
-// ListAllViews returns all views (dashboards/worksheets) on the site
+// ListAllViews returns all views (dashboards/worksheets) on the site.
 func (c *Client) ListAllViews(ctx context.Context) ([]ViewInfo, error) {
 	if err := c.authenticate(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate during list all views")
@@ -611,15 +611,16 @@ func (c *Client) ListAllViews(ctx context.Context) ([]ViewInfo, error) {
 			resp.Body.Close()
 			// Provide more context about the error
 			errMsg := fmt.Sprintf("list views failed with status %d", resp.StatusCode)
-			if resp.StatusCode == http.StatusUnauthorized {
+			switch resp.StatusCode {
+			case http.StatusUnauthorized:
 				errMsg += " - authentication failed, check your PAT or credentials"
-			} else if resp.StatusCode == http.StatusForbidden {
+			case http.StatusForbidden:
 				errMsg += " - access denied, check permissions for this site"
-			} else if resp.StatusCode == http.StatusNotFound {
+			case http.StatusNotFound:
 				errMsg += " - endpoint not found, API version may be incompatible"
 			}
 			if len(body) > 0 {
-				errMsg += fmt.Sprintf(": %s", string(body))
+				errMsg += ": " + string(body)
 			}
 			return nil, errors.New(errMsg)
 		}
@@ -638,7 +639,7 @@ func (c *Client) ListAllViews(ctx context.Context) ([]ViewInfo, error) {
 		if viewsResp.Pagination != nil && viewsResp.Pagination.TotalAvailable != "" {
 			// Parse string pagination values
 			totalAvail := 0
-			fmt.Sscanf(viewsResp.Pagination.TotalAvailable, "%d", &totalAvail)
+			_, _ = fmt.Sscanf(viewsResp.Pagination.TotalAvailable, "%d", &totalAvail)
 
 			totalFetched := pageNumber * pageSize
 			if totalFetched >= totalAvail {
@@ -655,7 +656,7 @@ func (c *Client) ListAllViews(ctx context.Context) ([]ViewInfo, error) {
 	return allViews, nil
 }
 
-// GetViewDetails fetches detailed information about a specific view
+// GetViewDetails fetches detailed information about a specific view.
 func (c *Client) GetViewDetails(ctx context.Context, viewID string) (*ViewInfo, error) {
 	if err := c.authenticate(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate during get view details")
@@ -693,7 +694,7 @@ func (c *Client) GetViewDetails(ctx context.Context, viewID string) (*ViewInfo, 
 	return &viewResp.View, nil
 }
 
-// GetWorkbookDetails returns detailed information for a specific workbook
+// GetWorkbookDetails returns detailed information for a specific workbook.
 func (c *Client) GetWorkbookDetails(ctx context.Context, workbookID string) (*WorkbookInfo, error) {
 	if err := c.authenticate(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate during get workbook details")
@@ -731,7 +732,7 @@ func (c *Client) GetWorkbookDetails(ctx context.Context, workbookID string) (*Wo
 	return &workbookResp.Workbook, nil
 }
 
-// GetWorkbookConnections returns all data source connections for a specific workbook
+// GetWorkbookConnections returns all data source connections for a specific workbook.
 func (c *Client) GetWorkbookConnections(ctx context.Context, workbookID string) ([]WorkbookConnection, error) {
 	if err := c.authenticate(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate during get workbook connections")
@@ -767,7 +768,7 @@ func (c *Client) GetWorkbookConnections(ctx context.Context, workbookID string) 
 	return connectionsResp.Connections.Connection, nil
 }
 
-// ListProjects returns all projects on the site
+// ListProjects returns all projects on the site.
 func (c *Client) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
 	if err := c.authenticate(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate during list projects")
@@ -815,7 +816,7 @@ func (c *Client) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
 		}
 
 		var totalAvailable int
-		fmt.Sscanf(projectsResp.Pagination.TotalAvailable, "%d", &totalAvailable)
+		_, _ = fmt.Sscanf(projectsResp.Pagination.TotalAvailable, "%d", &totalAvailable)
 
 		if pageNumber*pageSize >= totalAvailable {
 			break
@@ -827,7 +828,7 @@ func (c *Client) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
 	return allProjects, nil
 }
 
-// GetProjectDetails returns detailed information for a specific project
+// GetProjectDetails returns detailed information for a specific project.
 func (c *Client) GetProjectDetails(ctx context.Context, projectID string) (*ProjectInfo, error) {
 	if err := c.authenticate(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to authenticate during get project details")

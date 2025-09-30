@@ -69,9 +69,9 @@ func runTableauImport(ctx context.Context, pipelinePath, connectionName, environ
 	return importSelectedTableauDashboardsEnhanced(ctx, pipelinePath, selected, fs, tableauClient)
 }
 
-// Enhanced fetch function that gets project hierarchy and data sources
+// Enhanced fetch function that gets project hierarchy and data sources.
 func fetchTableauDashboardsEnhanced(ctx context.Context, client *tableau.Client, workbookFilter, projectFilter string) ([]TableauDashboard, error) {
-	var dashboards []TableauDashboard
+	dashboards := make([]TableauDashboard, 0)
 
 	// Fetch all projects first to build hierarchy
 	fmt.Println("  Fetching projects hierarchy...")
@@ -136,7 +136,7 @@ func fetchTableauDashboardsEnhanced(ctx context.Context, client *tableau.Client,
 	p := pool.New().WithMaxGoroutines(10).WithContext(ctx)
 
 	for _, wb := range workbooks {
-		wb := wb // capture loop variable
+		// wb is already captured in the loop
 		p.Go(func(ctx context.Context) error {
 			extWb := &tableau.ExtendedWorkbookInfo{
 				WorkbookInfo: wb,
@@ -184,7 +184,7 @@ func fetchTableauDashboardsEnhanced(ctx context.Context, client *tableau.Client,
 		viewPool := pool.New().WithMaxGoroutines(10).WithContext(ctx)
 
 		for _, wb := range workbooks {
-			wb := wb // capture loop variable
+			// wb is already captured in the loop
 			viewPool.Go(func(ctx context.Context) error {
 				wbViews, wbErr := client.GetWorkbookViews(ctx, wb.ID)
 				if wbErr != nil {
@@ -341,7 +341,7 @@ func fetchTableauDashboardsEnhanced(ctx context.Context, client *tableau.Client,
 	return dashboards, nil
 }
 
-// Enhanced import function that creates folder structure and data source assets
+// Enhanced import function that creates folder structure and data source assets.
 func importSelectedTableauDashboardsEnhanced(ctx context.Context, pipelinePath string, dashboards []TableauDashboard, fs afero.Fs, client *tableau.Client) error {
 	// Ensure pipeline path and get pipeline info
 	pathParts := strings.Split(pipelinePath, "/")
@@ -520,7 +520,7 @@ func importSelectedTableauDashboardsEnhanced(ctx context.Context, pipelinePath s
 
 // Helper functions for asset creation
 
-// sanitizeFolderName converts a string to a valid folder name
+// sanitizeFolderName converts a string to a valid folder name.
 func sanitizeFolderName(name string) string {
 	// First check if the input only contains special characters and no alphanumeric characters
 	hasAlphanumeric := false
@@ -715,7 +715,7 @@ func createDataSourceAsset(dataSource *tableau.DataSourceInfo, assetsPath string
 	}
 
 	// Build description
-	description := fmt.Sprintf("Tableau data source: %s", dataSource.Name)
+	description := "Tableau data source: " + dataSource.Name
 
 	// Create the asset (without name - Bruin will extract from file path)
 	asset := &pipeline.Asset{
@@ -755,7 +755,7 @@ func createWorkbookAsset(dashboardInfo *TableauDashboard, assetsPath string, cli
 	}
 
 	// Build description
-	description := fmt.Sprintf("Tableau workbook: %s", dashboardInfo.WorkbookName)
+	description := "Tableau workbook: " + dashboardInfo.WorkbookName
 	if len(dashboardInfo.ProjectPath) > 0 {
 		description += fmt.Sprintf(" [Project: %s]", strings.Join(dashboardInfo.ProjectPath, " > "))
 	}
@@ -869,7 +869,7 @@ func createEnhancedAssetFromTableauDashboard(dashboard TableauDashboard, assetsP
 	}
 
 	// Build description
-	description := fmt.Sprintf("Tableau dashboard: %s", dashboard.ViewName)
+	description := "Tableau dashboard: " + dashboard.ViewName
 	if dashboard.WorkbookName != "" {
 		description += fmt.Sprintf(" (Workbook: %s)", dashboard.WorkbookName)
 	}
@@ -945,7 +945,7 @@ func createEnhancedAssetFromTableauDashboard(dashboard TableauDashboard, assetsP
 	if dashboard.WorkbookID != "" {
 		if workbookAssetName, exists := workbookAssetNames[dashboard.WorkbookID]; exists {
 			// Use full path for workbook dependencies
-			fullPath := fmt.Sprintf("tableau.workbooks.%s", workbookAssetName)
+			fullPath := "tableau.workbooks." + workbookAssetName
 			upstreams = append(upstreams, pipeline.Upstream{
 				Type:  "asset",
 				Value: fullPath,
@@ -957,7 +957,7 @@ func createEnhancedAssetFromTableauDashboard(dashboard TableauDashboard, assetsP
 	for _, ds := range dashboard.DataSources {
 		if assetName, exists := dataSourceAssetNames[ds.ID]; exists {
 			// Use full path for data source dependencies
-			fullPath := fmt.Sprintf("tableau.data_sources.%s", assetName)
+			fullPath := "tableau.data_sources." + assetName
 			upstreams = append(upstreams, pipeline.Upstream{
 				Type:  "asset",
 				Value: fullPath,
