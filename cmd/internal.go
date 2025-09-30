@@ -1162,8 +1162,8 @@ func printTemplates(templates []string) {
 func AssetMetadata() *cli.Command {
 	return &cli.Command{
 		Name:      "asset-metadata",
-		Usage:     "run a dry-run for a BigQuery asset and return query metadata",
-		ArgsUsage: "[path to the asset sql file]",
+		Usage:     "run a dry-run for a BigQuery asset or sensor and return query metadata",
+		ArgsUsage: "[path to the asset sql file or sensor yaml file]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "environment",
