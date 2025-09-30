@@ -28,7 +28,6 @@ type DryRunner struct {
 }
 
 func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.Asset, c *config.Config) (map[string]any, error) {
-	// Support both BigQuery SQL assets and BigQuery query sensors
 	if a.Type != pipeline.AssetTypeBigqueryQuery && a.Type != pipeline.AssetTypeBigqueryQuerySensor {
 		return nil, errors.New("asset-metadata is only available for BigQuery SQL assets and BigQuery query sensors")
 	}
@@ -36,12 +35,9 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 	var queryString string
 	var err error
 
-	// Extract query based on asset type
 	if a.Type == pipeline.AssetTypeBigqueryQuery {
-		// For SQL assets, extract from ExecutableFile.Content
 		queryString = a.ExecutableFile.Content
 	} else if a.Type == pipeline.AssetTypeBigqueryQuerySensor {
-		// For query sensors, extract from parameters
 		queryParam, ok := a.Parameters["query"]
 		if !ok {
 			return nil, errors.New("query sensor requires a parameter named 'query'")

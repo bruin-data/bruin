@@ -603,9 +603,9 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "dry-run-pipeline: query the sensor metadata",
-							Command: binary,
-							Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/select_sensor.asset.yml")),
+							Name:          "dry-run-pipeline: query the sensor metadata",
+							Command:       binary,
+							Args:          append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/dry-run-pipeline/assets/select_sensor.asset.yml")),
 							SkipJSONNodes: []string{`"ProjectID"`},
 							Expected: e2e.Output{
 								ExitCode: 0,
