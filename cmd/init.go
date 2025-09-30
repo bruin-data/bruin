@@ -198,7 +198,7 @@ func Init() *cli.Command {
 	}
 	templateList := make([]string, 0)
 	for _, entry := range folders {
-		if entry.IsDir() {
+		if entry.IsDir() && entry.Name() != "bootstrap" {
 			templateList = append(templateList, entry.Name())
 		}
 	}

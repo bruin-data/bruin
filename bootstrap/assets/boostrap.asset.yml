@@ -1,0 +1,5 @@
+name: bootstrap
+type: duckdb.seed
+
+parameters:
+    path: seed.csv
