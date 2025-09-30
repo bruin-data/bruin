@@ -274,18 +274,31 @@ type SnowflakeConnection struct {
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
+
+	if c.PrivateKey != "" && c.PrivateKeyPath != "" {
+		fmt.Printf("Warning: Both private_key and private_key_path are set for Snowflake connection '%s'. Using private_key content and ignoring private_key_path.\n", c.Name)
+	}
+
+	if c.PrivateKey == "" && c.PrivateKeyPath != "" {
+		contents, err := os.ReadFile(c.PrivateKeyPath)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		c.PrivateKey = string(contents)
+	}
+
 	return json.Marshal(map[string]string{
-		"name":             c.Name,
-		"account":          c.Account,
-		"username":         c.Username,
-		"password":         c.Password,
-		"region":           c.Region,
-		"role":             c.Role,
-		"database":         c.Database,
-		"schema":           c.Schema,
-		"warehouse":        c.Warehouse,
-		"private_key_path": c.PrivateKeyPath,
-		"private_key":      c.PrivateKey,
+		"name":        c.Name,
+		"account":     c.Account,
+		"username":    c.Username,
+		"password":    c.Password,
+		"region":      c.Region,
+		"role":        c.Role,
+		"database":    c.Database,
+		"schema":      c.Schema,
+		"warehouse":   c.Warehouse,
+		"private_key": c.PrivateKey,
 	})
 }
 
