@@ -27,8 +27,47 @@ Where account is the identifier that you can copy here:
 
 ### Key-based Authentication
 
-Snowflake currently supports both password-based authentication as well as key-based authentication. In order to set up key-based authentication, follow the following steps.
+Snowflake currently supports both password-based authentication as well as key-based authentication.
 
+You can configure the private key in two ways:
+
+#### Option 1: Private Key File Path
+
+```yaml
+    connections:
+      snowflake:
+        - name: "connection_name"
+          username: "sfuser"
+          account: "AAAAAAA-AA00000"
+          database: "dev"
+          schema: "schema_name" # optional
+          warehouse: "warehouse_name" # optional
+          role: "data_analyst" # optional
+          region: "eu-west1" # optional
+          private_key_path: "path/to/private_key" # optional
+```
+
+#### Option 2: Private Key Content (Direct)
+
+```yaml
+    connections:
+      snowflake:
+        - name: "connection_name"
+          username: "sfuser"
+          account: "AAAAAAA-AA00000"
+          database: "dev"
+          schema: "schema_name" # optional
+          warehouse: "warehouse_name" # optional
+          role: "data_analyst" # optional
+          region: "eu-west1" # optional
+          private_key: |
+            -----BEGIN PRIVATE KEY-----
+            OEKLvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEIAoIBAQC0Xc2pIYcLxdve
+            E+J5c5f...
+            -----END PRIVATE KEY-----
+```
+
+In order to set up key-based authentication, follow the following steps.
 
 #### Step 1: Generate a key-pair
 
