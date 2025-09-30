@@ -65,5 +65,5 @@ The update command uses the same installation script that's recommended in the o
 
 ## See Also
 
-- [bruin version](version.md) - Check your current Bruin version
+- [bruin version] - Check your current Bruin version
 - [Installation Guide](../getting-started/introduction/installation.md) - Initial installation instructions
