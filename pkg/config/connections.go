@@ -274,7 +274,6 @@ type SnowflakeConnection struct {
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
-
 	if c.PrivateKey != "" && c.PrivateKeyPath != "" {
 		fmt.Printf("Warning: Both private_key and private_key_path are set for Snowflake connection '%s'. Using private_key content and ignoring private_key_path.\n", c.Name)
 	}
