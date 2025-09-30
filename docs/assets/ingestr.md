@@ -77,7 +77,7 @@ Define columns on the asset to enrich the metadata passed to Ingestr. Columns fl
 
 ### Run configuration
 
-Pipeline run options propagate to Ingestr automatically:
+Pipeline run options propagate to ingestr automatically:
 
 * When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled).
 * Running with `--full-refresh` adds the `--full-refresh` flag to Ingestr.
