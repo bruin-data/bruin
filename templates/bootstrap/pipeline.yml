@@ -1,4 +1,4 @@
-default_environment: bootstrap
+name: bootstrap
 environments:
   default:
     connections:
