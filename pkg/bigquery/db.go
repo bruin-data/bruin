@@ -77,6 +77,8 @@ func NewDB(c *Config) (*Client, error) {
 		options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
 	case c.CredentialsFilePath != "":
 		options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
+	case c.ADCCredentialsPath != "":
+		options = append(options, option.WithCredentialsFile(c.ADCCredentialsPath))
 	case c.Credentials != nil:
 		options = append(options, option.WithCredentials(c.Credentials))
 	case c.UsesApplicationDefaultCredentials():
@@ -129,6 +131,8 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 		options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
 	case d.config.CredentialsFilePath != "":
 		options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
+	case d.config.ADCCredentialsPath != "":
+		options = append(options, option.WithCredentialsFile(d.config.ADCCredentialsPath))
 	case d.config.Credentials != nil:
 		options = append(options, option.WithCredentials(d.config.Credentials))
 	case d.config.UsesApplicationDefaultCredentials():

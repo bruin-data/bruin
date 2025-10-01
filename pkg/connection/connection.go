@@ -215,6 +215,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		ProjectID:           connection.ProjectID,
 		CredentialsFilePath: connection.ServiceAccountFile,
 		CredentialsJSON:     connection.ServiceAccountJSON,
+		ADCCredentialsPath:  connection.ADCCredentialsPath,
 		Credentials:         connection.GetCredentials(),
 		Location:            connection.Location,
 	})

@@ -25,6 +25,7 @@ type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	ADCCredentialsPath string `yaml:"adc_credentials_path,omitempty" json:"adc_credentials_path,omitempty" mapstructure:"adc_credentials_path"`
 	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	Location           string `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
 	rawCredentials     *google.Credentials
@@ -47,11 +48,13 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 		m["location"] = c.Location
 	}
 
-	// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
+	// Include only one of ServiceAccountJSON, ServiceAccountFile, or ADCCredentialsPath, whichever is not empty
 	if c.ServiceAccountFile != "" {
 		m["service_account_file"] = c.ServiceAccountFile
 	} else if c.ServiceAccountJSON != "" {
 		m["service_account_json"] = c.ServiceAccountJSON
+	} else if c.ADCCredentialsPath != "" {
+		m["adc_credentials_path"] = c.ADCCredentialsPath
 	}
 	return m, nil
 }

@@ -15,12 +15,13 @@ type Config struct {
 	CredentialsJSON     string
 	Credentials         *google.Credentials
 	Location            string `envconfig:"BIGQUERY_LOCATION"`
+	ADCCredentialsPath  string `envconfig:"BIGQUERY_ADC_CREDENTIALS_PATH"` // Path to Application Default Credentials file
 }
 
 func (c Config) IsValid() bool {
 	// Valid if we have a project ID and at least one credential method
 	// (including Application Default Credentials when no explicit credentials are provided)
-	return c.ProjectID != "" && (c.CredentialsFilePath != "" || c.CredentialsJSON != "" || c.Credentials != nil || c.UsesApplicationDefaultCredentials())
+	return c.ProjectID != "" && (c.CredentialsFilePath != "" || c.CredentialsJSON != "" || c.Credentials != nil || c.ADCCredentialsPath != "" || c.UsesApplicationDefaultCredentials())
 }
 
 func (c Config) GetConnectionURI() (string, error) {
@@ -34,8 +35,14 @@ func (c Config) GetConnectionURI() (string, error) {
 		if err != nil {
 			return "", err
 		}
+	case c.ADCCredentialsPath != "":
+		var err error
+		creds, err = os.ReadFile(c.ADCCredentialsPath)
+		if err != nil {
+			return "", err
+		}
 	case c.Credentials != nil:
-		return "", errors.New("only `service_account_json` or `service_account_file` supported")
+		return "", errors.New("only `service_account_json`, `service_account_file`, or `adc_credentials_path` supported")
 	case c.UsesApplicationDefaultCredentials():
 		// For Application Default Credentials, we don't need to encode credentials
 		// The BigQuery client will automatically use ADC
@@ -64,5 +71,5 @@ func (c Config) GetIngestrURI() (string, error) {
 // UsesApplicationDefaultCredentials returns true if no explicit credentials are provided
 // and the configuration should use Application Default Credentials (gcloud auth)
 func (c Config) UsesApplicationDefaultCredentials() bool {
-	return c.CredentialsFilePath == "" && c.CredentialsJSON == "" && c.Credentials == nil
+	return c.CredentialsFilePath == "" && c.CredentialsJSON == "" && c.Credentials == nil && c.ADCCredentialsPath == ""
 }
