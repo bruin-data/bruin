@@ -19,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -36,6 +37,7 @@ func Import() *cli.Command {
 		Commands: []*cli.Command{
 			ImportDatabase(),
 			ImportScheduledQueries(),
+			ImportTableauDashboards(),
 		},
 	}
 }
@@ -476,12 +478,23 @@ type customDelegate struct {
 }
 
 func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	item, ok := listItem.(scheduledQueryItem)
-	if !ok {
-		d.DefaultDelegate.Render(w, m, index, listItem)
+	// Try to render as scheduledQueryItem
+	if sqItem, ok := listItem.(scheduledQueryItem); ok {
+		d.renderScheduledQueryItem(w, m, index, sqItem)
 		return
 	}
 
+	// Try to render as tableauDashboardItem
+	if tdItem, ok := listItem.(tableauDashboardItem); ok {
+		d.renderTableauDashboardItem(w, m, index, tdItem)
+		return
+	}
+
+	// Fallback to default rendering
+	d.DefaultDelegate.Render(w, m, index, listItem)
+}
+
+func (d customDelegate) renderScheduledQueryItem(w io.Writer, m list.Model, index int, item scheduledQueryItem) {
 	// Check if this item is selected
 	isSelected := d.selectedItems[index]
 	isCurrent := index == m.Index()
@@ -515,9 +528,65 @@ func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem li
 		fmt.Fprintf(w, "%s\n%s", styledLine, descLine)
 	} else {
 		// Non-current item
-		titleColor := "#374151"
+		titleColor := colorGray
 		if isSelected {
-			titleColor = "#059669"
+			titleColor = colorSuccess
+		}
+
+		titleLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(titleColor)).
+			Padding(0, 1).
+			MarginTop(1).
+			Render(fmt.Sprintf("%s %s", checkbox, title))
+
+		descLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9CA3AF")).
+			Padding(0, 5).
+			Render(desc)
+
+		fmt.Fprintf(w, "%s\n%s", titleLine, descLine)
+	}
+}
+
+func (d customDelegate) renderTableauDashboardItem(w io.Writer, m list.Model, index int, item tableauDashboardItem) {
+	// Check if this item is selected
+	isSelected := d.selectedItems[index]
+	isCurrent := index == m.Index()
+
+	// Create selection indicator with better styling
+	checkbox := "[ ]"
+	if isSelected {
+		checkbox = "[x]"
+	}
+
+	// Create clean title and description
+	title := item.Title()
+	desc := item.Description()
+
+	// Apply consistent styling
+	if isCurrent {
+		// Current item - purple background
+		styledLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(lipgloss.Color("#7C3AED")).
+			Width(m.Width()-4).
+			Padding(0, 1).
+			MarginTop(1).
+			Render(fmt.Sprintf("%s %s", checkbox, title))
+
+		descLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#D8B4FE")).
+			Background(lipgloss.Color("#7C3AED")).
+			Width(m.Width()-4).
+			Padding(0, 5).
+			Render(desc)
+
+		fmt.Fprintf(w, "%s\n%s", styledLine, descLine)
+	} else {
+		// Non-current item
+		titleColor := colorGray
+		if isSelected {
+			titleColor = colorSuccess
 		}
 
 		titleLine := lipgloss.NewStyle().
@@ -550,29 +619,42 @@ type scheduledQueryModel struct {
 	focusedPane   int // 0 for left pane, 1 for right pane
 }
 
+// Color constants for UI styling.
+const (
+	colorGray      = "#374151"
+	colorBlue      = "#4F46E5"
+	colorOrange    = "#FF6B35"
+	colorGreen     = "#10B981"
+	colorPurple    = "#A78BFA"
+	colorLightGray = "#9CA3AF"
+	colorDarkGray  = "#6B7280"
+	colorDarkBg    = "#1F2937"
+	colorSuccess   = "#059669"
+)
+
 // Styles for the UI.
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#FF6B35")).
+			Foreground(lipgloss.Color(colorOrange)).
 			MarginTop(1).
 			MarginBottom(1)
 
 	// Panel styles.
 	leftPanelStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#4F46E5")).
+			BorderForeground(lipgloss.Color(colorBlue)).
 			Padding(1)
 
 	rightPanelStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#FF6B35")).
+			BorderForeground(lipgloss.Color(colorOrange)).
 			Padding(0, 1)
 
 	// Status bar style.
 	statusBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#1F2937")).
-			Foreground(lipgloss.Color("#9CA3AF")).
+			Background(lipgloss.Color(colorDarkBg)).
+			Foreground(lipgloss.Color(colorLightGray)).
 			Padding(0, 1)
 )
 
@@ -700,7 +782,7 @@ func (m *scheduledQueryModel) updateRightPanelContent() {
 	currentIndex := m.list.Index()
 	if currentIndex >= len(m.queries) {
 		m.rightViewport.SetContent(lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
+			Foreground(lipgloss.Color(colorDarkGray)).
 			Render("No query selected"))
 		return
 	}
@@ -710,9 +792,9 @@ func (m *scheduledQueryModel) updateRightPanelContent() {
 
 	sectionHeaderStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#A78BFA"))
+		Foreground(lipgloss.Color(colorPurple))
 
-	regularTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
+	regularTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorLightGray))
 
 	if query.DisplayName != "" {
 		content.WriteString(sectionHeaderStyle.Render("Name: "))
@@ -743,11 +825,11 @@ func (m *scheduledQueryModel) updateRightPanelContent() {
 
 	if strings.TrimSpace(query.Query) == "" {
 		noQueryStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
+			Foreground(lipgloss.Color(colorDarkGray)).
 			Italic(true).
 			Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#374151"))
+			BorderForeground(lipgloss.Color(colorGray))
 
 		content.WriteString(noQueryStyle.Render("-- No SQL query available --"))
 	} else {
@@ -796,7 +878,7 @@ func (m *scheduledQueryModel) View() string {
 	}
 
 	summary := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981")).
+		Foreground(lipgloss.Color(colorGreen)).
 		Bold(true).
 		Render(summaryText)
 
@@ -808,18 +890,18 @@ func (m *scheduledQueryModel) View() string {
 
 	leftTitle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#4F46E5")).
+		Foreground(lipgloss.Color(colorBlue)).
 		Padding(0, 1).
 		Render(leftPanelTitle)
 
 	// Panel styles with dynamic border colors based on focus
-	leftBorderColor := "#374151"
-	rightBorderColor := "#374151"
+	leftBorderColor := colorGray
+	rightBorderColor := colorGray
 
 	if m.focusedPane == 0 {
-		leftBorderColor = "#4F46E5"
+		leftBorderColor = colorBlue
 	} else if m.focusedPane == 1 {
-		rightBorderColor = "#FF6B35"
+		rightBorderColor = colorOrange
 	}
 
 	// Use the same height for both panels to ensure alignment
@@ -1089,7 +1171,7 @@ func searchLocationsInParallel(ctx context.Context, client *datatransfer.Client,
 		fmt.Printf("\n%s\n", summaryStyle.Render(message))
 	} else {
 		emptyStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
+			Foreground(lipgloss.Color(colorDarkGray)).
 			MarginTop(1)
 
 		fmt.Printf("\n%s\n", emptyStyle.Render("📭 No scheduled queries found in any region"))
@@ -1269,6 +1351,58 @@ func showScheduledQuerySelector(queries []ScheduledQuery) ([]ScheduledQuery, err
 	return nil, nil
 }
 
+func showTableauDashboardSelector(dashboards []TableauDashboard) ([]TableauDashboard, error) {
+	// Convert dashboards to list items
+	items := make([]list.Item, len(dashboards))
+	for i, dashboard := range dashboards {
+		items[i] = tableauDashboardItem{
+			dashboard: dashboard,
+			selected:  false,
+		}
+	}
+
+	// Create list with custom delegate
+	delegate := customDelegate{
+		selectedItems: make(map[int]bool),
+	}
+	delegate.ShowDescription = true
+	delegate.SetHeight(3)
+
+	dashboardList := list.New(items, delegate, 0, 0)
+	dashboardList.Title = ""
+	dashboardList.SetShowStatusBar(false)
+	dashboardList.SetFilteringEnabled(true)
+	dashboardList.SetShowHelp(false)
+	dashboardList.SetShowTitle(false)
+
+	model := &tableauDashboardModel{
+		dashboards:  dashboards,
+		list:        dashboardList,
+		delegate:    delegate,
+		selected:    make(map[int]bool),
+		focusedPane: 0,
+	}
+
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	finalModel, err := p.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	final := finalModel.(*tableauDashboardModel)
+	if final.confirmed {
+		var selected []TableauDashboard
+		for i, isSelected := range final.selected {
+			if isSelected && i < len(dashboards) {
+				selected = append(selected, dashboards[i])
+			}
+		}
+		return selected, nil
+	}
+
+	return nil, nil
+}
+
 func importSelectedQueries(ctx context.Context, pipelinePath string, queries []ScheduledQuery, fs afero.Fs) error {
 	// Ensure pipeline path and get pipeline info
 	pathParts := strings.Split(pipelinePath, "/")
@@ -1366,4 +1500,445 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) *pip
 	}
 
 	return asset
+}
+
+func ImportTableauDashboards() *cli.Command {
+	return &cli.Command{
+		Name:  "tableau",
+		Usage: "Import Tableau dashboards and views as Bruin assets",
+		Description: `Import Tableau dashboards and views from Tableau Cloud/Server as individual Bruin assets.
+
+This command connects to Tableau using the REST API, lists all workbooks and their views/dashboards,
+and presents them in an interactive terminal UI where you can:
+- Navigate with arrow keys or j/k
+- Select/deselect items with space bar
+- Toggle preview mode with 'p' to see dashboard details in a dual-pane view
+- Press Enter to import selected dashboards
+- Press 'q' to quit without importing
+
+You can also use the --all flag to import all dashboards without the interactive UI.
+
+Selected dashboards will be imported as .yml files in the current pipeline's assets/tableau folder.
+Each imported asset will contain the necessary metadata to reference and refresh the dashboard.
+
+Example:
+  bruin import tableau ./my-pipeline --connection my-tableau-conn --env prod
+  bruin import tableau ./my-pipeline --connection my-tableau-conn --all`,
+		ArgsUsage: "[pipeline path]",
+		Before:    telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "connection",
+				Aliases:  []string{"c"},
+				Usage:    "the name of the Tableau connection to use",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
+				Usage:   "the path to the .bruin.yml file",
+			},
+			&cli.StringFlag{
+				Name:    "workbook",
+				Aliases: []string{"w"},
+				Usage:   "Filter by specific workbook name (optional)",
+			},
+			&cli.StringFlag{
+				Name:    "project",
+				Aliases: []string{"p"},
+				Usage:   "Filter by Tableau project name (optional)",
+			},
+			&cli.BoolFlag{
+				Name:    "all",
+				Aliases: []string{"a"},
+				Usage:   "Import all dashboards without interactive selection",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			pipelinePath := c.Args().Get(0)
+			if pipelinePath == "" {
+				return cli.Exit("pipeline path is required", 1)
+			}
+
+			connectionName := c.String("connection")
+			environment := c.String("environment")
+			configFile := c.String("config-file")
+			workbookFilter := c.String("workbook")
+			projectFilter := c.String("project")
+			importAll := c.Bool("all")
+
+			return runTableauImport(ctx, pipelinePath, connectionName, environment, configFile, workbookFilter, projectFilter, importAll)
+		},
+	}
+}
+
+// TableauDashboard represents a dashboard/view with its workbook information.
+type TableauDashboard struct {
+	ViewID       string
+	ViewName     string
+	WorkbookID   string
+	WorkbookName string
+	WorkbookURL  string // Added for workbook URL in meta
+	ProjectID    string // Added for project hierarchy
+	ProjectName  string
+	ProjectPath  []string // Added for full project hierarchy path
+	OwnerName    string
+	ContentURL   string
+	ViewURL      string
+	UpdatedAt    string
+	Tags         []string
+	DataSources  []tableau.DataSourceInfo     // Added for data source dependencies
+	Connections  []tableau.WorkbookConnection // Added for connection tracking
+}
+
+// tableauDashboardItem implements list.Item interface for the TUI.
+type tableauDashboardItem struct {
+	dashboard TableauDashboard
+	selected  bool
+}
+
+func (i tableauDashboardItem) Title() string {
+	if i.dashboard.ViewName != "" {
+		return i.dashboard.ViewName
+	}
+	return "Unnamed Dashboard"
+}
+
+func (i tableauDashboardItem) Description() string {
+	var parts []string
+	if i.dashboard.WorkbookName != "" {
+		parts = append(parts, "Workbook: "+i.dashboard.WorkbookName)
+	}
+	if i.dashboard.ProjectName != "" {
+		parts = append(parts, "Project: "+i.dashboard.ProjectName)
+	}
+	if len(parts) == 0 {
+		return "No additional details"
+	}
+	return strings.Join(parts, " | ")
+}
+
+func (i tableauDashboardItem) FilterValue() string {
+	return i.Title() + " " + i.dashboard.WorkbookName + " " + i.dashboard.ProjectName
+}
+
+// tableauDashboardModel is the Bubbletea model for dashboard selection.
+type tableauDashboardModel struct {
+	dashboards    []TableauDashboard
+	list          list.Model
+	delegate      customDelegate
+	rightViewport viewport.Model
+	selected      map[int]bool
+	windowWidth   int
+	windowHeight  int
+	quitting      bool
+	confirmed     bool
+	err           error
+	focusedPane   int
+}
+
+func (m *tableauDashboardModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m *tableauDashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			m.quitting = true
+			return m, tea.Quit
+		case "tab":
+			m.focusedPane = (m.focusedPane + 1) % 2
+		case " ":
+			if m.focusedPane == 0 {
+				currentIndex := m.list.Index()
+				if m.selected == nil {
+					m.selected = make(map[int]bool)
+				}
+				m.selected[currentIndex] = !m.selected[currentIndex]
+				m.delegate.selectedItems[currentIndex] = m.selected[currentIndex]
+				m.list.SetDelegate(m.delegate)
+				m.updateRightPanelContent()
+			}
+		case "enter":
+			m.confirmed = true
+			m.quitting = true
+			return m, tea.Quit
+		case "a":
+			if m.selected == nil {
+				m.selected = make(map[int]bool)
+			}
+			for i := range m.dashboards {
+				m.selected[i] = true
+				m.delegate.selectedItems[i] = true
+			}
+			m.list.SetDelegate(m.delegate)
+			m.updateRightPanelContent()
+		case "n":
+			if m.selected == nil {
+				m.selected = make(map[int]bool)
+			}
+			for i := range m.dashboards {
+				m.selected[i] = false
+				m.delegate.selectedItems[i] = false
+			}
+			m.list.SetDelegate(m.delegate)
+			m.updateRightPanelContent()
+		}
+
+	case tea.WindowSizeMsg:
+		m.windowWidth = msg.Width
+		m.windowHeight = msg.Height
+
+		leftWidth := m.windowWidth/2 - 4
+		rightWidth := m.windowWidth - leftWidth - 8
+		viewportHeight := m.windowHeight - 14
+
+		if leftWidth < 30 {
+			leftWidth = 30
+		}
+		if rightWidth < 40 {
+			rightWidth = 40
+		}
+		if viewportHeight < 10 {
+			viewportHeight = 10
+		}
+
+		m.list.SetSize(leftWidth, viewportHeight)
+
+		if m.rightViewport.Width == 0 {
+			m.rightViewport = viewport.New(rightWidth, viewportHeight)
+			m.updateRightPanelContent()
+		} else {
+			m.rightViewport.Width = rightWidth
+			m.rightViewport.Height = viewportHeight
+			m.updateRightPanelContent()
+		}
+	}
+
+	if m.focusedPane == 0 {
+		m.list, cmd = m.list.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	if m.focusedPane == 1 {
+		m.rightViewport, cmd = m.rightViewport.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		if msg.String() == "up" || msg.String() == "down" || msg.String() == "k" || msg.String() == "j" {
+			m.updateRightPanelContent()
+		}
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m *tableauDashboardModel) updateRightPanelContent() {
+	if m.rightViewport.Width == 0 {
+		return
+	}
+
+	currentIndex := m.list.Index()
+	if currentIndex >= len(m.dashboards) {
+		m.rightViewport.SetContent(lipgloss.NewStyle().
+			Foreground(lipgloss.Color(colorDarkGray)).
+			Render("No dashboard selected"))
+		return
+	}
+
+	dashboard := m.dashboards[currentIndex]
+	var content strings.Builder
+
+	sectionHeaderStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(colorPurple))
+
+	regularTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorLightGray))
+
+	content.WriteString(sectionHeaderStyle.Render("Dashboard Details"))
+	content.WriteString("\n\n")
+
+	if dashboard.ViewName != "" {
+		content.WriteString(sectionHeaderStyle.Render("Name: "))
+		content.WriteString(regularTextStyle.Render(dashboard.ViewName))
+		content.WriteString("\n")
+	}
+
+	if dashboard.ViewID != "" {
+		content.WriteString(sectionHeaderStyle.Render("View ID: "))
+		content.WriteString(regularTextStyle.Render(dashboard.ViewID))
+		content.WriteString("\n")
+	}
+
+	if dashboard.WorkbookName != "" {
+		content.WriteString(sectionHeaderStyle.Render("Workbook: "))
+		content.WriteString(regularTextStyle.Render(dashboard.WorkbookName))
+		content.WriteString("\n")
+	}
+
+	if dashboard.ProjectName != "" {
+		content.WriteString(sectionHeaderStyle.Render("Project: "))
+		content.WriteString(regularTextStyle.Render(dashboard.ProjectName))
+		content.WriteString("\n")
+	}
+
+	if dashboard.OwnerName != "" {
+		content.WriteString(sectionHeaderStyle.Render("Owner: "))
+		content.WriteString(regularTextStyle.Render(dashboard.OwnerName))
+		content.WriteString("\n")
+	}
+
+	if dashboard.UpdatedAt != "" {
+		content.WriteString(sectionHeaderStyle.Render("Last Updated: "))
+		content.WriteString(regularTextStyle.Render(dashboard.UpdatedAt))
+		content.WriteString("\n")
+	}
+
+	if len(dashboard.Tags) > 0 {
+		content.WriteString(sectionHeaderStyle.Render("Tags: "))
+		content.WriteString(regularTextStyle.Render(strings.Join(dashboard.Tags, ", ")))
+		content.WriteString("\n")
+	}
+
+	if dashboard.ContentURL != "" {
+		content.WriteString("\n")
+		content.WriteString(sectionHeaderStyle.Render("Content URL: "))
+		content.WriteString(regularTextStyle.Render(dashboard.ContentURL))
+		content.WriteString("\n")
+	}
+
+	m.rightViewport.SetContent(content.String())
+}
+
+func (m *tableauDashboardModel) View() string {
+	if m.quitting {
+		return ""
+	}
+
+	if m.err != nil {
+		return fmt.Sprintf("Error: %v\n", m.err)
+	}
+
+	if len(m.dashboards) == 0 {
+		return titleStyle.Render("No Tableau dashboards found.") + "\n"
+	}
+
+	if m.rightViewport.Width == 0 {
+		return titleStyle.Render("Loading...") + "\n"
+	}
+
+	selectedCount := 0
+	for _, selected := range m.selected {
+		if selected {
+			selectedCount++
+		}
+	}
+
+	summaryText := fmt.Sprintf("Selected: %d/%d dashboards", selectedCount, len(m.dashboards))
+	if selectedCount > 0 {
+		summaryText += " ✓"
+	}
+
+	summary := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorGreen)).
+		Bold(true).
+		Render(summaryText)
+
+	leftPanelTitle := "📊 Tableau Dashboards"
+	if m.focusedPane == 0 {
+		leftPanelTitle += " •"
+	}
+
+	leftTitle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(colorBlue)).
+		Padding(0, 1).
+		Render(leftPanelTitle)
+
+	leftBorderColor := colorGray
+	rightBorderColor := colorGray
+
+	if m.focusedPane == 0 {
+		leftBorderColor = colorBlue
+	} else if m.focusedPane == 1 {
+		rightBorderColor = colorOrange
+	}
+
+	panelHeight := maxInt(m.list.Height()+4, m.rightViewport.Height+4)
+
+	currentLeftPanelStyle := leftPanelStyle.
+		BorderForeground(lipgloss.Color(leftBorderColor)).
+		Width(m.list.Width() + 2).
+		Height(panelHeight)
+
+	currentRightPanelStyle := rightPanelStyle.
+		BorderForeground(lipgloss.Color(rightBorderColor)).
+		Width(m.rightViewport.Width + 2).
+		Height(panelHeight)
+
+	leftContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		leftTitle,
+		"",
+		m.list.View(),
+	)
+
+	rightContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		m.rightViewport.View(),
+	)
+
+	leftPane := currentLeftPanelStyle.Render(leftContent)
+	rightPane := currentRightPanelStyle.Render(rightContent)
+
+	content := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftPane,
+		rightPane,
+	)
+
+	var statusParts []string
+	statusParts = append(statusParts, "↑/↓/j/k: Navigate")
+	statusParts = append(statusParts, "Tab: Switch Panes")
+	statusParts = append(statusParts, "Space: Select")
+	statusParts = append(statusParts, "a: Select All")
+	statusParts = append(statusParts, "n: Select None")
+	if m.focusedPane == 1 {
+		statusParts = append(statusParts, "↑/↓: Scroll Details")
+	}
+	statusParts = append(statusParts, "Enter: Import")
+	statusParts = append(statusParts, "q/Esc: Quit")
+
+	statusText := strings.Join(statusParts, " • ")
+	statusBar := statusBarStyle.
+		Width(m.windowWidth).
+		Render(statusText)
+
+	usedHeight := 2 + 1 + 2 + panelHeight + 1
+	remainingHeight := m.windowHeight - usedHeight
+	if remainingHeight < 0 {
+		remainingHeight = 0
+	}
+
+	fillerLines := make([]string, remainingHeight)
+	for i := range remainingHeight {
+		fillerLines[i] = ""
+	}
+
+	elements := []string{summary, "", content}
+	elements = append(elements, fillerLines...)
+	elements = append(elements, statusBar)
+
+	return lipgloss.JoinVertical(lipgloss.Left, elements...)
 }

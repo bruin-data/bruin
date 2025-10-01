@@ -1,12 +1,12 @@
 # `import` Command
 
-The `import` commands allow you to automatically import existing resources from your data warehouse as Bruin assets. This includes database tables and BigQuery scheduled queries.
+The `import` commands allow you to automatically import existing resources from your data warehouse as Bruin assets. This includes database tables, BigQuery scheduled queries, and Tableau dashboards.
 
 ## Available Subcommands
 
 - `bruin import database` - Import database tables as Bruin assets
 - `bruin import bq-scheduled-queries` - Import BigQuery scheduled queries as Bruin assets
-
+- `bruin import tableau` - Import Tableau dashboards, workbooks, and data sources as Bruin assets
 ---
 
 ## `import database`
@@ -362,3 +362,226 @@ Common issues and solutions:
 - [`bruin run`](./run.md) - Execute the imported query assets
 - [`bruin validate`](./validate.md) - Validate the imported pipeline structure
 - [`bruin import database`](#import-database) - Import database tables as assets
+---
+
+## `import tableau`
+
+Import Tableau dashboards, workbooks, and data sources as Bruin assets with automatic dependency detection and project hierarchy replication.
+
+```bash
+bruin import tableau [FLAGS] [pipeline path]
+```
+
+### Overview
+
+The Tableau import command enables you to:
+
+- Connect to Tableau Cloud/Server using Personal Access Tokens
+- Automatically discover and import dashboards, workbooks, and data sources
+- Replicate Tableau's project folder structure in your Bruin pipeline
+- Create dependency relationships between dashboards and data sources
+- Preserve metadata including project hierarchy and workbook associations
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `pipeline path` | **Required.** Path to the directory where the pipeline and imported Tableau assets will be created. |
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--connection`, `-c` | string | - | **Required.** Name of the Tableau connection to use as defined in `.bruin.yml` |
+| `--environment`, `--env` | string | - | Target environment name as defined in `.bruin.yml` |
+| `--config-file` | string | - | Path to the `.bruin.yml` file. Can also be set via `BRUIN_CONFIG_FILE` environment variable |
+
+### How It Works
+
+1. **Authentication**: Uses your Tableau Personal Access Token from `.bruin.yml`
+2. **Discovery Phase**: 
+   - Fetches all projects to understand the hierarchy
+   - Retrieves workbooks and their associated views (dashboards/worksheets)
+   - Identifies data source connections
+3. **Parallel Processing**: Uses up to 10 concurrent workers to fetch workbook details efficiently
+4. **Asset Generation**: 
+   - Creates folder structure matching Tableau projects
+   - Generates YAML assets for dashboards, workbooks, and data sources
+   - Establishes dependency relationships
+5. **Name Sanitization**: Folder and file names are automatically sanitized (spaces replaced with underscores, special characters removed)
+
+### Examples
+
+#### Basic Import
+
+Import all Tableau assets:
+
+```bash
+bruin import tableau ./my-pipeline --connection tableau-prod
+```
+
+#### Environment-Specific Import
+
+Import using a specific environment configuration:
+
+```bash
+bruin import tableau ./my-pipeline --connection tableau-cloud --env production
+```
+
+### Generated Asset Structure
+
+The import command creates a hierarchical folder structure that mirrors your Tableau project organization:
+
+```
+assets/
+└── tableau/
+    ├── data_sources/
+    │   ├── sales_datasource.asset.yml
+    │   └── customer_datasource.asset.yml
+    └── dashboards/
+        ├── marketing_analytics/           # Project folder
+        │   ├── campaign_dashboard.asset.yml
+        │   └── roi_tracker.asset.yml
+        └── sales_reporting/               # Project folder
+            ├── daily_sales.asset.yml
+            └── quarterly_review.asset.yml
+```
+
+#### Dashboard Asset Example
+
+```yaml
+type: tableau.dashboard
+description: 'Tableau dashboard: Sales Overview [Project: Sales Reporting]'
+meta:
+  project_hierarchy: Sales Reporting
+  workbook_id: 57e851bb-c413-4f24-8125-e14ad9d8c07b
+  workbook_url: https://tableau.company.com/#/site/analytics/workbooks/SalesWorkbook
+
+depends:
+  - tableau.data_sources.sales_datasource
+  - tableau.data_sources.customer_datasource
+
+owner: analyst@company.com
+
+parameters:
+  dashboard_id: 2447c61b-8426-4767-a6dd-88292425551b
+  dashboard_name: Sales Overview
+  refresh: "false"
+  url: https://tableau.company.com/#/site/analytics/views/SalesWorkbook/SalesOverview
+```
+
+#### Data Source Asset Example
+
+```yaml
+type: tableau.datasource
+description: 'Tableau data source: Sales Database'
+
+owner: data-team@company.com
+
+parameters:
+  datasource_id: 8a9b10c2-3d4e-5f67-8901-234567890abc
+  datasource_name: Sales Database
+  refresh: "false"
+```
+
+### Key Features
+
+#### Project Hierarchy Preservation
+
+The importer maintains your Tableau project structure, creating nested folders that match your Tableau organization. Project names are sanitized to be filesystem-friendly while maintaining recognizability.
+
+#### Automatic Dependency Detection
+
+The importer automatically:
+- Identifies which data sources each dashboard depends on
+- Creates proper dependency chains using full asset paths
+- Ensures correct execution order in your pipeline
+
+#### Metadata Preservation
+
+Each asset includes metadata about:
+- Parent workbook name and URL
+- Project hierarchy
+- Original Tableau IDs for programmatic access
+- Owner information from Tableau
+
+#### Name Extraction
+
+Asset names are derived from file paths rather than explicitly defined, allowing Bruin to handle naming automatically. This prevents naming conflicts and ensures consistency.
+
+### Prerequisites
+
+1. **Tableau Connection**: A Tableau connection must be configured in `.bruin.yml` with:
+   - Personal Access Token (PAT) for authentication
+   - Site ID for your Tableau instance
+   - Base URL for Tableau Cloud/Server
+2. **Permissions**: Your PAT must have permissions to:
+   - View workbooks and views
+   - Access data source metadata
+   - List projects
+3. **Pipeline Directory**: The target pipeline path must exist
+
+### Configuration Example
+
+In your `.bruin.yml`:
+
+```yaml
+connections:
+  tableau-prod:
+    type: tableau
+    base_url: https://prod-useast-b.online.tableau.com
+    site_id: internetsociety
+    personal_access_token: ${TABLEAU_PAT_TOKEN}
+    personal_access_token_name: ${TABLEAU_PAT_NAME}
+```
+
+### Output
+
+The command provides progress updates during import:
+
+```
+Fetching Tableau workbooks and dashboards...
+Found 15 workbooks with 47 dashboards
+Fetching details for all workbooks (using 10 parallel workers)...
+Processing workbook: Marketing Analytics (3/15)
+Creating assets in: ./my-pipeline/assets/tableau/
+Successfully imported:
+- 47 dashboards
+- 12 data sources
+- Created 5 project folders
+```
+
+### Error Handling
+
+The import process is resilient to partial failures:
+
+- **Missing Views**: If views can't be fetched for a workbook, it continues with other workbooks
+- **API Errors**: Individual API failures are logged but don't stop the entire import
+- **Name Conflicts**: Sanitization ensures valid filesystem names; extremely similar names may require manual adjustment
+
+Common issues and solutions:
+
+- **Authentication Failed**: Verify your PAT is valid and not expired
+- **Site ID Missing**: Ensure site_id is configured in your connection
+- **No Workbooks Found**: Check that your PAT has appropriate permissions
+- **API Version Issues**: The importer uses Tableau API v3.21 by default
+
+### Best Practices
+
+1. **Review Generated Assets**: After import, review the generated structure and customize as needed
+2. **Folder Organization**: The automatic folder structure can be reorganized if needed
+3. **Dependency Management**: Review dependencies to ensure they match your expectations
+4. **Incremental Updates**: Re-running import will overwrite existing assets; consider version control
+5. **Name Validation**: Run `bruin validate` after import to ensure all asset names are valid
+
+### Notes
+
+- Dashboard and worksheet assets are created with `refresh: "false"` by default (no-op assets)
+- Data source assets can be modified to enable refresh by setting `refresh: "true"`
+- The import process fetches data in parallel for improved performance
+- Extremely long or complex project hierarchies may be truncated for filesystem compatibility
+
+### Related Commands
+- [`bruin run`](./run.md) - Execute the imported Tableau assets
+- [`bruin validate`](./validate.md) - Validate the imported pipeline structure
+- [Tableau Asset Documentation](../assets/tableau-refresh.md) - Learn about Tableau asset types and refresh capabilities

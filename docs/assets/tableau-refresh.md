@@ -151,3 +151,23 @@ parameters:
   - Data source: `POST /api/{version}/sites/{site-id}/datasources/{datasource-id}/refresh`
   - Workbook:    `POST /api/{version}/sites/{site-id}/workbooks/{workbook-id}/refresh`
 - Authentication is handled via the connection config (Personal Access Token recommended).
+
+## Importing Tableau Dashboards
+
+Bruin provides a powerful import command that automatically discovers and imports your Tableau dashboards, workbooks, and data sources as Bruin assets. The import command:
+
+- Connects to your Tableau Cloud/Server using Personal Access Tokens
+- Discovers all dashboards, workbooks, and data sources
+- Replicates your Tableau project folder structure
+- Automatically detects and creates dependency relationships
+- Preserves metadata including workbook associations and project hierarchy
+
+To import your Tableau assets:
+
+```bash
+bruin import tableau ./my-pipeline --connection tableau-prod
+```
+
+This command will create a structured folder hierarchy matching your Tableau projects, with all dashboards and data sources properly organized and linked.
+
+For detailed information about the import process, configuration options, and generated asset structure, see the [Tableau Import Documentation](../commands/import.md#import-tableau).
