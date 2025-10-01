@@ -12,7 +12,7 @@ RUN curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${VERSION}
 
 ENV PATH="/home/bruin/.local/bin:${PATH}"
 
-RUN bruin init bootstrap --in-place && bruin run bootstrap
+RUN cd /tmp && bruin init bootstrap --in-place && bruin run bootstrap
 
 RUN rm -rf bootstrap
 
