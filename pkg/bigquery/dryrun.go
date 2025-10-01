@@ -28,11 +28,24 @@ type DryRunner struct {
 }
 
 func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.Asset, c *config.Config) (map[string]any, error) {
-	if a.Type != pipeline.AssetTypeBigqueryQuery {
-		return nil, errors.New("asset-metadata is only available for BigQuery SQL assets")
+	if a.Type != pipeline.AssetTypeBigqueryQuery && a.Type != pipeline.AssetTypeBigqueryQuerySensor {
+		return nil, errors.New("asset-metadata is only available for BigQuery SQL assets and BigQuery query sensors")
 	}
 
-	queries, err := r.QueryExtractor.ExtractQueriesFromString(a.ExecutableFile.Content)
+	var queryString string
+	var err error
+
+	if a.Type == pipeline.AssetTypeBigqueryQuery {
+		queryString = a.ExecutableFile.Content
+	} else if a.Type == pipeline.AssetTypeBigqueryQuerySensor {
+		queryParam, ok := a.Parameters["query"]
+		if !ok {
+			return nil, errors.New("query sensor requires a parameter named 'query'")
+		}
+		queryString = queryParam
+	}
+
+	queries, err := r.QueryExtractor.ExtractQueriesFromString(queryString)
 	if err != nil || len(queries) == 0 {
 		if err == nil {
 			err = errors.New("no query found in asset")
