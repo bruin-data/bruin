@@ -346,32 +346,6 @@
       },
       "schema_prefix": ""
     },
-    "env-run-use-uv": {
-      "connections": {
-        "generic": [
-          {
-            "name": "KEY1",
-            "value": "value1"
-          }
-        ],
-        "duckdb": [
-          {
-            "name": "duckdb-env-run-use-uv",
-            "path": "duckdb-files/env-run-use-uv.db"
-          }
-        ],
-        "chess": [
-          {
-            "name": "chess-run-use-uv",
-            "players": [
-              "erik",
-              "vadimer2"
-            ]
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
     "env-run-with-downstream": {
       "connections": {
         "generic": [

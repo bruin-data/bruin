@@ -92,19 +92,6 @@ environments:
       duckdb:
         - name: "duckdb-push-metadata"
           path: "duckdb-files/push-metadata.db"
-  env-run-use-uv:
-    connections:
-      duckdb:
-        - name: "duckdb-env-run-use-uv"
-          path: "duckdb-files/env-run-use-uv.db"
-      chess:
-        - name: "chess-run-use-uv"
-          players:
-            - "erik"
-            - "vadimer2"
-      generic:
-        - name: KEY1
-          value: value1
   env-run-default-option:
     connections:
       duckdb:
