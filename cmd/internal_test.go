@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 )
 
 func BenchmarkInternalParsePipeline(b *testing.B) {
@@ -190,4 +193,65 @@ func normalize(s string) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+func TestAssetMetadataCommand(t *testing.T) {
+	t.Parallel()
+	cmd := AssetMetadata()
+
+	assert.Equal(t, "asset-metadata", cmd.Name)
+	assert.NotNil(t, cmd.Action)
+
+	flagNames := make(map[string]bool)
+	for _, flag := range cmd.Flags {
+		if f, ok := flag.(*cli.StringFlag); ok {
+			flagNames[f.Name] = true
+		}
+	}
+
+	expectedFlags := []string{"environment", "config-file", "start-date", "end-date"}
+	for _, expectedFlag := range expectedFlags {
+		assert.True(t, flagNames[expectedFlag], "Expected flag %s to be present", expectedFlag)
+	}
+
+	startDateFlag := findStringFlag(cmd.Flags, "start-date")
+	require.NotNil(t, startDateFlag, "start-date flag should exist")
+	assert.Contains(t, startDateFlag.Usage, "start date of the range")
+	assert.Contains(t, startDateFlag.Usage, "YYYY-MM-DD")
+	assert.NotNil(t, startDateFlag.Sources, "start-date flag should have sources")
+
+	endDateFlag := findStringFlag(cmd.Flags, "end-date")
+	require.NotNil(t, endDateFlag, "end-date flag should exist")
+	assert.Contains(t, endDateFlag.Usage, "end date of the range")
+	assert.Contains(t, endDateFlag.Usage, "YYYY-MM-DD")
+	assert.NotNil(t, endDateFlag.Sources, "end-date flag should have sources")
+}
+
+func TestAssetMetadataDefaultDates(t *testing.T) {
+	t.Parallel()
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	expectedStartDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+	expectedEndDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+
+	assert.Equal(t, expectedStartDate, defaultStartDate, "Default start date should be beginning of yesterday")
+	assert.Equal(t, expectedEndDate, defaultEndDate, "Default end date should be end of yesterday")
+
+	cmd := AssetMetadata()
+	startDateFlag := findStringFlag(cmd.Flags, "start-date")
+	require.NotNil(t, startDateFlag)
+	assert.Equal(t, expectedStartDate.Format("2006-01-02 15:04:05.000000"), startDateFlag.Value)
+
+	endDateFlag := findStringFlag(cmd.Flags, "end-date")
+	require.NotNil(t, endDateFlag)
+	assert.Equal(t, expectedEndDate.Format("2006-01-02 15:04:05")+".999999", endDateFlag.Value)
+}
+
+func findStringFlag(flags []cli.Flag, name string) *cli.StringFlag {
+	for _, flag := range flags {
+		if stringFlag, ok := flag.(*cli.StringFlag); ok && stringFlag.Name == name {
+			return stringFlag
+		}
+	}
+	return nil
 }
