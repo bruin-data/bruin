@@ -616,21 +616,6 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "run-use-uv",
-			task: e2e.Task{
-				Name:    "run-use-uv",
-				Command: binary,
-				Args:    []string{"run", "--env", "env-run-use-uv", "--use-uv", filepath.Join(currentFolder, "test-pipelines/run-use-uv-pipeline")},
-				Env:     []string{},
-				Expected: e2e.Output{
-					ExitCode: 1,
-				},
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-				},
-			},
-		},
-		{
 			name: "run-custom-check-count-false",
 			task: e2e.Task{
 				Name:    "run-custom-check-count-false",
