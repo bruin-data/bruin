@@ -1196,6 +1196,8 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("asset path is required", 1)
 			}
 
+			environment := c.String("environment")
+
 			fs := afero.NewOsFs()
 
 			pp, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
@@ -1204,7 +1206,16 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			manager, errs := connection.NewManagerFromConfig(pp.Config)
+			// Load config and switch environment if specified
+			cm := pp.Config
+			if environment != "" {
+				err = switchEnvironment(environment, false, cm, os.Stdin)
+				if err != nil {
+					return err
+				}
+			}
+
+			manager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				printErrorJSON(errs[0])
 				return cli.Exit("", 1)
