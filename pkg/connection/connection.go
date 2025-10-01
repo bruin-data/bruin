@@ -190,9 +190,10 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 	m.mutex.Unlock()
 
-	// Check if either ServiceAccountFile or ServiceAccountJSON is provided, prioritizing ServiceAccountFile.
-	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
-		return errors.New("credentials are required: provide either service_account_file or service_account_json")
+	// Check if either ServiceAccountFile or ServiceAccountJSON is provided, or if we should use Application Default Credentials
+	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 && connection.GetCredentials() == nil {
+		// No explicit credentials provided - will use Application Default Credentials (gcloud auth, etc.)
+		// This is allowed for BigQuery connections
 	}
 
 	// Validate ServiceAccountFile if provided.

@@ -79,6 +79,10 @@ func NewDB(c *Config) (*Client, error) {
 		options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
 	case c.Credentials != nil:
 		options = append(options, option.WithCredentials(c.Credentials))
+	case c.UsesApplicationDefaultCredentials():
+		// No explicit credentials provided - use Application Default Credentials
+		// The BigQuery client will automatically use ADC (gcloud auth, service account, etc.)
+		// No additional options needed
 	default:
 		return nil, errors.New("no credentials provided")
 	}
@@ -127,6 +131,10 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 		options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
 	case d.config.Credentials != nil:
 		options = append(options, option.WithCredentials(d.config.Credentials))
+	case d.config.UsesApplicationDefaultCredentials():
+		// No explicit credentials provided - use Application Default Credentials
+		// The Data Transfer client will automatically use ADC (gcloud auth, service account, etc.)
+		// No additional options needed
 	default:
 		return nil, errors.New("no credentials provided for Data Transfer client")
 	}
