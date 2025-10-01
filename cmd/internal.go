@@ -1167,13 +1167,27 @@ func AssetMetadata() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "environment",
-				Aliases: []string{"env"},
-				Usage:   "Target environment name as defined in .bruin.yml",
+				Aliases: []string{"e", "env"},
+				Usage:   "the environment to use",
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
+			},
+			&cli.StringFlag{
+				Name:        "start-date",
+				Usage:       "the start date of the range the asset will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
+				DefaultText: "beginning of yesterday, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
+				Value:       defaultStartDate.Format("2006-01-02 15:04:05.000000"),
+				Sources:     cli.EnvVars("BRUIN_START_DATE"),
+			},
+			&cli.StringFlag{
+				Name:        "end-date",
+				Usage:       "the end date of the range the asset will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
+				DefaultText: "end of yesterday, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
+				Value:       defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
+				Sources:     cli.EnvVars("BRUIN_END_DATE"),
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -1181,6 +1195,8 @@ func AssetMetadata() *cli.Command {
 			if assetPath == "" {
 				return cli.Exit("asset path is required", 1)
 			}
+
+			environment := c.String("environment")
 
 			fs := afero.NewOsFs()
 
@@ -1190,13 +1206,30 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			manager, errs := connection.NewManagerFromConfig(pp.Config)
+			// Load config and switch environment if specified
+			cm := pp.Config
+			if environment != "" {
+				err = switchEnvironment(environment, false, cm, os.Stdin)
+				if err != nil {
+					return err
+				}
+			}
+
+			manager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				printErrorJSON(errs[0])
 				return cli.Exit("", 1)
 			}
 
-			renderer := jinja.NewRendererWithStartEndDates(&defaultStartDate, &defaultEndDate, pp.Pipeline.Name, "asset-metadata-run", pp.Pipeline.Variables.Value())
+			startDateStr := c.String("start-date")
+			endDateStr := c.String("end-date")
+
+			startDate, endDate, err := ParseDate(startDateStr, endDateStr, makeLogger(false))
+			if err != nil {
+				return cli.Exit("", 1)
+			}
+
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pp.Pipeline.Name, "asset-metadata-run", pp.Pipeline.Variables.Value())
 			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: renderer}
 			extractor, err := whole.CloneForAsset(ctx, pp.Pipeline, pp.Asset)
 			if err != nil {
