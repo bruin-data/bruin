@@ -1167,8 +1167,8 @@ func AssetMetadata() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "environment",
-				Aliases: []string{"env"},
-				Usage:   "Target environment name as defined in .bruin.yml",
+				Aliases: []string{"e", "env"},
+				Usage:   "the environment to use",
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
