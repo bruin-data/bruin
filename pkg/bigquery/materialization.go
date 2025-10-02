@@ -69,7 +69,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 
 	on := make([]string, 0, len(primaryKeys))
 	for _, key := range primaryKeys {
-		on = append(on, fmt.Sprintf("target.%s IS NOT DISTINCT FROM source.%s", key, key))
+		on = append(on, fmt.Sprintf("(source.%s = target.%s OR (source.%s is null and target.%s))", key, key, key, key))
 	}
 	onQuery := strings.Join(on, " AND ")
 
