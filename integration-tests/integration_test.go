@@ -379,6 +379,73 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-start-date-flag",
+			task: e2e.Task{
+				Name:    "render-start-date-flag",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`'2024-01-15'`, `'2024-01-31'`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-full-refresh-uses-pipeline-start-date",
+			task: e2e.Task{
+				Name:    "render-full-refresh-uses-pipeline-start-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--full-refresh",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`'2023-06-15'`, `'2024-01-31'`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-full-refresh-no-start-flag-uses-pipeline-start-date",
+			task: e2e.Task{
+				Name:    "render-full-refresh-no-start-flag-uses-pipeline-start-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--full-refresh",
+					"--end-date", "2024-12-31",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`'2023-06-15'`, `'2024-12-31'`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "python-happy-path-run",
 			task: e2e.Task{
 				Name:    "python-happy-path-run",

@@ -74,35 +74,10 @@ func Render() *cli.Command {
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fullRefresh := c.Bool("full-refresh")
+			logger := makeLogger(c.Bool("debug"))
 
 			if vars := c.StringSlice("var"); len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
-			}
-
-			startDate, err := date.ParseTime(c.String("start-date"))
-			if err != nil {
-				if c.String("output") == "json" {
-					printErrorJSON(errors.New("Please give a valid start date: bruin run --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
-				} else {
-					errorPrinter.Printf("Please give a valid start date: bruin run --start-date <start date>)\n")
-					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
-					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
-					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
-				}
-				return cli.Exit("", 1)
-			}
-
-			endDate, err := date.ParseTime(c.String("end-date"))
-			if err != nil {
-				if c.String("output") == "json" {
-					printErrorJSON(errors.New("Please give a valid end date: bruin run --end-date <end date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
-				} else {
-					errorPrinter.Printf("Please give a valid end date: bruin run --start-date <start date>)\n")
-					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
-					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
-					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
-				}
-				return cli.Exit("", 1)
 			}
 
 			inputPath := c.Args().Get(0)
@@ -144,6 +119,33 @@ func Render() *cli.Command {
 			pl, err = DefaultPipelineBuilder.MutatePipeline(ctx, pl)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to mutate the pipeline:")
+				return cli.Exit("", 1)
+			}
+
+			// Determine start date based on full-refresh flag and pipeline configuration
+			startDate, err := DetermineStartDate(c.String("start-date"), pl, fullRefresh, logger)
+			if err != nil {
+				if c.String("output") == "json" {
+					printErrorJSON(errors.New("Please give a valid start date: bruin render --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
+				} else {
+					errorPrinter.Printf("Please give a valid start date: bruin render --start-date <start date>)\n")
+					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
+					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+				}
+				return cli.Exit("", 1)
+			}
+
+			endDate, err := date.ParseTime(c.String("end-date"))
+			if err != nil {
+				if c.String("output") == "json" {
+					printErrorJSON(errors.New("Please give a valid end date: bruin render --end-date <end date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
+				} else {
+					errorPrinter.Printf("Please give a valid end date: bruin render --start-date <start date>)\n")
+					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
+					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+				}
 				return cli.Exit("", 1)
 			}
 
