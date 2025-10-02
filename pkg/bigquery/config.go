@@ -56,9 +56,3 @@ func (c Config) GetConnectionURI() (string, error) {
 func (c Config) GetIngestrURI() (string, error) {
 	return c.GetConnectionURI()
 }
-
-// UsesApplicationDefaultCredentials returns true if Application Default Credentials
-// should be used. When explicitly set to true, it takes precedence over explicit credentials.
-func (c Config) UsesApplicationDefaultCredentials() bool {
-	return c.UseApplicationDefaultCredentials
-}
