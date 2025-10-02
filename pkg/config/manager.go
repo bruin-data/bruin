@@ -50,6 +50,7 @@ type Connections struct {
 	MotherDuck          []MotherduckConnection          `yaml:"motherduck,omitempty" json:"motherduck,omitempty" mapstructure:"motherduck"`
 	ClickHouse          []ClickHouseConnection          `yaml:"clickhouse,omitempty" json:"clickhouse,omitempty" mapstructure:"clickhouse"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
+	Intercom            []IntercomConnection            `yaml:"intercom,omitempty" json:"intercom,omitempty" mapstructure:"intercom"`
 	GitHub              []GitHubConnection              `yaml:"github,omitempty" json:"github,omitempty" mapstructure:"github"`
 	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
 	Chess               []ChessConnection               `yaml:"chess,omitempty" json:"chess,omitempty" mapstructure:"chess"`
@@ -99,6 +100,7 @@ type Connections struct {
 	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
+	Jira                []JiraConnection                `yaml:"jira,omitempty" json:"jira,omitempty" mapstructure:"jira"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -566,6 +568,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Anthropic = append(env.Connections.Anthropic, conn)
+	case "intercom":
+		var conn IntercomConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Intercom = append(env.Connections.Intercom, conn)
 	case "stripe":
 		var conn StripeConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1027,6 +1036,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Adjust = removeConnection(env.Connections.Adjust, connectionName)
 	case "anthropic":
 		env.Connections.Anthropic = removeConnection(env.Connections.Anthropic, connectionName)
+	case "intercom":
+		env.Connections.Intercom = removeConnection(env.Connections.Intercom, connectionName)
 	case "generic":
 		env.Connections.Generic = removeConnection(env.Connections.Generic, connectionName)
 	case "facebookads":

@@ -274,18 +274,30 @@ type SnowflakeConnection struct {
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
+	if c.PrivateKey != "" && c.PrivateKeyPath != "" {
+		fmt.Printf("Warning: Both private_key and private_key_path are set for Snowflake connection '%s'. Using private_key content and ignoring private_key_path.\n", c.Name)
+	}
+
+	if c.PrivateKey == "" && c.PrivateKeyPath != "" {
+		contents, err := os.ReadFile(c.PrivateKeyPath)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		c.PrivateKey = string(contents)
+	}
+
 	return json.Marshal(map[string]string{
-		"name":             c.Name,
-		"account":          c.Account,
-		"username":         c.Username,
-		"password":         c.Password,
-		"region":           c.Region,
-		"role":             c.Role,
-		"database":         c.Database,
-		"schema":           c.Schema,
-		"warehouse":        c.Warehouse,
-		"private_key_path": c.PrivateKeyPath,
-		"private_key":      c.PrivateKey,
+		"name":        c.Name,
+		"account":     c.Account,
+		"username":    c.Username,
+		"password":    c.Password,
+		"region":      c.Region,
+		"role":        c.Role,
+		"database":    c.Database,
+		"schema":      c.Schema,
+		"warehouse":   c.Warehouse,
+		"private_key": c.PrivateKey,
 	})
 }
 
@@ -457,6 +469,16 @@ type HubspotConnection struct {
 }
 
 func (c HubspotConnection) GetName() string {
+	return c.Name
+}
+
+type IntercomConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	Region      string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+}
+
+func (c IntercomConnection) GetName() string {
 	return c.Name
 }
 
@@ -1006,5 +1028,16 @@ type FundraiseUpConnection struct {
 }
 
 func (c FundraiseUpConnection) GetName() string {
+	return c.Name
+}
+
+type JiraConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Domain   string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
+	Email    string `yaml:"email,omitempty" json:"email" mapstructure:"email"`
+	APIToken string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+}
+
+func (c JiraConnection) GetName() string {
 	return c.Name
 }

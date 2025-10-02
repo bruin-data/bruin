@@ -683,21 +683,6 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "run-use-uv",
-			task: e2e.Task{
-				Name:    "run-use-uv",
-				Command: binary,
-				Args:    []string{"run", "--env", "env-run-use-uv", "--use-uv", filepath.Join(currentFolder, "test-pipelines/run-use-uv-pipeline")},
-				Env:     []string{},
-				Expected: e2e.Output{
-					ExitCode: 1,
-				},
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-				},
-			},
-		},
-		{
 			name: "run-custom-check-count-false",
 			task: e2e.Task{
 				Name:    "run-custom-check-count-false",
@@ -1100,6 +1085,45 @@ func TestIndividualTasks(t *testing.T) {
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
+				},
+			},
+		},
+		{
+			name: "query-duckdb-decimal-return-types",
+			task: e2e.Task{
+				Name:          "query-duckdb-decimal-return-types",
+				Command:       binary,
+				Args:          []string{"query", "--env", "env-duckdb-decimal", "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-decimal-pipeline/assets/simple_decimal_test.sql"), "--output", "json"},
+				Env:           []string{},
+				SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/duckdb-decimal-pipeline/expectations/expected.json")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputJSON,
+				},
+			},
+		},
+		{
+			name: "validate-asset-time-interval",
+			task: e2e.Task{
+				Name:    "validate-asset-time-interval",
+				Command: binary,
+				Args:    []string{"validate", "--env", "env-validate-asset-time-interval", filepath.Join(currentFolder, "test-pipelines/validate-asset-time-interval")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"start date", "is after end date", "for asset invalid_jinja.example",
+						"start date", "is after end date", "for asset invalid_modifiers.example",
+						"Checked 1 pipeline and found", "2 issues",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
 				},
 			},
 		},

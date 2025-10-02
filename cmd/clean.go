@@ -107,6 +107,7 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 
 func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 	var binaryName string
+	//nolint:goconst
 	if runtime.GOOS == "windows" {
 		binaryName = "uv.exe"
 	} else {

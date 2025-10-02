@@ -2,6 +2,50 @@
 
 Bruin supports integrating Tableau assets into your data pipelines. You can represent Tableau datasources, workbooks, worksheets, and dashboards as assets, and trigger refreshes for datasources and workbooks directly from your pipeline.
 
+## Connection
+
+In order to set up a Tableau connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
+
+Tableau supports two authentication methods:
+
+### Personal Access Token (Recommended)
+
+```yaml
+connections:
+  tableau:
+    - name: "connection_name"
+      host: "your-tableau-server.com"
+      site_id: "your-site-id"
+      personal_access_token_name: "your-token-name"
+      personal_access_token_secret: "your-token-secret"
+      api_version: "3.4" # optional, defaults to 3.4
+```
+
+### Username and Password
+
+```yaml
+connections:
+  tableau:
+    - name: "connection_name"
+      host: "your-tableau-server.com"
+      site_id: "your-site-id"
+      username: "your-username"
+      password: "your-password"
+      api_version: "3.4" # optional, defaults to 3.4
+```
+
+**Parameters:**
+- `name`: A unique name for this connection
+- `host`: Your Tableau Server hostname (without https://)
+- `site_id`: The site identifier (content URL) for your Tableau site
+- `personal_access_token_name`: Personal Access Token name (PAT authentication)
+- `personal_access_token_secret`: Personal Access Token secret (PAT authentication)
+- `username`: Your Tableau username (username/password authentication)
+- `password`: Your Tableau password (username/password authentication)
+- `api_version`: Tableau REST API version (optional, defaults to "3.4")
+
+> **Note:** Either Personal Access Token credentials (name and secret) or username/password credentials are required. Personal Access Token authentication is recommended for production environments.
+
 ## Supported Tableau Asset Types
 
 - `tableau.datasource` — Represents a Tableau data source (can be refreshed)
@@ -107,3 +151,23 @@ parameters:
   - Data source: `POST /api/{version}/sites/{site-id}/datasources/{datasource-id}/refresh`
   - Workbook:    `POST /api/{version}/sites/{site-id}/workbooks/{workbook-id}/refresh`
 - Authentication is handled via the connection config (Personal Access Token recommended).
+
+## Importing Tableau Dashboards
+
+Bruin provides a powerful import command that automatically discovers and imports your Tableau dashboards, workbooks, and data sources as Bruin assets. The import command:
+
+- Connects to your Tableau Cloud/Server using Personal Access Tokens
+- Discovers all dashboards, workbooks, and data sources
+- Replicates your Tableau project folder structure
+- Automatically detects and creates dependency relationships
+- Preserves metadata including workbook associations and project hierarchy
+
+To import your Tableau assets:
+
+```bash
+bruin import tableau ./my-pipeline --connection tableau-prod
+```
+
+This command will create a structured folder hierarchy matching your Tableau projects, with all dashboards and data sources properly organized and linked.
+
+For detailed information about the import process, configuration options, and generated asset structure, see the [Tableau Import Documentation](../commands/import.md#import-tableau).

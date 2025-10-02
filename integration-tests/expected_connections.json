@@ -346,32 +346,6 @@
       },
       "schema_prefix": ""
     },
-    "env-run-use-uv": {
-      "connections": {
-        "generic": [
-          {
-            "name": "KEY1",
-            "value": "value1"
-          }
-        ],
-        "duckdb": [
-          {
-            "name": "duckdb-env-run-use-uv",
-            "path": "duckdb-files/env-run-use-uv.db"
-          }
-        ],
-        "chess": [
-          {
-            "name": "chess-run-use-uv",
-            "players": [
-              "erik",
-              "vadimer2"
-            ]
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
     "env-run-with-downstream": {
       "connections": {
         "generic": [
@@ -511,6 +485,28 @@
           {
             "name": "duckdb-start-date-flags",
             "path": "duckdb-files/start-date-flags.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-duckdb-decimal": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-decimal",
+            "path": "duckdb-files/duckdb-decimal.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-validate-asset-time-interval": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-validate-asset-time-interval",
+            "path": "duckdb-files/validate-asset-time-interval.db"
           }
         ]
       },

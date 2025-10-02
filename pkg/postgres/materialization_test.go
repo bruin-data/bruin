@@ -115,7 +115,25 @@ COMMIT;`,
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
 				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
-				"DELETE FROM my.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
+				`DELETE FROM my.asset WHERE "dt" in \(SELECT DISTINCT "dt" FROM __bruin_tmp_.+\);` + "\n" +
+				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
+				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "delete+insert with case-sensitive incremental key",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "eventTime",
+				},
+			},
+			query: "SELECT 1, NOW() as \"eventTime\"",
+			want: "^BEGIN TRANSACTION;\n" +
+				`CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1, NOW\(\) as "eventTime"\n;\n` +
+				`DELETE FROM my.asset WHERE "eventTime" in \(SELECT DISTINCT "eventTime" FROM __bruin_tmp_.+\);` + "\n" +
 				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
 				"COMMIT;$",
@@ -178,10 +196,31 @@ COMMIT;`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
-				"WHEN MATCHED THEN UPDATE SET name = source\\.name\n" +
-				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$",
+			want: `^MERGE INTO my\.asset target
+USING \(SELECT 1 as id, 'abc' as name\) source ON target\."id" = source\."id"
+WHEN MATCHED THEN UPDATE SET "name" = source\."name"
+WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
+		},
+		{
+			name: "merge with case-sensitive fields",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "code", Type: "varchar", PrimaryKey: true},
+					{Name: "iLeft", Type: "int", PrimaryKey: false, UpdateOnMerge: true},
+					{Name: "iRight", Type: "int", PrimaryKey: false, UpdateOnMerge: true},
+					{Name: "translation", Type: "varchar", PrimaryKey: false, UpdateOnMerge: true},
+				},
+			},
+			query: `SELECT 'ABC' as code, 1 as "iLeft", 2 as "iRight", 'test' as translation`,
+			want: `^MERGE INTO my\.asset target
+USING \(SELECT 'ABC' as code, 1 as "iLeft", 2 as "iRight", 'test' as translation\) source ON target\."code" = source\."code"
+WHEN MATCHED THEN UPDATE SET "iLeft" = source\."iLeft", "iRight" = source\."iRight", "translation" = source\."translation"
+WHEN NOT MATCHED THEN INSERT\("code", "iLeft", "iRight", "translation"\) VALUES\("code", "iLeft", "iRight", "translation"\);$`,
 		},
 		{
 			name: "time_interval_no_incremental_key",
@@ -209,10 +248,10 @@ COMMIT;`,
 				},
 			},
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
-			want: "^BEGIN TRANSACTION;\n" +
-				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"COMMIT;$",
+			want: `^BEGIN TRANSACTION;\s*` +
+				`DELETE FROM my\.asset WHERE "ts" BETWEEN '\{\{start_timestamp\}\}' AND '\{\{end_timestamp\}\}';\s*` +
+				`INSERT INTO my\.asset SELECT ts, event_name from source_table where ts between '\{\{start_timestamp\}\}' AND '\{\{end_timestamp\}\}';\s*` +
+				`COMMIT;$`,
 		},
 		{
 			name: "time_interval_date",
@@ -226,10 +265,10 @@ COMMIT;`,
 				},
 			},
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
-			want: "^BEGIN TRANSACTION;\n" +
-				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
-				"COMMIT;$",
+			want: `^BEGIN TRANSACTION;\s*` +
+				`DELETE FROM my\.asset WHERE "dt" BETWEEN '\{\{start_date\}\}' AND '\{\{end_date\}\}';\s*` +
+				`INSERT INTO my\.asset SELECT dt, event_name from source_table where dt between '\{\{start_date\}\}' and '\{\{end_date\}\}';\s*` +
+				`COMMIT;$`,
 		},
 		{
 			name: "empty table",
@@ -258,7 +297,7 @@ COMMIT;`,
 				},
 			},
 			want: "CREATE TABLE IF NOT EXISTS one_col_table \\(\n" +
-				"id INT64\n" +
+				`\"id\" INT64\n` +
 				"\\)",
 		},
 		{
@@ -274,11 +313,7 @@ COMMIT;`,
 					{Name: "name", Type: "STRING", Description: "The name of the person"},
 				},
 			},
-			want: "CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
-				"id INT64,\n" +
-				"name STRING\n" +
-				"\\);\n" +
-				"COMMENT ON COLUMN two_col_table\\.name IS \\'The name of the person\\';",
+			want: `CREATE TABLE IF NOT EXISTS two_col_table \(\s*"id" INT64,\s*"name" STRING\s*\);\s*COMMENT ON COLUMN two_col_table\."name" IS 'The name of the person';`,
 		},
 		{
 			name: "table with primary key",
@@ -293,12 +328,7 @@ COMMIT;`,
 					{Name: "category", Type: "STRING", Description: "Category of the item", PrimaryKey: false},
 				},
 			},
-			want: "CREATE TABLE IF NOT EXISTS my_primary_key_table \\(\n" +
-				"id INT64,\n" +
-				"category STRING,\n" +
-				"primary key \\(id\\)\n" +
-				"\\);\n" +
-				"COMMENT ON COLUMN my_primary_key_table\\.category IS \\'Category of the item\\';",
+			want: `CREATE TABLE IF NOT EXISTS my_primary_key_table \(\s*"id" INT64,\s*"category" STRING,\s*primary key \("id"\)\s*\);\s*COMMENT ON COLUMN my_primary_key_table\."category" IS 'Category of the item';`,
 		},
 		{
 			name: "table with composite primary key",
@@ -313,12 +343,7 @@ COMMIT;`,
 					{Name: "category", Type: "STRING", Description: "Category of the item", PrimaryKey: true},
 				},
 			},
-			want: "CREATE TABLE IF NOT EXISTS my_composite_primary_key_table \\(\n" +
-				"id INT64,\n" +
-				"category STRING,\n" +
-				"primary key \\(id, category\\)\n" +
-				"\\);\n" +
-				"COMMENT ON COLUMN my_composite_primary_key_table\\.category IS \\'Category of the item\\';",
+			want: `CREATE TABLE IF NOT EXISTS my_composite_primary_key_table \(\s*"id" INT64,\s*"category" STRING,\s*primary key \("id", "category"\)\s*\);\s*COMMENT ON COLUMN my_composite_primary_key_table\."category" IS 'Category of the item';`,
 		},
 	}
 	for _, tt := range tests {
@@ -488,16 +513,16 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM s1\n" +
-				"  JOIN   my.asset AS t1 USING (id)\n" +
-				"  WHERE  t1._valid_from < s1.ts AND t1._is_current\n" +
+				"  JOIN   my.asset AS t1 USING (\"id\")\n" +
+				"  WHERE  t1._valid_from < s1.\"ts\" AND t1._is_current\n" +
 				") AS source\n" +
-				"ON  target.id = source.id AND target._is_current AND source._is_current\n" +
+				"ON  target.\"id\" = source.\"id\" AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"  target._valid_from < source.ts\n" +
+				"  target._valid_from < source.\"ts\"\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
-				"    _valid_until = source.ts,\n" +
+				"    _valid_until = source.\"ts\",\n" +
 				"    _is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n" +
@@ -506,8 +531,8 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"    _is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, event_name, ts, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.event_name, source.ts, source.ts, '9999-12-31 00:00:00', TRUE);",
+				"  INSERT (\"id\", \"event_name\", \"ts\", _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.\"id\", source.\"event_name\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00', TRUE);",
 		},
 		//nolint:dupword
 		{
@@ -538,16 +563,16 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM s1\n" +
-				"  JOIN   my.asset AS t1 USING (id, event_type)\n" +
-				"  WHERE  t1._valid_from < s1.ts AND t1._is_current\n" +
+				"  JOIN   my.asset AS t1 USING (\"id\", \"event_type\")\n" +
+				"  WHERE  t1._valid_from < s1.\"ts\" AND t1._is_current\n" +
 				") AS source\n" +
-				"ON  target.id = source.id AND target.event_type = source.event_type AND target._is_current AND source._is_current\n" +
+				"ON  target.\"id\" = source.\"id\" AND target.\"event_type\" = source.\"event_type\" AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"  target._valid_from < source.ts\n" +
+				"  target._valid_from < source.\"ts\"\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
-				"    _valid_until = source.ts,\n" +
+				"    _valid_until = source.\"ts\",\n" +
 				"    _is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n" +
@@ -556,8 +581,8 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"    _is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, source.ts, '9999-12-31 00:00:00', TRUE);",
+				"  INSERT (\"id\", \"event_type\", \"col1\", \"col2\", \"ts\", _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.\"id\", source.\"event_type\", source.\"col1\", source.\"col2\", source.\"ts\", source.\"ts\", '9999-12-31 00:00:00', TRUE);",
 		},
 		{
 			name: "scd2_full_refresh_with_incremental_key",
@@ -580,7 +605,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"DROP TABLE IF EXISTS my.asset;\n" +
 				"CREATE TABLE my.asset AS\n" +
 				"SELECT\n" +
-				"  ts AS _valid_from,\n" +
+				"  \"ts\" AS _valid_from,\n" +
 				"  src.*,\n" +
 				"  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
@@ -708,13 +733,13 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM   s1\n" +
-				"  JOIN   my.asset AS t1 USING (id)\n" +
-				"  WHERE  (t1.col1 != s1.col1 OR t1.col2 != s1.col2 OR t1.col3 != s1.col3 OR t1.col4 != s1.col4) AND t1._is_current\n" +
+				"  JOIN   my.asset AS t1 USING (\"id\")\n" +
+				"  WHERE  (t1.\"col1\" != s1.\"col1\" OR t1.\"col2\" != s1.\"col2\" OR t1.\"col3\" != s1.\"col3\" OR t1.\"col4\" != s1.\"col4\") AND t1._is_current\n" +
 				") AS source\n" +
-				"ON  target.id = source.id AND target._is_current AND source._is_current\n" +
+				"ON  target.\"id\" = source.\"id\" AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"    target.col1 != source.col1 OR target.col2 != source.col2 OR target.col3 != source.col3 OR target.col4 != source.col4\n" +
+				"    target.\"col1\" != source.\"col1\" OR target.\"col2\" != source.\"col2\" OR target.\"col3\" != source.\"col3\" OR target.\"col4\" != source.\"col4\"\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
 				"    _valid_until = CURRENT_TIMESTAMP,\n" +
@@ -726,8 +751,8 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"    _is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
+				"  INSERT (\"id\", \"col1\", \"col2\", \"col3\", \"col4\", _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.\"id\", source.\"col1\", source.\"col2\", source.\"col3\", source.\"col4\", CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
 		},
 		{
 			name: "scd2_multiple_primary_keys",
@@ -755,13 +780,13 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM   s1\n" +
-				"  JOIN   my.asset AS t1 USING (id, category)\n" +
-				"  WHERE  (t1.name != s1.name OR t1.price != s1.price) AND t1._is_current\n" +
+				"  JOIN   my.asset AS t1 USING (\"id\", \"category\")\n" +
+				"  WHERE  (t1.\"name\" != s1.\"name\" OR t1.\"price\" != s1.\"price\") AND t1._is_current\n" +
 				") AS source\n" +
-				"ON  target.id = source.id AND target.category = source.category AND target._is_current AND source._is_current\n" +
+				"ON  target.\"id\" = source.\"id\" AND target.\"category\" = source.\"category\" AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"    target.name != source.name OR target.price != source.price\n" +
+				"    target.\"name\" != source.\"name\" OR target.\"price\" != source.\"price\"\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
 				"    _valid_until = CURRENT_TIMESTAMP,\n" +
@@ -773,8 +798,8 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"    _is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, category, name, price, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.category, source.name, source.price, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
+				"  INSERT (\"id\", \"category\", \"name\", \"price\", _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.\"id\", source.\"category\", source.\"name\", source.\"price\", CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
 		},
 		{
 			name: "scd2_full_refresh_by_column",
@@ -973,31 +998,31 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, event_name, ts from source_table\\) AS src;\n\n" +
 				"-- Update existing records where source timestamp is newer\n" +
 				"UPDATE my\\.asset AS target\n" +
-				"SET _valid_until = source\\.ts, _is_current = FALSE\n" +
+				"SET _valid_until = source\\.\"ts\", _is_current = FALSE\n" +
 				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
-				"WHERE target\\.id = source\\.id\n" +
+				"WHERE target\\.\"id\" = source\\.\"id\"\n" +
 				"  AND target\\._is_current = TRUE\n" +
-				"  AND target\\._valid_from < source\\.ts;\n\n" +
+				"  AND target\\._valid_from < source\\.\"ts\";\n\n" +
 				"-- Update records that are no longer in source \\(expired\\)\n" +
 				"UPDATE my\\.asset AS target\n" +
 				"SET _valid_until = CURRENT_TIMESTAMP, _is_current = FALSE\n" +
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND NOT EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_time_tmp_.+ AS source\n" +
-				"    WHERE target\\.id = source\\.id\n" +
+				"    WHERE target\\.\"id\" = source\\.\"id\"\n" +
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
-				"INSERT INTO my\\.asset \\(id, event_name, ts, _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.id, source\\.event_name, source\\.ts, source\\.ts, TIMESTAMP '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
+				"INSERT INTO my\\.asset \\(\"id\", \"event_name\", \"ts\", _valid_from, _valid_until, _is_current\\)\n" +
+				"SELECT source\\.\"id\", source\\.\"event_name\", source\\.\"ts\", source\\.\"ts\", TIMESTAMP '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
 				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM my\\.asset AS target \n" +
-				"  WHERE target\\.id = source\\.id AND target\\._is_current = TRUE\n" +
+				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\._is_current = TRUE\n" +
 				"\\)\n" +
 				"OR EXISTS \\(\n" +
 				"  SELECT 1 FROM my\\.asset AS target\n" +
-				"  WHERE target\\.id = source\\.id AND target\\._is_current = FALSE \n" +
-				"  AND target\\._valid_until = source\\.ts\n" +
+				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\._is_current = FALSE \n" +
+				"  AND target\\._valid_until = source\\.\"ts\"\n" +
 				"\\);\n\n" +
 				"DROP TABLE __bruin_scd2_time_tmp_.+;\n" +
 				"COMMIT;$",
@@ -1027,31 +1052,31 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, event_type, col1, col2, ts from source_table\\) AS src;\n\n" +
 				"-- Update existing records where source timestamp is newer\n" +
 				"UPDATE my\\.asset AS target\n" +
-				"SET _valid_until = source\\.ts, _is_current = FALSE\n" +
+				"SET _valid_until = source\\.\"ts\", _is_current = FALSE\n" +
 				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
-				"WHERE target\\.id = source\\.id AND target\\.event_type = source\\.event_type\n" +
+				"WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"event_type\" = source\\.\"event_type\"\n" +
 				"  AND target\\._is_current = TRUE\n" +
-				"  AND target\\._valid_from < source\\.ts;\n\n" +
+				"  AND target\\._valid_from < source\\.\"ts\";\n\n" +
 				"-- Update records that are no longer in source \\(expired\\)\n" +
 				"UPDATE my\\.asset AS target\n" +
 				"SET _valid_until = CURRENT_TIMESTAMP, _is_current = FALSE\n" +
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND NOT EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_time_tmp_.+ AS source\n" +
-				"    WHERE target\\.id = source\\.id AND target\\.event_type = source\\.event_type\n" +
+				"    WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"event_type\" = source\\.\"event_type\"\n" +
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
-				"INSERT INTO my\\.asset \\(id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.id, source\\.event_type, source\\.col1, source\\.col2, source\\.ts, source\\.ts, TIMESTAMP '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
+				"INSERT INTO my\\.asset \\(\"id\", \"event_type\", \"col1\", \"col2\", \"ts\", _valid_from, _valid_until, _is_current\\)\n" +
+				"SELECT source\\.\"id\", source\\.\"event_type\", source\\.\"col1\", source\\.\"col2\", source\\.\"ts\", source\\.\"ts\", TIMESTAMP '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
 				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM my\\.asset AS target \n" +
-				"  WHERE target\\.id = source\\.id AND target\\.event_type = source\\.event_type AND target\\._is_current = TRUE\n" +
+				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"event_type\" = source\\.\"event_type\" AND target\\._is_current = TRUE\n" +
 				"\\)\n" +
 				"OR EXISTS \\(\n" +
 				"  SELECT 1 FROM my\\.asset AS target\n" +
-				"  WHERE target\\.id = source\\.id AND target\\.event_type = source\\.event_type AND target\\._is_current = FALSE \n" +
-				"  AND target\\._valid_until = source\\.ts\n" +
+				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"event_type\" = source\\.\"event_type\" AND target\\._is_current = FALSE \n" +
+				"  AND target\\._valid_until = source\\.\"ts\"\n" +
 				"\\);\n\n" +
 				"DROP TABLE __bruin_scd2_time_tmp_.+;\n" +
 				"COMMIT;$",
@@ -1078,7 +1103,7 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 				"DROP TABLE IF EXISTS my.asset;\n" +
 				"CREATE TABLE my.asset AS\n" +
 				"SELECT\n" +
-				"  ts AS _valid_from,\n" +
+				"  \"ts\" AS _valid_from,\n" +
 				"  src.*,\n" +
 				"  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
@@ -1219,7 +1244,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
-				"    WHERE target\\.id = source\\.id AND \\(target\\.col1 != source\\.col1 OR target\\.col2 != source\\.col2 OR target\\.col3 != source\\.col3 OR target\\.col4 != source\\.col4\\)\n" +
+				"    WHERE target\\.\"id\" = source\\.\"id\" AND \\(target\\.\"col1\" != source\\.\"col1\" OR target\\.\"col2\" != source\\.\"col2\" OR target\\.\"col3\" != source\\.\"col3\" OR target\\.\"col4\" != source\\.\"col4\"\\)\n" +
 				"  \\);\n\n" +
 				"-- Update records that are no longer in source \\(expired\\)\n" +
 				"UPDATE my\\.asset AS target\n" +
@@ -1227,15 +1252,15 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND NOT EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
-				"    WHERE target\\.id = source\\.id\n" +
+				"    WHERE target\\.\"id\" = source\\.\"id\"\n" +
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
-				"INSERT INTO my\\.asset \\(id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.id, source\\.col1, source\\.col2, source\\.col3, source\\.col4, \\(SELECT session_timestamp FROM _ts\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"INSERT INTO my\\.asset \\(\"id\", \"col1\", \"col2\", \"col3\", \"col4\", _valid_from, _valid_until, _is_current\\)\n" +
+				"SELECT source\\.\"id\", source\\.\"col1\", source\\.\"col2\", source\\.\"col3\", source\\.\"col4\", \\(SELECT session_timestamp FROM _ts\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
 				"FROM __bruin_scd2_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM my\\.asset AS target \n" +
-				"  WHERE target\\.id = source\\.id AND target\\._is_current = TRUE\n" +
+				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\._is_current = TRUE\n" +
 				"\\);\n\n" +
 				"DROP TABLE __bruin_scd2_tmp_.+;\n" +
 				"COMMIT;$",
@@ -1270,7 +1295,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
-				"    WHERE target\\.id = source\\.id AND target\\.category = source\\.category AND \\(target\\.name != source\\.name OR target\\.price != source\\.price\\)\n" +
+				"    WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"category\" = source\\.\"category\" AND \\(target\\.\"name\" != source\\.\"name\" OR target\\.\"price\" != source\\.\"price\"\\)\n" +
 				"  \\);\n\n" +
 				"-- Update records that are no longer in source \\(expired\\)\n" +
 				"UPDATE my\\.asset AS target\n" +
@@ -1278,15 +1303,15 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"WHERE target\\._is_current = TRUE\n" +
 				"  AND NOT EXISTS \\(\n" +
 				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
-				"    WHERE target\\.id = source\\.id AND target\\.category = source\\.category\n" +
+				"    WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"category\" = source\\.\"category\"\n" +
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
-				"INSERT INTO my\\.asset \\(id, category, name, price, _valid_from, _valid_until, _is_current\\)\n" +
-				"SELECT source\\.id, source\\.category, source\\.name, source\\.price, \\(SELECT session_timestamp FROM _ts\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"INSERT INTO my\\.asset \\(\"id\", \"category\", \"name\", \"price\", _valid_from, _valid_until, _is_current\\)\n" +
+				"SELECT source\\.\"id\", source\\.\"category\", source\\.\"name\", source\\.\"price\", \\(SELECT session_timestamp FROM _ts\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
 				"FROM __bruin_scd2_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +
 				"  SELECT 1 FROM my\\.asset AS target \n" +
-				"  WHERE target\\.id = source\\.id AND target\\.category = source\\.category AND target\\._is_current = TRUE\n" +
+				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\.\"category\" = source\\.\"category\" AND target\\._is_current = TRUE\n" +
 				"\\);\n\n" +
 				"DROP TABLE __bruin_scd2_tmp_.+;\n" +
 				"COMMIT;$",

@@ -14,7 +14,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	_ "github.com/marcboeker/go-duckdb"
+	"github.com/marcboeker/go-duckdb"   //nolint:stylecheck
+	_ "github.com/marcboeker/go-duckdb" //nolint:stylecheck
 )
 
 type Client struct {
@@ -104,6 +105,11 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 			return nil, err
 		}
 
+		// Convert DuckDB-specific types (especially decimals)
+		for i, val := range columns {
+			columns[i] = c.convertValue(val)
+		}
+
 		result = append(result, columns)
 	}
 
@@ -159,10 +165,27 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 			return nil, err
 		}
 
+		// Convert DuckDB-specific types (especially decimals)
+		for i, val := range columns {
+			columns[i] = c.convertValue(val)
+		}
+
 		result.Rows = append(result.Rows, columns)
 	}
 
 	return result, nil
+}
+
+func (c *Client) convertValue(val interface{}) interface{} {
+	if val == nil {
+		return nil
+	}
+
+	if decimal, ok := val.(duckdb.Decimal); ok {
+		return decimal.Float64()
+	}
+
+	return val
 }
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {

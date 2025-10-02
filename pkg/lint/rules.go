@@ -1562,3 +1562,45 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 
 	return issues, nil
 }
+
+var intervalRenderer = jinja.NewRendererWithYesterday("some-pipeline", "some-run-id")
+
+func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	validationCtx := context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
+
+	r, err := intervalRenderer.CloneForAsset(validationCtx, p, asset)
+	if err != nil {
+		return nil, err
+	}
+
+	renderedStartDate, err := r.Render("{{ start_datetime }}")
+	if err != nil {
+		return nil, err
+	}
+
+	renderedEndDate, err := r.Render("{{ end_datetime }}")
+	if err != nil {
+		return nil, err
+	}
+
+	parsedStartDate, err := time.Parse("2006-01-02T15:04:05", renderedStartDate)
+	if err != nil {
+		return nil, err
+	}
+
+	parsedEndDate, err := time.Parse("2006-01-02T15:04:05", renderedEndDate)
+	if err != nil {
+		return nil, err
+	}
+
+	if parsedStartDate.After(parsedEndDate) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("start date %v is after end date %v for asset %v", parsedStartDate, parsedEndDate, asset.Name),
+		})
+	}
+
+	return issues, nil
+}
