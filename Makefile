@@ -12,6 +12,12 @@ TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
 OS_ARCH:=$(shell go env GOOS)_$(shell go env GOARCH)
 
+# Suppress CGO linker warnings on macOS (not needed on Linux/Windows)
+ifeq ($(shell go env GOOS),darwin)
+export CGO_LDFLAGS=-Wl,-w
+export LDFLAGS=-Wl,-w
+endif
+
 JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
 .PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations integration-test-cloud
