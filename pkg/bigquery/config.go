@@ -15,10 +15,16 @@ type Config struct {
 	CredentialsJSON     string
 	Credentials         *google.Credentials
 	Location            string `envconfig:"BIGQUERY_LOCATION"`
+	// Add support for Application Default Credentials
+	UseApplicationDefaultCredentials bool `envconfig:"BIGQUERY_USE_ADC"`
 }
 
 func (c Config) IsValid() bool {
-	return c.ProjectID != "" && c.CredentialsFilePath != ""
+	// Valid if we have a project ID and at least one credential method
+	return c.ProjectID != "" && (c.CredentialsFilePath != "" ||
+		c.CredentialsJSON != "" ||
+		c.Credentials != nil ||
+		c.UseApplicationDefaultCredentials)
 }
 
 func (c Config) GetConnectionURI() (string, error) {
