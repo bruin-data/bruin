@@ -85,16 +85,12 @@ func NewDB(c *Config) (*Client, error) {
 		// 2. gcloud auth application-default login credentials file
 		// 3. Attached service account (metadata server)
 	} else {
-		// Use explicit credentials in order of preference
 		switch {
 		case c.CredentialsJSON != "":
-			// Explicit service account JSON (highest priority for explicit credentials)
 			options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
 		case c.CredentialsFilePath != "":
-			// Explicit service account file (second priority for explicit credentials)
 			options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
 		case c.Credentials != nil:
-			// Pre-loaded credentials object (third priority for explicit credentials)
 			options = append(options, option.WithCredentials(c.Credentials))
 		default:
 			return nil, errors.New("no credentials provided")
@@ -143,7 +139,6 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 		// Use Application Default Credentials - no additional options needed
 		// The Data Transfer client will automatically use ADC
 	} else {
-		// Use explicit credentials in order of preference
 		switch {
 		case d.config.CredentialsJSON != "":
 			options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
