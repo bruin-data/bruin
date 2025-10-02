@@ -49,11 +49,12 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 	}
 
 	// Include only one of ServiceAccountJSON, ServiceAccountFile, or ADCCredentialsPath, whichever is not empty
-	if c.ServiceAccountFile != "" {
+	switch {
+	case c.ServiceAccountFile != "":
 		m["service_account_file"] = c.ServiceAccountFile
-	} else if c.ServiceAccountJSON != "" {
+	case c.ServiceAccountJSON != "":
 		m["service_account_json"] = c.ServiceAccountJSON
-	} else if c.ADCCredentialsPath != "" {
+	case c.ADCCredentialsPath != "":
 		m["adc_credentials_path"] = c.ADCCredentialsPath
 	}
 	return m, nil

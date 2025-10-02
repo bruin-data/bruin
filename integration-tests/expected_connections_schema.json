@@ -1164,6 +1164,9 @@
         "service_account_file": {
           "type": "string"
         },
+        "adc_credentials_path": {
+          "type": "string"
+        },
         "project_id": {
           "type": "string"
         },

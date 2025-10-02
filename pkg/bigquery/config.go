@@ -46,7 +46,7 @@ func (c Config) GetConnectionURI() (string, error) {
 	case c.UsesApplicationDefaultCredentials():
 		// For Application Default Credentials, we don't need to encode credentials
 		// The BigQuery client will automatically use ADC
-		URI := fmt.Sprintf("bigquery://%s", c.ProjectID)
+		URI := "bigquery://" + c.ProjectID
 		if c.Location != "" {
 			URI += "?location=" + c.Location
 		}
@@ -69,7 +69,7 @@ func (c Config) GetIngestrURI() (string, error) {
 }
 
 // UsesApplicationDefaultCredentials returns true if no explicit credentials are provided
-// and the configuration should use Application Default Credentials (gcloud auth)
+// and the configuration should use Application Default Credentials (gcloud auth).
 func (c Config) UsesApplicationDefaultCredentials() bool {
 	return c.CredentialsFilePath == "" && c.CredentialsJSON == "" && c.Credentials == nil && c.ADCCredentialsPath == ""
 }
