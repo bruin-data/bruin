@@ -96,19 +96,12 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	})
 
 	err := m.AddBqConnectionFromConfig(connection)
-	// The connection should now succeed because we have valid credentials via SetCredentials()
-	// The BigQuery client creation might still fail due to invalid project ID or credentials,
-	// but our credential validation logic should pass
 	if err != nil {
-		// If there's an error, it should be from BigQuery client creation, not credential validation
-		// The error should not be about missing credentials
 		assert.NotContains(t, err.Error(), "credentials are required")
 	}
 
-	// Check if connection was added (it might not be available if BigQuery client creation failed)
-	// but that's expected with invalid project ID "test"
 	connectionResult := m.GetConnection("test")
-	_ = connectionResult // Suppress unused variable warning
+	_ = connectionResult
 }
 
 func TestManager_AddPgConnectionFromConfig(t *testing.T) {
