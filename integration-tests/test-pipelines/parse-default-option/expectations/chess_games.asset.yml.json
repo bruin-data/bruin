@@ -5,6 +5,7 @@
     "name": "chess_playground.games",
     "type": "ingestr",
     "description": "",
+    "start_date": "",
     "connection": "",
     "tags": [],
     "domains": [],
@@ -14,7 +15,6 @@
     "image": "",
     "instance": "",
     "owner": "",
-    "start_date": "",
     "executable_file": {
       "name": "chess_games.asset.yml",
       "path": "test-pipelines/parse-default-option/assets/chess_games.asset.yml",
@@ -49,6 +49,6 @@
     "schedule": ""
   },
   "repo": {
-    "path": "/Users/bruin/GolandProjects/bruin/integration-tests"
+    "path": "/Users/johannes/bruin/integration-tests"
   }
 }

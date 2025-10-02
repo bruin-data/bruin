@@ -72,15 +72,33 @@ func NewDB(c *Config) (*Client, error) {
 		option.WithScopes(scopes...),
 	}
 
-	switch {
-	case c.CredentialsJSON != "":
-		options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
-	case c.CredentialsFilePath != "":
-		options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
-	case c.Credentials != nil:
-		options = append(options, option.WithCredentials(c.Credentials))
-	default:
-		return nil, errors.New("no credentials provided")
+	// Check if ADC is explicitly enabled
+	if c.UseApplicationDefaultCredentials {
+		// Warn if explicit credentials are provided but ADC is enabled
+		if c.CredentialsJSON != "" || c.CredentialsFilePath != "" || c.Credentials != nil {
+			fmt.Printf("Warning: Application Default Credentials (ADC) is enabled. Ignoring explicit credentials (service_account_file, service_account_json, or credentials object).\n")
+		}
+		// Use Application Default Credentials - no additional options needed
+		// The client library will automatically find credentials using ADC
+		// following Google's search order:
+		// 1. GOOGLE_APPLICATION_CREDENTIALS environment variable
+		// 2. gcloud auth application-default login credentials file
+		// 3. Attached service account (metadata server)
+	} else {
+		// Use explicit credentials in order of preference
+		switch {
+		case c.CredentialsJSON != "":
+			// Explicit service account JSON (highest priority for explicit credentials)
+			options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
+		case c.CredentialsFilePath != "":
+			// Explicit service account file (second priority for explicit credentials)
+			options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
+		case c.Credentials != nil:
+			// Pre-loaded credentials object (third priority for explicit credentials)
+			options = append(options, option.WithCredentials(c.Credentials))
+		default:
+			return nil, errors.New("no credentials provided")
+		}
 	}
 
 	client, err := bigquery.NewClient(
@@ -120,15 +138,22 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 		option.WithScopes(scopes...),
 	}
 
-	switch {
-	case d.config.CredentialsJSON != "":
-		options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
-	case d.config.CredentialsFilePath != "":
-		options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
-	case d.config.Credentials != nil:
-		options = append(options, option.WithCredentials(d.config.Credentials))
-	default:
-		return nil, errors.New("no credentials provided for Data Transfer client")
+	// Check if ADC is explicitly enabled
+	if d.config.UseApplicationDefaultCredentials {
+		// Use Application Default Credentials - no additional options needed
+		// The Data Transfer client will automatically use ADC
+	} else {
+		// Use explicit credentials in order of preference
+		switch {
+		case d.config.CredentialsJSON != "":
+			options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
+		case d.config.CredentialsFilePath != "":
+			options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
+		case d.config.Credentials != nil:
+			options = append(options, option.WithCredentials(d.config.Credentials))
+		default:
+			return nil, errors.New("no credentials provided for Data Transfer client")
+		}
 	}
 
 	return datatransfer.NewClient(ctx, options...)

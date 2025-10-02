@@ -5,6 +5,7 @@
     "name": "chess_playground.player_summary",
     "type": "duckdb.sql",
     "description": "",
+    "start_date": "",
     "connection": "",
     "tags": [],
     "domains": [],
@@ -34,7 +35,6 @@
     "image": "",
     "instance": "",
     "owner": "",
-    "start_date": "",
     "executable_file": {
       "name": "player_summary.sql",
       "path": "test-pipelines/parse-happy-path/assets/player_summary.sql",
@@ -84,6 +84,6 @@
     "schedule": ""
   },
   "repo": {
-    "path": "/Users/bruin/GolandProjects/bruin/integration-tests"
+    "path": "/Users/johannes/bruin/integration-tests"
   }
 }
