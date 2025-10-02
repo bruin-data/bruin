@@ -479,12 +479,6 @@
           },
           "type": "array"
         },
-        "intercom": {
-          "items": {
-            "$ref": "#/$defs/IntercomConnection"
-          },
-          "type": "array"
-        },
         "github": {
           "items": {
             "$ref": "#/$defs/GitHubConnection"
@@ -569,12 +563,6 @@
           },
           "type": "array"
         },
-        "revenuecat": {
-          "items": {
-            "$ref": "#/$defs/RevenueCatConnection"
-          },
-          "type": "array"
-        },
         "linear": {
           "items": {
             "$ref": "#/$defs/LinearConnection"
@@ -590,6 +578,12 @@
         "applovinmax": {
           "items": {
             "$ref": "#/$defs/ApplovinMaxConnection"
+          },
+          "type": "array"
+        },
+        "revenuecat": {
+          "items": {
+            "$ref": "#/$defs/RevenueCatConnection"
           },
           "type": "array"
         },
@@ -749,6 +743,12 @@
           },
           "type": "array"
         },
+        "intercom": {
+          "items": {
+            "$ref": "#/$defs/IntercomConnection"
+          },
+          "type": "array"
+        },
         "influxdb": {
           "items": {
             "$ref": "#/$defs/InfluxDBConnection"
@@ -864,38 +864,6 @@
         "schema"
       ]
     },
-    "DoceboConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "base_url": {
-          "type": "string"
-        },
-        "client_id": {
-          "type": "string"
-        },
-        "client_secret": {
-          "type": "string"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "base_url",
-        "client_id",
-        "client_secret",
-        "username",
-        "password"
-      ]
-    },
     "DuckDBConnection": {
       "properties": {
         "name": {
@@ -934,6 +902,38 @@
         "access_key_id",
         "secret_access_key",
         "region"
+      ]
+    },
+    "DoceboConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "base_url",
+        "client_id",
+        "client_secret",
+        "username",
+        "password"
       ]
     },
     "EMRServerlessConnection": {
@@ -1027,30 +1027,6 @@
         "account_id"
       ]
     },
-    "FluxxConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "instance": {
-          "type": "string"
-        },
-        "client_id": {
-          "type": "string"
-        },
-        "client_secret": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "instance",
-        "client_id",
-        "client_secret"
-      ]
-    },
     "FrankfurterConnection": {
       "properties": {
         "name": {
@@ -1061,22 +1037,6 @@
       "type": "object",
       "required": [
         "name"
-      ]
-    },
-    "FundraiseUpConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_key"
       ]
     },
     "GCSConnection": {
@@ -1221,9 +1181,6 @@
         },
         "location": {
           "type": "string"
-        },
-        "use_application_default_credentials": {
-          "type": "boolean"
         }
       },
       "additionalProperties": false,
@@ -1339,6 +1296,26 @@
         "token"
       ]
     },
+    "IntercomConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token",
+        "region"
+      ]
+    },
     "InfluxDBConnection": {
       "properties": {
         "name": {
@@ -1371,50 +1348,6 @@
         "token",
         "org",
         "bucket"
-      ]
-    },
-    "IntercomConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_token": {
-          "type": "string"
-        },
-        "region": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "access_token",
-        "region"
-      ]
-    },
-    "JiraConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "domain": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "api_token": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "domain",
-        "email",
-        "api_token"
       ]
     },
     "KafkaConnection": {
@@ -1976,26 +1909,6 @@
         "schema"
       ]
     },
-    "RevenueCatConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        },
-        "project_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_key",
-        "project_id"
-      ]
-    },
     "S3Connection": {
       "properties": {
         "name": {
@@ -2091,8 +2004,9 @@
           "type": "string"
         },
         "domain": {
-          "type": "string"
+          "type":"string"
         }
+        
       },
       "additionalProperties": false,
       "type": "object",
@@ -2481,6 +2395,26 @@
         "sub_domain"
       ]
     },
+    "RevenueCatConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "project_id"
+      ]
+    },
     "ZoomConnection": {
       "properties": {
         "name": {
@@ -2587,6 +2521,70 @@
         "name",
         "api_key",
         "workspace_id"
+      ]
+    },
+    "FluxxConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "instance",
+        "client_id",
+        "client_secret"
+      ]
+    },
+    "FundraiseUpConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "JiraConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "domain",
+        "email",
+        "api_token"
       ]
     }
   }
