@@ -1181,6 +1181,9 @@
         },
         "location": {
           "type": "string"
+        },
+        "use_application_default_credentials": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,
