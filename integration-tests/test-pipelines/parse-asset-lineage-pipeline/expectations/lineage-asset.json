@@ -5,7 +5,6 @@
     "name": "example",
     "type": "duckdb.sql",
     "description": "",
-    "start_date": "",
     "connection": "",
     "tags": [],
     "domains": [],
@@ -61,6 +60,7 @@
     "image": "",
     "instance": "",
     "owner": "",
+    "start_date": "",
     "executable_file": {
       "name": "example.sql",
       "path": "test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",
@@ -167,6 +167,6 @@
     "schedule": ""
   },
   "repo": {
-    "path": "/Users/johannes/bruin/integration-tests"
+    "path": "/Users/bruin/GolandProjects/bruin/integration-tests"
   }
 }

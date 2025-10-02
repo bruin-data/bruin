@@ -18,7 +18,6 @@
       "name": "country",
       "type": "duckdb.sql",
       "description": "",
-      "start_date": "",
       "connection": "",
       "tags": [],
       "domains": [],
@@ -51,6 +50,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "country.sql",
         "path": "test-pipelines/parse-lineage-pipeline/assets/country.sql",
@@ -118,7 +118,6 @@
       "name": "example",
       "type": "duckdb.sql",
       "description": "",
-      "start_date": "",
       "connection": "",
       "tags": [],
       "domains": [],
@@ -174,6 +173,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "example.sql",
         "path": "test-pipelines/parse-lineage-pipeline/assets/example.sql",
@@ -281,7 +281,6 @@
       "name": "people",
       "type": "duckdb.sql",
       "description": "",
-      "start_date": "",
       "connection": "",
       "tags": [],
       "domains": [],
@@ -326,6 +325,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "people.sql",
         "path": "test-pipelines/parse-lineage-pipeline/assets/people.sql",
@@ -433,7 +433,6 @@
       "name": "users",
       "type": "duckdb.sql",
       "description": "",
-      "start_date": "",
       "connection": "",
       "tags": [],
       "domains": [],
@@ -450,6 +449,7 @@
       "image": "",
       "instance": "",
       "owner": "",
+      "start_date": "",
       "executable_file": {
         "name": "users.sql",
         "path": "test-pipelines/parse-lineage-pipeline/assets/users.sql",
