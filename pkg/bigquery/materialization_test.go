@@ -295,7 +295,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			query: "SELECT 1",
 			want: "MERGE my\\.asset target\n" +
 				"USING \\(SELECT 1\\) source\n" +
-				"ON \\(\\(source\\.dt = target\\.dt OR \\(source\\.dt is null and target\\.dt\\)\\) AND \\(source\\.event_type = target\\.event_type OR \\(source\\.event_type is null and target\\.event_type\\)\\)\\)\n" +
+				"ON \\(\\(source\\.dt = target\\.dt OR \\(source\\.dt IS NULL and target\\.dt IS NULL\\)\\) AND \\(source\\.event_type = target\\.event_type OR \\(source\\.event_type IS NULL and target\\.event_type IS NULL\\)\\)\\)\n" +
 				"\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
@@ -317,7 +317,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			query: "SELECT 1;",
 			want: "MERGE my\\.asset target\n" +
 				"USING \\(SELECT 1\\) source\n" +
-				"ON \\(\\(source\\.dt = target\\.dt OR \\(source\\.dt is null and target\\.dt\\)\\) AND \\(source\\.event_type = target\\.event_type OR \\(source\\.event_type is null and target\\.event_type\\)\\)\\)\n" +
+				"ON \\(\\(source\\.dt = target\\.dt OR \\(source\\.dt IS NULL and target\\.dt IS NULL\\)\\) AND \\(source\\.event_type = target\\.event_type OR \\(source\\.event_type IS NULL and target\\.event_type IS NULL\\)\\)\\)\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.value = source\\.value\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
