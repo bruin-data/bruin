@@ -74,7 +74,7 @@ func Render() *cli.Command {
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fullRefresh := c.Bool("full-refresh")
-			logger := makeLogger(false)
+			logger := makeLogger(c.Bool("debug"))
 
 			if vars := c.StringSlice("var"); len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
