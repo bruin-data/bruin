@@ -244,7 +244,7 @@ func TestConfig_IsValid(t *testing.T) {
 
 func TestNewDB_ADCWarning(t *testing.T) {
 	t.Parallel()
-	
+
 	config := &Config{
 		ProjectID:                        "test-project",
 		CredentialsFilePath:              "/path/to/creds.json",
