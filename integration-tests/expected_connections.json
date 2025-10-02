@@ -86,6 +86,17 @@
       },
       "schema_prefix": ""
     },
+    "env-continue": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-continue",
+            "path": "duckdb-files/continue.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-custom-check-count-false": {
       "connections": {
         "duckdb": [
@@ -114,6 +125,17 @@
           {
             "name": "duckdb-ddl",
             "path": "duckdb-files/duckdb-ddl.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-duckdb-decimal": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-decimal",
+            "path": "duckdb-files/duckdb-decimal.db"
           }
         ]
       },
@@ -424,39 +446,6 @@
       },
       "schema_prefix": ""
     },
-    "env-time-materialization": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-time-materialization",
-            "path": "duckdb-files/time-materialization.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
-    "env-validate-with-exclude-tag": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-validate-with-exclude-tag",
-            "path": "duckdb-files/validate-with-exclude-tag.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
-    "env-continue": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-continue",
-            "path": "duckdb-files/continue.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
     "env-scd2-by-column": {
       "connections": {
         "duckdb": [
@@ -490,12 +479,12 @@
       },
       "schema_prefix": ""
     },
-    "env-duckdb-decimal": {
+    "env-time-materialization": {
       "connections": {
         "duckdb": [
           {
-            "name": "duckdb-decimal",
-            "path": "duckdb-files/duckdb-decimal.db"
+            "name": "duckdb-time-materialization",
+            "path": "duckdb-files/time-materialization.db"
           }
         ]
       },
@@ -507,6 +496,17 @@
           {
             "name": "duckdb-validate-asset-time-interval",
             "path": "duckdb-files/validate-asset-time-interval.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-validate-with-exclude-tag": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-validate-with-exclude-tag",
+            "path": "duckdb-files/validate-with-exclude-tag.db"
           }
         ]
       },

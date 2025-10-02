@@ -22,12 +22,13 @@ func (c AwsConnection) GetName() string {
 }
 
 type GoogleCloudPlatformConnection struct { //nolint:recvcheck
-	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
-	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
-	Location           string `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
-	rawCredentials     *google.Credentials
+	Name                             string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountJSON               string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile               string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	ProjectID                        string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	Location                         string `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
+	UseApplicationDefaultCredentials bool   `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" mapstructure:"use_application_default_credentials"`
+	rawCredentials                   *google.Credentials
 }
 
 func (c GoogleCloudPlatformConnection) GetName() string {
@@ -45,6 +46,9 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 	}
 	if c.Location != "" {
 		m["location"] = c.Location
+	}
+	if c.UseApplicationDefaultCredentials {
+		m["use_application_default_credentials"] = c.UseApplicationDefaultCredentials
 	}
 
 	// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
