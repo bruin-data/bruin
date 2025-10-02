@@ -244,29 +244,19 @@ func TestConfig_IsValid(t *testing.T) {
 
 func TestNewDB_ADCWarning(t *testing.T) {
 	t.Parallel()
-
-	// This test verifies that when ADC is enabled with explicit credentials,
-	// a warning is printed but the client is still created successfully.
-	// Note: This is a basic test - in a real scenario, you might want to
-	// capture stdout to verify the warning message.
-
+	
 	config := &Config{
 		ProjectID:                        "test-project",
 		CredentialsFilePath:              "/path/to/creds.json",
 		UseApplicationDefaultCredentials: true,
 	}
 
-	// This should not panic or fail, even though explicit credentials are provided
-	// The warning should be printed to stdout
 	client, err := NewDB(config)
 
-	// The client creation should succeed (though it might fail due to invalid credentials)
-	// The important thing is that it doesn't fail due to our logic
 	if err != nil && !strings.Contains(err.Error(), "failed to create bigquery client") {
 		t.Errorf("Expected client creation to succeed or fail with credential error, got: %v", err)
 	}
 
-	// If client was created successfully, it should have the correct config
 	if client != nil {
 		if !client.config.UseApplicationDefaultCredentials {
 			t.Error("Expected UseApplicationDefaultCredentials to be true")
