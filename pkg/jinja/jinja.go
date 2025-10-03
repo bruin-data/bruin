@@ -130,11 +130,20 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		return r, nil
 	}
 
+	// Extract full refresh flag from context, default to false if not set
+	fullRefresh := false
+	if val := ctx.Value(pipeline.RunConfigFullRefresh); val != nil {
+		if fr, ok := val.(bool); ok {
+			fullRefresh = fr
+		}
+	}
+
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
 		tempContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string))
 		tempContext["this"] = asset.Name
 		tempContext["var"] = pipe.Variables.Value()
+		tempContext["is_full_refresh"] = fullRefresh
 		tempRenderer := &Renderer{
 			context:         exec.NewContext(tempContext),
 			queryRenderLock: &sync.Mutex{},
@@ -156,6 +165,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	jinjaContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string))
 	jinjaContext["this"] = asset.Name
 	jinjaContext["var"] = pipe.Variables.Value()
+	jinjaContext["is_full_refresh"] = fullRefresh
 
 	return &Renderer{
 		context:         exec.NewContext(jinjaContext),

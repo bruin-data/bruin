@@ -66,6 +66,7 @@ Bruin injects various variables by default:
 | `end_timestamp` | The end timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-02T15:30:00.000000Z07:00" |
 | `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
 | `run_id` | The unique identifier for the current [pipeline run](../../getting-started/concepts.md#pipeline-run) | `run_1234567890` |
+| `is_full_refresh` | Boolean indicating whether the full refresh flag is set | `True` or `False` |
 
 You can use these variables in your SQL queries by referencing them with the `{{ }}` syntax:
 ```sql

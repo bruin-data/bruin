@@ -1234,3 +1234,75 @@ func TestRenderer_CloneForAsset_IntervalModifierTemplates(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderer_CloneForAsset_IsFullRefresh(t *testing.T) {
+	t.Parallel()
+
+	basePipeline := &pipeline.Pipeline{
+		Name: "test-pipeline",
+		Variables: pipeline.Variables{
+			"env": map[string]any{
+				"test_var": "test_value",
+			},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		fullRefresh     bool
+		setFullRefresh  bool
+		expectedRendered string
+	}{
+		{
+			name:            "full_refresh_true",
+			fullRefresh:     true,
+			setFullRefresh:  true,
+			expectedRendered: "SELECT * FROM table WHERE full_refresh = True",
+		},
+		{
+			name:            "full_refresh_false",
+			fullRefresh:     false,
+			setFullRefresh:  true,
+			expectedRendered: "SELECT * FROM table WHERE full_refresh = False",
+		},
+		{
+			name:            "full_refresh_not_set",
+			fullRefresh:     false,
+			setFullRefresh:  false,
+			expectedRendered: "SELECT * FROM table WHERE full_refresh = False",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			asset := &pipeline.Asset{
+				Name: "test-asset",
+			}
+
+			startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+
+			ctx := context.Background()
+			ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+			if tt.setFullRefresh {
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			}
+
+			baseRenderer := NewRenderer(Context{})
+			clonedRenderer, err := baseRenderer.CloneForAsset(ctx, basePipeline, asset)
+
+			require.NoError(t, err)
+			require.NotNil(t, clonedRenderer)
+
+			// Test that the is_full_refresh variable is available
+			testQuery := "SELECT * FROM table WHERE full_refresh = {{ is_full_refresh }}"
+			result, err := clonedRenderer.Render(testQuery)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedRendered, result)
+		})
+	}
+}

@@ -116,6 +116,7 @@ Bruin injects several variables automatically:
 | `end_timestamp` | The end timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-02T15:30:00.000000Z07:00" |
 | `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
 | `run_id` | The unique identifier for the current pipeline run | `run_1234567890` |
+| `is_full_refresh` | Boolean indicating whether the full refresh flag is set | `True` or `False` |
 
 In Python assets these built-ins are exposed as environment variables (e.g. `BRUIN_START_DATE`). User-defined variables are available as the JSON string `BRUIN_VARS`.
 
