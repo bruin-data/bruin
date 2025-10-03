@@ -55,6 +55,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/plusvibeai"
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/personio"
@@ -144,6 +145,7 @@ type Manager struct {
 	Fluxx                map[string]*fluxx.Client
 	FundraiseUp          map[string]*fundraiseup.Client
 	Jira                 map[string]*jira.Client
+	PlusVibeAI           map[string]*plusvibeai.Client
 	EMRSeverless         map[string]*emr_serverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
 	AppLovin             map[string]*applovin.Client
@@ -2029,6 +2031,26 @@ func (m *Manager) AddJiraConnectionFromConfig(connection *config.JiraConnection)
 	return nil
 }
 
+func (m *Manager) AddPlusVibeAIConnectionFromConfig(connection *config.PlusVibeAIConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.PlusVibeAI == nil {
+		m.PlusVibeAI = make(map[string]*plusvibeai.Client)
+	}
+
+	client, err := plusvibeai.NewClient(plusvibeai.Config{
+		APIKey:      connection.APIKey,
+		WorkspaceID: connection.WorkspaceID,
+	})
+	if err != nil {
+		return err
+	}
+	m.PlusVibeAI[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2239,6 +2261,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Jira, connectionManager.AddJiraConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.PlusVibeAI, connectionManager.AddPlusVibeAIConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)

@@ -778,6 +778,12 @@
             "$ref": "#/$defs/JiraConnection"
           },
           "type": "array"
+        },
+        "plusvibeai": {
+          "items": {
+            "$ref": "#/$defs/PlusVibeAIConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -2461,6 +2467,26 @@
         "domain",
         "email",
         "api_token"
+      ]
+    },
+    "PlusVibeAIConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "workspace_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "workspace_id"
       ]
     }
   }
