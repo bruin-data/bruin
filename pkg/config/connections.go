@@ -1041,3 +1041,13 @@ type JiraConnection struct {
 func (c JiraConnection) GetName() string {
 	return c.Name
 }
+
+type PlusVibeAIConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey      string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	WorkspaceID string `yaml:"workspace_id,omitempty" json:"workspace_id" mapstructure:"workspace_id"`
+}
+
+func (c PlusVibeAIConnection) GetName() string {
+	return c.Name
+}

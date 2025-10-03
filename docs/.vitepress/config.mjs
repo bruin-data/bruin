@@ -233,6 +233,7 @@ export default withMermaid({
                             {text: "Kafka", link: "/ingestion/kafka.md"},
                             {text: "Kinesis", link: "/ingestion/kinesis.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
+                            {text: "Plus Vibe AI", link: "/ingestion/plusvibeai.md"},
                             {text: "LinkedIn Ads", link: "/ingestion/linkedinads.md"},
                             {text: "Linear", link: "/ingestion/linear"},
                             {text: "Mixpanel", link: "/ingestion/mixpanel"},
