@@ -198,6 +198,18 @@ func (c MongoConnection) GetName() string {
 	return c.Name
 }
 
+type MongoAtlasConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+}
+
+func (c MongoAtlasConnection) GetName() string {
+	return c.Name
+}
+
 type MsSQLConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`

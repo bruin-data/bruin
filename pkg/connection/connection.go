@@ -53,6 +53,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mixpanel"
 	"github.com/bruin-data/bruin/pkg/mongo"
+	mongoatlas "github.com/bruin-data/bruin/pkg/mongo_atlas"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
@@ -95,6 +96,7 @@ type Manager struct {
 	MsSQL                map[string]*mssql.DB
 	Databricks           map[string]*databricks.DB
 	Mongo                map[string]*mongo.DB
+	MongoAtlas           map[string]*mongoatlas.DB
 	Mysql                map[string]*mysql.Client
 	Notion               map[string]*notion.Client
 	HANA                 map[string]*hana.Client
@@ -516,6 +518,32 @@ func (m *Manager) AddMongoConnectionFromConfig(connection *config.MongoConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mongo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddMongoAtlasConnectionFromConfig(connection *config.MongoAtlasConnection) error {
+	m.mutex.Lock()
+	if m.MongoAtlas == nil {
+		m.MongoAtlas = make(map[string]*mongoatlas.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := mongoatlas.NewDB(&mongoatlas.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.MongoAtlas[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2210,6 +2238,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Shopify, connectionManager.AddShopifyConnectionFromConfig, &wg, &errList, &mu)
