@@ -640,6 +640,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "test-api-token",
 				},
 			},
+			PlusVibeAI: []PlusVibeAIConnection{
+				{
+					Name:        "plusvibeai-1",
+					APIKey:      "test-api-key",
+					WorkspaceID: "test-workspace-id",
+				},
+			},
 		},
 	}
 

@@ -398,6 +398,10 @@ environments:
           domain: "company.atlassian.net"
           email: "user@company.com"
           api_token: "test-api-token"
+      plusvibeai:
+        - name: "plusvibeai-1"
+          api_key: "test-api-key"
+          workspace_id: "test-workspace-id"
 
   prod:
     connections:
