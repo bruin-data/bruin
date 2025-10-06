@@ -201,6 +201,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            BRANCH_NAME=${{ github.ref_name }}
 
   install-windows:
     runs-on: windows-latest

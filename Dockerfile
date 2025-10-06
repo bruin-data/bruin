@@ -1,5 +1,9 @@
 FROM golang:1.23-bullseye AS builder
 
+# Build argument for version information
+ARG VERSION=dev
+ARG BRANCH_NAME=unknown
+
 # Install build dependencies including C++ standard library for DuckDB
 RUN apt-get update && apt-get install -y git gcc g++ libc6-dev
 
@@ -15,8 +19,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application (using same command as Makefile but without tools dependency)
-RUN CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=dev-$(shell git describe --tags --abbrev=0)" -o "bin/bruin" .
+# Build the application with version information from build args
+RUN CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=${VERSION} -X main.BranchName=${BRANCH_NAME}" -o "bin/bruin" .
 
 # Final stage
 FROM debian:12.8-slim
