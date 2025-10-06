@@ -1,7 +1,6 @@
 package mongoatlas
 
 import (
-	"fmt"
 	"net/url"
 )
 
@@ -14,10 +13,15 @@ type Config struct {
 
 func (c *Config) GetIngestrURI() string {
 	// MongoDB Atlas URI format: mongodb+srv://username:password@host/database
-	return fmt.Sprintf("mongodb+srv://%s:%s@%s/%s",
-		url.PathEscape(c.Username),
-		url.PathEscape(c.Password),
-		c.Host,
-		c.Database,
-	)
+	u := &url.URL{
+		Scheme: "mongodb+srv",
+		Host:   c.Host,
+		Path:   c.Database,
+	}
+
+	if c.Username != "" {
+		u.User = url.UserPassword(c.Username, c.Password)
+	}
+
+	return u.String()
 }
