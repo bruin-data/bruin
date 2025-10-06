@@ -46,7 +46,7 @@ parameters:
   source_table: 'public.users'
 
   destination: mongo_atlas
-  destination_connection: mongo_atlas_connection
+  destination_connection: mongo_atlas
   destination_table: 'users'
 ```
 
