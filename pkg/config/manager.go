@@ -33,6 +33,7 @@ type Connections struct {
 	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks,omitempty" mapstructure:"databricks"`
 	Synapse             []SynapseConnection             `yaml:"synapse,omitempty" json:"synapse,omitempty" mapstructure:"synapse"`
 	Mongo               []MongoConnection               `yaml:"mongo,omitempty" json:"mongo,omitempty" mapstructure:"mongo"`
+	MongoAtlas          []MongoAtlasConnection          `yaml:"mongo_atlas,omitempty" json:"mongo_atlas,omitempty" mapstructure:"mongo_atlas"`
 	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql,omitempty" mapstructure:"mysql"`
 	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion,omitempty" mapstructure:"notion"`
 	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana,omitempty" mapstructure:"hana"`
@@ -513,6 +514,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Mongo = append(env.Connections.Mongo, conn)
+	case "mongo_atlas":
+		var conn MongoAtlasConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.MongoAtlas = append(env.Connections.MongoAtlas, conn)
 	case "mysql":
 		var conn MySQLConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1009,6 +1017,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Databricks = removeConnection(env.Connections.Databricks, connectionName)
 	case "mongo":
 		env.Connections.Mongo = removeConnection(env.Connections.Mongo, connectionName)
+	case "mongo_atlas":
+		env.Connections.MongoAtlas = removeConnection(env.Connections.MongoAtlas, connectionName)
 	case "aws":
 		env.Connections.AwsConnection = removeConnection(env.Connections.AwsConnection, connectionName)
 	case "athena":
@@ -1214,6 +1224,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Databricks, source.Databricks)
 	mergeConnectionList(&c.Synapse, source.Synapse)
 	mergeConnectionList(&c.Mongo, source.Mongo)
+	mergeConnectionList(&c.MongoAtlas, source.MongoAtlas)
 	mergeConnectionList(&c.MySQL, source.MySQL)
 	mergeConnectionList(&c.Notion, source.Notion)
 	mergeConnectionList(&c.HANA, source.HANA)

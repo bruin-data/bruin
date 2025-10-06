@@ -371,6 +371,12 @@
           },
           "type": "array"
         },
+        "mongo_atlas": {
+          "items": {
+            "$ref": "#/$defs/MongoAtlasConnection"
+          },
+          "type": "array"
+        },
         "mysql": {
           "items": {
             "$ref": "#/$defs/MySQLConnection"
@@ -1515,6 +1521,34 @@
         "password",
         "host",
         "port",
+        "database"
+      ]
+    },
+    "MongoAtlasConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
         "database"
       ]
     },
