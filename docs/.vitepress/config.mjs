@@ -153,6 +153,7 @@ export default withMermaid({
                     {text: "Oracle", link: "/platforms/oracle"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
                     {text: "Microsoft SQL Server", link: "/platforms/mssql"},
+                    {text: "MongoDB Atlas", link: "/platforms/mongoatlas"},
                     {text: "Postgres", link: "/platforms/postgres"},
                     {text: "Redshift", link: "/platforms/redshift"},
                     {text: "Snowflake", link: "/platforms/snowflake"},
