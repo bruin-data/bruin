@@ -20,7 +20,7 @@ RUN go mod download
 COPY . .
 
 # Build the application with version information from build args
-RUN CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=${VERSION} -X main.BranchName=${BRANCH_NAME}" -o "bin/bruin" .
+RUN CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
 
 # Final stage
 FROM debian:12.8-slim

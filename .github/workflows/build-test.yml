@@ -110,8 +110,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ github.ref_name }}
-            BRANCH_NAME=${{ github.ref_name }}
+            VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+            BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
 
   lint:
     runs-on: ubuntu-latest
