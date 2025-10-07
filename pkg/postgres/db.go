@@ -412,6 +412,23 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
 	var rowCount int64
 
+	// Parse table name to extract schema and table components
+	tableComponents := strings.Split(tableName, ".")
+	var schemaName, tableNameOnly string
+
+	switch len(tableComponents) {
+	case 1:
+		// table only - use public schema by default
+		schemaName = "public"
+		tableNameOnly = tableComponents[0]
+	case 2:
+		// schema.table format
+		schemaName = tableComponents[0]
+		tableNameOnly = tableComponents[1]
+	default:
+		return nil, fmt.Errorf("invalid table name format: %s", tableName)
+	}
+
 	// Get row count only if not in schema-only mode
 	if !schemaOnly {
 		rows, err := c.connection.Query(ctx, "SELECT COUNT(*) as row_count FROM "+tableName)
@@ -463,10 +480,10 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 		numeric_precision,
 		numeric_scale
 	FROM information_schema.columns
-	WHERE table_name = $1
+	WHERE table_catalog = $1 AND table_schema = $2 AND table_name = $3
 	ORDER BY ordinal_position`
 
-	schemaRows, err := c.connection.Query(ctx, schemaQuery, tableName)
+	schemaRows, err := c.connection.Query(ctx, schemaQuery, c.config.GetDatabase(), schemaName, tableNameOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute schema query for table '%s': %w", tableName, err)
 	}
