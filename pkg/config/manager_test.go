@@ -640,6 +640,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "test-api-token",
 				},
 			},
+			Monday: []MondayConnection{
+				{
+					Name:     "monday-1",
+					APIToken: "test-api-token",
+				},
+			},
 			PlusVibeAI: []PlusVibeAIConnection{
 				{
 					Name:        "plusvibeai-1",
