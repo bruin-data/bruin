@@ -150,6 +150,7 @@ type Manager struct {
 	Freshdesk            map[string]*freshdesk.Client
 	FundraiseUp          map[string]*fundraiseup.Client
 	Jira                 map[string]*jira.Client
+	Monday               map[string]*monday.Client
 	PlusVibeAI           map[string]*plusvibeai.Client
 	EMRSeverless         map[string]*emr_serverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
@@ -2087,6 +2088,25 @@ func (m *Manager) AddJiraConnectionFromConfig(connection *config.JiraConnection)
 	return nil
 }
 
+func (m *Manager) AddMondayConnectionFromConfig(connection *config.MondayConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Monday == nil {
+		m.Monday = make(map[string]*monday.Client)
+	}
+
+	client, err := monday.NewClient(monday.Config{
+		APIToken: connection.APIToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.Monday[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddPlusVibeAIConnectionFromConfig(connection *config.PlusVibeAIConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2319,6 +2339,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Jira, connectionManager.AddJiraConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Monday, connectionManager.AddMondayConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.PlusVibeAI, connectionManager.AddPlusVibeAIConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
