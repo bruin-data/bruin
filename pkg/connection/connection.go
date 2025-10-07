@@ -33,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fluxx"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
+	"github.com/bruin-data/bruin/pkg/freshdesk"
 	"github.com/bruin-data/bruin/pkg/fundraiseup"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
@@ -145,6 +146,7 @@ type Manager struct {
 	Zoom                 map[string]*zoom.Client
 	Frankfurter          map[string]*frankfurter.Client
 	Fluxx                map[string]*fluxx.Client
+	Freshdesk            map[string]*freshdesk.Client
 	FundraiseUp          map[string]*fundraiseup.Client
 	Jira                 map[string]*jira.Client
 	PlusVibeAI           map[string]*plusvibeai.Client
@@ -2020,6 +2022,28 @@ func (m *Manager) AddFluxxConnectionFromConfig(connection *config.FluxxConnectio
 	return nil
 }
 
+func (m *Manager) AddFreshdeskConnectionFromConfig(connection *config.FreshdeskConnection) error {
+	m.mutex.Lock()
+	if m.Freshdesk == nil {
+		m.Freshdesk = make(map[string]*freshdesk.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := freshdesk.NewClient(freshdesk.Config{
+		Domain: connection.Domain,
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Freshdesk[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddFundraiseUpConnectionFromConfig(connection *config.FundraiseUpConnection) error {
 	m.mutex.Lock()
 	if m.FundraiseUp == nil {
@@ -2291,6 +2315,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Jira, connectionManager.AddJiraConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.PlusVibeAI, connectionManager.AddPlusVibeAIConnectionFromConfig, &wg, &errList, &mu)
