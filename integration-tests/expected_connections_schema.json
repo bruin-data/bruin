@@ -773,6 +773,12 @@
           },
           "type": "array"
         },
+        "freshdesk": {
+          "items": {
+            "$ref": "#/$defs/FreshdeskConnection"
+          },
+          "type": "array"
+        },
         "fundraiseup": {
           "items": {
             "$ref": "#/$defs/FundraiseUpConnection"
@@ -2466,6 +2472,26 @@
         "client_secret"
       ]
     },
+    "FreshdeskConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "domain",
+        "api_key"
+      ]
+    },
     "FundraiseUpConnection": {
       "properties": {
         "name": {
@@ -2548,6 +2574,26 @@
         "instance",
         "client_id",
         "client_secret"
+      ]
+    },
+    "FreshdeskConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "domain",
+        "api_key"
       ]
     },
     "FundraiseUpConnection": {
