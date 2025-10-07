@@ -19,8 +19,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build go mod download
 # Copy source code
 COPY . .
 
-# Build the application with version information from build args (no cache for app code)
-RUN CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
+# Build the application with version information from build args (with build cache for incremental builds)
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
 
 # Final stage
 FROM debian:12.8-slim
