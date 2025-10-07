@@ -53,6 +53,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/linear"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mixpanel"
+	"github.com/bruin-data/bruin/pkg/monday"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	mongoatlas "github.com/bruin-data/bruin/pkg/mongo_atlas"
 	"github.com/bruin-data/bruin/pkg/mssql"
