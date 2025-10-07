@@ -47,11 +47,9 @@ gcloud auth login
 gcloud auth application-default login
 ```
 
-
-
 With ADC login there is no need to manage service account files, since it automatically works with gcloud authentication.
 
-**Note:** If you have both ADC enabled and explicit credentials (service account file/JSON), ADC takes precedence and a warning will be displayed.
+**Note:** If you have both ADC enabled and explicit credentials (service account file/JSON), ADC take precedence.
 
 #### 2. Service Account File
 Point to a service account JSON file on your filesystem:
