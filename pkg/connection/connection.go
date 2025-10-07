@@ -49,7 +49,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/jira"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/kinesis"
-	"github.com/bruin-data/bruin/pkg/monday"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/linear"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
