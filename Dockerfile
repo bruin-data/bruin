@@ -13,13 +13,13 @@ WORKDIR /src
 # Copy go mod files
 COPY go.mod go.sum ./
 
-# Download dependencies
-RUN go mod download
+# Download dependencies with cache mount (safe to cache)
+RUN --mount=type=cache,target=/root/.cache/go-build go mod download
 
 # Copy source code
 COPY . .
 
-# Build the application with version information from build args
+# Build the application with version information from build args (no cache for app code)
 RUN CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
 
 # Final stage
@@ -32,8 +32,16 @@ RUN adduser --disabled-password --gecos '' bruin
 # Copy the built binary from builder stage
 COPY --from=builder /src/bin/bruin /usr/local/bin/bruin
 
+# Set working directory and ensure bruin user has write permissions
+WORKDIR /workspace
+RUN chown -R bruin:bruin /workspace
+
 USER bruin
 
 ENV PATH="/usr/local/bin:${PATH}"
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD bruin version > /dev/null || exit 1
 
 CMD ["bruin"]
