@@ -72,15 +72,18 @@ func NewDB(c *Config) (*Client, error) {
 		option.WithScopes(scopes...),
 	}
 
-	switch {
-	case c.CredentialsJSON != "":
-		options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
-	case c.CredentialsFilePath != "":
-		options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
-	case c.Credentials != nil:
-		options = append(options, option.WithCredentials(c.Credentials))
-	default:
-		return nil, errors.New("no credentials provided")
+	// Check if ADC is explicitly enabled
+	if !c.UseApplicationDefaultCredentials {
+		switch {
+		case c.CredentialsJSON != "":
+			options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
+		case c.CredentialsFilePath != "":
+			options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
+		case c.Credentials != nil:
+			options = append(options, option.WithCredentials(c.Credentials))
+		default:
+			return nil, errors.New("no credentials provided")
+		}
 	}
 
 	client, err := bigquery.NewClient(
@@ -120,15 +123,18 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 		option.WithScopes(scopes...),
 	}
 
-	switch {
-	case d.config.CredentialsJSON != "":
-		options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
-	case d.config.CredentialsFilePath != "":
-		options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
-	case d.config.Credentials != nil:
-		options = append(options, option.WithCredentials(d.config.Credentials))
-	default:
-		return nil, errors.New("no credentials provided for Data Transfer client")
+	// Check if ADC is explicitly disabled
+	if !d.config.UseApplicationDefaultCredentials {
+		switch {
+		case d.config.CredentialsJSON != "":
+			options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
+		case d.config.CredentialsFilePath != "":
+			options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
+		case d.config.Credentials != nil:
+			options = append(options, option.WithCredentials(d.config.Credentials))
+		default:
+			return nil, errors.New("no credentials provided for Data Transfer client")
+		}
 	}
 
 	return datatransfer.NewClient(ctx, options...)

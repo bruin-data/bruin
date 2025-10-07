@@ -14,10 +14,16 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
         - name: "connection_name"
           project_id: "project-id"
           location: 'your-gcp-region' # see https://cloud.google.com/compute/docs/regions-zones
-          # you can either specify a path to the service account file
+          
+          # Authentication options (choose one):
+          
+          # Option 1: Use Application Default Credentials (ADC)
+          use_application_default_credentials: true
+          
+          # Option 2: Specify a path to the service account file
           service_account_file: "path/to/file.json"
           
-          # or you can specify the service account json directly
+          # Option 3: Specify the service account json directly
           service_account_json: |
             {
               "type": "service_account",
@@ -25,6 +31,41 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
             }
 ```
 
+### Authentication Options
+
+Bruin supports three authentication methods for BigQuery connections, listed in order of precedence:
+
+#### 1. Application Default Credentials (ADC) 
+When `use_application_default_credentials: true` is set, Bruin will use Google Cloud's [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials#personal).
+
+**Setup:**
+```bash
+# Authenticate with gcloud, with GOOGLE_APPLICATION_CREDENTIALS environment variable set
+gcloud auth login
+
+# Authenticate with gcloud by creating default credential file
+gcloud auth application-default login
+```
+
+With ADC login there is no need to manage service account files, since it automatically works with gcloud authentication.
+
+**Note:** If you have both ADC enabled and explicit credentials (service account file/JSON), ADC take precedence.
+
+#### 2. Service Account File
+Point to a service account JSON file on your filesystem:
+```yaml
+service_account_file: "/path/to/service-account.json"
+```
+
+#### 3. Service Account JSON (Inline)
+Embed the service account credentials directly in your configuration:
+```yaml
+service_account_json: |
+  {
+    "type": "service_account",
+    ...
+  }
+```
 ## BigQuery Assets
 
 ### `bq.sql`

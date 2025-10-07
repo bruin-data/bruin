@@ -194,9 +194,11 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 	m.mutex.Unlock()
 
-	// Check if either ServiceAccountFile or ServiceAccountJSON is provided, prioritizing ServiceAccountFile.
-	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
-		return errors.New("credentials are required: provide either service_account_file or service_account_json")
+	// Check if we have valid credentials configuration
+	hasExplicitCredentials := len(connection.ServiceAccountFile) > 0 || len(connection.ServiceAccountJSON) > 0 || connection.GetCredentials() != nil
+
+	if !hasExplicitCredentials && !connection.UseApplicationDefaultCredentials {
+		return errors.New("credentials are required: provide either service_account_file, service_account_json, or enable use_application_default_credentials")
 	}
 
 	// Validate ServiceAccountFile if provided.
@@ -215,11 +217,12 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 
 	// Set up the BigQuery client using the preferred credentials.
 	db, err := bigquery.NewDB(&bigquery.Config{
-		ProjectID:           connection.ProjectID,
-		CredentialsFilePath: connection.ServiceAccountFile,
-		CredentialsJSON:     connection.ServiceAccountJSON,
-		Credentials:         connection.GetCredentials(),
-		Location:            connection.Location,
+		ProjectID:                        connection.ProjectID,
+		CredentialsFilePath:              connection.ServiceAccountFile,
+		CredentialsJSON:                  connection.ServiceAccountJSON,
+		Credentials:                      connection.GetCredentials(),
+		Location:                         connection.Location,
+		UseApplicationDefaultCredentials: connection.UseApplicationDefaultCredentials,
 	})
 	if err != nil {
 		return err
