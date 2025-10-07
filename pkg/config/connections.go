@@ -1038,6 +1038,16 @@ func (c FluxxConnection) GetName() string {
 	return c.Name
 }
 
+type FreshdeskConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Domain string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c FreshdeskConnection) GetName() string {
+	return c.Name
+}
+
 type FundraiseUpConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`

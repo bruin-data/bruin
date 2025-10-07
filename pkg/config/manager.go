@@ -100,6 +100,7 @@ type Connections struct {
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
 	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
+	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
 	Jira                []JiraConnection                `yaml:"jira,omitempty" json:"jira,omitempty" mapstructure:"jira"`
 	PlusVibeAI          []PlusVibeAIConnection          `yaml:"plusvibeai,omitempty" json:"plusvibeai,omitempty" mapstructure:"plusvibeai"`
