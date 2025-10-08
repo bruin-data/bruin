@@ -218,6 +218,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Fluxx", link: "/ingestion/fluxx.md"},
                             {text: "Frankfurter", link: "/ingestion/frankfurter.md"},
                             {text: "FundraiseUp", link: "/ingestion/fundraiseup.md"},
+                            {text: "Freshdesk", link: "/ingestion/freshdesk.md"},
                             {text: "GCP Spanner", link: "/ingestion/spanner.md"},
                             {text: "GitHub", link: "/ingestion/github.md"},
                             {text: "Google Cloud Storage", link: "/ingestion/gcs.md"},
