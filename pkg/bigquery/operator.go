@@ -19,6 +19,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const CharacterLimit = 10000
+
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
 	IsFullRefresh() bool
@@ -126,8 +128,8 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
 		if w, ok := writer.(io.Writer); ok {
 			queryPreview := strings.TrimSpace(annotatedQuery.Query)
-			if len(queryPreview) > 5000 {
-				queryPreview = queryPreview[:5000] + "\n... (truncated)"
+			if len(queryPreview) > CharacterLimit {
+				queryPreview = queryPreview[:CharacterLimit] + "\n... (truncated)"
 			}
 			fmt.Fprintf(w, "Executing SQL query:\n%s\n\n", queryPreview)
 		}
