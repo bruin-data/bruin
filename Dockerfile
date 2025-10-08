@@ -1,19 +1,48 @@
+FROM golang:1.23-bullseye AS builder
+
+# Build argument for version information
+ARG VERSION=dev
+ARG BRANCH_NAME=unknown
+
+# Install build dependencies including C++ standard library for DuckDB
+RUN apt-get update && apt-get install -y git gcc g++ libc6-dev
+
+# Set working directory
+WORKDIR /src
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies with cache mount (safe to cache)
+RUN --mount=type=cache,target=/root/.cache/go-build go mod download
+
+# Copy source code
+COPY . .
+
+# Build the application with version information from build args (with build cache for incremental builds)
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
+
+# Final stage
 FROM debian:12.8-slim
 
 RUN apt-get update && apt-get install -y curl git
 
-RUN  adduser --disabled-password --gecos '' bruin
+RUN adduser --disabled-password --gecos '' bruin
+
+# Copy the built binary from builder stage
+COPY --from=builder /src/bin/bruin /usr/local/bin/bruin
+
+# Set working directory and ensure bruin user has write permissions
+WORKDIR /workspace
+RUN chown -R bruin:bruin /workspace
 
 USER bruin
 
-ARG VERSION=latest
+ENV PATH="/usr/local/bin:${PATH}"
 
-RUN curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${VERSION}
-
-ENV PATH="/home/bruin/.local/bin:${PATH}"
-
-RUN cd /tmp && bruin init bootstrap --in-place && bruin run bootstrap
-
-RUN rm -rf bootstrap
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD bruin version > /dev/null || exit 1
 
 CMD ["bruin"]
