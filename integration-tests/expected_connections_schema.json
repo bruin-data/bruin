@@ -791,6 +791,12 @@
           },
           "type": "array"
         },
+        "monday": {
+          "items": {
+            "$ref": "#/$defs/MondayConnection"
+          },
+          "type": "array"
+        },
         "plusvibeai": {
           "items": {
             "$ref": "#/$defs/PlusVibeAIConnection"
@@ -2633,6 +2639,22 @@
         "name",
         "domain",
         "email",
+        "api_token"
+      ]
+    },
+    "MondayConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
         "api_token"
       ]
     }

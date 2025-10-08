@@ -103,6 +103,7 @@ type Connections struct {
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
 	Jira                []JiraConnection                `yaml:"jira,omitempty" json:"jira,omitempty" mapstructure:"jira"`
+	Monday              []MondayConnection              `yaml:"monday,omitempty" json:"monday,omitempty" mapstructure:"monday"`
 	PlusVibeAI          []PlusVibeAIConnection          `yaml:"plusvibeai,omitempty" json:"plusvibeai,omitempty" mapstructure:"plusvibeai"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
