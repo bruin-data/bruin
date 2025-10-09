@@ -3,16 +3,10 @@ FROM golang:1.23-bullseye AS builder
 # Build argument for version information
 ARG VERSION=dev
 ARG BRANCH_NAME=unknown
-ARG TARGETPLATFORM
 
 # Install build dependencies including C++ standard library for DuckDB
 RUN apt-get update && apt-get install -y git gcc g++ libc6-dev
 
-# Set platform emulation for ARM64 builds to handle ibm-db dependency issues
-# This follows the approach from: https://levelup.gitconnected.com/setting-up-ibm-db2-database-in-arm-64-a015105963c7
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-        export DOCKER_DEFAULT_PLATFORM=linux/amd64; \
-    fi
 
 # Set working directory
 WORKDIR /src
