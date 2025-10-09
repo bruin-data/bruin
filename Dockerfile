@@ -36,7 +36,7 @@ RUN apt-get update && apt-get install -y curl git
 RUN adduser --disabled-password --gecos '' bruin
 
 # Copy the built binary from builder stage
-COPY --from=builder /src/bin/bruin /usr/local/bin/bruin
+COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
 # Set working directory and ensure bruin user has write permissions
 WORKDIR /workspace
@@ -44,7 +44,7 @@ RUN chown -R bruin:bruin /workspace
 
 USER bruin
 
-ENV PATH="/usr/local/bin:${PATH}"
+ENV PATH="/home/bruin/.local/bin:${PATH}"
 
 # Add healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
