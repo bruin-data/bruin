@@ -34,6 +34,9 @@ RUN chown -R bruin:bruin /home/bruin
 
 USER bruin
 
+# Create necessary directories for bruin user
+RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/share
+
 # Copy the built binary from builder stage
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
