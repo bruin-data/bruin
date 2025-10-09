@@ -23,6 +23,11 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
 
+# Bootstrap ingestr installation
+RUN cd /tmp && /src/bin/bruin init bootstrap --in-place && /src/bin/bruin run bootstrap
+
+RUN rm -rf /tmp/bootstrap
+
 # Final stage
 FROM debian:12.8-slim
 
