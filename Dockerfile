@@ -7,7 +7,6 @@ ARG BRANCH_NAME=unknown
 # Install build dependencies including C++ standard library for DuckDB
 RUN apt-get update && apt-get install -y git gcc g++ libc6-dev
 
-
 # Set working directory
 WORKDIR /src
 
