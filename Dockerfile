@@ -23,11 +23,6 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
 
-# Bootstrap ingestr installation
-RUN cd /tmp && /src/bin/bruin init bootstrap --in-place && /src/bin/bruin run bootstrap
-
-RUN rm -rf /tmp/bootstrap
-
 # Final stage
 FROM debian:12.8-slim
 
@@ -35,19 +30,13 @@ RUN apt-get update && apt-get install -y curl git
 
 RUN adduser --disabled-password --gecos '' bruin
 
-# Copy the built binary from builder stage
-COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
-
-# Set working directory and ensure bruin user has write permissions
-WORKDIR /workspace
-RUN chown -R bruin:bruin /workspace
+RUN chown -R bruin:bruin /home/bruin
 
 USER bruin
 
-ENV PATH="/home/bruin/.local/bin:${PATH}"
+# Copy the built binary from builder stage
+COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
-# Add healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD bruin version > /dev/null || exit 1
+ENV PATH="/home/bruin/.local/bin:${PATH}"
 
 CMD ["bruin"]
