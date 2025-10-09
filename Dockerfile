@@ -39,12 +39,4 @@ COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
 ENV PATH="/home/bruin/.local/bin:${PATH}"
 
-# Bootstrap ingestr installation
-RUN cd /tmp && /home/bruin/.local/bin/bruin init bootstrap --in-place && /home/bruin/.local/bin/bruin run bootstrap
-
-RUN rm -rf /tmp/bootstrap
-
-
-
-
 CMD ["bruin"]
