@@ -446,6 +446,57 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-is-full-refresh-false",
+			task: e2e.Task{
+				Name:    "render-is-full-refresh-false",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
+					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"'render_this.test_full_refresh' AS asset_name",
+						"'INCREMENTAL_MODE' AS refresh_mode",
+						"'2024-01-15' AS start_date",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-is-full-refresh-true",
+			task: e2e.Task{
+				Name:    "render-is-full-refresh-true",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--full-refresh",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
+					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"'render_this.test_full_refresh' AS asset_name",
+						"'FULL_REFRESH_MODE' AS refresh_mode",
+						"'2020-01-01' AS start_date",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "python-happy-path-run",
 			task: e2e.Task{
 				Name:    "python-happy-path-run",
@@ -1028,7 +1079,7 @@ func TestIndividualTasks(t *testing.T) {
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{"Successfully validated 2 assets", "bruin run completed", "Finished: render_this.my_asset_2"},
+					Contains: []string{"Successfully validated 3 assets", "bruin run completed", "Finished: render_this.my_asset_2"},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,

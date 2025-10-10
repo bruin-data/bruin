@@ -19,7 +19,7 @@ bruin render [path to asset definition] [flags]
 
 | Flag               | Alias | Description                                                           |
 |--------------------|-------|-----------------------------------------------------------------------|
-| `--full-refresh`   | `-r`  | Truncate the table before running the query.                          |
+| `--full-refresh`   | `-r`  | Truncate the table before running the query. Also sets the `is_full_refresh` jinja variable to `True`. |
 | `--start-date`     |       | Specify the start date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format.|
 | `--end-date`       |       | Specify the end date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format. |
 | `--output [format]`| `-o`  | Specify the output format (e.g., `json`). Defaults to console output.  |
@@ -40,4 +40,8 @@ bruin render path/to/asset.yml --start-date 2024-01-01 --end-date 2024-01-31
 **Render an Asset in JSON Format:**
 ```bash
 bruin render path/to/asset.yml --output json
+```
+**Render an Asset with Full Refresh:**
+```bash
+bruin render path/to/asset.yml --full-refresh
 ```

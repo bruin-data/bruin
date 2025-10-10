@@ -66,11 +66,25 @@ Bruin injects various variables by default:
 | `end_timestamp` | The end timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-02T15:30:00.000000Z07:00" |
 | `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
 | `run_id` | The unique identifier for the current [pipeline run](../../getting-started/concepts.md#pipeline-run) | `run_1234567890` |
+| `is_full_refresh` | Boolean indicating whether the `--full-refresh` flag was used | `True` or `False` |
 
 You can use these variables in your SQL queries by referencing them with the `{{ }}` syntax:
 ```sql
-SELECT * FROM my_table 
+SELECT * FROM my_table
 WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+```
+
+The `is_full_refresh` variable is particularly useful for implementing different logic based on whether a full refresh is being performed:
+```sql
+SELECT * FROM my_table
+{% if is_full_refresh %}
+  -- Full refresh: process all historical data
+  WHERE created_at >= '2020-01-01'
+{% else %}
+  -- Incremental: process only recent data
+  WHERE created_at >= '{{ start_date }}'
+    AND created_at < '{{ end_date }}'
+{% endif %}
 ```
 
 > [!NOTE]

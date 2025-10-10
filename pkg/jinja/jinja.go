@@ -58,7 +58,7 @@ func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID strin
 }
 
 func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string, vars Context) *Renderer {
-	ctx := defaultContext(startDate, endDate, pipelineName, runID)
+	ctx := defaultContext(startDate, endDate, pipelineName, runID, false)
 	ctx["var"] = vars
 	return &Renderer{
 		context:         exec.NewContext(ctx),
@@ -66,7 +66,7 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, r
 	}
 }
 
-func defaultContext(startDate, endDate *time.Time, pipelineName, runID string) map[string]any {
+func defaultContext(startDate, endDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]any {
 	return map[string]any{
 		"start_date":        startDate.Format("2006-01-02"),
 		"start_date_nodash": startDate.Format("20060102"),
@@ -78,6 +78,7 @@ func defaultContext(startDate, endDate *time.Time, pipelineName, runID string) m
 		"end_timestamp":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 		"pipeline":          pipelineName,
 		"run_id":            runID,
+		"is_full_refresh":   fullRefresh,
 	}
 }
 
@@ -85,7 +86,12 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
-	return NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
+	ctx := defaultContext(&startDate, &endDate, pipelineName, runID, false)
+	ctx["var"] = nil
+	return &Renderer{
+		context:         exec.NewContext(ctx),
+		queryRenderLock: &sync.Mutex{},
+	}
 }
 
 func (r *Renderer) Render(query string) (string, error) {
@@ -130,9 +136,11 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		return r, nil
 	}
 
+	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
-		tempContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string))
+		tempContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
 		tempContext["this"] = asset.Name
 		tempContext["var"] = pipe.Variables.Value()
 		tempRenderer := &Renderer{
@@ -153,7 +161,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		endDate = pipeline.ModifyDate(endDate, resolvedEndModifier)
 	}
 
-	jinjaContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string))
+	jinjaContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
 	jinjaContext["this"] = asset.Name
 	jinjaContext["var"] = pipe.Variables.Value()
 
