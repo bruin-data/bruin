@@ -169,3 +169,21 @@ jobs:
       - name: Run GoReleaser
         run: |
           docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }}  -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
+
+  check-docker-image:
+    runs-on: ubuntu-latest
+    name: Check Docker Image on Main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Read Bruin Version
+        id: version
+        run: |
+          BRUIN_VERSION=$(cat src/core/BRUIN_VERSION.txt)
+          echo "bruin_version=$BRUIN_VERSION" >> $GITHUB_OUTPUT
+          echo "Checking Docker image for version: $BRUIN_VERSION"
+      
+      - name: Pull Docker Image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.bruin_version }}
