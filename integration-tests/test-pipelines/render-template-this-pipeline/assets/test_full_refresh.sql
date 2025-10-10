@@ -7,7 +7,7 @@ type: duckdb.sql
 
 SELECT
     '{{ this }}' AS asset_name,
-    {% if is_full_refresh %}
+    {% if full_refresh %}
     'FULL_REFRESH_MODE' AS refresh_mode,
     '2020-01-01' AS start_date
     {% else %}

@@ -78,7 +78,7 @@ func defaultContext(startDate, endDate *time.Time, pipelineName, runID string, f
 		"end_timestamp":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 		"pipeline":          pipelineName,
 		"run_id":            runID,
-		"is_full_refresh":   fullRefresh,
+		"full_refresh":      fullRefresh,
 	}
 }
 

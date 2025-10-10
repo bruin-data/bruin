@@ -1260,12 +1260,12 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 		expectedRenderedText string
 	}{
 		{
-			name:                 "is_full_refresh is false when full refresh is disabled",
+			name:                 "full_refresh is false when full refresh is disabled",
 			fullRefresh:          false,
 			expectedRenderedText: "False",
 		},
 		{
-			name:                 "is_full_refresh is true when full refresh is enabled",
+			name:                 "full_refresh is true when full refresh is enabled",
 			fullRefresh:          true,
 			expectedRenderedText: "True",
 		},
@@ -1286,13 +1286,13 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, clonedRenderer)
 
-			// Test that is_full_refresh variable is set correctly
-			result, err := clonedRenderer.Render("{{ is_full_refresh }}")
+			// Test that full_refresh variable is set correctly
+			result, err := clonedRenderer.Render("{{ full_refresh }}")
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedRenderedText, result)
 
-			// Test using is_full_refresh in a conditional
-			conditionalQuery := `{% if is_full_refresh %}full{% else %}incremental{% endif %}`
+			// Test using full_refresh in a conditional
+			conditionalQuery := `{% if full_refresh %}full{% else %}incremental{% endif %}`
 			conditionalResult, err := clonedRenderer.Render(conditionalQuery)
 			require.NoError(t, err)
 			if tt.fullRefresh {
