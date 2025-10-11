@@ -8,6 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var commentRegex = regexp.MustCompile(`/\* *@bruin[\s\w\S]*@bruin *\*/`)
+
 type (
 	MaterializerFunc        func(task *Asset, query string) (string, error)
 	AssetMaterializationMap map[MaterializationType]map[MaterializationStrategy]MaterializerFunc
@@ -44,10 +46,7 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 }
 
 func removeComments(query string) string {
-	bytes := []byte(query)
-	re := regexp.MustCompile(`/\* *@bruin[\s\w\S]*@bruin *\*/`)
-	newBytes := re.ReplaceAll(bytes, []byte(""))
-	return string(newBytes)
+	return commentRegex.ReplaceAllString(query, "")
 }
 
 func (m *Materializer) IsFullRefresh() bool {
