@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -28,6 +29,24 @@ var (
 )
 
 var validRulePattern = regexp.MustCompile(`^[A-Za-z0-9\-]+$`)
+
+// patternCache stores compiled regexp patterns to avoid recompilation
+var patternCache sync.Map
+
+// getCompiledPattern returns a compiled regexp pattern from cache or compiles and caches it
+func getCompiledPattern(pattern string) (*regexp.Regexp, error) {
+	if cached, ok := patternCache.Load(pattern); ok {
+		return cached.(*regexp.Regexp), nil
+	}
+
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+
+	patternCache.Store(pattern, compiled)
+	return compiled, nil
+}
 
 type assetValidatorEnv struct {
 	Asset     *pipeline.Asset    `expr:"asset"`
@@ -331,11 +350,13 @@ func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, 
 			if key != "tag" {
 				pattern = addBoundaryAnchors(pattern)
 			}
-			match, err := regexp.MatchString(pattern, subject)
+
+			compiledPattern, err := getCompiledPattern(pattern)
 			if err != nil {
-				return false, fmt.Errorf("error matching %s: %w", key, err)
+				return false, fmt.Errorf("error compiling pattern %s: %w", pattern, err)
 			}
-			if !match {
+
+			if !compiledPattern.MatchString(subject) {
 				return false, nil
 			}
 		}
