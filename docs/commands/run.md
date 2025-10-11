@@ -38,7 +38,7 @@ table td:first-child {
 | `--force` | bool | `false` | Do not ask for confirmation in a production environment. |
 | `--no-log-file` | bool | `false` | Do not create a log file for this run. |
 | `--sensor-mode` | str | `'once'` | Set sensor mode: `skip`, `once`, or `wait`. |
-| `--full-refresh` | bool | `false` | Truncate the table before running. |
+| `--full-refresh` | bool | `false` | Truncate the table before running. Also sets the `full_refresh` jinja variable to `True` and `BRUIN_FULL_REFRESH` environment variable to `1`. |
 | `--apply-interval-modifiers` | bool | `false` | Apply interval modifiers. |
 | `--use-pip` | bool | `false` | Use pip for managing Python dependencies. |
 | `--continue` | bool | `false` | Continue from the last failed asset. |
@@ -155,6 +155,11 @@ bruin run --only checks
 Run only the main tasks and not the quality checks:
 ```bash
 bruin run --only main
+```
+
+Run with full refresh to reprocess all historical data:
+```bash
+bruin run --full-refresh
 ```
 
 Run with default query annotations:
