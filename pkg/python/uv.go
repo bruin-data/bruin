@@ -399,16 +399,31 @@ func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
 // args necessary for installing ingestr.
 func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string) []string {
 	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
+
+	// For ARM64 Linux, use platform-specific installation
+	if runtime.GOOS == "linux" && runtime.GOARCH == "arm64" {
+		// Install using pip with the ARM64 requirements file
+		cmdline := []string{
+			"pip", "install",
+			"--quiet",
+			"--python", pythonVersionForIngestr,
+		}
+		for _, pkg := range pkgs {
+			cmdline = append(cmdline, pkg)
+		}
+		// Use the ARM64-specific requirements from ingestr
+		cmdline = append(cmdline,
+			"--constraint",
+			"https://raw.githubusercontent.com/bruin-data/ingestr/main/requirements_arm64.txt",
+			ingestrPackageName,
+		)
+		return cmdline
+	}
+
+	// Original logic for other platforms
 	cmdline := []string{
-		"tool",
-		"install",
-		"--no-config",
-		"--force",
-		"--quiet",
-		"--prerelease",
-		"allow",
-		"--python",
-		pythonVersionForIngestr,
+		"tool", "install", "--no-config", "--force", "--quiet",
+		"--prerelease", "allow", "--python", pythonVersionForIngestr,
 	}
 	for _, pkg := range pkgs {
 		cmdline = append(cmdline, "--with", pkg)
