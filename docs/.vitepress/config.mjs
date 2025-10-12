@@ -237,6 +237,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Monday", link: "/ingestion/monday.md"},
                             {text: "Plus Vibe AI", link: "/ingestion/plusvibeai.md"},
                             {text: "LinkedIn Ads", link: "/ingestion/linkedinads.md"},
+                            {text: "Mailchimp", link: "/ingestion/mailchimp.md"},
                             {text: "Linear", link: "/ingestion/linear"},
                             {text: "Mixpanel", link: "/ingestion/mixpanel"},
                             {text: "MongoDB", link: "/ingestion/mongo"},

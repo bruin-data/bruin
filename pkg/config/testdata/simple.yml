@@ -161,6 +161,10 @@ environments:
         - name: conn23
           base_id: "123"
           access_token: "accessKey"
+      mailchimp:
+        - name: conn26
+          api_key: "mailchimpKey"
+          server: "us10"
       zendesk:
         - name: conn25
           api_token: "zendeskKey"

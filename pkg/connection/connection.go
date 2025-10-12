@@ -52,6 +52,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/linear"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
+	"github.com/bruin-data/bruin/pkg/mailchimp"
 	"github.com/bruin-data/bruin/pkg/mixpanel"
 	"github.com/bruin-data/bruin/pkg/monday"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -130,6 +131,7 @@ type Manager struct {
 	GitHub               map[string]*github.Client
 	AppStore             map[string]*appstore.Client
 	LinkedInAds          map[string]*linkedinads.Client
+	Mailchimp            map[string]*mailchimp.Client
 	Linear               map[string]*linear.Client
 	RevenueCat           map[string]*revenuecat.Client
 	ClickHouse           map[string]*clickhouse.Client
@@ -1412,6 +1414,27 @@ func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedIn
 	return nil
 }
 
+func (m *Manager) AddMailchimpConnectionFromConfig(connection *config.MailchimpConnection) error {
+	m.mutex.Lock()
+	if m.Mailchimp == nil {
+		m.Mailchimp = make(map[string]*mailchimp.Client)
+	}
+	m.mutex.Unlock()
+	client, err := mailchimp.NewClient(mailchimp.Config{
+		APIKey: connection.APIKey,
+		Server: connection.Server,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Mailchimp[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddRevenueCatConnectionFromConfig(connection *config.RevenueCatConnection) error {
 	m.mutex.Lock()
 	if m.RevenueCat == nil {
@@ -2317,6 +2340,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Mailchimp, connectionManager.AddMailchimpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RevenueCat, connectionManager.AddRevenueCatConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Linear, connectionManager.AddLinearConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
