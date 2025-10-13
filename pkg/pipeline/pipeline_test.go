@@ -970,7 +970,7 @@ func TestPipeline_Persist_ErrorHandling(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		err := p.Persist(fs)
 		require.NoError(t, err)
-		
+
 		// Verify the file was created
 		exists, err := afero.Exists(fs, "/valid/pipeline.yml")
 		require.NoError(t, err)
@@ -989,19 +989,19 @@ func TestPipeline_Persist_ErrorHandling(t *testing.T) {
 
 		variables := make(pipeline.Variables)
 		variables["invalid"] = map[string]any{
-			"channel": make(chan int), 
+			"channel": make(chan int),
 		}
 		p.Variables = variables
 
 		fs := afero.NewMemMapFs()
-		
+
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
 					t.Logf("Expected panic caught: %v", r)
 				}
 			}()
-			
+
 			err := p.Persist(fs)
 			t.Errorf("Expected panic but got error: %v", err)
 		}()
@@ -1010,9 +1010,9 @@ func TestPipeline_Persist_ErrorHandling(t *testing.T) {
 	t.Run("persist fails with nil pipeline", func(t *testing.T) {
 		t.Parallel()
 
-		var p *pipeline.Pipeline 
+		var p *pipeline.Pipeline
 		fs := afero.NewMemMapFs()
-		
+
 		err := p.Persist(fs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to generate content for persistence")
@@ -1021,7 +1021,7 @@ func TestPipeline_Persist_ErrorHandling(t *testing.T) {
 	t.Run("persist propagates FormatContent error", func(t *testing.T) {
 		t.Parallel()
 
-		var p *pipeline.Pipeline 
+		var p *pipeline.Pipeline
 
 		fs := afero.NewMemMapFs()
 		err := p.Persist(fs)
@@ -1038,7 +1038,7 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 
 		var p *pipeline.Pipeline // nil pipeline
 		content, err := p.FormatContent()
-		
+
 		require.Error(t, err)
 		assert.Nil(t, content)
 		assert.Contains(t, err.Error(), "failed to build a pipeline, therefore cannot persist it")
@@ -1055,7 +1055,7 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 		}
 
 		content, err := p.FormatContent()
-		
+
 		require.NoError(t, err)
 		assert.NotNil(t, content)
 		assert.Contains(t, string(content), "name: test-pipeline")
@@ -1065,20 +1065,20 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 		t.Parallel()
 
 		p := &pipeline.Pipeline{
-			Name: "complex-test",
-			Schedule: "daily",
-			StartDate: "2024-01-01",
-			Retries: 3,
-			Concurrency: 5,
-			Catchup: true,
-			Agent: true,
-			Tags: pipeline.EmptyStringArray{"production", "critical"},
-			Domains: pipeline.EmptyStringArray{"analytics"},
-			Meta: pipeline.EmptyStringMap{"owner": "data-team"},
+			Name:               "complex-test",
+			Schedule:           "daily",
+			StartDate:          "2024-01-01",
+			Retries:            3,
+			Concurrency:        5,
+			Catchup:            true,
+			Agent:              true,
+			Tags:               pipeline.EmptyStringArray{"production", "critical"},
+			Domains:            pipeline.EmptyStringArray{"analytics"},
+			Meta:               pipeline.EmptyStringMap{"owner": "data-team"},
 			DefaultConnections: pipeline.EmptyStringMap{"gcp": "prod-connection"},
 			Variables: pipeline.Variables{
 				"env": map[string]any{
-					"type": "string",
+					"type":    "string",
 					"default": "production",
 				},
 			},
@@ -1088,10 +1088,10 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 		}
 
 		content, err := p.FormatContent()
-		
+
 		require.NoError(t, err)
 		assert.NotNil(t, content)
-		
+
 		contentStr := string(content)
 		assert.Contains(t, contentStr, "name: complex-test")
 		assert.Contains(t, contentStr, "schedule: daily")

@@ -1263,7 +1263,6 @@ func (p *Pipeline) FormatContent() ([]byte, error) {
 	return []byte(stringVersion), nil
 }
 
-
 func uniqueAssets(assets []*Asset) []*Asset {
 	seenValues := make(map[string]bool, len(assets))
 	unique := make([]*Asset, 0, len(assets))
@@ -1383,7 +1382,7 @@ type Pipeline struct {
 	Agent              bool                   `json:"agent" yaml:"agent,omitempty" mapstructure:"agent"`
 	Variables          Variables              `json:"variables" yaml:"variables,omitempty" mapstructure:"variables"`
 	TasksByType        map[AssetType][]*Asset `json:"-" yaml:"-"`
-	tasksByName        map[string]*Asset `yaml:"-"`
+	tasksByName        map[string]*Asset      `yaml:"-"`
 }
 
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
