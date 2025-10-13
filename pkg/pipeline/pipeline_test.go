@@ -906,6 +906,206 @@ func TestAsset_Persist(t *testing.T) {
 	}
 }
 
+func TestPipeline_Persist(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		pipelinePath string
+		expectedPath string
+	}{
+		{
+			name:         "simple pipeline is saved correctly",
+			pipelinePath: path.AbsPathForTests(t, "testdata/persist/simple-pipeline.yml"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/simple-pipeline.expected.yml"),
+		},
+		{
+			name:         "complex pipeline is saved correctly",
+			pipelinePath: path.AbsPathForTests(t, "testdata/persist/complex-pipeline.yml"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/complex-pipeline.expected.yml"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Load the pipeline from file
+			p, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath(context.Background(), tt.pipelinePath, pipeline.WithMutate())
+			require.NoError(t, err)
+
+			// Set the definition file path for persistence
+			p.DefinitionFile.Path = tt.pipelinePath
+
+			fs := afero.NewMemMapFs()
+			err = p.Persist(fs)
+			require.NoError(t, err)
+
+			actual, err := afero.ReadFile(fs, p.DefinitionFile.Path)
+			require.NoError(t, err)
+
+			expected, err := afero.ReadFile(afero.NewOsFs(), tt.expectedPath)
+			require.NoError(t, err)
+
+			expectedStr := strings.ReplaceAll(string(expected), "\r\n", "\n")
+			actualStr := strings.ReplaceAll(string(actual), "\r\n", "\n")
+
+			assert.Equal(t, expectedStr, actualStr)
+		})
+	}
+}
+
+func TestPipeline_Persist_ErrorHandling(t *testing.T) {
+	t.Parallel()
+
+	t.Run("persist succeeds with valid path", func(t *testing.T) {
+		t.Parallel()
+
+		p := &pipeline.Pipeline{
+			Name: "test-pipeline",
+			DefinitionFile: pipeline.DefinitionFile{
+				Path: "/valid/pipeline.yml",
+			},
+		}
+
+		fs := afero.NewMemMapFs()
+		err := p.Persist(fs)
+		require.NoError(t, err)
+
+		// Verify the file was created
+		exists, err := afero.Exists(fs, "/valid/pipeline.yml")
+		require.NoError(t, err)
+		assert.True(t, exists)
+	})
+
+	t.Run("persist fails with YAML encoding error", func(t *testing.T) {
+		t.Parallel()
+
+		p := &pipeline.Pipeline{
+			Name: "test-pipeline",
+			DefinitionFile: pipeline.DefinitionFile{
+				Path: "/test/pipeline.yml",
+			},
+		}
+
+		variables := make(pipeline.Variables)
+		variables["invalid"] = map[string]any{
+			"channel": make(chan int),
+		}
+		p.Variables = variables
+
+		fs := afero.NewMemMapFs()
+
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Logf("Expected panic caught: %v", r)
+				}
+			}()
+
+			err := p.Persist(fs)
+			t.Errorf("Expected panic but got error: %v", err)
+		}()
+	})
+
+	t.Run("persist fails with nil pipeline", func(t *testing.T) {
+		t.Parallel()
+
+		var p *pipeline.Pipeline
+		fs := afero.NewMemMapFs()
+
+		err := p.Persist(fs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to generate content for persistence")
+	})
+
+	t.Run("persist propagates FormatContent error", func(t *testing.T) {
+		t.Parallel()
+
+		var p *pipeline.Pipeline
+
+		fs := afero.NewMemMapFs()
+		err := p.Persist(fs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to generate content for persistence")
+	})
+}
+
+func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
+	t.Parallel()
+
+	t.Run("FormatContent fails with nil pipeline", func(t *testing.T) {
+		t.Parallel()
+
+		var p *pipeline.Pipeline // nil pipeline
+		content, err := p.FormatContent()
+
+		require.Error(t, err)
+		assert.Nil(t, content)
+		assert.Contains(t, err.Error(), "failed to build a pipeline, therefore cannot persist it")
+	})
+
+	t.Run("FormatContent handles empty DefinitionFile.Path", func(t *testing.T) {
+		t.Parallel()
+
+		p := &pipeline.Pipeline{
+			Name: "test-pipeline",
+			DefinitionFile: pipeline.DefinitionFile{
+				Path: "", // Empty path
+			},
+		}
+
+		content, err := p.FormatContent()
+
+		require.NoError(t, err)
+		assert.NotNil(t, content)
+		assert.Contains(t, string(content), "name: test-pipeline")
+	})
+
+	t.Run("FormatContent handles complex pipeline correctly", func(t *testing.T) {
+		t.Parallel()
+
+		p := &pipeline.Pipeline{
+			Name:               "complex-test",
+			Schedule:           "daily",
+			StartDate:          "2024-01-01",
+			Retries:            3,
+			Concurrency:        5,
+			Catchup:            true,
+			Agent:              true,
+			Tags:               pipeline.EmptyStringArray{"production", "critical"},
+			Domains:            pipeline.EmptyStringArray{"analytics"},
+			Meta:               pipeline.EmptyStringMap{"owner": "data-team"},
+			DefaultConnections: pipeline.EmptyStringMap{"gcp": "prod-connection"},
+			Variables: pipeline.Variables{
+				"env": map[string]any{
+					"type":    "string",
+					"default": "production",
+				},
+			},
+			DefinitionFile: pipeline.DefinitionFile{
+				Path: "/test/pipeline.yml",
+			},
+		}
+
+		content, err := p.FormatContent()
+
+		require.NoError(t, err)
+		assert.NotNil(t, content)
+
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "name: complex-test")
+		assert.Contains(t, contentStr, "schedule: daily")
+		assert.Contains(t, contentStr, "retries: 3")
+		assert.Contains(t, contentStr, "concurrency: 5")
+		assert.Contains(t, contentStr, "catchup: true")
+		assert.Contains(t, contentStr, "agent: true")
+		assert.Contains(t, contentStr, "tags:")
+		assert.Contains(t, contentStr, "- production")
+		assert.Contains(t, contentStr, "variables:")
+		assert.Contains(t, contentStr, "env:")
+	})
+}
+
 func TestClearSpacesAtLineEndings(t *testing.T) {
 	t.Parallel()
 

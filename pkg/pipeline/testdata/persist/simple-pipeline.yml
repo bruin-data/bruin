@@ -1,0 +1,5 @@
+name: simple-pipeline
+schedule: daily
+start_date: "2023-01-01"
+default_connections:
+  gcp: my-connection
