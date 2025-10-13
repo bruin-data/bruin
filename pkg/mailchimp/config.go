@@ -8,19 +8,18 @@ type Config struct {
 }
 
 func (c *Config) GetIngestrURI() string {
-	u := &url.URL{
-		Scheme: "mailchimp",
-		Host:   "",
-	}
-
-	q := u.Query()
+	params := url.Values{}
 	if c.APIKey != "" {
-		q.Set("api_key", c.APIKey)
+		params.Set("api_key", c.APIKey)
 	}
 	if c.Server != "" {
-		q.Set("server", c.Server)
+		params.Set("server", c.Server)
 	}
-	u.RawQuery = q.Encode()
 
-	return u.String()
+	uri := "mailchimp://"
+	if len(params) > 0 {
+		uri += "?" + params.Encode()
+	}
+
+	return uri
 }
