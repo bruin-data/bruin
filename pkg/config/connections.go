@@ -678,6 +678,16 @@ func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }
 
+type MailchimpConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Server string `yaml:"server,omitempty" json:"server" mapstructure:"server"`
+}
+
+func (c MailchimpConnection) GetName() string {
+	return c.Name
+}
+
 type RevenueCatConnection struct {
 	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey    string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`

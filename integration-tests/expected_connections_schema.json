@@ -563,6 +563,12 @@
           },
           "type": "array"
         },
+        "mailchimp": {
+          "items": {
+            "$ref": "#/$defs/MailchimpConnection"
+          },
+          "type": "array"
+        },
         "linear": {
           "items": {
             "$ref": "#/$defs/LinearConnection"
@@ -1477,6 +1483,26 @@
         "name",
         "access_token",
         "account_ids"
+      ]
+    },
+    "MailchimpConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "server": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "server"
       ]
     },
     "MixpanelConnection": {

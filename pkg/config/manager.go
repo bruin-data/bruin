@@ -66,6 +66,7 @@ type Connections struct {
 	GoogleAds           []GoogleAdsConnection           `yaml:"googleads,omitempty" json:"googleads,omitempty" mapstructure:"googleads"`
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
+	Mailchimp           []MailchimpConnection           `yaml:"mailchimp,omitempty" json:"mailchimp,omitempty" mapstructure:"mailchimp"`
 	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
 	Linear              []LinearConnection              `yaml:"linear,omitempty" json:"linear,omitempty" mapstructure:"linear"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`

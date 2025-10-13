@@ -290,6 +290,13 @@ func TestLoadFromFile(t *testing.T) {
 					AccessToken: "accessKey",
 				},
 			},
+			Mailchimp: []MailchimpConnection{
+				{
+					Name:   "conn26",
+					APIKey: "mailchimpKey",
+					Server: "us10",
+				},
+			},
 			S3: []S3Connection{
 				{
 					Name:            "conn25",
