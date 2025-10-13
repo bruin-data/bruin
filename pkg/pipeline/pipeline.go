@@ -1222,6 +1222,47 @@ func (a *Asset) FormatContent() ([]byte, error) {
 	return []byte(stringVersion), nil
 }
 
+func (p *Pipeline) Persist(fs afero.Fs) error {
+	// Generate the YAML content for the pipeline
+	content, err := p.FormatContent()
+	if err != nil {
+		return errors.Wrap(err, "failed to generate content for persistence")
+	}
+
+	// Write the generated content to the file
+	filePath := p.DefinitionFile.Path
+	return afero.WriteFile(fs, filePath, content, 0o644)
+}
+
+func (p *Pipeline) FormatContent() ([]byte, error) {
+	if p == nil {
+		return nil, errors.New("failed to build a pipeline, therefore cannot persist it")
+	}
+
+	buf := bytes.NewBuffer(nil)
+	enc := yaml.NewEncoder(buf)
+	enc.SetIndent(2)
+
+	err := enc.Encode(p)
+	if err != nil {
+		return nil, err
+	}
+
+	yamlConfig := buf.Bytes()
+
+	keysToAddSpace := []string{"assets", "notifications", "default_connections", "variables"}
+	for _, key := range keysToAddSpace {
+		yamlConfig = bytes.ReplaceAll(yamlConfig, []byte("\n"+key+":"), []byte("\n\n"+key+":"))
+	}
+
+	stringVersion := string(yamlConfig)
+	if !strings.HasSuffix(stringVersion, "\n") {
+		stringVersion += "\n"
+	}
+
+	return []byte(stringVersion), nil
+}
+
 func uniqueAssets(assets []*Asset) []*Asset {
 	seenValues := make(map[string]bool, len(assets))
 	unique := make([]*Asset, 0, len(assets))
@@ -1320,28 +1361,28 @@ func (mp *MetadataPush) HasAnyEnabled() bool {
 }
 
 type Pipeline struct {
-	LegacyID           string                 `json:"legacy_id" yaml:"id" mapstructure:"id"`
-	Name               string                 `json:"name" yaml:"name" mapstructure:"name"`
+	LegacyID           string                 `json:"legacy_id" yaml:"id,omitempty" mapstructure:"id"`
+	Name               string                 `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Tags               EmptyStringArray       `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	Domains            EmptyStringArray       `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
 	Meta               EmptyStringMap         `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
-	Schedule           Schedule               `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
-	StartDate          string                 `json:"start_date" yaml:"start_date" mapstructure:"start_date"`
-	DefinitionFile     DefinitionFile         `json:"definition_file"`
-	DefaultConnections EmptyStringMap         `json:"default_connections" yaml:"default_connections" mapstructure:"default_connections"`
-	Assets             []*Asset               `json:"assets"`
-	Notifications      Notifications          `json:"notifications" yaml:"notifications" mapstructure:"notifications"`
-	Catchup            bool                   `json:"catchup" yaml:"catchup" mapstructure:"catchup"`
-	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
-	Retries            int                    `json:"retries" yaml:"retries" mapstructure:"retries"`
-	Concurrency        int                    `json:"concurrency" yaml:"concurrency" mapstructure:"concurrency"`
+	Schedule           Schedule               `json:"schedule" yaml:"schedule,omitempty" mapstructure:"schedule"`
+	StartDate          string                 `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
+	DefinitionFile     DefinitionFile         `json:"definition_file" yaml:"-"`
+	DefaultConnections EmptyStringMap         `json:"default_connections" yaml:"default_connections,omitempty" mapstructure:"default_connections"`
+	Assets             []*Asset               `json:"assets" yaml:"assets,omitempty"`
+	Notifications      Notifications          `json:"notifications" yaml:"notifications,omitempty" mapstructure:"notifications"`
+	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
+	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
+	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
-	Commit             string                 `json:"commit"`
-	Snapshot           string                 `json:"snapshot"`
-	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
-	Variables          Variables              `json:"variables" yaml:"variables" mapstructure:"variables"`
-	TasksByType        map[AssetType][]*Asset `json:"-"`
-	tasksByName        map[string]*Asset
+	Commit             string                 `json:"commit" yaml:"commit,omitempty"`
+	Snapshot           string                 `json:"snapshot" yaml:"snapshot,omitempty"`
+	Agent              bool                   `json:"agent" yaml:"agent,omitempty" mapstructure:"agent"`
+	Variables          Variables              `json:"variables" yaml:"variables,omitempty" mapstructure:"variables"`
+	TasksByType        map[AssetType][]*Asset `json:"-" yaml:"-"`
+	tasksByName        map[string]*Asset      `yaml:"-"`
 }
 
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {

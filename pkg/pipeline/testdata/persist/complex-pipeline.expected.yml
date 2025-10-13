@@ -1,0 +1,28 @@
+name: complex-pipeline
+tags:
+  - production
+  - critical
+domains:
+  - analytics
+  - reporting
+meta:
+  cost-center: engineering
+  owner: data-team
+schedule: hourly
+start_date: "2024-01-01"
+
+default_connections:
+  gcp: prod-connection
+  snowflake: snow-connection
+catchup: true
+retries: 3
+concurrency: 5
+agent: true
+
+variables:
+  debug:
+    default: false
+    type: boolean
+  env:
+    default: production
+    type: string
