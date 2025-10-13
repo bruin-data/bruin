@@ -563,6 +563,24 @@ bruin render assets/daily_sales.sql
 {%- endmacro %}
 ```
 
+### Commenting Macros
+
+::: warning Important
+SQL comments (`--`) don't prevent Jinja from processing macros. To show example macro code without executing it, use `{% raw %}` blocks:
+
+```sql
+-- ❌ Wrong: This will still execute the macro!
+-- {{ top_n('orders', 'amount', 10) }}
+
+-- ✅ Correct: Wrap in {% raw %} to show the code without executing
+{% raw %}
+-- {{ top_n('orders', 'amount', 10) }}
+{% endraw %}
+```
+
+Everything inside `{% raw %}` ... `{% endraw %}` is treated as literal text, allowing you to document macro examples without executing them.
+:::
+
 ### Design
 
 - **Keep macros focused**: Each macro should do one thing well

@@ -24,6 +24,7 @@ columns:
 -- This counts the number of people per country
 {{ count_by('example', 'country') }}
 
+{% raw %}
 -- You can also try other macros:
 --
 -- Example 2: Get top countries
@@ -48,3 +49,4 @@ columns:
 --     {{ safe_divide('COUNT(*)', '(SELECT total FROM totals)') }} * 100 as percentage
 -- FROM example
 -- GROUP BY country
+{% endraw %}
