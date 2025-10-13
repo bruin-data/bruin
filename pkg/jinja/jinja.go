@@ -116,7 +116,7 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, r
 
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
 func NewRendererWithStartEndDatesAndMacros(startDate, endDate *time.Time, pipelineName, runID string, vars Context, macroContent string) *Renderer {
-	ctx := defaultContext(startDate, endDate, pipelineName, runID)
+	ctx := defaultContext(startDate, endDate, pipelineName, runID, false)
 	ctx["var"] = vars
 	return &Renderer{
 		context:         exec.NewContext(ctx),

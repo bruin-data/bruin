@@ -187,7 +187,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {
                         text: " Jinja Templating",
                         link: "/assets/templating/templating",
-                        items: [{text: "Filters", link: "/assets/templating/filters"}],
+                        items: [
+                            {text: "Filters", link: "/assets/templating/filters"},
+                            {text: "Macros", link: "/assets/templating/macros"}
+                        ],
                     },
                 ],
             },
