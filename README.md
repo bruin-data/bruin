@@ -26,7 +26,7 @@ Please see the installation instructions [here](https://bruin-data.github.io/bru
 
 ## Community
 
-Join our Slack community [here](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-2dl2i8foy-bVsuMUauHeN9M2laVm3ZVg).
+Join our Slack community [here](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-3cymzktqu-bvFxPGyQHpvi~dok_W0L3w).
 
 
 <div style="margin-top: 24px;">
