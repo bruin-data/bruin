@@ -2,6 +2,7 @@ package jinja
 
 import (
 	"context"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -11,11 +12,13 @@ import (
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 )
 
 type Renderer struct {
 	context         *exec.Context
 	queryRenderLock *sync.Mutex
+	macroContent    string
 }
 
 func init() { //nolint: gochecknoinits
@@ -29,10 +32,54 @@ var (
 
 type Context map[string]any
 
+// LoadMacros loads all macro files from the given directory and returns them as a single string.
+func LoadMacros(fs afero.Fs, macrosPath string) (string, error) {
+	exists, err := afero.DirExists(fs, macrosPath)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to check if macros directory exists: %s", macrosPath)
+	}
+	if !exists {
+		return "", nil
+	}
+
+	entries, err := afero.ReadDir(fs, macrosPath)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to read macros directory: %s", macrosPath)
+	}
+
+	var macroContent strings.Builder
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+
+		filePath := filepath.Join(macrosPath, entry.Name())
+		content, err := afero.ReadFile(fs, filePath)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to read macro file: %s", filePath)
+		}
+
+		macroContent.Write(content)
+		macroContent.WriteString("\n")
+	}
+
+	return macroContent.String(), nil
+}
+
 func NewRenderer(context Context) *Renderer {
 	return &Renderer{
 		context:         exec.NewContext(context),
 		queryRenderLock: &sync.Mutex{},
+		macroContent:    "",
+	}
+}
+
+// NewRendererWithMacros creates a new Renderer with the given context and macro content.
+func NewRendererWithMacros(context Context, macroContent string) *Renderer {
+	return &Renderer{
+		context:         exec.NewContext(context),
+		queryRenderLock: &sync.Mutex{},
+		macroContent:    macroContent,
 	}
 }
 
@@ -63,6 +110,18 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, r
 	return &Renderer{
 		context:         exec.NewContext(ctx),
 		queryRenderLock: &sync.Mutex{},
+		macroContent:    "",
+	}
+}
+
+// NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
+func NewRendererWithStartEndDatesAndMacros(startDate, endDate *time.Time, pipelineName, runID string, vars Context, macroContent string) *Renderer {
+	ctx := defaultContext(startDate, endDate, pipelineName, runID)
+	ctx["var"] = vars
+	return &Renderer{
+		context:         exec.NewContext(ctx),
+		queryRenderLock: &sync.Mutex{},
+		macroContent:    macroContent,
 	}
 }
 
@@ -97,7 +156,13 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 func (r *Renderer) Render(query string) (string, error) {
 	r.queryRenderLock.Lock()
 
-	tpl, err := gonja.FromString(query)
+	// Prepend macro content to the query if macros are loaded
+	fullQuery := query
+	if r.macroContent != "" {
+		fullQuery = r.macroContent + "\n" + query
+	}
+
+	tpl, err := gonja.FromString(fullQuery)
 	if err != nil {
 		r.queryRenderLock.Unlock()
 		customError := findParserErrorType(err)
@@ -121,7 +186,32 @@ func (r *Renderer) Render(query string) (string, error) {
 		return "", errors.New(customError)
 	}
 
+	if r.macroContent != "" {
+		out = cleanupExcessiveNewlines(out)
+	}
+
 	return out, nil
+}
+
+func cleanupExcessiveNewlines(s string) string {
+	lines := strings.Split(s, "\n")
+	var result []string
+	consecutiveEmpty := 0
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			consecutiveEmpty++
+			if consecutiveEmpty <= 2 {
+				result = append(result, line)
+			}
+		} else {
+			consecutiveEmpty = 0
+			result = append(result, line)
+		}
+	}
+
+	return strings.Join(result, "\n")
 }
 
 //nolint:ireturn
@@ -168,6 +258,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	return &Renderer{
 		context:         exec.NewContext(jinjaContext),
 		queryRenderLock: &sync.Mutex{},
+		macroContent:    r.macroContent, // Preserve macro content when cloning
 	}, nil
 }
 
