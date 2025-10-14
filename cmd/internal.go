@@ -39,6 +39,7 @@ func Internal() *cli.Command {
 			ParseAsset(),
 			ParsePipeline(),
 			PatchAsset(),
+			PatchPipeline(),
 			ParseGlossary(),
 			ConnectionSchemas(),
 			DBSummary(),
@@ -642,6 +643,50 @@ func PatchAsset() *cli.Command {
 			err = asset.Persist(afero.NewOsFs())
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to save the asset to the file"))
+				return cli.Exit("", 1)
+			}
+
+			return nil
+		},
+	}
+}
+
+func PatchPipeline() *cli.Command {
+	return &cli.Command{
+		Name:      "patch-pipeline",
+		Usage:     "patch a single Bruin pipeline with the given fields",
+		ArgsUsage: "[path to the pipeline definition]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "body",
+				Usage:    "the JSON object containing the patch body",
+				Required: false,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			pipelinePath := c.Args().Get(0)
+			if pipelinePath == "" {
+				printErrorJSON(errors2.New("empty pipeline path given, you must provide an existing pipeline path"))
+				return cli.Exit("", 1)
+			}
+
+			p, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate(), pipeline.WithOnlyPipeline())
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to load pipeline"))
+				return cli.Exit("", 1)
+			}
+
+			if err := json.Unmarshal([]byte(c.String("body")), &p); err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to apply patch to pipeline"))
+				return cli.Exit("", 1)
+			}
+
+			p.DefinitionFile.Path = pipelinePath
+
+			fs := afero.NewOsFs()
+			err = p.Persist(fs)
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to save the pipeline to the file"))
 				return cli.Exit("", 1)
 			}
 
