@@ -21,8 +21,8 @@ func TestPipeline_Patch(t *testing.T) {
 		{
 			name: "patch name and retries",
 			original: Pipeline{
-				Name:    "original-pipeline",
-				Retries: 3,
+				Name:     "original-pipeline",
+				Retries:  3,
 				Schedule: "hourly",
 			},
 			patchData: map[string]interface{}{
@@ -91,7 +91,7 @@ func TestPipeline_Patch(t *testing.T) {
 			},
 			expected: Pipeline{
 				Name:        "test-pipeline", // Should remain unchanged
-				Concurrency: 1,              // Default value set by UnmarshalJSON
+				Concurrency: 1,               // Default value set by UnmarshalJSON
 			},
 			expectError: false,
 		},
@@ -168,7 +168,7 @@ func TestPipeline_PatchPreservesExistingFields(t *testing.T) {
 				"default": "production",
 			},
 		},
-		Tags: EmptyStringArray{"important", "data"},
+		Tags:    EmptyStringArray{"important", "data"},
 		Domains: EmptyStringArray{"analytics"},
 		Meta: EmptyStringMap{
 			"owner": "data-team",

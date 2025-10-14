@@ -13,19 +13,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	executableName    = "bruin"
+	executableNameWin = "bruin.exe"
+	windowsOS         = "windows"
+)
+
 func TestPatchPipeline_BasicFunctionality(t *testing.T) {
-	if os.Getenv("ENABLE_PARALLEL") == "1" {
-		t.Parallel()
-	}
+	t.Parallel()
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	executable := "bruin"
-	if runtime.GOOS == "windows" {
-		executable = "bruin.exe"
+	executable := executableName
+	if runtime.GOOS == windowsOS {
+		executable = executableNameWin
 	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
 	tests := []struct {
@@ -62,6 +66,7 @@ func TestPatchPipeline_BasicFunctionality(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			tempDir := t.TempDir()
 			tempPipelinePath := filepath.Join(tempDir, "pipeline.yml")
 
@@ -104,18 +109,16 @@ func TestPatchPipeline_BasicFunctionality(t *testing.T) {
 }
 
 func TestPatchPipeline_WithAssets(t *testing.T) {
-	if os.Getenv("ENABLE_PARALLEL") == "1" {
-		t.Parallel()
-	}
+	t.Parallel()
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	executable := "bruin"
-	if runtime.GOOS == "windows" {
-		executable = "bruin.exe"
+	executable := executableName
+	if runtime.GOOS == windowsOS {
+		executable = executableNameWin
 	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
 
@@ -164,18 +167,16 @@ schedule: daily`
 }
 
 func TestPatchPipeline_PreservesExistingFields(t *testing.T) {
-	if os.Getenv("ENABLE_PARALLEL") == "1" {
-		t.Parallel()
-	}
+	t.Parallel()
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	executable := "bruin"
-	if runtime.GOOS == "windows" {
-		executable = "bruin.exe"
+	executable := executableName
+	if runtime.GOOS == windowsOS {
+		executable = executableNameWin
 	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
 
@@ -220,18 +221,16 @@ func TestPatchPipeline_PreservesExistingFields(t *testing.T) {
 }
 
 func TestPatchPipeline_OnlyPipelineOption(t *testing.T) {
-	if os.Getenv("ENABLE_PARALLEL") == "1" {
-		t.Parallel()
-	}
+	t.Parallel()
 
 	currentFolder, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	executable := "bruin"
-	if runtime.GOOS == "windows" {
-		executable = "bruin.exe"
+	executable := executableName
+	if runtime.GOOS == windowsOS {
+		executable = executableNameWin
 	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
 
