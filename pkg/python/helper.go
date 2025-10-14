@@ -79,6 +79,16 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	if ctx.Value(pipeline.RunConfigStartDate) != nil {
 		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 		if okParse {
+			fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+
+			// If full-refresh and asset has a start_date, use that instead
+			if fullRefresh && asset.StartDate != "" {
+				parsedStartDate, err := time.Parse("2006-01-02", asset.StartDate)
+				if err == nil {
+					startTimeInstance = time.Date(parsedStartDate.Year(), parsedStartDate.Month(), parsedStartDate.Day(), 0, 0, 0, 0, time.UTC)
+				}
+			}
+
 			applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 			startTime := startTimeInstance
 			if ok && applyModifiers {
