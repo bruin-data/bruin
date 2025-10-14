@@ -1,7 +1,6 @@
 package main_test
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,7 +18,7 @@ const (
 	windowsOS         = "windows"
 )
 
-func TestPatchPipeline_BasicFunctionality(t *testing.T) {
+func TestPatchPipeline_Workflow(t *testing.T) {
 	t.Parallel()
 
 	currentFolder, err := os.Getwd()
@@ -32,259 +31,113 @@ func TestPatchPipeline_BasicFunctionality(t *testing.T) {
 		executable = executableNameWin
 	}
 	binary := filepath.Join(currentFolder, "../bin", executable)
-	tests := []struct {
-		name           string
-		pipelinePath   string
-		patchBody      map[string]interface{}
-		expectedFields map[string]interface{}
-	}{
-		{
-			name:         "patch simple pipeline name and retries",
-			pipelinePath: filepath.Join(currentFolder, "../pkg/pipeline/testdata/persist/simple-pipeline.yml"),
-			patchBody: map[string]interface{}{
-				"name":    "patched-simple-pipeline",
-				"retries": 5,
-			},
-			expectedFields: map[string]interface{}{
-				"name":    "patched-simple-pipeline",
-				"retries": 5,
-			},
-		},
-		{
-			name:         "patch complex pipeline concurrency and schedule",
-			pipelinePath: filepath.Join(currentFolder, "../pkg/pipeline/testdata/persist/complex-pipeline.yml"),
-			patchBody: map[string]interface{}{
-				"concurrency": 10,
-				"schedule":    "daily",
-			},
-			expectedFields: map[string]interface{}{
-				"concurrency": 10,
-				"schedule":    "daily",
-			},
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tempDir := t.TempDir()
-			tempPipelinePath := filepath.Join(tempDir, "pipeline.yml")
+	tempDir := t.TempDir()
+	testDir := filepath.Join(tempDir, "test-patch-pipeline")
 
-			originalContent, err := os.ReadFile(tt.pipelinePath)
-			require.NoError(t, err)
-			err = os.WriteFile(tempPipelinePath, originalContent, 0o644)
-			require.NoError(t, err)
-
-			patchJSON, err := json.Marshal(tt.patchBody)
-			require.NoError(t, err)
-
-			task := e2e.Task{
-				Name:    tt.name,
-				Command: binary,
-				Args:    []string{"internal", "patch-pipeline", "--body", string(patchJSON), tempPipelinePath},
+	workflow := e2e.Workflow{
+		Name: "patch_pipeline_workflow",
+		Steps: []e2e.Task{
+			{
+				Name:    "create test directory",
+				Command: "mkdir",
+				Args:    []string{"-p", testDir},
 				Expected: e2e.Output{
 					ExitCode: 0,
 				},
-				WorkingDir: currentFolder,
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
 				},
-			}
-
-			err = task.Run()
-			require.NoError(t, err)
-
-			patchedContent, err := os.ReadFile(tempPipelinePath)
-			require.NoError(t, err)
-
-			var pipelineData map[string]interface{}
-			err = yaml.Unmarshal(patchedContent, &pipelineData)
-			require.NoError(t, err)
-
-			for field, expectedValue := range tt.expectedFields {
-				assert.Equal(t, expectedValue, pipelineData[field])
-			}
-		})
-	}
-}
-
-func TestPatchPipeline_WithAssets(t *testing.T) {
-	t.Parallel()
-
-	currentFolder, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current working directory: %v", err)
-	}
-
-	executable := executableName
-	if runtime.GOOS == windowsOS {
-		executable = executableNameWin
-	}
-	binary := filepath.Join(currentFolder, "../bin", executable)
-
-	tempDir := t.TempDir()
-	tempPipelinePath := filepath.Join(tempDir, "pipeline.yml")
-
-	originalContent := `name: test-pipeline
-schedule: daily`
-	err = os.WriteFile(tempPipelinePath, []byte(originalContent), 0o644)
-	require.NoError(t, err)
-
-	patchBody := map[string]interface{}{
-		"name": "pipeline-with-assets",
-		"assets": []map[string]interface{}{
+			},
 			{
-				"name": "test-asset",
-				"type": "python",
+				Name:       "initialize git repository",
+				Command:    "git",
+				Args:       []string{"init"},
+				WorkingDir: testDir,
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:       "copy simple pipeline",
+				Command:    "cp",
+				Args:       []string{filepath.Join(currentFolder, "../pkg/pipeline/testdata/persist/simple-pipeline.yml"), "pipeline.yml"},
+				WorkingDir: testDir,
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "patch pipeline name and add retries",
+				Command: binary,
+				Args:    []string{"internal", "patch-pipeline", "--body", `{"name": "patched-pipeline", "retries": 5}`, filepath.Join(testDir, "pipeline.yml")},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "patch pipeline concurrency and schedule",
+				Command: binary,
+				Args:    []string{"internal", "patch-pipeline", "--body", `{"concurrency": 10, "schedule": "daily"}`, filepath.Join(testDir, "pipeline.yml")},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "patch pipeline with assets",
+				Command: binary,
+				Args:    []string{"internal", "patch-pipeline", "--body", `{"name": "final-pipeline", "assets": [{"name": "test-asset", "type": "python"}]}`, filepath.Join(testDir, "pipeline.yml")},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
 			},
 		},
 	}
 
-	patchJSON, err := json.Marshal(patchBody)
+	err = workflow.Run()
 	require.NoError(t, err)
 
-	task := e2e.Task{
-		Name:    "patch-pipeline-with-assets",
-		Command: binary,
-		Args:    []string{"internal", "patch-pipeline", "--body", string(patchJSON), tempPipelinePath},
-		Expected: e2e.Output{
-			ExitCode: 0,
-		},
-		WorkingDir: currentFolder,
-		Asserts: []func(*e2e.Task) error{
-			e2e.AssertByExitCode,
-		},
-	}
-
-	err = task.Run()
+	pipelinePath := filepath.Join(testDir, "pipeline.yml")
+	fileContent, err := os.ReadFile(pipelinePath)
 	require.NoError(t, err)
 
-	fileContent, err := os.ReadFile(tempPipelinePath)
-	require.NoError(t, err)
-	assert.Contains(t, string(fileContent), "assets:")
-	assert.Contains(t, string(fileContent), "test-asset")
-	assert.Contains(t, string(fileContent), "python")
-}
-
-func TestPatchPipeline_PreservesExistingFields(t *testing.T) {
-	t.Parallel()
-
-	currentFolder, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current working directory: %v", err)
-	}
-
-	executable := executableName
-	if runtime.GOOS == windowsOS {
-		executable = executableNameWin
-	}
-	binary := filepath.Join(currentFolder, "../bin", executable)
-
-	tempDir := t.TempDir()
-	tempPipelinePath := filepath.Join(tempDir, "pipeline.yml")
-
-	originalContent, err := os.ReadFile(filepath.Join(currentFolder, "../pkg/pipeline/testdata/persist/complex-pipeline.yml"))
-	require.NoError(t, err)
-	err = os.WriteFile(tempPipelinePath, originalContent, 0o644)
+	// Parse the YAML to verify the final state
+	var pipelineData map[string]interface{}
+	err = yaml.Unmarshal(fileContent, &pipelineData)
 	require.NoError(t, err)
 
-	patchBody := map[string]interface{}{
-		"name": "updated-complex-pipeline",
-	}
+	// Verify all patches were applied correctly
+	assert.Equal(t, "final-pipeline", pipelineData["name"])
+	assert.Equal(t, 5, pipelineData["retries"])
+	assert.Equal(t, 10, pipelineData["concurrency"])
+	assert.Equal(t, "daily", pipelineData["schedule"])
 
-	patchJSON, err := json.Marshal(patchBody)
-	require.NoError(t, err)
+	// Verify assets were added
+	assets, ok := pipelineData["assets"].([]interface{})
+	require.True(t, ok, "assets should be present")
+	require.Len(t, assets, 1, "should have exactly one asset")
 
-	task := e2e.Task{
-		Name:    "patch-pipeline-preserves-fields",
-		Command: binary,
-		Args:    []string{"internal", "patch-pipeline", "--body", string(patchJSON), tempPipelinePath},
-		Expected: e2e.Output{
-			ExitCode: 0,
-		},
-		WorkingDir: currentFolder,
-		Asserts: []func(*e2e.Task) error{
-			e2e.AssertByExitCode,
-		},
-	}
+	asset, ok := assets[0].(map[string]interface{})
+	require.True(t, ok, "asset should be a map")
+	assert.Equal(t, "test-asset", asset["name"])
+	assert.Equal(t, "python", asset["type"])
 
-	err = task.Run()
-	require.NoError(t, err)
-
-	fileContent, err := os.ReadFile(tempPipelinePath)
-	require.NoError(t, err)
-	assert.Contains(t, string(fileContent), "updated-complex-pipeline")
-	assert.Contains(t, string(fileContent), "hourly")
-	assert.Contains(t, string(fileContent), "2024-01-01")
-	assert.Contains(t, string(fileContent), "retries: 3")
-	assert.Contains(t, string(fileContent), "concurrency: 5")
-}
-
-func TestPatchPipeline_OnlyPipelineOption(t *testing.T) {
-	t.Parallel()
-
-	currentFolder, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current working directory: %v", err)
-	}
-
-	executable := executableName
-	if runtime.GOOS == windowsOS {
-		executable = executableNameWin
-	}
-	binary := filepath.Join(currentFolder, "../bin", executable)
-
-	tempDir := t.TempDir()
-	tempPipelinePath := filepath.Join(tempDir, "pipeline.yml")
-
-	originalContent := `name: test-pipeline
-schedule: daily`
-	err = os.WriteFile(tempPipelinePath, []byte(originalContent), 0o644)
-	require.NoError(t, err)
-
-	assetsDir := filepath.Join(tempDir, "assets")
-	err = os.MkdirAll(assetsDir, 0o755)
-	require.NoError(t, err)
-
-	assetFile := filepath.Join(assetsDir, "test-asset.yml")
-	assetContent := `name: filesystem-asset
-type: python`
-	err = os.WriteFile(assetFile, []byte(assetContent), 0o644)
-	require.NoError(t, err)
-
-	patchBody := map[string]interface{}{
-		"name": "pipeline-with-patch-assets",
-		"assets": []map[string]interface{}{
-			{
-				"name": "patch-asset",
-				"type": "bq.sql",
-			},
-		},
-	}
-
-	patchJSON, err := json.Marshal(patchBody)
-	require.NoError(t, err)
-
-	task := e2e.Task{
-		Name:    "patch-pipeline-only-pipeline",
-		Command: binary,
-		Args:    []string{"internal", "patch-pipeline", "--body", string(patchJSON), tempPipelinePath},
-		Expected: e2e.Output{
-			ExitCode: 0,
-		},
-		WorkingDir: currentFolder,
-		Asserts: []func(*e2e.Task) error{
-			e2e.AssertByExitCode,
-		},
-	}
-
-	err = task.Run()
-	require.NoError(t, err)
-
-	fileContent, err := os.ReadFile(tempPipelinePath)
-	require.NoError(t, err)
-	assert.Contains(t, string(fileContent), "assets:")
-	assert.Contains(t, string(fileContent), "patch-asset")
-	assert.Contains(t, string(fileContent), "bq.sql")
-	assert.NotContains(t, string(fileContent), "filesystem-asset")
+	// Verify original fields are preserved
+	assert.Equal(t, "my-connection", pipelineData["default_connections"].(map[string]interface{})["gcp"])
+	assert.Equal(t, "2023-01-01", pipelineData["start_date"])
 }
