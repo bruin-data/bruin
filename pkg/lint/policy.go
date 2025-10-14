@@ -30,10 +30,10 @@ var (
 
 var validRulePattern = regexp.MustCompile(`^[A-Za-z0-9\-]+$`)
 
-// patternCache stores compiled regexp patterns to avoid recompilation
+// patternCache stores compiled regexp patterns to avoid recompilation.
 var patternCache sync.Map
 
-// getCompiledPattern returns a compiled regexp pattern from cache or compiles and caches it
+// getCompiledPattern returns a compiled regexp pattern from cache or compiles and caches it.
 func getCompiledPattern(pattern string) (*regexp.Regexp, error) {
 	if cached, ok := patternCache.Load(pattern); ok {
 		return cached.(*regexp.Regexp), nil
