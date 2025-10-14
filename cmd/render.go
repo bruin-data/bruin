@@ -122,20 +122,6 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Determine start date based on full-refresh flag and pipeline configuration
-			startDate, err := DetermineStartDate(c.String("start-date"), pl, fullRefresh, logger)
-			if err != nil {
-				if c.String("output") == "json" {
-					printErrorJSON(errors.New("Please give a valid start date: bruin render --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
-				} else {
-					errorPrinter.Printf("Please give a valid start date: bruin render --start-date <start date>)\n")
-					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
-					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
-					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
-				}
-				return cli.Exit("", 1)
-			}
-
 			endDate, err := date.ParseTime(c.String("end-date"))
 			if err != nil {
 				if c.String("output") == "json" {
@@ -164,6 +150,35 @@ func Render() *cli.Command {
 			if asset == nil {
 				printError(errors.New("no asset found"), c.String("output"), "Failed to read the asset definition file:")
 				return cli.Exit("", 1)
+			}
+
+			// Determine start date: prioritize asset's start_date if full_refresh is enabled
+			var startDate time.Time
+			if fullRefresh && asset.StartDate != "" {
+				startDate, err = date.ParseTime(asset.StartDate)
+				if err != nil {
+					if c.String("output") == "json" {
+						printErrorJSON(errors.New("Invalid asset start_date: " + asset.StartDate + ". A valid start date must be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
+					} else {
+						errorPrinter.Printf("Invalid asset start_date: %s\n", asset.StartDate)
+						errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats.\n")
+					}
+					return cli.Exit("", 1)
+				}
+				logger.Debug("Using asset start_date: ", asset.StartDate)
+			} else {
+				startDate, err = DetermineStartDate(c.String("start-date"), pl, fullRefresh, logger)
+				if err != nil {
+					if c.String("output") == "json" {
+						printErrorJSON(errors.New("Please give a valid start date: bruin render --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
+					} else {
+						errorPrinter.Printf("Please give a valid start date: bruin render --start-date <start date>)\n")
+						errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
+						errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+						errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+					}
+					return cli.Exit("", 1)
+				}
 			}
 
 			resultsLocation := "s3://{destination-bucket}"
