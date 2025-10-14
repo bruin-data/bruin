@@ -1998,6 +1998,95 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "patch_pipeline_workflow",
+			workflow: e2e.Workflow{
+				Name: "patch_pipeline_workflow",
+				Steps: []e2e.Task{
+					{
+						Name:    "patch: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempdir, "test-patch-pipeline")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "patch: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempdir, "test-patch-pipeline"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "patch: copy simple pipeline",
+						Command:    "cp",
+						Args:       []string{filepath.Join(currentFolder, "../pkg/pipeline/testdata/persist/simple-pipeline.yml"), "pipeline.yml"},
+						WorkingDir: filepath.Join(tempdir, "test-patch-pipeline"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "patch: patch pipeline name and add retries",
+						Command: binary,
+						Args:    []string{"internal", "patch-pipeline", "--body", `{"name": "patched-pipeline", "retries": 5}`, filepath.Join(tempdir, "test-patch-pipeline/pipeline.yml")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "patch: patch pipeline concurrency and schedule",
+						Command: binary,
+						Args:    []string{"internal", "patch-pipeline", "--body", `{"concurrency": 10, "schedule": "daily"}`, filepath.Join(tempdir, "test-patch-pipeline/pipeline.yml")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "patch: patch pipeline with assets",
+						Command: binary,
+						Args:    []string{"internal", "patch-pipeline", "--body", `{"name": "final-pipeline", "assets": [{"name": "test-asset", "type": "python"}]}`, filepath.Join(tempdir, "test-patch-pipeline/pipeline.yml")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "patch: verify final pipeline with parse-pipeline",
+						Command: binary,
+						Args:    []string{"internal", "parse-pipeline", filepath.Join(tempdir, "test-patch-pipeline")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"final-pipeline", "daily", "2023-01-01", "my-connection", "retries\":5", "concurrency\":10"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
