@@ -1348,6 +1348,10 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 	pl.Assets = make([]*Asset, 0)
 	pl.DefinitionFile.Name = filepath.Base(filePath)
 	pl.DefinitionFile.Path = filePath
+
+	pipelineDir := filepath.Dir(filePath)
+	pl.MacrosPath = filepath.Join(pipelineDir, "macros")
+
 	return &pl, nil
 }
 
@@ -1383,6 +1387,7 @@ type Pipeline struct {
 	Variables          Variables              `json:"variables" yaml:"variables,omitempty" mapstructure:"variables"`
 	TasksByType        map[AssetType][]*Asset `json:"-" yaml:"-"`
 	tasksByName        map[string]*Asset      `yaml:"-"`
+	MacrosPath         string                 `json:"-" yaml:"-"`
 }
 
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {

@@ -204,7 +204,14 @@ func Render() *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 
-			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value())
+			// Load macros from the pipeline's macros directory
+			macroContent, err := jinja.LoadMacros(fs, pl.MacrosPath)
+			if err != nil {
+				printError(err, c.String("output"), "Failed to load macros:")
+				return cli.Exit("", 1)
+			}
+
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value(), macroContent)
 			forAsset, err := renderer.CloneForAsset(runCtx, pl, asset)
 			if err != nil {
 				return err
