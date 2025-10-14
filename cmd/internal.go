@@ -1229,7 +1229,14 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pp.Pipeline.Name, "asset-metadata-run", pp.Pipeline.Variables.Value())
+			// Load macros from the pipeline's macros directory
+			macroContent, err := jinja.LoadMacros(afero.NewOsFs(), pp.Pipeline.MacrosPath)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pp.Pipeline.Name, "asset-metadata-run", pp.Pipeline.Variables.Value(), macroContent)
 			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: renderer}
 			extractor, err := whole.CloneForAsset(ctx, pp.Pipeline, pp.Asset)
 			if err != nil {

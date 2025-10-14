@@ -743,7 +743,14 @@ func Run(isDebug *bool) *cli.Command {
 				endDate = parsedEndDate
 			}
 
-			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, preview.Pipeline.Name, runID, nil)
+			// Load macros from the pipeline's macros directory
+			macroContent, err := jinja.LoadMacros(fs, preview.Pipeline.MacrosPath)
+			if err != nil {
+				logger.Error("Failed to load macros", "error", err)
+				return cli.Exit("", 1)
+			}
+
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, preview.Pipeline.Name, runID, nil, macroContent)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
@@ -764,7 +771,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Update renderer with the finalized start/end dates
-			renderer = jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, runID, nil)
+			renderer = jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pipelineInfo.Pipeline.Name, runID, nil, macroContent)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			// Update context with the finalized dates
