@@ -302,12 +302,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 text: "Commands",
                 collapsed: false,
                 items: [
+                    {text: "Init", link: "/commands/init"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections.md"},
                     {text: "Data Diff", link: "/commands/data-diff"},
                     {text: "Environments", link: "/commands/environments"},
                     {text: "Format", link: "/commands/format"},
-                    {text: "Init", link: "/commands/init"},
                     {text: "Import", link: "/commands/import"},
                     {text: "Lineage", link: "/commands/lineage"},
                     {text: "Patch", link: "/commands/patch"},
