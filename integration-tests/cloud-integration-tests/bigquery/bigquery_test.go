@@ -163,7 +163,6 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Name:    "move the ingest_data.sql to the assets folder",
 							Command: "cp",
 							Args:    []string{filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/resources/ingest_data.sql"), filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/assets/ddl_table.sql")},
-							//		[]string{filepath.Join(tempDir, "test-pipelines/nullable-pipeline/resources/nulltable_merge.sql"), filepath.Join(tempDir, "test-pipelines/nullable-pipeline/assets/nulltable.sql")},
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
