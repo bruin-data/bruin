@@ -1,4 +1,4 @@
 name: asset-level-start-date-test
 start_date: "2023-01-01"
 default_connections:
-    duckdb: "duckdb-start-date-flags"
+    duckdb: "duckdb-variables"

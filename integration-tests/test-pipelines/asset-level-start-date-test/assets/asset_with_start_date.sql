@@ -2,6 +2,7 @@
 
 name: asset_with_start_date
 type: duckdb.sql
+connection: duckdb-variables
 start_date: "2024-06-01"
 materialization:
   type: table

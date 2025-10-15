@@ -2,6 +2,7 @@
 
 name: asset_no_start_date
 type: duckdb.sql
+connection: duckdb-variables
 materialization:
   type: table
 
