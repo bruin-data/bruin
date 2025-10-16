@@ -678,6 +678,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.DuckDB = append(env.Connections.DuckDB, conn)
+	case "motherduck":
+		var conn MotherduckConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.MotherDuck = append(env.Connections.MotherDuck, conn)
 	case "asana":
 		var conn AsanaConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -981,6 +988,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.FundraiseUp = append(env.Connections.FundraiseUp, conn)
+	case "plusvibeai":
+		var conn PlusVibeAIConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.PlusVibeAI = append(env.Connections.PlusVibeAI, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1078,6 +1092,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
 	case "duckdb":
 		env.Connections.DuckDB = removeConnection(env.Connections.DuckDB, connectionName)
+	case "motherduck":
+		env.Connections.MotherDuck = removeConnection(env.Connections.MotherDuck, connectionName)
 	case "asana":
 		env.Connections.Asana = removeConnection(env.Connections.Asana, connectionName)
 	case "dynamodb":
@@ -1162,6 +1178,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Fluxx = removeConnection(env.Connections.Fluxx, connectionName)
 	case "fundraiseup":
 		env.Connections.FundraiseUp = removeConnection(env.Connections.FundraiseUp, connectionName)
+	case "plusvibeai":
+		env.Connections.PlusVibeAI = removeConnection(env.Connections.PlusVibeAI, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
