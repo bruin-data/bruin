@@ -51,6 +51,7 @@ const (
 	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
 	AssetTypeDuckDBSeed             = AssetType("duckdb.seed")
 	AssetTypeDuckDBQuerySensor      = AssetType("duckdb.sensor.query")
+	AssetTypeMotherduckQuery        = AssetType("motherduck.sql")
 	AssetTypeEmpty                  = AssetType("empty")
 	AssetTypePostgresQuery          = AssetType("pg.sql")
 	AssetTypePostgresSeed           = AssetType("pg.seed")
@@ -615,6 +616,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDuckDBSeed:            "duckdb",
 	AssetTypeDuckDBQuerySensor:     "duckdb",
 	AssetTypeDuckDBSource:          "duckdb",
+	AssetTypeMotherduckQuery:       "motherduck",
 	AssetTypeClickHouse:            "clickhouse",
 	AssetTypeClickHouseSeed:        "clickhouse",
 	AssetTypeClickHouseQuerySensor: "clickhouse",
@@ -641,6 +643,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"duckdb":     AssetTypeDuckDBQuery,
 	"clickhouse": AssetTypeClickHouse,
 	"oracle":     AssetTypeOracleQuery,
+	"motherduck": AssetTypeMotherduckQuery,
 }
 
 type SecretMapping struct {
