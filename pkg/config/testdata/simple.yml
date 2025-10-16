@@ -83,6 +83,10 @@ environments:
         - name: conn9
           api_key: "XXXXYYYYZZZZ"
 
+      allium:
+        - name: allium-1
+          api_key: "allium-api-key"
+
       hana:
         - name: conn10
           username: "hanauser"
@@ -416,4 +420,3 @@ environments:
         - name: conn1
           service_account_file: "/path/to/service_account.json"
           project_id: "my-project"
-

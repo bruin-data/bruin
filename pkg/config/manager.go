@@ -36,6 +36,7 @@ type Connections struct {
 	MongoAtlas          []MongoAtlasConnection          `yaml:"mongo_atlas,omitempty" json:"mongo_atlas,omitempty" mapstructure:"mongo_atlas"`
 	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql,omitempty" mapstructure:"mysql"`
 	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion,omitempty" mapstructure:"notion"`
+	Allium              []AlliumConnection              `yaml:"allium,omitempty" json:"allium,omitempty" mapstructure:"allium"`
 	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana,omitempty" mapstructure:"hana"`
 	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify,omitempty" mapstructure:"shopify"`
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`

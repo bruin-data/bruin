@@ -389,6 +389,12 @@
           },
           "type": "array"
         },
+        "allium": {
+          "items": {
+            "$ref": "#/$defs/AlliumConnection"
+          },
+          "type": "array"
+        },
         "hana": {
           "items": {
             "$ref": "#/$defs/HANAConnection"
@@ -1691,6 +1697,22 @@
       ]
     },
     "NotionConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "AlliumConnection": {
       "properties": {
         "name": {
           "type": "string"

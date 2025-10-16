@@ -206,6 +206,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
                             {text: "Anthropic", link: "/ingestion/anthropic.md"},
+                            {text: "Allium", link: "/ingestion/allium.md"},
                             {text: "AppStore", link: "/ingestion/appstore.md"},
                             {text: "AppLovin", link: "/ingestion/applovin.md"},
                             {text: "AppLovin Max", link: "/ingestion/applovin_max.md"},
