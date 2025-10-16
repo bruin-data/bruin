@@ -161,6 +161,7 @@ var defaultMapping = map[string]string{
 	"solidgate":             "solidgate-default",
 	"smartsheet":            "smartsheet-default",
 	"sftp":                  "sftp-default",
+	"motherduck":            "motherduck-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
