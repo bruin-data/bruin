@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/xeipuuv/gojsonschema"
@@ -61,5 +62,22 @@ func (v Variables) Merge(other map[string]any) error {
 		}
 		v[key]["default"] = value
 	}
+	return nil
+}
+
+// This ensures that when an empty object {} is provided, it clears the variables
+func (v *Variables) UnmarshalJSON(data []byte) error {
+	*v = make(Variables)
+	
+	if len(data) == 0 || string(data) == "{}" {
+		return nil
+	}
+	
+	var temp map[string]map[string]any
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	
+	*v = Variables(temp)
 	return nil
 }
