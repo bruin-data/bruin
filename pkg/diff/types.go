@@ -352,6 +352,41 @@ func NewSnowflakeTypeMapper() *DatabaseTypeMapper {
 	return mapper
 }
 
+// NewAthenaTypeMapper provides Athena-specific type mapping.
+func NewAthenaTypeMapper() *DatabaseTypeMapper {
+	mapper := NewDatabaseTypeMapper()
+
+	// Numeric types supported by Athena (Presto/Trino compatible)
+	mapper.AddNumericTypes(
+		"tinyint", "smallint", "integer", "int", "bigint",
+		"decimal", "numeric",
+		"double", "double precision",
+		"float", "real",
+	)
+
+	// String and binary-like types
+	mapper.AddStringTypes(
+		"varchar", "char", "character", "string",
+	)
+
+	// Boolean support
+	mapper.AddBooleanTypes(
+		"boolean", "bool",
+	)
+
+	// Temporal types
+	mapper.AddDateTimeTypes(
+		"date", "time", "time with time zone",
+		"timestamp", "timestamp with time zone",
+	)
+
+	// Binary/JSON types
+	mapper.AddBinaryTypes("varbinary")
+	mapper.AddJSONTypes("json")
+
+	return mapper
+}
+
 type Table struct {
 	Name    string
 	Columns []*Column

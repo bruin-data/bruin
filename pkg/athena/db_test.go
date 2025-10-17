@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -262,6 +263,137 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestDB_GetTableSummary_WithStatistics(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+	rowCountQuery := `SELECT COUNT(*) AS row_count FROM "default"."orders"`
+	mock.ExpectQuery(rowCountQuery).
+		WillReturnRows(sqlmock.NewRows([]string{"row_count"}).AddRow(int64(42)))
+
+	schemaQuery := `SELECT 
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'default' AND table_name = 'orders'
+ORDER BY ordinal_position;`
+
+	mock.ExpectQuery(schemaQuery).WillReturnRows(
+		sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable"}).
+			AddRow("id", "integer", "YES"),
+	)
+
+	numericStatsQuery := `SELECT
+    COUNT(*) AS count,
+    COUNT(*) - COUNT("id") AS null_count,
+    MIN("id") AS min_val,
+    MAX("id") AS max_val,
+    AVG(CAST("id" AS DOUBLE)) AS avg_val,
+    SUM(CAST("id" AS DOUBLE)) AS sum_val,
+    STDDEV_POP(CAST("id" AS DOUBLE)) AS stddev_val
+FROM "default"."orders"`
+
+	mock.ExpectQuery(numericStatsQuery).WillReturnRows(
+		sqlmock.NewRows([]string{
+			"count",
+			"null_count",
+			"min_val",
+			"max_val",
+			"avg_val",
+			"sum_val",
+			"stddev_val",
+		}).AddRow(
+			int64(100),
+			int64(0),
+			int64(1),
+			int64(100),
+			float64(50.5),
+			float64(5050.0),
+			float64(10.0),
+		),
+	)
+
+	db := NewDB(&Config{Database: "default"})
+	db.conn = sqlxDB
+
+	summary, err := db.GetTableSummary(context.Background(), "orders", false)
+	require.NoError(t, err)
+
+	require.Equal(t, int64(42), summary.RowCount)
+	require.NotNil(t, summary.Table)
+	require.Equal(t, "orders", summary.Table.Name)
+	require.Len(t, summary.Table.Columns, 1)
+
+	column := summary.Table.Columns[0]
+	require.Equal(t, "id", column.Name)
+	require.Equal(t, diff.CommonTypeNumeric, column.NormalizedType)
+	require.True(t, column.Nullable)
+	require.NotNil(t, column.Stats)
+
+	numericStats, ok := column.Stats.(*diff.NumericalStatistics)
+	require.True(t, ok)
+	require.Equal(t, int64(100), numericStats.Count)
+	require.Equal(t, int64(0), numericStats.NullCount)
+	require.NotNil(t, numericStats.Min)
+	require.Equal(t, 1.0, *numericStats.Min)
+	require.NotNil(t, numericStats.Max)
+	require.Equal(t, 100.0, *numericStats.Max)
+	require.NotNil(t, numericStats.Avg)
+	require.Equal(t, 50.5, *numericStats.Avg)
+	require.NotNil(t, numericStats.Sum)
+	require.Equal(t, 5050.0, *numericStats.Sum)
+	require.NotNil(t, numericStats.StdDev)
+	require.Equal(t, 10.0, *numericStats.StdDev)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDB_GetTableSummary_SchemaOnly(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+	schemaQuery := `SELECT 
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'default' AND table_name = 'orders'
+ORDER BY ordinal_position;`
+
+	mock.ExpectQuery(schemaQuery).WillReturnRows(
+		sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable"}).
+			AddRow("customer_name", "varchar", "NO"),
+	)
+
+	db := NewDB(&Config{Database: "default"})
+	db.conn = sqlxDB
+
+	summary, err := db.GetTableSummary(context.Background(), "orders", true)
+	require.NoError(t, err)
+
+	require.Equal(t, int64(0), summary.RowCount)
+	require.Len(t, summary.Table.Columns, 1)
+
+	column := summary.Table.Columns[0]
+	require.Equal(t, "customer_name", column.Name)
+	require.Equal(t, diff.CommonTypeString, column.NormalizedType)
+	require.False(t, column.Nullable)
+	require.Nil(t, column.Stats)
+
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDB_BuildTableExistsQuery(t *testing.T) {
