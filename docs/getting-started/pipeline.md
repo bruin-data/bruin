@@ -222,7 +222,7 @@ notifications:
 
 - **Type:** `Object`
 
-> This is a cloud related feature. See [Notifications]() page for more details.
+> This is a cloud related feature. See [Notifications](/cloud/notifications) page for more details.
 
 ### Catchup
 
@@ -351,5 +351,3 @@ Variable schema fields (subset):
 |---------|--------|----------|-------------------------------------------------------------------------|
 | type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array       |
 | default | any    | yes      | REQUIRED. Must be present; used as the variable value unless overridden |
-
->
