@@ -497,6 +497,48 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-asset-level-start-date-no-start-date",
+			task: e2e.Task{
+				Name:    "render-asset-level-start-date-no-start-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--full-refresh",
+					"--end-date", "2024-12-31",
+					filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_no_start_date.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"'2023-01-01' as captured_start_date", "'2024-12-31' as captured_end_date"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-asset-level-start-date-with-start-date",
+			task: e2e.Task{
+				Name:    "render-asset-level-start-date-with-start-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--full-refresh",
+					"--end-date", "2024-12-31",
+					filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_with_start_date.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"'2024-06-01' as captured_start_date", "'2024-12-31' as captured_end_date"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "python-happy-path-run",
 			task: e2e.Task{
 				Name:    "python-happy-path-run",
