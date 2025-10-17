@@ -1,0 +1,1 @@
+{"columns":[{"name":"captured_start_date","type":"VARCHAR"},{"name":"captured_end_date","type":"VARCHAR"},{"name":"asset_type","type":"VARCHAR"}],"rows":[["2023-01-01","2024-12-31","no_asset_start_date"]]}

@@ -2087,6 +2087,72 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "asset_level_start_date_workflow",
+			workflow: e2e.Workflow{
+				Name: "asset_level_start_date_workflow",
+				Steps: []e2e.Task{
+					{
+						Name:    "asset-level-start-date: run with full-refresh",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: asset_no_start_date", "Finished: asset_with_start_date"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:          "asset-level-start-date: validate asset without start_date uses pipeline start_date",
+						Command:       binary,
+						Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_no_start_date.sql"), "--output", "json"},
+						Env:           []string{},
+						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/expectations/asset_no_start_date_full_refresh.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+					{
+						Name:          "asset-level-start-date: validate asset with start_date uses its own start_date",
+						Command:       binary,
+						Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_with_start_date.sql"), "--output", "json"},
+						Env:           []string{},
+						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/expectations/asset_with_start_date_full_refresh.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+					{
+						Name:    "asset-level-start-date: run asset with invalid start_date should fail",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_invalid_start_date.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"failed to parse asset start_date", "invalid-date-format"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
