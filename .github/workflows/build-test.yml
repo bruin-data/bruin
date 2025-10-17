@@ -33,6 +33,7 @@ concurrency:
 
 
 env:
+  IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
@@ -109,8 +110,8 @@ jobs:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache:latest
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache:latest,mode=max
+          cache-from: ${{ env.IS_FORK && 'type=gha' || 'type=gha\ntype=registry,ref=ghcr.io/bruin-data/bruin/cache' }}
+          cache-to:   ${{ env.IS_FORK && 'type=gha,mode=max' || 'type=gha,mode=max\ntype=registry,ref=ghcr.io/bruin-data/bruin/cache,mode=max' }}
           build-args: |
             VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
             BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
