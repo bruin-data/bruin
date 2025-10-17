@@ -222,7 +222,7 @@ notifications:
 
 - **Type:** `Object`
 
-> This is a cloud related feature. See [Notifications]() page for more details.
+> This is a cloud related feature. See [Notifications](/cloud/notifications) page for more details.
 
 ### Catchup
 
