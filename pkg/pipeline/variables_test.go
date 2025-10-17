@@ -168,7 +168,7 @@ func TestVariables_UnmarshalJSON(t *testing.T) {
 		assert.Contains(t, vars, "var2")
 		assert.Contains(t, vars, "var3")
 		assert.Equal(t, "value1", vars["var1"]["default"])
-		assert.Equal(t, float64(42), vars["var2"]["default"]) // JSON numbers are float64
+		assert.InEpsilon(t, float64(42), vars["var2"]["default"], 0.0001) // JSON numbers are float64
 		assert.Equal(t, true, vars["var3"]["default"])
 	})
 
