@@ -295,6 +295,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 ]
             },
             {
+                text: "Deployment",
+                collapsed: false,
+                items: [
+                    {text: "Ubuntu VM with Cron", link: "/deployment/vm-deployment"},
+                    {text: "GitHub Actions", link: "/deployment/github-actions"}
+                ],
+            },
+            {
                 text: "CI/CD Integration",
                 collapsed: false,
                 items: [{text: "Github Actions", link: "/cicd/github-action"}],
