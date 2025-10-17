@@ -75,6 +75,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         text: "Features",
                         link: "/getting-started/features",
                         items: [
+                            {text: "Pipeline", link: "/getting-started/pipeline"},
                             {text: "Glossary", link: "/getting-started/glossary"},
                             {text: "Policies", link: "/getting-started/policies"},
                             {text: "Environments", link: "/getting-started/devenv"},
