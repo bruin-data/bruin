@@ -3,6 +3,7 @@ package bigquery
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -501,13 +502,54 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 		return true
 	}
 
+	// Compile the regex for parsing partition expressions
+	partitionRegex := regexp.MustCompile(`^\s*(?:(?:date(?:time)?_trunc|timestamp_trunc|date_trunc)\(\s*([A-Za-z_][\w.]*)\s*,\s*(day|hour|month|year)\s*\)|date\(\s*([A-Za-z_][\w.]*)\s*\)|([A-Za-z_][\w.]*)\s*)$`)
+
+	// Parse the asset's partition expression
+	assetPartitionBy := strings.ToLower(strings.TrimSpace(asset.Materialization.PartitionBy))
+	assetMatches := partitionRegex.FindStringSubmatch(assetPartitionBy)
+
+	var assetColumn string
+	var assetPartitionType string
+
+	if len(assetMatches) > 0 {
+		// Extract column and partition type from regex matches
+		if assetMatches[1] != "" && assetMatches[2] != "" {
+			// date_trunc/timestamp_trunc case
+			assetColumn = strings.ToLower(assetMatches[1])
+			assetPartitionType = strings.ToLower(assetMatches[2])
+		} else if assetMatches[3] != "" {
+			// date() case
+			assetColumn = strings.ToLower(assetMatches[3])
+			assetPartitionType = "day" // date() defaults to day partitioning
+		} else if assetMatches[4] != "" {
+			// simple column case
+			assetColumn = strings.ToLower(assetMatches[4])
+			assetPartitionType = "day" // default to day partitioning
+		}
+	}
+
 	if meta.TimePartitioning != nil {
-		if meta.TimePartitioning.Field != asset.Materialization.PartitionBy {
+		metaField := strings.ToLower(meta.TimePartitioning.Field)
+		metaType := strings.ToLower(string(meta.TimePartitioning.Type))
+
+		// Compare column names (case-insensitive)
+		if metaField != assetColumn {
+			return false
+		}
+
+		// Only compare partition types if we have a complex expression and both types are specified
+		// For simple column names, we don't enforce type matching
+		if assetPartitionType != "" && metaType != "" && metaType != assetPartitionType {
 			return false
 		}
 	}
+
 	if meta.RangePartitioning != nil {
-		if meta.RangePartitioning.Field != asset.Materialization.PartitionBy {
+		metaField := strings.ToLower(meta.RangePartitioning.Field)
+
+		// For range partitioning, only compare the column name
+		if metaField != assetColumn {
 			return false
 		}
 	}
