@@ -632,6 +632,310 @@ END; \$TEST\$;`
 	}
 }
 
+func TestClient_GetDatabases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		setupMock func(mock pgxmock.PgxPoolIface)
+		want      []string
+		wantErr   string
+	}{
+		{
+			name: "successfully returns database names",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "datname"},
+				).AddRow("db_a").AddRow("db_b")
+				mock.ExpectQuery("SELECT datname").
+					WillReturnRows(rows)
+			},
+			want: []string{"db_a", "db_b"},
+		},
+		{
+			name: "returns empty slice when rows cannot be cast to string",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "datname"},
+				).AddRow(int32(1))
+				mock.ExpectQuery("SELECT datname").
+					WillReturnRows(rows)
+			},
+			want: nil,
+		},
+		{
+			name: "propagates query error",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectQuery("SELECT datname").
+					WillReturnError(errors.New("boom"))
+			},
+			wantErr: "failed to query PostgreSQL databases: boom",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, err := pgxmock.NewPool()
+			require.NoError(t, err)
+			defer mock.Close()
+
+			if tt.setupMock != nil {
+				tt.setupMock(mock)
+			}
+
+			client := Client{connection: mock}
+
+			got, err := client.GetDatabases(context.Background())
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Equal(t, tt.wantErr, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tt.want == nil {
+				require.Empty(t, got)
+			} else {
+				require.Equal(t, tt.want, got)
+			}
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestClient_GetTables(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		databaseName string
+		setupMock    func(mock pgxmock.PgxPoolIface)
+		want         []string
+		wantErr      string
+	}{
+		{
+			name:         "returns error when database name empty",
+			databaseName: "",
+			wantErr:      "database name cannot be empty",
+		},
+		{
+			name:         "successfully returns table names",
+			databaseName: "db_main",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "table_name"},
+				).AddRow("customers").AddRow("orders")
+				mock.ExpectQuery("SELECT table_name").
+					WithArgs("db_main").
+					WillReturnRows(rows)
+			},
+			want: []string{"customers", "orders"},
+		},
+		{
+			name:         "skips non-string values",
+			databaseName: "db_main",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "table_name"},
+				).AddRow(int32(10))
+				mock.ExpectQuery("SELECT table_name").
+					WithArgs("db_main").
+					WillReturnRows(rows)
+			},
+			want: nil,
+		},
+		{
+			name:         "propagates query error",
+			databaseName: "db_main",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectQuery("SELECT table_name").
+					WithArgs("db_main").
+					WillReturnError(errors.New("query failed"))
+			},
+			wantErr: "failed to query tables in database 'db_main': query failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, err := pgxmock.NewPool()
+			require.NoError(t, err)
+			defer mock.Close()
+
+			if tt.setupMock != nil {
+				tt.setupMock(mock)
+			}
+
+			client := Client{connection: mock}
+
+			got, err := client.GetTables(context.Background(), tt.databaseName)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Equal(t, tt.wantErr, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tt.want == nil {
+				require.Empty(t, got)
+			} else {
+				require.Equal(t, tt.want, got)
+			}
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestClient_GetColumns(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		databaseName string
+		tableName    string
+		setupMock    func(mock pgxmock.PgxPoolIface)
+		want         []*ansisql.DBColumn
+		wantErr      string
+	}{
+		{
+			name:         "returns error when database name empty",
+			databaseName: "",
+			tableName:    "public.users",
+			wantErr:      "database name cannot be empty",
+		},
+		{
+			name:         "returns error when table name empty",
+			databaseName: "db_main",
+			tableName:    "",
+			wantErr:      "table name cannot be empty",
+		},
+		{
+			name:         "returns error for invalid table format",
+			databaseName: "db_main",
+			tableName:    "a.b.c",
+			wantErr:      "invalid table name format: a.b.c",
+		},
+		{
+			name:         "propagates query error",
+			databaseName: "db_main",
+			tableName:    "sales.orders",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectQuery("SELECT\\s+column_name").
+					WithArgs("db_main", "sales", "orders").
+					WillReturnError(errors.New("query failed"))
+			},
+			wantErr: "failed to query columns for table 'db_main.sales.orders': query failed",
+		},
+		{
+			name:         "successfully returns column metadata without schema prefix",
+			databaseName: "db_main",
+			tableName:    "users",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "column_name"},
+					pgconn.FieldDescription{Name: "data_type"},
+					pgconn.FieldDescription{Name: "is_nullable"},
+					pgconn.FieldDescription{Name: "column_default"},
+					pgconn.FieldDescription{Name: "character_maximum_length"},
+					pgconn.FieldDescription{Name: "numeric_precision"},
+					pgconn.FieldDescription{Name: "numeric_scale"},
+				).
+					AddRow("id", "integer", "NO", nil, nil, int32(32), int32(0)).
+					AddRow("name", "character varying", "YES", nil, int32(255), nil, nil)
+
+				mock.ExpectQuery("SELECT\\s+column_name").
+					WithArgs("db_main", "public", "users").
+					WillReturnRows(rows)
+			},
+			want: []*ansisql.DBColumn{
+				{
+					Name:       "id",
+					Type:       "integer(32)",
+					Nullable:   false,
+					PrimaryKey: false,
+					Unique:     false,
+				},
+				{
+					Name:       "name",
+					Type:       "character varying(255)",
+					Nullable:   true,
+					PrimaryKey: false,
+					Unique:     false,
+				},
+			},
+		},
+		{
+			name:         "successfully handles numeric precision and scale",
+			databaseName: "db_main",
+			tableName:    "sales.orders",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "column_name"},
+					pgconn.FieldDescription{Name: "data_type"},
+					pgconn.FieldDescription{Name: "is_nullable"},
+					pgconn.FieldDescription{Name: "column_default"},
+					pgconn.FieldDescription{Name: "character_maximum_length"},
+					pgconn.FieldDescription{Name: "numeric_precision"},
+					pgconn.FieldDescription{Name: "numeric_scale"},
+				).
+					AddRow("amount", "numeric", "NO", nil, nil, int32(10), int32(2)).
+					AddRow("description", "text", "YES", nil, nil, nil, nil)
+
+				mock.ExpectQuery("SELECT\\s+column_name").
+					WithArgs("db_main", "sales", "orders").
+					WillReturnRows(rows)
+			},
+			want: []*ansisql.DBColumn{
+				{
+					Name:       "amount",
+					Type:       "numeric(10,2)",
+					Nullable:   false,
+					PrimaryKey: false,
+					Unique:     false,
+				},
+				{
+					Name:       "description",
+					Type:       "text",
+					Nullable:   true,
+					PrimaryKey: false,
+					Unique:     false,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, err := pgxmock.NewPool()
+			require.NoError(t, err)
+			defer mock.Close()
+
+			if tt.setupMock != nil {
+				tt.setupMock(mock)
+			}
+
+			client := Client{connection: mock}
+
+			got, err := client.GetColumns(context.Background(), tt.databaseName, tt.tableName)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Equal(t, tt.wantErr, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tt.want, got)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 func TestDB_GetDatabaseSummary(t *testing.T) {
 	t.Parallel()
 
