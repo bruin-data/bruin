@@ -126,7 +126,6 @@ func TestVariables_UnmarshalJSON(t *testing.T) {
 		err := json.Unmarshal([]byte(`{}`), &vars)
 		require.NoError(t, err)
 
-		assert.Len(t, vars, 0)
 		assert.Empty(t, vars)
 	})
 
@@ -186,6 +185,6 @@ func TestVariables_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		// Should be empty now
-		assert.Len(t, vars, 0)
+		assert.Empty(t, vars)
 	})
 }

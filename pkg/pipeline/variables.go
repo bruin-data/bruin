@@ -65,7 +65,7 @@ func (v Variables) Merge(other map[string]any) error {
 	return nil
 }
 
-// This ensures that when an empty object {} is provided, it clears the variables
+// This ensures that when an empty object {} is provided, it clears the variables.
 func (v *Variables) UnmarshalJSON(data []byte) error {
 	*v = make(Variables)
 
