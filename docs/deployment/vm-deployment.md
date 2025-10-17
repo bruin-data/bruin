@@ -1,5 +1,9 @@
 # Deploying Bruin on Ubuntu VMs
 
+::: info Managed Option Available
+Looking for a fully managed solution? [Bruin Cloud](https://getbruin.com) provides managed orchestration, monitoring, and scheduling without the operational overhead. Try it free!
+:::
+
 This guide walks you through deploying Bruin on Ubuntu-based virtual machines (AWS EC2, Google Cloud Compute Engine, DigitalOcean Droplets, or any Ubuntu server) and scheduling pipeline runs using cron jobs.
 
 ## Prerequisites

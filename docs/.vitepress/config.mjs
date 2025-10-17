@@ -299,7 +299,24 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 collapsed: false,
                 items: [
                     {text: "Ubuntu VM with Cron", link: "/deployment/vm-deployment"},
-                    {text: "GitHub Actions", link: "/deployment/github-actions"}
+                    {text: "Apache Airflow", link: "/deployment/airflow"},
+                    {text: "GitHub Actions", link: "/deployment/github-actions"},
+                    {text: "GitLab CI/CD", link: "/deployment/cloud/gitlab-cicd"},
+                    {
+                        text: "AWS",
+                        collapsed: true,
+                        items: [
+                            {text: "Lambda", link: "/deployment/cloud/aws-lambda"},
+                            {text: "ECS", link: "/deployment/cloud/aws-ecs"}
+                        ]
+                    },
+                    {
+                        text: "Google Cloud",
+                        collapsed: true,
+                        items: [
+                            {text: "Cloud Run", link: "/deployment/cloud/google-cloud-run"}
+                        ]
+                    }
                 ],
             },
             {

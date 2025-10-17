@@ -1,5 +1,9 @@
 # Deploying Bruin with GitHub Actions
 
+::: info Managed Option Available
+Looking for a fully managed solution? [Bruin Cloud](https://getbruin.com) provides managed orchestration, monitoring, and scheduling without the operational overhead. Try it free!
+:::
+
 This guide shows you how to deploy and run Bruin pipelines automatically using GitHub Actions. You can schedule pipeline runs, trigger them on code changes, or run them manually.
 
 ## Prerequisites
