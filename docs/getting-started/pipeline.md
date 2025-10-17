@@ -89,18 +89,13 @@ variables:
 
 ### Name
 
-Give your pipeline a clear, human-friendly name. It appears in UIs, logs, and tooling—keep it stable and descriptive.
+Give your pipeline a clear, human-friendly name. It appears in UIs, logs, and tooling , keep it decriptive.
 
 Example:
 
 ```yaml
 name: analytics-daily
 ```
-
-- **Type:** `String`
-
-That section is already clear and concise — but here’s a refined version that adds a bit more context about **why**
-scheduling matters in data pipelines, while keeping the technical precision:
 
 ---
 
@@ -279,8 +274,8 @@ retries: 2
 
 ### Concurrency
 
-Limit how many assets can run at the same time. Tune this to balance speed and resource limits on your warehouse/engine;
-defaults to 1 for safety.
+Limit how many runs you can take at the same time for this pipeline in Bruin Cloud. 
+Defaults to 1 for safety.
 
 Example:
 
@@ -299,20 +294,19 @@ concurrency: 4
 Set sensible defaults for all assets in the pipeline so you don’t repeat yourself. Override at the asset level only when
 a task needs something different.
 
+See also: [Defaults](/getting-started/concepts#defaults).
+
 Example:
 
 ```yaml
 
 default:
-  type: sql
-  parameters:
-    timezone: UTC
   secrets:
     - key: MY_API_KEY
       inject_as: API_KEY
   interval_modifiers:
     start: "-1d"
-    end: "+0d"
+    end: "-1d"
 ```
 
 - **Type:** `Object`
@@ -324,7 +318,7 @@ Fields:
 | type               | String                     | —       | Default asset type (e.g., "sql") |
 | parameters         | Object (map[string]string) | {}      | Arbitrary key/value defaults     |
 | secrets            | Array of objects           | []      | See below                        |
-| interval_modifiers | Object                     | —       | See []                           |
+| interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers) |
 
 Secrets item:
 
@@ -338,13 +332,14 @@ Secrets item:
 Define pipeline-scoped parameters with safe defaults so you can change behavior without editing code.
 Great for toggling modes (e.g., full vs incremental) or passing environment-specific values.
 
+See also: [Variables](/getting-started/pipeline-variables).
+
 Example:
 
 ```yaml
 variables:
   run_mode:
     type: string
-    enum: [ "full", "incremental" ]
     default: "incremental"
 ```
 
@@ -355,8 +350,6 @@ Variable schema fields (subset):
 | Field   | Type   | Required | Notes                                                                   |
 |---------|--------|----------|-------------------------------------------------------------------------|
 | type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array       |
-| enum    | Array  | no       | Allowed values for the variable (if specified)                          |
 | default | any    | yes      | REQUIRED. Must be present; used as the variable value unless overridden |
 
-> [!WARNING]
-> Each variable entry MUST have a default value. Merging overrides for unknown variables will fail.
+>
