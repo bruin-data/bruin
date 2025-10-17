@@ -305,7 +305,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             {
                 text: "CI/CD Integration",
                 collapsed: false,
-                items: [{text: "Github Actions", link: "/cicd/github-action"}],
+                items: [
+                    {text: "GitHub Actions", link: "/cicd/github-action"},
+                    {text: "GitLab CI/CD", link: "/cicd/gitlab-ci"},
+                    {text: "CircleCI", link: "/cicd/circleci"},
+                    {text: "Jenkins", link: "/cicd/jenkins"},
+                    {text: "Azure Pipelines", link: "/cicd/azure-pipelines"},
+                ],
             },
             {
                 text: "Commands",
