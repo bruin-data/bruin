@@ -1,0 +1,26 @@
+name: PR Agent (Claude)
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    steps:
+      - name: PR Agent action step
+        uses: qodo-ai/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          config.model: "anthropic/claude-3-5-sonnet-20240620"
+          config.fallback_models: '["anthropic/claude-3-haiku-20240307"]'
+          ANTHROPIC.KEY: ${{ secrets.ANTHROPIC_KEY }}
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "true"

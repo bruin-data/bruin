@@ -1,0 +1,12 @@
+[config]
+model = "anthropic/claude-3-5-sonnet-20240620"
+
+[pr_reviewer]
+extra_instructions = """
+Focus only on real issues:
+- Logic errors
+- Security risks
+- Performance or maintainability problems
+Do not nitpick on style, naming, formatting, and other minor details.
+"""
+num_code_suggestions = 5
