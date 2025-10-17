@@ -5,7 +5,6 @@
 A pipeline is a group of assets that are executed together in the right order.
 For instance, if you have an asset that ingests data from an API, and another one that creates another table from the
 ingested data, you have a pipeline.
-Asset executions occur on a pipeline level.
 
 A pipeline is defined with a `pipeline.yml` file, and all the assets need to be under a folder called `assets` next to
 this file:
@@ -64,7 +63,6 @@ default:
     start: "-1d"
     end: "+0d"
 
-agent: false
 
 variables:
   run_mode:
