@@ -36,6 +36,7 @@ type Connections struct {
 	MongoAtlas          []MongoAtlasConnection          `yaml:"mongo_atlas,omitempty" json:"mongo_atlas,omitempty" mapstructure:"mongo_atlas"`
 	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql,omitempty" mapstructure:"mysql"`
 	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion,omitempty" mapstructure:"notion"`
+	Allium              []AlliumConnection              `yaml:"allium,omitempty" json:"allium,omitempty" mapstructure:"allium"`
 	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana,omitempty" mapstructure:"hana"`
 	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify,omitempty" mapstructure:"shopify"`
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
@@ -524,6 +525,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.MongoAtlas = append(env.Connections.MongoAtlas, conn)
+	case "monday":
+		var conn MondayConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Monday = append(env.Connections.Monday, conn)
 	case "mysql":
 		var conn MySQLConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -615,6 +623,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Appsflyer = append(env.Connections.Appsflyer, conn)
+	case "jira":
+		var conn JiraConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Jira = append(env.Connections.Jira, conn)
 	case "kafka":
 		var conn KafkaConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -678,6 +693,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.DuckDB = append(env.Connections.DuckDB, conn)
+	case "motherduck":
+		var conn MotherduckConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.MotherDuck = append(env.Connections.MotherDuck, conn)
 	case "asana":
 		var conn AsanaConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -797,6 +819,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Clickup = append(env.Connections.Clickup, conn)
+	case "mailchimp":
+		var conn MailchimpConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Mailchimp = append(env.Connections.Mailchimp, conn)
 	case "mixpanel":
 		var conn MixpanelConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -818,6 +847,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Pinterest = append(env.Connections.Pinterest, conn)
+	case "trino":
+		var conn TrinoConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Trino = append(env.Connections.Trino, conn)
 	case "trustpilot":
 		var conn TrustpilotConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -854,6 +890,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GoogleAnalytics = append(env.Connections.GoogleAnalytics, conn)
+	case "freshdesk":
+		var conn FreshdeskConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Freshdesk = append(env.Connections.Freshdesk, conn)
 	case "frankfurter":
 		var conn FrankfurterConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -981,6 +1024,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.FundraiseUp = append(env.Connections.FundraiseUp, conn)
+	case "plusvibeai":
+		var conn PlusVibeAIConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.PlusVibeAI = append(env.Connections.PlusVibeAI, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1030,6 +1080,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Postgres = removeConnection(env.Connections.Postgres, connectionName)
 	case "redshift":
 		env.Connections.RedShift = removeConnection(env.Connections.RedShift, connectionName)
+	case "monday":
+		env.Connections.Monday = removeConnection(env.Connections.Monday, connectionName)
 	case "mysql":
 		env.Connections.MySQL = removeConnection(env.Connections.MySQL, connectionName)
 	case "notion":
@@ -1060,6 +1112,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Stripe = removeConnection(env.Connections.Stripe, connectionName)
 	case "appsflyer":
 		env.Connections.Appsflyer = removeConnection(env.Connections.Appsflyer, connectionName)
+	case "jira":
+		env.Connections.Jira = removeConnection(env.Connections.Jira, connectionName)
 	case "kafka":
 		env.Connections.Kafka = removeConnection(env.Connections.Kafka, connectionName)
 	case "hubspot":
@@ -1078,6 +1132,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
 	case "duckdb":
 		env.Connections.DuckDB = removeConnection(env.Connections.DuckDB, connectionName)
+	case "motherduck":
+		env.Connections.MotherDuck = removeConnection(env.Connections.MotherDuck, connectionName)
 	case "asana":
 		env.Connections.Asana = removeConnection(env.Connections.Asana, connectionName)
 	case "dynamodb":
@@ -1110,10 +1166,14 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
 	case "clickup":
 		env.Connections.Clickup = removeConnection(env.Connections.Clickup, connectionName)
+	case "mailchimp":
+		env.Connections.Mailchimp = removeConnection(env.Connections.Mailchimp, connectionName)
 	case "mixpanel":
 		env.Connections.Mixpanel = removeConnection(env.Connections.Mixpanel, connectionName)
 	case "pinterest":
 		env.Connections.Pinterest = removeConnection(env.Connections.Pinterest, connectionName)
+	case "trino":
+		env.Connections.Trino = removeConnection(env.Connections.Trino, connectionName)
 	case "trustpilot":
 		env.Connections.Trustpilot = removeConnection(env.Connections.Trustpilot, connectionName)
 	case "quickbooks":
@@ -1128,6 +1188,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GoogleAnalytics = removeConnection(env.Connections.GoogleAnalytics, connectionName)
 	case "applovin":
 		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
+	case "freshdesk":
+		env.Connections.Freshdesk = removeConnection(env.Connections.Freshdesk, connectionName)
 	case "frankfurter":
 		env.Connections.Frankfurter = removeConnection(env.Connections.Frankfurter, connectionName)
 	case "salesforce":
@@ -1162,6 +1224,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Fluxx = removeConnection(env.Connections.Fluxx, connectionName)
 	case "fundraiseup":
 		env.Connections.FundraiseUp = removeConnection(env.Connections.FundraiseUp, connectionName)
+	case "plusvibeai":
+		env.Connections.PlusVibeAI = removeConnection(env.Connections.PlusVibeAI, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

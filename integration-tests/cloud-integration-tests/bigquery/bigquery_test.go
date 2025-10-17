@@ -130,6 +130,116 @@ func TestBigQueryWorkflows(t *testing.T) {
 		workflow func(tempDir string, configFlags []string, binary string) e2e.Workflow
 	}{
 		{
+			name: "bigquery-ddl-create-and-validate",
+			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
+				return e2e.Workflow{
+					Name: "bigquery-ddl-create-and-validate",
+					Steps: []e2e.Task{
+						{
+							Name:    "drop the initial DDL table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS ddl_full_refresh.ddl;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "create the initial DDL table",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/assets/ddl_table.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "move the ingest_data.sql to the assets folder",
+							Command: "cp",
+							Args:    []string{filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/resources/ingest_data.sql"), filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/assets/ddl_table.sql")},
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "run the ingest_data.sql",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/assets/ddl_table.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "query the products table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM ddl_full_refresh.ddl ORDER BY company", "--output", "csv"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/expectations/expect.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+						{
+							Name:    "move the ingest_data.sql to the assets folder",
+							Command: "cp",
+							Args:    []string{filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/resources/ddl_table.sql"), filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/assets/ddl_table.sql")},
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "run the ddl table with full refresh",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/assets/ddl_table.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "query the products table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM ddl_full_refresh.ddl ORDER BY company", "--output", "csv"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/ddl_drop_pipeline/expectations/expect.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
 			name: "bigquery-products-create-and-validate",
 			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
 				return e2e.Workflow{

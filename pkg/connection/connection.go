@@ -10,6 +10,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
+	"github.com/bruin-data/bruin/pkg/allium"
 	"github.com/bruin-data/bruin/pkg/anthropic"
 	"github.com/bruin-data/bruin/pkg/applovin"
 	"github.com/bruin-data/bruin/pkg/applovinmax"
@@ -102,6 +103,7 @@ type Manager struct {
 	MongoAtlas           map[string]*mongoatlas.DB
 	Mysql                map[string]*mysql.Client
 	Notion               map[string]*notion.Client
+	Allium               map[string]*allium.Client
 	HANA                 map[string]*hana.Client
 	Shopify              map[string]*shopify.Client
 	Gorgias              map[string]*gorgias.Client
@@ -330,6 +332,29 @@ func (m *Manager) AddAwsConnectionFromConfig(connection *config.AwsConnection) e
 
 	m.Aws[connection.Name] = connection
 	m.availableConnections[connection.Name] = m.Aws[connection.Name]
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddAlliumConnectionFromConfig(connection *config.AlliumConnection) error {
+	m.mutex.Lock()
+	if m.Allium == nil {
+		m.Allium = make(map[string]*allium.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := allium.NewClient(&allium.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Allium[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
 	return nil
@@ -2312,6 +2337,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Allium, connectionManager.AddAlliumConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Shopify, connectionManager.AddShopifyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Gorgias, connectionManager.AddGorgiasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Klaviyo, connectionManager.AddKlaviyoConnectionFromConfig, &wg, &errList, &mu)

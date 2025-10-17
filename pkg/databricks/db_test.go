@@ -104,6 +104,78 @@ func TestDB_Select(t *testing.T) {
 	}
 }
 
+func TestDB_SelectWithSchema(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		mockConnection func(mock sqlmock.Sqlmock)
+		query          query.Query
+		want           *query.QueryResult
+		wantErr        bool
+		errorMessage   string
+	}{
+		{
+			name: "simple select with schema query is handled",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT 1, 2, 3`).
+					WillReturnRows(
+						sqlmock.NewRowsWithColumnDefinition(
+							sqlmock.NewColumn("one").OfType("BIGINT", int64(1)),
+							sqlmock.NewColumn("two").OfType("BIGINT", int64(2)),
+							sqlmock.NewColumn("three").OfType("BIGINT", int64(3)),
+						).AddRow(1, 2, 3),
+					)
+			},
+			query: query.Query{
+				Query: "SELECT 1, 2, 3",
+			},
+			want: &query.QueryResult{
+				Columns:     []string{"one", "two", "three"},
+				Rows:        [][]interface{}{{int64(1), int64(2), int64(3)}},
+				ColumnTypes: []string{"BIGINT", "BIGINT", "BIGINT"},
+			},
+		},
+		{
+			name: "error in query is properly handled",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT problem`).
+					WillReturnError(errors.New("query execution failed"))
+			},
+			query: query.Query{
+				Query: "SELECT problem",
+			},
+			wantErr:      true,
+			errorMessage: "query execution failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			tt.mockConnection(mock)
+			db := DB{conn: sqlxDB}
+
+			got, err := db.SelectWithSchema(context.Background(), &tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Equal(t, tt.errorMessage, err.Error())
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, got)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 func TestDB_Ping(t *testing.T) {
 	t.Parallel()
 
