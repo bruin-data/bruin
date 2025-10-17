@@ -53,21 +53,17 @@ retries: 2
 concurrency: 4
 
 default:
-  type: sql
-  parameters:
-    timezone: UTC
   secrets:
     - key: MY_API_KEY
       inject_as: API_KEY
   interval_modifiers:
     start: "-1d"
-    end: "+0d"
+    end: "-1d"
 
 
 variables:
   run_mode:
     type: string
-    enum: [ "full", "incremental" ]
     default: "incremental"
 
 ```
