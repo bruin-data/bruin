@@ -32,9 +32,9 @@ parameters:
 ```
 
 ## Data transformation
-Bruin supports SQL & Python data transformations natively.
+Bruin supports SQL, Python & R data transformations natively.
 
-Naturally, after you ingest the data into your data warehouse/lake, you'll want to transform this data. This transformation can be a simple SQL query, or a more complicated logic written in Python. Bruin supports both SQL & Python natively across [many data platforms](/#supported-platforms).
+Naturally, after you ingest the data into your data warehouse/lake, you'll want to transform this data. This transformation can be a simple SQL query, or a more complicated logic written in Python or R. Bruin supports SQL, Python & R natively across [many data platforms](/#supported-platforms).
 
 ```bruin-sql
 /* @bruin

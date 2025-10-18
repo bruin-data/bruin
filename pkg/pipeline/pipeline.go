@@ -29,6 +29,7 @@ const (
 	YamlTask    TaskDefinitionType = "yaml"
 
 	AssetTypePython                 = AssetType("python")
+	AssetTypeR                      = AssetType("r")
 	AssetTypeSnowflakeQuery         = AssetType("sf.sql")
 	AssetTypeSnowflakeSeed          = AssetType("sf.seed")
 	AssetTypeSnowflakeQuerySensor   = AssetType("sf.sensor.query")
@@ -165,7 +166,7 @@ var defaultMapping = map[string]string{
 	"motherduck":            "motherduck-default",
 }
 
-var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
+var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", ".r", "task.yml", "task.yaml"}
 
 type (
 	Schedule           string
@@ -1953,6 +1954,11 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 	// at least that's the hypothesis for now
 	if strings.HasSuffix(task.ExecutableFile.Path, ".py") && task.Type == "" {
 		task.Type = AssetTypePython
+	}
+
+	// if the definition comes from an R file the asset is always an R asset
+	if strings.HasSuffix(task.ExecutableFile.Path, ".r") && task.Type == "" {
+		task.Type = AssetTypeR
 	}
 
 	task.DefinitionFile.Name = filepath.Base(filePath)

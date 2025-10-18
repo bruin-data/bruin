@@ -19,6 +19,7 @@ const (
 var commentMarkers = map[string]string{
 	".sql": "--",
 	".py":  "#",
+	".r":   "#",
 }
 
 var (
