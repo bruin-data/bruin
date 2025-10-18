@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
+
+	"github.com/bruin-data/bruin/pkg/path"
 )
 
 var ValidQualityChecks = map[string]bool{

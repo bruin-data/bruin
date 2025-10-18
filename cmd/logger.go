@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"github.com/bruin-data/bruin/pkg/logger"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/bruin-data/bruin/pkg/logger"
 )
 
 func makeLogger(isDebug bool) logger.Logger {

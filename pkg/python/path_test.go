@@ -4,10 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func TestFindModulePath(t *testing.T) {

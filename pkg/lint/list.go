@@ -3,12 +3,13 @@ package lint
 import (
 	"slices"
 
+	"github.com/samber/lo"
+	"github.com/spf13/afero"
+
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
-	"github.com/samber/lo"
-	"github.com/spf13/afero"
 )
 
 type repoFinder interface {

@@ -13,9 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/manifoldco/promptui"
 	"github.com/urfave/cli/v3"
+
+	"github.com/bruin-data/bruin/pkg/config"
 )
 
 type ErrorResponse struct {

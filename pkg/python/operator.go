@@ -7,6 +7,10 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"go.uber.org/zap"
+
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -15,9 +19,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/user"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"go.uber.org/zap"
 )
 
 type executionContext struct {

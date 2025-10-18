@@ -13,9 +13,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error) {

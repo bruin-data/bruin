@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func TestLogIfFullRefreshAndDDL(t *testing.T) {

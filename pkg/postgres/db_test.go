@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	_ "github.com/DATA-DOG/go-sqlmock"
-	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 func TestClient_Select(t *testing.T) {

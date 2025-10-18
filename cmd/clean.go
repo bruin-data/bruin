@@ -11,12 +11,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/telemetry"
-	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
+
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/pkg/user"
 )
 
 func CleanCmd() *cli.Command {

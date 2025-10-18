@@ -11,15 +11,16 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/git"
-	path2 "github.com/bruin-data/bruin/pkg/path"
-	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/invopop/jsonschema"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert/yaml"
+
+	"github.com/bruin-data/bruin/pkg/git"
+	path2 "github.com/bruin-data/bruin/pkg/path"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
 type Connections struct {

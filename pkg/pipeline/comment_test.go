@@ -4,11 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/path"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/path"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func mustRead(t *testing.T, file string) string {

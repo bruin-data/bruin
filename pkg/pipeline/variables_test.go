@@ -3,9 +3,10 @@ package pipeline_test
 import (
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func TestVariables(t *testing.T) {

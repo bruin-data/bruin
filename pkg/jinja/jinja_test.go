@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func TestJinjaRenderer_RenderQuery(t *testing.T) {

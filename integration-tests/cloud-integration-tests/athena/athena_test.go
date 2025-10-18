@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/e2e"
 )
 
 func TestAthenaWorkflows(t *testing.T) {

@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 type Printer struct {

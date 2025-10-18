@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+
+	"github.com/bruin-data/bruin/pkg/path"
 )
 
 const (

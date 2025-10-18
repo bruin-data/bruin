@@ -3,9 +3,10 @@ package executor
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/pkg/errors"
 )
 
 type Operator interface {

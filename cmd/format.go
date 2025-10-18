@@ -9,15 +9,16 @@ import (
 	"os"
 	"path/filepath"
 
+	errors2 "github.com/pkg/errors"
+	"github.com/sourcegraph/conc/pool"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
-	errors2 "github.com/pkg/errors"
-	"github.com/sourcegraph/conc/pool"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 )
 
 func Format(isDebug *bool) *cli.Command {

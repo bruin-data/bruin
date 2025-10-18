@@ -4,12 +4,13 @@ import (
 	"context"
 	"os"
 
+	"github.com/fatih/color"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/cmd"
 	"github.com/bruin-data/bruin/cmd/mcp"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	v "github.com/bruin-data/bruin/pkg/version"
-	"github.com/fatih/color"
-	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -82,7 +83,6 @@ func main() {
 	}
 
 	err := app.Run(context.Background(), os.Args)
-
 	if err != nil {
 		cli.HandleExitCoder(err)
 		// Close the telemetry client manually as the defer is not called on os.Exit(1)

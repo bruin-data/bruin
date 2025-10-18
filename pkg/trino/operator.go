@@ -2,14 +2,20 @@ package trino
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/pkg/errors"
 )
+
+const CharacterLimit = 10000
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
@@ -81,6 +87,17 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	// Execute each query separately
 	for _, queryObj := range materializedQueries {
+		// Print SQL query in verbose mode
+		if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
+			if w, ok := writer.(io.Writer); ok {
+				queryPreview := strings.TrimSpace(queryObj.Query)
+				if len(queryPreview) > CharacterLimit {
+					queryPreview = queryPreview[:CharacterLimit] + "\n... (truncated)"
+				}
+				fmt.Fprintf(w, "Executing SQL query:\n%s\n\n", queryPreview)
+			}
+		}
+
 		err = conn.RunQueryWithoutResult(ctx, queryObj)
 		if err != nil {
 			return err

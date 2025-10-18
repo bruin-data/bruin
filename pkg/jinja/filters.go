@@ -4,10 +4,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
 	"github.com/pkg/errors"
+
+	"github.com/bruin-data/bruin/pkg/date"
 )
 
 var Filters *exec.FilterSet

@@ -8,6 +8,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pkg/errors"
+	"github.com/sourcegraph/conc"
+
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/allium"
@@ -88,8 +91,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/wise"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
-	"github.com/pkg/errors"
-	"github.com/sourcegraph/conc"
 )
 
 type Manager struct {

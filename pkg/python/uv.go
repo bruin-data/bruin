@@ -16,15 +16,16 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/pkg/errors"
+	"github.com/sourcegraph/conc/pool"
+	"github.com/spf13/afero"
+
 	"github.com/bruin-data/bruin/pkg/config"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/user"
-	"github.com/pkg/errors"
-	"github.com/sourcegraph/conc/pool"
-	"github.com/spf13/afero"
 )
 
 var AvailablePythonVersions = map[string]bool{

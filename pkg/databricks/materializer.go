@@ -5,8 +5,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 // The other packages all use a materializer that renders the query to a single string. Due to the quirks of databricks

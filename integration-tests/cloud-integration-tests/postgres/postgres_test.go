@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/e2e"
 )
 
 func TestPostgresWorkflows(t *testing.T) {

@@ -10,11 +10,12 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/logger"
-	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 )
 
 const WINDOWS = "windows"

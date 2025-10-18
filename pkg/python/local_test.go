@@ -6,9 +6,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/bruin-data/bruin/pkg/git"
 )
 
 type mockReqInstaller struct {

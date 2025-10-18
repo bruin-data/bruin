@@ -4,9 +4,10 @@ package sqlparser
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGetLineageForRunner(t *testing.T) {

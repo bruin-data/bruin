@@ -17,6 +17,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+	"github.com/xlab/treeprint"
+	"go.uber.org/zap"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -49,12 +56,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/trino"
-	"github.com/fatih/color"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
-	"github.com/xlab/treeprint"
-	"go.uber.org/zap"
 )
 
 const LogsFolder = "logs"

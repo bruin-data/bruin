@@ -14,13 +14,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kluctl/go-embed-python/embed_util"
+	"github.com/kluctl/go-embed-python/python"
+	"github.com/pkg/errors"
+
 	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pythonsrc"
-	"github.com/kluctl/go-embed-python/embed_util"
-	"github.com/kluctl/go-embed-python/python"
-	"github.com/pkg/errors"
 )
 
 type SQLParser struct {
