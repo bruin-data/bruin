@@ -120,7 +120,7 @@ Bruin will take the result of the given query, and will create a `dataset.player
 materialization type instead of `table` to create a view instead.
 
 > [!INFO]
-> Bruin supports many asset types, including BigQuery, Snowflake, Python, Redshift, Databricks, and more.
+> Bruin supports many asset types, including BigQuery, Snowflake, Python, R, Redshift, Databricks, and more.
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
 ```bash
@@ -146,6 +146,28 @@ print('hello world')
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
 ```bash
 bruin run assets/my_python_asset.py
+```
+
+### Creating an R asset
+Similar to SQL and Python, Bruin supports running R natively as well.
+
+You can create an R asset with a file `assets/my_r_asset.r`:
+
+```r
+# @bruin.name: my_r_asset
+# @bruin.type: r
+
+cat("Hello from R!\n")
+result <- 2 + 2
+cat(sprintf("2 + 2 = %d\n", result))
+```
+
+- Lines starting with `# @bruin.` are configuration for the asset.
+- The rest of the file is a regular R script.
+
+You can run this asset either via the Bruin VS Code extension, or in the terminal:
+```bash
+bruin run assets/my_r_asset.r
 ```
 
 At this point, you can also run the whole pipeline:

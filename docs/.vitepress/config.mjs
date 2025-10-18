@@ -174,6 +174,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Seed", link: "/assets/seed"},
                             {text: "Ingestr", link: "/assets/ingestr"},
                             {text: "Python", link: "/assets/python"},
+                            {text: "R", link: "/assets/r"},
                             {text: "Sensor", link: "/assets/sensor"},
                             {text: "Dashboard", link: "/assets/dashboard", items: [
                                 {text: "Tableau", link: "/assets/tableau-refresh.md"},

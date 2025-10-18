@@ -4,7 +4,7 @@ Once you’ve installed the Bruin VS Code extension and configured your settings
 
 ## 1. Open a Supported File
 
-The Bruin extension works with SQL, Python, and YAML files. Open a file with one of these extensions in VS Code, or create a new one to get started.
+The Bruin extension works with SQL, Python, R, and YAML files. Open a file with one of these extensions in VS Code, or create a new one to get started.
 
 ## 2. Create a Bruin Section
 

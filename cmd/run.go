@@ -39,6 +39,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/r"
 	"github.com/bruin-data/bruin/pkg/redshift"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -1180,6 +1181,14 @@ func SetupExecutors(
 		} else {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(conn, jinjaVariables)
 		}
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeR) {
+		rOperator, err := r.NewLocalOperator(conn, jinjaVariables)
+		if err != nil {
+			return nil, err
+		}
+		mainExecutors[pipeline.AssetTypeR][scheduler.TaskInstanceTypeMain] = rOperator
 	}
 
 	wholeFileExtractor := &query.WholeFileExtractor{

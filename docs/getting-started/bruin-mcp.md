@@ -1,5 +1,5 @@
 # Bruin MCP
-Bruin is a CLI tool that allows users to ingest data from many different sources, transform data using SQL and Python, run data quality checks, compare table outputs, and more.
+Bruin is a CLI tool that allows users to ingest data from many different sources, transform data using SQL, Python, and R, run data quality checks, compare table outputs, and more.
 
 ![Bruin MCP](../public/mcp-claude.png)
 
