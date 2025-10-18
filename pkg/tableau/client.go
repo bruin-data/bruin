@@ -11,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/pkg/errors"
+
+	"github.com/bruin-data/bruin/pkg/executor"
 )
 
 type Client struct {

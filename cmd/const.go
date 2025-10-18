@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/fatih/color"
+	"github.com/spf13/afero"
+
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/fatih/color"
-	"github.com/spf13/afero"
 )
 
 var PipelineDefinitionFiles = []string{"pipeline.yml", "pipeline.yaml"}

@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	_ "github.com/trinodb/trino-go-client/trino"
+
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 type Client struct {

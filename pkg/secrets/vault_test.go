@@ -4,12 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/logger"
 )
 
 type mockLogger struct{}

@@ -6,11 +6,12 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/git"
 )
 
 type mockConfigManager struct {

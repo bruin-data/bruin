@@ -11,15 +11,16 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	datatransfer "cloud.google.com/go/bigquery/datatransfer/apiv1"
-	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/diff"
-	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/diff"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 var scopes = []string{

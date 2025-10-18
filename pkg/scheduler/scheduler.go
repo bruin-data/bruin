@@ -11,13 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/spf13/afero"
+	"go.uber.org/zap"
+
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/version"
-	"github.com/google/uuid"
-	"github.com/spf13/afero"
-	"go.uber.org/zap"
 )
 
 type TaskInstanceStatus int

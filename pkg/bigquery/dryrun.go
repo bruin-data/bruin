@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/pkg/errors"
+
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/pkg/errors"
 )
 
 type connectionGetter interface {

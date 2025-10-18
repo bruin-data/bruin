@@ -9,11 +9,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/telemetry"
-	"github.com/pkg/errors"
-	"github.com/urfave/cli/v3"
 )
 
 type contextKey string

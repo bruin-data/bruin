@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/pkg/errors"
 )
 
 var matMap = pipeline.AssetMaterializationMap{

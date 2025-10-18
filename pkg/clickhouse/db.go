@@ -8,9 +8,10 @@ import (
 
 	click_house "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/pkg/errors"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/pkg/errors"
 )
 
 // Rowscanner exists since clickhouse library requires us to scan either to a specific type or an implementor of the

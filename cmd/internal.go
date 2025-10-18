@@ -9,6 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	color2 "github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/v6/table"
+	errors2 "github.com/pkg/errors"
+	"github.com/sourcegraph/conc"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery" //nolint:unused
 	"github.com/bruin-data/bruin/pkg/config"
@@ -23,12 +30,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/templates"
-	color2 "github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/v6/table"
-	errors2 "github.com/pkg/errors"
-	"github.com/sourcegraph/conc"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 )
 
 func Internal() *cli.Command {

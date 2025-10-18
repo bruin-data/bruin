@@ -6,11 +6,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 type Querier interface {

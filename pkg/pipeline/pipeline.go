@@ -14,12 +14,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/glossary"
-	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
+
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/path"
 )
 
 type RunConfig string

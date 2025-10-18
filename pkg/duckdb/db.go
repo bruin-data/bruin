@@ -10,12 +10,13 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/marcboeker/go-duckdb"   //nolint:stylecheck
+	_ "github.com/marcboeker/go-duckdb" //nolint:stylecheck
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/marcboeker/go-duckdb"   //nolint:stylecheck
-	_ "github.com/marcboeker/go-duckdb" //nolint:stylecheck
 )
 
 type Client struct {

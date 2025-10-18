@@ -8,15 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/date"
-	"github.com/bruin-data/bruin/pkg/logger"
-	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+
+	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/logger"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
 func TestClean(t *testing.T) {

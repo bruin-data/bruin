@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/bruin-data/bruin/pkg/helpers"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBigQueryIndividualTasks(t *testing.T) {

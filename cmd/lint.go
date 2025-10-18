@@ -9,6 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
@@ -20,10 +25,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
-	"github.com/fatih/color"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 )
 
 var ErrExcludeTagNotSupported = errors.New("exclude-tag flag is not supported for asset-only validation")

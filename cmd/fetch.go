@@ -13,6 +13,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -22,10 +27,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 )
 
 const (

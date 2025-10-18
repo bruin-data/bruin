@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	_ "github.com/sijms/go-ora/v2"
+
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 type Client struct {

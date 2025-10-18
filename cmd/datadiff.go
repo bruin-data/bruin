@@ -10,16 +10,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
-	"github.com/bruin-data/bruin/pkg/diff"
-	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/sourcegraph/conc"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
+
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/diff"
+	"github.com/bruin-data/bruin/pkg/git"
 )
 
 // TableComparer defines an interface for connections that can compare tables.

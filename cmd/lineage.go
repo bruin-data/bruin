@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/bruin-data/bruin/pkg/path"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v3"
+
+	"github.com/bruin-data/bruin/pkg/path"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func Lineage() *cli.Command {

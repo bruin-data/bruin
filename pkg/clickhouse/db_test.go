@@ -8,10 +8,11 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	_ "github.com/DATA-DOG/go-sqlmock"
-	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 type MockColumnType struct {

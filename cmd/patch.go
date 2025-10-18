@@ -7,6 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -16,9 +20,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 )
 
 const (

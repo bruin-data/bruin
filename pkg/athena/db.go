@@ -7,11 +7,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	drv "github.com/uber/athenadriver/go"
+
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 type DB struct {

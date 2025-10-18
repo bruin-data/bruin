@@ -9,9 +9,10 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v3"
+
+	"github.com/bruin-data/bruin/pkg/telemetry"
 )
 
 func Update() *cli.Command {

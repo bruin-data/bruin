@@ -12,16 +12,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/robfig/cron/v3"
+	"github.com/spf13/afero"
+	"github.com/yourbasic/graph"
+
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
-	"github.com/pkg/errors"
-	"github.com/robfig/cron/v3"
-	"github.com/spf13/afero"
-	"github.com/yourbasic/graph"
 )
 
 const (

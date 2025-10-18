@@ -8,11 +8,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pkg/tableau"
 	errors2 "github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/tableau"
 )
 
 func runTableauImport(ctx context.Context, pipelinePath, connectionName, environment, configFile, workbookFilter, projectFilter string, importAll bool) error {

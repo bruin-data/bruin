@@ -8,10 +8,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatih/color"
+
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/fatih/color"
 )
 
 var (

@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 type mockUvInstaller struct {

@@ -12,10 +12,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/diff"
-	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
@@ -23,6 +19,11 @@ import (
 	bigquery2 "google.golang.org/api/bigquery/v2"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
+
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/diff"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 const testProjectID = "test-project"

@@ -6,10 +6,11 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -102,7 +103,7 @@ func cleanupDuckDBFiles(t *testing.T) {
 		t.Fatalf("Failed to remove duckdb-files directory: %v", err)
 	}
 
-	if err := os.MkdirAll(duckdbFilesDir, 0755); err != nil {
+	if err := os.MkdirAll(duckdbFilesDir, 0o755); err != nil {
 		t.Fatalf("Failed to create duckdb-files directory: %v", err)
 	}
 }
@@ -344,7 +345,8 @@ func TestIndividualTasks(t *testing.T) {
 				Args: []string{
 					"render",
 					"--var", `{"users": ["mark", "nicholas"]}`,
-					filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql")},
+					filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql"),
+				},
 				Env:           []string{},
 				SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 				Expected: e2e.Output{
@@ -365,7 +367,8 @@ func TestIndividualTasks(t *testing.T) {
 				Args: []string{
 					"render",
 					"--var", `users=["mark", "nicholas"]`,
-					filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql")},
+					filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql"),
+				},
 				Env:           []string{},
 				SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 				Expected: e2e.Output{
@@ -388,7 +391,8 @@ func TestIndividualTasks(t *testing.T) {
 					"--start-date", "2024-01-15",
 					"--end-date", "2024-01-31",
 					"--output", "json",
-					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -411,7 +415,8 @@ func TestIndividualTasks(t *testing.T) {
 					"--start-date", "2024-01-15",
 					"--end-date", "2024-01-31",
 					"--output", "json",
-					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -433,7 +438,8 @@ func TestIndividualTasks(t *testing.T) {
 					"--full-refresh",
 					"--end-date", "2024-12-31",
 					"--output", "json",
-					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -454,7 +460,8 @@ func TestIndividualTasks(t *testing.T) {
 					"render",
 					"--start-date", "2024-01-15",
 					"--end-date", "2024-01-31",
-					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql")},
+					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -480,7 +487,8 @@ func TestIndividualTasks(t *testing.T) {
 					"--full-refresh",
 					"--start-date", "2024-01-15",
 					"--end-date", "2024-01-31",
-					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql")},
+					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,

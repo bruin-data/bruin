@@ -5,10 +5,11 @@ import (
 	"path"
 	"sync"
 
-	"github.com/bruin-data/bruin/pkg/git"
-	path2 "github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+
+	"github.com/bruin-data/bruin/pkg/git"
+	path2 "github.com/bruin-data/bruin/pkg/path"
 )
 
 type Contact struct {

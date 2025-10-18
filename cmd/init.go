@@ -9,15 +9,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/telemetry"
-	"github.com/bruin-data/bruin/templates"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
+
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/templates"
 )
 
 const (

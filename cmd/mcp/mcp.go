@@ -11,11 +11,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rudderlabs/analytics-go/v4"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/docs/ingestion"
 	"github.com/bruin-data/bruin/docs/platforms"
 	"github.com/bruin-data/bruin/pkg/telemetry"
-	"github.com/rudderlabs/analytics-go/v4"
-	"github.com/urfave/cli/v3"
 )
 
 type JSONRPCRequest struct {

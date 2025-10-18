@@ -8,9 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v3"
+
+	"github.com/bruin-data/bruin/pkg/logger"
 )
 
 type VersionInfo struct {

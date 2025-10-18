@@ -7,11 +7,12 @@ import (
 	path2 "path"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
+
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/git"
 )
 
 func Environments(isDebug *bool) *cli.Command {

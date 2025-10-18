@@ -12,6 +12,10 @@ import (
 	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
@@ -28,9 +32,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 )
 
 type ModifierInfo struct {

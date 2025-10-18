@@ -9,13 +9,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	"github.com/snowflakedb/gosnowflake"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
-	"github.com/snowflakedb/gosnowflake"
 )
 
 const (

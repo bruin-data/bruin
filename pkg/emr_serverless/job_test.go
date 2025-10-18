@@ -6,8 +6,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func TestBuildJobRunConf(t *testing.T) {

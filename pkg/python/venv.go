@@ -9,10 +9,11 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/path"
 )
 
 type configManager interface {

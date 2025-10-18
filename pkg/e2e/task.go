@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/google/uuid"
+
+	"github.com/bruin-data/bruin/pkg/helpers"
 )
 
 type Task struct {

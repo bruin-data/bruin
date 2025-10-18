@@ -9,9 +9,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/scheduler"
 	jd "github.com/josephburnett/jd/lib"
 	"github.com/spf13/afero"
+
+	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
 func AssertByExitCode(i *Task) error {

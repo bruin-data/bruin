@@ -7,12 +7,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
-	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/pkg/errors"
+
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/logger"
 )
 
 func NewVaultClientFromEnv(logger logger.Logger) (*Client, error) {

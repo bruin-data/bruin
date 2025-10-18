@@ -5,10 +5,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/jinja"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 type Query struct {
