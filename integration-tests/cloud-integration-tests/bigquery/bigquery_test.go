@@ -741,6 +741,54 @@ func TestBigQueryWorkflows(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "merge-sql-pipeline",
+			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
+				return e2e.Workflow{
+					Name: "merge-sql-pipeline",
+					Steps: []e2e.Task{
+						{
+							Name:    "merge-sql-pipeline: bootstrap initial data",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--asset", filepath.Join(tempDir, "test-pipelines/merge-sql-pipeline/assets/bootstrap_table.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "merge-sql-pipeline: run merge asset",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/merge-sql-pipeline/assets/merge_asset.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "merge-sql-pipeline: validate merged result",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--output", "csv", "--query", "SELECT pk, col_a, col_b, col_c, col_d FROM dataset.target_table ORDER BY pk"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/merge-sql-pipeline/expectations/target_table.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+					},
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
