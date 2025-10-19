@@ -36,7 +36,7 @@ func (db *DB) GetIngestrURI() (string, error) {
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	err := db.initializeDB()
+	err := db.initializeDB(ctx)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) err
 }
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	err := db.initializeDB()
+	err := db.initializeDB(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 
 func (db *DB) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
 	// Initialize the database connection
-	err := db.initializeDB()
+	err := db.initializeDB(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*
 	return result, nil
 }
 
-func (db *DB) initializeDB() error {
+func (db *DB) initializeDB(ctx context.Context) error {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
@@ -175,9 +175,9 @@ func (db *DB) initializeDB() error {
 		return errors.New("failed to create DSN for Athena")
 	}
 
-	conn, err := sqlx.Open(drv.DriverName, athenaURI)
+	conn, err := sqlx.ConnectContext(ctx, drv.DriverName, athenaURI)
 	if err != nil {
-		return errors.Errorf("Failed to open database connection: %v", err)
+		return errors.Errorf("Failed to connect to Athena: %v", err)
 	}
 
 	db.conn = conn
