@@ -285,6 +285,7 @@ type column struct {
 	Tests         []columnCheck     `yaml:"checks"`
 	PrimaryKey    bool              `yaml:"primary_key"`
 	UpdateOnMerge bool              `yaml:"update_on_merge"`
+	MergeSQL      string            `yaml:"merge_sql"`
 	Nullable      *bool             `yaml:"nullable"`
 	Upstreams     []columnUpstream  `yaml:"upstreams"`
 	Tags          []string          `yaml:"tags"`
@@ -460,6 +461,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Checks:          tests,
 			PrimaryKey:      column.PrimaryKey,
 			UpdateOnMerge:   column.UpdateOnMerge,
+			MergeSQL:        column.MergeSQL,
 			Nullable:        DefaultTrueBool{Value: column.Nullable},
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
