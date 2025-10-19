@@ -18,6 +18,7 @@ func TestMaterializer_Render(t *testing.T) {
 		want        string
 		wantErr     bool
 		fullRefresh bool
+		exactMatch  bool
 	}{
 		{
 			name:  "no materialization, return raw query",
@@ -322,6 +323,76 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
 		{
+			name: "merge with merge_sql custom expressions",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "pk", PrimaryKey: true},
+					{Name: "col1", MergeSQL: "min(target.col1, source.col1)"},
+					{Name: "col2", MergeSQL: "target.col1 - source.col1"},
+					{Name: "col3", UpdateOnMerge: true},
+					{Name: "col4"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query: "SELECT pk, col1, col2, col3, col4 from input_table",
+			want: "MERGE my.asset target\n" +
+				"USING (SELECT pk, col1, col2, col3, col4 from input_table) source\n" +
+				"ON ((source.pk = target.pk OR (source.pk IS NULL and target.pk IS NULL)))\n" +
+				"WHEN MATCHED THEN UPDATE SET target.col1 = min(target.col1, source.col1), target.col2 = target.col1 - source.col1, target.col3 = source.col3\n" +
+				"WHEN NOT MATCHED THEN INSERT(pk, col1, col2, col3, col4) VALUES(pk, col1, col2, col3, col4);",
+			exactMatch: true,
+		},
+		{
+			name: "merge with only merge_sql no update_on_merge",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "value", MergeSQL: "GREATEST(target.value, source.value)"},
+					{Name: "count", MergeSQL: "target.count + source.count"},
+					{Name: "status"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query: "SELECT id, value, count, status FROM source",
+			want: "MERGE my.asset target\n" +
+				"USING (SELECT id, value, count, status FROM source) source\n" +
+				"ON ((source.id = target.id OR (source.id IS NULL and target.id IS NULL)))\n" +
+				"WHEN MATCHED THEN UPDATE SET target.value = GREATEST(target.value, source.value), target.count = target.count + source.count\n" +
+				"WHEN NOT MATCHED THEN INSERT(id, value, count, status) VALUES(id, value, count, status);",
+			exactMatch: true,
+		},
+		{
+			name: "merge with both merge_sql and update_on_merge prioritizes merge_sql",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "col1", MergeSQL: "COALESCE(source.col1, target.col1)", UpdateOnMerge: true},
+					{Name: "col2", UpdateOnMerge: true},
+					{Name: "col3"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query: "SELECT id, col1, col2, col3 FROM source",
+			want: "MERGE my.asset target\n" +
+				"USING (SELECT id, col1, col2, col3 FROM source) source\n" +
+				"ON ((source.id = target.id OR (source.id IS NULL and target.id IS NULL)))\n" +
+				"WHEN MATCHED THEN UPDATE SET target.col1 = COALESCE(source.col1, target.col1), target.col2 = source.col2\n" +
+				"WHEN NOT MATCHED THEN INSERT(id, col1, col2, col3) VALUES(id, col1, col2, col3);",
+			exactMatch: true,
+		},
+		{
 			name: "time_interval_no_incremental_key",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -383,7 +454,11 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 				require.NoError(t, err)
 			}
 
-			assert.Regexp(t, tt.want, render)
+			if tt.exactMatch {
+				assert.Equal(t, tt.want, render)
+			} else {
+				assert.Regexp(t, tt.want, render)
+			}
 		})
 	}
 }
