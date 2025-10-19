@@ -45,6 +45,7 @@ Each column will have the following keys:
 | `tags`            | String[]| no   | Tags applied to the column for categorization and filtering                     |
 | `primary_key`     | Bool    | no   | Whether the column is a primary key                                             |
 | `update_on_merge` | Bool    | no   | Whether the column should be updated with [`merge`](./materialization.md#merge) |
+| `merge_sql`       | String  | no   | Expression to compute column on merge; takes precedence over `update_on_merge` |
 | `nullable`        | Bool    | no   | Whether the column can contain NULL values                                      |
 | `owner`           | String  | no   | The owner of the column for governance and lineage                              |
 | `domains`         | String[]| no   | Business domains the column belongs to                                          |
