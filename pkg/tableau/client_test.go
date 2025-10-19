@@ -138,7 +138,7 @@ func TestFindDatasourceIDByName(t *testing.T) {
 
 	id, err = FindDatasourceIDByName(context.Background(), "gamma", datasources)
 	require.NoError(t, err)
-	require.Equal(t, "", id)
+	require.Empty(t, id)
 
 	// nil datasources
 	_, err = FindDatasourceIDByName(context.Background(), "alpha", nil)
@@ -147,12 +147,12 @@ func TestFindDatasourceIDByName(t *testing.T) {
 	// empty slice
 	id, err = FindDatasourceIDByName(context.Background(), "alpha", []DataSourceInfo{})
 	require.NoError(t, err)
-	require.Equal(t, "", id)
+	require.Empty(t, id)
 
 	// empty name
 	id, err = FindDatasourceIDByName(context.Background(), "", datasources)
 	require.NoError(t, err)
-	require.Equal(t, "", id)
+	require.Empty(t, id)
 
 	// name with spaces
 	datasourcesWithSpaces := []DataSourceInfo{
@@ -189,7 +189,7 @@ func TestFindWorkbookIDByName(t *testing.T) {
 
 	id, err = FindWorkbookIDByName(context.Background(), "notfound", workbooks)
 	require.NoError(t, err)
-	require.Equal(t, "", id)
+	require.Empty(t, id)
 
 	// nil workbooks
 	_, err = FindWorkbookIDByName(context.Background(), "superstore", nil)
@@ -198,12 +198,12 @@ func TestFindWorkbookIDByName(t *testing.T) {
 	// empty slice
 	id, err = FindWorkbookIDByName(context.Background(), "superstore", []WorkbookInfo{})
 	require.NoError(t, err)
-	require.Equal(t, "", id)
+	require.Empty(t, id)
 
 	// empty name
 	id, err = FindWorkbookIDByName(context.Background(), "", workbooks)
 	require.NoError(t, err)
-	require.Equal(t, "", id)
+	require.Empty(t, id)
 
 	// name with spaces
 	workbooksWithSpaces := []WorkbookInfo{

@@ -737,7 +737,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 						}
 
 						// ensure we didn't drop any columns that we didn't have documented
-						assert.Equal(t, len(tt.tableResponse.Schema.Fields), len(table.Schema.Fields))
+						assert.Len(t, table.Schema.Fields, len(tt.tableResponse.Schema.Fields))
 
 						// ensure the primary keys are set correctly
 						primaryKeys := tt.asset.ColumnNamesWithPrimaryKey()
