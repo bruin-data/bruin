@@ -497,6 +497,48 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-asset-level-start-date-no-start-date",
+			task: e2e.Task{
+				Name:    "render-asset-level-start-date-no-start-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--full-refresh",
+					"--end-date", "2024-12-31",
+					filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_no_start_date.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"'2023-01-01' as captured_start_date", "'2024-12-31' as captured_end_date"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-asset-level-start-date-with-start-date",
+			task: e2e.Task{
+				Name:    "render-asset-level-start-date-with-start-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--full-refresh",
+					"--end-date", "2024-12-31",
+					filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_with_start_date.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"'2024-06-01' as captured_start_date", "'2024-12-31' as captured_end_date"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "python-happy-path-run",
 			task: e2e.Task{
 				Name:    "python-happy-path-run",
@@ -2082,6 +2124,72 @@ func TestWorkflowTasks(t *testing.T) {
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
 							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "asset_level_start_date_workflow",
+			workflow: e2e.Workflow{
+				Name: "asset_level_start_date_workflow",
+				Steps: []e2e.Task{
+					{
+						Name:    "asset-level-start-date: run asset_no_start_date",
+						Command: binary,
+						Args:    []string{"run", "--full-refresh", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_no_start_date.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: asset_no_start_date"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "asset-level-start-date: run asset_with_start_date",
+						Command: binary,
+						Args:    []string{"run", "--full-refresh", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_with_start_date.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: asset_with_start_date"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:          "asset-level-start-date: validate asset without start_date uses pipeline start_date",
+						Command:       binary,
+						Args:          []string{"query", "--connection", "duckdb-variables", "--query", "SELECT * FROM asset_no_start_date", "--output", "json"},
+						Env:           []string{},
+						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/expectations/asset_no_start_date_full_refresh.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+					{
+						Name:          "asset-level-start-date: validate asset with start_date uses its own start_date",
+						Command:       binary,
+						Args:          []string{"query", "--connection", "duckdb-variables", "--query", "SELECT * FROM asset_with_start_date", "--output", "json"},
+						Env:           []string{},
+						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/expectations/asset_with_start_date_full_refresh.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
 						},
 					},
 				},
