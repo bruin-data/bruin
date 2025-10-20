@@ -41,7 +41,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT pk, col1, col2, col3, col4 from input_table",
-			want: []string{"MERGE INTO my.asset target USING (SELECT pk, col1, col2, col3, col4 from input_table) source ON target.pk = source.pk WHEN MATCHED THEN UPDATE SET target.col1 = min(target.col1, source.col1), target.col2 = target.col1 - source.col1, target.col3 = source.col3 WHEN NOT MATCHED THEN INSERT(pk, col1, col2, col3, col4) VALUES(source.pk, source.col1, source.col2, source.col3, source.col4)"},
+			want:  []string{"MERGE INTO my.asset target USING (SELECT pk, col1, col2, col3, col4 from input_table) source ON target.pk = source.pk WHEN MATCHED THEN UPDATE SET target.col1 = min(target.col1, source.col1), target.col2 = target.col1 - source.col1, target.col3 = source.col3 WHEN NOT MATCHED THEN INSERT(pk, col1, col2, col3, col4) VALUES(source.pk, source.col1, source.col2, source.col3, source.col4)"},
 		},
 		{
 			name: "merge with only merge_sql no update_on_merge",
@@ -59,7 +59,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT id, value, count, status FROM source",
-			want: []string{"MERGE INTO my.asset target USING (SELECT id, value, count, status FROM source) source ON target.id = source.id WHEN MATCHED THEN UPDATE SET target.value = GREATEST(target.value, source.value), target.count = target.count + source.count WHEN NOT MATCHED THEN INSERT(id, value, count, status) VALUES(source.id, source.value, source.count, source.status)"},
+			want:  []string{"MERGE INTO my.asset target USING (SELECT id, value, count, status FROM source) source ON target.id = source.id WHEN MATCHED THEN UPDATE SET target.value = GREATEST(target.value, source.value), target.count = target.count + source.count WHEN NOT MATCHED THEN INSERT(id, value, count, status) VALUES(source.id, source.value, source.count, source.status)"},
 		},
 		{
 			name: "merge with both merge_sql and update_on_merge prioritizes merge_sql",
@@ -77,7 +77,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, col3 FROM source",
-			want: []string{"MERGE INTO my.asset target USING (SELECT id, col1, col2, col3 FROM source) source ON target.id = source.id WHEN MATCHED THEN UPDATE SET target.col1 = COALESCE(source.col1, target.col1), target.col2 = source.col2 WHEN NOT MATCHED THEN INSERT(id, col1, col2, col3) VALUES(source.id, source.col1, source.col2, source.col3)"},
+			want:  []string{"MERGE INTO my.asset target USING (SELECT id, col1, col2, col3 FROM source) source ON target.id = source.id WHEN MATCHED THEN UPDATE SET target.col1 = COALESCE(source.col1, target.col1), target.col2 = source.col2 WHEN NOT MATCHED THEN INSERT(id, col1, col2, col3) VALUES(source.id, source.col1, source.col2, source.col3)"},
 		},
 		{
 			name: "materialize to a view",
