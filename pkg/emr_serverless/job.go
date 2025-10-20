@@ -174,7 +174,6 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	defer fd.Close()
 
 	zipper := zip.NewWriter(fd)
-	defer zipper.Close()
 
 	repo, err := git.FindRepoFromPath(scriptPath)
 	if err != nil {
