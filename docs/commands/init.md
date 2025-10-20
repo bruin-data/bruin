@@ -95,7 +95,7 @@ Name of the template to use. If omitted, an interactive selector appears.
 Name of the folder where the pipeline will be created.
 
 - **Type:** `string`
-- **Default:** `bruin-pipeline`
+- **Default:** `bruin-pipeline` (when using default template), template name (when using other templates)
 - **Required:** `false`
 
 ## Flags
@@ -119,13 +119,16 @@ $ bruin init
 Please select a template below:
 
  [x] default
- [ ] postgres-duckdb
- [ ] analytics-starter
+ [ ] athena
+ [ ] clickhouse
+ [ ] duckdb
+ [ ] chess
+ [ ] python
 
-A new 'default' pipeline created successfully in folder 'ecommerce'.
+A new 'default' pipeline created successfully in folder 'bruin-pipeline'.
 
 You can run the following commands to get started:
-    bruin validate ecommerce
+    bruin validate bruin-pipeline
 ```
 
 ### Initializing the Shopify-Bigquery template
