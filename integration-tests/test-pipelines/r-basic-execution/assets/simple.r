@@ -1,5 +1,7 @@
-# @bruin.name: r_simple_asset
-# @bruin.type: r
+""" @bruin
+name: r_simple_asset
+type: r
+@bruin """
 
 # Simple R script that prints output
 cat("Hello from R!\n")

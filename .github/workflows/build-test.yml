@@ -75,6 +75,16 @@ jobs:
       - name: Install winget
         if: matrix.platform == 'windows-2022'
         uses: Cyberboss/install-winget@v1
+      - name: Install R (Ubuntu)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y r-base
+      - name: Install R (Windows)
+        if: matrix.platform == 'windows-2022'
+        shell: bash
+        run: |
+          choco install r.project -y
       - run: make integration-test
         shell: bash
 

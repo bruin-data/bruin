@@ -1,7 +1,10 @@
-# @bruin.name: data_visualization
-# @bruin.type: r
-# @bruin.depends: basic_stats
-# @bruin.description: Data visualization example using ggplot2 and dplyr
+""" @bruin
+name: data_visualization
+type: r
+depends:
+    - basic_stats
+description: Data visualization example using ggplot2 and dplyr
+@bruin """
 
 # This example uses packages managed by renv
 # The renv.lock file in this directory specifies the exact versions
