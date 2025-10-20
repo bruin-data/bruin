@@ -2315,7 +2315,15 @@ func processConnections[T config.Named](connections []T, adder func(*T) error, w
 	}
 }
 
+// NewManagerFromConfig creates a connection Manager using a background context.
+// Prefer NewManagerFromConfigWithContext to propagate cancellation and deadlines.
 func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
+	return NewManagerFromConfigWithContext(context.Background(), cm)
+}
+
+// NewManagerFromConfigWithContext creates a connection Manager using the provided context
+// for any connection initializations that support context (e.g., Postgres/Redshift).
+func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
 	connectionManager := &Manager{}
 	connectionManager.availableConnections = make(map[string]any)
 	connectionManager.AllConnectionDetails = make(map[string]any)
@@ -2329,10 +2337,10 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.GoogleCloudPlatform, connectionManager.AddBqConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Snowflake, connectionManager.AddSfConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Postgres, func(conn *config.PostgresConnection) error {
-		return connectionManager.AddPgConnectionFromConfig(context.Background(), conn)
+		return connectionManager.AddPgConnectionFromConfig(ctx, conn)
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RedShift, func(conn *config.RedshiftConnection) error {
-		return connectionManager.AddRedshiftConnectionFromConfig(context.Background(), conn)
+		return connectionManager.AddRedshiftConnectionFromConfig(ctx, conn)
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)

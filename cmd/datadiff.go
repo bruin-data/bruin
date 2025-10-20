@@ -136,7 +136,7 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			// Create connection manager
-			manager, errs := connection.NewManagerFromConfig(cm)
+			manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 			if len(errs) > 0 {
 				// Handle multiple errors, e.g. by joining them or returning the first one
 				return fmt.Errorf("failed to create connection manager: %w", errs[0])

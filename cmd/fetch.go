@@ -263,7 +263,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 
 	// Direct query mode (no asset path)
 	if assetPath == "" {
-		conn, err := getConnectionFromConfig(env, connectionName, fs, c.String("config-file"))
+		conn, err := getConnectionFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", err
 		}
@@ -294,7 +294,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 			return "", nil, "", "", errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
 		}
 
-		connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
+		connName, conn, err := getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
 		if err != nil {
 			return "", nil, "", "", err
 		}
@@ -334,7 +334,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	if err != nil {
 		return "", nil, "", "", err
 	}
-	connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
+	connName, conn, err := getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
 	if err != nil {
 		return "", nil, "", "", err
 	}
@@ -342,7 +342,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	return connName, conn, queryStr, pipelineInfo.Asset.Type, nil
 }
 
-func getConnectionFromConfig(env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
+func getConnectionFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
 	repoRoot, err := git.FindRepoFromPath(".")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find the git repository root")
@@ -363,7 +363,7 @@ func getConnectionFromConfig(env string, connectionName string, fs afero.Fs, con
 		}
 	}
 
-	manager, errs := connection.NewManagerFromConfig(cm)
+	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 	if len(errs) > 0 {
 		return nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
@@ -390,7 +390,7 @@ func extractQuery(content string, extractor query.QueryExtractor) (string, error
 	return queries[0].Query, nil
 }
 
-func getConnectionFromPipelineInfo(pipelineInfo *ppInfo, env string) (string, interface{}, error) {
+func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo *ppInfo, env string) (string, interface{}, error) {
 	if env != "" {
 		err := pipelineInfo.Config.SelectEnvironment(env)
 		if err != nil {
@@ -399,7 +399,7 @@ func getConnectionFromPipelineInfo(pipelineInfo *ppInfo, env string) (string, in
 	}
 
 	// Get connection info
-	manager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
+	manager, errs := connection.NewManagerFromConfigWithContext(ctx, pipelineInfo.Config)
 	if len(errs) > 0 {
 		return "", nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
