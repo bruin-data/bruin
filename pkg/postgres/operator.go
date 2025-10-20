@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -14,6 +16,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 )
+
+const CharacterLimit = 10000
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
@@ -120,12 +124,33 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if o.devEnv == nil {
+		// Print SQL query in verbose mode
+		if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
+			if w, ok := writer.(io.Writer); ok {
+				queryPreview := strings.TrimSpace(q.Query)
+				if len(queryPreview) > CharacterLimit {
+					queryPreview = queryPreview[:CharacterLimit] + "\n... (truncated)"
+				}
+				fmt.Fprintf(w, "Executing SQL query:\n%s\n\n", queryPreview)
+			}
+		}
 		return conn.RunQueryWithoutResult(ctx, q)
 	}
 
 	q, err = o.devEnv.Modify(ctx, p, t, q)
 	if err != nil {
 		return err
+	}
+
+	// Print SQL query in verbose mode
+	if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
+		if w, ok := writer.(io.Writer); ok {
+			queryPreview := strings.TrimSpace(q.Query)
+			if len(queryPreview) > CharacterLimit {
+				queryPreview = queryPreview[:CharacterLimit] + "\n... (truncated)"
+			}
+			fmt.Fprintf(w, "Executing SQL query:\n%s\n\n", queryPreview)
+		}
 	}
 
 	err = conn.RunQueryWithoutResult(ctx, q)
