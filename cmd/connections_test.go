@@ -499,8 +499,7 @@ func TestListConnectionsCommand_ReturnsEmptyEnvironments(t *testing.T) {
 
 			// Verify that when listing all environments, empty environments are included
 			if tt.environment == "" {
-				assert.Equal(t, len(tt.expectedEnvs), len(cm.Environments),
-					"Should have all expected environments including empty ones")
+				assert.Len(t, cm.Environments, len(tt.expectedEnvs), "Should have all expected environments including empty ones")
 
 				// Count empty environments
 				emptyEnvCount := 0

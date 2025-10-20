@@ -282,13 +282,13 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 				assert.EqualExportedValues(t, *asset, *gotAsset)
 
 				gotAssetUpstreams := gotAsset.GetUpstream()
-				assert.Equal(t, len(asset.GetUpstream()), len(gotAssetUpstreams))
+				assert.Len(t, gotAssetUpstreams, len(asset.GetUpstream()))
 				for upstreamIdx, u := range asset.GetUpstream() {
 					assert.EqualExportedValues(t, *u, *gotAssetUpstreams[upstreamIdx])
 				}
 
 				gotAssetDownstreams := gotAsset.GetDownstream()
-				assert.Equal(t, len(asset.GetDownstream()), len(gotAssetDownstreams))
+				assert.Len(t, gotAssetDownstreams, len(asset.GetDownstream()))
 				for idx, d := range asset.GetDownstream() {
 					assert.EqualExportedValues(t, *d, *gotAssetDownstreams[idx])
 				}
