@@ -25,6 +25,70 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  "SELECT 1",
 		},
 		{
+			name: "merge with merge_sql custom expressions",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "pk", PrimaryKey: true},
+					{Name: "col1", MergeSQL: "min(target.col1, source.col1)"},
+					{Name: "col2", MergeSQL: "target.col1 - source.col1"},
+					{Name: "col3", UpdateOnMerge: true},
+					{Name: "col4"},
+				},
+			},
+			query: "SELECT pk, col1, col2, col3, col4 from input_table",
+			want: "^MERGE INTO my\\.asset target\n" +
+				"USING \\(SELECT pk, col1, col2, col3, col4 from input_table\\) source ON target\\.pk = source.pk\n" +
+				"WHEN MATCHED THEN UPDATE SET target\\.col1 = min\\(target\\.col1, source\\.col1\\), target\\.col2 = target\\.col1 - source\\.col1, target\\.col3 = source\\.col3\n" +
+				"WHEN NOT MATCHED THEN INSERT\\(pk, col1, col2, col3, col4\\) VALUES\\(pk, col1, col2, col3, col4\\);$",
+		},
+		{
+			name: "merge with only merge_sql no update_on_merge",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "value", MergeSQL: "GREATEST(target.value, source.value)"},
+					{Name: "count", MergeSQL: "target.count + source.count"},
+					{Name: "status"},
+				},
+			},
+			query: "SELECT id, value, count, status FROM source",
+			want: "^MERGE INTO my\\.asset target\n" +
+				"USING \\(SELECT id, value, count, status FROM source\\) source ON target\\.id = source.id\n" +
+				"WHEN MATCHED THEN UPDATE SET target\\.value = GREATEST\\(target\\.value, source\\.value\\), target\\.count = target\\.count \\+ source\\.count\n" +
+				"WHEN NOT MATCHED THEN INSERT\\(id, value, count, status\\) VALUES\\(id, value, count, status\\);$",
+		},
+		{
+			name: "merge with both merge_sql and update_on_merge prioritizes merge_sql",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "col1", MergeSQL: "COALESCE(source.col1, target.col1)", UpdateOnMerge: true},
+					{Name: "col2", UpdateOnMerge: true},
+					{Name: "col3"},
+				},
+			},
+			query: "SELECT id, col1, col2, col3 FROM source",
+			want: "^MERGE INTO my\\.asset target\n" +
+				"USING \\(SELECT id, col1, col2, col3 FROM source\\) source ON target\\.id = source.id\n" +
+				"WHEN MATCHED THEN UPDATE SET target\\.col1 = COALESCE\\(source\\.col1, target\\.col1\\), target\\.col2 = source\\.col2\n" +
+				"WHEN NOT MATCHED THEN INSERT\\(id, col1, col2, col3\\) VALUES\\(id, col1, col2, col3\\);$",
+		},
+		{
 			name: "materialize to a view",
 			task: &pipeline.Asset{
 				Name: "my.asset",
