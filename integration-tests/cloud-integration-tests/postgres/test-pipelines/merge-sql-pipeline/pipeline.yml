@@ -1,0 +1,3 @@
+name: merge-sql-pipeline
+description: Test pipeline for merge_sql functionality with custom SQL expressions in merge operations
+

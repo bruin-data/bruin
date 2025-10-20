@@ -189,9 +189,15 @@ select 2 as one
 ### `merge`
 `merge` strategy is useful when you want to merge the existing rows with the new rows. This is useful when you have a table with a primary key and you want to update the existing rows and insert the new rows, helping you avoid duplication while keeping the most up-to-date version of the data in the table incrementally.
 
-Merge strategy requires columns to be defined and marked with `primary_key` or `update_on_merge`.
-- `primary_key` is used to determine which rows to update and which rows to insert.
-- `update_on_merge` is used to determine which columns to update when a row already exists. By default, this is considered to be `false`.
+Merge strategy requires columns to be defined and marked with `primary_key` and optionally `update_on_merge` or `merge_sql`:
+- `primary_key` determines which rows to update vs insert.
+- `update_on_merge` marks columns to update with `source.col` when a row matches.
+- `merge_sql` lets you specify a custom expression per column for matches, e.g. `GREATEST(target.col, source.col)` or `target.c + source.c`. When present, `merge_sql` takes precedence over `update_on_merge`.
+
+Supported platforms for `merge_sql`:
+- BigQuery, Snowflake, Postgres, mssql: supported
+- Athena (Iceberg tables): supported
+- Databricks,ClickHouse, Trino, DuckDB: not supported
 
 > [!INFO]
 > An important difference between `merge` and `delete+insert` is that `merge` will update the existing rows, while `delete+insert` will delete the existing rows and insert the new rows. This means if your source has deleted rows, `merge` will not delete them from the destination, whereas `delete+insert` will if their `incremental_key` matches.
@@ -214,6 +220,9 @@ columns:
   - name: UserName
     type: string
     update_on_merge: true
+  - name: Score
+    type: integer
+    merge_sql: GREATEST(target.Score, source.Score)
 
 @bruin */
 

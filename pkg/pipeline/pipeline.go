@@ -550,6 +550,7 @@ type Column struct {
 	Tags            EmptyStringArray  `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	PrimaryKey      bool              `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
+	MergeSQL        string            `json:"merge_sql" yaml:"merge_sql,omitempty" mapstructure:"merge_sql"`
 	Nullable        DefaultTrueBool   `json:"nullable" yaml:"nullable,omitempty" mapstructure:"nullable"`
 	Owner           string            `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
 	Domains         EmptyStringArray  `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`

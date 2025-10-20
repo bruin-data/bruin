@@ -223,6 +223,65 @@ WHEN MATCHED THEN UPDATE SET "iLeft" = source\."iLeft", "iRight" = source\."iRig
 WHEN NOT MATCHED THEN INSERT\("code", "iLeft", "iRight", "translation"\) VALUES\("code", "iLeft", "iRight", "translation"\);$`,
 		},
 		{
+			name: "merge with merge_sql custom expressions",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "col_a", Type: "int", MergeSQL: "GREATEST(target.col_a, source.col_a)"},
+					{Name: "col_b", Type: "int", MergeSQL: "target.col_b + source.col_b"},
+					{Name: "col_c", Type: "varchar", UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c",
+			want: `^MERGE INTO my\.asset target
+USING \(SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c\) source ON target\."id" = source\."id"
+WHEN MATCHED THEN UPDATE SET "col_a" = GREATEST\(target\.col_a, source\.col_a\), "col_b" = target\.col_b \+ source\.col_b, "col_c" = source\."col_c"
+WHEN NOT MATCHED THEN INSERT\("id", "col_a", "col_b", "col_c"\) VALUES\("id", "col_a", "col_b", "col_c"\);$`,
+		},
+		{
+			name: "merge with only merge_sql no update_on_merge",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "col_a", Type: "int", MergeSQL: "LEAST(target.col_a, source.col_a)"},
+				},
+			},
+			query: "SELECT 1 as id, 15 as col_a",
+			want: `^MERGE INTO my\.asset target
+USING \(SELECT 1 as id, 15 as col_a\) source ON target\."id" = source\."id"
+WHEN MATCHED THEN UPDATE SET "col_a" = LEAST\(target\.col_a, source\.col_a\)
+WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
+		},
+		{
+			name: "merge with both merge_sql and update_on_merge prioritizes merge_sql",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "col_a", Type: "int", MergeSQL: "COALESCE(source.col_a, target.col_a)", UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT 1 as id, 15 as col_a",
+			want: `^MERGE INTO my\.asset target
+USING \(SELECT 1 as id, 15 as col_a\) source ON target\."id" = source\."id"
+WHEN MATCHED THEN UPDATE SET "col_a" = COALESCE\(source\.col_a, target\.col_a\)
+WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
+		},
+		{
 			name: "time_interval_no_incremental_key",
 			task: &pipeline.Asset{
 				Name: "my.asset",

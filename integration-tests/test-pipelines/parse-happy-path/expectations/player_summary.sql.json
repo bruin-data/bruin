@@ -5,6 +5,7 @@
     "name": "chess_playground.player_summary",
     "type": "duckdb.sql",
     "description": "",
+    "start_date": "",
     "connection": "",
     "tags": [],
     "domains": [],
@@ -34,7 +35,6 @@
     "image": "",
     "instance": "",
     "owner": "",
-    "start_date": "",
     "executable_file": {
       "name": "player_summary.sql",
       "path": "test-pipelines/parse-happy-path/assets/player_summary.sql",
@@ -57,6 +57,7 @@
         "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "merge_sql": "",
         "nullable": true,
         "owner": "",
         "domains": [],

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -86,7 +87,7 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 		return []string{}, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
-	nonPrimaryKeys := asset.ColumnNamesWithUpdateOnMerge()
+	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
 	columnNames := asset.ColumnNames()
 
 	on := make([]string, 0, len(primaryKeys))
@@ -104,10 +105,14 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 
 	whenMatchedThenQuery := ""
 
-	if len(nonPrimaryKeys) > 0 {
-		matchedUpdateStatements := make([]string, 0, len(nonPrimaryKeys))
-		for _, col := range nonPrimaryKeys {
-			matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = source.%s", col, col))
+	if len(mergeColumns) > 0 {
+		matchedUpdateStatements := make([]string, 0, len(mergeColumns))
+		for _, col := range mergeColumns {
+			if col.MergeSQL != "" {
+				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("target.%s = %s", col.Name, col.MergeSQL))
+			} else {
+				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("target.%s = source.%s", col.Name, col.Name))
+			}
 		}
 
 		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
