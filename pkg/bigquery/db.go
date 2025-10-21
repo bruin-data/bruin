@@ -67,7 +67,6 @@ type Client struct {
 	typeMapper *diff.DatabaseTypeMapper
 }
 
-// isCredentialError checks if an error is related to missing or invalid credentials.
 // This function detects authentication errors using Google API's error codes.
 // Reference: https://pkg.go.dev/cloud.google.com/go#section-readme
 func isCredentialError(err error) bool {
@@ -75,7 +74,6 @@ func isCredentialError(err error) bool {
 		return false
 	}
 
-	// Check if this is a googleapi.Error with an authentication/authorization error code
 	var apiErr *googleapi.Error
 	if errors.As(err, &apiErr) {
 		// 401 = Unauthorized (authentication failure)
