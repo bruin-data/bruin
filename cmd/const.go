@@ -63,7 +63,7 @@ func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMu
 			if err != nil {
 				return nil, fmt.Errorf("error rendering parameter %q: %w", key, err)
 			}
-			a.Parameters[key] = renderedValue
+			a.Parameters[key] = strings.TrimSpace(renderedValue)
 		}
 
 		return a, nil
