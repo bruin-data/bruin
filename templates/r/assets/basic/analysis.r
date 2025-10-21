@@ -1,8 +1,8 @@
-""" @bruin
-name: basic_stats
-type: r
-description: Basic statistical analysis example showing R's capabilities
-@bruin """
+# @bruin
+# name: basic_stats
+# type: r
+# description: Basic statistical analysis example showing R's capabilities
+# @bruin
 
 # Generate sample data
 cat("Running basic statistical analysis\n")

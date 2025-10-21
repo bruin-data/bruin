@@ -1,7 +1,7 @@
-""" @bruin
-name: r_asset_with_renv
-type: r
-@bruin """
+# @bruin
+# name: r_asset_with_renv
+# type: r
+# @bruin
 
 # R script that uses jsonlite package from renv
 library(jsonlite)
