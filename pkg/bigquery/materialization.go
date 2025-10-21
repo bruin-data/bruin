@@ -363,10 +363,13 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		insertCols = append(insertCols, col.Name)
 		insertValues = append(insertValues, "source."+col.Name)
 		if !col.PrimaryKey {
+			// Use NULL-safe comparison: (a != b OR (a IS NULL AND b IS NOT NULL) OR (a IS NOT NULL AND b IS NULL))
+			// This can be simplified to: NOT (a IS NOT DISTINCT FROM b)
+			// But BigQuery doesn't support IS NOT DISTINCT FROM, so we use: (a != b OR (a IS NULL) != (b IS NULL))
 			compareConds = append(compareConds,
-				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+				fmt.Sprintf("(target.%[1]s != source.%[1]s OR (target.%[1]s IS NULL) != (source.%[1]s IS NULL))", col.Name))
 			compareCondsS1T1 = append(compareCondsS1T1,
-				fmt.Sprintf("t1.%[1]s != s1.%[1]s", col.Name))
+				fmt.Sprintf("(t1.%[1]s != s1.%[1]s OR (t1.%[1]s IS NULL) != (s1.%[1]s IS NULL))", col.Name))
 		}
 	}
 

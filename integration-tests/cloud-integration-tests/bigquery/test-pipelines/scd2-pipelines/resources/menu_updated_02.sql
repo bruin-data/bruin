@@ -26,3 +26,5 @@ columns:
 
 
 SELECT 1 AS ID, 'Cola' AS Name, 0.99 AS Price
+UNION ALL
+SELECT 5 AS ID, 'Water' AS Name, 1.99 AS Price

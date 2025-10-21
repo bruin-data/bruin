@@ -907,12 +907,12 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM   s1\n" +
 				"  JOIN   `my.asset` AS t1 USING (id)\n" +
-				"  WHERE  (t1.col1 != s1.col1 OR t1.col2 != s1.col2 OR t1.col3 != s1.col3 OR t1.col4 != s1.col4) AND t1._is_current\n" +
+				"  WHERE  ((t1.col1 != s1.col1 OR (t1.col1 IS NULL) != (s1.col1 IS NULL)) OR (t1.col2 != s1.col2 OR (t1.col2 IS NULL) != (s1.col2 IS NULL)) OR (t1.col3 != s1.col3 OR (t1.col3 IS NULL) != (s1.col3 IS NULL)) OR (t1.col4 != s1.col4 OR (t1.col4 IS NULL) != (s1.col4 IS NULL))) AND t1._is_current\n" +
 				") AS source\n" +
 				"ON  target.id = source.id AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"    target.col1 != source.col1 OR target.col2 != source.col2 OR target.col3 != source.col3 OR target.col4 != source.col4\n" +
+				"    (target.col1 != source.col1 OR (target.col1 IS NULL) != (source.col1 IS NULL)) OR (target.col2 != source.col2 OR (target.col2 IS NULL) != (source.col2 IS NULL)) OR (target.col3 != source.col3 OR (target.col3 IS NULL) != (source.col3 IS NULL)) OR (target.col4 != source.col4 OR (target.col4 IS NULL) != (source.col4 IS NULL))\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
 				"    target._valid_until = CURRENT_TIMESTAMP(),\n" +
