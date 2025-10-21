@@ -538,8 +538,7 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 			return false
 		}
 
-		// Only compare partition types if we have a complex expression and both types are specified
-		// For simple column names, we don't enforce type matching
+		// Compare partition types (defaults to DAY for simple column names)
 		if assetPartitionType != "" && metaType != "" && metaType != assetPartitionType {
 			return false
 		}
