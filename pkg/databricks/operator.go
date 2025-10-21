@@ -2,9 +2,6 @@ package databricks
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -14,8 +11,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 )
-
-const CharacterLimit = 10000
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) ([]string, error)
@@ -95,16 +90,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	for _, queryString := range materializedQueries {
 		p := &query.Query{Query: queryString}
 
-		// Print SQL query in verbose mode
-		if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
-			if w, ok := writer.(io.Writer); ok {
-				queryPreview := strings.TrimSpace(p.Query)
-				if len(queryPreview) > CharacterLimit {
-					queryPreview = queryPreview[:CharacterLimit] + "\n... (truncated)"
-				}
-				fmt.Fprintf(w, "Executing SQL query:\n%s\n\n", queryPreview)
-			}
-		}
+		ansisql.LogQueryIfVerbose(ctx, writer, p.Query)
 
 		err = conn.RunQueryWithoutResult(ctx, p)
 		if err != nil {

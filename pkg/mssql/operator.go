@@ -2,9 +2,6 @@ package mssql
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -14,8 +11,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 )
-
-const CharacterLimit = 10000
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
@@ -89,17 +84,8 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("'%s' either does not exist or is not a MsSql connection", connName)
 	}
 
-	// Print SQL query in verbose mode
 	writer := ctx.Value(executor.KeyPrinter)
-	if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
-		if w, ok := writer.(io.Writer); ok {
-			queryPreview := strings.TrimSpace(q.Query)
-			if len(queryPreview) > CharacterLimit {
-				queryPreview = queryPreview[:CharacterLimit] + "\n... (truncated)"
-			}
-			fmt.Fprintf(w, "Executing SQL query:\n%s\n\n", queryPreview)
-		}
-	}
+	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
 
 	return conn.RunQueryWithoutResult(ctx, q)
 }

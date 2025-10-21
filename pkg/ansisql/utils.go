@@ -4,13 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 )
 
 const DefaultQueryAnnotations = "default"
+const QueryLogCharacterLimit = 10000
 
 func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) (*query.Query, error) {
 	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
@@ -121,4 +125,25 @@ func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 	return &query.Query{
 		Query: comment + q.Query,
 	}, nil
+}
+
+// LogQueryIfVerbose logs the SQL query to the writer if verbose mode is enabled.
+// It checks for the verbose flag in the context and writes a formatted query preview
+// to the printer writer, truncating queries longer than QueryLogCharacterLimit.
+func LogQueryIfVerbose(ctx context.Context, writer interface{}, queryString string) {
+	verbose := ctx.Value(executor.KeyVerbose)
+	if verbose == nil || !verbose.(bool) {
+		return
+	}
+
+	w, ok := writer.(io.Writer)
+	if !ok {
+		return
+	}
+
+	queryPreview := strings.TrimSpace(queryString)
+	if len(queryPreview) > QueryLogCharacterLimit {
+		queryPreview = queryPreview[:QueryLogCharacterLimit] + "\n... (truncated)"
+	}
+	fmt.Fprintf(w, "Executing SQL query:\n%s\n\n", queryPreview)
 }
