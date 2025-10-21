@@ -154,15 +154,18 @@ Similar to SQL and Python, Bruin supports running R natively as well.
 You can create an R asset with a file `assets/my_r_asset.r`:
 
 ```r
-# @bruin.name: my_r_asset
-# @bruin.type: r
+"@bruin
+name: my_r_asset
+type: r
+@bruin"
 
 cat("Hello from R!\n")
 result <- 2 + 2
 cat(sprintf("2 + 2 = %d\n", result))
 ```
 
-- Lines starting with `# @bruin.` are configuration for the asset.
+- The sections between `"@bruin` and `@bruin"` contain YAML configuration for the asset using R's multiline string syntax.
+- You can use either double quotes `"` or single quotes `'` - just make sure they match.
 - The rest of the file is a regular R script.
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:

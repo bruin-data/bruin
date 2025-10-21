@@ -9,18 +9,15 @@ Bruin brings R statistical computing capabilities to your data pipelines:
 R assets allow you to leverage R's extensive ecosystem for statistical analysis, machine learning, data visualization, and more within your Bruin pipelines.
 
 ```r
-# @bruin
-#
-# name: statistical_analysis
-# type: r
-# connection: postgres
-#
-# @bruin
+"@bruin
+name: statistical_analysis
+type: r
+depends:
+    - raw_user_data
+@bruin"
 
 library(dplyr)
-library(ggplot2)
 
-# Perform statistical analysis
 cat("Running R statistical analysis\n")
 
 # Your R code here
@@ -73,12 +70,10 @@ renv::snapshot()           # Create renv.lock file
 If you don't use `renv.lock`, you can manage dependencies directly in your R script using `install.packages()`:
 
 ```r
-# @bruin
-#
-# name: manual_deps_example
-# type: r
-#
-# @bruin
+"@bruin
+name: manual_deps_example
+type: r
+@bruin"
 
 # Check if package is installed, install if not
 if (!require("jsonlite", quietly = TRUE)) {
@@ -92,82 +87,60 @@ library(jsonlite)
 
 ## Asset Definition
 
-R assets use R comments with the `@bruin` marker to define metadata:
+R assets use a multiline string with `@bruin` markers to define metadata in YAML format. This is similar to Python's approach but uses R's native string syntax:
 
 ```r
-# @bruin
-#
-# name: asset_name
-# type: r
-# depends:
-#   - upstream_asset
-#
-# secrets:
-#   - key: MY_SECRET
-#     inject_as: R_SECRET
-#
-# @bruin
+"@bruin
+name: asset_name
+type: r
+depends:
+    - upstream_asset1
+    - upstream_asset2
+
+secrets:
+    - key: MY_SECRET
+      inject_as: R_SECRET
+@bruin"
 
 # Your R code starts here
 cat("Hello from R!\n")
 ```
 
-### Parameters
+The configuration block must:
+- Start with `"@bruin` on its own line (can also use single quotes `'@bruin`)
+- End with `@bruin"` on its own line (matching quote type)
+- Contain valid YAML configuration between the markers
+- Preserve proper YAML indentation
 
-| Parameter | Required | Description |
-|:----------|:---------|:------------|
-| `name` | Yes | The unique identifier for the asset |
-| `type` | No | Asset type, automatically set to `r` for `.r` files |
-| `depends` | No | List of upstream assets this asset depends on |
-| `secrets` | No | List of secrets/connections to inject as environment variables |
-| `connection` | No | Default connection to use for this asset |
+All standard asset parameters are supported. See the [SQL asset documentation](/assets/sql#definition) for a complete list of available configuration options including:
+- Dependencies (`depends`)
+- Secrets and connections (`secrets`)
+- Parameters (`parameters`)
+- Columns and quality checks (`columns`)
+- Custom checks (`custom_checks`)
+- And more
 
-## Secrets
+## Secrets and Connections
 
-Bruin supports injecting connections into your R assets as environment variables.
-
-You can define secrets in your asset definition using the `secrets` key, and Bruin will automatically make them available as environment variables during execution.
-The injected secret is a JSON representation of the connection model.
-
-This is useful for API keys, passwords, database credentials, and other sensitive information.
+Secrets and connections are injected as environment variables in JSON format. See the [secrets documentation](/secrets/overview) for more details on how to define and use secrets.
 
 ```r
-# @bruin
-#
-# name: r_with_secrets
-# secrets:
-#   - key: postgres_connection
-#
-# @bruin
+"@bruin
+name: r_with_secrets
+secrets:
+    - key: postgres_connection
+      inject_as: DB_CONN
+@bruin"
+
+library(jsonlite)
 
 # Access the secret from environment variable
-connection_json <- Sys.getenv("postgres_connection")
-
-# Parse JSON if needed
-library(jsonlite)
+connection_json <- Sys.getenv("DB_CONN")
 conn_details <- fromJSON(connection_json)
 
 # Use connection details
 cat(sprintf("Connecting to: %s\n", conn_details$host))
 ```
-
-By default, secrets are injected as environment variables using the key name. If you want to inject a secret under a different environment variable name, you can use the `inject_as` field:
-
-```r
-# @bruin
-#
-# name: r_renamed_secret
-# secrets:
-#   - key: postgres_connection
-#     inject_as: DB_CREDS
-#
-# @bruin
-
-# Access using the custom name
-db_credentials <- Sys.getenv("DB_CREDS")
-```
-
-This allows you to map a secret key to any environment variable name you prefer inside your R code.
 
 ## Environment Variables
 
@@ -198,11 +171,9 @@ Bruin supports user-defined variables at a pipeline level. These become availabl
 Here's an example:
 
 ```r
-# @bruin
-#
-# name: r_with_variables
-#
-# @bruin
+"@bruin
+name: r_with_variables
+@bruin"
 
 library(jsonlite)
 
@@ -210,7 +181,6 @@ library(jsonlite)
 vars_json <- Sys.getenv("BRUIN_VARS")
 vars <- fromJSON(vars_json)
 
-# Use variables in your R code
 cat(sprintf("Environment: %s\n", vars$environment))
 cat(sprintf("Region: %s\n", vars$region))
 ```
@@ -222,11 +192,10 @@ cat(sprintf("Region: %s\n", vars$region))
 The simplest R asset with no dependencies:
 
 ```r
-# @bruin
-#
-# name: hello_r
-#
-# @bruin
+"@bruin
+name: hello_r
+type: r
+@bruin"
 
 cat("Hello from R!\n")
 result <- 2 + 2
@@ -238,17 +207,14 @@ cat(sprintf("2 + 2 = %d\n", result))
 Using R packages for statistical analysis:
 
 ```r
-# @bruin
-#
-# name: statistical_summary
-# depends:
-#   - raw_data
-#
-# @bruin
+"@bruin
+name: statistical_summary
+depends:
+    - raw_data
+@bruin"
 
 library(dplyr)
 
-# Assuming you have data from upstream
 cat("Performing statistical analysis\n")
 
 # Generate sample data
@@ -276,14 +242,12 @@ print(summary_stats)
 Accessing database credentials via environment variables:
 
 ```r
-# @bruin
-#
-# name: db_analysis
-# secrets:
-#   - key: postgres-default
-#     inject_as: PG_CONN
-#
-# @bruin
+"@bruin
+name: db_analysis
+secrets:
+    - key: postgres-default
+      inject_as: PG_CONN
+@bruin"
 
 library(jsonlite)
 library(DBI)
@@ -316,16 +280,13 @@ dbDisconnect(con)
 Using R's extensive time-series capabilities:
 
 ```r
-# @bruin
-#
-# name: time_series_forecast
-# depends:
-#   - historical_data
-#
-# @bruin
+"@bruin
+name: time_series_forecast
+depends:
+    - historical_data
+@bruin"
 
 library(forecast)
-library(lubridate)
 
 cat("Running time-series forecast\n")
 
@@ -356,16 +317,47 @@ To verify R is installed correctly:
 R --version
 ```
 
+### Advanced Configuration Example
+
+Here's an example showing a more complex configuration:
+
+```r
+"@bruin
+name: comprehensive_analysis
+type: r
+depends:
+    - raw_user_data
+    - product_catalog
+
+secrets:
+    - key: postgres-analytics
+      inject_as: DB_CONN
+
+columns:
+    - name: user_id
+      type: integer
+      checks:
+          - name: not_null
+          - name: unique
+@bruin"
+
+library(dplyr)
+library(jsonlite)
+
+# Access environment variables
+db_json <- Sys.getenv("DB_CONN")
+db <- fromJSON(db_json)
+
+cat("Running comprehensive analysis\n")
+# Your analysis code here
+```
+
 ## Best Practices
 
 1. **Use renv for reproducibility**: Create an `renv.lock` file to ensure consistent package versions across environments
-2. **Handle errors gracefully**: Use R's error handling (`tryCatch`) to provide clear error messages
-3. **Log progress**: Use `cat()` or `print()` statements to provide visibility into your R script's execution
-4. **Clean up resources**: Always close database connections and file handles when done
-5. **Test locally**: Run your R scripts locally before integrating them into pipelines
-
-## Limitations
-
-- R assets currently support script execution only (no table materialization in the initial version)
-- Column checks and custom SQL checks are not available for R assets
-- R version must be installed on the system (automatic R version management is not yet supported)
+2. **Use the string-based multiline format**: The multiline string format (using `"@bruin ... @bruin"`) makes complex configurations with dependencies, secrets, and parameters much easier to read and maintain
+3. **Quote choice**: Use double quotes `"` or single quotes `'` - both work, just ensure the opening and closing quotes match
+4. **Handle errors gracefully**: Use R's error handling (`tryCatch`) to provide clear error messages
+5. **Log progress**: Use `cat()` or `print()` statements to provide visibility into your R script's execution
+6. **Clean up resources**: Always close database connections and file handles when done
+7. **Test locally**: Run your R scripts locally before integrating them into pipelines

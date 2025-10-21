@@ -23,8 +23,18 @@ var commentMarkers = map[string]string{
 }
 
 var (
-	possiblePrefixesForCommentBlocks = []string{"/*@bruin", "/* @bruin", "/*  @bruin", "/*   @bruin", `"""@bruin`, `""" @bruin`, `"""  @bruin`, `"""   @bruin`, "#@bruin", "# @bruin", "#  @bruin", "#   @bruin"}
-	possibleSuffixesForCommentBlocks = []string{"@bruin*/", "@bruin */", "@bruin  */", "@bruin   */", `@bruin"""`, `@bruin """`, `@bruin  """`, `@bruin   """`, "#@bruin", "# @bruin", "#  @bruin", "#   @bruin"}
+	possiblePrefixesForCommentBlocks = []string{
+		"/*@bruin", "/* @bruin", "/*  @bruin", "/*   @bruin",
+		`"""@bruin`, `""" @bruin`, `"""  @bruin`, `"""   @bruin`,
+		`"@bruin`, `" @bruin`, `"  @bruin`, `"   @bruin`,
+		`'@bruin`, `' @bruin`, `'  @bruin`, `'   @bruin`,
+	}
+	possibleSuffixesForCommentBlocks = []string{
+		"@bruin*/", "@bruin */", "@bruin  */", "@bruin   */",
+		`@bruin"""`, `@bruin """`, `@bruin  """`, `@bruin   """`,
+		`@bruin"`, `@bruin "`, `@bruin  "`, `@bruin   "`,
+		`@bruin'`, `@bruin '`, `@bruin  '`, `@bruin   '`,
+	}
 )
 
 func CreateTaskFromFileComments(fs afero.Fs) TaskCreator {
@@ -76,9 +86,7 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 }
 
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
-	extension := filepath.Ext(filePath)
-	commentMarker := commentMarkers[extension]
-	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks, commentMarker)
+	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
 	if rows == "" {
 		return nil, &ParseError{"no embedded YAML found in the comments"}
 	}
@@ -112,26 +120,11 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	return task, nil
 }
 
-func readUntilComments(file afero.File, prefixes, suffixes []string, commentMarker string) (string, int) {
+func readUntilComments(file afero.File, prefixes, suffixes []string) (string, int) {
 	scanner := bufio.NewScanner(file)
 	defer func() { _, _ = file.Seek(0, io.SeekStart) }()
 	rows := ""
 	rowCount := 0
-
-	// Check if we're using comment-based multiline blocks (e.g., # @bruin for R)
-	// This is only true if the first line is EXACTLY one of the prefixes that start with the comment marker
-	isCommentBased := false
-	if scanner.Scan() {
-		firstLine := strings.TrimSpace(scanner.Text())
-		for _, prefix := range prefixes {
-			if firstLine == prefix && strings.HasPrefix(prefix, commentMarker) && (commentMarker == "#" || commentMarker == "--") {
-				isCommentBased = true
-				break
-			}
-		}
-	}
-	_, _ = file.Seek(0, io.SeekStart)
-	scanner = bufio.NewScanner(file)
 
 	seenPrefix := false
 
@@ -142,7 +135,7 @@ OUTER:
 		rowText := scanner.Text()
 		trimmed := strings.TrimSpace(rowText)
 
-		// For comment-based blocks where prefix == suffix, track if we've seen the opening
+		// Check if this line matches a prefix (opening marker)
 		for _, prefix := range prefixes {
 			if trimmed == prefix {
 				if !seenPrefix {
@@ -150,37 +143,18 @@ OUTER:
 					seenPrefix = true
 					continue OUTER
 				}
-				// Second occurrence - this is the closing marker
-				break OUTER
 			}
 		}
 
-		// For blocks where prefix != suffix (like SQL /* */ or Python """)
+		// Check if this line matches a suffix (closing marker)
 		for _, suffix := range suffixes {
-			if trimmed == suffix && trimmed != prefixes[0] {
+			if trimmed == suffix {
 				break OUTER
 			}
 		}
 
-		// For comment-based blocks, strip the comment marker from each line
-		if isCommentBased {
-			// Find the comment marker and remove it, preserving indentation after the marker
-			idx := strings.Index(rowText, commentMarker)
-			if idx >= 0 {
-				// Get everything after the comment marker
-				afterMarker := rowText[idx+len(commentMarker):]
-				// If there's a space immediately after the marker, remove it
-				if len(afterMarker) > 0 && afterMarker[0] == ' ' {
-					afterMarker = afterMarker[1:]
-				}
-				rows += afterMarker + "\n"
-			} else {
-				// If no comment marker found, just add the line as-is (shouldn't happen but be safe)
-				rows += rowText + "\n"
-			}
-		} else {
-			rows += rowText + "\n"
-		}
+		// Add the content line
+		rows += rowText + "\n"
 	}
 
 	return strings.TrimSpace(rows), rowCount

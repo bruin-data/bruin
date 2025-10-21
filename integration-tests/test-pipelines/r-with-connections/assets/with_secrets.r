@@ -1,11 +1,11 @@
-# @bruin
-# name: r_asset_with_secrets
-# type: r
-# secrets:
-#     - key: KEY1
-#       inject_as: INJECTED1
-#     - key: chess-default
-# @bruin
+"@bruin
+name: r_asset_with_secrets
+type: r
+secrets:
+    - key: KEY1
+      inject_as: INJECTED1
+    - key: chess-default
+@bruin"
 
 # R script that tests environment variable injection (secrets/connections)
 cat("Testing environment variable injection\n")
