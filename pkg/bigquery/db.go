@@ -67,6 +67,38 @@ type Client struct {
 	typeMapper *diff.DatabaseTypeMapper
 }
 
+// isCredentialError checks if an error is related to missing or invalid credentials
+func isCredentialError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errMsg := err.Error()
+
+	// Check for common credential-related error messages
+	credentialErrorPatterns := []string{
+		"credentials",
+		"authentication",
+		"auth",
+		"permission denied",
+		"unauthorized",
+		"unauthenticated",
+		"invalid grant",
+		"token",
+		"DefaultCredentialsError",
+		"could not find default credentials",
+	}
+
+	errLower := strings.ToLower(errMsg)
+	for _, pattern := range credentialErrorPatterns {
+		if strings.Contains(errLower, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func NewDB(c *Config) (*Client, error) {
 	options := []option.ClientOption{
 		option.WithScopes(scopes...),
@@ -85,6 +117,7 @@ func NewDB(c *Config) (*Client, error) {
 			return nil, errors.New("no credentials provided")
 		}
 	}
+	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
 
 	client, err := bigquery.NewClient(
 		context.Background(),
@@ -92,6 +125,18 @@ func NewDB(c *Config) (*Client, error) {
 		options...,
 	)
 	if err != nil {
+		// If ADC is enabled and the error is credential-related, provide helpful instructions
+		if c.UseApplicationDefaultCredentials && isCredentialError(err) {
+			return nil, fmt.Errorf("failed to create BigQuery client using Application Default Credentials.\n\n"+
+				"Original error: %v\n\n"+
+				"Please authenticate using one of the following methods:\n\n"+
+				"  1. Run: gcloud auth application-default login\n"+
+				"     This will open a browser to authenticate and store credentials.\n\n"+
+				"  2. Set GOOGLE_APPLICATION_CREDENTIALS environment variable:\n"+
+				"     export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json\n\n"+
+				"For more information, visit:\n"+
+				"https://cloud.google.com/docs/authentication/application-default-credentials", err)
+		}
 		return nil, errors.Wrap(err, "failed to create bigquery client")
 	}
 
@@ -136,8 +181,25 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 			return nil, errors.New("no credentials provided for Data Transfer client")
 		}
 	}
+	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
 
-	return datatransfer.NewClient(ctx, options...)
+	client, err := datatransfer.NewClient(ctx, options...)
+	if err != nil {
+		// If ADC is enabled and the error is credential-related, provide helpful instructions
+		if d.config.UseApplicationDefaultCredentials && isCredentialError(err) {
+			return nil, fmt.Errorf("failed to create Data Transfer client using Application Default Credentials.\n\n"+
+				"Original error: %v\n\n"+
+				"Please authenticate using one of the following methods:\n\n"+
+				"  1. Run: gcloud auth application-default login\n"+
+				"     This will open a browser to authenticate and store credentials.\n\n"+
+				"  2. Set GOOGLE_APPLICATION_CREDENTIALS environment variable:\n"+
+				"     export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json\n\n"+
+				"For more information, visit:\n"+
+				"https://cloud.google.com/docs/authentication/application-default-credentials", err)
+		}
+		return nil, err
+	}
+	return client, nil
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
