@@ -92,6 +92,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	for _, queryString := range materializedQueries {
 		p := &query.Query{Query: queryString}
+
+		ansisql.LogQueryIfVerbose(ctx, writer, p.Query)
+
 		err = conn.RunQueryWithoutResult(ctx, p)
 		if err != nil {
 			return err

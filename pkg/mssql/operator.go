@@ -5,6 +5,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -82,6 +83,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if !ok {
 		return errors.Errorf("'%s' either does not exist or is not a MsSql connection", connName)
 	}
+
+	writer := ctx.Value(executor.KeyPrinter)
+	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
 
 	return conn.RunQueryWithoutResult(ctx, q)
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -75,8 +76,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("'%s' either does not exist or is not a Synapse connection", connName)
 	}
 
+	writer := ctx.Value(executor.KeyPrinter)
 	for _, queryString := range materializedQueries {
 		p := &query.Query{Query: queryString}
+
+		ansisql.LogQueryIfVerbose(ctx, writer, p.Query)
+
 		err = conn.RunQueryWithoutResult(ctx, p)
 		if err != nil {
 			return err
