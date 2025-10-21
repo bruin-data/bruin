@@ -512,17 +512,19 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 	var assetColumn string
 	var assetPartitionType string
 
-	if len(assetMatches) > 0 {
+	// if match, FindStringSubmatch() returns a slice of exactly 5 elements [fullMatch, group1, group2, group3, group4], else returns nil.
+	if assetMatches != nil {
 		// Extract column and partition type from regex matches
-		if assetMatches[1] != "" && assetMatches[2] != "" {
+		switch {
+		case assetMatches[1] != "" && assetMatches[2] != "":
 			// date_trunc/timestamp_trunc case
 			assetColumn = strings.ToLower(assetMatches[1])
 			assetPartitionType = strings.ToLower(assetMatches[2])
-		} else if assetMatches[3] != "" {
+		case assetMatches[3] != "":
 			// date() case
 			assetColumn = strings.ToLower(assetMatches[3])
 			assetPartitionType = "day" // date() defaults to day partitioning
-		} else if assetMatches[4] != "" {
+		case assetMatches[4] != "":
 			// simple column case
 			assetColumn = strings.ToLower(assetMatches[4])
 			assetPartitionType = "day" // default to day partitioning
