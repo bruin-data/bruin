@@ -67,30 +67,45 @@ type Client struct {
 	typeMapper *diff.DatabaseTypeMapper
 }
 
-// isCredentialError checks if an error is related to missing or invalid credentials
+// isCredentialError checks if an error is related to missing or invalid credentials.
+// This function detects authentication errors using Google API's error codes.
+// Reference: https://pkg.go.dev/cloud.google.com/go#section-readme
 func isCredentialError(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	errMsg := err.Error()
-
-	// Check for common credential-related error messages
-	credentialErrorPatterns := []string{
-		"credentials",
-		"authentication",
-		"auth",
-		"permission denied",
-		"unauthorized",
-		"unauthenticated",
-		"invalid grant",
-		"token",
-		"DefaultCredentialsError",
-		"could not find default credentials",
+	// Check if this is a googleapi.Error with an authentication/authorization error code
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) {
+		// 401 = Unauthorized (authentication failure)
+		// 403 = Forbidden (authorization/permission failure)
+		if apiErr.Code == 401 || apiErr.Code == 403 {
+			return true
+		}
 	}
 
+	// Also check for credential setup errors that occur before API calls
+	// These are returned during client initialization when ADC cannot find credentials
+	errMsg := err.Error()
 	errLower := strings.ToLower(errMsg)
-	for _, pattern := range credentialErrorPatterns {
+
+	// Standard ADC error when credentials are not found
+	if strings.Contains(errLower, "could not find default credentials") {
+		return true
+	}
+
+	// OAuth2 credential errors that occur during client setup
+	credentialSetupErrors := []string{
+		"defaultcredentialserror",        // Error type name from oauth2/google
+		"no such file or directory",      // When GOOGLE_APPLICATION_CREDENTIALS points to missing file
+		"failed to create oauth2 client", // OAuth2 setup failure
+		"unable to retrieve credentials", // Generic credential retrieval failure
+		"invalid_grant",                  // OAuth2 invalid grant error
+		"unauthorized_client",            // OAuth2 client authorization error
+	}
+
+	for _, pattern := range credentialSetupErrors {
 		if strings.Contains(errLower, pattern) {
 			return true
 		}
@@ -126,16 +141,22 @@ func NewDB(c *Config) (*Client, error) {
 	)
 	if err != nil {
 		// If ADC is enabled and the error is credential-related, provide helpful instructions
+		// based on Google Cloud's official documentation
 		if c.UseApplicationDefaultCredentials && isCredentialError(err) {
-			return nil, fmt.Errorf("failed to create BigQuery client using Application Default Credentials.\n\n"+
+			return nil, fmt.Errorf("failed to create BigQuery client using Application Default Credentials (ADC).\n\n"+
 				"Original error: %v\n\n"+
-				"Please authenticate using one of the following methods:\n\n"+
-				"  1. Run: gcloud auth application-default login\n"+
-				"     This will open a browser to authenticate and store credentials.\n\n"+
-				"  2. Set GOOGLE_APPLICATION_CREDENTIALS environment variable:\n"+
-				"     export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json\n\n"+
-				"For more information, visit:\n"+
-				"https://cloud.google.com/docs/authentication/application-default-credentials", err)
+				"ADC searches for credentials in this order:\n"+
+				"  1. GOOGLE_APPLICATION_CREDENTIALS environment variable\n"+
+				"  2. User credentials from gcloud CLI\n"+
+				"  3. Service account credentials (when running on Google Cloud)\n\n"+
+				"To fix this, try one of the following:\n\n"+
+				"  Option 1 - Use gcloud CLI (recommended for local development):\n"+
+				"    $ gcloud auth application-default login\n\n"+
+				"  Option 2 - Use a service account key file:\n"+
+				"    $ export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/service-account-key.json\"\n\n"+
+				"For more information:\n"+
+				"  https://cloud.google.com/docs/authentication/application-default-credentials\n"+
+				"  https://pkg.go.dev/cloud.google.com/go#section-readme", err)
 		}
 		return nil, errors.Wrap(err, "failed to create bigquery client")
 	}
@@ -186,16 +207,22 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 	client, err := datatransfer.NewClient(ctx, options...)
 	if err != nil {
 		// If ADC is enabled and the error is credential-related, provide helpful instructions
+		// based on Google Cloud's official documentation
 		if d.config.UseApplicationDefaultCredentials && isCredentialError(err) {
-			return nil, fmt.Errorf("failed to create Data Transfer client using Application Default Credentials.\n\n"+
+			return nil, fmt.Errorf("failed to create Data Transfer client using Application Default Credentials (ADC).\n\n"+
 				"Original error: %v\n\n"+
-				"Please authenticate using one of the following methods:\n\n"+
-				"  1. Run: gcloud auth application-default login\n"+
-				"     This will open a browser to authenticate and store credentials.\n\n"+
-				"  2. Set GOOGLE_APPLICATION_CREDENTIALS environment variable:\n"+
-				"     export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json\n\n"+
-				"For more information, visit:\n"+
-				"https://cloud.google.com/docs/authentication/application-default-credentials", err)
+				"ADC searches for credentials in this order:\n"+
+				"  1. GOOGLE_APPLICATION_CREDENTIALS environment variable\n"+
+				"  2. User credentials from gcloud CLI\n"+
+				"  3. Service account credentials (when running on Google Cloud)\n\n"+
+				"To fix this, try one of the following:\n\n"+
+				"  Option 1 - Use gcloud CLI (recommended for local development):\n"+
+				"    $ gcloud auth application-default login\n\n"+
+				"  Option 2 - Use a service account key file:\n"+
+				"    $ export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/service-account-key.json\"\n\n"+
+				"For more information:\n"+
+				"  https://cloud.google.com/docs/authentication/application-default-credentials\n"+
+				"  https://pkg.go.dev/cloud.google.com/go#section-readme", err)
 		}
 		return nil, err
 	}
