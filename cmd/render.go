@@ -223,16 +223,26 @@ func Render() *cli.Command {
 					Renderer: forAsset,
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
-					pipeline.AssetTypeBigqueryQuery:   bigquery.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeSnowflakeQuery:  snowflake.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeRedshiftQuery:   postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypePostgresQuery:   postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeMsSQLQuery:      mssql.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeDatabricksQuery: databricks.NewRenderer(fullRefresh),
-					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
-					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh, resultsLocation),
-					pipeline.AssetTypeDuckDBQuery:     duck.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeClickHouse:      clickhouse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeBigqueryQuery:       bigquery.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeBigqueryQuerySensor: bigquery.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSnowflakeQuery:      snowflake.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSnowflakeQuerySensor: snowflake.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeRedshiftQuery:       postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeRedshiftQuerySensor: postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypePostgresQuery:       postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypePostgresQuerySensor: postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeMsSQLQuery:          mssql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeMsSQLQuerySensor:    mssql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDatabricksQuery:     databricks.NewRenderer(fullRefresh),
+					pipeline.AssetTypeDatabricksQuerySensor: databricks.NewRenderer(fullRefresh),
+					pipeline.AssetTypeSynapseQuery:        synapse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeSynapseQuerySensor:  synapse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeAthenaQuery:         athena.NewRenderer(fullRefresh, resultsLocation),
+					pipeline.AssetTypeAthenaSQLSensor:     athena.NewRenderer(fullRefresh, resultsLocation),
+					pipeline.AssetTypeDuckDBQuery:         duck.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDuckDBQuerySensor:   duck.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeClickHouse:          clickhouse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeClickHouseQuerySensor: clickhouse.NewRenderer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
@@ -278,7 +288,20 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	}
 	extractor := r.extractor
 
-	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
+	// For query sensor assets, extract query from Parameters instead of ExecutableFile.Content
+	var queryString string
+	if isQuerySensorAsset(task.Type) {
+		queryParam, ok := task.Parameters["query"]
+		if !ok {
+			r.printErrorOrJSON("query sensor asset requires a parameter named 'query'")
+			return cli.Exit("", 1)
+		}
+		queryString = queryParam
+	} else {
+		queryString = task.ExecutableFile.Content
+	}
+
+	queries, err := extractor.ExtractQueriesFromString(queryString)
 	if err != nil {
 		r.printErrorOrJSON(err.Error())
 		return cli.Exit("", 1)
@@ -327,6 +350,22 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	}
 
 	return err
+}
+
+func isQuerySensorAsset(assetType pipeline.AssetType) bool {
+	querySensorTypes := map[pipeline.AssetType]bool{
+		pipeline.AssetTypeBigqueryQuerySensor:    true,
+		pipeline.AssetTypeSnowflakeQuerySensor:   true,
+		pipeline.AssetTypePostgresQuerySensor:    true,
+		pipeline.AssetTypeRedshiftQuerySensor:    true,
+		pipeline.AssetTypeMsSQLQuerySensor:       true,
+		pipeline.AssetTypeDatabricksQuerySensor:  true,
+		pipeline.AssetTypeSynapseQuerySensor:     true,
+		pipeline.AssetTypeAthenaSQLSensor:        true,
+		pipeline.AssetTypeDuckDBQuerySensor:      true,
+		pipeline.AssetTypeClickHouseQuerySensor:  true,
+	}
+	return querySensorTypes[assetType]
 }
 
 func highlightCode(code string, language string) string {
