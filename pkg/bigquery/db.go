@@ -492,6 +492,12 @@ func (d *Client) IsPartitioningOrClusteringMismatch(ctx context.Context, meta *b
 }
 
 func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	// If asset has no partition but table does, they don't match
+	if asset.Materialization.PartitionBy == "" &&
+		(meta.TimePartitioning != nil || meta.RangePartitioning != nil) {
+		return false
+	}
+
 	if asset.Materialization.PartitionBy != "" &&
 		meta.TimePartitioning == nil &&
 		meta.RangePartitioning == nil {
@@ -529,6 +535,11 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 			assetColumn = strings.ToLower(assetMatches[4])
 			assetPartitionType = "day" // default to day partitioning
 		}
+	}
+
+	// If regex failed to extract a column name, the partition expression is invalid
+	if assetColumn == "" {
+		return false
 	}
 
 	if meta.TimePartitioning != nil {
