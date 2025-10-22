@@ -742,6 +742,93 @@ func TestBigQueryWorkflows(t *testing.T) {
 			},
 		},
 		{
+			name: "bigquery-drop-on-mismatch",
+			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
+				return e2e.Workflow{
+					Name: "bigquery-drop-on-mismatch",
+					Steps: []e2e.Task{
+						{
+							Name:    "drop-on-mismatch: drop schema if exists",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP SCHEMA IF EXISTS bq_test CASCADE;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode, // Should fail because table doesn't exist
+							},
+						},
+						{
+							Name:    "drop-on-mismatch: run the pipeline",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--start-date", "2024-01-01", "--end-date", "2024-01-02", filepath.Join(tempDir, "test-pipelines/drop-on-mismatch-pipeline")),
+							Expected: e2e.Output{
+								ExitCode: 0,
+								Contains: []string{"Interval: 2024-01-01T00:00:00Z - 2024-01-02T00:00:00Z", "Assets executed", "11 succeeded"},
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByContains,
+							},
+						},
+						{
+							Name:    "drop-on-mismatch: run the pipeline with full refresh",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--start-date", "2025-01-01", "--end-date", "2025-01-02", "--env", "default", filepath.Join(tempDir, "test-pipelines/drop-on-mismatch-pipeline")),
+							Expected: e2e.Output{
+								ExitCode: 0,
+								Contains: []string{"Successfully"},
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByContains,
+							},
+						},
+						{
+							Name:    "drop-on-mismatch: query the schema to check that no new tables were created	",
+							Command: binary,
+							Args: append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", `
+								SELECT COUNT(*) as tables_with_2025_data
+								FROM (
+									SELECT 'compose' as table_name, COUNT(*) as cnt FROM bq_test.compose WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'date_01', COUNT(*) FROM bq_test.date_01 WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'date_02', COUNT(*) FROM bq_test.date_02 WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'date_trunc_01', COUNT(*) FROM bq_test.date_trunc_01 WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'date_trunc_02', COUNT(*) FROM bq_test.date_trunc_02 WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'date_trunc_03', COUNT(*) FROM bq_test.date_trunc_03 WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'ts', COUNT(*) FROM bq_test.ts WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'ts_truncate_01', COUNT(*) FROM bq_test.ts_truncate_01 WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'ts_truncate_02', COUNT(*) FROM bq_test.ts_truncate_02 WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'ts_truncate_03', COUNT(*) FROM bq_test.ts_truncate_03 WHERE created_at = '2025-01-01'
+									UNION ALL
+									SELECT 'ts_truncate_04', COUNT(*) FROM bq_test.ts_truncate_04 WHERE created_at = '2025-01-01'
+								)
+								WHERE cnt > 0;
+							`, "--output", "csv"),
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/drop-on-mismatch-pipeline/expectations/drop_on_mismatch_expected.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
 			name: "merge-sql-pipeline",
 			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
 				return e2e.Workflow{
