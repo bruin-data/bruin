@@ -202,6 +202,19 @@ func (c MongoConnection) GetName() string {
 	return c.Name
 }
 
+type CouchbaseConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Bucket   string `yaml:"bucket,omitempty" json:"bucket" mapstructure:"bucket"`
+	SSL      bool   `yaml:"ssl,omitempty" json:"ssl" mapstructure:"ssl"`
+}
+
+func (c CouchbaseConnection) GetName() string {
+	return c.Name
+}
+
 type MongoAtlasConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
