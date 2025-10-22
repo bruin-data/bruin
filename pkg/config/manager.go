@@ -1292,6 +1292,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Databricks, source.Databricks)
 	mergeConnectionList(&c.Synapse, source.Synapse)
 	mergeConnectionList(&c.Mongo, source.Mongo)
+	mergeConnectionList(&c.Couchbase, source.Couchbase)
 	mergeConnectionList(&c.MongoAtlas, source.MongoAtlas)
 	mergeConnectionList(&c.MySQL, source.MySQL)
 	mergeConnectionList(&c.Notion, source.Notion)

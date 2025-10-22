@@ -115,7 +115,7 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Couchbase: []CouchbaseConnection{
 				{
-					Name:     "conn-couchbase",
+					Name:     "couchbase1",
 					Host:     "couchbasehost",
 					Username: "couchbaseuser",
 					Password: "couchbasepass",

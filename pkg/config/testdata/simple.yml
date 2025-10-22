@@ -72,7 +72,7 @@ environments:
           database: "mongodb"
 
       couchbase:
-        - name: conn-couchbase
+        - name: couchbase1
           username: "couchbaseuser"
           password: "couchbasepass"
           host: "couchbasehost"
