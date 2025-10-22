@@ -772,19 +772,19 @@ func TestBigQueryWorkflows(t *testing.T) {
 								e2e.AssertByContains,
 							},
 						},
-						// {
-						// 	Name:    "drop-on-mismatch: run the pipeline with full refresh",
-						// 	Command: binary,
-						// 	Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--start-date", "2025-01-01", "--end-date", "2025-01-02", "--env", "default", filepath.Join(tempDir, "test-pipelines/drop-on-mismatch-pipeline")),
-						// 	Expected: e2e.Output{
-						// 		ExitCode: 0,
-						// 		Contains: []string{"Successfully"},
-						// 	},
-						// 	Asserts: []func(*e2e.Task) error{
-						// 		e2e.AssertByExitCode,
-						// 		e2e.AssertByContains,
-						// 	},
-						// },
+						{
+							Name:    "drop-on-mismatch: run the pipeline with full refresh",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--start-date", "2025-01-01", "--end-date", "2025-01-02", "--env", "default", filepath.Join(tempDir, "test-pipelines/drop-on-mismatch-pipeline")),
+							Expected: e2e.Output{
+								ExitCode: 0,
+								Contains: []string{"Successfully"},
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByContains,
+							},
+						},
 						{
 							Name:    "drop-on-mismatch: query the schema to check that no new tables were created	",
 							Command: binary,
