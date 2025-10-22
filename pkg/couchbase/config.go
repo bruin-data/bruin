@@ -1,7 +1,6 @@
 package couchbase
 
 import (
-	"fmt"
 	"net/url"
 )
 
