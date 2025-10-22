@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -126,7 +127,7 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 		PoolMaxConns: 10,
 	}
 
-	err := m.AddPgConnectionFromConfig(configuration)
+	err := m.AddPgConnectionFromConfig(context.Background(), configuration)
 	require.NoError(t, err)
 
 	res, ok := m.GetConnection("test").(postgres.PgClient)
@@ -156,7 +157,7 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 		SslMode:  "disable",
 	}
 
-	err := m.AddRedshiftConnectionFromConfig(configuration)
+	err := m.AddRedshiftConnectionFromConfig(context.Background(), configuration)
 	require.NoError(t, err)
 
 	res, ok = m.GetConnection("test").(postgres.PgClient)

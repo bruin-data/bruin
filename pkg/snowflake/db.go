@@ -48,7 +48,7 @@ func NewDB(c *Config) (*DB, error) {
 	}, nil
 }
 
-func (db *DB) initializeDB() error {
+func (db *DB) initializeDB(ctx context.Context) error {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
@@ -56,9 +56,9 @@ func (db *DB) initializeDB() error {
 		return nil
 	}
 
-	conn, err := sqlx.Open("snowflake", db.dsn)
+	conn, err := sqlx.ConnectContext(ctx, "snowflake", db.dsn)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open snowflake connection")
+		return errors.Wrapf(err, "failed to connect to snowflake")
 	}
 
 	db.conn = conn
@@ -75,7 +75,7 @@ func (db *DB) GetIngestrURI() (string, error) {
 }
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	if err := db.initializeDB(); err != nil {
+	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
@@ -127,7 +127,7 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 }
 
 func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	if err := db.initializeDB(); err != nil {
+	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
 
@@ -193,7 +193,7 @@ func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][
 }
 
 func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
-	if err := db.initializeDB(); err != nil {
+	if err := db.initializeDB(ctx); err != nil {
 		return false, err
 	}
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
@@ -240,7 +240,7 @@ func (db *DB) Ping(ctx context.Context) error {
 }
 
 func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
-	if err := db.initializeDB(); err != nil {
+	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
 	// Prepare Snowflake context for the query execution

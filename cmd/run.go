@@ -799,7 +799,7 @@ func Run(isDebug *bool) *cli.Command {
 					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}
 			} else {
-				connectionManager, errs = connection.NewManagerFromConfig(cm)
+				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
 			}
 
 			if len(errs) > 0 {

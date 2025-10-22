@@ -21,7 +21,7 @@ func runTableauImport(ctx context.Context, pipelinePath, connectionName, environ
 	fmt.Printf("🔧 Getting Tableau connection '%s'...\n", connectionName)
 
 	// Get Tableau connection
-	conn, err := getConnectionFromConfig(environment, connectionName, fs, configFile)
+	conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
 	if err != nil {
 		return errors2.Wrapf(err, "failed to get Tableau connection '%s' from environment '%s'", connectionName, environment)
 	}

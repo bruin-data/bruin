@@ -360,15 +360,15 @@ func (m *Manager) AddAlliumConnectionFromConfig(connection *config.AlliumConnect
 	return nil
 }
 
-func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnection) error {
-	return m.addPgLikeConnectionFromConfig(connection, false)
+func (m *Manager) AddPgConnectionFromConfig(ctx context.Context, connection *config.PostgresConnection) error {
+	return m.addPgLikeConnectionFromConfig(ctx, connection, false)
 }
 
-func (m *Manager) AddRedshiftConnectionFromConfig(connection *config.RedshiftConnection) error {
-	return m.addRedshiftConnectionFromConfig(connection)
+func (m *Manager) AddRedshiftConnectionFromConfig(ctx context.Context, connection *config.RedshiftConnection) error {
+	return m.addRedshiftConnectionFromConfig(ctx, connection)
 }
 
-func (m *Manager) addRedshiftConnectionFromConfig(connection *config.RedshiftConnection) error {
+func (m *Manager) addRedshiftConnectionFromConfig(ctx context.Context, connection *config.RedshiftConnection) error {
 	m.mutex.Lock()
 	if m.Postgres == nil {
 		m.Postgres = make(map[string]*postgres.Client)
@@ -377,7 +377,7 @@ func (m *Manager) addRedshiftConnectionFromConfig(connection *config.RedshiftCon
 
 	var client *postgres.Client
 	var err error
-	client, err = postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
+	client, err = postgres.NewClient(ctx, postgres.RedShiftConfig{
 		Username: connection.Username,
 		Password: connection.Password,
 		Host:     connection.Host,
@@ -399,7 +399,7 @@ func (m *Manager) addRedshiftConnectionFromConfig(connection *config.RedshiftCon
 	return nil
 }
 
-func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConnection, redshift bool) error {
+func (m *Manager) addPgLikeConnectionFromConfig(ctx context.Context, connection *config.PostgresConnection, redshift bool) error {
 	m.mutex.Lock()
 	if m.Postgres == nil {
 		m.Postgres = make(map[string]*postgres.Client)
@@ -414,7 +414,7 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 	var client *postgres.Client
 	var err error
 	if redshift {
-		client, err = postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
+		client, err = postgres.NewClient(ctx, postgres.RedShiftConfig{
 			Username: connection.Username,
 			Password: connection.Password,
 			Host:     connection.Host,
@@ -424,7 +424,7 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 			SslMode:  connection.SslMode,
 		})
 	} else {
-		client, err = postgres.NewClient(context.TODO(), postgres.Config{
+		client, err = postgres.NewClient(ctx, postgres.Config{
 			Username:     connection.Username,
 			Password:     connection.Password,
 			Host:         connection.Host,
@@ -2315,7 +2315,15 @@ func processConnections[T config.Named](connections []T, adder func(*T) error, w
 	}
 }
 
+// NewManagerFromConfig creates a connection Manager using a background context.
+// Prefer NewManagerFromConfigWithContext to propagate cancellation and deadlines.
 func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
+	return NewManagerFromConfigWithContext(context.Background(), cm)
+}
+
+// NewManagerFromConfigWithContext creates a connection Manager using the provided context
+// for any connection initializations that support context (e.g., Postgres/Redshift).
+func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (config.ConnectionAndDetailsGetter, []error) {
 	connectionManager := &Manager{}
 	connectionManager.availableConnections = make(map[string]any)
 	connectionManager.AllConnectionDetails = make(map[string]any)
@@ -2328,8 +2336,12 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.AwsConnection, connectionManager.AddAwsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleCloudPlatform, connectionManager.AddBqConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Snowflake, connectionManager.AddSfConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.Postgres, connectionManager.AddPgConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.RedShift, connectionManager.AddRedshiftConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Postgres, func(conn *config.PostgresConnection) error {
+		return connectionManager.AddPgConnectionFromConfig(ctx, conn)
+	}, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.RedShift, func(conn *config.RedshiftConnection) error {
+		return connectionManager.AddRedshiftConnectionFromConfig(ctx, conn)
+	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)

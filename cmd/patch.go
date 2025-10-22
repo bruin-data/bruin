@@ -79,7 +79,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager conf
 			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s'", pp.Asset.Name)
 		}
 	} else {
-		_, conn, err = getConnectionFromPipelineInfo(pp, environment)
+		_, conn, err = getConnectionFromPipelineInfoWithContext(context.Background(), pp, environment)
 		if err != nil {
 			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
 		}

@@ -165,7 +165,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("switched to the environment '%s'", cm.SelectedEnvironmentName)
 
-			connectionManager, errs := connection.NewManagerFromConfig(cm)
+			connectionManager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 			if len(errs) > 0 {
 				printErrors(errs, c.String("output"), "Failed to register connections")
 				return cli.Exit("", 1)

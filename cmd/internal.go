@@ -222,7 +222,7 @@ func DBSummary() *cli.Command {
 			output := c.String("output")
 
 			// Get connection from config
-			conn, err := getConnectionFromConfig(environment, connectionName, fs, c.String("config-file"))
+			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
@@ -792,7 +792,7 @@ func FetchDatabases() *cli.Command {
 			output := c.String("output")
 
 			// Get connection from config
-			conn, err := getConnectionFromConfig(environment, connectionName, fs, c.String("config-file"))
+			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
@@ -908,7 +908,7 @@ func FetchTables() *cli.Command {
 			output := c.String("output")
 
 			// Get connection from config
-			conn, err := getConnectionFromConfig(environment, connectionName, fs, c.String("config-file"))
+			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
@@ -1034,7 +1034,7 @@ func FetchColumns() *cli.Command {
 			output := c.String("output")
 
 			// Get connection from config
-			conn, err := getConnectionFromConfig(environment, connectionName, fs, c.String("config-file"))
+			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
@@ -1260,7 +1260,7 @@ func AssetMetadata() *cli.Command {
 				}
 			}
 
-			manager, errs := connection.NewManagerFromConfig(cm)
+			manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 			if len(errs) > 0 {
 				printErrorJSON(errs[0])
 				return cli.Exit("", 1)
