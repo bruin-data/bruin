@@ -192,7 +192,7 @@ select 2 as one
 Merge strategy requires columns to be defined and marked with `primary_key` and optionally `update_on_merge` or `merge_sql`:
 - `primary_key` determines which rows to update vs insert.
 - `update_on_merge` marks columns to update with `source.col` when a row matches.
-- `merge_sql` lets you specify a custom expression per column for matches, e.g. `GREATEST(target.col, source.col)` or `target.c + source.c`. When present, `merge_sql` takes precedence over `update_on_merge`.
+- `merge_sql` lets you specify a custom expression per column for matches, e.g. `GREATEST(target.col, source.col)`. When present, `merge_sql` takes precedence over `update_on_merge`.
 
 Supported platforms for `merge_sql`:
 - BigQuery, Snowflake, Postgres, mssql: supported

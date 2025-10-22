@@ -101,6 +101,8 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
+	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
+
 	return conn.RunQueryWithoutResult(ctx, q)
 }
 

@@ -3,6 +3,7 @@ package trino
 import (
 	"context"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -81,6 +82,8 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	// Execute each query separately
 	for _, queryObj := range materializedQueries {
+		ansisql.LogQueryIfVerbose(ctx, writer, queryObj.Query)
+
 		err = conn.RunQueryWithoutResult(ctx, queryObj)
 		if err != nil {
 			return err

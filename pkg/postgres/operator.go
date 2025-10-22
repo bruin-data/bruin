@@ -120,6 +120,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if o.devEnv == nil {
+		ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
 		return conn.RunQueryWithoutResult(ctx, q)
 	}
 
@@ -127,6 +128,8 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
+
+	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
 
 	err = conn.RunQueryWithoutResult(ctx, q)
 	if err != nil {

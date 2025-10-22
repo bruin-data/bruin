@@ -177,7 +177,7 @@ func TestNewDB_ADCWarning(t *testing.T) {
 
 	client, err := NewDB(config)
 
-	if err != nil && !strings.Contains(err.Error(), "failed to create bigquery client") {
+	if err != nil && !strings.Contains(err.Error(), "failed to create BigQuery client using Application Default Credentials (ADC)") {
 		t.Errorf("Expected client creation to succeed or fail with credential error, got: %v", err)
 	}
 
