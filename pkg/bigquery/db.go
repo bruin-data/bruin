@@ -348,7 +348,7 @@ func (m NoMetadataUpdatedError) Error() string {
 	return "no metadata found for the given asset to be pushed to BigQuery"
 }
 
-// ADCCredentialError represents an error when Application Default Credentials cannot be found or are invalid
+// ADCCredentialError represents an error when Application Default Credentials cannot be found or are invalid.
 type ADCCredentialError struct {
 	ClientType  string // e.g., "BigQuery client" or "Data Transfer client"
 	OriginalErr error
