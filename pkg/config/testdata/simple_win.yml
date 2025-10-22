@@ -71,6 +71,14 @@ environments:
           port: 27017
           database: "mongodb"
 
+      couchbase:
+        - name: conn-couchbase
+          username: "couchbaseuser"
+          password: "couchbasepass"
+          host: "couchbasehost"
+          bucket: "mybucket"
+          ssl: false
+
       mysql:
         - name: conn8
           username: "mysqluser"
