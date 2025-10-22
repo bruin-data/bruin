@@ -15,6 +15,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/devenv"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -101,7 +102,7 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
-			connName, conn, queryStr, assetType, err := prepareQueryExecution(ctx, c, fs)
+			connName, conn, queryStr, assetType, pipelineInfo, connManager, err := prepareQueryExecution(ctx, c, fs)
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
@@ -110,8 +111,21 @@ func Query() *cli.Command {
 			if err != nil {
 				dialect = ""
 			}
-			if c.IsSet("limit") {
-				parser, err := sqlparser.NewSQLParser(false)
+
+			var parser *sqlparser.SQLParser
+			needsParser := c.IsSet("limit")
+
+			// Check if schema prefix is enabled
+			var schemaPrefix string
+			if pipelineInfo != nil && pipelineInfo.Config != nil && pipelineInfo.Config.SelectedEnvironment != nil {
+				schemaPrefix = pipelineInfo.Config.SelectedEnvironment.SchemaPrefix
+				if schemaPrefix != "" {
+					needsParser = true
+				}
+			}
+
+			if needsParser && dialect != "" {
+				parser, err = sqlparser.NewSQLParser(false)
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "failed to initialize SQL parser"))
 				}
@@ -121,9 +135,31 @@ func Query() *cli.Command {
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "failed to start SQL parser"))
 				}
+			}
 
+			if c.IsSet("limit") && parser != nil {
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
+
+			// Apply schema prefix rewriting if enabled
+			if schemaPrefix != "" && parser != nil && pipelineInfo != nil && pipelineInfo.Asset != nil {
+				// Set the environment in the context for the modifier
+				modifierCtx := context.WithValue(ctx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
+
+				modifier := &devenv.DevEnvQueryModifier{
+					Dialect: dialect,
+					Conn:    connManager,
+					Parser:  parser,
+				}
+
+				q := &query.Query{Query: queryStr}
+				modifiedQuery, err := modifier.Modify(modifierCtx, pipelineInfo.Pipeline, pipelineInfo.Asset, q)
+				if err != nil {
+					return handleError(c.String("output"), errors.Wrap(err, "failed to apply schema prefix to query"))
+				}
+				queryStr = modifiedQuery.Query
+			}
+
 			//nolint:nestif
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
@@ -242,7 +278,7 @@ func validateFlags(connection, query, asset string) error {
 	}
 }
 
-func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (string, interface{}, string, pipeline.AssetType, error) {
+func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (string, interface{}, string, pipeline.AssetType, *ppInfo, connection.Manager, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
@@ -252,7 +288,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	logger := makeLogger(false)
 	startDate, endDate, err := ParseDate(s, e, logger)
 	if err != nil {
-		return "", nil, "", "", err
+		return "", nil, "", "", nil, nil, err
 	}
 
 	extractor := &query.WholeFileExtractor{
@@ -265,20 +301,33 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	if assetPath == "" {
 		conn, err := getConnectionFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
 		if err != nil {
-			return "", nil, "", "", err
+			return "", nil, "", "", nil, nil, err
 		}
 		queryStr, err = extractQuery(queryStr, extractor)
 		if err != nil {
-			return "", nil, "", "", err
+			return "", nil, "", "", nil, nil, err
 		}
-		return connectionName, conn, queryStr, "", nil
+		return connectionName, conn, queryStr, "", nil, nil, nil
 	}
 
 	if queryStr != "" {
 		pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
 		if err != nil {
-			return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
+			return "", nil, "", "", nil, nil, errors.Wrap(err, "failed to get pipeline info")
 		}
+
+		if env != "" {
+			err := pipelineInfo.Config.SelectEnvironment(env)
+			if err != nil {
+				return "", nil, "", "", nil, nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+			}
+		}
+
+		// Store the environment context if schema prefix is set
+		if pipelineInfo.Config.SelectedEnvironment != nil {
+			ctx = context.WithValue(ctx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
+		}
+
 		fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
@@ -291,25 +340,37 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 
 		newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
 		if err != nil {
-			return "", nil, "", "", errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+			return "", nil, "", "", nil, nil, errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
 		}
 
-		connName, conn, err := getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
+		connName, conn, connManager, err := getConnectionFromPipelineInfoWithContextAndManager(ctx, pipelineInfo, env)
 		if err != nil {
-			return "", nil, "", "", err
+			return "", nil, "", "", nil, nil, err
 		}
 
 		queryStr, err = extractQuery(queryStr, newExtractor)
 		if err != nil {
-			return "", nil, "", "", err
+			return "", nil, "", "", nil, nil, err
 		}
 
-		return connName, conn, queryStr, pipelineInfo.Asset.Type, nil
+		return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, connManager, nil
 	}
 	// Asset query mode (only asset path)
 	pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
 	if err != nil {
-		return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
+		return "", nil, "", "", nil, nil, errors.Wrap(err, "failed to get pipeline info")
+	}
+
+	if env != "" {
+		err := pipelineInfo.Config.SelectEnvironment(env)
+		if err != nil {
+			return "", nil, "", "", nil, nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+		}
+	}
+
+	// Store the environment context if schema prefix is set
+	if pipelineInfo.Config.SelectedEnvironment != nil {
+		ctx = context.WithValue(ctx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
 	}
 
 	fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
@@ -322,24 +383,24 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	}
 	newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
 	if err != nil {
-		return "", nil, "", "", errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+		return "", nil, "", "", nil, nil, errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
 	}
 	// Verify that the asset is a SQL asset
 	if !pipelineInfo.Asset.IsSQLAsset() {
-		return "", nil, "", "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
+		return "", nil, "", "", nil, nil, errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
 			assetPath,
 			pipelineInfo.Asset.Type)
 	}
 	queryStr, err = extractQuery(pipelineInfo.Asset.ExecutableFile.Content, newExtractor)
 	if err != nil {
-		return "", nil, "", "", err
+		return "", nil, "", "", nil, nil, err
 	}
-	connName, conn, err := getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
+	connName, conn, connManager, err := getConnectionFromPipelineInfoWithContextAndManager(ctx, pipelineInfo, env)
 	if err != nil {
-		return "", nil, "", "", err
+		return "", nil, "", "", nil, nil, err
 	}
 
-	return connName, conn, queryStr, pipelineInfo.Asset.Type, nil
+	return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, connManager, nil
 }
 
 func getConnectionFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
@@ -415,6 +476,27 @@ func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo 
 	}
 
 	return connName, conn, nil
+}
+
+func getConnectionFromPipelineInfoWithContextAndManager(ctx context.Context, pipelineInfo *ppInfo, env string) (string, interface{}, connection.Manager, error) {
+	// Note: Environment selection is already handled in prepareQueryExecution
+	// Get connection info
+	manager, errs := connection.NewManagerFromConfigWithContext(ctx, pipelineInfo.Config)
+	if len(errs) > 0 {
+		return "", nil, nil, errors.Wrap(errs[0], "failed to create connection manager")
+	}
+
+	connName, err := pipelineInfo.Pipeline.GetConnectionNameForAsset(pipelineInfo.Asset)
+	if err != nil {
+		return "", nil, nil, errors.Wrap(err, "failed to get connection")
+	}
+
+	conn := manager.GetConnection(connName)
+	if conn == nil {
+		return "", nil, nil, errors.Errorf("failed to get connection '%s'", connName)
+	}
+
+	return connName, conn, manager, nil
 }
 
 type Limiter interface {
