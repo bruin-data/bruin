@@ -2315,6 +2315,7 @@ func TestIngestrTasks(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest
 func TestMacros(t *testing.T) {
 	cleanupDuckDBFiles(t)
 
