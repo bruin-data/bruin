@@ -2314,3 +2314,57 @@ func TestIngestrTasks(t *testing.T) {
 		})
 	}
 }
+
+func TestMacros(t *testing.T) {
+	cleanupDuckDBFiles(t)
+
+	// Check if parallel execution is enabled via environment variable
+	if os.Getenv("ENABLE_PARALLEL") == "1" {
+		t.Parallel()
+	}
+
+	currentFolder, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
+
+	executable := "bruin"
+	if runtime.GOOS == "windows" {
+		executable = "bruin.exe"
+	}
+	binary := filepath.Join(currentFolder, "../bin", executable)
+
+	tests := []struct {
+		name string
+		task e2e.Task
+	}{
+		{
+			name: "macros-pipeline",
+			task: e2e.Task{
+				Name:    "macros-pipeline",
+				Command: binary,
+				Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/macros-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"bruin run completed", "4 succeeded"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Check if parallel execution is enabled via environment variable
+			if os.Getenv("ENABLE_PARALLEL") == "1" {
+				t.Parallel()
+			}
+			err := tt.task.Run()
+			require.NoError(t, err, "Task %s failed: %v", tt.task.Name, err)
+		})
+	}
+}

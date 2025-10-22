@@ -2,3 +2,4 @@ name: macros_test_pipeline
 
 default_connections:
   duckdb: "duckdb-default"
+  chess: "chess-default"
