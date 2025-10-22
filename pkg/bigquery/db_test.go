@@ -1535,6 +1535,36 @@ func TestIsSamePartitioning(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "empty partition by but table has partitioning",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "created_at",
+					Type:  "DAY",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "invalid partition expression - regex fails to parse",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "created_at",
+					Type:  "DAY",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "INVALID_FUNCTION(created_at, something)",
+				},
+			},
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
