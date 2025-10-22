@@ -67,6 +67,51 @@ type Client struct {
 	typeMapper *diff.DatabaseTypeMapper
 }
 
+// This function detects authentication errors using Google API's error codes.
+// Reference: https://pkg.go.dev/cloud.google.com/go#section-readme
+func isCredentialError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) {
+		// 401 = Unauthorized (authentication failure)
+		// 403 = Forbidden (authorization/permission failure)
+		if apiErr.Code == 401 || apiErr.Code == 403 {
+			return true
+		}
+	}
+
+	// Also check for credential setup errors that occur before API calls
+	// These are returned during client initialization when ADC cannot find credentials
+	errMsg := err.Error()
+	errLower := strings.ToLower(errMsg)
+
+	// Standard ADC error when credentials are not found
+	if strings.Contains(errLower, "could not find default credentials") {
+		return true
+	}
+
+	// OAuth2 credential errors that occur during client setup
+	credentialSetupErrors := []string{
+		"defaultcredentialserror",        // Error type name from oauth2/google
+		"no such file or directory",      // When GOOGLE_APPLICATION_CREDENTIALS points to missing file
+		"failed to create oauth2 client", // OAuth2 setup failure
+		"unable to retrieve credentials", // Generic credential retrieval failure
+		"invalid_grant",                  // OAuth2 invalid grant error
+		"unauthorized_client",            // OAuth2 client authorization error
+	}
+
+	for _, pattern := range credentialSetupErrors {
+		if strings.Contains(errLower, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func NewDB(c *Config) (*Client, error) {
 	options := []option.ClientOption{
 		option.WithScopes(scopes...),
@@ -85,6 +130,7 @@ func NewDB(c *Config) (*Client, error) {
 			return nil, errors.New("no credentials provided")
 		}
 	}
+	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
 
 	client, err := bigquery.NewClient(
 		context.Background(),
@@ -92,6 +138,13 @@ func NewDB(c *Config) (*Client, error) {
 		options...,
 	)
 	if err != nil {
+		// If ADC is enabled and the error is credential-related, provide helpful instructions
+		if c.UseApplicationDefaultCredentials && isCredentialError(err) {
+			return nil, &ADCCredentialError{
+				ClientType:  "BigQuery client",
+				OriginalErr: err,
+			}
+		}
 		return nil, errors.Wrap(err, "failed to create bigquery client")
 	}
 
@@ -136,8 +189,20 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 			return nil, errors.New("no credentials provided for Data Transfer client")
 		}
 	}
+	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
 
-	return datatransfer.NewClient(ctx, options...)
+	client, err := datatransfer.NewClient(ctx, options...)
+	if err != nil {
+		// If ADC is enabled and the error is credential-related, provide helpful instructions
+		if d.config.UseApplicationDefaultCredentials && isCredentialError(err) {
+			return nil, &ADCCredentialError{
+				ClientType:  "Data Transfer client",
+				OriginalErr: err,
+			}
+		}
+		return nil, err
+	}
+	return client, nil
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
@@ -281,6 +346,34 @@ type NoMetadataUpdatedError struct{}
 
 func (m NoMetadataUpdatedError) Error() string {
 	return "no metadata found for the given asset to be pushed to BigQuery"
+}
+
+// ADCCredentialError represents an error when Application Default Credentials cannot be found or are invalid.
+type ADCCredentialError struct {
+	ClientType  string // e.g., "BigQuery client" or "Data Transfer client"
+	OriginalErr error
+}
+
+func (e *ADCCredentialError) Error() string {
+	return fmt.Sprintf("failed to create %s using Application Default Credentials (ADC).\n\n"+
+		"Original error: %v\n\n"+
+		"ADC searches for credentials in this order:\n"+
+		"  1. GOOGLE_APPLICATION_CREDENTIALS environment variable\n"+
+		"  2. User credentials from gcloud CLI\n"+
+		"  3. Service account credentials (when running on Google Cloud)\n\n"+
+		"To fix this, try one of the following:\n\n"+
+		"  Option 1 - Use gcloud CLI (recommended for local development):\n"+
+		"    $ gcloud auth application-default login\n\n"+
+		"  Option 2 - Use a service account key file:\n"+
+		"    $ export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/service-account-key.json\"\n\n"+
+		"For more information:\n"+
+		"  https://cloud.google.com/docs/authentication/application-default-credentials\n"+
+		"  https://pkg.go.dev/cloud.google.com/go#section-readme",
+		e.ClientType, e.OriginalErr)
+}
+
+func (e *ADCCredentialError) Unwrap() error {
+	return e.OriginalErr
 }
 
 func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {

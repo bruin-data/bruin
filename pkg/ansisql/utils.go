@@ -13,8 +13,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-const DefaultQueryAnnotations = "default"
-const QueryLogCharacterLimit = 10000
+const (
+	DefaultQueryAnnotations = "default"
+	QueryLogCharacterLimit  = 10000
+)
 
 func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) (*query.Query, error) {
 	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
