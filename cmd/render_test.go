@@ -395,6 +395,16 @@ func TestIsQuerySensorAsset(t *testing.T) {
 			assetType: pipeline.AssetTypeS3KeySensor,
 			expected: false,
 		},
+		{
+			name:     "Custom query sensor with .sensor.query suffix should be detected",
+			assetType: pipeline.AssetType("custom.sensor.query"),
+			expected: true,
+		},
+		{
+			name:     "Empty asset type should NOT be detected",
+			assetType: pipeline.AssetType(""),
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {

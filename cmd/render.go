@@ -367,19 +367,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 }
 
 func isQuerySensorAsset(assetType pipeline.AssetType) bool {
-	querySensorTypes := map[pipeline.AssetType]bool{
-		pipeline.AssetTypeBigqueryQuerySensor:    true,
-		pipeline.AssetTypeSnowflakeQuerySensor:   true,
-		pipeline.AssetTypePostgresQuerySensor:    true,
-		pipeline.AssetTypeRedshiftQuerySensor:    true,
-		pipeline.AssetTypeMsSQLQuerySensor:       true,
-		pipeline.AssetTypeDatabricksQuerySensor:  true,
-		pipeline.AssetTypeSynapseQuerySensor:     true,
-		pipeline.AssetTypeAthenaSQLSensor:        true,
-		pipeline.AssetTypeDuckDBQuerySensor:      true,
-		pipeline.AssetTypeClickHouseQuerySensor:  true,
-	}
-	return querySensorTypes[assetType]
+	return strings.HasSuffix(string(assetType), ".sensor.query")
 }
 
 func highlightCode(code string, language string) string {
