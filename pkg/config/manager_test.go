@@ -129,6 +129,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "XXXXYYYYZZZZ",
 				},
 			},
+			Allium: []AlliumConnection{
+				{
+					Name:   "allium-1",
+					APIKey: "allium-api-key",
+				},
+			},
 			HANA: []HANAConnection{
 				{
 					Name:     "conn10",

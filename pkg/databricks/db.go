@@ -77,6 +77,62 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	return result, err
 }
 
+func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	queryString := queryObj.String()
+	rows, err := db.conn.QueryContext(ctx, queryString)
+	if err != nil {
+		errorMessage := err.Error()
+		return nil, errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
+	}
+	defer rows.Close()
+
+	result := &query.QueryResult{
+		Columns:     []string{},
+		Rows:        [][]interface{}{},
+		ColumnTypes: []string{},
+	}
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	result.Columns = cols
+
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		result.ColumnTypes = make([]string, len(cols))
+	} else {
+		result.ColumnTypes = make([]string, len(columnTypes))
+		for i, columnType := range columnTypes {
+			typeName := columnType.DatabaseTypeName()
+			if typeName == "" && columnType.ScanType() != nil {
+				typeName = columnType.ScanType().String()
+			}
+			result.ColumnTypes[i] = typeName
+		}
+	}
+
+	for rows.Next() {
+		row := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i := range row {
+			columnPointers[i] = &row[i]
+		}
+
+		if err := rows.Scan(columnPointers...); err != nil {
+			return nil, err
+		}
+
+		result.Rows = append(result.Rows, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (db *DB) Ping(ctx context.Context) error {
 	q := query.Query{
 		Query: "SELECT 1",

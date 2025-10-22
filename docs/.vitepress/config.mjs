@@ -75,6 +75,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         text: "Features",
                         link: "/getting-started/features",
                         items: [
+                            {text: "Pipeline", link: "/getting-started/pipeline"},
                             {text: "Glossary", link: "/getting-started/glossary"},
                             {text: "Policies", link: "/getting-started/policies"},
                             {text: "Environments", link: "/getting-started/devenv"},
@@ -152,7 +153,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Oracle", link: "/platforms/oracle"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
                     {text: "Microsoft SQL Server", link: "/platforms/mssql"},
-                    {text: "MongoDB Atlas", link: "/platforms/mongoatlas"},
                     {text: "Postgres", link: "/platforms/postgres"},
                     {text: "Redshift", link: "/platforms/redshift"},
                     {text: "Snowflake", link: "/platforms/snowflake"},
@@ -206,6 +206,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
                             {text: "Anthropic", link: "/ingestion/anthropic.md"},
+                            {text: "Allium", link: "/ingestion/allium.md"},
                             {text: "AppStore", link: "/ingestion/appstore.md"},
                             {text: "AppLovin", link: "/ingestion/applovin.md"},
                             {text: "AppLovin Max", link: "/ingestion/applovin_max.md"},
@@ -294,9 +295,40 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 ]
             },
             {
+                text: "Deployment",
+                collapsed: false,
+                items: [
+                    {text: "Ubuntu VM with Cron", link: "/deployment/vm-deployment"},
+                    {text: "Apache Airflow", link: "/deployment/airflow"},
+                    {text: "GitHub Actions", link: "/deployment/github-actions"},
+                    {text: "GitLab CI/CD", link: "/deployment/cloud/gitlab-cicd"},
+                    {
+                        text: "AWS",
+                        collapsed: true,
+                        items: [
+                            {text: "Lambda", link: "/deployment/cloud/aws-lambda"},
+                            {text: "ECS", link: "/deployment/cloud/aws-ecs"}
+                        ]
+                    },
+                    {
+                        text: "Google Cloud",
+                        collapsed: true,
+                        items: [
+                            {text: "Cloud Run", link: "/deployment/cloud/google-cloud-run"}
+                        ]
+                    }
+                ],
+            },
+            {
                 text: "CI/CD Integration",
                 collapsed: false,
-                items: [{text: "Github Actions", link: "/cicd/github-action"}],
+                items: [
+                    {text: "GitHub Actions", link: "/cicd/github-action"},
+                    {text: "GitLab CI/CD", link: "/cicd/gitlab-ci"},
+                    {text: "CircleCI", link: "/cicd/circleci"},
+                    {text: "Jenkins", link: "/cicd/jenkins"},
+                    {text: "Azure Pipelines", link: "/cicd/azure-pipelines"},
+                ],
             },
             {
                 text: "Commands",

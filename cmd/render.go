@@ -166,6 +166,20 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// If asset has its own start_date, use it instead of pipeline's start_date
+			if asset.StartDate != "" && fullRefresh {
+				startDate, err = date.ParseTime(asset.StartDate)
+				if err != nil {
+					if c.String("output") == "json" {
+						printErrorJSON(errors.New("Please give a valid start date in asset: A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
+					} else {
+						errorPrinter.Printf("Invalid start date in asset '%s': %s\n", asset.Name, asset.StartDate)
+					}
+					return cli.Exit("", 1)
+				}
+				logger.Debug("Using asset-level start_date: ", asset.StartDate)
+			}
+
 			resultsLocation := "s3://{destination-bucket}"
 			if asset.Type == pipeline.AssetTypeAthenaQuery {
 				connName, err := pl.GetConnectionNameForAsset(asset)

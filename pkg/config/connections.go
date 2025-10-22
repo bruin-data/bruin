@@ -400,6 +400,15 @@ func (c NotionConnection) GetName() string {
 	return c.Name
 }
 
+type AlliumConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c AlliumConnection) GetName() string {
+	return c.Name
+}
+
 type ShopifyConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	URL    string `yaml:"url,omitempty" json:"url" mapstructure:"url"`
