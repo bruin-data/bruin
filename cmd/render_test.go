@@ -326,8 +326,8 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 			render := &RenderCommand{
 				extractor: extractor,
 				materializers: map[pipeline.AssetType]queryMaterializer{
-					pipeline.AssetTypeBigqueryQuery:       materializer,
-					pipeline.AssetTypeBigqueryQuerySensor: materializer,
+					pipeline.AssetTypeBigqueryQuery:        materializer,
+					pipeline.AssetTypeBigqueryQuerySensor:  materializer,
 					pipeline.AssetTypeSnowflakeQuerySensor: materializer,
 				},
 				writer: writer,
@@ -351,49 +351,49 @@ func TestIsQuerySensorAsset(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
+		name      string
 		assetType pipeline.AssetType
-		expected bool
+		expected  bool
 	}{
 		{
-			name:     "BigQuery query sensor should be detected",
+			name:      "BigQuery query sensor should be detected",
 			assetType: pipeline.AssetTypeBigqueryQuerySensor,
-			expected: true,
+			expected:  true,
 		},
 		{
-			name:     "Snowflake query sensor should be detected",
+			name:      "Snowflake query sensor should be detected",
 			assetType: pipeline.AssetTypeSnowflakeQuerySensor,
-			expected: true,
+			expected:  true,
 		},
 		{
-			name:     "PostgreSQL query sensor should be detected",
+			name:      "PostgreSQL query sensor should be detected",
 			assetType: pipeline.AssetTypePostgresQuerySensor,
-			expected: true,
+			expected:  true,
 		},
 		{
-			name:     "Athena query sensor should be detected",
+			name:      "Athena query sensor should be detected",
 			assetType: pipeline.AssetTypeAthenaSQLSensor,
-			expected: true,
+			expected:  true,
 		},
 		{
-			name:     "BigQuery table sensor should NOT be detected",
+			name:      "BigQuery table sensor should NOT be detected",
 			assetType: pipeline.AssetTypeBigqueryTableSensor,
-			expected: false,
+			expected:  false,
 		},
 		{
-			name:     "Snowflake table sensor should NOT be detected",
+			name:      "Snowflake table sensor should NOT be detected",
 			assetType: pipeline.AssetTypeSnowflakeTableSensor,
-			expected: false,
+			expected:  false,
 		},
 		{
-			name:     "Regular BigQuery query should NOT be detected",
+			name:      "Regular BigQuery query should NOT be detected",
 			assetType: pipeline.AssetTypeBigqueryQuery,
-			expected: false,
+			expected:  false,
 		},
 		{
-			name:     "S3 key sensor should NOT be detected",
+			name:      "S3 key sensor should NOT be detected",
 			assetType: pipeline.AssetTypeS3KeySensor,
-			expected: false,
+			expected:  false,
 		},
 	}
 
