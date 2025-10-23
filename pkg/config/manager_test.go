@@ -113,6 +113,16 @@ func TestLoadFromFile(t *testing.T) {
 					Port:     27017,
 				},
 			},
+			Couchbase: []CouchbaseConnection{
+				{
+					Name:     "couchbase1",
+					Host:     "couchbasehost",
+					Username: "couchbaseuser",
+					Password: "couchbasepass",
+					Bucket:   "mybucket",
+					SSL:      false,
+				},
+			},
 			MySQL: []MySQLConnection{
 				{
 					Name:     "conn8",
@@ -1836,6 +1846,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Databricks:          []DatabricksConnection{{Name: "db1"}},
 				Synapse:             []SynapseConnection{{Name: "syn1"}},
 				Mongo:               []MongoConnection{{Name: "mongo1"}},
+				Couchbase:           []CouchbaseConnection{{Name: "couchbase1"}},
 				MySQL:               []MySQLConnection{{Name: "mysql1"}},
 				Notion:              []NotionConnection{{Name: "notion1"}},
 				HANA:                []HANAConnection{{Name: "hana1"}},
@@ -1856,6 +1867,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Databricks:          []DatabricksConnection{{Name: "db1"}},
 				Synapse:             []SynapseConnection{{Name: "syn1"}},
 				Mongo:               []MongoConnection{{Name: "mongo1"}},
+				Couchbase:           []CouchbaseConnection{{Name: "couchbase1"}},
 				MySQL:               []MySQLConnection{{Name: "mysql1"}},
 				Notion:              []NotionConnection{{Name: "notion1"}},
 				HANA:                []HANAConnection{{Name: "hana1"}},

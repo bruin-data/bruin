@@ -325,6 +325,36 @@
         "api_token"
       ]
     },
+    "CouchbaseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -384,6 +414,12 @@
         "mongo": {
           "items": {
             "$ref": "#/$defs/MongoConnection"
+          },
+          "type": "array"
+        },
+        "couchbase": {
+          "items": {
+            "$ref": "#/$defs/CouchbaseConnection"
           },
           "type": "array"
         },

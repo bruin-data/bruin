@@ -214,6 +214,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Attio", link: "/ingestion/attio.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
                             {text: "ClickUp", link: "/ingestion/clickup.md"},
+                            {text: "Couchbase", link: "/ingestion/couchbase.md"},
                             {text: "DB2", link: "/ingestion/db2.md"},
                             {text: "Docebo", link: "/ingestion/docebo"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
