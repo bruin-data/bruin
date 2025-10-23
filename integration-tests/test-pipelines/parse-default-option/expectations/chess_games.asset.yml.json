@@ -46,7 +46,8 @@
   },
   "pipeline": {
     "name": "integration_test",
-    "schedule": ""
+    "schedule": "",
+    "start_date": ""
   },
   "repo": {
     "path": "/Users/bruin/GolandProjects/bruin/integration-tests"
