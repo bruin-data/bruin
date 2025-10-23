@@ -560,8 +560,9 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 	}
 
 	type pipelineSummary struct {
-		Name     string            `json:"name"`
-		Schedule pipeline.Schedule `json:"schedule"`
+		Name      string            `json:"name"`
+		Schedule  pipeline.Schedule `json:"schedule"`
+		StartDate string            `json:"start_date"`
 	}
 
 	js, err := json.Marshal(struct {
@@ -572,8 +573,9 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 	}{
 		Asset: asset,
 		Pipeline: pipelineSummary{
-			Name:     foundPipeline.Name,
-			Schedule: foundPipeline.Schedule,
+			Name:      foundPipeline.Name,
+			Schedule:  foundPipeline.Schedule,
+			StartDate: foundPipeline.StartDate,
 		},
 		LineageIssues: lineageIssues,
 		Repo:          repoRoot,
