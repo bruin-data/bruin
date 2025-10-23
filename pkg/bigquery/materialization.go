@@ -166,7 +166,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 
 		clusterByClause := ""
 		if len(mat.ClusterBy) > 0 {
-			clusterByClause = " CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
+			clusterByClause = "CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
 		}
 		return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
 	}
