@@ -443,10 +443,27 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	}
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 	cluster := strings.Join(primaryKeys, ", ")
+
+	// Build partition clause - use user-specified partition or default to DATE(_valid_from)
+	partitionClause := ""
+	if asset.Materialization.PartitionBy != "" {
+		partitionClause = "PARTITION BY " + asset.Materialization.PartitionBy
+	} else {
+		partitionClause = "PARTITION BY DATE(_valid_from)"
+	}
+
+	// Build cluster clause - use user-specified cluster or default to _is_current + primary keys
+	clusterClause := ""
+	if len(asset.Materialization.ClusterBy) > 0 {
+		clusterClause = "CLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ")
+	} else {
+		clusterClause = "CLUSTER BY _is_current, " + cluster
+	}
+
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s
-PARTITION BY DATE(_valid_from)
-CLUSTER BY _is_current, %s AS
+%s
+%s AS
 SELECT
   CAST (%s AS TIMESTAMP) AS _valid_from,
   src.*,
@@ -456,7 +473,8 @@ FROM (
 %s
 ) AS src;`,
 		tbl,
-		cluster,
+		partitionClause,
+		clusterClause,
 		asset.Materialization.IncrementalKey,
 		strings.TrimSpace(query),
 	)
@@ -471,11 +489,27 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	}
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 	cluster := strings.Join(primaryKeys, ", ")
+
+	// Build partition clause - use user-specified partition or default to DATE(_valid_from)
+	partitionClause := ""
+	if asset.Materialization.PartitionBy != "" {
+		partitionClause = "PARTITION BY " + asset.Materialization.PartitionBy
+	} else {
+		partitionClause = "PARTITION BY DATE(_valid_from)"
+	}
+
+	// Build cluster clause - use user-specified cluster or default to _is_current + primary keys
+	clusterClause := ""
+	if len(asset.Materialization.ClusterBy) > 0 {
+		clusterClause = "CLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ")
+	} else {
+		clusterClause = "CLUSTER BY _is_current, " + cluster
+	}
+
 	stmt := fmt.Sprintf(
-		`
-CREATE OR REPLACE TABLE %s
-PARTITION BY DATE(_valid_from)
-CLUSTER BY _is_current, %s AS
+		`CREATE OR REPLACE TABLE %s
+%s
+%s AS
 SELECT
   CURRENT_TIMESTAMP() AS _valid_from,
   src.*,
@@ -485,7 +519,8 @@ FROM (
 %s
 ) AS src;`,
 		tbl,
-		cluster,
+		partitionClause,
+		clusterClause,
 		strings.TrimSpace(query),
 	)
 
