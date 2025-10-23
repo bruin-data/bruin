@@ -3,6 +3,7 @@ package bigquery
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -491,6 +492,12 @@ func (d *Client) IsPartitioningOrClusteringMismatch(ctx context.Context, meta *b
 }
 
 func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	// If asset has no partition but table does, they don't match
+	if asset.Materialization.PartitionBy == "" &&
+		(meta.TimePartitioning != nil || meta.RangePartitioning != nil) {
+		return false
+	}
+
 	if asset.Materialization.PartitionBy != "" &&
 		meta.TimePartitioning == nil &&
 		meta.RangePartitioning == nil {
@@ -501,13 +508,60 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 		return true
 	}
 
+	// Compile the regex for parsing partition expressions
+	partitionRegex := regexp.MustCompile(`^\s*(?:(?:date(?:time)?_trunc|timestamp_trunc|date_trunc)\(\s*([A-Za-z_][\w.]*)\s*,\s*(day|hour|month|year)\s*\)|date\(\s*([A-Za-z_][\w.]*)\s*\)|([A-Za-z_][\w.]*)\s*)$`)
+
+	// Parse the asset's partition expression
+	assetPartitionBy := strings.ToLower(strings.TrimSpace(asset.Materialization.PartitionBy))
+	assetMatches := partitionRegex.FindStringSubmatch(assetPartitionBy)
+
+	var assetColumn string
+	var assetPartitionType string
+
+	// if match, FindStringSubmatch() returns a slice of exactly 5 elements [fullMatch, group1, group2, group3, group4], else returns nil.
+	if assetMatches != nil {
+		// Extract column and partition type from regex matches
+		switch {
+		case assetMatches[1] != "" && assetMatches[2] != "":
+			// date_trunc/timestamp_trunc case
+			assetColumn = strings.ToLower(assetMatches[1])
+			assetPartitionType = strings.ToLower(assetMatches[2])
+		case assetMatches[3] != "":
+			// date() case
+			assetColumn = strings.ToLower(assetMatches[3])
+			assetPartitionType = "day" // date() defaults to day partitioning
+		case assetMatches[4] != "":
+			// simple column case
+			assetColumn = strings.ToLower(assetMatches[4])
+			assetPartitionType = "day" // default to day partitioning
+		}
+	}
+
+	// If regex failed to extract a column name, the partition expression is invalid
+	if assetColumn == "" {
+		return false
+	}
+
 	if meta.TimePartitioning != nil {
-		if meta.TimePartitioning.Field != asset.Materialization.PartitionBy {
+		metaField := strings.ToLower(meta.TimePartitioning.Field)
+		metaType := strings.ToLower(string(meta.TimePartitioning.Type))
+
+		// Compare column names (case-insensitive)
+		if metaField != assetColumn {
+			return false
+		}
+
+		// Compare partition types (defaults to DAY for simple column names)
+		if assetPartitionType != "" && metaType != "" && metaType != assetPartitionType {
 			return false
 		}
 	}
+
 	if meta.RangePartitioning != nil {
-		if meta.RangePartitioning.Field != asset.Materialization.PartitionBy {
+		metaField := strings.ToLower(meta.RangePartitioning.Field)
+
+		// For range partitioning, only compare the column name
+		if metaField != assetColumn {
 			return false
 		}
 	}

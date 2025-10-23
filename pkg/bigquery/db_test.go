@@ -1278,24 +1278,176 @@ func TestIsSamePartitioning(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "matching time partitioning",
+			name: "simple column name - matching",
 			meta: &bigquery.TableMetadata{
 				TimePartitioning: &bigquery.TimePartitioning{
-					Field: "date_field",
+					Field: "date_timestamp",
+					Type:  "DAY",
 				},
 			},
 			asset: &pipeline.Asset{
 				Materialization: pipeline.Materialization{
-					PartitionBy: "date_field",
+					PartitionBy: "date_timestamp",
 				},
 			},
 			expected: true,
 		},
 		{
-			name: "mismatched time partitioning",
+			name: "simple column name - case insensitive",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "DAY",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "DATE_TIMESTAMP",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "DATE_TRUNC with MONTH",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "MONTH",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "DATE_TRUNC(date_timestamp, MONTH)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "DATETIME_TRUNC with DAY",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "DAY",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "DATETIME_TRUNC(date_timestamp, DAY)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "DATETIME_TRUNC with MONTH",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "MONTH",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "DATETIME_TRUNC(date_timestamp, MONTH)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "DATETIME_TRUNC with YEAR",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "YEAR",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "DATETIME_TRUNC(date_timestamp, YEAR)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "TIMESTAMP_TRUNC with HOUR",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "HOUR",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "TIMESTAMP_TRUNC(date_timestamp, HOUR)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "TIMESTAMP_TRUNC with DAY",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "ts",
+					Type:  "DAY",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "TIMESTAMP_TRUNC(ts, DAY)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "TIMESTAMP_TRUNC with MONTH",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "MONTH",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "TIMESTAMP_TRUNC(date_timestamp, MONTH)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "TIMESTAMP_TRUNC with YEAR",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "YEAR",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "TIMESTAMP_TRUNC(date_timestamp, YEAR)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mismatched partition type",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "MONTH",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "TIMESTAMP_TRUNC(date_timestamp, DAY)",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "mismatched column name",
 			meta: &bigquery.TableMetadata{
 				TimePartitioning: &bigquery.TimePartitioning{
 					Field: "date_field",
+					Type:  "DAY",
 				},
 			},
 			asset: &pipeline.Asset{
@@ -1352,6 +1504,66 @@ func TestIsSamePartitioning(t *testing.T) {
 				},
 			},
 			expected: true,
+		},
+		{
+			name: "DATE function with column",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "timestamp_col",
+					Type:  "DAY",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "DATE(timestamp_col)",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "extra whitespace in asset partition expression",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_timestamp",
+					Type:  "MONTH",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "  DATETIME_TRUNC( date_timestamp , MONTH )  ",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "empty partition by but table has partitioning",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "created_at",
+					Type:  "DAY",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "invalid partition expression - regex fails to parse",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "created_at",
+					Type:  "DAY",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "INVALID_FUNCTION(created_at, something)",
+				},
+			},
+			expected: false,
 		},
 	}
 
