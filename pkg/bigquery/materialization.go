@@ -166,7 +166,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 
 		clusterByClause := ""
 		if len(mat.ClusterBy) > 0 {
-			clusterByClause = "CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
+			clusterByClause = " CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
 		}
 		return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
 	}
@@ -445,7 +445,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	cluster := strings.Join(primaryKeys, ", ")
 
 	// Build partition clause - use user-specified partition or default to DATE(_valid_from)
-	partitionClause := ""
+	var partitionClause string
 	if asset.Materialization.PartitionBy != "" {
 		partitionClause = "PARTITION BY " + asset.Materialization.PartitionBy
 	} else {
@@ -453,7 +453,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	}
 
 	// Build cluster clause - use user-specified cluster or default to _is_current + primary keys
-	clusterClause := ""
+	var clusterClause string
 	if len(asset.Materialization.ClusterBy) > 0 {
 		clusterClause = "CLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ")
 	} else {
@@ -491,7 +491,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	cluster := strings.Join(primaryKeys, ", ")
 
 	// Build partition clause - use user-specified partition or default to DATE(_valid_from)
-	partitionClause := ""
+	var partitionClause string
 	if asset.Materialization.PartitionBy != "" {
 		partitionClause = "PARTITION BY " + asset.Materialization.PartitionBy
 	} else {
@@ -499,7 +499,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	}
 
 	// Build cluster clause - use user-specified cluster or default to _is_current + primary keys
-	clusterClause := ""
+	var clusterClause string
 	if len(asset.Materialization.ClusterBy) > 0 {
 		clusterClause = "CLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ")
 	} else {
