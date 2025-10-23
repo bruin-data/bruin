@@ -207,8 +207,8 @@ type CouchbaseConnection struct {
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
 	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
 	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Bucket   string `yaml:"bucket,omitempty" json:"bucket" mapstructure:"bucket"`
-	SSL      bool   `yaml:"ssl,omitempty" json:"ssl" mapstructure:"ssl"`
+	Bucket   string `yaml:"bucket,omitempty" json:"bucket,omitempty" mapstructure:"bucket"`
+	SSL      bool   `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
 }
 
 func (c CouchbaseConnection) GetName() string {

@@ -352,9 +352,7 @@
         "name",
         "username",
         "password",
-        "host",
-        "bucket",
-        "ssl"
+        "host"
       ]
     },
     "Connections": {
