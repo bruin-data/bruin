@@ -78,6 +78,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/smartsheet"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/socrata"
 	"github.com/bruin-data/bruin/pkg/solidgate"
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
@@ -126,6 +127,7 @@ type Manager struct {
 	Chess                map[string]*chess.Client
 	S3                   map[string]*s3.Client
 	Slack                map[string]*slack.Client
+	Socrata              map[string]*socrata.Client
 	Asana                map[string]*asana.Client
 	DynamoDB             map[string]*dynamodb.Client
 	Docebo               map[string]*docebo.Client
@@ -1255,6 +1257,29 @@ func (m *Manager) AddSlackConnectionFromConfig(connection *config.SlackConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Slack[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddSocrataConnectionFromConfig(connection *config.SocrataConnection) error {
+	m.mutex.Lock()
+	if m.Socrata == nil {
+		m.Socrata = make(map[string]*socrata.Client)
+	}
+	m.mutex.Unlock()
+	client, err := socrata.NewClient(&socrata.Config{
+		Domain:   connection.Domain,
+		AppToken: connection.AppToken,
+		Username: connection.Username,
+		Password: connection.Password,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Socrata[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 	return nil
@@ -2399,6 +2424,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Airtable, connectionManager.AddAirtableConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.S3, connectionManager.AddS3ConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Slack, connectionManager.AddSlackConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Socrata, connectionManager.AddSocrataConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Asana, connectionManager.AddAsanaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DynamoDB, connectionManager.AddDynamoDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Docebo, connectionManager.AddDoceboConnectionFromConfig, &wg, &errList, &mu)

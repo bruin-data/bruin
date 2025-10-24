@@ -264,6 +264,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Solidgate", link: "/ingestion/solidgate"},
                             {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
+                            {text: "Socrata", link: "/ingestion/socrata.md"},
                             {text: "SQLite", link: "/ingestion/sqlite"},
                             {text: "TikTok Ads", link: "/ingestion/tiktokads.md"},
                             {text: "Wise", link: "/ingestion/wise.md"},

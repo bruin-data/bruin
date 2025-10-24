@@ -328,6 +328,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "slackkey",
 				},
 			},
+			Socrata: []SocrataConnection{
+				{
+					Name:     "socrata-test",
+					Domain:   "data.seattle.gov",
+					AppToken: "test_app_token",
+				},
+			},
 			Asana: []AsanaConnection{
 				{
 					Name:        "asana-workspace-1337",
