@@ -362,18 +362,18 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name               string
-		schemaComparison   diff.SchemaComparisonResult
-		table1Name         string
-		expectedStatements []string
+		name             string
+		schemaComparison diff.SchemaComparisonResult
+		table1Name       string
+		expectedClauses  []string // Clauses that should be present in the single statement
 	}{
 		{
 			name: "no schema differences",
 			schemaComparison: diff.SchemaComparisonResult{
 				HasSchemaDifferences: false,
 			},
-			table1Name:         "users",
-			expectedStatements: nil, // Should return empty string
+			table1Name:      "users",
+			expectedClauses: nil, // Should return empty string
 		},
 		{
 			name: "add column",
@@ -390,8 +390,8 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 				},
 			},
 			table1Name: "users",
-			expectedStatements: []string{
-				"ALTER TABLE users ADD COLUMN email VARCHAR(255) NOT NULL;",
+			expectedClauses: []string{
+				"ADD COLUMN email VARCHAR(255) NOT NULL",
 			},
 		},
 		{
@@ -409,8 +409,8 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 				},
 			},
 			table1Name: "users",
-			expectedStatements: []string{
-				"ALTER TABLE users DROP COLUMN old_field;",
+			expectedClauses: []string{
+				"DROP COLUMN old_field",
 			},
 		},
 		{
@@ -428,8 +428,8 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 				},
 			},
 			table1Name: "users",
-			expectedStatements: []string{
-				"ALTER TABLE users ALTER COLUMN age TYPE BIGINT;",
+			expectedClauses: []string{
+				"ALTER COLUMN age TYPE BIGINT",
 			},
 		},
 		{
@@ -447,8 +447,8 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 				},
 			},
 			table1Name: "users",
-			expectedStatements: []string{
-				"ALTER TABLE users ALTER COLUMN middle_name DROP NOT NULL;",
+			expectedClauses: []string{
+				"ALTER COLUMN middle_name DROP NOT NULL",
 			},
 		},
 		{
@@ -466,8 +466,8 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 				},
 			},
 			table1Name: "users",
-			expectedStatements: []string{
-				"ALTER TABLE users ALTER COLUMN last_name SET NOT NULL;",
+			expectedClauses: []string{
+				"ALTER COLUMN last_name SET NOT NULL",
 			},
 		},
 		{
@@ -485,8 +485,8 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 				},
 			},
 			table1Name: "users",
-			expectedStatements: []string{
-				"ALTER TABLE users ADD UNIQUE (username);",
+			expectedClauses: []string{
+				"ADD UNIQUE (username)",
 			},
 		},
 		{
@@ -520,10 +520,10 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 				},
 			},
 			table1Name: "users",
-			expectedStatements: []string{
-				"ALTER TABLE users ADD COLUMN created_at TIMESTAMP NOT NULL;",
-				"ALTER TABLE users ALTER COLUMN age TYPE BIGINT;",
-				"ALTER TABLE users ALTER COLUMN bio DROP NOT NULL;",
+			expectedClauses: []string{
+				"ADD COLUMN created_at TIMESTAMP NOT NULL",
+				"ALTER COLUMN age TYPE BIGINT",
+				"ALTER COLUMN bio DROP NOT NULL",
 			},
 		},
 	}
@@ -534,17 +534,29 @@ func TestGenerateAlterTableStatement(t *testing.T) {
 
 			result := generateAlterTableStatement(tt.schemaComparison, tt.table1Name)
 
-			if len(tt.expectedStatements) == 0 {
+			if len(tt.expectedClauses) == 0 {
 				if result != "" {
 					t.Errorf("Expected empty string, got %q", result)
 				}
 				return
 			}
 
-			// Check that all expected statements are present in the result
-			for _, expectedStmt := range tt.expectedStatements {
-				if !strings.Contains(result, expectedStmt) {
-					t.Errorf("Expected statement %q not found in result:\n%s", expectedStmt, result)
+			// Check that the result is a single ALTER TABLE statement
+			if !strings.HasPrefix(strings.TrimSpace(result), "ALTER TABLE "+tt.table1Name) {
+				t.Errorf("Expected result to start with 'ALTER TABLE %s', got:\n%s", tt.table1Name, result)
+			}
+
+			// Check that all expected clauses are present in the result
+			for _, expectedClause := range tt.expectedClauses {
+				if !strings.Contains(result, expectedClause) {
+					t.Errorf("Expected clause %q not found in result:\n%s", expectedClause, result)
+				}
+			}
+
+			// For multiple changes, ensure they're separated by commas
+			if len(tt.expectedClauses) > 1 {
+				if !strings.Contains(result, ",") {
+					t.Errorf("Expected multiple clauses to be separated by commas, got:\n%s", result)
 				}
 			}
 		})
