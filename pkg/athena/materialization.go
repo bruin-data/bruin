@@ -373,6 +373,9 @@ func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query, location string)
 	var partitionBy string
 	if asset.Materialization.PartitionBy != "" {
 		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	} else {
+		// Default partitioning for SCD2 by column
+		partitionBy = ", partitioning = ARRAY['_valid_from']"
 	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
@@ -549,6 +552,9 @@ func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query, location string) (
 	var partitionBy string
 	if asset.Materialization.PartitionBy != "" {
 		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	} else {
+		// Default partitioning for SCD2 by time
+		partitionBy = ", partitioning = ARRAY['_valid_from']"
 	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
