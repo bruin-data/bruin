@@ -375,8 +375,8 @@ When changes are detected in non-primary key columns:
 - `_is_current`: BOOLEAN indicating if this is the current version of the record
 
 **NOTE:***
-- Unless otherwise specified by `partition_by`, the SCD2 table will be partitioned by `_valid_from` for BigQuery.
-- Unless otherwise specified by `cluster_by`, the SCD2 table will be clustered using `_is_current` AND `primary key(s)` for BigQuery.  
+- Unless otherwise specified by `partition_by`, the SCD2 table will be partitioned by `_valid_from` for platforms which support partitioning (BigQuery, Athena, Snowflake).
+- Unless otherwise specified by `cluster_by`, the SCD2 table will be clustered using `_is_current` AND `primary key(s)` for platforms which support clustering (BigQuery, Snowflake).  
 
 Here's an example of an asset with `scd2_by_column` materialization:
 
