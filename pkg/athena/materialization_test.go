@@ -700,7 +700,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.name, src.price,\n" +
 					"CURRENT_TIMESTAMP AS _valid_from,\n" +
 					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
@@ -729,7 +729,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, category, name, price from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.category, src.name, src.price,\n" +
 					"CURRENT_TIMESTAMP AS _valid_from,\n" +
 					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
@@ -1127,7 +1127,7 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.event_name, src.ts,\n" +
 					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
 					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
@@ -1157,7 +1157,7 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, category, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['_valid_from']) AS\n" +
 					"SELECT src.id, src.category, src.event_name, src.ts,\n" +
 					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
 					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
