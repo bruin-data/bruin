@@ -108,6 +108,7 @@ type Connections struct {
 	Jira                []JiraConnection                `yaml:"jira,omitempty" json:"jira,omitempty" mapstructure:"jira"`
 	Monday              []MondayConnection              `yaml:"monday,omitempty" json:"monday,omitempty" mapstructure:"monday"`
 	PlusVibeAI          []PlusVibeAIConnection          `yaml:"plusvibeai,omitempty" json:"plusvibeai,omitempty" mapstructure:"plusvibeai"`
+	Socrata             []SocrataConnection             `yaml:"socrata,omitempty" json:"socrata,omitempty" mapstructure:"socrata"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
