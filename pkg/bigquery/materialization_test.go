@@ -788,6 +788,69 @@ func TestBuildSCD2Query(t *testing.T) {
 				"SELECT id, event_name, ts from source_table\n" +
 				") AS src;",
 		},
+		{
+			name: "scd2_by_time_full_refresh_with_custom_partitioning",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+					PartitionBy:    "DATE(created_at)",
+					ClusterBy:      []string{"id", "event_type"},
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_name"},
+					{Name: "ts", Type: "DATE"},
+					{Name: "created_at", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, event_name, ts, created_at from source_table",
+			want: "CREATE OR REPLACE TABLE `my.asset`\n" +
+				"PARTITION BY DATE(created_at)\n" +
+				"CLUSTER BY id, event_type AS\n" +
+				"SELECT\n" +
+				"  CAST (ts AS TIMESTAMP) AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TIMESTAMP('9999-12-31') AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, event_name, ts, created_at from source_table\n" +
+				") AS src;",
+		},
+		{
+			name: "scd2_by_column_full_refresh_with_custom_partitioning",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategySCD2ByColumn,
+					PartitionBy: "DATE(created_at)",
+					ClusterBy:   []string{"id", "status"},
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "name"},
+					{Name: "status"},
+					{Name: "created_at", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, status, created_at from source_table",
+			want: "CREATE OR REPLACE TABLE `my.asset`\n" +
+				"PARTITION BY DATE(created_at)\n" +
+				"CLUSTER BY id, status AS\n" +
+				"SELECT\n" +
+				"  CURRENT_TIMESTAMP() AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TIMESTAMP('9999-12-31') AS _valid_until,\n" +
+				"  TRUE                    AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, name, status, created_at from source_table\n" +
+				") AS src;",
+		},
 	}
 
 	for _, tt := range tests {
