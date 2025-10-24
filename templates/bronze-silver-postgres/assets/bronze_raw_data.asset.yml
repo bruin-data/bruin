@@ -1,0 +1,52 @@
+name: public.bronze_exchange_rates
+type: ingestr
+
+description: >
+  Ingests daily FX rates from the Frankfurter API into PostgreSQL without transformations.
+  The dataset makes the raw bronze layer available for downstream silver modeling.
+
+columns:
+  - name: date
+    type: date
+    description: "Exchange rate date reported by the Frankfurter API."
+    checks:
+      - name: not_null
+  - name: base_currency
+    type: varchar
+    description: "Currency that the quote currency is priced against."
+    checks:
+      - name: not_null
+  - name: currency_code
+    type: varchar
+    description: "Quote currency code returned by Frankfurter."
+    checks:
+      - name: not_null
+  - name: rate
+    type: numeric
+    description: "Reported daily conversion rate between the base and quote currency."
+    checks:
+      - name: not_null
+      - name: positive
+
+custom_checks:
+  - name: unique currency per day
+    value: 0
+    query: |
+      SELECT COUNT(*)
+      FROM (
+        SELECT date, currency_code, base_currency
+        FROM public.bronze_exchange_rates
+        GROUP BY 1, 2, 3
+        HAVING COUNT(*) > 1
+      ) duplicates
+  - name: data freshness (3 day max lag)
+    value: 0
+    query: |
+      SELECT CASE WHEN MAX(CAST(date AS DATE)) < CURRENT_DATE - INTERVAL '3 days' THEN 1 ELSE 0 END AS stale_flag
+      FROM public.bronze_exchange_rates
+
+parameters:
+  source_connection: frankfurter-default
+  source_table: exchange_rates
+  destination: postgres
+  destination_table: bronze_exchange_rates

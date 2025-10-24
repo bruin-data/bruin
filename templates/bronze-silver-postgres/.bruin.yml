@@ -1,0 +1,14 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      frankfurter:
+        - name: "frankfurter-default"
+      postgres:
+        - name: "postgres-default"
+          host: "localhost"
+          port: 5432
+          database: "bruin"
+          username: "postgres"
+          password: "postgres"
+          ssl_mode: "disable"
