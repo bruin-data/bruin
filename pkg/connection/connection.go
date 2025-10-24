@@ -78,6 +78,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/smartsheet"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/socrata"
 	"github.com/bruin-data/bruin/pkg/solidgate"
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
@@ -176,6 +177,7 @@ type Manager struct {
 	InfluxDB             map[string]*influxdb.Client
 	Tableau              map[string]*tableau.Client
 	Trino                map[string]*trino.Client
+	Socrata              map[string]*socrata.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -2204,6 +2206,29 @@ func (m *Manager) AddPlusVibeAIConnectionFromConfig(connection *config.PlusVibeA
 	return nil
 }
 
+func (m *Manager) AddSocrataConnectionFromConfig(connection *config.SocrataConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Socrata == nil {
+		m.Socrata = make(map[string]*socrata.Client)
+	}
+
+	client, err := socrata.NewClient(socrata.Config{
+		Domain:    connection.Domain,
+		DatasetID: connection.DatasetID,
+		AppToken:  connection.AppToken,
+		Username:  connection.Username,
+		Password:  connection.Password,
+	})
+	if err != nil {
+		return err
+	}
+	m.Socrata[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2433,6 +2458,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Jira, connectionManager.AddJiraConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Monday, connectionManager.AddMondayConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.PlusVibeAI, connectionManager.AddPlusVibeAIConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Socrata, connectionManager.AddSocrataConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)
