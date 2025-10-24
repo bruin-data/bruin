@@ -836,6 +836,12 @@
             "$ref": "#/$defs/PlusVibeAIConnection"
           },
           "type": "array"
+        },
+        "socrata": {
+          "items": {
+            "$ref": "#/$defs/SocrataConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -2370,6 +2376,36 @@
         "name",
         "account",
         "username"
+      ]
+    },
+    "SocrataConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "dataset_id": {
+          "type": "string"
+        },
+        "app_token": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "domain",
+        "dataset_id",
+        "app_token"
       ]
     },
     "SolidgateConnection": {
