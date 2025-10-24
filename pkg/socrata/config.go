@@ -1,7 +1,6 @@
 package socrata
 
 import (
-	"fmt"
 	"net/url"
 )
 
@@ -27,5 +26,5 @@ func (c *Config) GetIngestrURI() string {
 		u.Add("password", c.Password)
 	}
 
-	return fmt.Sprintf("socrata://?%s", u.Encode())
+	return "socrata://?" + u.Encode()
 }
