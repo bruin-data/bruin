@@ -1,0 +1,21 @@
+name: conversation_analyzer
+type: agent.claude_code
+description: Maintain conversation context across multiple runs
+owner: analytics@company.com
+tags:
+  - session
+  - context
+  - multi-step
+
+parameters:
+  prompt: |
+    Continue our analysis of the customer churn data.
+    What are the top 3 factors we should address first?
+  
+  model: sonnet
+  session_id: "550e8400-e29b-41d4-a716-446655440000"
+  continue_session: "false"
+  output_format: text
+  system_prompt: |
+    You are helping with an ongoing customer churn analysis.
+    Reference previous findings when relevant.
