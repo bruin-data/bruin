@@ -2196,10 +2196,11 @@ func TestIngestrTasks(t *testing.T) {
 		{
 			name: "validate-r-basic-execution",
 			task: e2e.Task{
-				Name:    "validate-r-basic-execution",
-				Command: binary,
-				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/r-basic-execution")},
-				Env:     []string{},
+				Name:       "validate-r-basic-execution",
+				Command:    binary,
+				Args:       []string{"validate", filepath.Join(currentFolder, "test-pipelines/r-basic-execution")},
+				Env:        []string{},
+				WorkingDir: currentFolder,
 				Expected: e2e.Output{
 					ExitCode: 0,
 				},
@@ -2211,10 +2212,11 @@ func TestIngestrTasks(t *testing.T) {
 		{
 			name: "run-r-basic-execution",
 			task: e2e.Task{
-				Name:    "run-r-basic-execution",
-				Command: binary,
-				Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/r-basic-execution")},
-				Env:     []string{},
+				Name:       "run-r-basic-execution",
+				Command:    binary,
+				Args:       []string{"run", filepath.Join(currentFolder, "test-pipelines/r-basic-execution")},
+				Env:        []string{},
+				WorkingDir: currentFolder,
 				Expected: e2e.Output{
 					ExitCode: 0,
 					Contains: []string{"Hello from R!", "2 + 2 = 4"},
@@ -2228,10 +2230,11 @@ func TestIngestrTasks(t *testing.T) {
 		{
 			name: "validate-r-with-connections",
 			task: e2e.Task{
-				Name:    "validate-r-with-connections",
-				Command: binary,
-				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/r-with-connections")},
-				Env:     []string{},
+				Name:       "validate-r-with-connections",
+				Command:    binary,
+				Args:       []string{"validate", filepath.Join(currentFolder, "test-pipelines/r-with-connections")},
+				Env:        []string{},
+				WorkingDir: currentFolder,
 				Expected: e2e.Output{
 					ExitCode: 0,
 				},
@@ -2243,10 +2246,11 @@ func TestIngestrTasks(t *testing.T) {
 		{
 			name: "run-r-with-connections",
 			task: e2e.Task{
-				Name:    "run-r-with-connections",
-				Command: binary,
-				Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/r-with-connections")},
-				Env:     []string{},
+				Name:       "run-r-with-connections",
+				Command:    binary,
+				Args:       []string{"run", filepath.Join(currentFolder, "test-pipelines/r-with-connections")},
+				Env:        []string{},
+				WorkingDir: currentFolder,
 				Expected: e2e.Output{
 					ExitCode: 0,
 					Contains: []string{"All environment variable tests passed!"},
