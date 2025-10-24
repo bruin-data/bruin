@@ -330,10 +330,9 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Socrata: []SocrataConnection{
 				{
-					Name:      "socrata-test",
-					Domain:    "data.seattle.gov",
-					DatasetID: "2khk-5ukd",
-					AppToken:  "test_app_token",
+					Name:     "socrata-test",
+					Domain:   "data.seattle.gov",
+					AppToken: "test_app_token",
 				},
 			},
 			Asana: []AsanaConnection{
