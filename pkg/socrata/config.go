@@ -3,21 +3,15 @@ package socrata
 import "net/url"
 
 type Config struct {
-	Domain    string
-	DatasetID string
-	AppToken  string
-	Username  string
-	Password  string
+	Domain   string
+	AppToken string
+	Username string
+	Password string
 }
 
 func (c *Config) GetIngestrURI() string {
 	params := url.Values{}
-	if c.Domain != "" {
-		params.Set("domain", c.Domain)
-	}
-	if c.DatasetID != "" {
-		params.Set("dataset_id", c.DatasetID)
-	}
+	// Note: dataset_id is not included in the URI as it comes from source_table parameter
 	if c.AppToken != "" {
 		params.Set("app_token", c.AppToken)
 	}
@@ -28,7 +22,12 @@ func (c *Config) GetIngestrURI() string {
 		params.Set("password", c.Password)
 	}
 
+	// Domain should be in the host part of the URI, not as a query parameter
+	// Format: socrata://domain?app_token=TOKEN
 	uri := "socrata://"
+	if c.Domain != "" {
+		uri += c.Domain
+	}
 	if len(params) > 0 {
 		uri += "?" + params.Encode()
 	}

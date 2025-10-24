@@ -2306,9 +2306,6 @@
         "domain": {
           "type": "string"
         },
-        "dataset_id": {
-          "type": "string"
-        },
         "app_token": {
           "type": "string"
         },
@@ -2324,7 +2321,6 @@
       "required": [
         "name",
         "domain",
-        "dataset_id",
         "app_token"
       ]
     },

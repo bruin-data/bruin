@@ -1269,11 +1269,10 @@ func (m *Manager) AddSocrataConnectionFromConfig(connection *config.SocrataConne
 	}
 	m.mutex.Unlock()
 	client, err := socrata.NewClient(&socrata.Config{
-		Domain:    connection.Domain,
-		DatasetID: connection.DatasetID,
-		AppToken:  connection.AppToken,
-		Username:  connection.Username,
-		Password:  connection.Password,
+		Domain:   connection.Domain,
+		AppToken: connection.AppToken,
+		Username: connection.Username,
+		Password: connection.Password,
 	})
 	if err != nil {
 		return err
