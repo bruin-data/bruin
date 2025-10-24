@@ -152,6 +152,7 @@ The `data-diff` command includes specialized type mapping support for the follow
 - **BigQuery** - Native support for BigQuery types including `INT64`, `FLOAT64`, `BIGNUMERIC`, and BigQuery-specific formatting
 - **PostgreSQL & AWS Redshift** - Complete support for PostgreSQL types including `SERIAL` types, `MONEY`, network types (`CIDR`, `INET`), and `JSONB`
 - **Snowflake** - Full support for Snowflake types including `NUMBER`, `VARIANT`, and timezone-aware timestamp types
+- **Athena** - Supports AWS Athena (Trino/Presto) type system including `DECIMAL`, `DOUBLE`, `BOOLEAN`, `JSON`, and timestamp types for data-diff comparisons
 
 ### Type Mapping Features
 
