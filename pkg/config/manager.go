@@ -62,6 +62,7 @@ type Connections struct {
 	TikTokAds           []TikTokAdsConnection           `yaml:"tiktokads,omitempty" json:"tiktokads,omitempty" mapstructure:"tiktokads"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
+	Socrata             []SocrataConnection             `yaml:"socrata,omitempty" json:"socrata,omitempty" mapstructure:"socrata"`
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
 	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
 	Docebo              []DoceboConnection              `yaml:"docebo,omitempty" json:"docebo,omitempty" mapstructure:"docebo"`

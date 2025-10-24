@@ -599,6 +599,19 @@ func (c SlackConnection) GetName() string {
 	return c.Name
 }
 
+type SocrataConnection struct {
+	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Domain    string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
+	DatasetID string `yaml:"dataset_id,omitempty" json:"dataset_id" mapstructure:"dataset_id"`
+	AppToken  string `yaml:"app_token,omitempty" json:"app_token" mapstructure:"app_token"`
+	Username  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+}
+
+func (c SocrataConnection) GetName() string {
+	return c.Name
+}
+
 type PersonioConnection struct {
 	Name         string `yaml:"name" json:"name" mapstructure:"name"`
 	ClientID     string `yaml:"client_id" json:"client_id" mapstructure:"client_id"`

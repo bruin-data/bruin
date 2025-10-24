@@ -211,6 +211,11 @@ environments:
       slack:
         - name: conn26
           api_key: "slackkey"
+      socrata:
+        - name: "socrata-test"
+          domain: "data.seattle.gov"
+          dataset_id: "2khk-5ukd"
+          app_token: "test_app_token"
       googleads:
         - name: googleads-0
           dev_token: dev-0
