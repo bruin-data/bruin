@@ -1652,7 +1652,7 @@ func TestWorkflowTasks(t *testing.T) {
 						WorkingDir: currentFolder,
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Contains: []string{"PUBLIC"},
+							Contains: []string{"public"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
