@@ -231,6 +231,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Google Ads", link: "/ingestion/google-ads"},
                             {text: "Google Analytics", link: "/ingestion/google_analytics"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
+                            {text: "Hostaway", link: "/ingestion/hostaway"},
                             {text: "Hubspot", link: "/ingestion/hubspot"},
                             {text: "Intercom", link: "/ingestion/intercom"},
                             {text: "InfluxDB", link: "/ingestion/influxdb"},
