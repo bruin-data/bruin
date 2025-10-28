@@ -102,31 +102,44 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 	cmd := exec.Command(command.Name, command.Args...) //nolint:gosec
 	cmd.Dir = repo.Path
 
-	// Start with parent environment to inherit important vars like PATH, CC, CFLAGS, etc.
-	cmd.Env = os.Environ()
+	// Build environment: start with parent environment to inherit PATH, CC, CFLAGS, etc.
+	envMap := make(map[string]string)
 
-	// Override with custom env vars if provided
-	if len(command.EnvVars) > 0 {
-		envMap := make(map[string]string)
-
-		// First, parse existing environment into a map
-		for _, envVar := range cmd.Env {
-			parts := strings.SplitN(envVar, "=", 2)
-			if len(parts) == 2 {
-				envMap[parts[0]] = parts[1]
-			}
+	// First, parse parent environment into a map
+	for _, envVar := range os.Environ() {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
 		}
+	}
 
-		// Override with command-specific env vars
-		for k, v := range command.EnvVars {
-			envMap[k] = v
+	// Ensure path-related env vars are set (preserving backward compatibility)
+	// These will only be set if not already present in parent environment
+	if _, exists := envMap["USERPROFILE"]; !exists {
+		if val := os.Getenv("USERPROFILE"); val != "" {
+			envMap["USERPROFILE"] = val
 		}
+	}
+	if _, exists := envMap["HOMEPATH"]; !exists {
+		if val := os.Getenv("HOMEPATH"); val != "" {
+			envMap["HOMEPATH"] = val
+		}
+	}
+	if _, exists := envMap["HOME"]; !exists {
+		if val := os.Getenv("HOME"); val != "" {
+			envMap["HOME"] = val
+		}
+	}
 
-		// Rebuild env slice
-		cmd.Env = make([]string, 0, len(envMap))
-		for k, v := range envMap {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-		}
+	// Override with command-specific env vars if provided
+	for k, v := range command.EnvVars {
+		envMap[k] = v
+	}
+
+	// Rebuild env slice
+	cmd.Env = make([]string, 0, len(envMap))
+	for k, v := range envMap {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
 	return l.RunAnyCommand(ctx, cmd)
