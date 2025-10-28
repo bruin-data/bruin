@@ -93,25 +93,11 @@ Hostaway assets will be ingested to your data warehouse as defined in the `desti
 | Webhook Reservations            | `webhook_reservations`          | replace          | Webhook configurations for reservation events                  |
 | Tasks                           | `tasks`                         | replace          | Tasks and to-dos within the system                             |
 
-## Asset-Specific Configuration
-
-### Listings
-The `listings` table supports incremental loading based on the `latestActivityOn` field. This allows you to fetch only listings that have been modified since the last ingestion.
-
-### Listing Fee Settings
-The `listing_fee_settings` table supports incremental loading based on the `updatedOn` field.
-
-### Parallelized Tables
-The `finance_fields`, `reservation_rental_agreements`, and `listing_calendars` tables use parallelization for improved performance when fetching nested resource data.
-
-### Other Tables
-Most other tables use full refresh mode (replace strategy) as they represent current state data or don't have suitable incremental keys.
 
 ## Notes
 
 - **Authentication**: Hostaway uses OAuth 2.0 client credentials authentication. Access tokens are JWTs with configurable expiration times - manage them securely and rotate them as needed.
 - **Incremental Loading**: Only `listings` and `listing_fee_settings` support incremental loading. Use `--interval-start` and `--interval-end` parameters for these tables.
-- **Parallelization**: Some tables use parallelization for performance optimization when fetching large amounts of nested data.
 - **API Documentation**: More details on the Hostaway API can be found in the [official API documentation](https://api-docs.hostaway.com/).
 - **Rate Limits**: Be aware of Hostaway API rate limits when ingesting large amounts of data.
 
