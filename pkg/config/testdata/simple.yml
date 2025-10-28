@@ -134,6 +134,9 @@ environments:
       anthropic:
         - name: "anthropic-1"
           api_key: "test-api-key"
+      hostaway:
+        - name: "hostaway-1"
+          api_key: "test-api-key"
       intercom:
         - name: "intercom-1"
           access_token: "test-access-token"
