@@ -5,6 +5,7 @@ secrets:
     - key: KEY1
       inject_as: INJECTED1
     - key: chess-default
+      inject_as: CHESS_DEFAULT
 @bruin"
 
 # R script that tests environment variable injection (secrets/connections)
@@ -27,15 +28,15 @@ if (injected1 != "value1") {
 }
 cat(sprintf("INJECTED1: %s (correct!)\n", injected1))
 
-# Check for chess-default connection
-chess_default <- Sys.getenv("chess-default")
+# Check for CHESS_DEFAULT connection (injected with underscore instead of hyphen)
+chess_default <- Sys.getenv("CHESS_DEFAULT")
 expected_chess <- '{"name":"chess-default","players":["erik","vadimer2"]}'
 if (nchar(chess_default) == 0) {
-  stop("chess-default environment variable not set")
+  stop("CHESS_DEFAULT environment variable not set")
 }
 if (chess_default != expected_chess) {
-  stop(sprintf("chess-default has wrong value:\nExpected: %s\nGot: %s", expected_chess, chess_default))
+  stop(sprintf("CHESS_DEFAULT has wrong value:\nExpected: %s\nGot: %s", expected_chess, chess_default))
 }
-cat(sprintf("chess-default: %s (correct!)\n", chess_default))
+cat(sprintf("CHESS_DEFAULT: %s (correct!)\n", chess_default))
 
 cat("\nAll environment variable tests passed!\n")
