@@ -21,7 +21,7 @@ import (
 type Client struct {
 	connection    connection
 	config        DuckDBConfig
-	schemaCreator *ansisql.SchemaCreator
+	schemaCreator *DuckDBSchemaCreator
 	typeMapper    *diff.DatabaseTypeMapper
 }
 
@@ -47,7 +47,7 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 	return &Client{
 		connection:    conn,
 		config:        c,
-		schemaCreator: ansisql.NewSchemaCreator(),
+		schemaCreator: NewDuckDBSchemaCreator(),
 		typeMapper:    diff.NewDuckDBTypeMapper(),
 	}, nil
 }

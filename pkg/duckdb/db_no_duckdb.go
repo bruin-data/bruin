@@ -17,7 +17,7 @@ var errDuckDBNotSupported = errors.New("DuckDB support not available in this bui
 type Client struct {
 	connection    connection
 	config        DuckDBConfig
-	schemaCreator *ansisql.SchemaCreator
+	schemaCreator *DuckDBSchemaCreator
 }
 
 type DuckDBConfig interface {
