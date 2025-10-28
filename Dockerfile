@@ -26,7 +26,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # Final stage
 FROM debian:12.8-slim
 
-RUN apt-get update && apt-get install -y curl git
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    binutils \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN adduser --disabled-password --gecos '' bruin
 

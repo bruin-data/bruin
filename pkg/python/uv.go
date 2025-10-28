@@ -205,6 +205,12 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	err = u.Cmd.Run(ctx, repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: u.ingestrInstallCmd(ctx, extraPackages),
+		EnvVars: map[string]string{
+			"CC":      "/usr/bin/gcc",
+			"PATH":    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"CFLAGS":  "-I/usr/include",
+			"LDFLAGS": "-L/usr/lib",
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
@@ -356,6 +362,12 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: u.ingestrInstallCmd(ctx, nil),
+		EnvVars: map[string]string{
+			"CC":      "/usr/bin/gcc",
+			"PATH":    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"CFLAGS":  "-I/usr/include",
+			"LDFLAGS": "-L/usr/lib",
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
