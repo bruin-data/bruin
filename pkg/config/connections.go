@@ -347,6 +347,15 @@ func (c HANAConnection) GetName() string {
 	return c.Name
 }
 
+type HostawayConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c HostawayConnection) GetName() string {
+	return c.Name
+}
+
 type GorgiasConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Domain string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
