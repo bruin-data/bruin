@@ -270,7 +270,7 @@ retries: 2
 ```
 
 - **Type:** `Integer`
-- **Default:** `0`
+- **Default:** `2`
 
 ### Concurrency
 
