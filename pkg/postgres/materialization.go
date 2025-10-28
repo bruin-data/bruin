@@ -10,7 +10,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func quoteIdentifier(identifier string) string {
+// QuoteIdentifier quotes a PostgreSQL identifier (table, column, etc.) to handle case-sensitive names.
+// It splits the identifier on "." and quotes each part separately.
+// For example, "schema.MyTable" becomes "\"schema\".\"MyTable\"".
+func QuoteIdentifier(identifier string) string {
 	parts := strings.Split(identifier, ".")
 	quotedParts := make([]string, len(parts))
 	for i, part := range parts {
@@ -68,7 +71,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
-	quotedIncrementalKey := quoteIdentifier(mat.IncrementalKey)
+	quotedIncrementalKey := QuoteIdentifier(mat.IncrementalKey)
 
 	queries := []string{
 		"BEGIN TRANSACTION",
@@ -97,7 +100,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	on := make([]string, 0, len(primaryKeys))
 	for _, key := range primaryKeys {
-		on = append(on, fmt.Sprintf("target.%s = source.%s", quoteIdentifier(key), quoteIdentifier(key)))
+		on = append(on, fmt.Sprintf("target.%s = source.%s", QuoteIdentifier(key), QuoteIdentifier(key)))
 	}
 	onQuery := strings.Join(on, " AND ")
 
@@ -105,8 +108,8 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	quotedColumnNames := make([]string, 0, len(columnNames))
 	quotedColumnValues := make([]string, 0, len(columnNames))
 	for _, col := range columnNames {
-		quotedColumnNames = append(quotedColumnNames, quoteIdentifier(col))
-		quotedColumnValues = append(quotedColumnValues, quoteIdentifier(col))
+		quotedColumnNames = append(quotedColumnNames, QuoteIdentifier(col))
+		quotedColumnValues = append(quotedColumnValues, QuoteIdentifier(col))
 	}
 	allColumnNamesStr := strings.Join(quotedColumnNames, ", ")
 	allColumnValuesStr := strings.Join(quotedColumnValues, ", ")
@@ -117,9 +120,9 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		matchedUpdateStatements := make([]string, 0, len(mergeColumns))
 		for _, col := range mergeColumns {
 			if col.MergeSQL != "" {
-				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = %s", quoteIdentifier(col.Name), col.MergeSQL))
+				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = %s", QuoteIdentifier(col.Name), col.MergeSQL))
 			} else {
-				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = source.%s", quoteIdentifier(col.Name), quoteIdentifier(col.Name)))
+				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = source.%s", QuoteIdentifier(col.Name), QuoteIdentifier(col.Name)))
 			}
 		}
 
@@ -171,7 +174,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp || asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
-	quotedIncrementalKey := quoteIdentifier(asset.Materialization.IncrementalKey)
+	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
@@ -194,7 +197,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnComments := []string{}
 
 	for _, col := range asset.Columns {
-		quotedColName := quoteIdentifier(col.Name)
+		quotedColName := QuoteIdentifier(col.Name)
 		def := fmt.Sprintf("%s %s", quotedColName, col.Type)
 
 		if col.PrimaryKey {
@@ -278,7 +281,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
 	}
 
-	quotedIncrementalKey := quoteIdentifier(asset.Materialization.IncrementalKey)
+	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
@@ -317,7 +320,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	)
 
 	for _, col := range asset.Columns {
-		quotedColName := quoteIdentifier(col.Name)
+		quotedColName := QuoteIdentifier(col.Name)
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, quotedColName)
 		}
@@ -425,7 +428,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 		insertValues = make([]string, 0, 12)
 	)
 	for _, col := range asset.Columns {
-		quotedColName := quoteIdentifier(col.Name)
+		quotedColName := QuoteIdentifier(col.Name)
 		switch col.Name {
 		case "_valid_from", "_valid_until", "_is_current":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
@@ -451,7 +454,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 		)
 	}
 	pkList := strings.Join(primaryKeys, ", ")
-	quotedIncrementalKey := quoteIdentifier(asset.Materialization.IncrementalKey)
+	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(insertValues,
 		"source."+quotedIncrementalKey,
@@ -523,7 +526,7 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 	)
 
 	for _, col := range asset.Columns {
-		quotedColName := quoteIdentifier(col.Name)
+		quotedColName := QuoteIdentifier(col.Name)
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, quotedColName)
 		}
@@ -640,7 +643,7 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 		insertValues = make([]string, 0, 12)
 	)
 	for _, col := range asset.Columns {
-		quotedColName := quoteIdentifier(col.Name)
+		quotedColName := QuoteIdentifier(col.Name)
 		switch col.Name {
 		case "_valid_from", "_valid_until", "_is_current":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
@@ -665,7 +668,7 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 			asset.Materialization.Strategy,
 		)
 	}
-	quotedIncrementalKey := quoteIdentifier(asset.Materialization.IncrementalKey)
+	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(insertValues,
 		"source."+quotedIncrementalKey,
