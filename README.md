@@ -2,13 +2,13 @@
   <img src="./resources/logo-horizontal.svg" width="500" />
 </p>
 
-Bruin is a data pipeline tool that brings together data ingestion, data transformation with SQL & Python, and data quality into a single framework. It works with all the major data platforms and runs on your local machine, an EC2 instance, or GitHub Actions.
+Bruin is a data pipeline tool that brings together data ingestion, data transformation with SQL, Python & R, and data quality into a single framework. It works with all the major data platforms and runs on your local machine, an EC2 instance, or GitHub Actions.
 
 <img alt="Bruin CLI - Demo" src="./resources/demo.gif" width="1200" />
 
 Bruin is packed with features:
 - 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
-- ✨ run SQL & Python transformations on [many platforms](https://bruin-data.github.io/bruin/#supported-platforms)
+- ✨ run SQL, Python & R transformations on [many platforms](https://bruin-data.github.io/bruin/#supported-platforms)
 - 📐 table/view [materializations](https://bruin-data.github.io/bruin/assets/materialization.html), incremental tables
 - 🐍 run Python in isolated environments using [uv](https://github.com/astral-sh/uv)
 - 💅 built-in data quality checks

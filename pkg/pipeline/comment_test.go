@@ -319,6 +319,47 @@ func Test_createTaskFromFile(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "R file with comment block parsed",
+			args: args{
+				filePath: path.AbsPathForTests(t, "testdata/comments/test.r"),
+			},
+			want: &pipeline.Asset{
+				ID:          "aba30496cdc78a46e6e2e6da72985ac3e05aa83b87a01b3dc347166ffa634e5f",
+				Name:        "some-r-task",
+				Description: "R task with multiline configuration",
+				Type:        "r",
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "test.r",
+					Path:    path.AbsPathForTests(t, "testdata/comments/test.r"),
+					Content: "cat(\"Hello from R!\\n\")\nprint(\"This is an R script\")",
+				},
+				Parameters: map[string]string{
+					"param1": "first-parameter",
+					"param2": "second-parameter",
+					"param3": "third-parameter",
+				},
+				Image:    "r:4.3",
+				Instance: "b1.nano",
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "secret1",
+						InjectedKey: "INJECTED_SECRET1",
+					},
+					{
+						SecretKey:   "secret2",
+						InjectedKey: "secret2",
+					},
+				},
+				Upstreams: []pipeline.Upstream{
+					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+				},
+				Columns:      make([]pipeline.Column, 0),
+				CustomChecks: make([]pipeline.CustomCheck, 0),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

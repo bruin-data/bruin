@@ -12,7 +12,7 @@ If dbt, Airbyte, and Great Expectations had a lovechild, it would be Bruin.
 
 Bruin is packed with features:
 - 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
-- ✨ run SQL & Python transformations on [many platforms](#supported-platforms)
+- ✨ run SQL, Python & R transformations on [many platforms](#supported-platforms)
 - 📐 table/view [materializations](assets/materialization.md), incremental tables
 - 🐍 run Python in isolated environments using [uv](https://github.com/astral-sh/uv)
 - 💅 built-in data quality checks
