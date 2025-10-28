@@ -102,10 +102,31 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 	cmd := exec.Command(command.Name, command.Args...) //nolint:gosec
 	cmd.Dir = repo.Path
 
-	// pass the path-related env vars by default
-	cmd.Env = []string{"USERPROFILE=" + os.Getenv("USERPROFILE"), "HOMEPATH=" + os.Getenv("HOMEPATH"), "HOME=" + os.Getenv("HOME")}
-	for k, v := range command.EnvVars {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+	// Start with parent environment to inherit important vars like PATH, CC, CFLAGS, etc.
+	cmd.Env = os.Environ()
+
+	// Override with custom env vars if provided
+	if len(command.EnvVars) > 0 {
+		envMap := make(map[string]string)
+
+		// First, parse existing environment into a map
+		for _, envVar := range cmd.Env {
+			parts := strings.SplitN(envVar, "=", 2)
+			if len(parts) == 2 {
+				envMap[parts[0]] = parts[1]
+			}
+		}
+
+		// Override with command-specific env vars
+		for k, v := range command.EnvVars {
+			envMap[k] = v
+		}
+
+		// Rebuild env slice
+		cmd.Env = make([]string, 0, len(envMap))
+		for k, v := range envMap {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+		}
 	}
 
 	return l.RunAnyCommand(ctx, cmd)

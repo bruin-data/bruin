@@ -47,6 +47,9 @@ RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/share
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
 ENV PATH="/home/bruin/.local/bin:${PATH}"
+ENV CC="/usr/bin/gcc"
+ENV CFLAGS="-I/usr/include"
+ENV LDFLAGS="-L/usr/lib"
 
 # Bootstrap ingestr installation
 RUN cd /tmp && /home/bruin/.local/bin/bruin init bootstrap --in-place && /home/bruin/.local/bin/bruin run bootstrap
