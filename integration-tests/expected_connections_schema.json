@@ -423,6 +423,12 @@
           },
           "type": "array"
         },
+        "hostaway": {
+          "items": {
+            "$ref": "#/$defs/HostawayConnection"
+          },
+          "type": "array"
+        },
         "shopify": {
           "items": {
             "$ref": "#/$defs/ShopifyConnection"
@@ -1407,6 +1413,22 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "HostawayConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "HubspotConnection": {

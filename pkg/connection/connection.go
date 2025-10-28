@@ -44,6 +44,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
+	"github.com/bruin-data/bruin/pkg/hostaway"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/influxdb"
 	"github.com/bruin-data/bruin/pkg/intercom"
@@ -108,6 +109,7 @@ type Manager struct {
 	Notion               map[string]*notion.Client
 	Allium               map[string]*allium.Client
 	HANA                 map[string]*hana.Client
+	Hostaway             map[string]*hostaway.Client
 	Shopify              map[string]*shopify.Client
 	Gorgias              map[string]*gorgias.Client
 	Klaviyo              map[string]*klaviyo.Client
@@ -829,6 +831,29 @@ func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.HANA[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddHostawayConnectionFromConfig(connection *config.HostawayConnection) error {
+	m.mutex.Lock()
+	if m.Hostaway == nil {
+		m.Hostaway = make(map[string]*hostaway.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := hostaway.NewClient(hostaway.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Hostaway[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2405,6 +2430,8 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Allium, connectionManager.AddAlliumConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.HANA, connectionManager.AddHANAConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Hostaway, connectionManager.AddHostawayConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Shopify, connectionManager.AddShopifyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Gorgias, connectionManager.AddGorgiasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Klaviyo, connectionManager.AddKlaviyoConnectionFromConfig, &wg, &errList, &mu)

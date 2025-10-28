@@ -188,6 +188,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "test-api-key",
 				},
 			},
+			Hostaway: []HostawayConnection{
+				{
+					Name:   "hostaway-1",
+					APIKey: "test-api-key",
+				},
+			},
 			Intercom: []IntercomConnection{
 				{
 					Name:        "intercom-1",
@@ -1194,6 +1200,10 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Anthropic, 1)
 					assert.Equal(t, tt.connName, env.Connections.Anthropic[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.Anthropic[0].APIKey)
+				case "hostaway":
+					assert.Len(t, env.Connections.Hostaway, 1)
+					assert.Equal(t, tt.connName, env.Connections.Hostaway[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Hostaway[0].APIKey)
 				case "intercom":
 					assert.Len(t, env.Connections.Intercom, 1)
 					assert.Equal(t, tt.connName, env.Connections.Intercom[0].Name)
