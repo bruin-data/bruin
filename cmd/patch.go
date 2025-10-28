@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
@@ -92,6 +93,12 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager conf
 		return fillStatusFailed, fmt.Errorf("connection for asset '%s' does not support schema introspection", pp.Asset.Name)
 	}
 	tableName := pp.Asset.Name
+
+	// For PostgreSQL, quote the table name to handle case-sensitive names
+	if _, ok := conn.(*postgres.Client); ok {
+		tableName = postgres.QuoteIdentifier(tableName)
+	}
+
 	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", tableName)
 	if _, ok := conn.(*mssql.DB); ok {
 		queryStr = "SELECT TOP 0 * FROM " + tableName
