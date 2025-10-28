@@ -556,6 +556,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.HANA = append(env.Connections.HANA, conn)
+	case "hostaway":
+		var conn HostawayConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Hostaway = append(env.Connections.Hostaway, conn)
 	case "shopify":
 		var conn ShopifyConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1091,6 +1098,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Notion = removeConnection(env.Connections.Notion, connectionName)
 	case "hana":
 		env.Connections.HANA = removeConnection(env.Connections.HANA, connectionName)
+	case "hostaway":
+		env.Connections.Hostaway = removeConnection(env.Connections.Hostaway, connectionName)
 	case "shopify":
 		env.Connections.Shopify = removeConnection(env.Connections.Shopify, connectionName)
 	case "snowflake":
@@ -1299,6 +1308,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.MySQL, source.MySQL)
 	mergeConnectionList(&c.Notion, source.Notion)
 	mergeConnectionList(&c.HANA, source.HANA)
+	mergeConnectionList(&c.Hostaway, source.Hostaway)
 	mergeConnectionList(&c.Shopify, source.Shopify)
 	mergeConnectionList(&c.Gorgias, source.Gorgias)
 	mergeConnectionList(&c.Klaviyo, source.Klaviyo)
