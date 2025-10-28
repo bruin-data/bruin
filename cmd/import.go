@@ -18,6 +18,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
@@ -259,13 +260,21 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 		return errors2.New("connection does not support schema introspection")
 	}
 
+	// Build fully qualified table name
+	fullTableName := schemaName + "." + tableName
+
+	// For PostgreSQL, quote the schema and table names to handle case-sensitive names
+	if _, ok := conn.(*postgres.Client); ok {
+		fullTableName = postgres.QuoteIdentifier(fullTableName)
+	}
+
 	// Query to get column information
-	queryStr := fmt.Sprintf("SELECT * FROM %s.%s WHERE 1=0 LIMIT 0", schemaName, tableName)
+	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", fullTableName)
 
 	if _, ok := conn.(*mssql.DB); ok {
-		queryStr = "SELECT TOP 0 * FROM " + schemaName + "." + tableName
+		queryStr = "SELECT TOP 0 * FROM " + fullTableName
 	} else if _, ok := conn.(*oracle.Client); ok {
-		queryStr = "SELECT * FROM " + schemaName + "." + tableName + " WHERE 1=0"
+		queryStr = "SELECT * FROM " + fullTableName + " WHERE 1=0"
 	}
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(ctx, q)
