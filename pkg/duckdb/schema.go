@@ -31,10 +31,8 @@ func (sc *DuckDBSchemaCreator) CreateSchemaIfNotExist(ctx context.Context, qr qu
 	var schemaName string
 	switch len(tableComponents) {
 	case 2:
-		// Preserve the original case for DuckDB (don't uppercase)
 		schemaName = strings.ToLower(tableComponents[0])
 	case 3:
-		// Preserve the original case for DuckDB (don't uppercase)
 		schemaName = strings.ToLower(tableComponents[1])
 	default:
 		return nil
