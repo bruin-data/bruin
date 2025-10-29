@@ -26,7 +26,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # Final stage
 FROM debian:12.8-slim
 
-RUN apt-get update && apt-get install -y curl git
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    binutils \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN adduser --disabled-password --gecos '' bruin
 
@@ -41,6 +47,9 @@ RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/share
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
 ENV PATH="/home/bruin/.local/bin:${PATH}"
+ENV CC="/usr/bin/gcc"
+ENV CFLAGS="-I/usr/include"
+ENV LDFLAGS="-L/usr/lib"
 
 # Bootstrap ingestr installation
 RUN cd /tmp && /home/bruin/.local/bin/bruin init bootstrap --in-place && /home/bruin/.local/bin/bruin run bootstrap

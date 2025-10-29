@@ -102,9 +102,43 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 	cmd := exec.Command(command.Name, command.Args...) //nolint:gosec
 	cmd.Dir = repo.Path
 
-	// pass the path-related env vars by default
-	cmd.Env = []string{"USERPROFILE=" + os.Getenv("USERPROFILE"), "HOMEPATH=" + os.Getenv("HOMEPATH"), "HOME=" + os.Getenv("HOME")}
+	// Build environment: start with parent environment to inherit PATH, CC, CFLAGS, etc.
+	envMap := make(map[string]string)
+
+	// First, parse parent environment into a map
+	for _, envVar := range os.Environ() {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// Ensure path-related env vars are set (preserving backward compatibility)
+	// These will only be set if not already present in parent environment
+	if _, exists := envMap["USERPROFILE"]; !exists {
+		if val := os.Getenv("USERPROFILE"); val != "" {
+			envMap["USERPROFILE"] = val
+		}
+	}
+	if _, exists := envMap["HOMEPATH"]; !exists {
+		if val := os.Getenv("HOMEPATH"); val != "" {
+			envMap["HOMEPATH"] = val
+		}
+	}
+	if _, exists := envMap["HOME"]; !exists {
+		if val := os.Getenv("HOME"); val != "" {
+			envMap["HOME"] = val
+		}
+	}
+
+	// Override with command-specific env vars if provided
 	for k, v := range command.EnvVars {
+		envMap[k] = v
+	}
+
+	// Rebuild env slice
+	cmd.Env = make([]string, 0, len(envMap))
+	for k, v := range envMap {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
