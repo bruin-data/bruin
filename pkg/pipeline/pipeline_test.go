@@ -906,6 +906,74 @@ func TestAsset_Persist(t *testing.T) {
 	}
 }
 
+func TestAsset_Persist_TagsRemoval(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		tagsValue   pipeline.EmptyStringArray
+		shouldOmit  bool
+		description string
+	}{
+		{
+			name:        "nil tags should be omitted",
+			tagsValue:   nil,
+			shouldOmit:  true,
+			description: "Assets with nil tags should not include tags field in persisted YAML",
+		},
+		{
+			name:        "empty tags array should be omitted",
+			tagsValue:   pipeline.EmptyStringArray{},
+			shouldOmit:  true,
+			description: "Assets with empty tags array should not include tags field in persisted YAML",
+		},
+		{
+			name:        "populated tags should be included",
+			tagsValue:   pipeline.EmptyStringArray{"production", "critical"},
+			shouldOmit:  false,
+			description: "Assets with populated tags should include tags field in persisted YAML",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			asset := &pipeline.Asset{
+				Name: "some-sql-task",
+				Type: pipeline.AssetTypeDuckDBQuery,
+				Tags: tt.tagsValue,
+				ExecutableFile: pipeline.ExecutableFile{
+					Path:    path.AbsPathForTests(t, "testdata/persist/simple.sql"),
+					Content: "SELECT 1 as id",
+				},
+			}
+
+			if tt.tagsValue == nil {
+				err := json.Unmarshal([]byte(`{"tags": []}`), asset)
+				require.NoError(t, err)
+			}
+
+			fs := afero.NewMemMapFs()
+			err := asset.Persist(fs)
+			require.NoError(t, err)
+
+			content, err := afero.ReadFile(fs, path.AbsPathForTests(t, "testdata/persist/simple.sql"))
+			require.NoError(t, err)
+
+			contentStr := string(content)
+			containsTags := strings.Contains(contentStr, "tags:")
+
+			if tt.shouldOmit {
+				assert.False(t, containsTags, "%s\nContent:\n%s", tt.description, contentStr)
+			} else {
+				assert.True(t, containsTags, "%s\nContent:\n%s", tt.description, contentStr)
+			}
+		})
+	}
+}
+
 func TestPipeline_Persist(t *testing.T) {
 	t.Parallel()
 
