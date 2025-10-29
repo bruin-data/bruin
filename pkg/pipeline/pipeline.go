@@ -1331,6 +1331,7 @@ func (a *EmptyStringArray) UnmarshalJSON(data []byte) error {
 	}
 
 	if len(v) == 0 {
+		*a = nil
 		return nil
 	}
 
