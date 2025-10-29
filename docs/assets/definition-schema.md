@@ -95,6 +95,10 @@ The items of this list can be just a `String` with the name of the asset in the 
 ```
 
 
+## `start_date`
+The start date for the asset, used when running with full refresh (`--full-refresh`). When specified, the asset will process data starting from this date during full refresh runs (overrides the pipeline's start_date).
+- **Type:** `String` (YYYY-MM-DD format)
+
 ## `interval_modifiers`
 Controls how the processing window is adjusted by shifting the start and end times. Requires the `--apply-interval-modifiers` flag when running the pipeline.
 

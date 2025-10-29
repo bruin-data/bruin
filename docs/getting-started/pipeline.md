@@ -129,7 +129,7 @@ schedule: "0 0 * * *"
 
 ### Start date
 
-Set the earliest date from which runs should be considered. Useful for controlled backfills and catchup runs.
+Set the earliest date from which runs should be considered. Useful for controlled backfills and catchup runs. When running with full refresh (`--full-refresh`), the pipeline will process data starting from this date.
 
 Example:
 
