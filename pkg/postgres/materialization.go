@@ -395,7 +395,7 @@ WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
 WHEN NOT MATCHED BY TARGET THEN
   INSERT (%s)
   VALUES (%s);`,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		strings.TrimSpace(query),
 		asset.Name,
 		pkList,
@@ -500,7 +500,7 @@ WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
 WHEN NOT MATCHED BY TARGET THEN
   INSERT (%s)
   VALUES (%s);`,
-		tbl,
+		QuoteIdentifier(tbl),
 		strings.TrimSpace(query),
 		tbl,
 		pkList,

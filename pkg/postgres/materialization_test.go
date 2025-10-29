@@ -562,7 +562,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_name, ts from source_table",
-			want: "MERGE INTO "my".a"sset" AS target\n" +
+			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_name, ts from source_table\n" +
@@ -612,7 +612,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_type, col1, col2, ts from source_table",
-			want: "MERGE INTO "my".a"sset" AS target\n" +
+			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_type, col1, col2, ts from source_table\n" +
@@ -782,7 +782,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, col3, col4 from source_table",
-			want: "MERGE INTO "my".a"sset" AS target\n" +
+			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, col1, col2, col3, col4 from source_table\n" +
@@ -829,7 +829,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, category, name, price from source_table",
-			want: "MERGE INTO "my".a"sset" AS target\n" +
+			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, category, name, price from source_table\n" +
