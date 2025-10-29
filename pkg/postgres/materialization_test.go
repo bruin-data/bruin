@@ -196,7 +196,7 @@ COMMIT;`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want: `^MERGE INTO my\.asset target
+			want: `^MERGE INTO "my"\."asset" target
 USING \(SELECT 1 as id, 'abc' as name\) source ON target\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "name" = source\."name"
 WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
@@ -217,7 +217,7 @@ WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
 				},
 			},
 			query: `SELECT 'ABC' as code, 1 as "iLeft", 2 as "iRight", 'test' as translation`,
-			want: `^MERGE INTO my\.asset target
+			want: `^MERGE INTO "my"\."asset" target
 USING \(SELECT 'ABC' as code, 1 as "iLeft", 2 as "iRight", 'test' as translation\) source ON target\."code" = source\."code"
 WHEN MATCHED THEN UPDATE SET "iLeft" = source\."iLeft", "iRight" = source\."iRight", "translation" = source\."translation"
 WHEN NOT MATCHED THEN INSERT\("code", "iLeft", "iRight", "translation"\) VALUES\("code", "iLeft", "iRight", "translation"\);$`,
@@ -238,7 +238,7 @@ WHEN NOT MATCHED THEN INSERT\("code", "iLeft", "iRight", "translation"\) VALUES\
 				},
 			},
 			query: "SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c",
-			want: `^MERGE INTO my\.asset target
+			want: `^MERGE INTO "my"\."asset" target
 USING \(SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c\) source ON target\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "col_a" = GREATEST\(target\.col_a, source\.col_a\), "col_b" = target\.col_b \+ source\.col_b, "col_c" = source\."col_c"
 WHEN NOT MATCHED THEN INSERT\("id", "col_a", "col_b", "col_c"\) VALUES\("id", "col_a", "col_b", "col_c"\);$`,
@@ -257,7 +257,7 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a", "col_b", "col_c"\) VALUES\("id", "c
 				},
 			},
 			query: "SELECT 1 as id, 15 as col_a",
-			want: `^MERGE INTO my\.asset target
+			want: `^MERGE INTO "my"\."asset" target
 USING \(SELECT 1 as id, 15 as col_a\) source ON target\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "col_a" = LEAST\(target\.col_a, source\.col_a\)
 WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
@@ -276,7 +276,7 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 				},
 			},
 			query: "SELECT 1 as id, 15 as col_a",
-			want: `^MERGE INTO my\.asset target
+			want: `^MERGE INTO "my"\."asset" target
 USING \(SELECT 1 as id, 15 as col_a\) source ON target\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "col_a" = COALESCE\(source\.col_a, target\.col_a\)
 WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
@@ -562,7 +562,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_name, ts from source_table",
-			want: "MERGE INTO my.asset AS target\n" +
+			want: "MERGE INTO "my".a"sset" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_name, ts from source_table\n" +
@@ -612,7 +612,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				},
 			},
 			query: "SELECT id, event_type, col1, col2, ts from source_table",
-			want: "MERGE INTO my.asset AS target\n" +
+			want: "MERGE INTO "my".a"sset" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_type, col1, col2, ts from source_table\n" +
@@ -782,7 +782,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, col1, col2, col3, col4 from source_table",
-			want: "MERGE INTO my.asset AS target\n" +
+			want: "MERGE INTO "my".a"sset" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, col1, col2, col3, col4 from source_table\n" +
@@ -829,7 +829,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				},
 			},
 			query: "SELECT id, category, name, price from source_table",
-			want: "MERGE INTO my.asset AS target\n" +
+			want: "MERGE INTO "my".a"sset" AS target\n" +
 				"USING (\n" +
 				"  WITH s1 AS (\n" +
 				"    SELECT id, category, name, price from source_table\n" +

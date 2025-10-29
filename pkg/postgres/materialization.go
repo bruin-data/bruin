@@ -131,7 +131,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 
 	mergeLines := []string{
-		fmt.Sprintf("MERGE INTO %s target", asset.Name),
+		fmt.Sprintf("MERGE INTO %s target", QuoteIdentifier(asset.Name)),
 		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),
