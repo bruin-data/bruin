@@ -154,9 +154,6 @@ refresh-integration-expectations: build
 	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expected_connections.json
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
 
-# sometimes vendoring doesn't move the precompiled library
-duck-db-static-lib:
-	@mkdir vendor/github.com/marcboeker/go-duckdb/deps || true
-	@mkdir vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH) || true
-	@cp $$(go env GOPATH)/pkg/mod/github.com/marcboeker/go-duckdb@v1.8.2/deps/$(OS_ARCH)/libduckdb.a vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH)/libduckdb.a
+# Note: duckdb v2.5.0+ uses platform-specific bindings packages instead of static libs
+# The duck-db-static-lib target is no longer needed
 
