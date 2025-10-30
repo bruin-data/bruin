@@ -1,0 +1,6 @@
+name: bronze-silver-postgres
+schedule: daily
+start_date: "2024-01-01"
+
+default_connections:
+  postgres: "postgres-default"
