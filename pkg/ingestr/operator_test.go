@@ -97,9 +97,15 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 					"source_connection": "duck",
 					"source_table":      "source-table",
 					"destination":       "bigquery",
+					"enforce_schema":    "true",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "integer"},
+					{Name: "name", Type: "string"},
+					{Name: "age", Type: "integer"},
 				},
 			},
-			want: []string{"ingest", "--source-uri", "duckdb:////some/path", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+			want: []string{"ingest", "--source-uri", "duckdb:////some/path", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log", "--columns", "id:bigint,name:text,age:bigint"},
 		},
 		{
 			name: "duck db dest, basic scenario",

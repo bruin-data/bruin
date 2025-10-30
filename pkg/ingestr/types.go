@@ -37,6 +37,12 @@ var typeHintMapping = map[string]string{
 	"timestamp_ltz":    "timestamp",
 	"timestamp_ntz":    "timestamp",
 	"timestamp_tz":     "timestamp",
+	"string":           "text",
+	"char":             "text",
+	"nchar":            "text",
+	"varchar":          "text",
+	"nvarchar":         "text",
+	"text":             "text",
 }
 
 // columnHints returns an ingestr compatible type hint string
