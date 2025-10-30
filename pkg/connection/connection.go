@@ -598,7 +598,7 @@ func (m *Manager) AddMongoAtlasConnectionFromConfig(connection *config.MongoAtla
 	}
 	m.mutex.Unlock()
 
-	client, err := mongoatlas.NewDB(&mongoatlas.Config{
+	client, err := mongoatlas.NewClient(context.Background(), &mongoatlas.Config{
 		Username: connection.Username,
 		Password: connection.Password,
 		Host:     connection.Host,
