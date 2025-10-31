@@ -123,7 +123,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	if asset.Parameters["enforce_schema"] == "true" {
-		columns := columnHints(asset.Columns)
+		columns := columnHints(asset.Columns, false)
 		if columns != "" {
 			cmdArgs = append(cmdArgs, "--columns", columns)
 		}
@@ -210,10 +210,13 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return err
 	}
 
-	columns := columnHints(asset.Columns)
+	columns := columnHints(asset.Columns, true)
 	if columns != "" {
 		cmdArgs = append(cmdArgs, "--columns", columns)
 	}
+
+	fmt.Println("running Ingestr with the following parameters:")
+	fmt.Println(cmdArgs)
 
 	path := asset.ExecutableFile.Path
 	repo, err := o.finder.Repo(path)

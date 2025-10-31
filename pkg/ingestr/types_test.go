@@ -10,6 +10,7 @@ func TestNormaliseColumnName(t *testing.T) {
 		"With  Two  Space": "with_two_space",
 		"1 twoThree":       "_1_two_three",
 		"danger⛔":          "danger",
+		"DateOfBirth":      "date_of_birth",
 	}
 
 	for in, out := range testCases {
