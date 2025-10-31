@@ -47,24 +47,26 @@ var typeHintMapping = map[string]string{
 
 // columnHints returns an ingestr compatible type hint string
 // that can be passed via the --column flag to the CLI.
-func columnHints(cols []pipeline.Column) string {
+func columnHints(cols []pipeline.Column, normaliseNames bool) string {
 	hints := make([]string, 0)
 	for _, col := range cols {
 		typ := normaliseColumnType(col.Type)
+
 		hint, exists := typeHintMapping[typ]
 		if !exists {
 			continue
 		}
-		name := normalizeColumnName(col.Name)
+		name := col.Name
+		if normaliseNames {
+			name = normalizeColumnName(name)
+		}
+
 		hints = append(hints, fmt.Sprintf("%s:%s", name, hint))
 	}
 	return strings.Join(hints, ",")
 }
 
-var (
-	camelPattern         = regexp.MustCompile(`([\w])([A-Z][a-z]+)`)
-	multipleSpacePattern = regexp.MustCompile(`\s+`)
-)
+var multipleSpacePattern = regexp.MustCompile(`\s+`)
 
 func normaliseColumnType(typ string) string {
 	typ = multipleSpacePattern.ReplaceAllString(typ, " ")
@@ -91,7 +93,19 @@ func normalizeColumnName(name string) string {
 	name = multipleSpacePattern.ReplaceAllString(name, " ")
 
 	// convert to snake case
-	name = camelPattern.ReplaceAllString(name, "${1}_${2}")
+	var sb strings.Builder
+	for i, r := range name {
+		if unicode.IsUpper(r) {
+			// Add underscore before uppercase letter (not at start)
+			if i > 0 && (unicode.IsLower(rune(name[i-1])) || unicode.IsDigit(rune(name[i-1]))) {
+				sb.WriteRune('_')
+			}
+			sb.WriteRune(unicode.ToLower(r))
+		} else {
+			sb.WriteRune(r)
+		}
+	}
+	name = sb.String()
 
 	// replace space with underscore
 	name = strings.ReplaceAll(name, " ", "_")
