@@ -190,18 +190,53 @@ ORDER BY datname;
 	return databases, nil
 }
 
+func (c *Client) GetSchemas(ctx context.Context) ([]string, error) {
+	db := c.config.GetDatabase()
+	q := `
+SELECT schema_name
+FROM information_schema.schemata
+WHERE catalog_name = $1
+    AND schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+ORDER BY schema_name;
+`
+
+	rows, err := c.connection.Query(ctx, q, db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query PostgreSQL schemas: %w", err)
+	}
+	defer rows.Close()
+
+	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]any, error) {
+		return row.Values()
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to collect row values")
+	}
+
+	var schemas []string
+	for _, row := range collectedRows {
+		if len(row) > 0 {
+			if schemaName, ok := row[0].(string); ok {
+				schemas = append(schemas, schemaName)
+			}
+		}
+	}
+
+	return schemas, nil
+}
+
 func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
 	if databaseName == "" {
 		return nil, errors.New("database name cannot be empty")
 	}
 
 	q := `
-SELECT table_name
+SELECT table_schema || '.' || table_name as full_table_name
 FROM information_schema.tables
 WHERE table_catalog = $1
     AND table_schema NOT IN ('pg_catalog', 'information_schema')
     AND table_type IN ('BASE TABLE', 'VIEW')
-ORDER BY table_name;
+ORDER BY table_schema, table_name;
 `
 
 	rows, err := c.connection.Query(ctx, q, databaseName)
