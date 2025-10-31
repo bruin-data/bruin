@@ -2,97 +2,70 @@
 
 [Allium](https://allium.so/) is a blockchain data platform that provides access to indexed blockchain data through a powerful query interface.
 
-ingestr supports Allium as a source.
+Bruin supports Allium as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Allium into your data platform.
 
-## URI format
-
-The URI format for Allium is as follows:
-
-```plaintext
-allium://?api_key=<api-key>
-```
-
-URI parameters:
-
-- `api_key`: The API key used for authentication with the Allium API (required)
-
-The URI is used to connect to the Allium API for extracting blockchain data.
-
-Query parameters should be passed using ingestr's `--interval-start` and `--interval-end` flags.
-
-## Setting up an Allium Integration
+In order to set up Allium connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. You need the `api_key` for authentication.
 
 To get your Allium API credentials:
-
 1. Sign up for an Allium account at [allium.so](https://allium.so/)
 2. Navigate to your account settings
 3. Generate an API key
 4. Find your query ID from the Allium explorer interface
 
-Once you have your credentials, here's a sample command that will copy the data from Allium into a DuckDB database:
+Follow the steps below to correctly set up Allium as a data source and run ingestion.
 
-```sh
-ingestr ingest \
-  --source-uri 'allium://?api_key=your_api_key' \
-  --source-table 'query:your_query_id' \
-  --interval-start '2025-02-01' \
-  --interval-end '2025-02-02' \
-  --dest-uri duckdb:///allium.duckdb \
-  --dest-table 'allium.query_results'
+### Step 1: Add a connection to .bruin.yml file
+
+To connect to Allium, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
+
+```yaml
+connections:
+  allium:
+    - name: my-allium
+      api_key: "your_api_key"
 ```
 
-The result of this command will be a table in the `allium.duckdb` database.
+- `api_key`: The API key used for authentication with the Allium API (required)
 
-## Tables
+### Step 2: Create an asset file for data ingestion
 
-Allium source uses query IDs as table identifiers. The query ID should be passed as the `--source-table` parameter with the `query:` prefix:
+To ingest data from Allium, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., allium_ingestion.yml) inside the assets folder and add the following content:
 
-```sh
---source-table 'query:abc123def456'
+```yaml
+name: public.allium
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-allium
+  source_table: 'query:abc123def456'
+
+  destination: postgres
 ```
 
-Each query ID represents a specific blockchain data query that you've created in the Allium explorer.
+- `name`: The name of the asset.
+- `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
+- `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
+- `source_connection`: The name of the Allium connection defined in .bruin.yml.
+- `source_table`: The query ID from Allium explorer in the format `query:your_query_id`. Each query ID represents a specific blockchain data query that you've created in the Allium explorer.
 
-## How it works
+## Available Source Tables
 
-The Allium source connector:
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| `query:<query_id>` | - | - | replace | Allium source uses query IDs as table identifiers. Format must be `query:abc123def456` where the query ID is from your Allium explorer. |
 
-1. Starts an async query execution using your query ID and parameters
-2. Polls for completion status every 5 seconds (max 5 minutes)
-3. Fetches and returns the results once the query completes successfully
 
-## Examples
 
-### Basic Query Ingestion (without date filters)
-
-```sh
-ingestr ingest \
-  --source-uri 'allium://?api_key=your_api_key' \
-  --source-table 'query:abc123def456' \
-  --dest-uri duckdb:///allium.duckdb \
-  --dest-table 'allium.transactions'
+### Step 3: [Run](/commands/run) asset to ingest data
 ```
-
-### Query with Date Parameters
-
-```sh
-ingestr ingest \
-  --source-uri 'allium://?api_key=your_api_key' \
-  --source-table 'query:abc123def456' \
-  --interval-start '2025-02-01' \
-  --interval-end '2025-02-02' \
-  --dest-uri duckdb:///allium.duckdb \
-  --dest-table 'allium.daily_transactions'
+bruin run assets/allium_ingestion.yml
 ```
+As a result of this command, Bruin will ingest data from the given Allium query into your Postgres database.
 
 ## Notes
 
-> [!NOTE]
-> - Query execution is asynchronous and may take time depending on the complexity of your query
-> - The connector will wait up to 5 minutes for query completion
-> - Use `--interval-start` and `--interval-end` flags to pass date parameters to your Allium query
-> - The dates will be automatically converted to `start_date` and `end_date` parameters in the format `YYYY-MM-DD`
-> - Default dates: If not specified, defaults to 2 days ago (00:00) to yesterday (00:00)
-> - Make sure your query ID is valid and accessible with your API key
-> - The source table format must be `query:your_query_id`
-
+- Query execution is asynchronous and may take time depending on the complexity of your query
+- The connector will wait up to 5 minutes for query completion
+- Make sure your query ID is valid and accessible with your API key
+- The source table format must be `query:your_query_id`
