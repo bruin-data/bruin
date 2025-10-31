@@ -935,16 +935,45 @@ func FetchTables() *cli.Command {
 			case outputFormatPlain:
 				printTableNames(databaseName, tables)
 			case "json":
+				type schemaInfo struct {
+					Tables []string `json:"tables"`
+				}
+
 				type jsonResponse struct {
-					Database   string   `json:"database"`
-					Tables     []string `json:"tables"`
-					ConnName   string   `json:"connection_name"`
-					TableCount int      `json:"table_count"`
+					Database   string                 `json:"database"`
+					Schemas    map[string]schemaInfo  `json:"schemas"`
+					ConnName   string                 `json:"connection_name"`
+					TableCount int                    `json:"table_count"`
+				}
+
+				// Group tables by schema
+				schemaMap := make(map[string]schemaInfo)
+				for _, table := range tables {
+					parts := strings.Split(table, ".")
+					if len(parts) == 2 {
+						schemaName := parts[0]
+						tableName := parts[1]
+						
+						info, exists := schemaMap[schemaName]
+						if !exists {
+							info = schemaInfo{Tables: []string{}}
+						}
+						info.Tables = append(info.Tables, tableName)
+						schemaMap[schemaName] = info
+					} else {
+						// Fallback for tables without schema prefix
+						info, exists := schemaMap[""]
+						if !exists {
+							info = schemaInfo{Tables: []string{}}
+						}
+						info.Tables = append(info.Tables, table)
+						schemaMap[""] = info
+					}
 				}
 
 				finalOutput := jsonResponse{
 					Database:   databaseName,
-					Tables:     tables,
+					Schemas:    schemaMap,
 					ConnName:   connectionName,
 					TableCount: len(tables),
 				}
@@ -1061,18 +1090,42 @@ func FetchColumns() *cli.Command {
 			case outputFormatPlain:
 				printColumns(databaseName, tableName, columns)
 			case "json":
+				// Parse table name to extract schema
+				var schemaName, tableNameOnly string
+				parts := strings.Split(tableName, ".")
+				if len(parts) == 2 {
+					schemaName = parts[0]
+					tableNameOnly = parts[1]
+				} else {
+					tableNameOnly = tableName
+				}
+
+				type tableInfo struct {
+					Name    string              `json:"name"`
+					Columns []*ansisql.DBColumn `json:"columns"`
+				}
+
+				type schemaInfo struct {
+					Name  string    `json:"name"`
+					Table tableInfo `json:"table"`
+				}
+
 				type jsonResponse struct {
-					Database    string              `json:"database"`
-					Table       string              `json:"table"`
-					Columns     []*ansisql.DBColumn `json:"columns"`
-					ConnName    string              `json:"connection_name"`
-					ColumnCount int                 `json:"column_count"`
+					Database    string     `json:"database"`
+					Schema      schemaInfo `json:"schema"`
+					ConnName    string     `json:"connection_name"`
+					ColumnCount int        `json:"column_count"`
 				}
 
 				finalOutput := jsonResponse{
-					Database:    databaseName,
-					Table:       tableName,
-					Columns:     columns,
+					Database: databaseName,
+					Schema: schemaInfo{
+						Name: schemaName,
+						Table: tableInfo{
+							Name:    tableNameOnly,
+							Columns: columns,
+						},
+					},
 					ConnName:    connectionName,
 					ColumnCount: len(columns),
 				}
