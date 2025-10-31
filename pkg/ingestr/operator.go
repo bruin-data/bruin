@@ -215,9 +215,6 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		cmdArgs = append(cmdArgs, "--columns", columns)
 	}
 
-	fmt.Println("running Ingestr with the following parameters:")
-	fmt.Println(cmdArgs)
-
 	path := asset.ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
 	if err != nil {

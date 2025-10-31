@@ -66,10 +66,7 @@ func columnHints(cols []pipeline.Column, normaliseNames bool) string {
 	return strings.Join(hints, ",")
 }
 
-var (
-	camelPattern         = regexp.MustCompile(`([\w])([A-Z][a-z]+)`)
-	multipleSpacePattern = regexp.MustCompile(`\s+`)
-)
+var multipleSpacePattern = regexp.MustCompile(`\s+`)
 
 func normaliseColumnType(typ string) string {
 	typ = multipleSpacePattern.ReplaceAllString(typ, " ")
