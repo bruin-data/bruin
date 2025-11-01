@@ -215,6 +215,15 @@ func (c CouchbaseConnection) GetName() string {
 	return c.Name
 }
 
+type CursorConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c CursorConnection) GetName() string {
+	return c.Name
+}
+
 type MongoAtlasConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`

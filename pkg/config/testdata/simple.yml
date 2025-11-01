@@ -79,6 +79,10 @@ environments:
           bucket: "mybucket"
           ssl: false
 
+      cursor:
+        - name: cursor1
+          api_key: "cursorapikey"
+
       mysql:
         - name: conn8
           username: "mysqluser"

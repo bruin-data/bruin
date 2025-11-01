@@ -393,6 +393,12 @@
           },
           "type": "array"
         },
+        "cursor": {
+          "items": {
+            "$ref": "#/$defs/CursorConnection"
+          },
+          "type": "array"
+        },
         "mongo_atlas": {
           "items": {
             "$ref": "#/$defs/MongoAtlasConnection"
@@ -881,6 +887,22 @@
         "username",
         "password",
         "host"
+      ]
+    },
+    "CursorConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "DB2Connection": {
