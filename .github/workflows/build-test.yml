@@ -124,7 +124,8 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23.2'
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
       - run: make tools
       - name: Run golangci-lint
         run: golangci-lint run --timeout 10m60s ./...
