@@ -52,7 +52,7 @@ func (l *localRRunner) Run(ctx context.Context, execCtx *executionContext) error
 	// If there's no renv.lock, just run the R script directly
 	if execCtx.renvLock == "" {
 		log(ctx, "No renv.lock found, executing R script directly...")
-		rCommand := fmt.Sprintf("%s %s", l.pathToRscript, scriptPath)
+		rCommand := fmt.Sprintf("\"%s\" \"%s\"", l.pathToRscript, scriptPath)
 		return l.cmd.Run(ctx, execCtx.repo, &CommandInstance{
 			Name:    getShell(),
 			Args:    []string{getShellSubcommandFlag(), rCommand},
@@ -70,7 +70,7 @@ func (l *localRRunner) Run(ctx context.Context, execCtx *executionContext) error
 	}
 
 	log(ctx, "renv dependencies ready, executing R script...")
-	rCommand := fmt.Sprintf("%s %s", l.pathToRscript, scriptPath)
+	rCommand := fmt.Sprintf("\"%s\" \"%s\"", l.pathToRscript, scriptPath)
 	return l.cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name:    getShell(),
 		Args:    []string{getShellSubcommandFlag(), rCommand},
