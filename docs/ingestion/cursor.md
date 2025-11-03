@@ -1,49 +1,66 @@
 # Cursor
 
-[Cursor](https://cursor.com/) is an AI-powered code editor built for productivity. The Cursor API provides access to team usage data, spending information, and detailed usage events.
+[Cursor](https://cursor.com/) is an AI-powered code editor built for productivity.
 
-To set up a Cursor connection, you need to have an API key from your Cursor team settings.
+Bruin supports Cursor as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Cursor API into your data warehouse.
 
-## Set up a connection
+In order to set up Cursor connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. You need an API key from your Cursor team settings.
 
-Cursor connections are defined using the following properties:
+Follow the steps below to correctly set up Cursor as a data source and run ingestion.
 
-- `name`: The name to identify this connection
-- `api_key`: Your Cursor API key (required)
+### Step 1: Add a connection to .bruin.yml file
 
-:::code-group
-```yaml [connections.yml]
+To connect to Cursor, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
+
+```yaml
 connections:
   cursor:
-    - name: "my_cursor"
+    - name: "my-cursor"
       api_key: "your_api_key_here"
 ```
 
+- `api_key`: Your Cursor API key (required)
 
-## Supported Data Assets
+### Step 2: Create an asset file for data ingestion
 
-Cursor assets will be ingested to your data warehouse as defined in the `destination` table.
+To ingest data from Cursor, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., cursor_ingestion.yml) inside the assets folder and add the following content:
 
-| Asset                  | Table Name             | Incremental Strategy | Description                                                                  |
-|------------------------|------------------------|-----------------|------------------------------------------------------------------------------|
-| Team Members           | `team_members`         | replace         | Team member information including names, emails, and roles                   |
-| Daily Usage Data       | `daily_usage_data`     | replace         | Daily usage statistics including lines added/deleted, AI requests, model usage |
-| Team Spend             | `team_spend`           | replace         | Team spending data for the current billing cycle                             |
-| Filtered Usage Events  | `filtered_usage_events`| replace         | Detailed usage events with timestamps, models, token usage, and costs        |
+```yaml
+name: public.cursor
+type: ingestr
+connection: postgres
 
-### Optional Date Filtering
-`daily_usage_data` and `filtered_usage_events` tables support optional date filtering:
-- When dates are provided, only data within that range is fetched
-- When dates are omitted, the API returns default data (typically last 30 days)
-- **Important:** Date range cannot exceed 30 days
+parameters:
+  source_connection: my-cursor
+  source_table: 'team_members'
+
+  destination: postgres
+```
+
+- `name`: The name of the asset.
+- `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
+- `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
+- `source_connection`: The name of the Cursor connection defined in .bruin.yml.
+- `source_table`: The name of the table in Cursor you want to ingest. See available tables below.
+
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| `team_members` | - | - | replace | Team member information including names, emails, and roles |
+| `daily_usage_data` | - | - | replace | Daily usage statistics including lines added/deleted, AI requests, model usage. Supports optional date filtering |
+| `team_spend` | - | - | replace | Team spending data for the current billing cycle |
+| `filtered_usage_events` | - | - | replace | Detailed usage events with timestamps, models, token usage, and costs. Supports optional date filtering |
+
+### Step 3: [Run](/commands/run) asset to ingest data
+```
+bruin run assets/cursor_ingestion.yml
+```
+As a result of this command, Bruin will ingest data from the given Cursor table into your Postgres database.
 
 ## Notes
 
 - **Authentication**: The Cursor API uses API key authentication.
-- **Rate Limits**: The source handles rate limiting and server errors automatically.
-- **Pagination**: The source handles pagination automatically (100 records per page by default).
 - **Date Range Limit**: The `daily_usage_data` and `filtered_usage_events` endpoints have a 30-day limit per request. If you need more than 30 days of historical data, make multiple requests with different date ranges.
-- **Endpoints**:
-  - `team_members` uses a GET endpoint
-  - All other endpoints use POST with JSON payloads
-- **Data Format**: All data is returned with flat schema for easier querying.
+- **Date Filtering**: `daily_usage_data` and `filtered_usage_events` tables support optional date filtering. When dates are provided, only data within that range is fetched. When dates are omitted, the API returns default data (typically last 30 days).
+
