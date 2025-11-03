@@ -3,7 +3,6 @@ type: ingestr
 connection: neon
 
 parameters:
-  source_connection: wise
-  source_table: 'balances'
-
   destination: postgres
+  source_connection: wise
+  source_table: balances

@@ -2,15 +2,14 @@ name: test_data_alberto.ingestr_destiny_2
 type: ingestr
 
 parameters:
-  source_connection: neon
-  source_table: 'public.test_merge'
-
   destination: bigquery
+  source_connection: neon
+  source_table: public.test_merge
 
 columns:
   - name: qty
     type: integer
-    description: "Just a number"
+    description: Just a number
     checks:
       - name: not_null
       - name: positive

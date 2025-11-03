@@ -1,7 +1,10 @@
 /* @bruin
+
 name: table-sensor
 type: athena.sensor.table
+
 parameters:
-    table: datatable
-    poke_interval: 3
+  poke_interval: "3"
+  table: datatable
+
 @bruin */

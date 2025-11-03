@@ -17,8 +17,8 @@ materialization:
   time_granularity: date
 
 depends:
-  - analytics_123456789.parse_version # TODO: Change 123456789 to your analytics ID
-  - analytics_123456789.events # TODO: If you need intraday, use the events_intraday table instead
+  - analytics_123456789.parse_version
+  - analytics_123456789.events
 
 columns:
   - name: app
@@ -45,9 +45,8 @@ columns:
     type: STRING
   - name: app_version
     type: STRING
-    description: >
-      The cleaned app version, suitable for comparisons like >= or sorting. To standardize the version, we use 3 digits for each part of the version. 
-      Ex value: 1.20.3 -> 001.020.003
+    description: |
+      The cleaned app version, suitable for comparisons like >= or sorting. To standardize the version, we use 3 digits for each part of the version.  Ex value: 1.20.3 -> 001.020.003
   - name: event_params
     type: STRING
     description: Parameters specific to each event, independent of others. In the free version, you are limited to 20 parameters per event, with string values capped at 100 characters each.

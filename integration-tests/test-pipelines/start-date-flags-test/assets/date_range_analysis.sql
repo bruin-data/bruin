@@ -1,7 +1,7 @@
 /* @bruin
 
-name: date_range_analysis
 type: duckdb.sql
+
 materialization:
   type: table
 
@@ -10,7 +10,7 @@ depends:
 
 @bruin */
 
-SELECT 
+SELECT
     captured_start_date,
     captured_end_date
 FROM date_capture;

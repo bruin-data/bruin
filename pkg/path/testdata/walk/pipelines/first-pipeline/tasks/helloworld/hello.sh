@@ -1,1 +1,5 @@
-echo "hello world from test script"
+name: hello-world
+type: bash
+
+depends:
+  - gcs-to-bq

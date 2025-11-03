@@ -4,18 +4,20 @@ name: dbo.hello_ms
 type: ms.sql
 
 materialization:
-   type: table
+  type: table
 
 columns:
   - name: one
     type: integer
-    description: "Just a number"
+    description: Just a number
     checks:
-        - name: unique
-        - name: not_null
-        - name: positive
-        - name: accepted_values
-          value: [1, 2]
+      - name: unique
+      - name: not_null
+      - name: positive
+      - name: accepted_values
+        value:
+          - 1
+          - 2
 
 custom_checks:
   - name: This is a custom check name

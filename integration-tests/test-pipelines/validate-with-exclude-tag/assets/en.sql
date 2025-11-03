@@ -1,11 +1,12 @@
 /* @bruin
 
 type: duckdb.sql
-depends:
-  - e
 tags:
   - exclude
 
+depends:
+  - e
+
 @bruin */
 
- select 1
+select 1

@@ -1,12 +1,12 @@
 /* @bruin
 
-name: nonexistent
 type: duckdb.sql
+
 materialization:
-   type: table
+  type: table
 
 depends:
-   - non_existent
+  - non_existent
 
 @bruin */
 

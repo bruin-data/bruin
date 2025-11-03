@@ -2,8 +2,6 @@ name: ingestDB.stripe
 type: ingestr
 
 parameters:
-  source_connection: my-stripe
-  source_table: 'customer'
-
   destination: clickhouse
-  
+  source_connection: my-stripe
+  source_table: customer

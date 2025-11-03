@@ -1,6 +1,8 @@
 /* @bruin
+
 name: bq_test.ts
 type: bq.sql
+
 materialization:
   type: table
   strategy: create+replace
@@ -14,5 +16,6 @@ columns:
 
 @bruin */
 
-SELECT current_timestamp() as ts,
-DATE(TIMESTAMP_SECONDS({{start_date}})) as created_at
+SELECT
+    current_timestamp() AS ts,
+    date(timestamp_seconds({{ start_date }})) AS created_at

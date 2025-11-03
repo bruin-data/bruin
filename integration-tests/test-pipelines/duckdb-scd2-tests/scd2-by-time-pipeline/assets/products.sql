@@ -1,26 +1,28 @@
 /* @bruin
+
 name: test.products
 type: duckdb.sql
 
 materialization:
   type: table
   strategy: scd2_by_time
-  incremental_key : dt
+  incremental_key: dt
 
 columns:
   - name: product_id
     type: INTEGER
-    description: "Unique identifier for the product"
+    description: Unique identifier for the product
     primary_key: true
   - name: product_name
     type: VARCHAR
     primary_key: true
   - name: dt
     type: DATE
-    description: "incremental key"
+    description: incremental key
   - name: stock
     type: INTEGER
-    description: "Number of units in stock"
+    description: Number of units in stock
+
 @bruin */
 
 SELECT

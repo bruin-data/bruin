@@ -26,13 +26,21 @@ columns:
 @bruin */
 
 SELECT
-    1 AS category_id, 'Electronics' AS category_name, 'Devices like phones, laptops, and monitors' AS description
+    1 AS category_id,
+    'Electronics' AS category_name,
+    'Devices like phones, laptops, and monitors' AS description
 UNION ALL
 SELECT
-    2 AS category_id, 'Accessories' AS category_name, 'Complementary items like headphones and chargers' AS description
+    2 AS category_id,
+    'Accessories' AS category_name,
+    'Complementary items like headphones and chargers' AS description
 UNION ALL
 SELECT
-    3 AS category_id, 'Appliances' AS category_name, 'Household devices like refrigerators and microwaves' AS description
+    3 AS category_id,
+    'Appliances' AS category_name,
+    'Household devices like refrigerators and microwaves' AS description
 UNION ALL
 SELECT
-    4 AS category_id, 'Furniture' AS category_name, 'Home and office furniture like desks and chairs' AS description;
+    4 AS category_id,
+    'Furniture' AS category_name,
+    'Home and office furniture like desks and chairs' AS description;

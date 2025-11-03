@@ -1,15 +1,16 @@
-""" @bruin
+"""@bruin
 
 name: python_asset
-image: python:3.11
+
 depends:
-    - products
+  - products
+image: python:3.11
 
 secrets:
-    - key: KEY1
-      inject_as: INJECTED1
+  - key: KEY1
+    inject_as: INJECTED1
 
-@bruin """
+@bruin"""
 
 import os
 import duckdb

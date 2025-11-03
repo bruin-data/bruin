@@ -3,15 +3,14 @@ type: ingestr
 connection: redshift-aws
 
 parameters:
-  source_connection: alberto-gcp
-  source_table: 'test_data_alberto.ingestr_destiny_2'
-
   destination: redshift
+  source_connection: alberto-gcp
+  source_table: test_data_alberto.ingestr_destiny_2
 
 columns:
   - name: id
     type: integer
-    description: "Just a number"
+    description: Just a number
     checks:
       - name: not_null
       - name: positive

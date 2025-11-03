@@ -1,11 +1,21 @@
-# @bruin.name: some-python-task
-# @bruin.description: some description goes here
-# @bruin.depends: task1, task2
-# @bruin.depends: task3,task4
-# @bruin.depends: task5, task3
-# @bruin.parameters.param1: first-parameter
-# @bruin.parameters.param2: second-parameter
-# @bruin.parameters.param3: third-parameter
-# @bruin.connection: first-connection
+"""@bruin
+
+name: some-python-task
+description: some description goes here
+connection: first-connection
+
+depends:
+  - task1
+  - task2
+  - task3
+  - task4
+  - task5
+
+parameters:
+  param1: first-parameter
+  param2: second-parameter
+  param3: third-parameter
+
+@bruin"""
 
 print('hello world')

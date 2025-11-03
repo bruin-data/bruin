@@ -1,7 +1,7 @@
 /* @bruin
-name: my-other-asset
+
 type: duckdb.sql
 
-   @bruin */
+@bruin */
 
-SELECT * FROM my 
+SELECT * FROM my

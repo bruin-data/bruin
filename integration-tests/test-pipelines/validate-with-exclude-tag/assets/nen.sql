@@ -1,7 +1,9 @@
 /* @bruin
+
 type: duckdb.sql
+
 depends:
-    - ne
+  - ne
 
 @bruin */
 

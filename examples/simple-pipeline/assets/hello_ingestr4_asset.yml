@@ -3,8 +3,6 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: localMongo
-  source_table: 'kollywood.Horror'
-
   destination: postgres
-  
+  source_connection: localMongo
+  source_table: kollywood.Horror

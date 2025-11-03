@@ -6,5 +6,4 @@ fdsdfds
 @bruin */
 
 
-
 SELECT 1

@@ -1,13 +1,12 @@
-""" @bruin
+"""@bruin
 
 name: materialize.country
+connection: duckdb-run-python-materialization
 
 materialization:
-    type: table
+  type: table
 
-
-connection: duckdb-run-python-materialization
-@bruin """
+@bruin"""
 
 import pandas as pd
 import numpy as np
@@ -29,5 +28,3 @@ def materialize():
     
     # Return the dataset
     return df
-
-

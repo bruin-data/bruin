@@ -1,7 +1,10 @@
 /* @bruin
+
 name: dataset.sensor
 type: rs.sensor.table
+
 parameters:
-    table: dataset.datatable
-    poke_interval: 3
+  poke_interval: "3"
+  table: dataset.datatable
+
 @bruin */

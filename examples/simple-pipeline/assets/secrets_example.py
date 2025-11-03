@@ -1,11 +1,15 @@
-""" @bruin
-name: secrets_example
+"""@bruin
+
 secrets:
-    - key: KEY1
-      inject_as: INJECTED1
-    - key: KEY2_AS_IS
-    - key: snowflake
-@bruin """
+  - key: KEY1
+    inject_as: INJECTED1
+  - key: KEY2_AS_IS
+    inject_as: KEY2_AS_IS
+  - key: snowflake
+    inject_as: snowflake
+
+@bruin"""
+
 import json
 import os
 

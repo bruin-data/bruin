@@ -1,24 +1,21 @@
-""" @bruin
+"""@bruin
 
-name: myschema.my_mat_asset 
-image: python:3.11
+name: myschema.my_mat_asset
 connection: duckdb-default
 
 materialization:
   type: table
   strategy: merge
+image: python:3.11
 
 columns:
-    - name: col1
-      type: int
-      primary_key: true
-      upstreams:
-        - table: xyz
-          column: abc
-      checks:
-        - name: unique
+  - name: col1
+    type: int
+    primary_key: true
+    checks:
+      - name: unique
 
-@bruin """
+@bruin"""
 
 import pandas as pd
 

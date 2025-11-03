@@ -1,15 +1,16 @@
-""" @bruin
+"""@bruin
 
 name: python_asset
-image: python:3.11
+
 depends:
-    - chess_playground.player_summary
+  - chess_playground.player_summary
+image: python:3.11
 
 secrets:
-    - key: KEY1
-      inject_as: INJECTED1
-    
-@bruin """
+  - key: KEY1
+    inject_as: INJECTED1
+
+@bruin"""
 
 import os
 import duckdb

@@ -3,16 +3,15 @@ type: ingestr
 connection: local
 
 parameters:
+  destination: postgres
   source: gsheets
   source_connection: neon
-  source_table: 'public.test_merge'
-  destination: postgres
-
+  source_table: public.test_merge
 
 columns:
   - name: id
     type: integer
-    description: "Just a number"
+    description: Just a number
     checks:
       - name: not_null
       - name: positive

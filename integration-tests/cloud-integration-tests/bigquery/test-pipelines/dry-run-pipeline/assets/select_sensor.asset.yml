@@ -1,4 +1,5 @@
 name: dataset.select_sensor
 type: bq.sensor.query
+
 parameters:
-    query: SELECT * FROM dataset.dry_run_table
+  query: SELECT * FROM dataset.dry_run_table

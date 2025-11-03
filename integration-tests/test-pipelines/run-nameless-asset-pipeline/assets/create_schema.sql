@@ -1,4 +1,5 @@
 /* @bruin
+
 type: duckdb.sql
 
 @bruin */

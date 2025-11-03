@@ -1,17 +1,19 @@
 /* @bruin
-name: payments
+
 materialization:
-   type: view
+  type: view
+
 columns:
   - name: amount
     type: integer
-    description: "amount of the payment"
+    description: amount of the payment
     checks:
-        - name: positive
+      - name: positive
+
 @bruin */
 
 SELECT 10
-union all
+UNION ALL
 SELECT 20
-union all
+UNION ALL
 SELECT 30

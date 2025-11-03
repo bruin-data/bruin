@@ -2,52 +2,60 @@
 
 name: public.example
 type: rs.sql
-
-materialization:
-   type: table
-
 description: |
   # Example table
   This asset is an example table with some quality checks to help you get started.
 
   You can write Markdown here, it supports `inline codeblocks` or larger blocks of code. It supports **bold** and *italic* text.
 
+materialization:
+  type: table
+
 columns:
   - name: id
     type: integer
-    description: "Just a number"
+    description: Just a number
     primary_key: true
     checks:
-        - name: not_null
-        - name: positive
-
+      - name: not_null
+      - name: positive
   - name: country
     type: varchar
-    description: "the country"
+    description: the country
     primary_key: true
     checks:
-        - name: not_null
-
+      - name: not_null
   - name: name
     type: varchar
+    description: Just a name
     update_on_merge: true
-    description: "Just a name"
     checks:
-        - name: unique
-        - name: not_null
+      - name: unique
+      - name: not_null
 
 custom_checks:
   - name: match column counts
     value: 4
-    query: |
-      SELECT COUNT(*) as count FROM public.example
+    query: SELECT COUNT(*) as count FROM public.example
 
 @bruin */
 
-SELECT 1 as id, 'Spain' as country, 'Juan' as name
-union all
-SELECT 2 as id, 'Germany' as country, 'Markus' as name
-union all
-SELECT 3 as id, 'France' as country, 'Antoine' as name
-union all
-SELECT 4 as id, 'Poland' as country, 'Franciszek' as name
+SELECT
+    1 AS id,
+    'Spain' AS country,
+    'Juan' AS name
+UNION ALL
+SELECT
+    2 AS id,
+    'Germany' AS country,
+    'Markus' AS name
+UNION ALL
+SELECT
+    3 AS id,
+    'France' AS country,
+    'Antoine' AS name
+UNION ALL
+SELECT
+    4 AS id,
+    'Poland' AS country,
+    'Franciszek' AS name

@@ -1,26 +1,29 @@
 /* @bruin
+
 name: test.products
 type: bq.sql
 
 materialization:
   type: table
   strategy: scd2_by_time
-  incremental_key : dt
+  incremental_key: dt
 
 columns:
   - name: product_id
     type: INTEGER
-    description: "Unique identifier for the product"
+    description: Unique identifier for the product
     primary_key: true
   - name: product_name
     type: VARCHAR
   - name: dt
     type: DATE
-    description: "incremental key"
+    description: incremental key
   - name: stock
     type: INTEGER
-    description: "Number of units in stock"
+    description: Number of units in stock
+
 @bruin */
+
 SELECT
     1 AS product_id,
     'Laptop' AS product_name,
@@ -45,4 +48,3 @@ SELECT
     'Monitor' AS product_name,
     25 AS stock,
     DATE '2025-04-02' AS dt
-

@@ -3,7 +3,6 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: new_facebookads
-  source_table: 'ads'
-
   destination: postgres
+  source_connection: new_facebookads
+  source_table: ads

@@ -3,22 +3,24 @@
 name: dashboard.hello_sf
 type: sf.sql
 
-depends:
-   - hello_python
-
 materialization:
-   type: table
+  type: table
+
+depends:
+  - hello_python
 
 columns:
   - name: one
     type: integer
-    description: "Just a number"
+    description: Just a number
     checks:
-        - name: unique
-        - name: not_null
-        - name: positive
-        - name: accepted_values
-          value: [1, 2]
+      - name: unique
+      - name: not_null
+      - name: positive
+      - name: accepted_values
+        value:
+          - 1
+          - 2
 
 custom_checks:
   - name: This is a custom check name

@@ -1,29 +1,30 @@
 /* @bruin
-name: products
+
 type: duckdb.sql
 
 materialization:
   type: table
   strategy: time_interval
+  incremental_key: dt
   time_granularity: date
-  incremental_key : dt
 
 columns:
   - name: product_id
     type: INTEGER
-    description: "Unique identifier for the product"
+    description: Unique identifier for the product
     primary_key: true
   - name: product_name
     type: VARCHAR
-    description: "Name of the product"
+    description: Name of the product
   - name: price
     type: FLOAT
-    description: "Price of the product in USD"
+    description: Price of the product in USD
     checks:
       - name: positive
   - name: stock
     type: INTEGER
-    description: "Number of units in stock"
+    description: Number of units in stock
+
 @bruin */
 
 SELECT
@@ -102,5 +103,3 @@ SELECT
     89.99 AS price,
     60 AS stock,
     DATE '2025-03-13' AS dt;
-
-

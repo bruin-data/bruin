@@ -1,19 +1,18 @@
-/*@bruin
+/* @bruin
 
-name: frankfurter.currency_names
 type: duckdb.sql
-materialization:
-   type: table
-
 description: This query creates a table with available currency codes and their corresponding names.
+
+materialization:
+  type: table
 
 depends:
   - frankfurter_raw.currencies
 
-@bruin*/
+@bruin */
 
-SELECT 
+SELECT
     currency_code,
     currency_name
-FROM 
+FROM
     frankfurter_raw.currencies;

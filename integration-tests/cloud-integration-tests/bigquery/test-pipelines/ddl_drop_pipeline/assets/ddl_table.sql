@@ -7,21 +7,21 @@ materialization:
   type: table
   strategy: ddl
   partition_by: TIMESTAMP_TRUNC(logged_at, DAY)
-  cluster_by: 
+  cluster_by:
     - channel, site_name
 
 columns:
   - name: logged_at
     type: TIMESTAMP
-    description: "Timestamp of the log"
+    description: Timestamp of the log
   - name: company
     type: STRING
-    description: "Company name"
+    description: Company name
   - name: site_name
     type: STRING
-    description: "Site name"
+    description: Site name
   - name: channel
-    type: STRING 
-    description: "Channel name"
+    type: STRING
+    description: Channel name
 
 @bruin */

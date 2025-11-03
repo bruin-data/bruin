@@ -4,44 +4,56 @@ name: hello_synapse_table_delete_insert
 type: synapse.sql
 
 materialization:
-   type: table
-   strategy: delete+insert
-   incremental_key: id
+  type: table
+  strategy: delete+insert
+  incremental_key: id
 
 columns:
   - name: id
     type: integer
-    description: "Just a number"
+    description: Just a number
     primary_key: true
     checks:
-        - name: not_null
-        - name: positive
-        - name: non_negative
-
+      - name: not_null
+      - name: positive
+      - name: non_negative
   - name: country
     type: varchar
-    description: "the country"
+    description: the country
     primary_key: true
     checks:
-        - name: not_null
-
+      - name: not_null
   - name: name
     type: varchar
+    description: Just a name
     update_on_merge: true
-    description: "Just a name"
     checks:
-        - name: unique
-        - name: not_null
-
+      - name: unique
+      - name: not_null
 
 @bruin */
 
-SELECT 1 as id, 'spain' as country , 'juan1' as name
-union all
-SELECT 2 as id, 'germany' as country , 'markus1' as name
-union all
-SELECT 3 as id, 'germany' as country , 'franz3' as name
-union all
-SELECT 4 as id, 'france' as country , 'antoin5' as name
-union all
-SELECT 5 as id, 'poland' as country , 'maciej7' as name
+SELECT
+    1 AS id,
+    'spain' AS country,
+    'juan1' AS name
+UNION ALL
+SELECT
+    2 AS id,
+    'germany' AS country,
+    'markus1' AS name
+UNION ALL
+SELECT
+    3 AS id,
+    'germany' AS country,
+    'franz3' AS name
+UNION ALL
+SELECT
+    4 AS id,
+    'france' AS country,
+    'antoin5' AS name
+UNION ALL
+SELECT
+    5 AS id,
+    'poland' AS country,
+    'maciej7' AS name

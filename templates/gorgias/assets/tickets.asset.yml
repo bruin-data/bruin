@@ -1,9 +1,10 @@
 name: gorgias_raw.tickets
 type: ingestr
+
 depends:
   - gorgias_raw.customers
 
 parameters:
+  destination: bigquery
   source_connection: gorgias
   source_table: tickets
-  destination: bigquery

@@ -4,7 +4,7 @@ name: render_this.my_asset_2
 type: duckdb.sql
 
 depends:
-   - render_this.my_asset
+  - render_this.my_asset
 
 custom_checks:
   - name: verify this resolves in query

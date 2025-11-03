@@ -3,7 +3,6 @@ type: ingestr
 connection: duckdb
 
 parameters:
-  source_connection: frankfurter
-  source_table: 'latest'
-
   destination: duckdb
+  source_connection: frankfurter
+  source_table: latest

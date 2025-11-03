@@ -1,4 +1,5 @@
 /* @bruin
+
 name: dataset.target_table
 type: bq.sql
 
@@ -25,8 +26,23 @@ columns:
 @bruin */
 
 -- New data that will merge with existing target_table
-SELECT 1 AS pk, 15 AS col_a, 50 AS col_b, 'updated_a' AS col_c, 'default' AS col_d
+SELECT
+    1 AS pk,
+    15 AS col_a,
+    50 AS col_b,
+    'updated_a' AS col_c,
+    'default' AS col_d
 UNION ALL
-SELECT 2 AS pk, 5 AS col_a, 150 AS col_b, 'updated_b' AS col_c, 'default' AS col_d
+SELECT
+    2 AS pk,
+    5 AS col_a,
+    150 AS col_b,
+    'updated_b' AS col_c,
+    'default' AS col_d
 UNION ALL
-SELECT 3 AS pk, 30 AS col_a, 300 AS col_b, 'new_c' AS col_c, 'default' AS col_d
+SELECT
+    3 AS pk,
+    30 AS col_a,
+    300 AS col_b,
+    'new_c' AS col_c,
+    'default' AS col_d

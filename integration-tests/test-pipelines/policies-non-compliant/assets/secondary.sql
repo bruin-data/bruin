@@ -1,19 +1,22 @@
 /* @bruin
+
 name: non_compliant.secondary
 type: bq.sql
 description: |
-    This pipeline demonstrates the use of non-compliant assets
+  This pipeline demonstrates the use of non-compliant assets
 owner: engineering@getbruin.com
+
 columns:
-    - name: name
-      type: string
-    - name: age
-      type: string
-    - name: country
-      type: string
+  - name: name
+    type: string
+  - name: age
+    type: string
+  - name: country
+    type: string
+
 @bruin */
 
-select 
+select
     "Jhon" as name,
     "21" as age,
     "USA" as country

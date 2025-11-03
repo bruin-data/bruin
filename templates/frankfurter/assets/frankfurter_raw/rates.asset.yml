@@ -1,6 +1,6 @@
 type: ingestr
 
 parameters:
-  source_table: exchange_rates
-  source_connection: frankfurter-default
   destination: duckdb
+  source_connection: frankfurter-default
+  source_table: exchange_rates

@@ -2,6 +2,6 @@ name: gorgias_raw.customers
 type: ingestr
 
 parameters:
+  destination: bigquery
   source_connection: gorgias
   source_table: customers
-  destination: bigquery

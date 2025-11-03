@@ -1,4 +1,5 @@
 name: chess_playground.profiles
 type: ingestr
+
 parameters:
   source_table: profiles

@@ -1,11 +1,17 @@
 /* @bruin
-name: country
+
 type: duckdb.sql
+
 materialization:
-   type: table
+  type: table
 
 depends:
   - users
+
 @bruin */
 
-select id, country from users where id > 10000;
+select
+    id,
+    country
+from users
+where id > 10000;

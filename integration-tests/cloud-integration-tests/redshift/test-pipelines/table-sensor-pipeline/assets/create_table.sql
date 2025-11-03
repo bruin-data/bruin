@@ -1,4 +1,5 @@
 /* @bruin
+
 name: dataset.datatable
 type: rs.sql
 
@@ -8,16 +9,23 @@ materialization:
 columns:
   - name: ID
     type: INTEGER
-    description: "Unique identifier for Employee"
+    description: Unique identifier for Employee
     primary_key: true
   - name: Name
     type: VARCHAR
-    description: "Name of the Employee"
+    description: Name of the Employee
     primary_key: true
+
 @bruin */
 
-SELECT 1 AS ID, 'Colin' AS Name
+SELECT
+    1 AS ID,
+    'Colin' AS NAME
 UNION ALL
-SELECT 2 AS ID, 'John' AS Name
+SELECT
+    2 AS ID,
+    'John' AS NAME
 UNION ALL
-SELECT 4 AS ID, 'Jane' AS Name
+SELECT
+    4 AS ID,
+    'Jane' AS NAME

@@ -1,9 +1,9 @@
 /* @bruin
 
-name: malformed
 type: duckdb.sql
+
 materialization:
-   type: table
+  type: table
 
 @bruin */
 

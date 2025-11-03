@@ -1,11 +1,14 @@
 /* @bruin
+
 name: valid_jinja.example
+type: duckdb.sql
+
+materialization:
+  type: table
 interval_modifiers:
   start: '{{ "-1d" }}'
   end: '{{ "1d" }}'
-type: duckdb.sql
-materialization:
-   type: table
+
 @bruin */
 
-SELECT 1 
+SELECT 1

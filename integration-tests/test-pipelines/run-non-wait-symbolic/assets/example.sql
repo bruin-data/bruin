@@ -1,17 +1,14 @@
 /* @bruin
-name: example
+
 type: duckdb.sql
 
 depends:
-  - asset1               # this one waits
-  - asset: asset2        # this also waits
+  - asset1
+  - asset: asset2
+    mode: symbolic
+  - asset: my-other-asset
     mode: symbolic
 
+@bruin */
 
-  - asset: my-other-asset   # this does not wait
-    mode: symbolic
-
-
-   @bruin */
-
-SELECT 1 
+SELECT 1

@@ -1,5 +1,5 @@
 /* @bruin
-name: test_aggregation_macro
+
 type: duckdb.sql
 
 materialization:

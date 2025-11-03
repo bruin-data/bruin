@@ -3,7 +3,6 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: my-slack
-  source_table: 'users'
-
   destination: postgres
+  source_connection: my-slack
+  source_table: users

@@ -3,7 +3,6 @@ type: ingestr
 connection: postgres-default
 
 parameters:
-  source_connection: neon
-  source_table: 'public.department'
-
   destination: postgres
+  source_connection: neon
+  source_table: public.department

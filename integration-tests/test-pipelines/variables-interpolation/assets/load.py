@@ -1,6 +1,8 @@
-""" @bruin
+"""@bruin
+
 name: variables.py
 description: integration test for variables in python assets
+
 @bruin"""
 
 import os

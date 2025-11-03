@@ -1,11 +1,12 @@
 /* @bruin
-name: example_d
+
 type: clickhouse.sql
+
 materialization:
-   type: table
+  type: table
 
 depends:
-    - example_c
+  - example_c
 
 columns:
   - name: id
@@ -13,6 +14,11 @@ columns:
     primary_key: true
   - name: name
     type: varchar
-   @bruin */
 
-SELECT id, name from example_c WHERE country_name = 'germany'
+@bruin */
+
+SELECT
+    id,
+    name
+FROM example_c
+WHERE country_name = 'germany'

@@ -1,10 +1,10 @@
 /* @bruin
 
 type: duckdb.sql
+
 depends:
   - en
 
-
 @bruin */
 
- select 1
+select 1

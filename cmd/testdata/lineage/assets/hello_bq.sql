@@ -3,30 +3,31 @@
 name: dashboard.hello_bq
 type: bq.sql
 
-depends:
-   - hello_python
-   - uri: bigquery://project_id/dataset_id/table_id
-
 materialization:
-   type: table
+  type: table
+
+depends:
+  - hello_python
+  - uri: bigquery://project_id/dataset_id/table_id
 
 columns:
   - name: one
     type: integer
-    description: "Just a number"
+    description: Just a number
     primary_key: true
     checks:
-        - name: unique
-        - name: not_null
-        - name: positive
-        - name: accepted_values
-          value: [1, 2]
+      - name: unique
+      - name: not_null
+      - name: positive
+      - name: accepted_values
+        value:
+          - 1
+          - 2
 
 custom_checks:
   - name: This is a custom check name
     value: 2
     query: select count(*) from dashboard.hello_bq
-
 
 @bruin */
 

@@ -4,44 +4,50 @@ name: test_merge
 type: pg.sql
 
 materialization:
-   type: table
-   strategy: merge
+  type: table
+  strategy: merge
 
 columns:
   - name: id
     type: integer
-    description: "Just a number"
+    description: Just a number
     primary_key: true
     checks:
-        - name: not_null
-        - name: positive
-        - name: non_negative
-
+      - name: not_null
+      - name: positive
+      - name: non_negative
   - name: country
     type: varchar
-    description: "the country"
+    description: the country
     primary_key: true
     checks:
-        - name: not_null
-
+      - name: not_null
   - name: name
     type: varchar
+    description: Just a name
     update_on_merge: true
-    description: "Just a name"
     checks:
-        - name: unique
-        - name: not_null
-
+      - name: unique
+      - name: not_null
 
 @bruin */
 
-SELECT 1 as id, 'spain' as country , 'juan' as name
-union all
-SELECT 2 as id, 'germany' as country , 'markus' as name
-union all
-SELECT 3 as id, 'france' as country , 'antoine' as name
-union all
-SELECT 4 as id, 'poland' as country , 'franciszek' as name
-
-
-
+SELECT
+    1 AS id,
+    'spain' AS country,
+    'juan' AS name
+UNION ALL
+SELECT
+    2 AS id,
+    'germany' AS country,
+    'markus' AS name
+UNION ALL
+SELECT
+    3 AS id,
+    'france' AS country,
+    'antoine' AS name
+UNION ALL
+SELECT
+    4 AS id,
+    'poland' AS country,
+    'franciszek' AS name

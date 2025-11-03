@@ -8,8 +8,8 @@ type: duckdb.sql
 SELECT
     '{{ this }}' AS asset_name,
     {% if full_refresh %}
-    'FULL_REFRESH_MODE' AS refresh_mode,
-    '2020-01-01' AS start_date
+        'FULL_REFRESH_MODE' AS refresh_mode,
+        '2020-01-01' AS start_date
     {% else %}
     'INCREMENTAL_MODE' AS refresh_mode,
     '{{ start_date }}' AS start_date

@@ -1,16 +1,18 @@
-""" @bruin
+"""@bruin
 
 name: python_asset_happy
-image: python:3.11
+
 depends:
-    - products
+  - products
+image: python:3.11
 
 secrets:
-    - key: KEY1
-      inject_as: INJECTED1  
-    - key: chess-default
+  - key: KEY1
+    inject_as: INJECTED1
+  - key: chess-default
+    inject_as: chess-default
 
-@bruin """
+@bruin"""
 
 import os
 
@@ -20,5 +22,3 @@ if os.getenv('INJECTED1') != "value1":
 if os.getenv('chess-default') != '{"name":"chess-default","players":["erik","vadimer2"]}':
     print( os.getenv('chess-default'))
     raise Exception("chess-default is not injected correctly")
-
-

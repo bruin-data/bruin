@@ -1,5 +1,5 @@
 /* @bruin
-name: macro_example
+
 description: |
   This asset demonstrates the use of macros in Bruin.
   Macros are defined in the macros/ folder and are automatically available.

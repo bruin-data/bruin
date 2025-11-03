@@ -1,7 +1,7 @@
 /* @bruin
+
 name: dataset.cleanup
 type: bq.sql
-
 
 depends:
   - dataset.target_table

@@ -1,22 +1,24 @@
 /* @bruin
-name: shipping_providers
+
 type: duckdb.sql
+
 materialization:
   type: table
+
 columns:
   - name: provider_id
     type: INTEGER
-    description: "Unique identifier for each shipping provider"
+    description: Unique identifier for each shipping provider
     primary_key: true
   - name: provider_name
     type: VARCHAR
-    description: "Name of the fictional shipping provider"
+    description: Name of the fictional shipping provider
   - name: delivery_speed
     type: VARCHAR
-    description: "Average delivery time (e.g., '2-day', 'Standard')"
+    description: Average delivery time (e.g., '2-day', 'Standard')
   - name: service_areas
     type: VARCHAR
-    description: "Regions or countries where the provider operates"
+    description: Regions or countries where the provider operates
 
 @bruin */
 
