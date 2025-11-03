@@ -2451,6 +2451,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)
