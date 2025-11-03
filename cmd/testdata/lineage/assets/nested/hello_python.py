@@ -1,4 +1,7 @@
-# @bruin.name: hello_python
-# @bruin.type: python
+"""@bruin
+
+name: hello_python
+
+@bruin"""
 
 print("Bruin says hello!")
