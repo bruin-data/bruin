@@ -44,7 +44,8 @@ parameters:
   incremental_strategy: replace | append | merge | delete+insert
   incremental_key: string
   sql_backend: pyarrow | sqlalchemy
-  loader_file_format: jsonl | csv | parquet
+  loader_file_format: jsonl | csv | parquet]
+  enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
 ```
 
 ## Parameter reference
@@ -64,7 +65,7 @@ parameters:
 | `loader_file_format` | No | `--loader-file-format` | Overrides the loader file format (`jsonl`, `csv`, `parquet`). |
 | `loader_file_size` | No | `--loader-file-size` | Sets the maximum loader file size accepted by Ingestr. |
 | `sql_backend` | No | `--sql-backend` | Selects the SQL backend Ingestr should use (`pyarrow` or `sqlalchemy`). |
-| `schema_naming` | No | `--schema-naming` | Controls how Ingestr normalizes schema names. Accepted values match the Ingestr CLI. |
+| `schema_naming` | No | `--schema-naming` | Controls how Ingestr normalizes schema names. Accepted values match the [Ingestr CLI.](https://getbruin.com/docs/ingestr/commands/ingest.html#optional-flags) |
 | `extract_parallelism` | No | `--extract-parallelism` | Limits the number of concurrent extraction workers. |
 | `sql_reflection_level` | No | `--sql-reflection-level` | Tunes the amount of schema reflection performed against the source. |
 | `sql_limit` | No | `--sql-limit` | Applies a `LIMIT` clause when extracting from the source. |
