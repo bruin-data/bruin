@@ -20,7 +20,7 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations integration-test-cloud
+.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations integration-test-cloud test-docker test-docker-local
 all: clean deps test build
 
 deps: tools
@@ -159,4 +159,13 @@ duck-db-static-lib:
 	@mkdir vendor/github.com/marcboeker/go-duckdb/deps || true
 	@mkdir vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH) || true
 	@cp $$(go env GOPATH)/pkg/mod/github.com/marcboeker/go-duckdb@v1.8.2/deps/$(OS_ARCH)/libduckdb.a vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH)/libduckdb.a
+
+test-docker:
+	@echo "$(OK_COLOR)==> Testing Docker image...$(NO_COLOR)"
+	@./scripts/test-docker-release.sh $(tag)
+
+test-docker-local:
+	@echo "$(OK_COLOR)==> Building and testing local Docker image...$(NO_COLOR)"
+	@docker build -t bruin-local:test --build-arg VERSION=local-test --build-arg BRANCH_NAME=local .
+	@./scripts/test-docker-release.sh bruin-local:test
 

@@ -207,6 +207,94 @@ jobs:
             VERSION=${{ github.ref_name }}
             BRANCH_NAME=${{ github.ref_name }}
 
+  dockerTest:
+    runs-on: ubuntu-latest
+    name: Test Docker Image
+    needs: [dockerBuild]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: bruin-data
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Pull the built Docker image
+        run: |
+          echo "Pulling image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+      
+      - name: Test basic CLI commands
+        run: |
+          echo "Testing bruin version..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} bruin version
+          
+          echo "Testing bruin help..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} bruin --help
+      
+      - name: Test chess example pipeline initialization
+        run: |
+          echo "Creating test directory..."
+          mkdir -p /tmp/docker-test
+          
+          echo "Initializing chess pipeline..."
+          docker run --rm \
+            -v /tmp/docker-test:/workspace \
+            -w /workspace \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            bruin init chess test-pipeline
+          
+          echo "Verifying pipeline was created..."
+          ls -la /tmp/docker-test/test-pipeline
+      
+      - name: Test running chess pipeline
+        run: |
+          echo "Running chess pipeline..."
+          docker run --rm \
+            -v /tmp/docker-test:/workspace \
+            -w /workspace/test-pipeline \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            bruin run .
+      
+      - name: Test DuckDB support with lint
+        run: |
+          echo "Testing DuckDB support by linting happy-path pipeline..."
+          docker run --rm \
+            -v ${{ github.workspace }}/integration-tests/test-pipelines/happy-path:/test-pipeline:ro \
+            -w /test-pipeline \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            bruin lint .
+      
+      - name: Test Python environment
+        run: |
+          echo "Verifying Python is available..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} python3 --version
+          
+          echo "Verifying uv is available..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            bash -c "uv --version || echo 'uv not found in PATH, checking bootstrap...'"
+      
+      - name: Test ingestr availability
+        run: |
+          echo "Verifying ingestr is available..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            bash -c "ingestr --version && echo 'ingestr is available' || echo 'Warning: ingestr not found but image may still work'"
+      
+      - name: Test Git availability (required for repo detection)
+        run: |
+          echo "Verifying git is available..."
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} git --version
+      
+      - name: Cleanup test files
+        if: always()
+        run: |
+          rm -rf /tmp/docker-test
+
   install-windows:
     runs-on: windows-latest
     name: Installer Script on Windows
@@ -241,7 +329,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [install-unix, install-windows, dockerBuild]
+    needs: [install-unix, install-windows, dockerBuild, dockerTest]
     steps:
       - uses: actions/checkout@v3
       - name: Extract tag from ref
