@@ -116,7 +116,7 @@ jobs:
         with:
           path: dist/darwin
           key: darwin-${{ env.sha_short }}
-      - uses: goreleaser/goreleaser-action@v3
+      - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro
           version: ${{ env.GORELEASER_PRO_VERSION }}
