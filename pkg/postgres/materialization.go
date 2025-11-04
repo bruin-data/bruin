@@ -55,11 +55,11 @@ func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
+	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", QuoteIdentifier(asset.Name), query), nil
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
+	return fmt.Sprintf("INSERT INTO %s %s", QuoteIdentifier(asset.Name), query), nil
 }
 
 func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
@@ -76,8 +76,8 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s\n", tempTableName, query),
-		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, quotedIncrementalKey, quotedIncrementalKey, tempTableName),
-		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
+		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", QuoteIdentifier(task.Name), quotedIncrementalKey, quotedIncrementalKey, tempTableName),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", QuoteIdentifier(task.Name), tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
 		"COMMIT",
 	}
@@ -211,7 +211,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 			`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s; 
 CREATE TABLE %s AS %s;
-COMMIT;`, task.Name, task.Name, query), nil
+COMMIT;`, QuoteIdentifier(task.Name), QuoteIdentifier(task.Name), query), nil
 	}
 }
 
@@ -237,12 +237,12 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
-			asset.Name,
+			QuoteIdentifier(asset.Name),
 			quotedIncrementalKey,
 			startVar,
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
-			asset.Name,
+			QuoteIdentifier(asset.Name),
 			strings.TrimSuffix(query, ";")),
 		"COMMIT",
 	}
@@ -265,7 +265,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		columnDefs = append(columnDefs, def)
 
 		if col.Description != "" {
-			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", asset.Name, quotedColName, strings.ReplaceAll(col.Description, "'", "''"))
+			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", QuoteIdentifier(asset.Name), quotedColName, strings.ReplaceAll(col.Description, "'", "''"))
 			columnComments = append(columnComments, comment)
 		}
 	}
@@ -277,7 +277,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n"+
 		"%s\n)",
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		strings.Join(columnDefs, ",\n"),
 	)
 
@@ -314,8 +314,8 @@ FROM (
 %s
 ) AS src;
 COMMIT;`,
-		asset.Name,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
+		QuoteIdentifier(asset.Name),
 		validuntil,
 		strings.TrimSpace(query),
 	)
@@ -354,8 +354,8 @@ FROM (
 %s
 ) AS src;
 COMMIT;`,
-		asset.Name,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
+		QuoteIdentifier(asset.Name),
 		quotedIncrementalKey,
 		validuntil,
 		strings.TrimSpace(query),
@@ -456,7 +456,7 @@ WHEN NOT MATCHED BY TARGET THEN
   VALUES (%s);`,
 		QuoteIdentifier(asset.Name),
 		strings.TrimSpace(query),
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		pkList,
 		whereCondition,
 		onCondition,
@@ -561,7 +561,7 @@ WHEN NOT MATCHED BY TARGET THEN
   VALUES (%s);`,
 		QuoteIdentifier(tbl),
 		strings.TrimSpace(query),
-		tbl,
+		QuoteIdentifier(tbl),
 		pkList,
 		quotedIncrementalKey,
 		onCondition,
@@ -670,18 +670,18 @@ DROP TABLE %s;
 COMMIT;`,
 		tempTableName,
 		strings.TrimSpace(query),
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		tempTableName,
 		onCondition,
 		matchedCondition,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		tempTableName,
 		onCondition,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
 		tempTableName,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		onCondition,
 		tempTableName,
 	)
@@ -786,21 +786,21 @@ DROP TABLE %s;
 COMMIT;`,
 		tempTableName,
 		strings.TrimSpace(query),
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		quotedIncrementalKey,
 		tempTableName,
 		onCondition,
 		quotedIncrementalKey,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		tempTableName,
 		onCondition,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
 		tempTableName,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		onCondition,
-		asset.Name,
+		QuoteIdentifier(asset.Name),
 		onCondition,
 		quotedIncrementalKey,
 		tempTableName,
