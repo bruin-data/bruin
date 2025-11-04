@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -917,7 +918,7 @@ func FetchTables() *cli.Command {
 
 			// Check if connection supports GetTables
 			fetcher, ok := conn.(interface {
-				GetTables(ctx context.Context, databaseName string) ([]string, error)
+				GetTables(ctx context.Context, databaseName string) (map[string][]string, error)
 			})
 			if !ok {
 				return handleError(output, fmt.Errorf("connection type '%s' does not support table fetching", connectionName))
@@ -936,17 +937,23 @@ func FetchTables() *cli.Command {
 				printTableNames(databaseName, tables)
 			case "json":
 				type jsonResponse struct {
-					Database   string   `json:"database"`
-					Tables     []string `json:"tables"`
-					ConnName   string   `json:"connection_name"`
-					TableCount int      `json:"table_count"`
+					Database   string              `json:"database"`
+					Tables     map[string][]string `json:"tables"`
+					ConnName   string              `json:"connection_name"`
+					TableCount int                 `json:"table_count"`
+				}
+
+				// Count total tables
+				totalTables := 0
+				for _, schemaTables := range tables {
+					totalTables += len(schemaTables)
 				}
 
 				finalOutput := jsonResponse{
 					Database:   databaseName,
 					Tables:     tables,
 					ConnName:   connectionName,
-					TableCount: len(tables),
+					TableCount: totalTables,
 				}
 
 				jsonData, err := json.Marshal(finalOutput)
@@ -963,26 +970,45 @@ func FetchTables() *cli.Command {
 	}
 }
 
-func printTableNames(databaseName string, tables []string) {
+func printTableNames(databaseName string, tables map[string][]string) {
 	if len(tables) == 0 {
 		fmt.Printf("No tables found in database '%s'\n", databaseName)
 		return
 	}
 
-	fmt.Printf("Database: %s\n", databaseName)
-	fmt.Printf("Found %d table(s):\n", len(tables))
-	fmt.Println(strings.Repeat("=", 30))
-
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Table"})
-
-	for _, tableName := range tables {
-		t.AppendRow(table.Row{tableName})
+	// Count total tables
+	totalTables := 0
+	for _, schemaTables := range tables {
+		totalTables += len(schemaTables)
 	}
 
-	t.SetStyle(table.StyleLight)
-	t.Render()
+	fmt.Printf("Database: %s\n", databaseName)
+	fmt.Printf("Found %d table(s) in %d schema(s):\n", totalTables, len(tables))
+	fmt.Println(strings.Repeat("=", 50))
+
+	// Sort schema names for consistent output
+	schemaNames := make([]string, 0, len(tables))
+	for schemaName := range tables {
+		schemaNames = append(schemaNames, schemaName)
+	}
+	sort.Strings(schemaNames)
+
+	// Print tables grouped by schema
+	for _, schemaName := range schemaNames {
+		schemaTables := tables[schemaName]
+		fmt.Printf("\nSchema: %s (%d table(s))\n", schemaName, len(schemaTables))
+
+		t := table.NewWriter()
+		t.SetOutputMirror(os.Stdout)
+		t.AppendHeader(table.Row{"Table"})
+
+		for _, tableName := range schemaTables {
+			t.AppendRow(table.Row{tableName})
+		}
+
+		t.SetStyle(table.StyleLight)
+		t.Render()
+	}
 }
 
 func FetchColumns() *cli.Command {
