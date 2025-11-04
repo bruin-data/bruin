@@ -14,8 +14,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/duckdb/duckdb-go/v2"   //nolint:stylecheck
-	_ "github.com/duckdb/duckdb-go/v2" //nolint:stylecheck
+	"github.com/marcboeker/go-duckdb"   //nolint:stylecheck
+	_ "github.com/marcboeker/go-duckdb" //nolint:stylecheck
 )
 
 type Client struct {

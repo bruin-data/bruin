@@ -12,8 +12,6 @@ env:
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
-  GORELEASER_CROSS_VERSION: v1.25.3
-  GORELEASER_PRO_VERSION: v2.12.5
 
 jobs:
   integration-tests:
@@ -61,7 +59,7 @@ jobs:
       - name: Run GoReleaser
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross-pro:${{ env.GORELEASER_CROSS_VERSION }} release --clean --split --verbose
+          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src ghcr.io/bruin-data/goreleaser-cross-pro:v1.22 release --clean --split --verbose
   
         
   prepare-linux:
@@ -90,7 +88,7 @@ jobs:
       - name: Run GoReleaser
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross-pro:${{ env.GORELEASER_CROSS_VERSION }} release --clean --split --verbose
+          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src ghcr.io/bruin-data/goreleaser-cross-pro:v1.22 release --clean --split --verbose
 
 
   release-unix:
@@ -116,10 +114,10 @@ jobs:
         with:
           path: dist/darwin
           key: darwin-${{ env.sha_short }}
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser-pro
-          version: ${{ env.GORELEASER_PRO_VERSION }}
+          version: v2.3.2
           args: continue --merge
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -148,7 +146,7 @@ jobs:
       - name: Release
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: ${{ env.GORELEASER_PRO_VERSION }}
+          version: v2.3.2
           distribution: goreleaser-pro
           args: release --clean --split
         env:
