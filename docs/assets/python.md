@@ -144,28 +144,52 @@ The following environment variables are available in every Python asset executio
 
 ### Pipeline
 
-Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your python asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [pipeline variables](/getting-started/pipeline-variables) for more information on how to define and override them.
+Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your python asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [pipeline variables](/getting-started/pipeline-variables) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/getting-started/pipeline-variables#supported-json-schema-keywords).
 
 Here's a short example:
 ::: code-group
 ```yaml [pipeline.yml]
 name: pipeline-with-variables
 variables:
-  env:
+  target_segment:
     type: string
-    default: dev
-  users:
+    enum: ["self_serve", "enterprise", "partner"]
+    default: "enterprise"
+  forecast_horizon_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 30
+  experiment_cohorts:
     type: array
+    minItems: 1
     items:
-      type: string
-    default: ["jhon", "nick"]
+      type: object
+      required: [name, weight, channels]
+      properties:
+        name:
+          type: string
+        weight:
+          type: number
+        channels:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    default:
+      - name: enterprise_baseline
+        weight: 0.6
+        channels: ["email", "customer_success"]
+      - name: partner_campaign
+        weight: 0.4
+        channels: ["webinar", "email"]
 ```
 :::
 
 ::: code-group
 ```bruin-python [asset.py]
 """ @bruin
-name: inspect_env
+name: inspect_segments
 @bruin """
 
 import os
@@ -173,8 +197,13 @@ import json
 
 vars = json.loads(os.environ.get("BRUIN_VARS"))
 
-print("env:", vars["env"])      # env: dev
-print("users:", vars["users"])  # users: ['jhon', 'nick']
+print("target_segment:", vars["target_segment"])            # target_segment: enterprise
+print("forecast_horizon_days:", vars["forecast_horizon_days"])  # forecast_horizon_days: 30
+
+for cohort in vars["experiment_cohorts"]:
+    print(cohort["name"], cohort["weight"], cohort["channels"])
+    # enterprise_baseline 0.6 ['email', 'customer_success']
+    # partner_campaign 0.4 ['webinar', 'email']
 ```
 :::
 
