@@ -712,7 +712,7 @@ func TestClient_GetTables(t *testing.T) {
 		name         string
 		databaseName string
 		setupMock    func(mock pgxmock.PgxPoolIface)
-		want         []string
+		want         map[string][]string
 		wantErr      string
 	}{
 		{
@@ -721,36 +721,41 @@ func TestClient_GetTables(t *testing.T) {
 			wantErr:      "database name cannot be empty",
 		},
 		{
-			name:         "successfully returns table names",
+			name:         "successfully returns table names grouped by schema",
 			databaseName: "db_main",
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "table_schema"},
 					pgconn.FieldDescription{Name: "table_name"},
-				).AddRow("customers").AddRow("orders")
-				mock.ExpectQuery("SELECT table_name").
+				).AddRow("public", "customers").AddRow("public", "orders").AddRow("analytics", "reports")
+				mock.ExpectQuery("SELECT table_schema, table_name").
 					WithArgs("db_main").
 					WillReturnRows(rows)
 			},
-			want: []string{"customers", "orders"},
+			want: map[string][]string{
+				"public":    {"customers", "orders"},
+				"analytics": {"reports"},
+			},
 		},
 		{
 			name:         "skips non-string values",
 			databaseName: "db_main",
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "table_schema"},
 					pgconn.FieldDescription{Name: "table_name"},
-				).AddRow(int32(10))
-				mock.ExpectQuery("SELECT table_name").
+				).AddRow(int32(10), int32(20))
+				mock.ExpectQuery("SELECT table_schema, table_name").
 					WithArgs("db_main").
 					WillReturnRows(rows)
 			},
-			want: nil,
+			want: map[string][]string{},
 		},
 		{
 			name:         "propagates query error",
 			databaseName: "db_main",
 			setupMock: func(mock pgxmock.PgxPoolIface) {
-				mock.ExpectQuery("SELECT table_name").
+				mock.ExpectQuery("SELECT table_schema, table_name").
 					WithArgs("db_main").
 					WillReturnError(errors.New("query failed"))
 			},

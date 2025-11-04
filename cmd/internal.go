@@ -910,73 +910,123 @@ func FetchTables() *cli.Command {
 			environment := c.String("environment")
 			output := c.String("output")
 
-			// Get connection from config
 			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
 
-			// Check if connection supports GetTables
-			fetcher, ok := conn.(interface {
+			if fetcherWithSchemas, ok := conn.(interface {
 				GetTables(ctx context.Context, databaseName string) (map[string][]string, error)
-			})
-			if !ok {
-				return handleError(output, fmt.Errorf("connection type '%s' does not support table fetching", connectionName))
-			}
-
-			// Get tables
-			// ctx is already available from function signature
-			tables, err := fetcher.GetTables(ctx, databaseName)
-			if err != nil {
-				return handleError(output, errors2.Wrap(err, "failed to retrieve tables"))
-			}
-
-			// Output result based on format specified
-			switch output {
-			case outputFormatPlain:
-				printTableNames(databaseName, tables)
-			case "json":
-				type jsonResponse struct {
-					Database   string              `json:"database"`
-					Tables     map[string][]string `json:"tables"`
-					ConnName   string              `json:"connection_name"`
-					TableCount int                 `json:"table_count"`
-				}
-
-				// Count total tables
-				totalTables := 0
-				for _, schemaTables := range tables {
-					totalTables += len(schemaTables)
-				}
-
-				finalOutput := jsonResponse{
-					Database:   databaseName,
-					Tables:     tables,
-					ConnName:   connectionName,
-					TableCount: totalTables,
-				}
-
-				jsonData, err := json.Marshal(finalOutput)
+			}); ok {
+				tables, err := fetcherWithSchemas.GetTables(ctx, databaseName)
 				if err != nil {
-					return handleError(output, errors2.Wrap(err, "failed to marshal result to JSON"))
+					return handleError(output, errors2.Wrap(err, "failed to retrieve tables"))
 				}
-				fmt.Println(string(jsonData))
-			default:
-				return handleError(output, fmt.Errorf("invalid output type: %s", output))
+
+				switch output {
+				case outputFormatPlain:
+					printTableNamesWithSchemas(databaseName, tables)
+				case "json":
+					type jsonResponse struct {
+						Database   string              `json:"database"`
+						Schemas    map[string][]string `json:"schemas"`
+						ConnName   string              `json:"connection_name"`
+						TableCount int                 `json:"table_count"`
+					}
+
+					totalTables := 0
+					for _, schemaTables := range tables {
+						totalTables += len(schemaTables)
+					}
+
+					finalOutput := jsonResponse{
+						Database:   databaseName,
+						Schemas:    tables,
+						ConnName:   connectionName,
+						TableCount: totalTables,
+					}
+
+					jsonData, err := json.Marshal(finalOutput)
+					if err != nil {
+						return handleError(output, errors2.Wrap(err, "failed to marshal result to JSON"))
+					}
+					fmt.Println(string(jsonData))
+				default:
+					return handleError(output, fmt.Errorf("invalid output type: %s", output))
+				}
+				return nil
 			}
 
-			return nil
+			if fetcher, ok := conn.(interface {
+				GetTables(ctx context.Context, databaseName string) ([]string, error)
+			}); ok {
+				tables, err := fetcher.GetTables(ctx, databaseName)
+				if err != nil {
+					return handleError(output, errors2.Wrap(err, "failed to retrieve tables"))
+				}
+
+				switch output {
+				case outputFormatPlain:
+					printTableNames(databaseName, tables)
+				case "json":
+					type jsonResponse struct {
+						Database   string   `json:"database"`
+						Tables     []string `json:"tables"`
+						ConnName   string   `json:"connection_name"`
+						TableCount int      `json:"table_count"`
+					}
+
+					finalOutput := jsonResponse{
+						Database:   databaseName,
+						Tables:     tables,
+						ConnName:   connectionName,
+						TableCount: len(tables),
+					}
+
+					jsonData, err := json.Marshal(finalOutput)
+					if err != nil {
+						return handleError(output, errors2.Wrap(err, "failed to marshal result to JSON"))
+					}
+					fmt.Println(string(jsonData))
+				default:
+					return handleError(output, fmt.Errorf("invalid output type: %s", output))
+				}
+				return nil
+			}
+
+			return handleError(output, fmt.Errorf("connection type '%s' does not support table fetching", connectionName))
 		},
 	}
 }
 
-func printTableNames(databaseName string, tables map[string][]string) {
+func printTableNames(databaseName string, tables []string) {
 	if len(tables) == 0 {
 		fmt.Printf("No tables found in database '%s'\n", databaseName)
 		return
 	}
 
-	// Count total tables
+	fmt.Printf("Database: %s\n", databaseName)
+	fmt.Printf("Found %d table(s):\n", len(tables))
+	fmt.Println(strings.Repeat("=", 30))
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Table"})
+
+	for _, tableName := range tables {
+		t.AppendRow(table.Row{tableName})
+	}
+
+	t.SetStyle(table.StyleLight)
+	t.Render()
+}
+
+func printTableNamesWithSchemas(databaseName string, tables map[string][]string) {
+	if len(tables) == 0 {
+		fmt.Printf("No tables found in database '%s'\n", databaseName)
+		return
+	}
+
 	totalTables := 0
 	for _, schemaTables := range tables {
 		totalTables += len(schemaTables)
@@ -986,14 +1036,12 @@ func printTableNames(databaseName string, tables map[string][]string) {
 	fmt.Printf("Found %d table(s) in %d schema(s):\n", totalTables, len(tables))
 	fmt.Println(strings.Repeat("=", 50))
 
-	// Sort schema names for consistent output
 	schemaNames := make([]string, 0, len(tables))
 	for schemaName := range tables {
 		schemaNames = append(schemaNames, schemaName)
 	}
 	sort.Strings(schemaNames)
 
-	// Print tables grouped by schema
 	for _, schemaName := range schemaNames {
 		schemaTables := tables[schemaName]
 		fmt.Printf("\nSchema: %s (%d table(s))\n", schemaName, len(schemaTables))
