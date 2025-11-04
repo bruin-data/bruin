@@ -50,9 +50,9 @@ linters:
     - depguard
     - tagalign
     - gocyclo
-    - exportloopref
     - godox
     - nonamedreturns
+    - usetesting
   presets:
     - bugs
     - comment
