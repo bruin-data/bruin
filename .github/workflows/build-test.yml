@@ -37,7 +37,7 @@ env:
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
-  GORELEASER_VERSION: v1.23.5
+  GORELEASER_VERSION: v1.25.3
 
 jobs:
   test:
