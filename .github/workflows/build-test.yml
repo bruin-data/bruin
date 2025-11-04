@@ -172,3 +172,16 @@ jobs:
       - name: Run GoReleaser
         run: |
           docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }}  -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:${{ env.GORELEASER_CROSS_VERSION }} build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
+  
+  goreleaser-unix-pro:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Run GoReleaser
+        run: |
+          docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }}  -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src ghcr.io/bruin-data/goreleaser-cross-pro:${{ env.GORELEASER_CROSS_VERSION }} build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
