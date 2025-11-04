@@ -122,6 +122,13 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return err
 	}
 
+	if asset.Parameters["enforce_schema"] == "true" {
+		columns := columnHints(asset.Columns, false)
+		if columns != "" {
+			cmdArgs = append(cmdArgs, "--columns", columns)
+		}
+	}
+
 	path := asset.ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
 	if err != nil {
@@ -203,7 +210,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return err
 	}
 
-	columns := columnHints(asset.Columns)
+	columns := columnHints(asset.Columns, true)
 	if columns != "" {
 		cmdArgs = append(cmdArgs, "--columns", columns)
 	}

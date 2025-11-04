@@ -25,6 +25,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/clickup"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/couchbase"
+	"github.com/bruin-data/bruin/pkg/cursor"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/db2"
 	"github.com/bruin-data/bruin/pkg/docebo"
@@ -104,6 +105,7 @@ type Manager struct {
 	Databricks           map[string]*databricks.DB
 	Mongo                map[string]*mongo.DB
 	Couchbase            map[string]*couchbase.DB
+	Cursor               map[string]*cursor.Client
 	MongoAtlas           map[string]*mongoatlas.DB
 	Mysql                map[string]*mysql.Client
 	Notion               map[string]*notion.Client
@@ -591,6 +593,29 @@ func (m *Manager) AddCouchbaseConnectionFromConfig(connection *config.CouchbaseC
 	return nil
 }
 
+func (m *Manager) AddCursorConnectionFromConfig(connection *config.CursorConnection) error {
+	m.mutex.Lock()
+	if m.Cursor == nil {
+		m.Cursor = make(map[string]*cursor.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := cursor.NewClient(cursor.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Cursor[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddMongoAtlasConnectionFromConfig(connection *config.MongoAtlasConnection) error {
 	m.mutex.Lock()
 	if m.MongoAtlas == nil {
@@ -598,7 +623,7 @@ func (m *Manager) AddMongoAtlasConnectionFromConfig(connection *config.MongoAtla
 	}
 	m.mutex.Unlock()
 
-	client, err := mongoatlas.NewDB(&mongoatlas.Config{
+	client, err := mongoatlas.NewClient(context.Background(), &mongoatlas.Config{
 		Username: connection.Username,
 		Password: connection.Password,
 		Host:     connection.Host,
@@ -2426,6 +2451,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)

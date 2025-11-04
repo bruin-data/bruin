@@ -39,7 +39,7 @@ var AvailablePythonVersions = map[string]bool{
 const (
 	UvVersion               = "0.6.16"
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.14.97"
+	ingestrVersion          = "0.14.98"
 	sqlfluffVersion         = "3.4.1"
 )
 
