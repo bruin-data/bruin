@@ -239,7 +239,7 @@ jobs:
             -v /tmp/docker-test:/workspace \
             -w /workspace \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            bruin init python python-pipeline
+            bruin init python --in-place python-pipeline
           
           echo "Verifying Python pipeline was created..."
           ls -la /tmp/docker-test/python-pipeline
@@ -260,7 +260,7 @@ jobs:
             -v /tmp/docker-test:/workspace \
             -w /workspace \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            bruin init duckdb duckdb-pipeline
+            bruin init duckdb --in-place duckdb-pipeline
           
           echo "Verifying DuckDB pipeline was created..."
           ls -la /tmp/docker-test/duckdb-pipeline
