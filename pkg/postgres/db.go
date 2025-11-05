@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -22,6 +23,7 @@ type Client struct {
 	connection    connection
 	config        PgConfig
 	schemaCreator *ansisql.SchemaCreator
+	schemaCache   *sync.Map // Cache for created schemas to avoid repeated CREATE SCHEMA calls
 	typeMapper    *diff.DatabaseTypeMapper
 }
 
@@ -46,6 +48,7 @@ func NewClient(ctx context.Context, c PgConfig) (*Client, error) {
 		connection:    conn,
 		config:        c,
 		schemaCreator: ansisql.NewSchemaCreator(),
+		schemaCache:   &sync.Map{},
 		typeMapper:    diff.NewPostgresTypeMapper(),
 	}, nil
 }
@@ -406,7 +409,35 @@ ORDER BY table_schema, table_name;
 }
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = tableComponents[0]
+	case 3:
+		schemaName = tableComponents[1]
+	default:
+		return nil
+	}
+
+	// Check the cache for the schema using the exact case
+	// This is important because quoted identifiers in PostgreSQL are case-sensitive
+	if _, exists := c.schemaCache.Load(schemaName); exists {
+		return nil
+	}
+
+	// Create schema with proper quoting to preserve case sensitivity
+	quotedSchemaName := QuoteIdentifier(schemaName)
+	createQuery := query.Query{
+		Query: "CREATE SCHEMA IF NOT EXISTS " + quotedSchemaName,
+	}
+	if err := c.RunQueryWithoutResult(ctx, &createQuery); err != nil {
+		return errors.Wrapf(err, "failed to create or ensure schema: %s", schemaName)
+	}
+
+	// Cache the exact schema name (case-sensitive)
+	c.schemaCache.Store(schemaName, true)
+	return nil
 }
 
 func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
