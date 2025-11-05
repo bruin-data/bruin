@@ -705,7 +705,7 @@ func TestClient_GetDatabases(t *testing.T) {
 	}
 }
 
-func TestClient_GetTables(t *testing.T) {
+func TestClient_GetTablesWithSchemas(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -777,7 +777,7 @@ func TestClient_GetTables(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			got, err := client.GetTables(context.Background(), tt.databaseName)
+			got, err := client.GetTablesWithSchemas(context.Background(), tt.databaseName)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				require.Equal(t, tt.wantErr, err.Error())

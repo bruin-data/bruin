@@ -916,9 +916,9 @@ func FetchTables() *cli.Command {
 			}
 
 			if fetcherWithSchemas, ok := conn.(interface {
-				GetTables(ctx context.Context, databaseName string) (map[string][]string, error)
+				GetTablesWithSchemas(ctx context.Context, databaseName string) (map[string][]string, error)
 			}); ok {
-				tables, err := fetcherWithSchemas.GetTables(ctx, databaseName)
+				tables, err := fetcherWithSchemas.GetTablesWithSchemas(ctx, databaseName)
 				if err != nil {
 					return handleError(output, errors2.Wrap(err, "failed to retrieve tables"))
 				}

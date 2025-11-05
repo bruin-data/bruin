@@ -190,7 +190,7 @@ ORDER BY datname;
 	return databases, nil
 }
 
-func (c *Client) GetTables(ctx context.Context, databaseName string) (map[string][]string, error) {
+func (c *Client) GetTablesWithSchemas(ctx context.Context, databaseName string) (map[string][]string, error) {
 	if databaseName == "" {
 		return nil, errors.New("database name cannot be empty")
 	}
