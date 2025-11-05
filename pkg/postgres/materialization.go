@@ -86,6 +86,10 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 }
 
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		return buildRedshiftMergeQuery(asset, query)
+	}
+
 	if len(asset.Columns) == 0 {
 		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
@@ -132,6 +136,61 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	mergeLines := []string{
 		fmt.Sprintf("MERGE INTO %s target", QuoteIdentifier(asset.Name)),
+		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		whenMatchedThenQuery,
+		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),
+	}
+
+	return strings.Join(mergeLines, "\n") + ";", nil
+}
+
+func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
+	}
+
+	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
+	columnNames := asset.ColumnNames()
+
+	on := make([]string, 0, len(primaryKeys))
+	for _, key := range primaryKeys {
+		on = append(on, fmt.Sprintf("target.%s = source.%s", QuoteIdentifier(key), QuoteIdentifier(key)))
+	}
+	onQuery := strings.Join(on, " AND ")
+
+	// Quote all column names for INSERT clause
+	quotedColumnNames := make([]string, 0, len(columnNames))
+	quotedColumnValues := make([]string, 0, len(columnNames))
+	for _, col := range columnNames {
+		quotedColumnNames = append(quotedColumnNames, QuoteIdentifier(col))
+		quotedColumnValues = append(quotedColumnValues, "source."+QuoteIdentifier(col))
+	}
+	allColumnNamesStr := strings.Join(quotedColumnNames, ", ")
+	allColumnValuesStr := strings.Join(quotedColumnValues, ", ")
+
+	whenMatchedThenQuery := ""
+
+	if len(mergeColumns) > 0 {
+		matchedUpdateStatements := make([]string, 0, len(mergeColumns))
+		for _, col := range mergeColumns {
+			if col.MergeSQL != "" {
+				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = %s", QuoteIdentifier(col.Name), col.MergeSQL))
+			} else {
+				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = source.%s", QuoteIdentifier(col.Name), QuoteIdentifier(col.Name)))
+			}
+		}
+
+		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
+		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
+	}
+
+	mergeLines := []string{
+		"MERGE INTO " + QuoteIdentifier(asset.Name),
 		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),

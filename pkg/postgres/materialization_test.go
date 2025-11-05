@@ -202,6 +202,26 @@ WHEN MATCHED THEN UPDATE SET "name" = source\."name"
 WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
 		},
 		{
+			name: "redshift merge with primary keys",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Type: "rs.sql",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "name", Type: "varchar", PrimaryKey: false, UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT 1 as id, 'abc' as name",
+			want: `^MERGE INTO "my"\."asset"
+USING \(SELECT 1 as id, 'abc' as name\) source ON target\."id" = source\."id"
+WHEN MATCHED THEN UPDATE SET "name" = source\."name"
+WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\(source."id", source."name"\);$`,
+		},
+		{
 			name: "merge with case-sensitive fields",
 			task: &pipeline.Asset{
 				Name: "my.asset",
