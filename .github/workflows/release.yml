@@ -236,11 +236,11 @@ jobs:
           
           echo "Initializing Python pipeline..."
           docker run --rm \
-            -v /tmp/docker-test:/workspace \
-            -w /workspace \
+            -v /tmp/docker-test:/tmp/docker-test \
+            -w /tmp/docker-test \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             bruin init python --in-place python-pipeline
-          
+           
           echo "Verifying Python pipeline was created..."
           ls -la /tmp/docker-test/python-pipeline
       
@@ -248,8 +248,8 @@ jobs:
         run: |
           echo "Running Python pipeline..."
           docker run --rm \
-            -v /tmp/docker-test:/workspace \
-            -w /workspace/python-pipeline \
+            -v /tmp/docker-test:/tmp/docker-test \
+            -w /tmp/docker-test/python-pipeline \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             bruin run .
       
@@ -257,8 +257,8 @@ jobs:
         run: |
           echo "Initializing DuckDB pipeline..."
           docker run --rm \
-            -v /tmp/docker-test:/workspace \
-            -w /workspace \
+            -v /tmp/docker-test:/tmp/docker-test \
+            -w /tmp/docker-test \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             bruin init duckdb --in-place duckdb-pipeline
           
@@ -269,8 +269,8 @@ jobs:
         run: |
           echo "Running DuckDB pipeline..."
           docker run --rm \
-            -v /tmp/docker-test:/workspace \
-            -w /workspace/duckdb-pipeline \
+            -v /tmp/docker-test:/tmp/docker-test \
+            -w /tmp/docker-test/duckdb-pipeline \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             bruin run .
       
