@@ -214,7 +214,6 @@ jobs:
     permissions:
       contents: read
       packages: read
-    # NOTE: These tests should mirror scripts/test-docker-release.sh for local testing
     steps:
       - uses: actions/checkout@v4
       
