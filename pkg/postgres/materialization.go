@@ -177,7 +177,7 @@ func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
-	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
+	mergeColumns := getColumnsWithMergeLogic(asset)
 	columnNames := asset.ColumnNames()
 
 	on := make([]string, 0, len(primaryKeys))
