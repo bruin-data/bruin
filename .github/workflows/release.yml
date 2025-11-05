@@ -214,6 +214,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+    # NOTE: These tests should mirror scripts/test-docker-release.sh for local testing
     steps:
       - uses: actions/checkout@v4
       
@@ -229,66 +230,50 @@ jobs:
           echo "Pulling image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}"
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
       
-      - name: Test basic CLI commands
-        run: |
-          echo "Testing bruin version..."
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} bruin version
-          
-          echo "Testing bruin help..."
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} bruin --help
-      
-      - name: Test chess example pipeline initialization
+      - name: Test Python pipeline initialization
         run: |
           echo "Creating test directory..."
           mkdir -p /tmp/docker-test
           
-          echo "Initializing chess pipeline..."
+          echo "Initializing Python pipeline..."
           docker run --rm \
             -v /tmp/docker-test:/workspace \
             -w /workspace \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            bruin init chess test-pipeline
+            bruin init python python-pipeline
           
-          echo "Verifying pipeline was created..."
-          ls -la /tmp/docker-test/test-pipeline
+          echo "Verifying Python pipeline was created..."
+          ls -la /tmp/docker-test/python-pipeline
       
-      - name: Test running chess pipeline
+      - name: Test running Python pipeline
         run: |
-          echo "Running chess pipeline..."
+          echo "Running Python pipeline..."
           docker run --rm \
             -v /tmp/docker-test:/workspace \
-            -w /workspace/test-pipeline \
+            -w /workspace/python-pipeline \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             bruin run .
       
-      - name: Test DuckDB support with lint
+      - name: Test DuckDB pipeline initialization
         run: |
-          echo "Testing DuckDB support by linting happy-path pipeline..."
+          echo "Initializing DuckDB pipeline..."
           docker run --rm \
-            -v ${{ github.workspace }}/integration-tests/test-pipelines/happy-path:/test-pipeline:ro \
-            -w /test-pipeline \
+            -v /tmp/docker-test:/workspace \
+            -w /workspace \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            bruin lint .
-      
-      - name: Test Python environment
-        run: |
-          echo "Verifying Python is available..."
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} python3 --version
+            bruin init duckdb duckdb-pipeline
           
-          echo "Verifying uv is available..."
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            bash -c "uv --version || echo 'uv not found in PATH, checking bootstrap...'"
+          echo "Verifying DuckDB pipeline was created..."
+          ls -la /tmp/docker-test/duckdb-pipeline
       
-      - name: Test ingestr availability
+      - name: Test running DuckDB pipeline
         run: |
-          echo "Verifying ingestr is available..."
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            bash -c "ingestr --version && echo 'ingestr is available' || echo 'Warning: ingestr not found but image may still work'"
-      
-      - name: Test Git availability (required for repo detection)
-        run: |
-          echo "Verifying git is available..."
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} git --version
+          echo "Running DuckDB pipeline..."
+          docker run --rm \
+            -v /tmp/docker-test:/workspace \
+            -w /workspace/duckdb-pipeline \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            bruin run .
       
       - name: Cleanup test files
         if: always()
