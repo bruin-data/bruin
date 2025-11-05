@@ -22,12 +22,12 @@ variables:
 ```
 
 `asset.sql`
-```sql 
+```sql
 SELECT
     conversion_date,
     cohort_id,
     {% for day_n in var.days %}
-    SUM(IFF(days_since_install < {{ day_n }}, revenue, 0)) 
+    SUM(IFF(days_since_install < {{ day_n }}, revenue, 0))
     AS revenue_{{ day_n }}_days
     {% if not loop.last %},{% endif %}
     {% endfor %}
@@ -35,6 +35,9 @@ FROM user_cohorts
 GROUP BY 1,2
 ```
 :::
+
+> [!TIP]
+> Need enumerations, numeric bounds, or nested structures for your variables? Consult the [JSON Schema keyword reference](/getting-started/pipeline-variables#supported-json-schema-keywords) for the full list of `type` values and examples of arrays-of-objects and object-of-arrays patterns you can reuse in templated SQL.
 
 This will render into the following SQL query:
 

@@ -123,6 +123,12 @@ func TestLoadFromFile(t *testing.T) {
 					SSL:      false,
 				},
 			},
+			Cursor: []CursorConnection{
+				{
+					Name:   "cursor1",
+					APIKey: "cursorapikey",
+				},
+			},
 			MySQL: []MySQLConnection{
 				{
 					Name:     "conn8",

@@ -396,10 +396,16 @@ name: sales_pipeline
 variables:
   regions:
     type: array
-    default: ['US', 'EU', 'APAC']
+    minItems: 1
+    items:
+      type: string
+      enum: ['US', 'EU', 'APAC']
+    default: ['US', 'EU']
   min_revenue:
     type: integer
-    default: 1000
+    minimum: 1000
+    maximum: 100000
+    default: 5000
 ```
 
 `macros/filters.sql`
@@ -425,6 +431,9 @@ AND region = '{{ region }}'
 {% endfor %}
 ```
 :::
+
+> [!TIP]
+> The pipeline snippet above showcases array enums and numeric bounds. For additional JSON Schema keywords you can mix into macros-driven workflows—including nested objects and nullable values—refer to the [pipeline variables keyword reference](/getting-started/pipeline-variables#supported-json-schema-keywords).
 
 ### Dynamic Column Generation
 
