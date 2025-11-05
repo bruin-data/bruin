@@ -62,7 +62,16 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at EXACTLY one column", strategy)
 	}
 
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+	// Extract database name from task.Name to ensure temp table is created in the correct database
+	assetNameParts := strings.Split(task.Name, ".")
+	var tempTableName string
+	if len(assetNameParts) == 2 {
+		databaseName := assetNameParts[0]
+		tempTableName = databaseName + ".__bruin_tmp_" + helpers.PrefixGenerator()
+	} else {
+		// Fallback for tables without explicit database
+		tempTableName = "__bruin_tmp_" + helpers.PrefixGenerator()
+	}
 
 	queries := []string{
 		fmt.Sprintf(
@@ -92,7 +101,6 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 	if len(task.Columns) == 0 {
 		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
 	}
-
 	primaryKeys := task.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) != 1 {
 		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at EXACTLY one column", task.Materialization.Strategy)
@@ -100,7 +108,16 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 
 	query = strings.TrimSuffix(query, ";")
 
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+	// Extract database name from task.Name to ensure temp table is created in the correct database
+	assetNameParts := strings.Split(task.Name, ".")
+	var tempTableName string
+	if len(assetNameParts) == 2 {
+		databaseName := assetNameParts[0]
+		tempTableName = databaseName + ".__bruin_tmp_" + helpers.PrefixGenerator()
+	} else {
+		// Fallback for tables without explicit database
+		tempTableName = "__bruin_tmp_" + helpers.PrefixGenerator()
+	}
 
 	return []string{
 		fmt.Sprintf(
