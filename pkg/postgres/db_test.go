@@ -705,14 +705,14 @@ func TestClient_GetDatabases(t *testing.T) {
 	}
 }
 
-func TestClient_GetTables(t *testing.T) {
+func TestClient_GetTablesWithSchemas(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name         string
 		databaseName string
 		setupMock    func(mock pgxmock.PgxPoolIface)
-		want         []string
+		want         map[string][]string
 		wantErr      string
 	}{
 		{
@@ -721,36 +721,41 @@ func TestClient_GetTables(t *testing.T) {
 			wantErr:      "database name cannot be empty",
 		},
 		{
-			name:         "successfully returns table names",
+			name:         "successfully returns table names grouped by schema",
 			databaseName: "db_main",
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "table_schema"},
 					pgconn.FieldDescription{Name: "table_name"},
-				).AddRow("customers").AddRow("orders")
-				mock.ExpectQuery("SELECT table_name").
+				).AddRow("public", "customers").AddRow("public", "orders").AddRow("analytics", "reports")
+				mock.ExpectQuery("SELECT table_schema, table_name").
 					WithArgs("db_main").
 					WillReturnRows(rows)
 			},
-			want: []string{"customers", "orders"},
+			want: map[string][]string{
+				"public":    {"customers", "orders"},
+				"analytics": {"reports"},
+			},
 		},
 		{
 			name:         "skips non-string values",
 			databaseName: "db_main",
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "table_schema"},
 					pgconn.FieldDescription{Name: "table_name"},
-				).AddRow(int32(10))
-				mock.ExpectQuery("SELECT table_name").
+				).AddRow(int32(10), int32(20))
+				mock.ExpectQuery("SELECT table_schema, table_name").
 					WithArgs("db_main").
 					WillReturnRows(rows)
 			},
-			want: nil,
+			want: map[string][]string{},
 		},
 		{
 			name:         "propagates query error",
 			databaseName: "db_main",
 			setupMock: func(mock pgxmock.PgxPoolIface) {
-				mock.ExpectQuery("SELECT table_name").
+				mock.ExpectQuery("SELECT table_schema, table_name").
 					WithArgs("db_main").
 					WillReturnError(errors.New("query failed"))
 			},
@@ -772,7 +777,7 @@ func TestClient_GetTables(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			got, err := client.GetTables(context.Background(), tt.databaseName)
+			got, err := client.GetTablesWithSchemas(context.Background(), tt.databaseName)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				require.Equal(t, tt.wantErr, err.Error())

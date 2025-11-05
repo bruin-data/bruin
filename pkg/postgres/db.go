@@ -193,18 +193,18 @@ ORDER BY datname;
 	return databases, nil
 }
 
-func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+func (c *Client) GetTablesWithSchemas(ctx context.Context, databaseName string) (map[string][]string, error) {
 	if databaseName == "" {
 		return nil, errors.New("database name cannot be empty")
 	}
 
 	q := `
-SELECT table_name
+SELECT table_schema, table_name
 FROM information_schema.tables
 WHERE table_catalog = $1
     AND table_schema NOT IN ('pg_catalog', 'information_schema')
     AND table_type IN ('BASE TABLE', 'VIEW')
-ORDER BY table_name;
+ORDER BY table_schema, table_name;
 `
 
 	rows, err := c.connection.Query(ctx, q, databaseName)
@@ -220,11 +220,13 @@ ORDER BY table_name;
 		return nil, errors.Wrap(err, "failed to collect row values")
 	}
 
-	var tables []string
+	tables := make(map[string][]string)
 	for _, row := range collectedRows {
-		if len(row) > 0 {
-			if tableName, ok := row[0].(string); ok {
-				tables = append(tables, tableName)
+		if len(row) >= 2 {
+			if schemaName, ok := row[0].(string); ok {
+				if tableName, ok := row[1].(string); ok {
+					tables[schemaName] = append(tables[schemaName], tableName)
+				}
 			}
 		}
 	}
