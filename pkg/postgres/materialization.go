@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -41,7 +40,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
 		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
-		pipeline.MaterializationStrategyTruncateInsert: ansisql.BuildTruncateInsertQuery,
+		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
 		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
@@ -85,6 +84,30 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
+func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error) {
+	queries := []string{
+		"BEGIN TRANSACTION",
+		"TRUNCATE TABLE " + QuoteIdentifier(task.Name),
+		fmt.Sprintf("INSERT INTO %s %s", QuoteIdentifier(task.Name), strings.TrimSuffix(query, ";")),
+		"COMMIT",
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func getColumnsWithMergeLogic(asset *pipeline.Asset) []pipeline.Column {
+	var columns []pipeline.Column
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			continue
+		}
+		if col.MergeSQL != "" || col.UpdateOnMerge {
+			columns = append(columns, col)
+		}
+	}
+	return columns
+}
+
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Type == pipeline.AssetTypeRedshiftQuery {
 		return buildRedshiftMergeQuery(asset, query)
@@ -99,7 +122,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
-	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
+	mergeColumns := getColumnsWithMergeLogic(asset)
 	columnNames := asset.ColumnNames()
 
 	on := make([]string, 0, len(primaryKeys))
