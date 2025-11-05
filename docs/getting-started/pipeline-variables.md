@@ -19,6 +19,76 @@ variables:
     default: ["alice", "bob"]
 ```
 
+### Supported JSON Schema keywords
+
+Bruin follows the [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) specification for variable definitions. The `type` keyword accepts the following values:
+
+| `type` value | Description | Example default |
+|--------------|-------------|-----------------|
+| `string`     | UTF-8 text, including templated snippets | `"dev"` |
+| `integer`    | Whole numbers | `42` |
+| `number`     | Numeric values, including decimals | `3.14` |
+| `boolean`    | `true` / `false` flags | `false` |
+| `object`     | Maps with nested schemas described in `properties` | `{ "region": "us-east-1" }` |
+| `array`      | Lists of values described by `items` | `["alice", "bob"]` |
+| `null`       | Explicitly nullable values | `null` |
+
+In addition to `type`, you can use other JSON Schema keywords such as `enum`, `const`, `minimum`, `maximum`, `pattern`, `items`, `properties`, and `required` to further restrict or describe the variable. Bruin does not automatically enforce these constraints at runtime today, but declaring them documents your intent and unlocks tooling like schema-aware editors and autocompletion.
+
+```yaml [pipeline.yml]
+variables:
+  target_segment:
+    type: string
+    enum: ["self_serve", "enterprise", "partner"]
+    default: "enterprise"
+  forecast_horizon_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 30
+  experiment_cohorts:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required: [name, weight, channels]
+      properties:
+        name:
+          type: string
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+        channels:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    default:
+      - name: enterprise_baseline
+        weight: 0.6
+        channels: ["email", "customer_success"]
+      - name: partner_campaign
+        weight: 0.4
+        channels: ["webinar", "email"]
+  channel_overrides:
+    type: object
+    properties:
+      email:
+        type: array
+        items:
+          type: string
+      sales_enablement:
+        type: array
+        items:
+          type: string
+    default:
+      email: ["enterprise_newsletter"]
+      sales_enablement: ["q1_forecast_brief", "expansion_playbook"]
+```
+
+The `experiment_cohorts` example shows an **array of structs** where each cohort defines a name, weight, and the list of channels that should receive the tailored analytics. Meanwhile, `channel_overrides` demonstrates a **struct whose fields are arrays**, letting you capture channel-specific campaign IDs or template names without sprinkling that metadata across multiple assets.
+
 ## Referencing variables in assets
 
 All variables are accessible in SQL, `seed`, `sensor`, and `ingestr` assets via the `var` namespace.
@@ -69,37 +139,79 @@ For YAML-style assets, variables can only be used in the value context of `param
 
 ::: code-group
 ```yaml [pipeline.yml]
-name: udharan
+name: experimentation
 variables:
-  config:
+  experiment_cohorts:
+    type: array
+    items:
+      type: object
+      required: [name, weight, channels]
+      properties:
+        name:
+          type: string
+        weight:
+          type: number
+        channels:
+          type: array
+          items:
+            type: string
+    default:
+      - name: enterprise_baseline
+        weight: 0.6
+        channels: ["email", "customer_success"]
+      - name: partner_campaign
+        weight: 0.4
+        channels: ["webinar", "email"]
+  channel_overrides:
     type: object
     properties:
-      name:
-        type: string
-      version:
-        type: object
+      email:
+        type: array
+        items:
+          type: string
     default:
-      name: bruin
-      version: 1.0.0
+      email: ["enterprise_newsletter"]
 ```
 :::
 
 ::: code-group
 ```bruin-sql [asset.sql]
 /* @bruin
-name: myschema.example
+name: analytics.cohort_plan
 type: duckdb.sql
 @bruin */
 
-SELECT 
-  '{{ var.config.name }}' as name,
-  '{{ var.config.version }}' as version;
+SELECT
+  cohort.name,
+  cohort.weight,
+  channel
+FROM (
+  SELECT *
+  FROM {{ var.experiment_cohorts | tojson }}
+) AS cohort,
+LATERAL UNNEST(cohort.channels) AS channel
+WHERE channel NOT IN (
+  SELECT value
+  FROM UNNEST({{ var.channel_overrides.email | tojson }}) AS value
+);
 ```
 :::
 
-When run, the rendered query will like the following:
+When run with the defaults above, Bruin renders the SQL with the array of structs expanded and the overridden email templates filtered out:
 ```sql
-SELECT 'bruin' as name, '1.0.0' as version;
+SELECT
+  cohort.name,
+  cohort.weight,
+  channel
+FROM (
+  SELECT *
+  FROM [{"name":"enterprise_baseline","weight":0.6,"channels":["email","customer_success"]},{"name":"partner_campaign","weight":0.4,"channels":["webinar","email"]}]
+) AS cohort,
+LATERAL UNNEST(cohort.channels) AS channel
+WHERE channel NOT IN (
+  SELECT value
+  FROM UNNEST(["enterprise_newsletter"]) AS value
+);
 ```
 
 ## Built-in variables

@@ -62,9 +62,42 @@ default:
 
 
 variables:
-  run_mode:
+  target_segment:
     type: string
-    default: "incremental"
+    enum: ["self_serve", "enterprise", "partner"]
+    default: "enterprise"
+  forecast_horizon_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 30
+  experiment_cohorts:
+    type: array
+    items:
+      type: object
+      required: [name, weight, channels]
+      properties:
+        name:
+          type: string
+        weight:
+          type: number
+        channels:
+          type: array
+          items:
+            type: string
+    default:
+      - name: enterprise_baseline
+        weight: 0.6
+        channels: ["email", "customer_success"]
+  channel_overrides:
+    type: object
+    properties:
+      email:
+        type: array
+        items:
+          type: string
+    default:
+      email: ["enterprise_newsletter"]
 
 ```
 
@@ -330,7 +363,7 @@ Secrets item:
 ### Variables
 
 Define pipeline-scoped parameters with safe defaults so you can change behavior without editing code.
-Great for toggling modes (e.g., full vs incremental) or passing environment-specific values.
+Great for steering business logic (e.g., targeting a customer segment) or tuning data science parameters (e.g., forecast horizons).
 
 See also: [Variables](/getting-started/pipeline-variables).
 
@@ -338,18 +371,51 @@ Example:
 
 ```yaml
 variables:
-  run_mode:
+  target_segment:
     type: string
-    default: "incremental"
+    enum: ["self_serve", "enterprise", "partner"]
+    default: "enterprise"
+  forecast_horizon_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 30
+  experiment_cohorts:
+    type: array
+    items:
+      type: object
+      required: [name, weight, channels]
+      properties:
+        name:
+          type: string
+        weight:
+          type: number
+        channels:
+          type: array
+          items:
+            type: string
+    default:
+      - name: enterprise_baseline
+        weight: 0.6
+        channels: ["email", "customer_success"]
+  channel_overrides:
+    type: object
+    properties:
+      email:
+        type: array
+        items:
+          type: string
+    default:
+      email: ["enterprise_newsletter"]
 ```
 
 - **Type:** `Object (map[string]variable-schema)`
 
 Variable schema fields (subset):
 
-| Field   | Type   | Required | Notes                                                                   |
-|---------|--------|----------|-------------------------------------------------------------------------|
-| type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array       |
-| default | any    | yes      | REQUIRED. Must be present; used as the variable value unless overridden |
+| Field   | Type   | Required | Notes                                                                                   |
+|---------|--------|----------|-----------------------------------------------------------------------------------------|
+| type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array, null. See [variables type reference](/getting-started/pipeline-variables#supported-json-schema-keywords) for details and examples. |
+| default | any    | yes      | REQUIRED. Must be present; used as the variable value unless overridden                 |
+| enum    | Array  | no       | Restrict values to a fixed list (e.g. `enum: ["self_serve", "enterprise", "partner"]`). See [variables documentation](/getting-started/pipeline-variables#supported-json-schema-keywords) for more JSON Schema keywords you can use. |
 
->
