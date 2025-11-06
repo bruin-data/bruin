@@ -2471,6 +2471,122 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "duckdb_truncate_insert_materialization",
+			workflow: e2e.Workflow{
+				Name: "duckdb_truncate_insert_materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "mat-trunc-00: ensure initial books.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert/resources/books_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert/assets/books.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-trunc-01: run pipeline with initial data",
+						Command: binary,
+						Args:    []string{"run", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-trunc-02: query the initial data",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT * FROM test.books ORDER BY book_id;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert/expectations/initial.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-trunc-03: get initial table structure",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "PRAGMA table_info('test.books');", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-trunc-04: replace books.sql with books_v2.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert/resources/books_v2.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert/assets/books.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-trunc-05: run pipeline after replacing asset",
+						Command: binary,
+						Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-trunc-06: query data after truncate+insert",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT * FROM test.books ORDER BY book_id;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert/expectations/after_truncate.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-trunc-07: verify table structure unchanged",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "PRAGMA table_info('test.books');", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-trunc-08: restore original books.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert/resources/books_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-truncate-insert/assets/books.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
