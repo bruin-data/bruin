@@ -53,6 +53,7 @@ linters:
     - exportloopref
     - godox
     - nonamedreturns
+    - maintidx
   presets:
     - bugs
     - comment
