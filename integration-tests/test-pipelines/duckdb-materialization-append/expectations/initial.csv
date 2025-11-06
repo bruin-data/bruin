@@ -1,0 +1,4 @@
+log_id,event,event_date
+1,User login,2024-01-01
+2,Page view,2024-01-01
+3,User logout,2024-01-01

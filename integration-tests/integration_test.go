@@ -2587,6 +2587,146 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "duckdb_append_materialization",
+			workflow: e2e.Workflow{
+				Name: "duckdb_append_materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "mat-app-00: ensure initial logs.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append/resources/logs_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append/assets/logs.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-app-01: run pipeline with initial data",
+						Command: binary,
+						Args:    []string{"run", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-app-02: query the initial data",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT * FROM test.logs ORDER BY log_id;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append/expectations/initial.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-app-03: replace logs.sql with logs_v2.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append/resources/logs_v2.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append/assets/logs.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-app-04: run pipeline to append new data",
+						Command: binary,
+						Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-app-05: query data after append",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT * FROM test.logs ORDER BY log_id;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append/expectations/after_append.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-app-06: restore original logs.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append/resources/logs_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-append/assets/logs.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "duckdb_ddl_materialization",
+			workflow: e2e.Workflow{
+				Name: "duckdb_ddl_materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "mat-ddl-01: run pipeline with DDL strategy",
+						Command: binary,
+						Args:    []string{"run", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-ddl")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-ddl-02: verify table exists but is empty",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT COUNT(*) as row_count FROM test.customers;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "row_count\n0\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "mat-ddl-03: verify table structure",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "PRAGMA table_info('test.customers');", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"customer_id", "name", "email", "created_at"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
