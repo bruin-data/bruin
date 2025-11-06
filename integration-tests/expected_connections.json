@@ -29,6 +29,10 @@
         {
           "name": "duckdb-start-date-flags",
           "path": "duckdb-files/start-date-flags.db"
+        },
+        {
+          "name": "duckdb-mat-test",
+          "path": "duckdb-files/materialization-test.db"
         }
       ],
       "chess": [
@@ -72,6 +76,10 @@
           {
             "name": "duckdb-start-date-flags",
             "path": "duckdb-files/start-date-flags.db"
+          },
+          {
+            "name": "duckdb-mat-test",
+            "path": "duckdb-files/materialization-test.db"
           }
         ],
         "chess": [

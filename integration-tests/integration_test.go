@@ -2201,6 +2201,17 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "duckdb_create_replace_materialization",
 				Steps: []e2e.Task{
 					{
+						Name:    "mat-cr-00: ensure initial orders.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-create-replace/resources/orders_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-create-replace/assets/orders.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "mat-cr-01: run pipeline with initial data",
 						Command: binary,
 						Args:    []string{"run", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-create-replace")},
@@ -2266,6 +2277,98 @@ func TestWorkflowTasks(t *testing.T) {
 						Name:    "mat-cr-06: restore original orders.sql",
 						Command: "cp",
 						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-create-replace/resources/orders_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-create-replace/assets/orders.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "duckdb_delete_insert_materialization",
+			workflow: e2e.Workflow{
+				Name: "duckdb_delete_insert_materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "mat-di-00: ensure initial products.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert/resources/products_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-di-01: run pipeline with initial data",
+						Command: binary,
+						Args:    []string{"run", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-di-02: query the initial data",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT * FROM test.products ORDER BY product_id;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert/expectations/initial.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-di-03: replace products.sql with products_v2.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert/resources/products_v2.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-di-04: run pipeline after replacing asset",
+						Command: binary,
+						Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-di-05: query data after delete+insert",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT * FROM test.products ORDER BY product_id;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert/expectations/after_delete_insert.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-di-06: restore original products.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert/resources/products_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-delete-insert/assets/products.sql")},
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
