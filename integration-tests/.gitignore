@@ -3,4 +3,3 @@ logs/*.log
 .bruin.cloud.yml
 logs/runs
 logs/exports
-.bruin.yml
