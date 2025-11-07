@@ -72,19 +72,6 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-func getColumnsWithMergeLogic(asset *pipeline.Asset) []pipeline.Column {
-	var columns []pipeline.Column
-	for _, col := range asset.Columns {
-		if col.PrimaryKey {
-			continue
-		}
-		if col.MergeSQL != "" || col.UpdateOnMerge {
-			columns = append(columns, col)
-		}
-	}
-	return columns
-}
-
 func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	if len(asset.Columns) == 0 {
 		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
@@ -95,7 +82,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
-	mergeColumns := getColumnsWithMergeLogic(asset)
+	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
 	query = strings.TrimSuffix(query, ";")
 	columnNames := asset.ColumnNames()
 

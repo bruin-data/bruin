@@ -13,10 +13,9 @@ columns:
     update_on_merge: true
   - name: stock
     type: INTEGER
-    update_on_merge: true
   - name: unit_price
     type: DOUBLE
-    update_on_merge: true
+    update_on_merge: false
 @bruin */
 
 SELECT 1 AS item_id, 'Widget' AS item_name, 100 AS stock, 1999.99 AS unit_price
