@@ -17,7 +17,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		Database: "test",
 	}
 
-	assert.Equal(t, "mysql://user:password@localhost:3306/test", c.GetIngestrURI())
+	assert.Equal(t, "mysql+pymysql://user:password@localhost:3306/test", c.GetIngestrURI())
 
 	c = Config{
 		Username:    "user",
@@ -30,7 +30,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		SslKeyPath:  "/path/to/key.pem",
 	}
 
-	assert.Equal(t, "mysql://user:password@localhost:3306/test?ssl_ca=%2Fpath%2Fto%2Fca.pem&ssl_cert=%2Fpath%2Fto%2Fcert.pem&ssl_key=%2Fpath%2Fto%2Fkey.pem", c.GetIngestrURI())
+	assert.Equal(t, "mysql+pymysql://user:password@localhost:3306/test?ssl_ca=%2Fpath%2Fto%2Fca.pem&ssl_cert=%2Fpath%2Fto%2Fcert.pem&ssl_key=%2Fpath%2Fto%2Fkey.pem", c.GetIngestrURI())
 
 	c = Config{
 		Username: "user",

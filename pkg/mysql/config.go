@@ -25,6 +25,8 @@ func (c Config) GetIngestrURI() string {
 	scheme := "mysql"
 	if c.Driver != "" {
 		scheme += "+" + c.Driver
+	} else {
+		scheme += "+pymysql"
 	}
 
 	u := &url.URL{
