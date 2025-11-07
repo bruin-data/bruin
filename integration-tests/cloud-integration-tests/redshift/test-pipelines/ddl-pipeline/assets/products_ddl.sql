@@ -16,8 +16,8 @@ columns:
     type: VARCHAR
     description: "Name of the product"
   - name: price
-    type: FLOAT
-    description: "Price of the product in USD"
+    type: INTEGER
+    description: "Price of the product in cents"
   - name: stock
     type: INTEGER
     description: "Number of units in stock"

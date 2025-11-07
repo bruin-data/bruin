@@ -15,11 +15,11 @@ columns:
     type: VARCHAR
     description: "Name of the product"
   - name: price
-    type: FLOAT
-    description: "Price of the product in USD"
+    type: INTEGER
+    description: "Price of the product in cents"
 
 @bruin */
 
-SELECT 4 AS product_id, 'Monitor' AS product_name, 299.99 AS price
+SELECT 4 AS product_id, 'Monitor' AS product_name, 29999 AS price
 UNION ALL
-SELECT 5 AS product_id, 'Keyboard' AS product_name, 89.99 AS price
+SELECT 5 AS product_id, 'Keyboard' AS product_name, 8999 AS price

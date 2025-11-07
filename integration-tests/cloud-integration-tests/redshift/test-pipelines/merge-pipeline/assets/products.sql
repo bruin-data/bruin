@@ -18,15 +18,15 @@ columns:
     update_on_merge: true
   - name: price
     type: INTEGER
-    description: "Price of the product in USD"
+    description: "Price of the product in cents"
     update_on_merge: true
 
 @bruin */
 
-SELECT 1 AS product_id, 'Laptop' AS product_name, 1299 AS price
+SELECT 1 AS product_id, 'Laptop' AS product_name, 129900 AS price
 UNION ALL
-SELECT 2 AS product_id, 'Smartphone' AS product_name, 699 AS price
+SELECT 2 AS product_id, 'Smartphone' AS product_name, 69900 AS price
 UNION ALL
-SELECT 3 AS product_id, 'Headphones' AS product_name, 199 AS price
+SELECT 3 AS product_id, 'Headphones' AS product_name, 19900 AS price
 UNION ALL
-SELECT 4 AS product_id, 'Monitor' AS product_name, 299 AS price
+SELECT 4 AS product_id, 'Monitor' AS product_name, 29900 AS price
