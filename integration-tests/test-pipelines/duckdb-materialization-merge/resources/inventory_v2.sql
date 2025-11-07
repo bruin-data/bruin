@@ -10,10 +10,13 @@ columns:
     primary_key: true
   - name: item_name
     type: VARCHAR
+    update_on_merge: true
   - name: stock
     type: INTEGER
+    update_on_merge: true
   - name: unit_price
     type: DOUBLE
+    update_on_merge: true
 @bruin */
 
 SELECT 1 AS item_id, 'Widget Pro' AS item_name, 150 AS stock, 1599.99 AS unit_price
