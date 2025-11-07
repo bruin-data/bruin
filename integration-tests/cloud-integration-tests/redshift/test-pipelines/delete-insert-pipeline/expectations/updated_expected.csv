@@ -1,6 +1,7 @@
 product_id,product_name,price,dt
 1,Laptop,{99999 -2 false finite true},2024-01-01 00:00:00 +0000 UTC
 2,Smartphone,{69999 -2 false finite true},2024-01-01 00:00:00 +0000 UTC
+3,Headphones,{19999 -2 false finite true},2024-01-02 00:00:00 +0000 UTC
+4,Tablet,{49999 -2 false finite true},2024-01-03 00:00:00 +0000 UTC
 5,Tablet,{49999 -2 false finite true},2024-01-15 00:00:00 +0000 UTC
 6,Mouse,{2999 -2 false finite true},2024-01-15 00:00:00 +0000 UTC
-4,Monitor,{29999 -2 false finite true},2024-01-20 00:00:00 +0000 UTC

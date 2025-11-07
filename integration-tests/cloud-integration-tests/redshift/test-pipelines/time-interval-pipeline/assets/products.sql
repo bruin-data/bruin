@@ -25,12 +25,8 @@ columns:
 
 @bruin */
 
-SELECT 1 AS product_id, 'Laptop' AS product_name, 999.99 AS price, DATE '2024-01-01' AS dt
+SELECT 6 AS product_id, 'Tablet' AS product_name, 499.99 AS price, DATE '2024-01-15' AS dt
 UNION ALL
-SELECT 2 AS product_id, 'Smartphone' AS product_name, 699.99 AS price, DATE '2024-01-02' AS dt
+SELECT 7 AS product_id, 'Mouse' AS product_name, 29.99 AS price, DATE '2024-01-16' AS dt
 UNION ALL
-SELECT 3 AS product_id, 'Headphones' AS product_name, 199.99 AS price, DATE '2024-01-03' AS dt
-UNION ALL
-SELECT 4 AS product_id, 'Monitor' AS product_name, 299.99 AS price, DATE '2024-01-04' AS dt
-UNION ALL
-SELECT 5 AS product_id, 'Keyboard' AS product_name, 89.99 AS price, DATE '2024-01-05' AS dt
+SELECT 8 AS product_id, 'Webcam' AS product_name, 79.99 AS price, DATE '2024-01-18' AS dt

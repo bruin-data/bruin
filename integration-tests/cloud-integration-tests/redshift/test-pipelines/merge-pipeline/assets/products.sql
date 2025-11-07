@@ -23,8 +23,10 @@ columns:
 
 @bruin */
 
-SELECT 1 AS product_id, 'Laptop' AS product_name, 999.99 AS price
+SELECT 1 AS product_id, 'Laptop' AS product_name, 1299.99 AS price
 UNION ALL
 SELECT 2 AS product_id, 'Smartphone' AS product_name, 699.99 AS price
 UNION ALL
 SELECT 3 AS product_id, 'Headphones' AS product_name, 199.99 AS price
+UNION ALL
+SELECT 4 AS product_id, 'Monitor' AS product_name, 299.99 AS price
