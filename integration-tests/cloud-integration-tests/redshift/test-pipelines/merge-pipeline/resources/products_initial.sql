@@ -19,7 +19,7 @@ columns:
   - name: price
     type: INTEGER
     description: "Price of the product in cents"
-    update_on_merge: true
+    update_on_merge: false
 
 @bruin */
 
