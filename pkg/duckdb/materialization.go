@@ -114,7 +114,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 			fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
 			fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s AS source WHERE NOT EXISTS (SELECT 1 FROM %s AS target WHERE %s)",
 				asset.Name, allColumnNames, allColumnNames, tempTableName, asset.Name, onCondition),
-			fmt.Sprintf("DROP TABLE %s", tempTableName),
+			"DROP TABLE " + tempTableName,
 			"COMMIT",
 		}
 
@@ -138,7 +138,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 			asset.Name, updateClause, tempTableName, onCondition),
 		fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s AS source WHERE NOT EXISTS (SELECT 1 FROM %s AS target WHERE %s)",
 			asset.Name, allColumnNames, allColumnNames, tempTableName, asset.Name, onCondition),
-		fmt.Sprintf("DROP TABLE %s", tempTableName),
+		"DROP TABLE " + tempTableName,
 		"COMMIT",
 	}
 
