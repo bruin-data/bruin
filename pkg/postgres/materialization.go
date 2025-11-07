@@ -180,9 +180,12 @@ func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error
 	mergeColumns := getColumnsWithMergeLogic(asset)
 	columnNames := asset.ColumnNames()
 
+	// In Redshift MERGE, target table doesn't have an alias, so we use the table name directly
+	targetTableName := QuoteIdentifier(asset.Name)
+
 	on := make([]string, 0, len(primaryKeys))
 	for _, key := range primaryKeys {
-		on = append(on, fmt.Sprintf("target.%s = source.%s", QuoteIdentifier(key), QuoteIdentifier(key)))
+		on = append(on, fmt.Sprintf("%s.%s = source.%s", targetTableName, QuoteIdentifier(key), QuoteIdentifier(key)))
 	}
 	onQuery := strings.Join(on, " AND ")
 
@@ -213,7 +216,7 @@ func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error
 	}
 
 	mergeLines := []string{
-		"MERGE INTO " + QuoteIdentifier(asset.Name),
+		"MERGE INTO " + targetTableName,
 		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),
