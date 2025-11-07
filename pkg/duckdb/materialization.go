@@ -82,22 +82,50 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
+	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
 	query = strings.TrimSuffix(query, ";")
-	usingClause := strings.Join(primaryKeys, ", ")
-	whereClause := primaryKeys[0]
+	columnNames := asset.ColumnNames()
 
-	mergeQuery := fmt.Sprintf(
-		"CREATE OR REPLACE TABLE %s AS WITH source_data AS (%s) SELECT * FROM source_data UNION ALL SELECT dt.* FROM %s AS dt LEFT JOIN source_data AS sd USING(%s) WHERE sd.%s IS NULL",
-		asset.Name,
-		query,
-		asset.Name,
-		usingClause,
-		whereClause,
-	)
+	onConditions := make([]string, 0, len(primaryKeys))
+	for _, pk := range primaryKeys {
+		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
+	}
+	onCondition := strings.Join(onConditions, " AND ")
+
+	allColumnNames := strings.Join(columnNames, ", ")
+	tempTableName := "__bruin_merge_tmp_" + helpers.PrefixGenerator()
+
+	if len(mergeColumns) == 0 {
+		queries := []string{
+			"BEGIN TRANSACTION",
+			fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
+			fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s AS source WHERE NOT EXISTS (SELECT 1 FROM %s AS target WHERE %s)",
+				asset.Name, allColumnNames, allColumnNames, tempTableName, asset.Name, onCondition),
+			"DROP TABLE " + tempTableName,
+			"COMMIT",
+		}
+
+		return strings.Join(queries, ";\n") + ";", nil
+	}
+
+	updateStatements := make([]string, 0, len(mergeColumns))
+	for _, col := range mergeColumns {
+		if col.MergeSQL != "" {
+			updateStatements = append(updateStatements, fmt.Sprintf("%s = %s", col.Name, col.MergeSQL))
+		} else {
+			updateStatements = append(updateStatements, fmt.Sprintf("%s = source.%s", col.Name, col.Name))
+		}
+	}
+	updateClause := strings.Join(updateStatements, ", ")
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		mergeQuery,
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
+		fmt.Sprintf("UPDATE %s AS target SET %s FROM %s AS source WHERE %s",
+			asset.Name, updateClause, tempTableName, onCondition),
+		fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s AS source WHERE NOT EXISTS (SELECT 1 FROM %s AS target WHERE %s)",
+			asset.Name, allColumnNames, allColumnNames, tempTableName, asset.Name, onCondition),
+		"DROP TABLE " + tempTableName,
 		"COMMIT",
 	}
 
