@@ -104,7 +104,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "SELECT * FROM table;",
 			filePath:    "test.sql",
 			wantErr:     false,
-			wantContent: "/* @bruin\n\ntype: bq.sql\n\n@bruin */\n\nSELECT * FROM table;",
+			wantContent: "/* @bruin\n\ntype: bq.sql\nmaterialization:\n  type: table\n\n@bruin */\n\nSELECT * FROM table;",
 			wantAsset:   true,
 		},
 		{
@@ -128,7 +128,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "SELECT * FROM table;",
 			filePath:    "my test.sql",
 			wantErr:     false,
-			wantContent: "/* @bruin\n\ntype: bq.sql\n\n@bruin */\n\nSELECT * FROM table;",
+			wantContent: "/* @bruin\n\ntype: bq.sql\nmaterialization:\n  type: table\n\n@bruin */\n\nSELECT * FROM table;",
 			wantAsset:   true,
 		},
 	}
@@ -169,6 +169,20 @@ func TestConvertToBruinAsset(t *testing.T) {
 					}
 					if asset == nil {
 						t.Error("Expected asset to be created, but got nil")
+					}
+
+					// Check materialization for SQL files
+					if strings.HasSuffix(tt.filePath, ".sql") {
+						if asset.Materialization.Type != "table" {
+							t.Errorf("Expected materialization type 'table', got '%s'", asset.Materialization.Type)
+						}
+					}
+
+					// Check no materialization for Python files
+					if strings.HasSuffix(tt.filePath, ".py") {
+						if asset.Materialization.Type != "" {
+							t.Errorf("Expected no materialization for Python file, got '%s'", asset.Materialization.Type)
+						}
 					}
 				} else { //nolint
 					if asset != nil {

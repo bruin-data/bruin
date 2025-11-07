@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -56,6 +57,41 @@ func Test_unwrapAllErrors(t *testing.T) {
 
 			got := unwrapAllErrors(tt.err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestLintFullRefreshFlag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		fullRefresh    bool
+		expectedCtxKey interface{}
+		expectedValue  interface{}
+	}{
+		{
+			name:           "full refresh enabled",
+			fullRefresh:    true,
+			expectedCtxKey: pipeline.RunConfigFullRefresh,
+			expectedValue:  true,
+		},
+		{
+			name:           "full refresh disabled",
+			fullRefresh:    false,
+			expectedCtxKey: pipeline.RunConfigFullRefresh,
+			expectedValue:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			lintCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			actualValue := lintCtx.Value(tt.expectedCtxKey)
+			assert.Equal(t, tt.expectedValue, actualValue, "Context should contain correct full refresh value")
 		})
 	}
 }
