@@ -167,7 +167,7 @@ COMMIT;`,
 			wantErr: true,
 		},
 		{
-			name: "merge with primary keys",
+			name: "merge with primary keys but no update_on_merge",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
@@ -176,17 +176,104 @@ COMMIT;`,
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "int", PrimaryKey: true},
-					{Name: "name", Type: "varchar", PrimaryKey: false, UpdateOnMerge: true},
+					{Name: "name", Type: "varchar", PrimaryKey: false},
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE OR REPLACE TABLE my\\.asset AS WITH source_data AS \\(" +
-				"SELECT 1 as id, 'abc' as name\\) SELECT \\* FROM source_data UNION ALL SELECT dt\\.\\* FROM my\\.asset AS dt LEFT JOIN source_data AS sd USING\\(id\\) WHERE sd.id IS NULL;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'abc' as name;\n" +
+				"INSERT INTO my\\.asset \\(id, name\\) SELECT id, name FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
+				"DROP TABLE __bruin_merge_tmp_.+;\n" +
 				"COMMIT;$",
 		},
 		{
-			name: "merge with composite primary keys",
+			name: "merge with update_on_merge",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "name", Type: "varchar", UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT 1 as id, 'abc' as name",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'abc' as name;\n" +
+				"UPDATE my\\.asset AS target SET name = source\\.name FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id;\n" +
+				"INSERT INTO my\\.asset \\(id, name\\) SELECT id, name FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
+				"DROP TABLE __bruin_merge_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "merge with merge_sql custom logic",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "col_a", Type: "int", MergeSQL: "GREATEST(target.col_a, source.col_a)"},
+					{Name: "col_b", Type: "int", MergeSQL: "target.col_b + source.col_b"},
+					{Name: "col_c", Type: "varchar", UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c;\n" +
+				"UPDATE my\\.asset AS target SET col_a = GREATEST\\(target\\.col_a, source\\.col_a\\), col_b = target\\.col_b \\+ source\\.col_b, col_c = source\\.col_c FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id;\n" +
+				"INSERT INTO my\\.asset \\(id, col_a, col_b, col_c\\) SELECT id, col_a, col_b, col_c FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
+				"DROP TABLE __bruin_merge_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "merge with only merge_sql no update_on_merge",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "col_a", Type: "int", MergeSQL: "LEAST(target.col_a, source.col_a)"},
+				},
+			},
+			query: "SELECT 1 as id, 15 as col_a",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a;\n" +
+				"UPDATE my\\.asset AS target SET col_a = LEAST\\(target\\.col_a, source\\.col_a\\) FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id;\n" +
+				"INSERT INTO my\\.asset \\(id, col_a\\) SELECT id, col_a FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
+				"DROP TABLE __bruin_merge_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "merge with both merge_sql and update_on_merge prioritizes merge_sql",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "col_a", Type: "int", MergeSQL: "COALESCE(source.col_a, target.col_a)", UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT 1 as id, 15 as col_a",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a;\n" +
+				"UPDATE my\\.asset AS target SET col_a = COALESCE\\(source\\.col_a, target\\.col_a\\) FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id;\n" +
+				"INSERT INTO my\\.asset \\(id, col_a\\) SELECT id, col_a FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
+				"DROP TABLE __bruin_merge_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "merge with composite primary keys and update_on_merge",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
@@ -201,8 +288,10 @@ COMMIT;`,
 			},
 			query: "SELECT 1 as id, 'A' as category, 'abc' as name",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE OR REPLACE TABLE my\\.asset AS WITH source_data AS \\(" +
-				"SELECT 1 as id, 'A' as category, 'abc' as name\\) SELECT \\* FROM source_data UNION ALL SELECT dt\\.\\* FROM my\\.asset AS dt LEFT JOIN source_data AS sd USING\\(id, category\\) WHERE sd.id IS NULL;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'A' as category, 'abc' as name;\n" +
+				"UPDATE my\\.asset AS target SET name = source\\.name FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id AND target\\.category = source\\.category;\n" +
+				"INSERT INTO my\\.asset \\(id, category, name\\) SELECT id, category, name FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id AND target\\.category = source\\.category\\);\n" +
+				"DROP TABLE __bruin_merge_tmp_.+;\n" +
 				"COMMIT;$",
 		},
 		{

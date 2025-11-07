@@ -10,10 +10,12 @@ columns:
     primary_key: true
   - name: item_name
     type: VARCHAR
+    update_on_merge: true
   - name: stock
     type: INTEGER
   - name: unit_price
     type: DOUBLE
+    update_on_merge: false
 @bruin */
 
 SELECT 1 AS item_id, 'Widget' AS item_name, 100 AS stock, 1999.99 AS unit_price

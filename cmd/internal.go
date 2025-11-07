@@ -742,11 +742,15 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 			Path:    filePath,
 			Content: string(content),
 		},
+		Materialization: pipeline.Materialization{
+			Type: "table",
+		},
 	}
 
 	if ext == ".py" {
 		asset.Type = ""
 		asset.Description = "this is a python asset"
+		asset.Materialization = pipeline.Materialization{} // Clear materialization for Python assets
 	}
 
 	err = asset.Persist(fs)

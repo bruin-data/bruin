@@ -96,6 +96,10 @@ func Lint(isDebug *bool) *cli.Command {
 				Name:  "exclude-paths",
 				Usage: "exclude the given list of paths from the folders that are searched during validation",
 			},
+			&cli.BoolFlag{
+				Name:  "full-refresh",
+				Usage: "validate with full refresh mode enabled",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -114,6 +118,9 @@ func Lint(isDebug *bool) *cli.Command {
 			if os.Getenv("BRUIN_RUN_ID") != "" {
 				runID = os.Getenv("BRUIN_RUN_ID")
 			}
+
+			fullRefresh := c.Bool("full-refresh")
+			lintCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, fullRefresh)
 
 			renderer := jinja.NewRendererWithStartEndDates(&defaultStartDate, &defaultEndDate, "<bruin-validation>", runID, nil)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
@@ -186,7 +193,7 @@ func Lint(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			rules = append(rules, queryValidatorRules(logger, cm, connectionManager)...)
+			rules = append(rules, queryValidatorRules(logger, cm, connectionManager, fullRefresh)...)
 			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager, renderer))
 			rules = append(rules, SeedAssetsValidator)
 
@@ -197,7 +204,7 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debugf("successfully loaded %d rules", len(rules))
 			}
 
-			lintCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, defaultStartDate)
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
 
@@ -372,7 +379,7 @@ func flattenErrors(err error) []string {
 	return foundErrors
 }
 
-func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager config.ConnectionGetter) []lint.Rule {
+func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager config.ConnectionGetter, fullRefresh bool) []lint.Rule {
 	rules := []lint.Rule{}
 	renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
 	if len(cfg.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
@@ -385,7 +392,7 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 				Renderer: renderer,
 			},
 			Materializer: jinjaRenderedMaterializer{
-				materializer: bigquery.NewMaterializer(false),
+				materializer: bigquery.NewMaterializer(fullRefresh),
 				renderer:     renderer,
 			},
 			WorkerCount: 32,
