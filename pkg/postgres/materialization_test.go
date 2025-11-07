@@ -217,7 +217,7 @@ WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: `^MERGE INTO "my"\."asset"
-USING \(SELECT 1 as id, 'abc' as name\) source ON target\."id" = source\."id"
+USING \(SELECT 1 as id, 'abc' as name\) source ON "my"\."asset"\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "name" = source\."name"
 WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\(source."id", source."name"\);$`,
 		},
