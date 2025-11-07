@@ -1,0 +1,6 @@
+product_id,product_name,price
+1,Laptop,{99999 -2 false finite true}
+2,Smartphone,{69999 -2 false finite true}
+3,Headphones,{19999 -2 false finite true}
+4,Monitor,{29999 -2 false finite true}
+5,Keyboard,{8999 -2 false finite true}
