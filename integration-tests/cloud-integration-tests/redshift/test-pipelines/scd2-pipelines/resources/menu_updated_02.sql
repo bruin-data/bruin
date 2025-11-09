@@ -20,8 +20,8 @@ columns:
     checks:
       - name: not_null
   - name: Price
-    type: FLOAT
-    description: "Price of the Menu Item"
+    type: INTEGER
+    description: "Price of the Menu Item in cents"
 @bruin */
 
 

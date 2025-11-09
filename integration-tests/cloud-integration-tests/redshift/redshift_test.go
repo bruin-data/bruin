@@ -500,6 +500,554 @@ func TestRedshiftWorkflows(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "truncate-insert-materialization",
+			workflow: e2e.Workflow{
+				Name: "truncate-insert-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "truncate-insert: restore initial SQL",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "truncate-insert: create initial table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_truncate"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "truncate-insert: query initial table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price, stock FROM public.products_truncate ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/expectations/initial_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "truncate-insert: copy updated SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "truncate-insert: run with truncate+insert strategy",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_truncate"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "truncate-insert: query updated table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price, stock FROM public.products_truncate ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/expectations/updated_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "truncate-insert: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS public.products_truncate;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "append-materialization",
+			workflow: e2e.Workflow{
+				Name: "append-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "append: restore initial SQL",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/append-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/append-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "append: create initial table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/append-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_append"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "append: query initial table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price FROM public.products_append ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/append-pipeline/expectations/initial_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "append: copy updated SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/append-pipeline/resources/products_append.sql"), filepath.Join(currentFolder, "test-pipelines/append-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "append: run append strategy",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/append-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_append"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "append: query appended table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price FROM public.products_append ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/append-pipeline/expectations/appended_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "append: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS public.products_append;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "merge-materialization",
+			workflow: e2e.Workflow{
+				Name: "merge-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "merge: restore initial SQL",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/merge-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/merge-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "merge: create initial table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/merge-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_merge"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "merge: query initial table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price FROM public.products_merge ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/merge-pipeline/expectations/initial_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "merge: copy updated SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/merge-pipeline/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/merge-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "merge: run merge strategy",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/merge-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_merge"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "merge: query merged table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price FROM public.products_merge ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/merge-pipeline/expectations/merged_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "merge: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS public.products_merge;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "delete-insert-materialization",
+			workflow: e2e.Workflow{
+				Name: "delete-insert-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "delete-insert: restore initial SQL",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "delete-insert: create initial table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_delete_insert"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "delete-insert: query initial table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price, dt FROM public.products_delete_insert ORDER BY dt, product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/expectations/initial_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "delete-insert: copy updated SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "delete-insert: run delete+insert for date 2024-01-15",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_delete_insert"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "delete-insert: query updated table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price, dt FROM public.products_delete_insert ORDER BY dt, product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/expectations/updated_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "delete-insert: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS public.products_delete_insert;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "time-interval-materialization",
+			workflow: e2e.Workflow{
+				Name: "time-interval-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "time-interval: restore initial SQL",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "time-interval: create initial table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--start-date", "2024-01-01", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_time_interval"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "time-interval: query initial table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price, dt FROM public.products_time_interval ORDER BY dt, product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/expectations/initial_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "time-interval: copy updated SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "time-interval: run for specific time range",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--start-date", "2024-01-15", "--end-date", "2024-01-18", filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_time_interval"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "time-interval: query updated table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT product_id, product_name, price, dt FROM public.products_time_interval ORDER BY dt, product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/expectations/updated_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "time-interval: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS public.products_time_interval;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ddl-materialization",
+			workflow: e2e.Workflow{
+				Name: "ddl-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "ddl: create table with DDL strategy",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/ddl-pipeline/assets/products_ddl.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: public.products_ddl"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "ddl: verify table exists and is empty",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT COUNT(*) as count FROM public.products_ddl;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"count", "0"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "ddl: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS public.products_ddl;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
