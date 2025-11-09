@@ -1,0 +1,4 @@
+name: validate-asset-start-date
+
+default_connections:
+  duckdb: duckdb-default
