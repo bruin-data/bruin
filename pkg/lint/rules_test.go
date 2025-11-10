@@ -1844,6 +1844,59 @@ func TestEnsurePipelineStartDateIsValid(t *testing.T) {
 	}
 }
 
+func TestEnsureAssetStartDateIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    []*Issue
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "empty start date is skipped",
+			asset: &pipeline.Asset{
+				Name:      "test-asset",
+				StartDate: "",
+			},
+			want:    noIssues,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "invalid start date is reported",
+			asset: &pipeline.Asset{
+				Name:      "test-asset",
+				StartDate: "20240101",
+			},
+			want: []*Issue{{
+				Task:        &pipeline.Asset{Name: "test-asset", StartDate: "20240101"},
+				Description: "start_date must be in the format of YYYY-MM-DD in the asset definition, '20240101' given",
+			}},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "valid start date is not reported as error",
+			asset: &pipeline.Asset{
+				Name:      "test-asset",
+				StartDate: "2024-01-01",
+			},
+			want:    noIssues,
+			wantErr: assert.NoError,
+		},
+	}
+	ctx := context.Background()
+	p := &pipeline.Pipeline{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := EnsureAssetStartDateIsValid(ctx, p, tt.asset)
+			tt.wantErr(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestGlossaryChecker_EnsureAssetEntitiesExistInGlossary(t *testing.T) {
 	t.Parallel()
 

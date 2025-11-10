@@ -439,6 +439,23 @@ func EnsurePipelineStartDateIsValid(ctx context.Context, p *pipeline.Pipeline) (
 	return issues, nil
 }
 
+func EnsureAssetStartDateIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.StartDate == "" {
+		return issues, nil
+	}
+
+	_, err := time.Parse("2006-01-02", asset.StartDate)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("start_date must be in the format of YYYY-MM-DD in the asset definition, '%s' given", asset.StartDate),
+		})
+	}
+
+	return issues, nil
+}
+
 // ValidateCustomCheckQueryExists checks for duplicate column checks within a single column.
 // It returns a slice of Issues, each representing a duplicate column check found.
 func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

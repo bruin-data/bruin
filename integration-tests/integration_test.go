@@ -1220,6 +1220,103 @@ func TestIndividualTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "validate-asset-start-date-invalid",
+			task: e2e.Task{
+				Name:    "validate-asset-start-date-invalid",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/validate-asset-start-date")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"start_date must be in the format of YYYY-MM-DD in the asset definition, 'notvalid' given",
+						"valid-asset-start-date",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "validate-asset-start-date-valid-asset",
+			task: e2e.Task{
+				Name:    "validate-asset-start-date-valid-asset",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/validate-asset-start-date/assets/valid_date.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 2 assets"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "validate-asset-start-date-invalid-single-asset",
+			task: e2e.Task{
+				Name:    "validate-asset-start-date-invalid-single-asset",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/validate-asset-start-date/assets/invalid_date.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"start_date must be in the format of YYYY-MM-DD in the asset definition, 'notvalid' given",
+						"valid-asset-start-date",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-asset-start-date-invalid-pipeline",
+			task: e2e.Task{
+				Name:    "run-asset-start-date-invalid-pipeline",
+				Command: binary,
+				Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/validate-asset-start-date")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"start_date must be in the format of YYYY-MM-DD in the asset definition, 'notvalid' given",
+						"found",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-asset-start-date-invalid-single-asset",
+			task: e2e.Task{
+				Name:    "run-asset-start-date-invalid-single-asset",
+				Command: binary,
+				Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/validate-asset-start-date/assets/invalid_date.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"start_date must be in the format of YYYY-MM-DD in the asset definition, 'notvalid' given",
+						"found",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
