@@ -238,5 +238,7 @@
   "snapshot": "",
   "agent": false,
   "variables": null,
-  "macros": []
+  "macros": [
+    "{{ some_macro() }}"
+  ]
 }
