@@ -337,4 +337,3 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 
 	return nil
 }
-
