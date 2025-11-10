@@ -1358,7 +1358,36 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 	pipelineDir := filepath.Dir(filePath)
 	pl.MacrosPath = filepath.Join(pipelineDir, "macros")
 
+	pl.Macros, err = LoadMacrosFromPath(pl.MacrosPath, fs)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing macros")
+	}
+
 	return &pl, nil
+}
+
+func LoadMacrosFromPath(macrosPath string, fs afero.Fs) ([]Macro, error) {
+	// Check if the path exists and is a directory
+	info, err := fs.Stat(macrosPath)
+	if err != nil || !info.IsDir() {
+		return []Macro{}, nil
+	}
+
+	macros := []Macro{}
+	files, err := path.GetAllFilesRecursive(macrosPath, []string{".sql"})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read macros folder file at '%s'", macrosPath)
+	}
+
+	for _, file := range files {
+		content, err := afero.ReadFile(fs, file)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read macro file at '%s'", file)
+		}
+		macros = append(macros, Macro(string(content)))
+	}
+
+	return macros, nil
 }
 
 type MetadataPush struct {
@@ -1369,6 +1398,8 @@ type MetadataPush struct {
 func (mp *MetadataPush) HasAnyEnabled() bool {
 	return mp.BigQuery || mp.Global
 }
+
+type Macro string
 
 type Pipeline struct {
 	LegacyID           string                 `json:"legacy_id" yaml:"id,omitempty" mapstructure:"id"`
@@ -1394,6 +1425,7 @@ type Pipeline struct {
 	TasksByType        map[AssetType][]*Asset `json:"-" yaml:"-"`
 	tasksByName        map[string]*Asset      `yaml:"-"`
 	MacrosPath         string                 `json:"-" yaml:"-"`
+	Macros             []Macro                `json:"macros" yaml:"macros,omitempty" mapstructure:"macros"`
 }
 
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {

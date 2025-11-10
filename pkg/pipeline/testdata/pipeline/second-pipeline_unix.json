@@ -273,5 +273,6 @@
     "commit": "",
     "snapshot": "",
     "agent": false,
-    "variables": null
+    "variables": null,
+    "macros": []
 }
