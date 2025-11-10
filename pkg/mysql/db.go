@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -28,8 +30,9 @@ type DB interface {
 }
 
 type Client struct {
-	conn   *sqlx.DB
-	config MySQLConfig
+	conn        *sqlx.DB
+	config      MySQLConfig
+	schemaCache *sync.Map // Cache for created schemas to avoid repeated CREATE SCHEMA calls
 }
 
 type MySQLConfig interface {
@@ -44,8 +47,9 @@ func NewClient(c MySQLConfig) (*Client, error) {
 	}
 
 	return &Client{
-		conn:   conn,
-		config: c,
+		conn:        conn,
+		config:      c,
+		schemaCache: &sync.Map{},
 	}, nil
 }
 
@@ -65,6 +69,16 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 	}
 
 	return nil
+}
+
+// quoteIdentifier quotes a MySQL identifier using backticks
+func quoteIdentifier(identifier string) string {
+	parts := strings.Split(identifier, ".")
+	quotedParts := make([]string, len(parts))
+	for i, part := range parts {
+		quotedParts[i] = fmt.Sprintf("`%s`", part)
+	}
+	return strings.Join(quotedParts, ".")
 }
 
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
@@ -240,3 +254,87 @@ ORDER BY table_schema, table_name;
 
 	return summary, nil
 }
+
+func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = tableComponents[0]
+	case 3:
+		schemaName = tableComponents[1]
+	default:
+		return nil
+	}
+
+	// Check the cache for the schema
+	if _, exists := c.schemaCache.Load(schemaName); exists {
+		return nil
+	}
+
+	// Create schema/database in MySQL
+	quotedSchemaName := quoteIdentifier(schemaName)
+	createQuery := query.Query{
+		Query: "CREATE DATABASE IF NOT EXISTS " + quotedSchemaName,
+	}
+	if err := c.RunQueryWithoutResult(ctx, &createQuery); err != nil {
+		return errors.Wrapf(err, "failed to create or ensure database: %s", schemaName)
+	}
+
+	// Cache the schema name
+	c.schemaCache.Store(schemaName, true)
+	return nil
+}
+
+func escapeSQLString(s string) string {
+	return strings.ReplaceAll(s, "'", "''") // Escape single quotes for SQL safety
+}
+
+func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	var tableName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = tableComponents[0]
+		tableName = tableComponents[1]
+	case 3:
+		schemaName = tableComponents[1]
+		tableName = tableComponents[2]
+	default:
+		return errors.Errorf("table name must be in schema.table or table format, '%s' given", asset.Name)
+	}
+
+	if asset.Description == "" && len(asset.Columns) == 0 {
+		return errors.New("no metadata to push: table and columns have no descriptions")
+	}
+
+	var updateQueries []string //nolint:prealloc
+	for _, col := range asset.Columns {
+		query := fmt.Sprintf(
+			`ALTER TABLE %s.%s MODIFY COLUMN %s %s COMMENT '%s';`,
+			quoteIdentifier(schemaName), quoteIdentifier(tableName), quoteIdentifier(col.Name), col.Type, escapeSQLString(col.Description),
+		)
+		updateQueries = append(updateQueries, query)
+	}
+
+	if len(updateQueries) > 0 {
+		batchQuery := strings.Join(updateQueries, "\n")
+		if err := c.RunQueryWithoutResult(ctx, &query.Query{Query: batchQuery}); err != nil {
+			return errors.Wrap(err, "failed to update column descriptions")
+		}
+	}
+
+	if asset.Description != "" {
+		updateTableQuery := fmt.Sprintf(
+			`ALTER TABLE %s.%s COMMENT = '%s';`,
+			quoteIdentifier(schemaName), quoteIdentifier(tableName), escapeSQLString(asset.Description),
+		)
+		if err := c.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
+			return errors.Wrap(err, "failed to update table description")
+		}
+	}
+
+	return nil
+}
+

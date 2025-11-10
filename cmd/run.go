@@ -34,6 +34,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/mssql"
+	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
@@ -1232,13 +1233,22 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypePostgresQuery) || estimateCustomCheckType == pipeline.AssetTypePostgresQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuery) || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftSeed) || s.WillRunTaskOfType(pipeline.AssetTypePostgresSeed) ||
-		s.WillRunTaskOfType(pipeline.AssetTypePostgresQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypePostgresTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftTableSensor) {
+		s.WillRunTaskOfType(pipeline.AssetTypePostgresQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypePostgresTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftTableSensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMysqlQuery) || estimateCustomCheckType == pipeline.AssetTypeMysqlQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMysqlSeed) || s.WillRunTaskOfType(pipeline.AssetTypeMysqlQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMysqlTableSensor) {
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh), parser)
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		pgTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 		pgMetadataPushOperator := postgres.NewMetadataPushOperator(conn)
 		rsTableSensor := redshift.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+
+		// MySQL operators
+		mysqlCheckRunner := mysql.NewColumnCheckOperator(conn)
+		mysqlOperator := mysql.NewBasicOperator(conn, wholeFileExtractor, mysql.NewMaterializer(fullRefresh), parser)
+		mysqlQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		mysqlTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+		mysqlMetadataPushOperator := mysql.NewMetadataPushOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -1277,10 +1287,36 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypeRedshiftTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		// MySQL executor assignments
+		mainExecutors[pipeline.AssetTypeMysqlQuery][scheduler.TaskInstanceTypeMain] = mysqlOperator
+		mainExecutors[pipeline.AssetTypeMysqlQuery][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMysqlQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeMysqlQuery][scheduler.TaskInstanceTypeMetadataPush] = mysqlMetadataPushOperator
+
+		mainExecutors[pipeline.AssetTypeMysqlSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeMysqlSeed][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMysqlSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeMysqlSeed][scheduler.TaskInstanceTypeMetadataPush] = mysqlMetadataPushOperator
+
+		mainExecutors[pipeline.AssetTypeMysqlQuerySensor][scheduler.TaskInstanceTypeMain] = mysqlQuerySensor
+		mainExecutors[pipeline.AssetTypeMysqlQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMysqlQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeMysqlQuerySensor][scheduler.TaskInstanceTypeMetadataPush] = mysqlMetadataPushOperator
+
+		mainExecutors[pipeline.AssetTypeMysqlTableSensor][scheduler.TaskInstanceTypeMain] = mysqlTableSensor
+		mainExecutors[pipeline.AssetTypeMysqlTableSensor][scheduler.TaskInstanceTypeMetadataPush] = mysqlMetadataPushOperator
+		mainExecutors[pipeline.AssetTypeMysqlTableSensor][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMysqlTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
-		if estimateCustomCheckType == pipeline.AssetTypePostgresQuery || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		if estimateCustomCheckType == pipeline.AssetTypePostgresQuery || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery || estimateCustomCheckType == pipeline.AssetTypeMysqlQuery {
+			if estimateCustomCheckType == pipeline.AssetTypeMysqlQuery {
+				mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+				mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+			} else {
+				mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+				mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+			}
 		}
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeTrinoQuery) || estimateCustomCheckType == pipeline.AssetTypeTrinoQuery || s.WillRunTaskOfType(pipeline.AssetTypeTrinoQuerySensor) {

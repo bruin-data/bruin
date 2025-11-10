@@ -332,6 +332,7 @@ var assetTypeDialectMap = map[pipeline.AssetType]string{
 	pipeline.AssetTypeMsSQLQuery:      "tsql",
 	pipeline.AssetTypeSynapseQuery:    "tsql",
 	pipeline.AssetTypeDuckDBQuery:     "duckdb",
+	pipeline.AssetTypeMysqlQuery:      "mysql",
 }
 
 func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
