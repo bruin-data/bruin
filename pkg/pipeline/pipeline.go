@@ -1370,7 +1370,7 @@ func LoadMacrosFromPath(macrosPath string, fs afero.Fs) ([]Macro, error) {
 	// Check if the path exists and is a directory
 	info, err := fs.Stat(macrosPath)
 	if err != nil || !info.IsDir() {
-		return []Macro{}, nil
+		return []Macro{}, nil //nolint:nilerr
 	}
 
 	macros := []Macro{}
