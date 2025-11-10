@@ -12,7 +12,8 @@
     "name": "pipeline.yml",
     "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\pipeline.yml"
   },
-  "variables": null,
+  "variables": null,,
+  "macros": [],
   "default_connections": {
     "gcpConnectionId": "gcp-connection-id-here",
     "slack": "slack-connection"
