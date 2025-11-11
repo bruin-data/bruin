@@ -39,6 +39,19 @@ env:
   IMAGE_NAME: bruin-data/bruin
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.2'
+      - run: make tools
+      - name: Run golangci-lint
+        run: golangci-lint run --timeout 10m60s ./...
+
   test:
     strategy:
       matrix:
@@ -55,7 +68,6 @@ jobs:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - run: make test
-
 
   end2end:
     strategy:
@@ -115,19 +127,6 @@ jobs:
           build-args: |
             VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
             BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23.2'
-      - run: make tools
-      - name: Run golangci-lint
-        run: golangci-lint run --timeout 10m60s ./...
 
   goreleaser-windows:
     runs-on: windows-2022
