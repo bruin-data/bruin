@@ -401,15 +401,15 @@ func TestLoadFromFile(t *testing.T) {
 					Timezone:      "UTC",
 				},
 			},
-		SnapchatAds: []SnapchatAdsConnection{
-			{
-				Name:           "snapchatads-1",
-				RefreshToken:   "refresh-token-123",
-				ClientID:       "client-id-123",
-				ClientSecret:   "client-secret-123",
-				OrganizationID: "org-id-123",
+			SnapchatAds: []SnapchatAdsConnection{
+				{
+					Name:           "snapchatads-1",
+					RefreshToken:   "refresh-token-123",
+					ClientID:       "client-id-123",
+					ClientSecret:   "client-secret-123",
+					OrganizationID: "org-id-123",
+				},
 			},
-		},
 			GitHub: []GitHubConnection{
 				{
 					Name:  "github-1",
