@@ -1,1 +1,2 @@
 name: duckdb-example-pipeline
+catchup: false
