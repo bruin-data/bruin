@@ -84,11 +84,11 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 
 	queries := []string{
 		"START TRANSACTION",
-		fmt.Sprintf("DROP TEMPORARY TABLE IF EXISTS %s", QuoteIdentifier(tempTableName)),
+		"DROP TEMPORARY TABLE IF EXISTS " + QuoteIdentifier(tempTableName),
 		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS %s", QuoteIdentifier(tempTableName), strings.TrimSuffix(query, ";")),
 		fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", QuoteIdentifier(asset.Name), quotedIncrementalKey, quotedIncrementalKey, QuoteIdentifier(tempTableName)),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", QuoteIdentifier(asset.Name), QuoteIdentifier(tempTableName)),
-		fmt.Sprintf("DROP TEMPORARY TABLE IF EXISTS %s", QuoteIdentifier(tempTableName)),
+		"DROP TEMPORARY TABLE IF EXISTS " + QuoteIdentifier(tempTableName),
 		"COMMIT",
 	}
 
@@ -204,27 +204,27 @@ func rewriteMergeExpression(expr string, asset *pipeline.Asset) string {
 			struct {
 				old string
 				new string
-			}{fmt.Sprintf(`source."%s"`, colName), fmt.Sprintf("VALUES(%s)", quotedCol)},
+			}{"source.\"" + colName + "\"", "VALUES(" + quotedCol + ")"},
 			struct {
 				old string
 				new string
-			}{fmt.Sprintf("source.%s", colName), fmt.Sprintf("VALUES(%s)", quotedCol)},
+			}{"source." + colName, "VALUES(" + quotedCol + ")"},
 			struct {
 				old string
 				new string
-			}{fmt.Sprintf("source.`%s`", colName), fmt.Sprintf("VALUES(%s)", quotedCol)},
+			}{"source.`" + colName + "`", "VALUES(" + quotedCol + ")"},
 			struct {
 				old string
 				new string
-			}{fmt.Sprintf(`target."%s"`, colName), quotedCol},
+			}{"target.\"" + colName + "\"", quotedCol},
 			struct {
 				old string
 				new string
-			}{fmt.Sprintf("target.%s", colName), quotedCol},
+			}{"target." + colName, quotedCol},
 			struct {
 				old string
 				new string
-			}{fmt.Sprintf("target.`%s`", colName), quotedCol},
+			}{"target.`" + colName + "`", quotedCol},
 		)
 	}
 
