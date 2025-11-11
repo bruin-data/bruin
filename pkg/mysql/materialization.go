@@ -31,7 +31,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
-		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
+		pipeline.MaterializationStrategyMerge:          errorMaterializer,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 		pipeline.MaterializationStrategySCD2ByColumn:   errorMaterializer,
@@ -104,118 +104,6 @@ CREATE TABLE %s AS
 		asset.Name,
 		query,
 	), nil
-}
-
-func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
-	if len(asset.Columns) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
-	}
-
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
-	}
-
-	columnNames := asset.ColumnNames()
-	if len(columnNames) == 0 {
-		return "", errors.New("no columns defined on asset")
-	}
-
-	insertColumns := make([]string, 0, len(columnNames))
-	for _, col := range columnNames {
-		insertColumns = append(insertColumns, col)
-	}
-
-	nonPKColumns := make([]pipeline.Column, 0, len(asset.Columns))
-	for _, col := range asset.Columns {
-		if col.PrimaryKey {
-			continue
-		}
-		nonPKColumns = append(nonPKColumns, col)
-	}
-
-	updateColumns := getColumnsForMerge(nonPKColumns)
-	updateAssignments := make([]string, 0, len(updateColumns))
-	for _, col := range updateColumns {
-		target := col.Name
-		updateExpr := fmt.Sprintf("VALUES(%s)", col.Name)
-		if col.MergeSQL != "" {
-			updateExpr = rewriteMergeExpression(col.MergeSQL, asset)
-		}
-		updateAssignments = append(updateAssignments, fmt.Sprintf("%s = %s", target, updateExpr))
-	}
-
-	if len(updateAssignments) == 0 {
-		return "", errors.New("materialization strategy merge requires at least one non-primary key column to update")
-	}
-
-	insertClause := fmt.Sprintf("INSERT INTO %s (%s)", asset.Name, strings.Join(insertColumns, ", "))
-	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
-
-	return fmt.Sprintf(`%s
-%s
-ON DUPLICATE KEY UPDATE %s;`,
-		insertClause,
-		query,
-		strings.Join(updateAssignments, ", "),
-	), nil
-}
-
-func getColumnsForMerge(cols []pipeline.Column) []pipeline.Column {
-	customCols := make([]pipeline.Column, 0, len(cols))
-	for _, col := range cols {
-		if col.MergeSQL != "" || col.UpdateOnMerge {
-			customCols = append(customCols, col)
-		}
-	}
-	if len(customCols) > 0 {
-		return customCols
-	}
-	return cols
-}
-
-func rewriteMergeExpression(expr string, asset *pipeline.Asset) string {
-	replacements := []struct {
-		old string
-		new string
-	}{}
-
-	for _, col := range asset.Columns {
-		colName := col.Name
-		replacements = append(replacements,
-			struct {
-				old string
-				new string
-			}{"source.\"" + colName + "\"", "VALUES(" + colName + ")"},
-			struct {
-				old string
-				new string
-			}{"source." + colName, "VALUES(" + colName + ")"},
-			struct {
-				old string
-				new string
-			}{"source.`" + colName + "`", "VALUES(" + colName + ")"},
-			struct {
-				old string
-				new string
-			}{"target.\"" + colName + "\"", colName},
-			struct {
-				old string
-				new string
-			}{"target." + colName, colName},
-			struct {
-				old string
-				new string
-			}{"target.`" + colName + "`", colName},
-		)
-	}
-
-	result := expr
-	for _, repl := range replacements {
-		result = strings.ReplaceAll(result, repl.old, repl.new)
-	}
-
-	return result
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {

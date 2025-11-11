@@ -116,27 +116,7 @@ DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
 COMMIT;$`),
 		},
 		{
-			name: "merge with custom expressions",
-			asset: &pipeline.Asset{
-				Name: "analytics.orders",
-				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyMerge,
-				},
-				Columns: []pipeline.Column{
-					{Name: "id", PrimaryKey: true},
-					{Name: "col1", MergeSQL: "COALESCE(source.col1, target.col1)"},
-					{Name: "col2", UpdateOnMerge: true},
-					{Name: "col3"},
-				},
-			},
-			query: "SELECT id, col1, col2, col3 FROM source",
-			wantExact: "INSERT INTO analytics.orders (id, col1, col2, col3)\n" +
-				"SELECT id, col1, col2, col3 FROM source\n" +
-				"ON DUPLICATE KEY UPDATE col1 = COALESCE(VALUES(col1), col1), col2 = VALUES(col2);",
-		},
-		{
-			name: "merge requires columns",
+			name: "merge unsupported",
 			asset: &pipeline.Asset{
 				Name: "analytics.orders",
 				Materialization: pipeline.Materialization{
@@ -144,9 +124,9 @@ COMMIT;$`),
 					Strategy: pipeline.MaterializationStrategyMerge,
 				},
 			},
-			query:       "SELECT 1",
+			query:       "SELECT id, col1 FROM source",
 			wantErr:     true,
-			expectedErr: "requires the `columns` field to be set",
+			expectedErr: "materialization strategy merge is not supported",
 		},
 		{
 			name: "time interval",
