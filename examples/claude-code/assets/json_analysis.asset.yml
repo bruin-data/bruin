@@ -1,0 +1,26 @@
+name: json_data_analyzer
+type: agent.claude_code
+description: Analyze data and return structured JSON response
+owner: data@company.com
+tags:
+  - json
+  - analysis
+  - structured
+
+parameters:
+  prompt: |
+    Analyze the sales data for {{start_date}} and provide a summary.
+    
+    Return a JSON object with:
+    - total_sales: number
+    - top_product: string
+    - growth_rate: number
+    - anomalies: array of strings
+    - recommendations: array of strings
+  
+  model: sonnet
+  fallback_model: haiku
+  output_format: json
+  system_prompt: |
+    You are a data analyst. Always return valid JSON.
+    Be precise with numbers and provide actionable insights.

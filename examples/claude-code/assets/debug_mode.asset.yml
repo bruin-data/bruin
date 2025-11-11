@@ -1,0 +1,23 @@
+name: debug_analysis
+type: agent.claude_code
+description: Run analysis with debug mode for troubleshooting
+owner: devops@company.com
+tags:
+  - debug
+  - troubleshooting
+
+parameters:
+  prompt: |
+    Debug the data pipeline issue reported for {{start_date}}.
+    Check for:
+    - Data quality issues
+    - Schema mismatches
+    - Performance bottlenecks
+  
+  model: sonnet
+  output_format: text
+  debug: "true"
+  verbose: "true"
+  system_prompt: |
+    Provide detailed debugging information.
+    Include specific line numbers and error messages when found.
