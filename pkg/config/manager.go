@@ -62,6 +62,7 @@ type Connections struct {
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
 	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
 	TikTokAds           []TikTokAdsConnection           `yaml:"tiktokads,omitempty" json:"tiktokads,omitempty" mapstructure:"tiktokads"`
+	SnapchatAds         []SnapchatAdsConnection         `yaml:"snapchatads,omitempty" json:"snapchatads,omitempty" mapstructure:"snapchatads"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
 	Socrata             []SocrataConnection             `yaml:"socrata,omitempty" json:"socrata,omitempty" mapstructure:"socrata"`
@@ -746,6 +747,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.TikTokAds = append(env.Connections.TikTokAds, conn)
+	case "snapchatads":
+		var conn SnapchatAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SnapchatAds = append(env.Connections.SnapchatAds, conn)
 	case "github":
 		var conn GitHubConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1157,6 +1165,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GoogleAds = removeConnection(env.Connections.GoogleAds, connectionName)
 	case "tiktokads":
 		env.Connections.TikTokAds = removeConnection(env.Connections.TikTokAds, connectionName)
+	case "snapchatads":
+		env.Connections.SnapchatAds = removeConnection(env.Connections.SnapchatAds, connectionName)
 	case "github":
 		env.Connections.GitHub = removeConnection(env.Connections.GitHub, connectionName)
 	case "appstore":

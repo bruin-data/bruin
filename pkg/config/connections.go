@@ -696,6 +696,18 @@ func (c TikTokAdsConnection) GetName() string {
 	return c.Name
 }
 
+type SnapchatAdsConnection struct {
+	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	RefreshToken   string `yaml:"refresh_token,omitempty" json:"refresh_token" mapstructure:"refresh_token"`
+	ClientID       string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	ClientSecret   string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	OrganizationID string `yaml:"organization_id,omitempty" json:"organization_id,omitempty" mapstructure:"organization_id"`
+}
+
+func (c SnapchatAdsConnection) GetName() string {
+	return c.Name
+}
+
 // github://?access_token=<access_token>&owner=<owner>&repo=<repo>
 type GitHubConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
