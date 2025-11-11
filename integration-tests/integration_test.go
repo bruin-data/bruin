@@ -2985,6 +2985,40 @@ func TestMacros(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "validate-single-asset",
+			task: e2e.Task{
+				Name:    "validate-single-asset",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/happy-path/assets/products.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated", "products.sql", "all good"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "validate-pipeline",
+			task: e2e.Task{
+				Name:    "validate-pipeline",
+				Command: binary,
+				Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/happy-path")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated", "assets across 1 pipeline", "all good"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
