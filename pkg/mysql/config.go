@@ -3,6 +3,7 @@ package mysql
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 type Config struct {
@@ -60,11 +61,19 @@ func (c Config) ToDBConnectionURI() string {
 
 	hostPort := fmt.Sprintf("%s:%d", c.Host, c.Port)
 
-	return fmt.Sprintf(
+	dsn := fmt.Sprintf(
 		"%s:%s@tcp(%s)/%s",
 		c.Username,
 		c.Password,
 		hostPort,
 		c.Database,
 	)
+
+	if !strings.Contains(dsn, "?") {
+		dsn += "?multiStatements=true"
+	} else {
+		dsn += "&multiStatements=true"
+	}
+
+	return dsn
 }
