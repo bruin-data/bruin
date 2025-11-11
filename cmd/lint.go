@@ -325,7 +325,11 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 	}
 	excludedAssetNumber := result.AssetWithExcludeTagCount
 	validatedTaskCount := taskCount - excludedAssetNumber
-	successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", validatedTaskCount, pipelineCount, pipelineStr)
+	if asset == "" {
+		successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", validatedTaskCount, pipelineCount, pipelineStr)
+	} else {
+		successPrinter.Printf("\n✓ Successfully validated '%s', all good.\n", asset)
+	}
 	return nil
 }
 
