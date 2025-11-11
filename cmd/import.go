@@ -382,6 +382,12 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		if strings.Contains(connType, "oracle") {
 			return pipeline.AssetTypeOracleSource
 		}
+		if strings.Contains(connType, "mssql") {
+			return pipeline.AssetTypeMsSQLSource
+		}
+		if strings.Contains(connType, "synapse") {
+			return pipeline.AssetTypeSynapseSource
+		}
 	}
 
 	// Fallback: try to detect the connection type from the connection name
