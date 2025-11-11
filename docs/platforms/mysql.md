@@ -25,7 +25,7 @@ connections:
 
 ## MySQL Assets
 
-### `mysql.sql`
+### `my.sql`
 Executes a materialized MySQL SQL asset. See the [definition schema](../assets/definition-schema.md) for available parameters.
 
 
@@ -33,7 +33,7 @@ Executes a materialized MySQL SQL asset. See the [definition schema](../assets/d
 ```bruin-sql
 /* @bruin
 name: warehouse.example
-type: mysql.sql
+type: my.sql
 materialization:
     type: table
 @bruin */
