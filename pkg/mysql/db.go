@@ -257,6 +257,6 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 		return nil
 	}
 
-	queryString := "CREATE DATABASE IF NOT EXISTS " + QuoteIdentifier(schemaName)
+	queryString := "CREATE DATABASE IF NOT EXISTS " + schemaName
 	return c.RunQueryWithoutResult(ctx, &query.Query{Query: queryString})
 }

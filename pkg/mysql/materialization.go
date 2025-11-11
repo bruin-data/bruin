@@ -47,28 +47,12 @@ func errorMaterializer(asset *pipeline.Asset, _ string) (string, error) {
 	)
 }
 
-// QuoteIdentifier quotes MySQL identifiers using backticks while preserving dotted identifiers.
-func QuoteIdentifier(identifier string) string {
-	if identifier == "" {
-		return identifier
-	}
-
-	parts := strings.Split(identifier, ".")
-	quoted := make([]string, len(parts))
-	for i, part := range parts {
-		escaped := strings.ReplaceAll(part, "`", "``")
-		quoted[i] = fmt.Sprintf("`%s`", escaped)
-	}
-
-	return strings.Join(quoted, ".")
-}
-
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", QuoteIdentifier(asset.Name), query), nil
+	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("INSERT INTO %s %s", QuoteIdentifier(asset.Name), query), nil
+	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
 }
 
 func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -80,15 +64,14 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
-	quotedIncrementalKey := QuoteIdentifier(mat.IncrementalKey)
 
 	queries := []string{
 		"START TRANSACTION",
-		"DROP TEMPORARY TABLE IF EXISTS " + QuoteIdentifier(tempTableName),
-		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS %s", QuoteIdentifier(tempTableName), strings.TrimSuffix(query, ";")),
-		fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", QuoteIdentifier(asset.Name), quotedIncrementalKey, quotedIncrementalKey, QuoteIdentifier(tempTableName)),
-		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", QuoteIdentifier(asset.Name), QuoteIdentifier(tempTableName)),
-		"DROP TEMPORARY TABLE IF EXISTS " + QuoteIdentifier(tempTableName),
+		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
+		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
+		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
 		"COMMIT",
 	}
 
@@ -98,8 +81,8 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, error) {
 	queries := []string{
 		"START TRANSACTION",
-		"TRUNCATE TABLE " + QuoteIdentifier(asset.Name),
-		fmt.Sprintf("INSERT INTO %s %s", QuoteIdentifier(asset.Name), strings.TrimSuffix(query, ";")),
+		"TRUNCATE TABLE " + asset.Name,
+		fmt.Sprintf("INSERT INTO %s %s", asset.Name, strings.TrimSuffix(query, ";")),
 		"COMMIT",
 	}
 
@@ -117,8 +100,8 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 	return fmt.Sprintf(`DROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 %s;`,
-		QuoteIdentifier(asset.Name),
-		QuoteIdentifier(asset.Name),
+		asset.Name,
+		asset.Name,
 		query,
 	), nil
 }
@@ -140,7 +123,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	insertColumns := make([]string, 0, len(columnNames))
 	for _, col := range columnNames {
-		insertColumns = append(insertColumns, QuoteIdentifier(col))
+		insertColumns = append(insertColumns, col)
 	}
 
 	nonPKColumns := make([]pipeline.Column, 0, len(asset.Columns))
@@ -154,8 +137,8 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	updateColumns := getColumnsForMerge(nonPKColumns)
 	updateAssignments := make([]string, 0, len(updateColumns))
 	for _, col := range updateColumns {
-		target := QuoteIdentifier(col.Name)
-		updateExpr := fmt.Sprintf("VALUES(%s)", target)
+		target := col.Name
+		updateExpr := fmt.Sprintf("VALUES(%s)", col.Name)
 		if col.MergeSQL != "" {
 			updateExpr = rewriteMergeExpression(col.MergeSQL, asset)
 		}
@@ -166,7 +149,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		return "", errors.New("materialization strategy merge requires at least one non-primary key column to update")
 	}
 
-	insertClause := fmt.Sprintf("INSERT INTO %s (%s)", QuoteIdentifier(asset.Name), strings.Join(insertColumns, ", "))
+	insertClause := fmt.Sprintf("INSERT INTO %s (%s)", asset.Name, strings.Join(insertColumns, ", "))
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 
 	return fmt.Sprintf(`%s
@@ -199,32 +182,31 @@ func rewriteMergeExpression(expr string, asset *pipeline.Asset) string {
 
 	for _, col := range asset.Columns {
 		colName := col.Name
-		quotedCol := QuoteIdentifier(colName)
 		replacements = append(replacements,
 			struct {
 				old string
 				new string
-			}{"source.\"" + colName + "\"", "VALUES(" + quotedCol + ")"},
+			}{"source.\"" + colName + "\"", "VALUES(" + colName + ")"},
 			struct {
 				old string
 				new string
-			}{"source." + colName, "VALUES(" + quotedCol + ")"},
+			}{"source." + colName, "VALUES(" + colName + ")"},
 			struct {
 				old string
 				new string
-			}{"source.`" + colName + "`", "VALUES(" + quotedCol + ")"},
+			}{"source.`" + colName + "`", "VALUES(" + colName + ")"},
 			struct {
 				old string
 				new string
-			}{"target.\"" + colName + "\"", quotedCol},
+			}{"target.\"" + colName + "\"", colName},
 			struct {
 				old string
 				new string
-			}{"target." + colName, quotedCol},
+			}{"target." + colName, colName},
 			struct {
 				old string
 				new string
-			}{"target.`" + colName + "`", quotedCol},
+			}{"target.`" + colName + "`", colName},
 		)
 	}
 
@@ -259,13 +241,13 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 	queries := []string{
 		"START TRANSACTION",
-		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
-			QuoteIdentifier(asset.Name),
-			QuoteIdentifier(asset.Materialization.IncrementalKey),
+		fmt.Sprintf("DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'",
+			asset.Name,
+			asset.Materialization.IncrementalKey,
 			startVar,
 			endVar),
-		fmt.Sprintf(`INSERT INTO %s %s`,
-			QuoteIdentifier(asset.Name),
+		fmt.Sprintf("INSERT INTO %s %s",
+			asset.Name,
 			strings.TrimSuffix(query, ";")),
 		"COMMIT",
 	}
@@ -283,10 +265,10 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 
 	for _, col := range asset.Columns {
 		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, QuoteIdentifier(col.Name))
+			primaryKeys = append(primaryKeys, col.Name)
 		}
 
-		definition := fmt.Sprintf("%s %s", QuoteIdentifier(col.Name), col.Type)
+		definition := fmt.Sprintf("%s %s", col.Name, col.Type)
 		if col.Nullable.Value != nil && !*col.Nullable.Value {
 			definition += " NOT NULL"
 		}
@@ -304,7 +286,7 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 	}
 
 	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n%s\n);",
-		QuoteIdentifier(asset.Name),
+		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 	), nil
 }

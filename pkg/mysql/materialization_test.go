@@ -42,7 +42,7 @@ func TestMaterializer_Render(t *testing.T) {
 				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeView},
 			},
 			query:     "SELECT 1",
-			wantExact: "CREATE OR REPLACE VIEW `analytics`.`daily_orders` AS\nSELECT 1",
+			wantExact: "CREATE OR REPLACE VIEW analytics.daily_orders AS\nSELECT 1",
 		},
 		{
 			name: "table defaults to create replace",
@@ -51,8 +51,8 @@ func TestMaterializer_Render(t *testing.T) {
 				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
 			},
 			query: "SELECT * FROM source",
-			wantExact: "DROP TABLE IF EXISTS `analytics`.`orders`;\n" +
-				"CREATE TABLE `analytics`.`orders` AS\n" +
+			wantExact: "DROP TABLE IF EXISTS analytics.orders;\n" +
+				"CREATE TABLE analytics.orders AS\n" +
 				"SELECT * FROM source;",
 		},
 		{
@@ -66,8 +66,8 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query:       "SELECT * FROM source",
 			fullRefresh: true,
-			wantExact: "DROP TABLE IF EXISTS `analytics`.`orders`;\n" +
-				"CREATE TABLE `analytics`.`orders` AS\n" +
+			wantExact: "DROP TABLE IF EXISTS analytics.orders;\n" +
+				"CREATE TABLE analytics.orders AS\n" +
 				"SELECT * FROM source;",
 		},
 		{
@@ -80,7 +80,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query:     "SELECT * FROM staging",
-			wantExact: "INSERT INTO `analytics`.`orders` SELECT * FROM staging",
+			wantExact: "INSERT INTO analytics.orders SELECT * FROM staging",
 		},
 		{
 			name: "incremental requires key",
@@ -108,16 +108,11 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT id, value FROM source",
 			wantRegex: regexp.MustCompile(
 				`(?s)^START TRANSACTION;
-DROP TEMPORARY TABLE IF EXISTS ` +
-					"`__bruin_tmp_[^`]+`" + `;
-CREATE TEMPORARY TABLE ` +
-					"`__bruin_tmp_[^`]+`" + ` AS SELECT id, value FROM source;
-DELETE FROM ` +
-					"`analytics`.`orders`" + ` WHERE ` + "`id`" + ` IN \(SELECT DISTINCT ` + "`id`" + ` FROM ` + "`__bruin_tmp_[^`]+`" + `\);
-INSERT INTO ` +
-					"`analytics`.`orders`" + ` SELECT \* FROM ` + "`__bruin_tmp_[^`]+`" + `;
-DROP TEMPORARY TABLE IF EXISTS ` +
-					"`__bruin_tmp_[^`]+`" + `;
+DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
+CREATE TEMPORARY TABLE __bruin_tmp_[^;\n]+ AS SELECT id, value FROM source;
+DELETE FROM analytics\.orders WHERE id IN \(SELECT DISTINCT id FROM __bruin_tmp_[^;\n]+\);
+INSERT INTO analytics\.orders SELECT \* FROM __bruin_tmp_[^;\n]+;
+DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
 COMMIT;$`),
 		},
 		{
@@ -136,9 +131,9 @@ COMMIT;$`),
 				},
 			},
 			query: "SELECT id, col1, col2, col3 FROM source",
-			wantExact: "INSERT INTO `analytics`.`orders` (`id`, `col1`, `col2`, `col3`)\n" +
+			wantExact: "INSERT INTO analytics.orders (id, col1, col2, col3)\n" +
 				"SELECT id, col1, col2, col3 FROM source\n" +
-				"ON DUPLICATE KEY UPDATE `col1` = COALESCE(VALUES(`col1`), `col1`), `col2` = VALUES(`col2`);",
+				"ON DUPLICATE KEY UPDATE col1 = COALESCE(VALUES(col1), col1), col2 = VALUES(col2);",
 		},
 		{
 			name: "merge requires columns",
@@ -166,8 +161,8 @@ COMMIT;$`),
 			},
 			query: "SELECT * FROM staging",
 			wantExact: "START TRANSACTION;\n" +
-				"DELETE FROM `analytics`.`orders` WHERE `event_time` BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO `analytics`.`orders` SELECT * FROM staging;\n" +
+				"DELETE FROM analytics.orders WHERE event_time BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO analytics.orders SELECT * FROM staging;\n" +
 				"COMMIT;",
 		},
 		{
@@ -183,10 +178,10 @@ COMMIT;$`),
 					{Name: "description", Type: "VARCHAR(255)", Description: "product info"},
 				},
 			},
-			wantExact: "CREATE TABLE IF NOT EXISTS `analytics`.`orders` (\n" +
-				"`id` INT NOT NULL,\n" +
-				"`description` VARCHAR(255) COMMENT 'product info',\n" +
-				"PRIMARY KEY (`id`)\n" +
+			wantExact: "CREATE TABLE IF NOT EXISTS analytics.orders (\n" +
+				"id INT NOT NULL,\n" +
+				"description VARCHAR(255) COMMENT 'product info',\n" +
+				"PRIMARY KEY (id)\n" +
 				");",
 		},
 		{
@@ -253,13 +248,4 @@ COMMIT;$`),
 			}
 		})
 	}
-}
-
-func TestQuoteIdentifier(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "`orders`", QuoteIdentifier("orders"))
-	assert.Equal(t, "`analytics`.`orders`", QuoteIdentifier("analytics.orders"))
-	assert.Equal(t, "```orders```", QuoteIdentifier("`orders`"))
-	assert.Equal(t, "`catalog`.`analytics`.`orders`", QuoteIdentifier("catalog.analytics.orders"))
 }
