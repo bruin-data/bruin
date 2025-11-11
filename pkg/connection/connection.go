@@ -82,6 +82,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/socrata"
 	"github.com/bruin-data/bruin/pkg/solidgate"
+	"github.com/bruin-data/bruin/pkg/snapchatads"
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
@@ -138,6 +139,7 @@ type Manager struct {
 	Zendesk              map[string]*zendesk.Client
 	GoogleAds            map[string]*googleads.Client
 	TikTokAds            map[string]*tiktokads.Client
+	SnapchatAds          map[string]*snapchatads.Client
 	GitHub               map[string]*github.Client
 	AppStore             map[string]*appstore.Client
 	LinkedInAds          map[string]*linkedinads.Client
@@ -1471,6 +1473,30 @@ func (m *Manager) AddTikTokAdsConnectionFromConfig(connection *config.TikTokAdsC
 	return nil
 }
 
+func (m *Manager) AddSnapchatAdsConnectionFromConfig(connection *config.SnapchatAdsConnection) error {
+	m.mutex.Lock()
+	if m.SnapchatAds == nil {
+		m.SnapchatAds = make(map[string]*snapchatads.Client)
+	}
+	m.mutex.Unlock()
+	client, err := snapchatads.NewClient(snapchatads.Config{
+		RefreshToken:   connection.RefreshToken,
+		ClientID:       connection.ClientID,
+		ClientSecret:   connection.ClientSecret,
+		OrganizationID: connection.OrganizationID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SnapchatAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddGitHubConnectionFromConfig(connection *config.GitHubConnection) error {
 	m.mutex.Lock()
 	if m.GitHub == nil {
@@ -2484,6 +2510,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Zendesk, connectionManager.AddZendeskConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAds, connectionManager.AddGoogleAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.TikTokAds, connectionManager.AddTikTokAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.SnapchatAds, connectionManager.AddSnapchatAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
