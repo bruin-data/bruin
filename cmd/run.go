@@ -34,6 +34,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/mssql"
+	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
@@ -1556,6 +1557,15 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeS3KeySensor) {
 		s3KeySensor := s3.NewKeySensor(conn, sensorMode)
 		mainExecutors[pipeline.AssetTypeS3KeySensor][scheduler.TaskInstanceTypeMain] = s3KeySensor
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMySQLQuery {
+		mysqlOperator := mysql.NewBasicOperator(conn, wholeFileExtractor, mysql.NewMaterializer(fullRefresh), parser)
+		mysqlCheckRunner := mysql.NewColumnCheckOperator(conn)
+
+		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeMain] = mysqlOperator
+		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 
 	return mainExecutors, nil

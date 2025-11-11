@@ -325,6 +325,7 @@ var assetTypeDialectMap = map[pipeline.AssetType]string{
 	pipeline.AssetTypeBigqueryQuery:   "bigquery",
 	pipeline.AssetTypeSnowflakeQuery:  "snowflake",
 	pipeline.AssetTypePostgresQuery:   "postgres",
+	pipeline.AssetTypeMySQLQuery:      "mysql",
 	pipeline.AssetTypeRedshiftQuery:   "redshift",
 	pipeline.AssetTypeAthenaQuery:     "athena",
 	pipeline.AssetTypeClickHouse:      "clickhouse",

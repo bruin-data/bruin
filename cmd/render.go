@@ -22,6 +22,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
+	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
@@ -237,6 +238,7 @@ func Render() *cli.Command {
 					Renderer: forAsset,
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
+					pipeline.AssetTypeMySQLQuery:            mysql.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeBigqueryQuery:         bigquery.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeBigqueryQuerySensor:   bigquery.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeSnowflakeQuery:        snowflake.NewMaterializer(fullRefresh),
