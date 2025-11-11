@@ -223,6 +223,22 @@ COMMIT;$`),
 			wantErr:     true,
 			expectedErr: "materialization strategy merge is not supported",
 		},
+		{
+			name: "truncate insert builds transaction",
+			asset: &pipeline.Asset{
+				Name: "analytics.orders",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyTruncateInsert,
+					IncrementalKey: "ignored",
+				},
+			},
+			query: "SELECT * FROM staging",
+			wantExact: "START TRANSACTION;\n" +
+				"TRUNCATE TABLE analytics.orders;\n" +
+				"INSERT INTO analytics.orders SELECT * FROM staging;\n" +
+				"COMMIT;",
+		},
 	}
 
 	for _, tt := range tests {
