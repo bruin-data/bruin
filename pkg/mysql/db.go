@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -239,4 +240,23 @@ ORDER BY table_schema, table_name;
 	})
 
 	return summary, nil
+}
+
+func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	if asset == nil {
+		return errors.New("asset cannot be nil")
+	}
+
+	nameParts := strings.Split(asset.Name, ".")
+	if len(nameParts) < 2 {
+		return nil
+	}
+
+	schemaName := nameParts[0]
+	if schemaName == "" {
+		return nil
+	}
+
+	queryString := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", QuoteIdentifier(schemaName))
+	return c.RunQueryWithoutResult(ctx, &query.Query{Query: queryString})
 }
