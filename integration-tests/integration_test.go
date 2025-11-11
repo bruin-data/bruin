@@ -1249,7 +1249,7 @@ func TestIndividualTasks(t *testing.T) {
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{"Successfully validated 2 assets"},
+					Contains: []string{"Successfully validated", "valid_date.sql", "all good"},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
