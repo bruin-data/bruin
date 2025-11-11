@@ -3,7 +3,7 @@ Snapchat Ads is an advertising platform that enables businesses to create, manag
 
 Bruin supports Snapchat Ads as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Snapchat Ads into your data warehouse.
 
-In order to set up Snapchat Ads connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. You need `refresh_token`, `client_id`, `client_secret`, and optionally `organization_id`. For details on how to obtain these credentials, please refer [here](https://developers.snap.com/api/marketing-api/Ads-API/authentication)
+In order to set up Snapchat Ads connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. You need `refresh_token`, `client_id`, `client_secret`, and optionally `organization_id`. For details on how to obtain these credentials, please refer [here](https://developers.snap.com/api/snapchat-ads-api/Ads-API/authentication)
 
 Follow the steps below to correctly set up Snapchat Ads as a data source and run ingestion.
 
@@ -20,9 +20,9 @@ connections:
        client_secret: "your_client_secret"
        organization_id: "your_organization_id"
 ```
-- `refresh_token` (required): OAuth refresh token for Snapchat Marketing API authentication.
-- `client_id` (required): OAuth client ID for your Snapchat Marketing API app.
-- `client_secret` (required): OAuth client secret for your Snapchat Marketing API app.
+- `refresh_token` (required): OAuth refresh token for Snapchat Ads API authentication.
+- `client_id` (required): OAuth client ID for your Snapchat Ads API app.
+- `client_secret` (required): OAuth client secret for your Snapchat Ads API app.
 - `organization_id` (optional): Organization ID. Required for most resources except `organizations`.
 
 ### Step 2: Create an asset file for data ingestion
