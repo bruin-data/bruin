@@ -1,4 +1,5 @@
 name: bootstrap
+catchup: false
 environments:
   default:
     connections:

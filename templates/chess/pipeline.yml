@@ -1,4 +1,5 @@
 name: chess_duckdb
+catchup: false
 default:
   type: ingestr
   parameters:
