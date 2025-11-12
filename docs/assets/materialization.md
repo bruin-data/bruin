@@ -195,9 +195,9 @@ Merge strategy requires columns to be defined and marked with `primary_key` and 
 - `merge_sql` lets you specify a custom expression per column for matches, e.g. `GREATEST(target.col, source.col)`. When present, `merge_sql` takes precedence over `update_on_merge`.
 
 Supported platforms for `merge_sql`:
-- BigQuery, Snowflake, Postgres, mssql: supported
+- BigQuery, Snowflake, Postgres, mssql, MySQL: supported
 - Athena (Iceberg tables): supported
-- Databricks,ClickHouse, Trino, DuckDB, MySQL: not supported
+- Databricks, ClickHouse, Trino, DuckDB: not supported
 
 > [!INFO]
 > An important difference between `merge` and `delete+insert` is that `merge` will update the existing rows, while `delete+insert` will delete the existing rows and insert the new rows. This means if your source has deleted rows, `merge` will not delete them from the destination, whereas `delete+insert` will if their `incremental_key` matches.
@@ -558,4 +558,4 @@ Notice how:
 | **Configuration** | Only requires primary_key columns | Requires both primary_key columns and incremental_key |
 
 > [!WARNING]
-> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift and DuckDB.
+> SCD2 materializations are currently supported for BigQuery, Snowflake, Postgres, Amazon Redshift, DuckDB, and MySQL.
