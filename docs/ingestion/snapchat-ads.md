@@ -12,7 +12,6 @@ To connect to Snapchat Ads as a source, you need to add a configuration item to 
 
 ```yaml
 connections:
-  <destination_connection_details>
   snapchatads:
      - name: my-snapchatads
        refresh_token: "your_refresh_token"
