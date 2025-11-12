@@ -31,9 +31,10 @@ type BasicOperator struct {
 }
 
 type SeedOperator struct {
-	conn   config.ConnectionGetter
-	runner ingestrRunner
-	finder repoFinder
+	conn          config.ConnectionGetter
+	runner        ingestrRunner
+	finder        repoFinder
+	jinjaRenderer jinja.RendererInterface
 }
 
 type pipelineConnection interface {
@@ -53,6 +54,24 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	var extraPackages []string
 
 	asset := ti.GetAsset()
+
+	// Render interval modifier templates if they exist
+	if asset.IntervalModifiers.Start.Template != "" {
+		renderedStart, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(o.jinjaRenderer)
+		if err != nil {
+			return fmt.Errorf("failed to render start interval modifier template: %w", err)
+		}
+		asset.IntervalModifiers.Start = renderedStart
+	}
+
+	if asset.IntervalModifiers.End.Template != "" {
+		renderedEnd, err := asset.IntervalModifiers.End.ResolveTemplateToNew(o.jinjaRenderer)
+		if err != nil {
+			return fmt.Errorf("failed to render end interval modifier template: %w", err)
+		}
+		asset.IntervalModifiers.End = renderedEnd
+	}
+
 	// Source connection
 	sourceConnectionName, ok := asset.Parameters["source_connection"]
 	if !ok {
@@ -148,16 +167,17 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
-func NewSeedOperator(conn config.ConnectionGetter) (*SeedOperator, error) {
+func NewSeedOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*SeedOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
 		Cmd:         &python.CommandRunner{},
 	}
 
 	return &SeedOperator{
-		conn:   conn,
-		runner: uvRunner,
-		finder: &git.RepoFinder{},
+		conn:          conn,
+		runner:        uvRunner,
+		finder:        &git.RepoFinder{},
+		jinjaRenderer: j,
 	}, nil
 }
 
@@ -166,6 +186,24 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	// Source connection
 
 	asset := ti.GetAsset()
+
+	// Render interval modifier templates if they exist
+	if asset.IntervalModifiers.Start.Template != "" {
+		renderedStart, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(o.jinjaRenderer)
+		if err != nil {
+			return fmt.Errorf("failed to render start interval modifier template: %w", err)
+		}
+		asset.IntervalModifiers.Start = renderedStart
+	}
+
+	if asset.IntervalModifiers.End.Template != "" {
+		renderedEnd, err := asset.IntervalModifiers.End.ResolveTemplateToNew(o.jinjaRenderer)
+		if err != nil {
+			return fmt.Errorf("failed to render end interval modifier template: %w", err)
+		}
+		asset.IntervalModifiers.End = renderedEnd
+	}
+
 	sourceConnectionPath, ok := asset.Parameters["path"]
 	if !ok {
 		return errors.New("source connection not configured")
