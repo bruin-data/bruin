@@ -3550,6 +3550,65 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 
+		// MySQL tests
+		{
+			name: "MySQL - no table parameter",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeMySQLTableSensor,
+			},
+			want:    []string{"MySQL table sensor requires a `table` parameter"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "MySQL - empty table component",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeMySQLTableSensor,
+				Parameters: map[string]string{
+					"table": "analytics.",
+				},
+			},
+			want:    []string{"MySQL table sensor `table` parameter contains empty components, 'analytics.' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "MySQL - invalid format (too many components)",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeMySQLTableSensor,
+				Parameters: map[string]string{
+					"table": "analytics.sales.daily",
+				},
+			},
+			want:    []string{"MySQL table sensor `table` parameter must be in format `table` or `schema.table`, 'analytics.sales.daily' given"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "MySQL - valid table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeMySQLTableSensor,
+				Parameters: map[string]string{
+					"table": "orders",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "MySQL - valid schema.table format",
+			asset: &pipeline.Asset{
+				Name: "task1",
+				Type: pipeline.AssetTypeMySQLTableSensor,
+				Parameters: map[string]string{
+					"table": "analytics.orders",
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+
 		// Synapse tests
 		{
 			name: "Synapse - no table parameter",
