@@ -472,6 +472,7 @@ func (m *Manager) AddMsSQLConnectionFromConfig(connection *config.MsSQLConnectio
 		Host:     connection.Host,
 		Port:     connection.Port,
 		Database: connection.Database,
+		Query:    connection.Options,
 	})
 	if err != nil {
 		return err
@@ -499,6 +500,7 @@ func (m *Manager) AddSynapseSQLConnectionFromConfig(connection *config.SynapseCo
 		Host:     connection.Host,
 		Port:     connection.Port,
 		Database: connection.Database,
+		Query:    connection.Options,
 	})
 	if err != nil {
 		return err

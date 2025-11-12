@@ -169,6 +169,7 @@ type SynapseConnection struct {
 	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
 	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Options  string `yaml:"options,omitempty"  json:"options,omitempty" mapstructure:"options"`
 }
 
 func (c SynapseConnection) GetName() string {
@@ -243,6 +244,7 @@ type MsSQLConnection struct {
 	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
 	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Options  string `yaml:"options,omitempty"  json:"options,omitempty" mapstructure:"options"`
 }
 
 func (c MsSQLConnection) GetName() string {
