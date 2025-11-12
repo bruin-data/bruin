@@ -229,6 +229,64 @@ func TestClient_Ping(t *testing.T) {
 	}
 }
 
+func TestClient_BuildTableExistsQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		tableName string
+		want      string
+		wantErr   assert.ErrorAssertionFunc
+		errMsg    string
+	}{
+		{
+			name:      "table only uses current database",
+			tableName: "orders",
+			want:      "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'orders'",
+			wantErr:   assert.NoError,
+		},
+		{
+			name:      "schema and table specified",
+			tableName: "analytics.orders",
+			want:      "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'analytics' AND table_name = 'orders'",
+			wantErr:   assert.NoError,
+		},
+		{
+			name:      "empty component returns error",
+			tableName: "analytics.",
+			wantErr:   assert.Error,
+			errMsg:    "table name must be in format schema.table or table, 'analytics.' given",
+		},
+		{
+			name:      "too many components returns error",
+			tableName: "a.b.c",
+			wantErr:   assert.Error,
+			errMsg:    "table name must be in format schema.table or table, 'a.b.c' given",
+		},
+	}
+
+	c := &Client{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := c.BuildTableExistsQuery(tt.tableName)
+
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			if err != nil {
+				assert.EqualError(t, err, tt.errMsg)
+				return
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestClient_GetDatabaseSummary(t *testing.T) {
 	t.Parallel()
 

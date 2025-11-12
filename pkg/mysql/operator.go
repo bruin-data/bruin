@@ -23,6 +23,7 @@ type MySQLClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
+	BuildTableExistsQuery(tableName string) (string, error)
 	Ping(ctx context.Context) error
 	GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error

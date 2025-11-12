@@ -242,6 +242,31 @@ ORDER BY table_schema, table_name;
 	return summary, nil
 }
 
+func (c *Client) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+		}
+	}
+
+	switch len(tableComponents) {
+	case 1:
+		return strings.TrimSpace(fmt.Sprintf(
+			"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '%s'",
+			tableComponents[0],
+		)), nil
+	case 2:
+		return strings.TrimSpace(fmt.Sprintf(
+			"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'",
+			tableComponents[0],
+			tableComponents[1],
+		)), nil
+	default:
+		return "", fmt.Errorf("table name must be in format schema.table or table, '%s' given", tableName)
+	}
+}
+
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	if asset == nil {
 		return errors.New("asset cannot be nil")
