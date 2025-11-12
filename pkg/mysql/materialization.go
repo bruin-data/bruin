@@ -35,7 +35,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByColumn:   errorMaterializer,
+		pipeline.MaterializationStrategySCD2ByColumn:   buildSCD2ByColumnQuery,
 		pipeline.MaterializationStrategySCD2ByTime:     buildSCD2ByTimeQuery,
 	},
 }
@@ -95,7 +95,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 		return buildSCD2ByTimefullRefresh(asset, query)
 	}
 	if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn {
-		return "", fmt.Errorf("materialization strategy %s is not supported during full refresh for MySQL", asset.Materialization.Strategy)
+		return buildSCD2ByColumnfullRefresh(asset, query)
 	}
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
@@ -394,6 +394,134 @@ FROM (
 		asset.Name,
 		strings.Join(srcCols, ",\n  "),
 		incrementalKey,
+		query,
+	), nil
+}
+
+func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", errors.New("SCD2_by_column strategy requires `columns` to be specified")
+	}
+
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
+
+	var (
+		columnNames             = make([]string, 0, len(asset.Columns))
+		primaryKeys             = make([]string, 0, len(asset.Columns))
+		changeConditionsTarget  = make([]string, 0, len(asset.Columns))
+		changeConditionsCurrent = make([]string, 0, len(asset.Columns))
+	)
+
+	for _, col := range asset.Columns {
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+
+		columnNames = append(columnNames, col.Name)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+			continue
+		}
+
+		changeConditionsTarget = append(changeConditionsTarget,
+			fmt.Sprintf("NOT (target.%[1]s <=> source.%[1]s)", col.Name))
+		changeConditionsCurrent = append(changeConditionsCurrent,
+			fmt.Sprintf("NOT (current.%[1]s <=> source.%[1]s)", col.Name))
+	}
+
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
+			asset.Materialization.Strategy)
+	}
+
+	if len(changeConditionsTarget) == 0 {
+		return "", errors.New("SCD2_by_column strategy requires at least one non-primary-key column")
+	}
+
+	joinConditions := make([]string, len(primaryKeys))
+	currentJoinConditions := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		joinConditions[i] = fmt.Sprintf("target.%[1]s = source.%[1]s", pk)
+		currentJoinConditions[i] = fmt.Sprintf("current.%[1]s = source.%[1]s", pk)
+	}
+	joinCondition := strings.Join(joinConditions, " AND ")
+	currentJoinCondition := strings.Join(currentJoinConditions, " AND ")
+	firstPK := primaryKeys[0]
+
+	sourceSelectColumns := make([]string, len(columnNames))
+	for i, col := range columnNames {
+		sourceSelectColumns[i] = "source." + col
+	}
+	selectClause := strings.Join(sourceSelectColumns, ", ")
+	insertColumns := append(append([]string{}, columnNames...), "_valid_from", "_valid_until", "_is_current")
+	insertList := strings.Join(insertColumns, ", ")
+
+	changeCondition := strings.Join(changeConditionsTarget, " OR ")
+	changeConditionCurrent := strings.Join(changeConditionsCurrent, " OR ")
+
+	tempTableName := "__bruin_scd2_col_tmp_" + helpers.PrefixGenerator()
+
+	queries := []string{
+		"START TRANSACTION",
+		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
+		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS %s", tempTableName, query),
+		"SET @current_scd2_ts = CURRENT_TIMESTAMP",
+		fmt.Sprintf("UPDATE %s AS target LEFT JOIN %s AS source ON %s SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND source.%s IS NULL",
+			asset.Name, tempTableName, joinCondition, firstPK),
+		fmt.Sprintf("UPDATE %s AS target JOIN %s AS source ON %s SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND (%s)",
+			asset.Name, tempTableName, joinCondition, changeCondition),
+		fmt.Sprintf("INSERT INTO %s (%s)\nSELECT %s, @current_scd2_ts, '9999-12-31 23:59:59', TRUE\nFROM %s AS source\nLEFT JOIN %s AS current ON %s AND current._is_current = TRUE\nWHERE current.%s IS NULL OR (%s)",
+			asset.Name,
+			insertList,
+			selectClause,
+			tempTableName,
+			asset.Name,
+			currentJoinCondition,
+			firstPK,
+			changeConditionCurrent),
+		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
+		"COMMIT",
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
+	}
+
+	if len(asset.Columns) == 0 {
+		return "", errors.New("SCD2_by_column strategy requires `columns` to be specified")
+	}
+
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
+
+	selectCols := make([]string, 0, len(asset.Columns))
+	for _, col := range asset.Columns {
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		selectCols = append(selectCols, "src."+col.Name)
+	}
+
+	return fmt.Sprintf(`DROP TABLE IF EXISTS %s;
+CREATE TABLE %s AS
+SELECT
+  %s,
+  CURRENT_TIMESTAMP AS _valid_from,
+  '9999-12-31 23:59:59' AS _valid_until,
+  TRUE AS _is_current
+FROM (
+%s
+) AS src;`,
+		asset.Name,
+		asset.Name,
+		strings.Join(selectCols, ",\n  "),
 		query,
 	), nil
 }
