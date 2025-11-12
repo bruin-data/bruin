@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -180,79 +179,6 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 	), nil
-}
-
-func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
-	if len(asset.Columns) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
-	}
-
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
-	}
-
-	columnNames := asset.ColumnNames()
-	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
-
-	trimmedQuery := strings.TrimSpace(query)
-	trimmedQuery = strings.TrimSuffix(trimmedQuery, ";")
-
-	selectColumns := make([]string, 0, len(columnNames))
-	for _, col := range columnNames {
-		selectColumns = append(selectColumns, "source."+col)
-	}
-
-	insertColumns := strings.Join(columnNames, ", ")
-	selectClause := strings.Join(selectColumns, ", ")
-
-	if len(mergeColumns) == 0 {
-		return fmt.Sprintf(
-			"INSERT IGNORE INTO %s (%s)\nSELECT %s\nFROM (\n%s\n) AS source;",
-			asset.Name,
-			insertColumns,
-			selectClause,
-			trimmedQuery,
-		), nil
-	}
-
-	assignments := make([]string, 0, len(mergeColumns))
-
-	for _, col := range mergeColumns {
-		var expression string
-		if col.MergeSQL != "" {
-			expression = transformMergeExpression(col.MergeSQL, columnNames)
-		} else {
-			expression = fmt.Sprintf("VALUES(%s)", col.Name)
-		}
-
-		assignments = append(assignments, fmt.Sprintf("%s = %s", col.Name, expression))
-	}
-
-	updateClause := "    " + strings.Join(assignments, ",\n    ")
-
-	return strings.Join([]string{
-		fmt.Sprintf("INSERT INTO %s (%s)", asset.Name, insertColumns),
-		"SELECT " + selectClause,
-		fmt.Sprintf("FROM (\n%s\n) AS source", trimmedQuery),
-		"ON DUPLICATE KEY UPDATE",
-		updateClause,
-	}, "\n") + ";", nil
-}
-
-func transformMergeExpression(expression string, columnNames []string) string {
-	replacements := make([]string, 0, len(columnNames)*4)
-
-	for _, col := range columnNames {
-		replacements = append(replacements,
-			"source."+col, "VALUES("+col+")",
-		)
-		replacements = append(replacements,
-			"target."+col, col,
-		)
-	}
-
-	return strings.NewReplacer(replacements...).Replace(expression)
 }
 
 func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
