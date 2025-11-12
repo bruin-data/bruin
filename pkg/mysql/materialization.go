@@ -209,7 +209,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	queries := []string{
 		"START TRANSACTION",
-		fmt.Sprintf("DROP TEMPORARY TABLE IF EXISTS %s", tempTableName),
+		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
 		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS\n%s", tempTableName, trimmedQuery),
 	}
 
@@ -251,7 +251,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	queries = append(queries,
 		deleteStmt,
 		insertStmt,
-		fmt.Sprintf("DROP TEMPORARY TABLE IF EXISTS %s", tempTableName),
+		"DROP TEMPORARY TABLE IF EXISTS "+tempTableName,
 		"COMMIT",
 	)
 
