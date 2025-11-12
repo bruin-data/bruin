@@ -31,7 +31,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
-		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
+		pipeline.MaterializationStrategyMerge:          errorMaterializer,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 		pipeline.MaterializationStrategySCD2ByColumn:   buildSCD2ByColumnQuery,
