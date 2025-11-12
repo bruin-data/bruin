@@ -14,8 +14,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/marcboeker/go-duckdb"   //nolint:stylecheck
-	_ "github.com/marcboeker/go-duckdb" //nolint:stylecheck
 )
 
 type Client struct {
@@ -31,9 +29,29 @@ type DuckDBConfig interface {
 }
 
 type connection interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryContext(ctx context.Context, query string, args ...any) (Rows, error)
 	ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...any) Row
+}
+
+// Rows interface for query results
+type Rows interface {
+	Next() bool
+	Scan(dest ...interface{}) error
+	Columns() ([]string, error)
+	ColumnTypes() ([]ColumnType, error)
+	Err() error
+	Close() error
+}
+
+// Row interface for single row results
+type Row interface {
+	Scan(dest ...interface{}) error
+}
+
+// ColumnType interface for column metadata
+type ColumnType interface {
+	DatabaseTypeName() string
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
@@ -177,14 +195,8 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 }
 
 func (c *Client) convertValue(val interface{}) interface{} {
-	if val == nil {
-		return nil
-	}
-
-	if decimal, ok := val.(duckdb.Decimal); ok {
-		return decimal.Float64()
-	}
-
+	// With ADBC, decimal conversion is handled in the Arrow value extraction
+	// This method is kept for compatibility but may not be needed
 	return val
 }
 

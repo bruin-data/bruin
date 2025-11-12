@@ -89,7 +89,7 @@ func TestDB_Select(t *testing.T) {
 			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
 			tt.mockConnection(mock)
-			db := Client{connection: sqlxDB, config: Config{Path: "some/path.db"}}
+			db := Client{connection: newSQLXAdapter(sqlxDB), config: Config{Path: "some/path.db"}}
 
 			got, err := db.Select(context.Background(), &tt.query)
 			if tt.wantErr {
@@ -188,7 +188,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
 			tt.mockConnection(mock)
-			db := Client{connection: sqlxDB, config: Config{Path: "some/path.db"}}
+			db := Client{connection: newSQLXAdapter(sqlxDB), config: Config{Path: "some/path.db"}}
 
 			got, err := db.SelectWithSchema(context.Background(), &tt.query)
 			if tt.wantErr {
@@ -277,7 +277,7 @@ ORDER BY table_schema, table_name;`).
 			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
 			tt.mockConnection(mock)
-			client := Client{connection: sqlxDB}
+			client := Client{connection: newSQLXAdapter(sqlxDB)}
 
 			got, err := client.GetDatabaseSummary(context.Background())
 			if tt.wantErr != "" {
