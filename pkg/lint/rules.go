@@ -1088,6 +1088,7 @@ var TableSensorAllowedAssetTypes = map[pipeline.AssetType]bool{
 	pipeline.AssetTypeMsSQLTableSensor:      true,
 	pipeline.AssetTypePostgresTableSensor:   true,
 	pipeline.AssetTypeSynapseTableSensor:    true,
+	pipeline.AssetTypeMySQLTableSensor:      true,
 }
 
 var platformNames = map[pipeline.AssetType]string{
@@ -1100,6 +1101,7 @@ var platformNames = map[pipeline.AssetType]string{
 	pipeline.AssetTypeMsSQLTableSensor:      "MS SQL",
 	pipeline.AssetTypeClickHouseTableSensor: "ClickHouse",
 	pipeline.AssetTypeSynapseTableSensor:    "Synapse",
+	pipeline.AssetTypeMySQLTableSensor:      "MySQL",
 }
 
 func ValidateTableSensorTableParameter(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -1177,6 +1179,11 @@ var tableNameValidationRules = map[string]TableNameValidationRule{
 		FormatDesc:    "`table` or `schema.table`",
 	},
 	"Synapse": {
+		MinComponents: 1,
+		MaxComponents: 2,
+		FormatDesc:    "`table` or `schema.table`",
+	},
+	"MySQL": {
 		MinComponents: 1,
 		MaxComponents: 2,
 		FormatDesc:    "`table` or `schema.table`",

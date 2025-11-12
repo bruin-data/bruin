@@ -1559,13 +1559,26 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeS3KeySensor][scheduler.TaskInstanceTypeMain] = s3KeySensor
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMySQLQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuery) ||
+		estimateCustomCheckType == pipeline.AssetTypeMySQLQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuerySensor) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMySQLTableSensor) {
 		mysqlOperator := mysql.NewBasicOperator(conn, wholeFileExtractor, mysql.NewMaterializer(fullRefresh), parser)
 		mysqlCheckRunner := mysql.NewColumnCheckOperator(conn)
+		mysqlQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		mysqlTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeMain] = mysqlOperator
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeMySQLQuerySensor][scheduler.TaskInstanceTypeMain] = mysqlQuerySensor
+		mainExecutors[pipeline.AssetTypeMySQLQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMySQLQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeMain] = mysqlTableSensor
+		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 
 	return mainExecutors, nil
