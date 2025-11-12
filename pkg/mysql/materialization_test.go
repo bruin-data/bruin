@@ -116,7 +116,87 @@ DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
 COMMIT;$`),
 		},
 		{
-			name: "merge unsupported",
+			name: "merge upserts with default updates",
+			asset: &pipeline.Asset{
+				Name: "analytics.orders",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "value", UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT id, value FROM source",
+			wantRegex: regexp.MustCompile(
+				`(?s)^START TRANSACTION;
+DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
+CREATE TEMPORARY TABLE __bruin_merge_tmp_[^;\n]+ AS
+SELECT id, value FROM source;
+UPDATE __bruin_merge_tmp_[^;\n]+ AS source JOIN analytics\.orders AS target ON target\.id = source\.id SET source\.value = source\.value;
+DELETE target FROM analytics\.orders AS target JOIN __bruin_merge_tmp_[^;\n]+ AS source ON target\.id = source\.id;
+INSERT INTO analytics\.orders \(id, value\)
+SELECT source\.id, source\.value
+FROM __bruin_merge_tmp_[^;\n]+ AS source;
+DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
+COMMIT;$`),
+		},
+		{
+			name: "merge with custom expression",
+			asset: &pipeline.Asset{
+				Name: "analytics.orders",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "value", MergeSQL: "GREATEST(target.value, source.value)"},
+				},
+			},
+			query: "SELECT id, value FROM source",
+			wantRegex: regexp.MustCompile(
+				`(?s)^START TRANSACTION;
+DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
+CREATE TEMPORARY TABLE __bruin_merge_tmp_[^;\n]+ AS
+SELECT id, value FROM source;
+UPDATE __bruin_merge_tmp_[^;\n]+ AS source JOIN analytics\.orders AS target ON target\.id = source\.id SET source\.value = GREATEST\(target\.value, source\.value\);
+DELETE target FROM analytics\.orders AS target JOIN __bruin_merge_tmp_[^;\n]+ AS source ON target\.id = source\.id;
+INSERT INTO analytics\.orders \(id, value\)
+SELECT source\.id, source\.value
+FROM __bruin_merge_tmp_[^;\n]+ AS source;
+DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
+COMMIT;$`),
+		},
+		{
+			name: "merge inserts without updates",
+			asset: &pipeline.Asset{
+				Name: "analytics.orders",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "value"},
+				},
+			},
+			query: "SELECT id, value FROM source",
+			wantRegex: regexp.MustCompile(
+				`(?s)^START TRANSACTION;
+DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
+CREATE TEMPORARY TABLE __bruin_merge_tmp_[^;\n]+ AS
+SELECT id, value FROM source;
+DELETE target FROM analytics\.orders AS target JOIN __bruin_merge_tmp_[^;\n]+ AS source ON target\.id = source\.id;
+INSERT INTO analytics\.orders \(id, value\)
+SELECT source\.id, source\.value
+FROM __bruin_merge_tmp_[^;\n]+ AS source;
+DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
+COMMIT;$`),
+		},
+		{
+			name: "merge requires columns",
 			asset: &pipeline.Asset{
 				Name: "analytics.orders",
 				Materialization: pipeline.Materialization{
@@ -124,9 +204,25 @@ COMMIT;$`),
 					Strategy: pipeline.MaterializationStrategyMerge,
 				},
 			},
-			query:       "SELECT id, col1 FROM source",
+			query:       "SELECT id FROM source",
 			wantErr:     true,
-			expectedErr: "materialization strategy merge is not supported",
+			expectedErr: "requires the `columns` field to be set",
+		},
+		{
+			name: "merge requires primary key",
+			asset: &pipeline.Asset{
+				Name: "analytics.orders",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+				},
+			},
+			query:       "SELECT id FROM source",
+			wantErr:     true,
+			expectedErr: "requires the `primary_key` field to be set",
 		},
 		{
 			name: "time interval",

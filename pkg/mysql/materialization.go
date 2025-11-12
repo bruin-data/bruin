@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -31,7 +32,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
-		pipeline.MaterializationStrategyMerge:          errorMaterializer,
+		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 		pipeline.MaterializationStrategySCD2ByColumn:   errorMaterializer,
@@ -177,4 +178,90 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 	), nil
+}
+
+func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
+	}
+
+	columnNames := asset.ColumnNames()
+	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
+
+	trimmedQuery := strings.TrimSpace(query)
+	trimmedQuery = strings.TrimSuffix(trimmedQuery, ";")
+
+	selectColumns := make([]string, 0, len(columnNames))
+	for _, col := range columnNames {
+		selectColumns = append(selectColumns, "source."+col)
+	}
+
+	insertColumns := strings.Join(columnNames, ", ")
+	selectClause := strings.Join(selectColumns, ", ")
+
+	tempTableName := "__bruin_merge_tmp_" + helpers.PrefixGenerator()
+	onClause := buildJoinConditions(primaryKeys, "target", "source")
+
+	queries := []string{
+		"START TRANSACTION",
+		fmt.Sprintf("DROP TEMPORARY TABLE IF EXISTS %s", tempTableName),
+		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS\n%s", tempTableName, trimmedQuery),
+	}
+
+	if len(mergeColumns) > 0 {
+		assignments := make([]string, 0, len(mergeColumns))
+		for _, col := range mergeColumns {
+			expr := "source." + col.Name
+			if col.MergeSQL != "" {
+				expr = col.MergeSQL
+			}
+			assignments = append(assignments, fmt.Sprintf("source.%s = %s", col.Name, expr))
+		}
+
+		updateStmt := fmt.Sprintf(
+			"UPDATE %s AS source JOIN %s AS target ON %s SET %s",
+			tempTableName,
+			asset.Name,
+			onClause,
+			strings.Join(assignments, ", "),
+		)
+		queries = append(queries, updateStmt)
+	}
+
+	deleteStmt := fmt.Sprintf(
+		"DELETE target FROM %s AS target JOIN %s AS source ON %s",
+		asset.Name,
+		tempTableName,
+		onClause,
+	)
+
+	insertStmt := fmt.Sprintf(
+		"INSERT INTO %s (%s)\nSELECT %s\nFROM %s AS source",
+		asset.Name,
+		insertColumns,
+		selectClause,
+		tempTableName,
+	)
+
+	queries = append(queries,
+		deleteStmt,
+		insertStmt,
+		fmt.Sprintf("DROP TEMPORARY TABLE IF EXISTS %s", tempTableName),
+		"COMMIT",
+	)
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildJoinConditions(keys []string, leftAlias, rightAlias string) string {
+	conditions := make([]string, len(keys))
+	for i, key := range keys {
+		conditions[i] = fmt.Sprintf("%s.%s = %s.%s", leftAlias, key, rightAlias, key)
+	}
+	return strings.Join(conditions, " AND ")
 }
