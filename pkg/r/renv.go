@@ -67,10 +67,9 @@ renv::restore(prompt = FALSE)
 		return errors.Wrap(err, "Rscript not found")
 	}
 
-	rCommand := fmt.Sprintf("%s %s", pathToRscript, tmpFile.Name())
 	err = r.cmd.Run(ctx, repo, &CommandInstance{
-		Name:    getShell(),
-		Args:    []string{getShellSubcommandFlag(), rCommand},
+		Name:    pathToRscript,
+		Args:    []string{tmpFile.Name()},
 		EnvVars: map[string]string{},
 	})
 	if err != nil {

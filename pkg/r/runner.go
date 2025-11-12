@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -16,8 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
-
-const WINDOWS = "windows"
 
 type cmd interface {
 	Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error
@@ -52,10 +49,9 @@ func (l *localRRunner) Run(ctx context.Context, execCtx *executionContext) error
 	// If there's no renv.lock, just run the R script directly
 	if execCtx.renvLock == "" {
 		log(ctx, "No renv.lock found, executing R script directly...")
-		rCommand := fmt.Sprintf("%s %s", l.pathToRscript, scriptPath)
 		return l.cmd.Run(ctx, execCtx.repo, &CommandInstance{
-			Name:    getShell(),
-			Args:    []string{getShellSubcommandFlag(), rCommand},
+			Name:    l.pathToRscript,
+			Args:    []string{scriptPath},
 			EnvVars: execCtx.envVariables,
 		})
 	}
@@ -70,10 +66,9 @@ func (l *localRRunner) Run(ctx context.Context, execCtx *executionContext) error
 	}
 
 	log(ctx, "renv dependencies ready, executing R script...")
-	rCommand := fmt.Sprintf("%s %s", l.pathToRscript, scriptPath)
 	return l.cmd.Run(ctx, execCtx.repo, &CommandInstance{
-		Name:    getShell(),
-		Args:    []string{getShellSubcommandFlag(), rCommand},
+		Name:    l.pathToRscript,
+		Args:    []string{scriptPath},
 		EnvVars: execCtx.envVariables,
 	})
 }
@@ -84,20 +79,6 @@ type CommandInstance struct {
 	Name    string
 	Args    []string
 	EnvVars map[string]string
-}
-
-func getShell() string {
-	if runtime.GOOS == WINDOWS {
-		return "cmd"
-	}
-	return "sh"
-}
-
-func getShellSubcommandFlag() string {
-	if runtime.GOOS == WINDOWS {
-		return "/C"
-	}
-	return "-c"
 }
 
 func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
