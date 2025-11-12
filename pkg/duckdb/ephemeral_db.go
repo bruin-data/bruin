@@ -5,8 +5,8 @@ package duck
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,14 +17,26 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/array"
 )
 
+// DriverInstaller is an interface for installing the DuckDB ADBC driver.
+type DriverInstaller interface {
+	InstallDuckDBDriver(ctx context.Context) error
+}
+
 var (
 	driverInstallOnce sync.Once
-	driverInstallErr  error
+	errDriverInstall  error
+	driverInstaller   DriverInstaller // Set by python package to avoid circular dependency
 )
 
-// ensureDriverInstalled ensures the DuckDB ADBC driver is installed
-// It lazily installs the driver on first connection attempt
-func ensureDriverInstalled() error {
+// SetDriverInstaller sets the driver installer to use for installing the ADBC driver.
+// This is called by the python package to avoid circular dependencies.
+func SetDriverInstaller(installer DriverInstaller) {
+	driverInstaller = installer
+}
+
+// ensureDriverInstalled ensures the DuckDB ADBC driver is installed.
+// It lazily installs the driver on first connection attempt.
+func ensureDriverInstalled(ctx context.Context) error {
 	driverInstallOnce.Do(func() {
 		// First, try to load the driver to see if it's already installed
 		var drv drivermgr.Driver
@@ -39,45 +51,18 @@ func ensureDriverInstalled() error {
 		}
 
 		// Driver not found, need to install it
-		// First ensure dbc tool is installed
-		if err := ensureDbcInstalled(); err != nil {
-			driverInstallErr = fmt.Errorf("failed to ensure dbc tool is installed: %w", err)
+		if driverInstaller == nil {
+			errDriverInstall = errors.New("driver installer not set - please ensure the python package is initialized")
 			return
 		}
 
-		// Install the DuckDB driver, suppress output
-		cmd := exec.Command("uv", "tool", "run", "dbc", "install", "duckdb")
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		if err := cmd.Run(); err != nil {
-			driverInstallErr = fmt.Errorf("failed to install duckdb driver: %w", err)
+		if err := driverInstaller.InstallDuckDBDriver(ctx); err != nil {
+			errDriverInstall = fmt.Errorf("failed to install duckdb driver: %w", err)
 			return
 		}
 	})
 
-	return driverInstallErr
-}
-
-// ensureDbcInstalled ensures the dbc tool is installed via uv
-func ensureDbcInstalled() error {
-	// Check if dbc is already available
-	cmd := exec.Command("uv", "tool", "run", "dbc", "--version")
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	if err := cmd.Run(); err == nil {
-		// dbc is already installed
-		return nil
-	}
-
-	// Install dbc, suppress output
-	cmd = exec.Command("uv", "tool", "install", "adbc-driver-manager[dbcapi]")
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to install dbc tool: %w", err)
-	}
-
-	return nil
+	return errDriverInstall
 }
 
 type ADBCConnection struct {
@@ -88,9 +73,10 @@ func NewEphemeralConnection(c DuckDBConfig) (*ADBCConnection, error) {
 	return &ADBCConnection{config: c}, nil
 }
 
+//nolint:ireturn // Returning ADBC interface types by design
 func (e *ADBCConnection) getConnection(ctx context.Context) (adbc.Connection, adbc.Database, error) {
 	// Ensure driver is installed
-	if err := ensureDriverInstalled(); err != nil {
+	if err := ensureDriverInstalled(ctx); err != nil {
 		return nil, nil, err
 	}
 
@@ -112,7 +98,9 @@ func (e *ADBCConnection) getConnection(ctx context.Context) (adbc.Connection, ad
 	return conn, db, nil
 }
 
-// QueryContext implements the connection interface
+// QueryContext implements the connection interface.
+//
+//nolint:ireturn // Returning interface type is by design for abstraction
 func (e *ADBCConnection) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
 	conn, db, err := e.getConnection(ctx)
 	if err != nil {
@@ -133,7 +121,7 @@ func (e *ADBCConnection) QueryContext(ctx context.Context, query string, args ..
 		stmt.Close()
 		_ = conn.Close()
 		_ = db.Close()
-		return nil, fmt.Errorf("parameterized queries not yet supported with ADBC")
+		return nil, errors.New("parameterized queries not yet supported with ADBC")
 	}
 
 	err = stmt.SetSqlQuery(query)
@@ -155,7 +143,7 @@ func (e *ADBCConnection) QueryContext(ctx context.Context, query string, args ..
 	return newADBCRows(reader, stmt, conn, db), nil
 }
 
-// ExecContext implements the connection interface
+// ExecContext implements the connection interface.
 func (e *ADBCConnection) ExecContext(ctx context.Context, sqlQuery string, arguments ...any) (sql.Result, error) {
 	conn, db, err := e.getConnection(ctx)
 	if err != nil {
@@ -173,7 +161,7 @@ func (e *ADBCConnection) ExecContext(ctx context.Context, sqlQuery string, argum
 	defer stmt.Close()
 
 	if len(arguments) > 0 {
-		return nil, fmt.Errorf("parameterized queries not yet supported with ADBC")
+		return nil, errors.New("parameterized queries not yet supported with ADBC")
 	}
 
 	err = stmt.SetSqlQuery(sqlQuery)
@@ -189,7 +177,9 @@ func (e *ADBCConnection) ExecContext(ctx context.Context, sqlQuery string, argum
 	return &basicResult{rowsAffected: rowsAffected}, nil
 }
 
-// QueryRowContext implements the connection interface
+// QueryRowContext implements the connection interface.
+//
+//nolint:ireturn // Returning interface type is by design for abstraction
 func (e *ADBCConnection) QueryRowContext(ctx context.Context, query string, args ...any) Row {
 	conn, db, err := e.getConnection(ctx)
 	if err != nil {
@@ -207,7 +197,7 @@ func (e *ADBCConnection) QueryRowContext(ctx context.Context, query string, args
 		stmt.Close()
 		_ = conn.Close()
 		_ = db.Close()
-		return &adbcRow{err: fmt.Errorf("parameterized queries not yet supported with ADBC")}
+		return &adbcRow{err: errors.New("parameterized queries not yet supported with ADBC")}
 	}
 
 	err = stmt.SetSqlQuery(query)
@@ -242,6 +232,7 @@ func (e *ADBCConnection) QueryRowContext(ctx context.Context, query string, args
 		return &adbcRow{err: sql.ErrNoRows}
 	}
 
+	//nolint:staticcheck // Using deprecated method for Arrow compatibility
 	record := reader.Record()
 	if record.NumRows() == 0 {
 		reader.Release()
@@ -271,21 +262,21 @@ type basicResult struct {
 }
 
 func (r *basicResult) LastInsertId() (int64, error) {
-	return 0, fmt.Errorf("LastInsertId not supported")
+	return 0, errors.New("LastInsertId not supported")
 }
 
 func (r *basicResult) RowsAffected() (int64, error) {
 	return r.rowsAffected, nil
 }
 
-// adbcRows implements the Rows interface
+// adbcRows implements the Rows interface.
 type adbcRows struct {
 	reader        array.RecordReader
 	stmt          adbc.Statement
 	conn          adbc.Connection
 	db            adbc.Database
-	currentRecord arrow.Record
-	allRecords    []arrow.Record // Keep all records to prevent premature release
+	currentRecord arrow.Record   //nolint:staticcheck // Using deprecated type for Arrow compatibility
+	allRecords    []arrow.Record //nolint:staticcheck // Using deprecated type for Arrow compatibility
 	currentRow    int64
 	closed        bool
 	err           error
@@ -319,6 +310,7 @@ func (r *adbcRows) Next() bool {
 			return false
 		}
 
+		//nolint:staticcheck // Using deprecated method for Arrow compatibility
 		r.currentRecord = r.reader.Record()
 		r.currentRecord.Retain()
 		r.allRecords = append(r.allRecords, r.currentRecord)
@@ -330,7 +322,7 @@ func (r *adbcRows) Next() bool {
 
 func (r *adbcRows) Scan(dest ...interface{}) error {
 	if r.currentRecord == nil {
-		return fmt.Errorf("no current record")
+		return errors.New("no current record")
 	}
 
 	if len(dest) != int(r.currentRecord.NumCols()) {
@@ -363,10 +355,13 @@ func (r *adbcRows) Scan(dest ...interface{}) error {
 				case *int:
 					*d = int(v)
 				case *int8:
+					//nolint:gosec // Intentional narrowing conversion, caller responsible for range
 					*d = int8(v)
 				case *int16:
+					//nolint:gosec // Intentional narrowing conversion, caller responsible for range
 					*d = int16(v)
 				case *int32:
+					//nolint:gosec // Intentional narrowing conversion, caller responsible for range
 					*d = int32(v)
 				case *int64:
 					*d = v
@@ -431,7 +426,7 @@ func (r *adbcRows) ColumnTypes() ([]ColumnType, error) {
 	return types, nil
 }
 
-// arrowTypeToSQLType maps Arrow type names to SQL type names
+// arrowTypeToSQLType maps Arrow type names to SQL type names.
 func arrowTypeToSQLType(arrowType string) string {
 	switch arrowType {
 	case "int8", "int16", "int32", "int64":
@@ -491,7 +486,7 @@ func (r *adbcRows) Close() error {
 	return nil
 }
 
-// adbcRow implements the Row interface
+// adbcRow implements the Row interface.
 type adbcRow struct {
 	values []interface{}
 	err    error
@@ -528,10 +523,13 @@ func (r *adbcRow) Scan(dest ...interface{}) error {
 				case *int:
 					*d = int(v)
 				case *int8:
+					//nolint:gosec // Intentional narrowing conversion, caller responsible for range
 					*d = int8(v)
 				case *int16:
+					//nolint:gosec // Intentional narrowing conversion, caller responsible for range
 					*d = int16(v)
 				case *int32:
+					//nolint:gosec // Intentional narrowing conversion, caller responsible for range
 					*d = int32(v)
 				case *int64:
 					*d = v
@@ -574,7 +572,7 @@ func (r *adbcRow) Scan(dest ...interface{}) error {
 	return nil
 }
 
-// adbcColumnType implements the ColumnType interface
+// adbcColumnType implements the ColumnType interface.
 type adbcColumnType struct {
 	name   string
 	dbType string
@@ -584,7 +582,7 @@ func (c *adbcColumnType) DatabaseTypeName() string {
 	return c.dbType
 }
 
-// getArrowValue extracts a value from an Arrow array at the given index
+// getArrowValue extracts a value from an Arrow array at the given index.
 func getArrowValue(arr arrow.Array, idx int) interface{} {
 	if arr.IsNull(idx) {
 		return nil

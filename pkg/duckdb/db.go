@@ -34,7 +34,7 @@ type connection interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) Row
 }
 
-// Rows interface for query results
+// Rows interface for query results.
 type Rows interface {
 	Next() bool
 	Scan(dest ...interface{}) error
@@ -44,12 +44,12 @@ type Rows interface {
 	Close() error
 }
 
-// Row interface for single row results
+// Row interface for single row results.
 type Row interface {
 	Scan(dest ...interface{}) error
 }
 
-// ColumnType interface for column metadata
+// ColumnType interface for column metadata.
 type ColumnType interface {
 	DatabaseTypeName() string
 }
