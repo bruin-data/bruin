@@ -153,6 +153,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Oracle", link: "/platforms/oracle"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
                     {text: "Microsoft SQL Server", link: "/platforms/mssql"},
+                    {text: "MySQL", link: "/platforms/mysql"},
                     {text: "Postgres", link: "/platforms/postgres"},
                     {text: "Redshift", link: "/platforms/redshift"},
                     {text: "Snowflake", link: "/platforms/snowflake"},
