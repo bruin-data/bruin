@@ -37,11 +37,11 @@ var AvailablePythonVersions = map[string]bool{
 }
 
 const (
-	UvVersion               = "0.6.16"
-	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.14.101"
-	sqlfluffVersion         = "3.4.1"
-	adbcDriverManagerVersion = "1.2.0"
+	UvVersion                = "0.6.16"
+	pythonVersionForIngestr  = "3.11"
+	ingestrVersion           = "0.14.101"
+	sqlfluffVersion          = "3.4.1"
+	adbcDriverManagerVersion = "1.9.0"
 )
 
 var DatabasePrefixToSqlfluffDialect = map[string]string{
@@ -437,7 +437,7 @@ func (u *UvPythonRunner) InstallDbcTool(ctx context.Context) error {
 	}
 
 	// Install dbc with the specified version
-	dbcPackage := fmt.Sprintf("adbc-driver-manager[dbcapi]==%s", adbcDriverManagerVersion)
+	dbcPackage := fmt.Sprintf("adbc-driver-manager[dbapi]==%s", adbcDriverManagerVersion)
 	installCmd := exec.CommandContext(ctx, uvBinaryPath, "tool", "install", "--no-config", "--force", "--quiet", "--python", pythonVersionForIngestr, dbcPackage)
 
 	output, err := installCmd.CombinedOutput()
@@ -467,6 +467,8 @@ func (u *UvPythonRunner) InstallDuckDBDriver(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to install duckdb driver: %w -- Output: %s", err, output)
 	}
+
+	fmt.Println(output) // Log the output for debugging
 
 	return nil
 }
