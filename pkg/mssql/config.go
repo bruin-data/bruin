@@ -17,6 +17,8 @@ type Config struct {
 func (c *Config) ToDBConnectionURI() string {
 	query := url.Values{}
 	query.Add("app name", "Bruin CLI")
+	query.Add("TrustServerCertificate", "true")
+	query.Add("encrypt", "disable")
 	if c.Database != "" {
 		query.Add("database", c.Database)
 	}
