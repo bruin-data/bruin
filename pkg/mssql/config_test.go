@@ -10,6 +10,7 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 	t.Parallel()
 
 	t.Run("default parameters without custom query", func(t *testing.T) {
+		t.Parallel()
 		c := Config{
 			Username: "user",
 			Password: "password",
@@ -27,6 +28,7 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 	})
 
 	t.Run("custom query parameters", func(t *testing.T) {
+		t.Parallel()
 		c := Config{
 			Username: "user",
 			Password: "password",
@@ -44,6 +46,7 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 	})
 
 	t.Run("custom query without database parameter", func(t *testing.T) {
+		t.Parallel()
 		c := Config{
 			Username: "user",
 			Password: "password",
@@ -60,6 +63,7 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 	})
 
 	t.Run("custom query with database parameter already included", func(t *testing.T) {
+		t.Parallel()
 		c := Config{
 			Username: "user",
 			Password: "password",
