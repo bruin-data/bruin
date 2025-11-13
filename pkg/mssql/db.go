@@ -22,6 +22,20 @@ type Limiter interface {
 	Limit(query string, limit int64) string
 }
 
+// QuoteIdentifier quotes a SQL Server identifier (table, column, etc.) to handle special characters.
+// It splits the identifier on "." and quotes each part separately with square brackets.
+// For example, "schema.my-table" becomes "[schema].[my-table]".
+func QuoteIdentifier(identifier string) string {
+	parts := strings.Split(identifier, ".")
+	quotedParts := make([]string, len(parts))
+	for i, part := range parts {
+		// Escape any existing right brackets by doubling them
+		escapedPart := strings.ReplaceAll(part, "]", "]]")
+		quotedParts[i] = fmt.Sprintf("[%s]", escapedPart)
+	}
+	return strings.Join(quotedParts, ".")
+}
+
 func NewDB(c *Config) (*DB, error) {
 	conn, err := sqlx.Open("mssql", c.ToDBConnectionURI())
 	if err != nil {
@@ -241,7 +255,7 @@ func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([
 
 	q := fmt.Sprintf(`
 USE [%s];
-SELECT 
+SELECT
     COLUMN_NAME,
     DATA_TYPE,
     IS_NULLABLE,
@@ -250,13 +264,33 @@ SELECT
     NUMERIC_PRECISION,
     NUMERIC_SCALE
 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
+WHERE TABLE_SCHEMA = @p1 AND TABLE_NAME = @p2
 ORDER BY ORDINAL_POSITION;
-`, databaseName, schemaName, tableNameOnly)
+`, databaseName)
 
-	result, err := db.Select(ctx, &query.Query{Query: q})
+	// Use parameterized query to avoid SQL injection and handle special characters
+	rows, err := db.conn.QueryContext(ctx, q, schemaName, tableNameOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
+	}
+	defer rows.Close()
+
+	var result [][]interface{}
+	for rows.Next() {
+		var columnName, dataType, isNullable string
+		var columnDefault interface{}
+		var charMaxLength, numericPrecision, numericScale interface{}
+
+		err := rows.Scan(&columnName, &dataType, &isNullable, &columnDefault, &charMaxLength, &numericPrecision, &numericScale)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan column row: %w", err)
+		}
+
+		result = append(result, []interface{}{columnName, dataType, isNullable, columnDefault, charMaxLength, numericPrecision, numericScale})
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating column rows: %w", err)
 	}
 
 	columns := make([]*ansisql.DBColumn, 0, len(result))

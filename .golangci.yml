@@ -54,6 +54,7 @@ linters:
     - godox
     - nonamedreturns
     - maintidx
+    - nestif
   presets:
     - bugs
     - comment

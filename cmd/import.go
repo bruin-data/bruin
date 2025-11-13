@@ -268,6 +268,11 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 		fullTableName = postgres.QuoteIdentifier(fullTableName)
 	}
 
+	// For MSSQL, quote the schema and table names to handle special characters
+	if _, ok := conn.(*mssql.DB); ok {
+		fullTableName = mssql.QuoteIdentifier(fullTableName)
+	}
+
 	// Query to get column information
 	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", fullTableName)
 
@@ -376,6 +381,12 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		}
 		if strings.Contains(connType, "oracle") {
 			return pipeline.AssetTypeOracleSource
+		}
+		if strings.Contains(connType, "mssql") {
+			return pipeline.AssetTypeMsSQLSource
+		}
+		if strings.Contains(connType, "synapse") {
+			return pipeline.AssetTypeSynapseSource
 		}
 	}
 

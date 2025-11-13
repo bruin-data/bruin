@@ -3,6 +3,7 @@ package mssql
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 type Config struct {
@@ -15,17 +16,36 @@ type Config struct {
 }
 
 func (c *Config) ToDBConnectionURI() string {
-	query := url.Values{}
-	query.Add("app name", "Bruin CLI")
-	if c.Database != "" {
-		query.Add("database", c.Database)
+	var rawQuery string
+
+	// If custom query parameters are provided, use them
+	if c.Query != "" {
+		rawQuery = c.Query
+		// If database is specified but not in the query, add it
+		if c.Database != "" && !strings.Contains(c.Query, "database=") {
+			if strings.Contains(rawQuery, "?") || strings.Contains(rawQuery, "&") {
+				rawQuery += "&database=" + url.QueryEscape(c.Database)
+			} else {
+				rawQuery = "database=" + url.QueryEscape(c.Database) + "&" + rawQuery
+			}
+		}
+	} else {
+		// Use default parameters for convenience (local dev, Docker, etc.)
+		query := url.Values{}
+		query.Add("app name", "Bruin CLI")
+		query.Add("TrustServerCertificate", "true")
+		query.Add("encrypt", "disable")
+		if c.Database != "" {
+			query.Add("database", c.Database)
+		}
+		rawQuery = query.Encode()
 	}
 
 	u := &url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(c.Username, c.Password),
 		Host:     fmt.Sprintf("%s:%d", c.Host, c.Port),
-		RawQuery: query.Encode(),
+		RawQuery: rawQuery,
 	}
 
 	return u.String()

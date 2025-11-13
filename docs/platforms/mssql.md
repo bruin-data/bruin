@@ -18,7 +18,99 @@ In order to set up a SQL Server connection in Bruin, you need to add a configura
           host: "mssql_host.somedomain.com"
           port: 1433
           database: "dev"
+          options: "encrypt=disable&TrustServerCertificate=true"  # optional
 ```
+
+### Connection Parameters
+
+- `name` (required): The name of the connection to be used in assets
+- `username` (required): SQL Server username
+- `password` (required): SQL Server password
+- `host` (required): Hostname or IP address of the SQL Server
+- `port` (optional): Port number (default: 1433)
+- `database` (required): Database name to connect to
+- `options` (optional): Additional connection string parameters
+
+### Connection Options
+
+The `options` field allows you to customize the connection behavior with additional parameters. If not specified, Bruin uses safe defaults suitable for local development and Docker environments.
+
+#### Default Behavior (No Options)
+
+When `options` is not specified, these defaults are applied:
+- `TrustServerCertificate=true` - Trust self-signed certificates
+- `encrypt=disable` - Disable encryption (suitable for local/Docker)
+- `app name=Bruin CLI` - Application identifier
+
+#### Common Use Cases
+
+**Production with Full Encryption:**
+```yaml
+connections:
+  mssql:
+    - name: "mssql_prod"
+      username: "prod_user"
+      password: "SecurePassword"
+      host: "production.database.azure.com"
+      port: 1433
+      database: "ProductionDB"
+      options: "encrypt=true&TrustServerCertificate=false"
+```
+
+**Azure SQL Database:**
+```yaml
+connections:
+  mssql:
+    - name: "mssql_azure"
+      username: "user@server"
+      password: "password"
+      host: "myserver.database.windows.net"
+      port: 1433
+      database: "mydb"
+      options: "encrypt=true"
+```
+
+**Local Development (Explicit):**
+```yaml
+connections:
+  mssql:
+    - name: "mssql_local"
+      username: "sa"
+      password: "LocalPass123"
+      host: "localhost"
+      port: 1433
+      database: "devdb"
+      options: "encrypt=disable&TrustServerCertificate=true"
+```
+
+**Custom Connection Timeout:**
+```yaml
+connections:
+  mssql:
+    - name: "mssql_custom"
+      username: "user"
+      password: "password"
+      host: "server.com"
+      port: 1433
+      database: "mydb"
+      options: "connection timeout=30&encrypt=true"
+```
+
+#### Available Options
+
+Common SQL Server connection string parameters:
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `encrypt` | `true`, `false`, `disable` | Enable/disable encryption |
+| `TrustServerCertificate` | `true`, `false` | Trust server certificate |
+| `connection timeout` | number | Connection timeout in seconds (default: 30) |
+| `app name` | string | Application name identifier |
+| `ApplicationIntent` | `ReadOnly`, `ReadWrite` | For Always On availability groups |
+| `MultiSubnetFailover` | `true`, `false` | For failover scenarios |
+| `packet size` | 4096-32767 | Network packet size |
+
+For a complete list of available parameters, see the [go-mssqldb documentation](https://github.com/microsoft/go-mssqldb?tab=readme-ov-file#connection-parameters-and-dsn).
 
 
 ## SQL Server Assets
