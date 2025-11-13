@@ -230,6 +230,13 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 
 	if schemaComparison.HasSchemaDifferences {
 		errorPrinter.Fprintf(errOut, "\n%s\n", "Schema differences detected, see the table above.")
+
+		// Generate and display ALTER TABLE statement
+		alterStatement := generateAlterTableStatement(schemaComparison, table1Name)
+		if alterStatement != "" {
+			fmt.Fprintf(errOut, "\nALTER TABLE statement to transform %s to match %s:\n", table1Name, table2Name)
+			fmt.Fprintf(errOut, "%s\n", alterStatement)
+		}
 	}
 
 	// Skip detailed column statistics in schema-only mode
@@ -836,4 +843,80 @@ func getColumnValue(col *diff.Column, exists bool, property string) string {
 	default:
 		return "-"
 	}
+}
+
+// generateAlterTableStatement generates a single SQL ALTER TABLE statement to transform table1 to match table2's schema.
+func generateAlterTableStatement(schemaComparison diff.SchemaComparisonResult, table1Name string) string {
+	if !schemaComparison.HasSchemaDifferences {
+		return ""
+	}
+
+	var clauses []string
+
+	// Handle columns that need to be added (exist in table2 but not in table1)
+	for _, missingCol := range schemaComparison.MissingColumns {
+		if missingCol.MissingFrom == table1Name {
+			// This column exists in table2 but not in table1, so we need to add it
+			nullability := "NULL"
+			if !missingCol.Nullable {
+				nullability = "NOT NULL"
+			}
+			clause := fmt.Sprintf("ADD COLUMN %s %s %s",
+				missingCol.ColumnName, missingCol.Type, nullability)
+			clauses = append(clauses, clause)
+		}
+	}
+
+	// Handle columns that need to be dropped (exist in table1 but not in table2)
+	for _, missingCol := range schemaComparison.MissingColumns {
+		if missingCol.TableName == table1Name && missingCol.MissingFrom != table1Name {
+			// This column exists in table1 but not in table2, so we need to drop it
+			clause := fmt.Sprintf("DROP COLUMN %s", missingCol.ColumnName)
+			clauses = append(clauses, clause)
+		}
+	}
+
+	// Handle columns with different properties
+	for _, colDiff := range schemaComparison.ColumnDifferences {
+		// Type differences
+		if colDiff.TypeDifference != nil {
+			clause := fmt.Sprintf("ALTER COLUMN %s TYPE %s",
+				colDiff.ColumnName, colDiff.TypeDifference.Table2Type)
+			clauses = append(clauses, clause)
+		}
+
+		// Nullability differences
+		if colDiff.NullabilityDifference != nil {
+			if colDiff.NullabilityDifference.Table2Nullable {
+				clause := fmt.Sprintf("ALTER COLUMN %s DROP NOT NULL",
+					colDiff.ColumnName)
+				clauses = append(clauses, clause)
+			} else {
+				clause := fmt.Sprintf("ALTER COLUMN %s SET NOT NULL",
+					colDiff.ColumnName)
+				clauses = append(clauses, clause)
+			}
+		}
+
+		// Uniqueness differences (simplified - actual implementation may vary by database)
+		if colDiff.UniquenessDifference != nil {
+			if colDiff.UniquenessDifference.Table2Unique && !colDiff.UniquenessDifference.Table1Unique {
+				clause := fmt.Sprintf("ADD UNIQUE (%s)", colDiff.ColumnName)
+				clauses = append(clauses, clause)
+			} else if !colDiff.UniquenessDifference.Table2Unique && colDiff.UniquenessDifference.Table1Unique {
+				// Dropping unique constraints requires knowing the constraint name, which varies by database
+				// This is a simplified version - commented out as it needs manual intervention
+				clause := fmt.Sprintf("-- DROP CONSTRAINT <constraint_name> -- Remove UNIQUE constraint on %s",
+					colDiff.ColumnName)
+				clauses = append(clauses, clause)
+			}
+		}
+	}
+
+	if len(clauses) == 0 {
+		return ""
+	}
+
+	// Combine all clauses into a single ALTER TABLE statement
+	return "\nALTER TABLE " + table1Name + "\n  " + strings.Join(clauses, ",\n  ") + ";"
 }

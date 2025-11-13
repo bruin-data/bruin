@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/bruin-data/bruin/pkg/diff"
 )
 
 func TestCalculatePercentageDiff(t *testing.T) {
@@ -350,6 +353,211 @@ func TestFormatDiffValue(t *testing.T) {
 			result := formatDiffValue(tt.rawDiff, tt.percentageDiff)
 			if result != tt.expected {
 				t.Errorf("formatDiffValue(%.6g, %q) = %q, want %q", tt.rawDiff, tt.percentageDiff, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGenerateAlterTableStatement(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		schemaComparison diff.SchemaComparisonResult
+		table1Name       string
+		expectedClauses  []string // Clauses that should be present in the single statement
+	}{
+		{
+			name: "no schema differences",
+			schemaComparison: diff.SchemaComparisonResult{
+				HasSchemaDifferences: false,
+			},
+			table1Name:      "users",
+			expectedClauses: nil, // Should return empty string
+		},
+		{
+			name: "add column",
+			schemaComparison: diff.SchemaComparisonResult{
+				HasSchemaDifferences: true,
+				MissingColumns: []diff.MissingColumn{
+					{
+						ColumnName:  "email",
+						Type:        "VARCHAR(255)",
+						Nullable:    false,
+						MissingFrom: "users",
+						TableName:   "users_v2",
+					},
+				},
+			},
+			table1Name: "users",
+			expectedClauses: []string{
+				"ADD COLUMN email VARCHAR(255) NOT NULL",
+			},
+		},
+		{
+			name: "drop column",
+			schemaComparison: diff.SchemaComparisonResult{
+				HasSchemaDifferences: true,
+				MissingColumns: []diff.MissingColumn{
+					{
+						ColumnName:  "old_field",
+						Type:        "INTEGER",
+						Nullable:    true,
+						MissingFrom: "users_v2",
+						TableName:   "users",
+					},
+				},
+			},
+			table1Name: "users",
+			expectedClauses: []string{
+				"DROP COLUMN old_field",
+			},
+		},
+		{
+			name: "alter column type",
+			schemaComparison: diff.SchemaComparisonResult{
+				HasSchemaDifferences: true,
+				ColumnDifferences: []diff.ColumnDifference{
+					{
+						ColumnName: "age",
+						TypeDifference: &diff.TypeDifference{
+							Table1Type: "INTEGER",
+							Table2Type: "BIGINT",
+						},
+					},
+				},
+			},
+			table1Name: "users",
+			expectedClauses: []string{
+				"ALTER COLUMN age TYPE BIGINT",
+			},
+		},
+		{
+			name: "alter column nullability - drop not null",
+			schemaComparison: diff.SchemaComparisonResult{
+				HasSchemaDifferences: true,
+				ColumnDifferences: []diff.ColumnDifference{
+					{
+						ColumnName: "middle_name",
+						NullabilityDifference: &diff.NullabilityDifference{
+							Table1Nullable: false,
+							Table2Nullable: true,
+						},
+					},
+				},
+			},
+			table1Name: "users",
+			expectedClauses: []string{
+				"ALTER COLUMN middle_name DROP NOT NULL",
+			},
+		},
+		{
+			name: "alter column nullability - set not null",
+			schemaComparison: diff.SchemaComparisonResult{
+				HasSchemaDifferences: true,
+				ColumnDifferences: []diff.ColumnDifference{
+					{
+						ColumnName: "last_name",
+						NullabilityDifference: &diff.NullabilityDifference{
+							Table1Nullable: true,
+							Table2Nullable: false,
+						},
+					},
+				},
+			},
+			table1Name: "users",
+			expectedClauses: []string{
+				"ALTER COLUMN last_name SET NOT NULL",
+			},
+		},
+		{
+			name: "add unique constraint",
+			schemaComparison: diff.SchemaComparisonResult{
+				HasSchemaDifferences: true,
+				ColumnDifferences: []diff.ColumnDifference{
+					{
+						ColumnName: "username",
+						UniquenessDifference: &diff.UniquenessDifference{
+							Table1Unique: false,
+							Table2Unique: true,
+						},
+					},
+				},
+			},
+			table1Name: "users",
+			expectedClauses: []string{
+				"ADD UNIQUE (username)",
+			},
+		},
+		{
+			name: "multiple changes",
+			schemaComparison: diff.SchemaComparisonResult{
+				HasSchemaDifferences: true,
+				MissingColumns: []diff.MissingColumn{
+					{
+						ColumnName:  "created_at",
+						Type:        "TIMESTAMP",
+						Nullable:    false,
+						MissingFrom: "users",
+						TableName:   "users_v2",
+					},
+				},
+				ColumnDifferences: []diff.ColumnDifference{
+					{
+						ColumnName: "age",
+						TypeDifference: &diff.TypeDifference{
+							Table1Type: "INTEGER",
+							Table2Type: "BIGINT",
+						},
+					},
+					{
+						ColumnName: "bio",
+						NullabilityDifference: &diff.NullabilityDifference{
+							Table1Nullable: false,
+							Table2Nullable: true,
+						},
+					},
+				},
+			},
+			table1Name: "users",
+			expectedClauses: []string{
+				"ADD COLUMN created_at TIMESTAMP NOT NULL",
+				"ALTER COLUMN age TYPE BIGINT",
+				"ALTER COLUMN bio DROP NOT NULL",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := generateAlterTableStatement(tt.schemaComparison, tt.table1Name)
+
+			if len(tt.expectedClauses) == 0 {
+				if result != "" {
+					t.Errorf("Expected empty string, got %q", result)
+				}
+				return
+			}
+
+			// Check that the result is a single ALTER TABLE statement
+			if !strings.HasPrefix(strings.TrimSpace(result), "ALTER TABLE "+tt.table1Name) {
+				t.Errorf("Expected result to start with 'ALTER TABLE %s', got:\n%s", tt.table1Name, result)
+			}
+
+			// Check that all expected clauses are present in the result
+			for _, expectedClause := range tt.expectedClauses {
+				if !strings.Contains(result, expectedClause) {
+					t.Errorf("Expected clause %q not found in result:\n%s", expectedClause, result)
+				}
+			}
+
+			// For multiple changes, ensure they're separated by commas
+			if len(tt.expectedClauses) > 1 {
+				if !strings.Contains(result, ",") {
+					t.Errorf("Expected multiple clauses to be separated by commas, got:\n%s", result)
+				}
 			}
 		})
 	}
