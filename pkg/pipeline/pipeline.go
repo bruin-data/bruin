@@ -642,18 +642,18 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
-	"athena":     AssetTypeAthenaQuery,
-	"bigquery":   AssetTypeBigqueryQuery,
-	"snowflake":  AssetTypeSnowflakeQuery,
-	"postgres":   AssetTypePostgresQuery,
-	"redshift":   AssetTypeRedshiftQuery,
-	"mssql":      AssetTypeMsSQLQuery,
-	"databricks": AssetTypeDatabricksQuery,
-	"synapse":    AssetTypeSynapseQuery,
-	"duckdb":     AssetTypeDuckDBQuery,
-	"clickhouse": AssetTypeClickHouse,
-	"oracle":     AssetTypeOracleQuery,
-	"motherduck": AssetTypeMotherduckQuery,
+	"athena":        AssetTypeAthenaQuery,
+	"bigquery":      AssetTypeBigqueryQuery,
+	"snowflake":     AssetTypeSnowflakeQuery,
+	"postgres":      AssetTypePostgresQuery,
+	"redshift":      AssetTypeRedshiftQuery,
+	"mssql":         AssetTypeMsSQLQuery,
+	"databricks":    AssetTypeDatabricksQuery,
+	"synapse":       AssetTypeSynapseQuery,
+	"duckdb":        AssetTypeDuckDBQuery,
+	"clickhouse":    AssetTypeClickHouse,
+	"oracle":        AssetTypeOracleQuery,
+	"motherduck":    AssetTypeMotherduckQuery,
 	"elasticsearch": AssetTypeElasticsearch,
 }
 

@@ -99,11 +99,11 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		{
 			name: "empty secure and verify_certs (should default to true)",
 			config: Config{
-				Username: "user",
-				Password: "pass",
-				Host:     "es.example.com",
-				Port:     443,
-				Secure:   "",
+				Username:    "user",
+				Password:    "pass",
+				Host:        "es.example.com",
+				Port:        443,
+				Secure:      "",
 				VerifyCerts: "",
 			},
 			expected: "elasticsearch://user:pass@es.example.com:443?secure=true&verify_certs=true",
