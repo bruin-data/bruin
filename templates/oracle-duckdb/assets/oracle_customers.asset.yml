@@ -1,0 +1,30 @@
+name: oracle_raw.customers
+type: ingestr
+
+description: >
+  Land customer master data from Oracle into DuckDB so downstream models have a trusted source of customer dimensions.
+columns:
+  - name: customer_id
+    type: number
+    description: "Surrogate identifier for the customer record"
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: full_name
+    type: varchar
+    description: "Customer full name used for reporting"
+  - name: segment
+    type: varchar
+    description: "Customer segment such as online, wholesale or retail"
+  - name: email
+    type: varchar
+    description: "Preferred notification email"
+  - name: updated_at
+    type: timestamp
+    description: "Last modification timestamp in Oracle"
+
+parameters:
+  source_connection: oracle-default
+  source_table: BRUIN_TMPL.CUSTOMERS
+  destination: duckdb
+  destination_table: oracle_customers

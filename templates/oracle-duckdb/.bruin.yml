@@ -1,0 +1,15 @@
+default_environment: default
+
+environments:
+  default:
+    connections:
+      oracle:
+        - name: oracle-default
+          username: ORACLE_USERNAME
+          password: ORACLE_PASSWORD
+          host: ORACLE_HOSTNAME
+          port: 1521
+          service_name: ORACLE_SERVICE
+      duckdb:
+        - name: duckdb-default
+          path: /absolute/path/to/oracle_duckdb.duckdb

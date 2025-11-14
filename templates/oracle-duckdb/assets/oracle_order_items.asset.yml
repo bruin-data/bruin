@@ -1,0 +1,28 @@
+name: oracle_raw.order_items
+type: ingestr
+
+description: >
+  Copy order line items from Oracle so each order-level metric in DuckDB can be rebuilt with product-level accuracy.
+columns:
+  - name: order_item_id
+    type: number
+    description: "Primary key for the order line"
+    primary_key: true
+  - name: order_id
+    type: number
+    description: "Parent order identifier"
+  - name: product_sku
+    type: varchar
+    description: "Product SKU for the ordered item"
+  - name: quantity
+    type: number
+    description: "Units sold in the order line"
+  - name: unit_price
+    type: number
+    description: "Unit price captured in Oracle"
+
+parameters:
+  source_connection: oracle-default
+  source_table: BRUIN_TMPL.ORDER_ITEMS
+  destination: duckdb
+  destination_table: oracle_order_items
