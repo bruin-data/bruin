@@ -173,11 +173,13 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 		return errors.Wrap(err, "failed to start CommandInstance")
 	}
 
-	// Wait for the command to finish - this will close the pipes
-	cmdErr := cmd.Wait()
-
-	// Wait for pipe consumption to complete
+	// Wait for pipe consumption to complete FIRST
+	// This is critical: we must finish reading from pipes before calling cmd.Wait()
+	// because cmd.Wait() will close the pipes after the command exits
 	pipeErr := wg.Wait()
+
+	// Now wait for the command to finish
+	cmdErr := cmd.Wait()
 
 	// Return command error first if both exist
 	if cmdErr != nil {
