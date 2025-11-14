@@ -110,6 +110,7 @@ const (
 	AssetTypeRedash                 = AssetType("redash")
 	AssetTypeGoodData               = AssetType("gooddata")
 	AssetTypeS3KeySensor            = AssetType("s3.sensor.key_sensor")
+	AssetTypeElasticsearch          = AssetType("elasticsearch")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
@@ -166,6 +167,7 @@ var defaultMapping = map[string]string{
 	"smartsheet":            "smartsheet-default",
 	"sftp":                  "sftp-default",
 	"motherduck":            "motherduck-default",
+	"elasticsearch":         "elasticsearch-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -636,6 +638,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeOracleQuery:           "oracle",
 	AssetTypeOracleSource:          "oracle",
 	AssetTypeS3KeySensor:           "aws",
+	AssetTypeElasticsearch:         "elasticsearch",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -651,6 +654,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"clickhouse": AssetTypeClickHouse,
 	"oracle":     AssetTypeOracleQuery,
 	"motherduck": AssetTypeMotherduckQuery,
+	"elasticsearch": AssetTypeElasticsearch,
 }
 
 type SecretMapping struct {
