@@ -59,7 +59,7 @@ This will verify that Bruin can successfully connect to your Oracle database usi
 You can query your Oracle tables directly using Bruin's query command:
 
 ```bash
-bruin query --connection oracle-default --query "SELECT * FROM employees LIMIT 10"
+bruin query --connection oracle-default --query "SELECT * FROM employees FETCH FIRST 10 ROWS ONLY"
 ```
 
 Alternatively, you can use the query preview feature in the VSCode extension for an interactive querying experience.
