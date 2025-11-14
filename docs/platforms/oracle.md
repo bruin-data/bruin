@@ -191,3 +191,49 @@ When you define dependencies between your Oracle assets, you can visualize the l
 
 
 In this diagram, you can see that `hr.employees` depends on both `hr.departments` and `hr.jobs` assets, which is defined in the `depends` section of the asset configuration. The VSCode extension provides this visual representation to help you understand data flow and relationships between your Oracle tables and views.
+
+## Ingesting Data from Oracle
+
+While the `oracle.sql` and `oracle.source` asset types are useful for documentation and lineage, you can use [Ingestr assets](../assets/ingestr.md) to actually move data from Oracle to your data warehouse platforms like BigQuery, Snowflake, Redshift, or Synapse.
+
+### Example: Ingest Oracle table to BigQuery
+
+This example shows how to copy a table from Oracle to BigQuery:
+
+```yaml
+name: raw.employees
+type: ingestr
+parameters:
+  source_connection: oracle-default
+  source_table: hr.employees
+  destination: bigquery
+```
+
+### Example: Incremental load from Oracle to BigQuery
+
+This example demonstrates how to use an `updated_at` column to incrementally load data from Oracle to BigQuery:
+
+```yaml
+name: raw.orders
+type: ingestr
+parameters:
+  source_connection: oracle-default
+  source_table: sales.orders
+  destination: bigquery
+  incremental_strategy: merge
+  incremental_key: updated_at
+
+columns:
+  - name: order_id
+    type: number
+    primary_key: true
+  - name: updated_at
+    type: date
+```
+
+In this example:
+- The `incremental_strategy: merge` ensures that existing records are updated based on the primary key
+- The `incremental_key: updated_at` tells ingestr to only load records that have been updated since the last run
+- The `primary_key` column definition is used by ingestr to identify unique records during merge operations
+
+For more information about ingestr capabilities and configuration options, see the [Ingestr Assets documentation](../assets/ingestr.md).
