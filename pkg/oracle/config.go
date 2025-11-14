@@ -76,23 +76,37 @@ func (c *Config) DSN() (string, error) {
 	return dsn, nil
 }
 
-func (c *Config) GetIngestrURI() string {
+func (c *Config) GetIngestrURI() (string, error) {
 	port := c.Port
 	if port == "" {
 		port = "1521"
 	}
 
-	// For Ingestr URI, we'll use the service name if available, otherwise SID
-	serviceOrSID := c.ServiceName
-	if serviceOrSID == "" {
-		serviceOrSID = c.SID
+	// For Ingestr URI with service name, use the format: oracle+cx_oracle://user:pass@host:port/?service_name=name
+	// For SID, use: oracle+cx_oracle://user:pass@host:port/sid
+	if c.ServiceName != "" {
+		// Use service_name as a query parameter
+		uri := fmt.Sprintf("oracle+cx_oracle://%s:%s@%s:%s/?service_name=%s",
+			url.QueryEscape(c.Username),
+			url.QueryEscape(c.Password),
+			c.Host,
+			port,
+			url.QueryEscape(c.ServiceName),
+		)
+		return uri, nil
 	}
 
-	url := url.URL{
-		Scheme: "oracle",
-		User:   url.UserPassword(c.Username, c.Password),
-		Host:   fmt.Sprintf("%s:%s", c.Host, port),
-		Path:   serviceOrSID,
+	if c.SID != "" {
+		// Use SID in the path
+		uri := fmt.Sprintf("oracle+cx_oracle://%s:%s@%s:%s/%s",
+			url.QueryEscape(c.Username),
+			url.QueryEscape(c.Password),
+			c.Host,
+			port,
+			c.SID,
+		)
+		return uri, nil
 	}
-	return url.String()
+
+	return "", errors.New("either ServiceName or SID must be specified")
 }

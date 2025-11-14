@@ -241,7 +241,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				Password:    "testpass",
 				ServiceName: "ORCL",
 			},
-			expected: "oracle://testuser:testpass@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/?service_name=ORCL",
 		},
 		{
 			name: "SID configuration when no service name",
@@ -252,7 +252,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				Password: "testpass",
 				SID:      "ORCL",
 			},
-			expected: "oracle://testuser:testpass@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/ORCL",
 		},
 		{
 			name: "default port when not specified",
@@ -262,7 +262,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				Password:    "testpass",
 				ServiceName: "ORCL",
 			},
-			expected: "oracle://testuser:testpass@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/?service_name=ORCL",
 		},
 		{
 			name: "service name takes precedence over SID",
@@ -274,7 +274,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				ServiceName: "ORCL",
 				SID:         "ORCL_SID",
 			},
-			expected: "oracle://testuser:testpass@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/?service_name=ORCL",
 		},
 		{
 			name: "special characters in password",
@@ -285,7 +285,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				Password:    "test@pass:word",
 				ServiceName: "ORCL",
 			},
-			expected: "oracle://testuser:test%40pass%3Aword@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:test%40pass%3Aword@localhost:1521/?service_name=ORCL",
 		},
 	}
 
@@ -293,10 +293,27 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			uri := tt.config.GetIngestrURI()
+			uri, err := tt.config.GetIngestrURI()
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, uri)
 		})
 	}
+}
+
+func TestConfig_GetIngestrURI_Error(t *testing.T) {
+	t.Parallel()
+
+	config := Config{
+		Host:     "localhost",
+		Port:     "1521",
+		Username: "testuser",
+		Password: "testpass",
+	}
+
+	uri, err := config.GetIngestrURI()
+	require.Error(t, err)
+	assert.Equal(t, "", uri)
+	assert.Contains(t, err.Error(), "either ServiceName or SID must be specified")
 }
 
 func TestConfig_DSN_ComplexScenarios(t *testing.T) {
