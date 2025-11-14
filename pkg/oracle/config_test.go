@@ -294,7 +294,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 			t.Parallel()
 
 			uri, err := tt.config.GetIngestrURI()
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, uri)
 		})
 	}
@@ -311,7 +311,7 @@ func TestConfig_GetIngestrURI_Error(t *testing.T) {
 	}
 
 	uri, err := config.GetIngestrURI()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "", uri)
 	assert.Contains(t, err.Error(), "either ServiceName or SID must be specified")
 }
