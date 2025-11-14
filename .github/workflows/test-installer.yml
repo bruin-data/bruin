@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   test-install-unix:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     steps:
       - name: Use install script
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
@@ -25,7 +25,7 @@ jobs:
 
 
   test-install-windows:
-    runs-on: windows-latest
+    runs-on: depot-windows-latest
     steps:
       - name: Use install script
         shell: bash
