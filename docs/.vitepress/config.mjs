@@ -111,9 +111,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                            text: "Tutorials",
                            collapsed: true,
                            items: [
-                              {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
+                          {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
                               { text: "Load Notion to PostgreSQL", link: "/getting-started/tutorials/load-notion-postgres" },
                                { text: "Using Templates", link: "/getting-started/tutorials/template-tutorial" },
+                               { text: "Oracle to DuckDB", link: "/getting-started/tutorials/oracle-duckdb" },
                           ],
 
                      },
