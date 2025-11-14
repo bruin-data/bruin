@@ -85,6 +85,10 @@ func (db *Client) Ping(ctx context.Context) error {
 	return db.RunQueryWithoutResult(ctx, q)
 }
 
+func (db *Client) GetIngestrURI() (string, error) {
+	return db.config.GetIngestrURI()
+}
+
 func (db *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
 	queryStr := strings.TrimSpace(queryObj.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")

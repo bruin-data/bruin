@@ -76,7 +76,7 @@ func (c *Config) DSN() (string, error) {
 	return dsn, nil
 }
 
-func (c *Config) GetIngestrURI() string {
+func (c *Config) GetIngestrURI() (string, error) {
 	port := c.Port
 	if port == "" {
 		port = "1521"
@@ -88,11 +88,17 @@ func (c *Config) GetIngestrURI() string {
 		serviceOrSID = c.SID
 	}
 
-	url := url.URL{
-		Scheme: "oracle",
-		User:   url.UserPassword(c.Username, c.Password),
-		Host:   fmt.Sprintf("%s:%s", c.Host, port),
-		Path:   serviceOrSID,
+	if serviceOrSID == "" {
+		return "", errors.New("either ServiceName or SID must be specified")
 	}
-	return url.String()
+
+	// Ingestr expects oracle+cx_oracle scheme
+	uri := fmt.Sprintf("oracle+cx_oracle://%s:%s@%s:%s/%s",
+		url.QueryEscape(c.Username),
+		url.QueryEscape(c.Password),
+		c.Host,
+		port,
+		serviceOrSID,
+	)
+	return uri, nil
 }
