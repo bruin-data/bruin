@@ -163,7 +163,7 @@ func runTestsForCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerier
 				Check: checkInstance,
 			}
 
-			tt.wantErr(t, n.Check(context.Background(), testInstance))
+			tt.wantErr(t, n.Check(t.Context(), testInstance))
 			defer q.AssertExpectations(t)
 		})
 	}
@@ -255,7 +255,7 @@ func TestCustomCheck(t *testing.T) {
 				},
 			}
 
-			tt.wantErr(t, n.Check(context.Background(), testInstance))
+			tt.wantErr(t, n.Check(t.Context(), testInstance))
 			defer q.AssertExpectations(t)
 		})
 	}

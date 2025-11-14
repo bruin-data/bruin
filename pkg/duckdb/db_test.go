@@ -1,7 +1,6 @@
 package duck
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -91,7 +90,7 @@ func TestDB_Select(t *testing.T) {
 			tt.mockConnection(mock)
 			db := Client{connection: newSQLXAdapter(sqlxDB), config: Config{Path: "some/path.db"}}
 
-			got, err := db.Select(context.Background(), &tt.query)
+			got, err := db.Select(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -190,7 +189,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			tt.mockConnection(mock)
 			db := Client{connection: newSQLXAdapter(sqlxDB), config: Config{Path: "some/path.db"}}
 
-			got, err := db.SelectWithSchema(context.Background(), &tt.query)
+			got, err := db.SelectWithSchema(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -279,7 +278,7 @@ ORDER BY table_schema, table_name;`).
 			tt.mockConnection(mock)
 			client := Client{connection: newSQLXAdapter(sqlxDB)}
 
-			got, err := client.GetDatabaseSummary(context.Background())
+			got, err := client.GetDatabaseSummary(t.Context())
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

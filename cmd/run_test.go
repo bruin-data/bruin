@@ -1093,7 +1093,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 			t.Parallel() // Enable parallel execution for individual test cases
 			logger := zap.NewNop().Sugar()
 			s := scheduler.NewScheduler(logger, tt.pipeline, "test")
-			err := ApplyAllFilters(context.Background(), tt.filter, s, tt.pipeline)
+			err := ApplyAllFilters(t.Context(), tt.filter, s, tt.pipeline)
 
 			// Assert
 			if tt.expectError {
@@ -1275,7 +1275,7 @@ func TestCheckLintFunc(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
@@ -1418,7 +1418,7 @@ func (m *mockAssetCounter) GetAssetCountWithTasksPending() int {
 
 func TestValidate_ShouldValidateFalse_ReturnsNil(t *testing.T) {
 	t.Parallel()
-	err := Validate(false, &mockAssetCounter{count: 1}, nil, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
+	err := Validate(false, &mockAssetCounter{count: 1}, nil, t.Context(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
 	if err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
@@ -1435,7 +1435,7 @@ func TestValidate_AssetsPending_CallsLintCheckerWithFalse(t *testing.T) {
 		return nil
 	}
 
-	err := Validate(true, &mockAssetCounter{count: 2}, lintChecker, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
+	err := Validate(true, &mockAssetCounter{count: 2}, lintChecker, t.Context(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
 	if err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
@@ -1458,7 +1458,7 @@ func TestValidate_NoAssetsPending_CallsLintCheckerWithTrue(t *testing.T) {
 		return nil
 	}
 
-	err := Validate(true, &mockAssetCounter{count: 0}, lintChecker, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
+	err := Validate(true, &mockAssetCounter{count: 0}, lintChecker, t.Context(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
 	if err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
@@ -1477,7 +1477,7 @@ func TestValidate_LintCheckerReturnsError_PropagatesError(t *testing.T) {
 		return expectedErr
 	}
 
-	err := Validate(true, &mockAssetCounter{count: 0}, lintChecker, context.Background(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
+	err := Validate(true, &mockAssetCounter{count: 0}, lintChecker, t.Context(), &pipeline.Pipeline{}, "path", zap.NewNop().Sugar())
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("expected %v, got %v", expectedErr, err)
 	}

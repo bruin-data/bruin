@@ -1,7 +1,6 @@
 package athena
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -90,7 +89,7 @@ func TestDB_Select(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			got, err := db.Select(context.Background(), &tt.query)
+			got, err := db.Select(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -144,7 +143,7 @@ func TestDB_Ping(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			err = db.Ping(context.Background())
+			err = db.Ping(t.Context())
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errorMessage)
@@ -247,7 +246,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			db := DB{conn: sqlxDB}
 
 			// Execute the SelectWithSchema method
-			got, err := db.SelectWithSchema(context.Background(), &tt.query)
+			got, err := db.SelectWithSchema(t.Context(), &tt.query)
 
 			// Verify results
 			if tt.wantErr {

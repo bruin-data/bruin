@@ -1,7 +1,6 @@
 package snowflake
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -79,7 +78,7 @@ func TestDB_IsValid(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			got, err := db.IsValid(context.Background(), &tt.query)
+			got, err := db.IsValid(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -171,7 +170,7 @@ func TestDB_Select(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			got, err := db.Select(context.Background(), &tt.query)
+			got, err := db.Select(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -260,7 +259,7 @@ func TestDB_SelectOnlyLastResult(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			got, err := db.SelectOnlyLastResult(context.Background(), &tt.query)
+			got, err := db.SelectOnlyLastResult(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
@@ -314,7 +313,7 @@ func TestDB_Ping(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			err = db.Ping(context.Background())
+			err = db.Ping(t.Context())
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errorMessage)
@@ -402,7 +401,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			db := DB{conn: sqlxDB}
 
 			// Execute SelectWithSchema
-			got, err := db.SelectWithSchema(context.Background(), &tt.query)
+			got, err := db.SelectWithSchema(t.Context(), &tt.query)
 
 			// Validate the error expectations
 			if tt.wantErr {
@@ -528,7 +527,7 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			tt.mockSetup(mock)
 
 			// Call the function under test
-			err = db.RecreateTableOnMaterializationTypeMismatch(context.Background(), tt.asset)
+			err = db.RecreateTableOnMaterializationTypeMismatch(t.Context(), tt.asset)
 
 			// Validate the expected outcome
 			if tt.expectedError != "" {
@@ -617,7 +616,7 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 			tt.mockSetup(mock, cache)
 
 			// Call the function under test
-			err = db.CreateSchemaIfNotExist(context.Background(), tt.asset)
+			err = db.CreateSchemaIfNotExist(t.Context(), tt.asset)
 
 			// Validate the result
 			if tt.expectedError != "" {
@@ -780,7 +779,7 @@ func TestDB_PushColumnDescriptions(t *testing.T) {
 				},
 			}
 			tt.mockSetup(mock)
-			err = db.PushColumnDescriptions(context.Background(), tt.asset)
+			err = db.PushColumnDescriptions(t.Context(), tt.asset)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
@@ -873,7 +872,7 @@ ORDER BY table_schema, table_name;`).
 				},
 			}
 
-			got, err := db.GetDatabaseSummary(context.Background())
+			got, err := db.GetDatabaseSummary(t.Context())
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

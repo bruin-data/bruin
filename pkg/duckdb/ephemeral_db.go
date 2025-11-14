@@ -244,7 +244,7 @@ func (e *ADBCConnection) QueryRowContext(ctx context.Context, query string, args
 
 	// Materialize the first row
 	values := make([]interface{}, record.NumCols())
-	for i := 0; i < int(record.NumCols()); i++ {
+	for i := range int(record.NumCols()) {
 		col := record.Column(i)
 		values[i] = getArrowValue(col, 0)
 	}
@@ -329,7 +329,7 @@ func (r *adbcRows) Scan(dest ...interface{}) error {
 		return fmt.Errorf("expected %d destination arguments, got %d", r.currentRecord.NumCols(), len(dest))
 	}
 
-	for i := 0; i < int(r.currentRecord.NumCols()); i++ {
+	for i := range int(r.currentRecord.NumCols()) {
 		col := r.currentRecord.Column(i)
 		value := getArrowValue(col, int(r.currentRow))
 
@@ -408,7 +408,7 @@ func (r *adbcRows) Scan(dest ...interface{}) error {
 func (r *adbcRows) Columns() ([]string, error) {
 	schema := r.reader.Schema()
 	columns := make([]string, schema.NumFields())
-	for i := 0; i < schema.NumFields(); i++ {
+	for i := range schema.NumFields() {
 		columns[i] = schema.Field(i).Name
 	}
 	return columns, nil
@@ -417,7 +417,7 @@ func (r *adbcRows) Columns() ([]string, error) {
 func (r *adbcRows) ColumnTypes() ([]ColumnType, error) {
 	schema := r.reader.Schema()
 	types := make([]ColumnType, schema.NumFields())
-	for i := 0; i < schema.NumFields(); i++ {
+	for i := range schema.NumFields() {
 		field := schema.Field(i)
 		// Map Arrow type names to SQL type names for compatibility
 		sqlType := arrowTypeToSQLType(field.Type.String())

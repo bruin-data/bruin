@@ -192,7 +192,7 @@ func TestClient_Select(t *testing.T) {
 
 			client := Client{connection: &mockConn}
 
-			result, err := client.Select(context.TODO(), &query.Query{
+			result, err := client.Select(t.Context(), &query.Query{
 				Query: tt.query,
 			})
 
@@ -296,7 +296,7 @@ func TestClient_SelectWithSchema(t *testing.T) {
 
 			client := Client{connection: &mockConn}
 
-			result, err := client.SelectWithSchema(context.TODO(), &query.Query{
+			result, err := client.SelectWithSchema(t.Context(), &query.Query{
 				Query: tt.query,
 			})
 
@@ -351,7 +351,7 @@ func TestClient_RunQueryWithoutResult(t *testing.T) {
 
 			client := Client{connection: &mockConn}
 
-			err := client.RunQueryWithoutResult(context.TODO(), &query.Query{
+			err := client.RunQueryWithoutResult(t.Context(), &query.Query{
 				Query: tt.query,
 			})
 
@@ -397,7 +397,7 @@ func TestClient_Ping(t *testing.T) {
 
 			client := Client{connection: &mockConn}
 
-			err := client.Ping(context.TODO())
+			err := client.Ping(t.Context())
 
 			if tt.wantErr == "" {
 				require.NoError(t, err)

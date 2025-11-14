@@ -23,7 +23,7 @@ func TestSetupVariables(t *testing.T) {
 		{
 			name: "with apply modifiers false",
 			setupCtx: func() context.Context {
-				ctx := context.Background()
+				ctx := t.Context()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
@@ -41,7 +41,7 @@ func TestSetupVariables(t *testing.T) {
 		{
 			name: "with days modifier",
 			setupCtx: func() context.Context {
-				ctx := context.Background()
+				ctx := t.Context()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
@@ -70,7 +70,7 @@ func TestSetupVariables(t *testing.T) {
 		{
 			name: "with hours modifier",
 			setupCtx: func() context.Context {
-				ctx := context.Background()
+				ctx := t.Context()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
@@ -99,7 +99,7 @@ func TestSetupVariables(t *testing.T) {
 		{
 			name: "with apply modifiers false 2",
 			setupCtx: func() context.Context {
-				ctx := context.Background()
+				ctx := t.Context()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
@@ -139,7 +139,7 @@ func TestSetupVariables(t *testing.T) {
 		},
 		{
 			setupCtx: func() context.Context {
-				ctx := context.Background()
+				ctx := t.Context()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")

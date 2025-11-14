@@ -236,7 +236,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 				pathToPython: "/test/python",
 			}
 
-			got, err := i.EnsureVirtualEnvExists(context.Background(), repo, requirementsTxt)
+			got, err := i.EnsureVirtualEnvExists(t.Context(), repo, requirementsTxt)
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
 		})

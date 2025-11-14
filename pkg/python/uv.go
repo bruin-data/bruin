@@ -430,7 +430,7 @@ func (u *UvPythonRunner) InstallDuckDBDriver(ctx context.Context) error {
 
 	checkCmd := exec.CommandContext(ctx, uvBinaryPath, "tool", "run", "--no-config", "dbc", "--version")
 	if err := checkCmd.Run(); err != nil {
-		dbcPackage := fmt.Sprintf("dbc==%s", dbcVersion)
+		dbcPackage := "dbc==" + dbcVersion
 		installCmd := exec.CommandContext(ctx, uvBinaryPath, "tool", "install", "--no-config", "--force", "--quiet", "--python", pythonVersionForIngestr, dbcPackage)
 
 		output, err := installCmd.CombinedOutput()
@@ -449,6 +449,7 @@ func (u *UvPythonRunner) InstallDuckDBDriver(ctx context.Context) error {
 	return nil
 }
 
+// nolint:gochecknoinits // init function needed to register driver installer and avoid circular dependency
 func init() {
 	// Register the UvPythonRunner as the driver installer for DuckDB ADBC
 	// This avoids circular dependency between python and duckdb packages

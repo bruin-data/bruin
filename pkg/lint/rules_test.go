@@ -91,7 +91,7 @@ func TestEnsureTaskNameIsNotEmpty(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -394,7 +394,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 			want: noIssues,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -538,7 +538,7 @@ func TestEnsureDependencyExists(t *testing.T) {
 			},
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -617,7 +617,7 @@ func TestEnsurePipelineScheduleIsValidCron(t *testing.T) {
 			want: noIssues,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -698,7 +698,7 @@ func TestEnsureOnlyAcceptedTaskTypesAreThere(t *testing.T) {
 			want: noIssues,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -776,7 +776,7 @@ func TestEnsureTaskNameIsUnique(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -897,7 +897,7 @@ func TestEnsureTaskNameIsUniqueForASingleAsset(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsureTaskNameIsUniqueForASingleAsset(context.Background(), tt.p, tt.asset)
+			got, err := EnsureTaskNameIsUniqueForASingleAsset(t.Context(), tt.p, tt.asset)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -965,7 +965,7 @@ func TestEnsurePipelineNameIsValid(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1059,7 +1059,7 @@ func TestEnsurePipelineHasNoCycles(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1184,7 +1184,7 @@ func TestEnsureSlackFieldInPipelineIsValid(t *testing.T) {
 			},
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1267,7 +1267,7 @@ func TestMSTeamsFieldInPipelineIsValid(t *testing.T) {
 			},
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1492,7 +1492,7 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1574,7 +1574,7 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1653,7 +1653,7 @@ func TestEnsureBigqueryQuerySensorHasQueryParameter(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1783,7 +1783,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			t.Parallel()
 
 			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
-			got, err := EnsureIngestrAssetIsValidForASingleAsset(context.Background(), p, tt.asset)
+			got, err := EnsureIngestrAssetIsValidForASingleAsset(t.Context(), p, tt.asset)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -1832,7 +1832,7 @@ func TestEnsurePipelineStartDateIsValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1884,7 +1884,7 @@ func TestEnsureAssetStartDateIsValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	p := &pipeline.Pipeline{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2038,7 +2038,7 @@ func TestGlossaryChecker_EnsureAssetEntitiesExistInGlossary(t *testing.T) {
 				},
 			}
 
-			got, err := checker.EnsureAssetEntitiesExistInGlossary(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			got, err := checker.EnsureAssetEntitiesExistInGlossary(t.Context(), &pipeline.Pipeline{}, tt.asset)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -2150,7 +2150,7 @@ func TestGlossaryChecker_EnsureParentDomainsExistInGlossary(t *testing.T) {
 				foundGlossary: tt.glossary,
 			}
 
-			got, err := checker.EnsureParentDomainsExistInGlossary(context.Background(), &pipeline.Pipeline{})
+			got, err := checker.EnsureParentDomainsExistInGlossary(t.Context(), &pipeline.Pipeline{})
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -2210,7 +2210,7 @@ func TestGlossaryChecker_EnsureParentDomainsExistInGlossary_WithCache(t *testing
 				cacheFoundGlossary: tt.cacheGlossary,
 			}
 
-			got, err := checker.EnsureParentDomainsExistInGlossary(context.Background(), &pipeline.Pipeline{})
+			got, err := checker.EnsureParentDomainsExistInGlossary(t.Context(), &pipeline.Pipeline{})
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -2329,7 +2329,7 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 			}
 
 			u := UsedTableValidatorRule{jinja.NewRendererWithYesterday("test", "test"), parser}
-			got, err := u.ValidateAsset(context.Background(), pp, tt.asset)
+			got, err := u.ValidateAsset(t.Context(), pp, tt.asset)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -2423,7 +2423,7 @@ func TestValidateDuplicateColumnNames(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := ValidateDuplicateColumnNames(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			got, err := ValidateDuplicateColumnNames(t.Context(), &pipeline.Pipeline{}, tt.asset)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -2488,7 +2488,7 @@ func TestValidateDuplicateTags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := ValidateDuplicateTags(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			got, err := ValidateDuplicateTags(t.Context(), &pipeline.Pipeline{}, tt.asset)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -2568,7 +2568,7 @@ func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := ValidatePythonAssetMaterialization(context.Background(), tt.p, tt.p.Assets[0])
+			got, err := ValidatePythonAssetMaterialization(t.Context(), tt.p, tt.p.Assets[0])
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -2618,7 +2618,7 @@ func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -2695,7 +2695,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
 		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
-		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
+		issues, err := validator(t.Context(), p.Pipeline, assetWithValidCheck)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
@@ -2704,7 +2704,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
 		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
-		issues, err := validator(context.Background(), p.Pipeline, assetWithInvalidCheck)
+		issues, err := validator(t.Context(), p.Pipeline, assetWithInvalidCheck)
 		require.NoError(t, err)
 		assert.Len(t, issues, 1)
 		assert.Contains(t, issues[0].Description, "Custom check query is invalid")
@@ -2714,7 +2714,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
 		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
-		issues, err := validator(context.Background(), p.Pipeline, assetWithEmptyCheck)
+		issues, err := validator(t.Context(), p.Pipeline, assetWithEmptyCheck)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
@@ -2723,7 +2723,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{err: errors.New("connection error")}
 		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
-		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
+		issues, err := validator(t.Context(), p.Pipeline, assetWithValidCheck)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
@@ -2732,7 +2732,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: struct{}{}}
 		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
-		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
+		issues, err := validator(t.Context(), p.Pipeline, assetWithValidCheck)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
@@ -2787,7 +2787,7 @@ func TestEnsurePipelineConcurrencyIsValid(t *testing.T) {
 			p := &pipeline.Pipeline{
 				Concurrency: tt.concurrency,
 			}
-			got, err := EnsurePipelineConcurrencyIsValid(context.Background(), p)
+			got, err := EnsurePipelineConcurrencyIsValid(t.Context(), p)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("EnsurePipelineConcurrencyIsValid() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2852,7 +2852,7 @@ func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			asset := &pipeline.Asset{Tier: tt.tier}
-			got, err := EnsureAssetTierIsValidForASingleAsset(context.Background(), &pipeline.Pipeline{}, asset)
+			got, err := EnsureAssetTierIsValidForASingleAsset(t.Context(), &pipeline.Pipeline{}, asset)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("EnsureAssetTierIsValidForASingleAsset() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2900,7 +2900,7 @@ func TestEnsureSecretMappingsHaveKeyForASingleAsset(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := EnsureSecretMappingsHaveKeyForASingleAsset(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			got, err := EnsureSecretMappingsHaveKeyForASingleAsset(t.Context(), &pipeline.Pipeline{}, tt.asset)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("EnsureSecretMappingsHaveKeyForASingleAsset() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -3104,7 +3104,7 @@ func TestValidateCrossPipelineURIDependencies(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -3123,7 +3123,7 @@ func TestValidateCrossPipelineURIDependencies(t *testing.T) {
 
 func TestValidateAssetSeedValidation_CaseInsensitive(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name    string
@@ -3623,7 +3623,7 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
