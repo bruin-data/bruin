@@ -161,6 +161,8 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 		return errors.Wrap(err, "failed to get stdout")
 	}
 
+	// Start reading from pipes in goroutines before starting the command
+	// This prevents deadlock if the command generates a lot of output
 	wg := new(errgroup.Group)
 	wg.Go(func() error { return consumePipe(stdout, output) })
 	wg.Go(func() error { return consumePipe(stderr, output) })
@@ -170,14 +172,20 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 		return errors.Wrap(err, "failed to start CommandInstance")
 	}
 
-	res := cmd.Wait()
-	if res != nil {
-		return res
+	// Wait for the command to finish - this will close the pipes
+	cmdErr := cmd.Wait()
+
+	// Wait for pipe consumption to complete
+	pipeErr := wg.Wait()
+
+	// Return command error first if both exist
+	if cmdErr != nil {
+		return cmdErr
 	}
 
-	err = wg.Wait()
-	if err != nil {
-		return errors.Wrap(err, "failed to consume pipe")
+	// Return pipe error if it exists
+	if pipeErr != nil {
+		return errors.Wrap(pipeErr, "failed to consume pipe")
 	}
 
 	return nil
@@ -204,5 +212,12 @@ func consumePipe(pipe io.Reader, output io.Writer) error {
 		}
 	}
 
-	return scanner.Err()
+	// scanner.Err() returns nil if the scanner stopped due to EOF or a closed pipe,
+	// which is the expected behavior when a subprocess finishes.
+	// We only return actual errors here.
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return err
+	}
+
+	return nil
 }
