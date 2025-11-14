@@ -3,6 +3,7 @@ package python
 import (
 	"bufio"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"os"
@@ -215,7 +216,7 @@ func consumePipe(pipe io.Reader, output io.Writer) error {
 	// scanner.Err() returns nil if the scanner stopped due to EOF or a closed pipe,
 	// which is the expected behavior when a subprocess finishes.
 	// We only return actual errors here.
-	if err := scanner.Err(); err != nil && err != io.EOF {
+	if err := scanner.Err(); err != nil && !stderrors.Is(err, io.EOF) {
 		return err
 	}
 
