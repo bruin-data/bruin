@@ -241,7 +241,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				Password:    "testpass",
 				ServiceName: "ORCL",
 			},
-			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/?service_name=ORCL",
 		},
 		{
 			name: "SID configuration when no service name",
@@ -262,7 +262,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				Password:    "testpass",
 				ServiceName: "ORCL",
 			},
-			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/?service_name=ORCL",
 		},
 		{
 			name: "service name takes precedence over SID",
@@ -274,7 +274,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				ServiceName: "ORCL",
 				SID:         "ORCL_SID",
 			},
-			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:testpass@localhost:1521/?service_name=ORCL",
 		},
 		{
 			name: "special characters in password",
@@ -285,7 +285,7 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 				Password:    "test@pass:word",
 				ServiceName: "ORCL",
 			},
-			expected: "oracle+cx_oracle://testuser:test%40pass%3Aword@localhost:1521/ORCL",
+			expected: "oracle+cx_oracle://testuser:test%40pass%3Aword@localhost:1521/?service_name=ORCL",
 		},
 	}
 
