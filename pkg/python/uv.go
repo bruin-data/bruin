@@ -339,11 +339,11 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	destURI, err := destConnectionInst.GetIngestrURI()
 	if err != nil {
-		return errors.New("could not get the source uri")
+		return errors.Wrap(err, "could not get the destination uri")
 	}
 
 	if destURI == "" {
-		return errors.New("could not determine the destination, please set the `connection` value in the asset definition.")
+		return errors.New("destination uri is empty, which means the destination connection is not configured correctly")
 	}
 
 	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
