@@ -6,7 +6,7 @@ on:
 jobs:
   bump_version:
     name: Bump Version
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:

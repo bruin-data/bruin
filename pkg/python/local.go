@@ -3,6 +3,7 @@ package python
 import (
 	"bufio"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"os"
@@ -161,6 +162,8 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 		return errors.Wrap(err, "failed to get stdout")
 	}
 
+	// Start reading from pipes in goroutines before starting the command
+	// This prevents deadlock if the command generates a lot of output
 	wg := new(errgroup.Group)
 	wg.Go(func() error { return consumePipe(stdout, output) })
 	wg.Go(func() error { return consumePipe(stderr, output) })
@@ -170,14 +173,22 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 		return errors.Wrap(err, "failed to start CommandInstance")
 	}
 
-	res := cmd.Wait()
-	if res != nil {
-		return res
+	// Wait for pipe consumption to complete FIRST
+	// This is critical: we must finish reading from pipes before calling cmd.Wait()
+	// because cmd.Wait() will close the pipes after the command exits
+	pipeErr := wg.Wait()
+
+	// Now wait for the command to finish
+	cmdErr := cmd.Wait()
+
+	// Return command error first if both exist
+	if cmdErr != nil {
+		return cmdErr
 	}
 
-	err = wg.Wait()
-	if err != nil {
-		return errors.Wrap(err, "failed to consume pipe")
+	// Return pipe error if it exists
+	if pipeErr != nil {
+		return errors.Wrap(pipeErr, "failed to consume pipe")
 	}
 
 	return nil
@@ -185,6 +196,12 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 
 func consumePipe(pipe io.Reader, output io.Writer) error {
 	scanner := bufio.NewScanner(pipe)
+
+	// Use a smaller buffer (4KB) for more responsive output instead of the default 64KB
+	// This reduces latency when streaming subprocess output in real-time
+	buf := make([]byte, 4096)
+	scanner.Buffer(buf, 4096)
+
 	for scanner.Scan() {
 		// the size of the slice here is important, the added 4 at the end includes the 3 bytes for the prefix and the 1 byte for the newline
 		msg := make([]byte, len(scanner.Bytes())+4)
@@ -196,6 +213,13 @@ func consumePipe(pipe io.Reader, output io.Writer) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// scanner.Err() returns nil if the scanner stopped due to EOF or a closed pipe,
+	// which is the expected behavior when a subprocess finishes.
+	// We only return actual errors here.
+	if err := scanner.Err(); err != nil && !stderrors.Is(err, io.EOF) {
+		return err
 	}
 
 	return nil

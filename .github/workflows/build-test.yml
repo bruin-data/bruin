@@ -42,7 +42,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ ubuntu-latest ]
+        platform: [ depot-ubuntu-latest ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
   end2end:
     strategy:
       matrix:
-        platform: [ ubuntu-latest, windows-2022 ]
+        platform: [ depot-ubuntu-latest, depot-windows-2022 ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -73,13 +73,13 @@ jobs:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - name: Install winget
-        if: matrix.platform == 'windows-2022'
+        if: matrix.platform == 'depot-windows-2022'
         uses: Cyberboss/install-winget@v1
       - run: make integration-test
         shell: bash
 
   dockerBuild:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     name: Docker Build
     permissions:
       contents: read
@@ -117,7 +117,7 @@ jobs:
             BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -130,7 +130,7 @@ jobs:
         run: golangci-lint run --timeout 10m60s ./...
 
   goreleaser-windows:
-    runs-on: windows-2022
+    runs-on: depot-windows-2022
     defaults:
       run:
         shell: msys2 {0}
@@ -159,7 +159,7 @@ jobs:
           TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
 
   goreleaser-unix:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
