@@ -1,0 +1,8 @@
+name: oracle-duckdb
+schedule: daily
+start_date: "2024-01-01"
+catchup: false
+
+default_connections:
+    oracle: oracle-default
+    duckdb: duckdb-default

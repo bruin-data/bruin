@@ -1,0 +1,31 @@
+name: oracle_raw.orders
+type: ingestr
+
+description: >
+  Sync the orders fact table out of Oracle so DuckDB always has the most recent order state.
+columns:
+  - name: order_id
+    type: number
+    description: "Primary key for the order"
+    primary_key: true
+  - name: customer_id
+    type: number
+    description: "Customer that placed the order"
+  - name: order_status
+    type: varchar
+    description: "Current fulfillment status"
+  - name: order_total
+    type: number
+    description: "Gross order amount in USD"
+  - name: ordered_at
+    type: timestamp
+    description: "Timestamp when the order was submitted"
+  - name: updated_at
+    type: timestamp
+    description: "Last modification timestamp in Oracle"
+
+parameters:
+  source_connection: oracle-default
+  source_table: BRUIN_TMPL.ORDERS
+  destination: duckdb
+  destination_table: oracle_orders
