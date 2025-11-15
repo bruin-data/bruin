@@ -17,7 +17,7 @@ func BenchmarkLint(b *testing.B) {
 	for range [10]int{} {
 		b.ResetTimer()
 		start := time.Now()
-		if err := cmd.Run(context.Background(), []string{"lint", "./testdata/lineage"}); err != nil {
+		if err := cmd.Run(b.Context(), []string{"lint", "./testdata/lineage"}); err != nil {
 			b.Fatalf("Failed to run Lint command: %v", err)
 		}
 		b.StopTimer()
@@ -88,7 +88,7 @@ func TestLintFullRefreshFlag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			lintCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, tt.fullRefresh)
 			actualValue := lintCtx.Value(tt.expectedCtxKey)
 			assert.Equal(t, tt.expectedValue, actualValue, "Context should contain correct full refresh value")

@@ -98,7 +98,7 @@ func TestSchemaCreator_CreateSchemaIfNotExist(t *testing.T) {
 			tt.mockSetup(db, cache)
 
 			// Call the function under test
-			err := creator.CreateSchemaIfNotExist(context.Background(), db, tt.asset)
+			err := creator.CreateSchemaIfNotExist(t.Context(), db, tt.asset)
 
 			// Validate the result
 			if tt.expectedError != "" {

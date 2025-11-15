@@ -2,7 +2,6 @@ package executor
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"testing"
@@ -78,9 +77,9 @@ func TestConcurrent_Start(t *testing.T) {
 
 	ex, err := NewConcurrent(logger, ops, 8, FormattingOptions{})
 	require.NoError(t, err)
-	ex.Start(context.Background(), s.WorkQueue, s.Results)
+	ex.Start(t.Context(), s.WorkQueue, s.Results)
 
-	results := s.Run(context.Background())
+	results := s.Run(t.Context())
 	assert.Len(t, results, len(p.Assets))
 
 	mockOperator.AssertExpectations(t)

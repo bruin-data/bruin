@@ -41,6 +41,8 @@ const (
 	pythonVersionForIngestr = "3.11"
 	ingestrVersion          = "0.14.102"
 	sqlfluffVersion         = "3.4.1"
+	dbcVersion              = "0.1.0"
+	duckdbDriverVersion     = "1.4.2"
 )
 
 var DatabasePrefixToSqlfluffDialect = map[string]string{
@@ -420,6 +422,44 @@ func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string) [
 	}
 	cmdline = append(cmdline, ingestrPackageName)
 	return cmdline
+}
+
+func (u *UvPythonRunner) InstallDuckDBDriver(ctx context.Context) error {
+	uvBinaryPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to ensure uv is installed: %w", err)
+	}
+
+	checkCmd := exec.CommandContext(ctx, uvBinaryPath, "tool", "run", "--no-config", "dbc", "--version")
+	if err := checkCmd.Run(); err != nil {
+		dbcPackage := "dbc==" + dbcVersion
+		installCmd := exec.CommandContext(ctx, uvBinaryPath, "tool", "install", "--no-config", "--force", "--quiet", "--python", pythonVersionForIngestr, dbcPackage)
+
+		output, err := installCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to install dbc tool: %w -- Output: %s", err, output)
+		}
+	}
+
+	installCmd := exec.CommandContext(ctx, uvBinaryPath, "tool", "run", "--no-config", "dbc", "install", "duckdb")
+
+	output, err := installCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to install duckdb driver: %w -- Output: %s", err, output)
+	}
+
+	return nil
+}
+
+// nolint:gochecknoinits // init function needed to register driver installer and avoid circular dependency
+func init() {
+	// Register the UvPythonRunner as the driver installer for DuckDB ADBC
+	// This avoids circular dependency between python and duckdb packages
+	defaultInstaller := &UvPythonRunner{
+		UvInstaller: &UvChecker{},
+		Cmd:         &CommandRunner{},
+	}
+	duck.SetDriverInstaller(defaultInstaller)
 }
 
 const PythonArrowTemplate = `

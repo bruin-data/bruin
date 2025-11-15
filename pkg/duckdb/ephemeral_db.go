@@ -5,58 +5,49 @@ package duck
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"sync"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
+	"github.com/apache/arrow-adbc/go/adbc/sqldriver"
 )
 
-type EphemeralConnection struct {
-	config DuckDBConfig
+// DriverInstaller is an interface for installing the DuckDB ADBC driver.
+type DriverInstaller interface {
+	InstallDuckDBDriver(ctx context.Context) error
 }
 
-func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
-	return &EphemeralConnection{config: c}, nil
+var (
+	registerDriverOnce sync.Once
+	driverInstaller    DriverInstaller
+)
+
+// SetDriverInstaller sets a custom driver installer (useful for testing).
+func SetDriverInstaller(customInstaller DriverInstaller) {
+	driverInstaller = customInstaller
 }
 
-func (e *EphemeralConnection) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	conn, err := sqlx.Open("duckdb", e.config.ToDBConnectionURI())
+// registerDriver registers the DuckDB ADBC driver with database/sql.
+func registerDriver() {
+	registerDriverOnce.Do(func() {
+		// Register the DuckDB ADBC driver with database/sql
+		sql.Register("duckdb", sqldriver.Driver{Driver: &drivermgr.Driver{}})
+	})
+}
+
+// NewEphemeralConnection creates a new database/sql connection using the ADBC sqldriver package.
+func NewEphemeralConnection(c DuckDBConfig) (*sql.DB, error) {
+	// Register the driver
+	registerDriver()
+
+	// Build the DSN with driver parameter
+	dsn := fmt.Sprintf("driver=duckdb;path=%s", c.ToDBConnectionURI())
+
+	// Use sqldriver to open a database/sql connection
+	db, err := sql.Open("duckdb", dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open DuckDB connection: %w", err)
 	}
-	defer func(conn *sqlx.DB) {
-		if err := conn.Close(); err != nil {
-			panic(err)
-		}
-	}(conn)
 
-	return conn.QueryContext(ctx, query, args...) //nolint
-}
-
-func (e *EphemeralConnection) ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error) {
-	conn, err := sqlx.Open("duckdb", e.config.ToDBConnectionURI())
-	if err != nil {
-		return nil, err
-	}
-	defer func(conn *sqlx.DB) {
-		if err := conn.Close(); err != nil {
-			panic(err)
-		}
-	}(conn)
-
-	return conn.ExecContext(ctx, sql, arguments...)
-}
-
-func (e *EphemeralConnection) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
-	conn, err := sqlx.Open("duckdb", e.config.ToDBConnectionURI())
-	if err != nil {
-		// Cannot return error from this function signature, so we panic.
-		// This is not ideal, but it's the best we can do with the current interface.
-		panic(err)
-	}
-	defer func(conn *sqlx.DB) {
-		if err := conn.Close(); err != nil {
-			panic(err)
-		}
-	}(conn)
-
-	return conn.QueryRowContext(ctx, query, args...)
+	return db, nil
 }

@@ -75,7 +75,7 @@ func TestNewTableSensorModeSkip(t *testing.T) {
 
 	ts := NewTableSensor(mockConn, "skip", mockExtractor)
 
-	err := ts.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
 		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path:    "test-file.sql",
@@ -94,7 +94,7 @@ func TestNewTableSensorModeNoTable(t *testing.T) {
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
-	err := ts.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
 		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path:    "test-file.sql",
@@ -113,7 +113,7 @@ func TestNewTableSensorNoConnectionForAsset(t *testing.T) {
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
-	err := ts.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
 		Type: pipeline.AssetTypeIngestr,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path:    "test-file.sql",
@@ -138,7 +138,7 @@ func TestNewTableSensorConnectionNotFound(t *testing.T) {
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
-	err := ts.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
 		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path:    "test-file.sql",
@@ -162,7 +162,7 @@ func TestNewTableSensorNoTableExistsChecker(t *testing.T) {
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
-	err := ts.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
 		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path:    "test-file.sql",
@@ -188,7 +188,7 @@ func TestNewTableSensorBuildTableExistsQueryError(t *testing.T) {
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
-	err := ts.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
 		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path:    "test-file.sql",
@@ -215,7 +215,7 @@ func TestNewTableSensorExtractQueriesFromStringError(t *testing.T) {
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
-	err := ts.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
 		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path:    "test-file.sql",
@@ -242,7 +242,7 @@ func TestNewTableSensorgNoQueries(t *testing.T) {
 
 	ts := NewTableSensor(mockConn, "wait", mockExtractor)
 
-	err := ts.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
 		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path:    "test-file.sql",

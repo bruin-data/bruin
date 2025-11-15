@@ -75,7 +75,7 @@ func TestColumnCheckOperatorOperator(t *testing.T) {
 				},
 			}
 
-			err := op.Run(context.Background(), &asset)
+			err := op.Run(t.Context(), &asset)
 			if tt.wantError {
 				require.Error(t, err)
 			} else {
@@ -141,7 +141,7 @@ func TestCustomColumnCheckOperatorOperator(t *testing.T) {
 				},
 			}
 
-			err := op.Run(context.Background(), &asset)
+			err := op.Run(t.Context(), &asset)
 			if tt.wantError {
 				require.Error(t, err)
 			} else {

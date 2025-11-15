@@ -1201,7 +1201,7 @@ func TestRenderer_CloneForAsset_IntervalModifierTemplates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, tt.startDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, tt.endDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
@@ -1275,7 +1275,7 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")

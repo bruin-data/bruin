@@ -1,7 +1,6 @@
 package tableau
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -128,29 +127,29 @@ func TestFindDatasourceIDByName(t *testing.T) {
 		{ID: "id2", Name: "Beta"},
 	}
 
-	id, err := FindDatasourceIDByName(context.Background(), "alpha", datasources)
+	id, err := FindDatasourceIDByName(t.Context(), "alpha", datasources)
 	require.NoError(t, err)
 	require.Equal(t, "id1", id)
 
-	id, err = FindDatasourceIDByName(context.Background(), "BETA", datasources)
+	id, err = FindDatasourceIDByName(t.Context(), "BETA", datasources)
 	require.NoError(t, err)
 	require.Equal(t, "id2", id)
 
-	id, err = FindDatasourceIDByName(context.Background(), "gamma", datasources)
+	id, err = FindDatasourceIDByName(t.Context(), "gamma", datasources)
 	require.NoError(t, err)
 	require.Empty(t, id)
 
 	// nil datasources
-	_, err = FindDatasourceIDByName(context.Background(), "alpha", nil)
+	_, err = FindDatasourceIDByName(t.Context(), "alpha", nil)
 	require.Error(t, err)
 
 	// empty slice
-	id, err = FindDatasourceIDByName(context.Background(), "alpha", []DataSourceInfo{})
+	id, err = FindDatasourceIDByName(t.Context(), "alpha", []DataSourceInfo{})
 	require.NoError(t, err)
 	require.Empty(t, id)
 
 	// empty name
-	id, err = FindDatasourceIDByName(context.Background(), "", datasources)
+	id, err = FindDatasourceIDByName(t.Context(), "", datasources)
 	require.NoError(t, err)
 	require.Empty(t, id)
 
@@ -158,7 +157,7 @@ func TestFindDatasourceIDByName(t *testing.T) {
 	datasourcesWithSpaces := []DataSourceInfo{
 		{ID: "id3", Name: "  Alpha  "},
 	}
-	id, err = FindDatasourceIDByName(context.Background(), "  alpha  ", datasourcesWithSpaces)
+	id, err = FindDatasourceIDByName(t.Context(), "  alpha  ", datasourcesWithSpaces)
 	require.NoError(t, err)
 	require.Equal(t, "id3", id)
 
@@ -167,7 +166,7 @@ func TestFindDatasourceIDByName(t *testing.T) {
 		{ID: "id4", Name: "Gamma"},
 		{ID: "id5", Name: "Gamma"},
 	}
-	id, err = FindDatasourceIDByName(context.Background(), "gamma", datasourcesDup)
+	id, err = FindDatasourceIDByName(t.Context(), "gamma", datasourcesDup)
 	require.NoError(t, err)
 	require.Equal(t, "id4", id)
 }
@@ -179,29 +178,29 @@ func TestFindWorkbookIDByName(t *testing.T) {
 		{ID: "w2", Name: "World Indicators"},
 	}
 
-	id, err := FindWorkbookIDByName(context.Background(), "superstore", workbooks)
+	id, err := FindWorkbookIDByName(t.Context(), "superstore", workbooks)
 	require.NoError(t, err)
 	require.Equal(t, "w1", id)
 
-	id, err = FindWorkbookIDByName(context.Background(), "WORLD INDICATORS", workbooks)
+	id, err = FindWorkbookIDByName(t.Context(), "WORLD INDICATORS", workbooks)
 	require.NoError(t, err)
 	require.Equal(t, "w2", id)
 
-	id, err = FindWorkbookIDByName(context.Background(), "notfound", workbooks)
+	id, err = FindWorkbookIDByName(t.Context(), "notfound", workbooks)
 	require.NoError(t, err)
 	require.Empty(t, id)
 
 	// nil workbooks
-	_, err = FindWorkbookIDByName(context.Background(), "superstore", nil)
+	_, err = FindWorkbookIDByName(t.Context(), "superstore", nil)
 	require.Error(t, err)
 
 	// empty slice
-	id, err = FindWorkbookIDByName(context.Background(), "superstore", []WorkbookInfo{})
+	id, err = FindWorkbookIDByName(t.Context(), "superstore", []WorkbookInfo{})
 	require.NoError(t, err)
 	require.Empty(t, id)
 
 	// empty name
-	id, err = FindWorkbookIDByName(context.Background(), "", workbooks)
+	id, err = FindWorkbookIDByName(t.Context(), "", workbooks)
 	require.NoError(t, err)
 	require.Empty(t, id)
 
@@ -209,7 +208,7 @@ func TestFindWorkbookIDByName(t *testing.T) {
 	workbooksWithSpaces := []WorkbookInfo{
 		{ID: "w3", Name: "  Superstore  "},
 	}
-	id, err = FindWorkbookIDByName(context.Background(), "  superstore  ", workbooksWithSpaces)
+	id, err = FindWorkbookIDByName(t.Context(), "  superstore  ", workbooksWithSpaces)
 	require.NoError(t, err)
 	require.Equal(t, "w3", id)
 
@@ -218,7 +217,7 @@ func TestFindWorkbookIDByName(t *testing.T) {
 		{ID: "w4", Name: "Gamma"},
 		{ID: "w5", Name: "Gamma"},
 	}
-	id, err = FindWorkbookIDByName(context.Background(), "gamma", workbooksDup)
+	id, err = FindWorkbookIDByName(t.Context(), "gamma", workbooksDup)
 	require.NoError(t, err)
 	require.Equal(t, "w4", id)
 }

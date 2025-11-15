@@ -224,7 +224,7 @@ func TestDevEnvQueryModifier_Modify(t *testing.T) {
 				Parser:  f.Parser,
 			}
 
-			ctx := context.WithValue(context.Background(), config.EnvironmentContextKey, tt.selectedEnv)
+			ctx := context.WithValue(t.Context(), config.EnvironmentContextKey, tt.selectedEnv)
 
 			got, err := d.Modify(ctx, p, a, &query.Query{Query: tt.inputQuery})
 			if tt.error != "" && (err == nil || tt.error != err.Error()) {

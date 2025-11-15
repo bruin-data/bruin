@@ -64,7 +64,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "asset-metadata is only available for BigQuery SQL assets")
@@ -92,7 +92,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "syntax error")
@@ -122,7 +122,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no query found in asset")
@@ -157,7 +157,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
@@ -195,7 +195,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
@@ -245,7 +245,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
@@ -288,7 +288,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.TODO(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
@@ -326,7 +326,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, nil)
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
@@ -361,7 +361,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no query found in asset")
@@ -399,7 +399,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 			QueryExtractor:   queryExtractor,
 		}
 
-		result, err := dryRunner.DryRun(context.Background(), *pipeline, asset, &config.Config{})
+		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")

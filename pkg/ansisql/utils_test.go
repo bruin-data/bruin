@@ -54,7 +54,7 @@ func TestAddAnnotationComment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if tt.annotations != "" {
 				ctx = context.WithValue(ctx, pipeline.RunConfigQueryAnnotations, tt.annotations)
 			}

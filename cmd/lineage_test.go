@@ -3,7 +3,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"runtime"
 	"strings"
@@ -134,7 +133,7 @@ Asset has no downstream dependencies.
 				errorPrinter: mp,
 			}
 
-			res := r.Run(context.Background(), tt.args.assetPath, tt.args.full, "plain")
+			res := r.Run(t.Context(), tt.args.assetPath, tt.args.full, "plain")
 			tt.wantErr(t, res)
 			if tt.want != "" {
 				want := tt.want
