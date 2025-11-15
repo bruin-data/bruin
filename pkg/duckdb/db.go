@@ -17,7 +17,7 @@ import (
 )
 
 type Client struct {
-	connection    connection
+	connection    *sql.DB
 	config        DuckDBConfig
 	schemaCreator *DuckDBSchemaCreator
 	typeMapper    *diff.DatabaseTypeMapper
@@ -26,32 +26,6 @@ type Client struct {
 type DuckDBConfig interface {
 	ToDBConnectionURI() string
 	GetIngestrURI() string
-}
-
-type connection interface {
-	QueryContext(ctx context.Context, query string, args ...any) (Rows, error)
-	ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) Row
-}
-
-// Rows interface for query results.
-type Rows interface {
-	Next() bool
-	Scan(dest ...interface{}) error
-	Columns() ([]string, error)
-	ColumnTypes() ([]ColumnType, error)
-	Err() error
-	Close() error
-}
-
-// Row interface for single row results.
-type Row interface {
-	Scan(dest ...interface{}) error
-}
-
-// ColumnType interface for column metadata.
-type ColumnType interface {
-	DatabaseTypeName() string
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
@@ -73,10 +47,16 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	LockDatabase(c.config.ToDBConnectionURI())
 	defer UnlockDatabase(c.config.ToDBConnectionURI())
-	_, err := c.connection.ExecContext(ctx, query.String())
+	queryStr := query.String()
+
+	// WORKAROUND: The sqldriver package has a bug where ExecContext always fails with
+	// "sql: expected 1 arguments, got 0" even for queries with no parameters.
+	// Use QueryContext instead and immediately close the result set.
+	rows, err := c.connection.QueryContext(ctx, queryStr)
 	if err != nil {
 		return err
 	}
+	rows.Close()
 
 	return nil
 }
@@ -523,15 +503,16 @@ func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, 
 		return nil, errors.New("database name cannot be empty")
 	}
 
-	q := `
+	// ADBC doesn't support parameterized queries with '?', use string formatting
+	q := fmt.Sprintf(`
 SELECT table_name
 FROM information_schema.tables
-WHERE table_schema = ?
+WHERE table_schema = '%s'
     AND table_type IN ('BASE TABLE', 'VIEW')
 ORDER BY table_name;
-`
+`, databaseName)
 
-	rows, err := c.connection.QueryContext(ctx, q, databaseName)
+	rows, err := c.connection.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tables in schema '%s': %w", databaseName, err)
 	}
@@ -561,18 +542,19 @@ func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 		return nil, errors.New("table name cannot be empty")
 	}
 
-	q := `
-SELECT 
+	// ADBC doesn't support parameterized queries with '?', use string formatting
+	q := fmt.Sprintf(`
+SELECT
     column_name,
     data_type,
     is_nullable,
     column_default
 FROM information_schema.columns
-WHERE table_schema = ? AND table_name = ?
+WHERE table_schema = '%s' AND table_name = '%s'
 ORDER BY ordinal_position;
-`
+`, databaseName, tableName)
 
-	rows, err := c.connection.QueryContext(ctx, q, databaseName, tableName)
+	rows, err := c.connection.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
 	}

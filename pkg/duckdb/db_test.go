@@ -7,7 +7,6 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,10 +84,9 @@ func TestDB_Select(t *testing.T) {
 			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 			require.NoError(t, err)
 			defer mockDB.Close()
-			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
 			tt.mockConnection(mock)
-			db := Client{connection: newSQLXAdapter(sqlxDB), config: Config{Path: "some/path.db"}}
+			db := Client{connection: mockDB, config: Config{Path: "some/path.db"}}
 
 			got, err := db.Select(t.Context(), &tt.query)
 			if tt.wantErr {
@@ -184,10 +182,8 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			require.NoError(t, err)
 			defer mockDB.Close()
 
-			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
-
 			tt.mockConnection(mock)
-			db := Client{connection: newSQLXAdapter(sqlxDB), config: Config{Path: "some/path.db"}}
+			db := Client{connection: mockDB, config: Config{Path: "some/path.db"}}
 
 			got, err := db.SelectWithSchema(t.Context(), &tt.query)
 			if tt.wantErr {
@@ -273,10 +269,9 @@ ORDER BY table_schema, table_name;`).
 			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 			require.NoError(t, err)
 			defer mockDB.Close()
-			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
 			tt.mockConnection(mock)
-			client := Client{connection: newSQLXAdapter(sqlxDB)}
+			client := Client{connection: mockDB}
 
 			got, err := client.GetDatabaseSummary(t.Context())
 			if tt.wantErr != "" {
