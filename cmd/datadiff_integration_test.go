@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -24,7 +23,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 
 	t.Run("add missing column", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Create temporary DuckDB database
 		tmpDir := t.TempDir()
@@ -101,7 +100,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 
 	t.Run("change column type", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test_type_change.db")
@@ -158,7 +157,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 
 	t.Run("change nullability", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test_nullability.db")
@@ -215,7 +214,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 
 	t.Run("multiple changes combined", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test_multiple.db")
@@ -294,7 +293,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 
 	t.Run("reverse direction", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx := t.Context()
 
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test_reverse.db")
@@ -371,7 +370,7 @@ func TestAlterStatementsWithRealConfig(t *testing.T) {
 		// This is more of a documentation test showing how the feature works
 		// with real configuration
 
-		ctx := context.Background()
+		ctx := t.Context()
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "config_test.db")
 
