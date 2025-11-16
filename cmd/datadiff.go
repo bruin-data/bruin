@@ -64,6 +64,24 @@ func compareTables(ctx context.Context, summarizer1, summarizer2 diff.TableSumma
 	return &result, nil
 }
 
+// generateAlterStatements generates ALTER TABLE SQL statements based on schema comparison.
+func generateAlterStatements(schemaComparison diff.SchemaComparisonResult, conn1Name, conn2Name, targetDialect string, reverse bool) []string {
+	var dialect diff.DatabaseDialect
+
+	// Determine the dialect
+	if targetDialect != "" {
+		// Use explicitly specified dialect
+		dialect = diff.DatabaseDialect(strings.ToLower(targetDialect))
+	} else {
+		// Auto-detect from connection names
+		dialect = diff.DetectDialectFromConnection(conn1Name, conn2Name)
+	}
+
+	// Create generator and generate statements
+	generator := diff.NewAlterStatementGenerator(dialect, reverse)
+	return generator.GenerateAlterStatements(&schemaComparison)
+}
+
 // DataDiffCmd defines the 'data-diff' command.
 func DataDiffCmd() *cli.Command {
 	var connectionName string
@@ -72,6 +90,8 @@ func DataDiffCmd() *cli.Command {
 	var tolerance float64
 	var schemaOnly bool
 	var failIfDiff bool
+	var targetDialect string
+	var reverse bool
 
 	return &cli.Command{
 		Name:    "data-diff",
@@ -107,6 +127,16 @@ func DataDiffCmd() *cli.Command {
 				Name:        "fail-if-diff",
 				Usage:       "Return a non-zero exit code if differences are found",
 				Destination: &failIfDiff,
+			},
+			&cli.StringFlag{
+				Name:        "target-dialect",
+				Usage:       "Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, generic). Auto-detected if not specified.",
+				Destination: &targetDialect,
+			},
+			&cli.BoolFlag{
+				Name:        "reverse",
+				Usage:       "Reverse the direction of ALTER statements (transform Table1 to match Table2 instead of Table2 to match Table1)",
+				Destination: &reverse,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -155,12 +185,36 @@ func DataDiffCmd() *cli.Command {
 			// Get the connection
 			conn1 := manager.GetConnection(conn1Name)
 			if conn1 == nil {
-				return fmt.Errorf("failed to get connection '%s'", conn1Name)
+				fmt.Fprintf(c.ErrWriter, "Connection '%s' not found.\n\n", conn1Name)
+				fmt.Fprintf(c.ErrWriter, "Please check:\n")
+				fmt.Fprintf(c.ErrWriter, "  1. The connection name is spelled correctly\n")
+				fmt.Fprintf(c.ErrWriter, "  2. The connection is defined in your .bruin.yml file\n")
+				fmt.Fprintf(c.ErrWriter, "  3. You're in the correct directory with a valid .bruin.yml\n\n")
+				fmt.Fprintf(c.ErrWriter, "Example .bruin.yml:\n")
+				fmt.Fprintf(c.ErrWriter, "  environments:\n")
+				fmt.Fprintf(c.ErrWriter, "    default:\n")
+				fmt.Fprintf(c.ErrWriter, "      connections:\n")
+				fmt.Fprintf(c.ErrWriter, "        duckdb:\n")
+				fmt.Fprintf(c.ErrWriter, "          - name: %s\n", conn1Name)
+				fmt.Fprintf(c.ErrWriter, "            path: path/to/database.db\n")
+				return cli.Exit("", 1)
 			}
 
 			conn2 := manager.GetConnection(conn2Name)
 			if conn2 == nil {
-				return fmt.Errorf("failed to get connection '%s'", conn2Name)
+				fmt.Fprintf(c.ErrWriter, "Connection '%s' not found.\n\n", conn2Name)
+				fmt.Fprintf(c.ErrWriter, "Please check:\n")
+				fmt.Fprintf(c.ErrWriter, "  1. The connection name is spelled correctly\n")
+				fmt.Fprintf(c.ErrWriter, "  2. The connection is defined in your .bruin.yml file\n")
+				fmt.Fprintf(c.ErrWriter, "  3. You're in the correct directory with a valid .bruin.yml\n\n")
+				fmt.Fprintf(c.ErrWriter, "Example .bruin.yml:\n")
+				fmt.Fprintf(c.ErrWriter, "  environments:\n")
+				fmt.Fprintf(c.ErrWriter, "    default:\n")
+				fmt.Fprintf(c.ErrWriter, "      connections:\n")
+				fmt.Fprintf(c.ErrWriter, "        duckdb:\n")
+				fmt.Fprintf(c.ErrWriter, "          - name: %s\n", conn2Name)
+				fmt.Fprintf(c.ErrWriter, "            path: path/to/database.db\n")
+				return cli.Exit("", 1)
 			}
 
 			// ctx is already available from the function signature
@@ -183,7 +237,19 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			if schemaComparison != nil {
-				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.Writer)
+				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.ErrWriter)
+
+				// Generate ALTER TABLE statements if there are schema differences
+				if schemaComparison.HasSchemaDifferences {
+					alterStatements := generateAlterStatements(*schemaComparison, conn1Name, conn2Name, targetDialect, reverse)
+					if len(alterStatements) > 0 {
+						fmt.Fprintf(c.Writer, "\n-- ALTER TABLE statements to synchronize schemas:\n")
+						for _, stmt := range alterStatements {
+							fmt.Fprintf(c.Writer, "%s\n\n", stmt)
+						}
+					}
+				}
+
 				if hasDifferences && failIfDiff {
 					return cli.Exit("", 1) // Exit with code 1 when differences are found and flag is set
 				}
