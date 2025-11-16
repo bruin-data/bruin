@@ -1,4 +1,4 @@
-FROM golang:1.25.4-bullseye AS builder
+FROM golang:1.25.4-trixie AS builder
 
 # Build argument for version information
 ARG VERSION=dev
