@@ -19,11 +19,22 @@ const (
 var commentMarkers = map[string]string{
 	".sql": "--",
 	".py":  "#",
+	".r":   "#",
 }
 
 var (
-	possiblePrefixesForCommentBlocks = []string{"/*@bruin", "/* @bruin", "/*  @bruin", "/*   @bruin", `"""@bruin`, `""" @bruin`, `"""  @bruin`, `"""   @bruin`}
-	possibleSuffixesForCommentBlocks = []string{"@bruin*/", "@bruin */", "@bruin  */", "@bruin   */", `@bruin"""`, `@bruin """`, `@bruin  """`, `@bruin   """`}
+	possiblePrefixesForCommentBlocks = []string{
+		"/*@bruin", "/* @bruin", "/*  @bruin", "/*   @bruin",
+		`"""@bruin`, `""" @bruin`, `"""  @bruin`, `"""   @bruin`,
+		`"@bruin`, `" @bruin`, `"  @bruin`, `"   @bruin`,
+		`'@bruin`, `' @bruin`, `'  @bruin`, `'   @bruin`,
+	}
+	possibleSuffixesForCommentBlocks = []string{
+		"@bruin*/", "@bruin */", "@bruin  */", "@bruin   */",
+		`@bruin"""`, `@bruin """`, `@bruin  """`, `@bruin   """`,
+		`@bruin"`, `@bruin "`, `@bruin  "`, `@bruin   "`,
+		`@bruin'`, `@bruin '`, `@bruin  '`, `@bruin   '`,
+	}
 )
 
 func CreateTaskFromFileComments(fs afero.Fs) TaskCreator {
@@ -58,14 +69,16 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 			continue
 		}
 
-		// find the first non-empty row, if it contains the prefix, return true
+		// find the first non-empty row, if it EXACTLY matches one of the prefixes, return true
+		// This ensures we only match multiline blocks, not single-line comments like "# @bruin.name: value"
+		trimmed := strings.TrimSpace(rowText)
 		for _, prefix := range prefixes {
-			if strings.HasPrefix(strings.TrimSpace(rowText), prefix) {
+			if trimmed == prefix {
 				return true
 			}
 		}
 
-		// if the first non-empty row doesn't contain the prefix, return false
+		// if the first non-empty row doesn't match, return false
 		return false
 	}
 
@@ -113,23 +126,34 @@ func readUntilComments(file afero.File, prefixes, suffixes []string) (string, in
 	rows := ""
 	rowCount := 0
 
+	seenPrefix := false
+
 OUTER:
 	for scanner.Scan() {
 		rowCount += 1
 
 		rowText := scanner.Text()
-		for _, suffix := range prefixes {
-			if strings.TrimSpace(rowText) == suffix {
-				continue OUTER
+		trimmed := strings.TrimSpace(rowText)
+
+		// Check if this line matches a prefix (opening marker)
+		for _, prefix := range prefixes {
+			if trimmed == prefix {
+				if !seenPrefix {
+					// First occurrence - this is the opening marker
+					seenPrefix = true
+					continue OUTER
+				}
 			}
 		}
 
+		// Check if this line matches a suffix (closing marker)
 		for _, suffix := range suffixes {
-			if strings.TrimSpace(rowText) == suffix {
+			if trimmed == suffix {
 				break OUTER
 			}
 		}
 
+		// Add the content line
 		rows += rowText + "\n"
 	}
 
