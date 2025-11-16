@@ -256,7 +256,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				config:     secret,
 			}
 
-			tt.wantErr(t, o.RunTask(context.Background(), nil, tt.task))
+			tt.wantErr(t, o.RunTask(t.Context(), nil, tt.task))
 		})
 	}
 }

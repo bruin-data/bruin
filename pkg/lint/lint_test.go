@@ -194,7 +194,7 @@ func TestLinter_Lint(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -461,7 +461,7 @@ func TestLinter_LintAsset(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -647,7 +647,7 @@ func TestRunLintRulesOnPipeline_ExcludeTag(t *testing.T) {
 				Assets: tt.assets,
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if tt.excludeTag != "" {
 				ctx = context.WithValue(ctx, excludeTagKey, tt.excludeTag)
 			}
@@ -824,7 +824,7 @@ func TestLinter_LintPipelines_AssetWithExcludeTagCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if tt.excludeTag != "" {
 				ctx = context.WithValue(ctx, excludeTagKey, tt.excludeTag)
 			}

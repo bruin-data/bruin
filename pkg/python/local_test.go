@@ -184,7 +184,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				requirementsInstaller: f.requirementsInstaller,
 				pathToPython:          "/test/python",
 			}
-			tt.wantErr(t, l.Run(context.Background(), tt.execCtx))
+			tt.wantErr(t, l.Run(t.Context(), tt.execCtx))
 		})
 	}
 }

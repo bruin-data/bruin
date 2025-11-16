@@ -252,7 +252,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 				materializer: mat,
 			}
 
-			err := o.RunTask(context.Background(), &pipeline.Pipeline{}, tt.args.t)
+			err := o.RunTask(t.Context(), &pipeline.Pipeline{}, tt.args.t)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -331,7 +331,7 @@ func TestMetadataPushOperator_Run(t *testing.T) {
 
 			taskInstance := scheduler.AssetInstance{Asset: tt.t, Pipeline: &pipeline.Pipeline{}}
 
-			ctx := context.WithValue(context.Background(), executor.KeyPrinter, io.Discard)
+			ctx := context.WithValue(t.Context(), executor.KeyPrinter, io.Discard)
 
 			err := o.Run(ctx, &taskInstance)
 			if tt.wantErr {
@@ -433,7 +433,7 @@ func TestBasicOperator_RunTask_WithRenderer(t *testing.T) {
 				materializer: mat,
 			}
 
-			err := o.RunTask(context.Background(), &pipeline.Pipeline{}, tt.args.t)
+			err := o.RunTask(t.Context(), &pipeline.Pipeline{}, tt.args.t)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -484,7 +484,7 @@ func TestBasicOperator_QueryAnnotations_Default(t *testing.T) {
 		},
 	}
 
-	ctx := context.WithValue(context.Background(), pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, ansisql.DefaultQueryAnnotations)
 
 	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "test_pipeline"}, asset)
 
@@ -537,7 +537,7 @@ func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
 		},
 	}
 	customAnnotations := `{"environment":"test","owner":"data_team","version":"1.0"}`
-	ctx := context.WithValue(context.Background(), pipeline.RunConfigQueryAnnotations, customAnnotations)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigQueryAnnotations, customAnnotations)
 
 	err := o.RunTask(ctx, &pipeline.Pipeline{Name: "orders_pipeline"}, asset)
 

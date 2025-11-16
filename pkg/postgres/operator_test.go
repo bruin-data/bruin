@@ -227,7 +227,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 				materializer: mat,
 			}
 
-			err := o.RunTask(context.Background(), &pipeline.Pipeline{}, tt.args.t)
+			err := o.RunTask(t.Context(), &pipeline.Pipeline{}, tt.args.t)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

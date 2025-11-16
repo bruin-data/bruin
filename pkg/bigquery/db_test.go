@@ -125,7 +125,7 @@ func TestDB_IsValid(t *testing.T) {
 			defer server.Close()
 
 			client, err := bigquery.NewClient(
-				context.Background(),
+				t.Context(),
 				testProjectID,
 				option.WithEndpoint(server.URL),
 				option.WithCredentials(&google.Credentials{
@@ -140,7 +140,7 @@ func TestDB_IsValid(t *testing.T) {
 
 			d := Client{client: client}
 
-			got, err := d.IsValid(context.Background(), &query.Query{Query: tt.query})
+			got, err := d.IsValid(t.Context(), &query.Query{Query: tt.query})
 			if tt.err == nil {
 				require.NoError(t, err)
 			} else {
@@ -237,7 +237,7 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 			defer server.Close()
 
 			client, err := bigquery.NewClient(
-				context.Background(),
+				t.Context(),
 				projectID,
 				option.WithEndpoint(server.URL),
 				option.WithCredentials(&google.Credentials{
@@ -252,7 +252,7 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 
 			d := Client{client: client}
 
-			err = d.RunQueryWithoutResult(context.Background(), &query.Query{Query: tt.query})
+			err = d.RunQueryWithoutResult(t.Context(), &query.Query{Query: tt.query})
 			if tt.err == nil {
 				require.NoError(t, err)
 			} else {
@@ -577,7 +577,7 @@ func TestDB_Select(t *testing.T) {
 			defer server.Close()
 
 			client, err := bigquery.NewClient(
-				context.Background(),
+				t.Context(),
 				projectID,
 				option.WithEndpoint(server.URL),
 				option.WithCredentials(&google.Credentials{
@@ -592,7 +592,7 @@ func TestDB_Select(t *testing.T) {
 
 			d := Client{client: client}
 
-			got, err := d.Select(context.Background(), &query.Query{Query: tt.query})
+			got, err := d.Select(t.Context(), &query.Query{Query: tt.query})
 			if tt.err == nil {
 				require.NoError(t, err)
 			} else {
@@ -761,7 +761,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 			defer server.Close()
 
 			client, err := bigquery.NewClient(
-				context.Background(),
+				t.Context(),
 				projectID,
 				option.WithEndpoint(server.URL),
 				option.WithCredentials(&google.Credentials{
@@ -781,7 +781,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 				},
 			}
 
-			err = d.UpdateTableMetadataIfNotExist(context.Background(), tt.asset)
+			err = d.UpdateTableMetadataIfNotExist(t.Context(), tt.asset)
 			if tt.err == nil {
 				require.NoError(t, err)
 			} else {
@@ -929,7 +929,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			defer server.Close()
 
 			client, err := bigquery.NewClient(
-				context.Background(),
+				t.Context(),
 				projectID,
 				option.WithEndpoint(server.URL),
 				option.WithCredentials(&google.Credentials{
@@ -944,7 +944,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 
 			d := Client{client: client}
 
-			got, err := d.SelectWithSchema(context.Background(), &query.Query{Query: tt.query})
+			got, err := d.SelectWithSchema(t.Context(), &query.Query{Query: tt.query})
 			if tt.err == nil {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
@@ -1035,7 +1035,7 @@ func TestClient_getTableRef(t *testing.T) {
 			t.Parallel()
 
 			client, err := bigquery.NewClient(
-				context.Background(),
+				t.Context(),
 				projectID,
 				option.WithEndpoint(srv.URL),
 				option.WithCredentials(&google.Credentials{
@@ -1214,7 +1214,7 @@ func TestClient_GetDatabaseSummary(t *testing.T) {
 	defer srv.Close()
 
 	client, err := bigquery.NewClient(
-		context.Background(),
+		t.Context(),
 		projectID,
 		option.WithEndpoint(srv.URL),
 		option.WithCredentials(&google.Credentials{
@@ -1227,7 +1227,7 @@ func TestClient_GetDatabaseSummary(t *testing.T) {
 
 	c := Client{client: client, config: &Config{ProjectID: projectID}}
 
-	got, err := c.GetDatabaseSummary(context.Background())
+	got, err := c.GetDatabaseSummary(t.Context())
 	require.NoError(t, err)
 
 	want := &ansisql.DBDatabase{
@@ -1720,7 +1720,7 @@ func TestClient_IsMaterializationTypeMismatch(t *testing.T) {
 			t.Parallel()
 
 			d := Client{}
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 			defer cancel()
 
 			mismatch := d.IsMaterializationTypeMismatch(ctx, tt.meta, tt.asset)
@@ -2093,7 +2093,7 @@ func TestClient_GetTables(t *testing.T) {
 			defer srv.Close()
 
 			client, err := bigquery.NewClient(
-				context.Background(),
+				t.Context(),
 				projectID,
 				option.WithEndpoint(srv.URL),
 				option.WithCredentials(&google.Credentials{
@@ -2106,7 +2106,7 @@ func TestClient_GetTables(t *testing.T) {
 
 			c := Client{client: client, config: &Config{ProjectID: projectID}}
 
-			got, err := c.GetTables(context.Background(), tt.databaseName)
+			got, err := c.GetTables(t.Context(), tt.databaseName)
 
 			if tt.wantErr {
 				require.Error(t, err)
