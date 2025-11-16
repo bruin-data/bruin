@@ -88,6 +88,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return fmt.Errorf("could not get the source uri: %w", err)
 	}
 
+	if sourceURI == "" {
+		return errors.New("source uri is empty, which means the source connection is not configured correctly")
+	}
+
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
 	// always feasible. In the case of GSheets, we have to reuse the same GCP credentials, but change the prefix with gsheets://
 	if asset.Parameters["source"] == "gsheets" {
@@ -116,7 +120,11 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
-		return errors.New("could not get the source uri")
+		return errors.Wrap(err, "could not get the destination uri")
+	}
+
+	if destURI == "" {
+		return errors.New("destination uri is empty, which means the connection is not configured correctly")
 	}
 
 	destTable := asset.Name
@@ -223,7 +231,10 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
-		return errors.New("could not get the source uri")
+		return errors.Wrap(err, "could not get the destination uri")
+	}
+	if destURI == "" {
+		return errors.New("destination uri is empty, which means the destination connection is not configured correctly")
 	}
 
 	destTable := asset.Name
