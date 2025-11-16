@@ -53,7 +53,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: false
       - run: make test
 
 
@@ -71,7 +71,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: false
       - name: Install winget
         if: matrix.platform == 'depot-windows-2022'
         uses: Cyberboss/install-winget@v1
@@ -147,7 +147,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: false
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
