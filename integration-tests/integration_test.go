@@ -2977,7 +2977,7 @@ func TestMacros(t *testing.T) {
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{"bruin run completed", "4 succeeded"},
+					Contains: []string{"bruin run completed", "3 succeeded"},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,

@@ -1,4 +1,4 @@
-FROM golang:1.23-bullseye AS builder
+FROM golang:1.25.4-trixie AS builder
 
 # Build argument for version information
 ARG VERSION=dev
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
 
 # Final stage
-FROM debian:12.8-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y \
     curl \

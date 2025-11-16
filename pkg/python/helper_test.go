@@ -1,7 +1,6 @@
 package python
 
 import (
-	"context"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -51,7 +50,7 @@ func Test_uvPythonRunner_ingestrLoaderFileFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := ConsolidatedParameters(context.Background(), tt.asset, tt.cmdArgs)
+			result, err := ConsolidatedParameters(t.Context(), tt.asset, tt.cmdArgs)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})

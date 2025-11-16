@@ -281,7 +281,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				Asset:    tt.asset,
 			}
 
-			ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
 
 			err := o.Run(ctx, &ti)
 			require.NoError(t, err)
@@ -339,7 +339,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t
 		},
 	}
 
-	ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, false)
+	ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
 	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC))
 
@@ -457,7 +457,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Asset:    tt.asset,
 			}
 
-			ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
 
 			err := o.Run(ctx, &ti)
 			require.NoError(t, err)

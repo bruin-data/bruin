@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -100,7 +99,7 @@ func TestClient_Select(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			result, err := client.Select(context.TODO(), &query.Query{
+			result, err := client.Select(t.Context(), &query.Query{
 				Query: tt.query,
 			})
 
@@ -197,7 +196,7 @@ func TestClient_SelectWithSchema(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			result, err := client.SelectWithSchema(context.TODO(), &query.Query{
+			result, err := client.SelectWithSchema(t.Context(), &query.Query{
 				Query: tt.query,
 			})
 
@@ -257,7 +256,7 @@ func TestClient_RunQueryWithoutResult(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			err = client.RunQueryWithoutResult(context.TODO(), &query.Query{
+			err = client.RunQueryWithoutResult(t.Context(), &query.Query{
 				Query: tt.query,
 			})
 
@@ -311,7 +310,7 @@ func TestClient_Ping(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			err = client.Ping(context.TODO())
+			err = client.Ping(t.Context())
 
 			if tt.wantErr == "" {
 				require.NoError(t, err)
@@ -618,7 +617,7 @@ END; \$TEST\$;`
 
 			client := Client{connection: mock}
 
-			got, err := client.IsValid(context.Background(), &tt.query)
+			got, err := client.IsValid(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -687,7 +686,7 @@ func TestClient_GetDatabases(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			got, err := client.GetDatabases(context.Background())
+			got, err := client.GetDatabases(t.Context())
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				require.Equal(t, tt.wantErr, err.Error())
@@ -777,7 +776,7 @@ func TestClient_GetTablesWithSchemas(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			got, err := client.GetTablesWithSchemas(context.Background(), tt.databaseName)
+			got, err := client.GetTablesWithSchemas(t.Context(), tt.databaseName)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				require.Equal(t, tt.wantErr, err.Error())
@@ -927,7 +926,7 @@ func TestClient_GetColumns(t *testing.T) {
 
 			client := Client{connection: mock}
 
-			got, err := client.GetColumns(context.Background(), tt.databaseName, tt.tableName)
+			got, err := client.GetColumns(t.Context(), tt.databaseName, tt.tableName)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				require.Equal(t, tt.wantErr, err.Error())
@@ -1006,7 +1005,7 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 
 			client := Client{connection: mock, config: Config{Database: "database1"}}
 
-			got, err := client.GetDatabaseSummary(context.Background())
+			got, err := client.GetDatabaseSummary(t.Context())
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				require.Equal(t, tt.wantErr, err.Error())

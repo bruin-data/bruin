@@ -161,7 +161,7 @@ func TestCreateAsset(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			conn := tt.setupConn()
 
 			got, err := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, conn, tt.fillColumns)
@@ -422,7 +422,7 @@ func TestFillAssetColumnsFromDB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			conn := tt.setupConn()
 			asset := tt.setupAsset()
 
@@ -469,7 +469,7 @@ func TestGetPipelinefromPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			got, err := GetPipelinefromPath(ctx, tt.inputPath)
 
 			if tt.wantErr != "" {

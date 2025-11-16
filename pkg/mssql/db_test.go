@@ -1,7 +1,6 @@
 package mssql
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -91,7 +90,7 @@ func TestDB_Select(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			got, err := db.Select(context.Background(), &tt.query)
+			got, err := db.Select(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -267,7 +266,7 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB, config: tt.config}
 
-			got, err := db.GetDatabaseSummary(context.Background())
+			got, err := db.GetDatabaseSummary(t.Context())
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -365,7 +364,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			got, err := db.SelectWithSchema(context.Background(), &tt.query)
+			got, err := db.SelectWithSchema(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errorMessage)
@@ -429,7 +428,7 @@ func TestDB_Ping(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			err = db.Ping(context.Background())
+			err = db.Ping(t.Context())
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errorMessage)

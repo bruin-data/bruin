@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -78,7 +77,7 @@ func TestClient_Select(t *testing.T) {
 			tt.mockConnection(mock)
 			client := Client{conn: sqlxDB}
 
-			got, err := client.Select(context.Background(), &tt.query)
+			got, err := client.Select(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -162,7 +161,7 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			tt.mockConnection(mock)
 			client := Client{conn: sqlxDB}
 
-			got, err := client.SelectWithSchema(context.Background(), &tt.query)
+			got, err := client.SelectWithSchema(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
@@ -216,7 +215,7 @@ func TestClient_Ping(t *testing.T) {
 			tt.mockConnection(mock)
 			client := Client{conn: sqlxDB}
 
-			err = client.Ping(context.Background())
+			err = client.Ping(t.Context())
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Equal(t, tt.errorMessage, err.Error())
@@ -362,7 +361,7 @@ ORDER BY table_schema, table_name;`).
 			tt.mockConnection(mock)
 			client := Client{conn: sqlxDB}
 
-			got, err := client.GetDatabaseSummary(context.Background())
+			got, err := client.GetDatabaseSummary(t.Context())
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

@@ -1,7 +1,6 @@
 package oracle
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -171,7 +170,7 @@ func TestClient_Select(t *testing.T) {
 			tt.mockConnection(mock)
 			client := &Client{conn: mockDB}
 
-			got, err := client.Select(context.Background(), tt.query)
+			got, err := client.Select(t.Context(), tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
@@ -271,7 +270,7 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			tt.mockConnection(mock)
 			client := &Client{conn: mockDB}
 
-			got, err := client.SelectWithSchema(context.Background(), tt.query)
+			got, err := client.SelectWithSchema(t.Context(), tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
@@ -367,7 +366,7 @@ func TestClient_RunQueryWithoutResult(t *testing.T) {
 			tt.mockConnection(mock)
 			client := &Client{conn: mockDB}
 
-			err = client.RunQueryWithoutResult(context.Background(), tt.query)
+			err = client.RunQueryWithoutResult(t.Context(), tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
@@ -419,7 +418,7 @@ func TestClient_Ping(t *testing.T) {
 			tt.mockConnection(mock)
 			client := &Client{conn: mockDB}
 
-			err = client.Ping(context.Background())
+			err = client.Ping(t.Context())
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
@@ -538,7 +537,7 @@ ORDER BY owner, table_name`).
 			tt.mockConnection(mock)
 			client := &Client{conn: mockDB, config: tt.config}
 
-			got, err := client.GetDatabaseSummary(context.Background())
+			got, err := client.GetDatabaseSummary(t.Context())
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -650,7 +649,7 @@ func TestClient_Select_ErrorHandling(t *testing.T) {
 			tt.mockConnection(mock)
 			client := &Client{conn: mockDB}
 
-			_, err = client.Select(context.Background(), tt.query)
+			_, err = client.Select(t.Context(), tt.query)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.errorMessage)
 

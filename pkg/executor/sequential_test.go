@@ -46,7 +46,7 @@ func TestLocal_RunSingleTask(t *testing.T) {
 			},
 		}
 
-		err := l.RunSingleTask(context.Background(), instance)
+		err := l.RunSingleTask(t.Context(), instance)
 
 		require.NoError(t, err)
 		mockOperator.AssertExpectations(t)
@@ -65,7 +65,7 @@ func TestLocal_RunSingleTask(t *testing.T) {
 			},
 		}
 
-		err := l.RunSingleTask(context.Background(), instance)
+		err := l.RunSingleTask(t.Context(), instance)
 
 		require.Error(t, err)
 		mockOperator.AssertExpectations(t)
@@ -86,7 +86,7 @@ func TestLocal_RunSingleTask(t *testing.T) {
 			},
 		}
 
-		err := l.RunSingleTask(context.Background(), instance)
+		err := l.RunSingleTask(t.Context(), instance)
 
 		require.Error(t, err)
 		mockOperator.AssertExpectations(t)

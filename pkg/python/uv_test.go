@@ -127,7 +127,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 				Cmd:         f.cmd,
 				UvInstaller: f.uvInstaller,
 			}
-			tt.wantErr(t, l.Run(context.Background(), tt.execCtx))
+			tt.wantErr(t, l.Run(t.Context(), tt.execCtx))
 		})
 	}
 }
