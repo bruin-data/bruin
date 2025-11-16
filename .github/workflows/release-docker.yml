@@ -97,8 +97,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache:latest
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache:latest,mode=max
           build-args: |
             VERSION=${{ steps.workflow_tag.outputs.tag || steps.manual_tag.outputs.tag }}
             BRANCH_NAME=${{ steps.workflow_tag.outputs.tag || steps.manual_tag.outputs.tag }}

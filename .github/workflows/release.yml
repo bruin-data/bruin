@@ -198,8 +198,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache:latest
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache:latest,mode=max
           build-args: |
             VERSION=${{ github.ref_name }}
             BRANCH_NAME=${{ github.ref_name }}
