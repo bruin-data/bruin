@@ -8,7 +8,6 @@ import (
 
 var BruinToIngestrStrategyMap = map[pipeline.MaterializationStrategy]string{
 	pipeline.MaterializationStrategyCreateReplace: "replace",
-	"replace":                                    "replace",
 	pipeline.MaterializationStrategyAppend:       "append",
 	pipeline.MaterializationStrategyMerge:        "merge",
 	pipeline.MaterializationStrategyDeleteInsert: "delete+insert",
