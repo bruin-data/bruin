@@ -1,6 +1,10 @@
 package python
 
-import "github.com/bruin-data/bruin/pkg/pipeline"
+import (
+	"strings"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
+)
 
 var BruinToIngestrStrategyMap = map[pipeline.MaterializationStrategy]string{
 	pipeline.MaterializationStrategyCreateReplace:  "replace",
@@ -25,4 +29,13 @@ func IsPythonMaterializationStrategySupported(strategy pipeline.MaterializationS
 func TranslateBruinStrategyToIngestr(strategy pipeline.MaterializationStrategy) (string, bool) {
 	ingestrStrategy, exists := BruinToIngestrStrategyMap[strategy]
 	return ingestrStrategy, exists
+}
+
+// GetSupportedStrategiesString returns a comma-separated string of supported Python materialization strategies
+func GetSupportedStrategiesString() string {
+	strategies := make([]string, 0, len(SupportedPythonMaterializationStrategies))
+	for _, s := range SupportedPythonMaterializationStrategies {
+		strategies = append(strategies, string(s))
+	}
+	return strings.Join(strategies, ", ")
 }
