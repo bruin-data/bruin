@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: bruin-data/bruin
+
 jobs:
   integration-tests:
     strategy:
@@ -288,7 +292,7 @@ jobs:
   #         rm -rf /tmp/docker-test
 
   install-windows:
-    runs-on: depot-windows-latest
+    runs-on: windows-latest
     name: Installer Script on Windows
     needs: [release-windows, release-unix]
     steps:
@@ -301,7 +305,7 @@ jobs:
         run: /c/Users/runneradmin/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && /c/Users/runneradmin/.local/bin/bruin.exe run .
 
   install-unix:
-    runs-on: depot-ubuntu-latest
+    runs-on: ubuntu-latest
     name: Installer Script on Linux
     needs: [release-windows, release-unix]
     steps:
@@ -320,7 +324,7 @@ jobs:
         run: bruin init chess test-pipeline && cd test-pipeline && bruin run .
 
   release:
-    runs-on: depot-ubuntu-latest
+    runs-on: ubuntu-latest
     needs: [install-unix, install-windows]
     steps:
       - uses: actions/checkout@v3
