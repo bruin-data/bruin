@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: bruin-data/bruin
+
 jobs:
   integration-tests:
     strategy:
