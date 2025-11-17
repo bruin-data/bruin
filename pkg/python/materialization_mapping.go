@@ -15,7 +15,6 @@ var SupportedPythonMaterializationStrategies = []pipeline.MaterializationStrateg
 	pipeline.MaterializationStrategyAppend,
 	pipeline.MaterializationStrategyMerge,
 	pipeline.MaterializationStrategyDeleteInsert,
-	pipeline.MaterializationStrategyTruncateInsert,
 }
 
 func IsPythonMaterializationStrategySupported(strategy pipeline.MaterializationStrategy) bool {

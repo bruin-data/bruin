@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
@@ -485,6 +486,19 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 			Task:        asset,
 			Description: "A task with materialization must have a connection defined",
 		})
+	}
+
+	if asset.Materialization.Strategy != "" && asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
+		if !python.IsPythonMaterializationStrategySupported(asset.Materialization.Strategy) {
+			supportedStrategies := make([]string, 0, len(python.SupportedPythonMaterializationStrategies))
+			for _, s := range python.SupportedPythonMaterializationStrategies {
+				supportedStrategies = append(supportedStrategies, string(s))
+			}
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Materialization strategy '%s' is not supported for Python assets. Supported strategies are: %s", asset.Materialization.Strategy, strings.Join(supportedStrategies, ", ")),
+			})
+		}
 	}
 
 	return issues, nil
