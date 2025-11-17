@@ -25,6 +25,20 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
+      - name: Install R (Ubuntu)
+        if: startsWith(matrix.platform, 'depot-ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y r-base
+      - name: Install R (macOS)
+        if: startsWith(matrix.platform, 'depot-macos')
+        run: |
+          brew install r
+      - name: Install R (Windows)
+        if: matrix.platform == 'windows-2022'
+        shell: bash
+        run: |
+          choco install r.project -y
       - run: make ${{ matrix.suite }}
         shell: bash
 
