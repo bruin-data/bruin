@@ -301,7 +301,10 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	if mat.Strategy != "" {
-		asset.Parameters["incremental_strategy"] = string(mat.Strategy)
+		ingestrStrategy, ok := TranslateBruinStrategyToIngestr(mat.Strategy)
+		if ok {
+			asset.Parameters["incremental_strategy"] = ingestrStrategy
+		}
 	}
 
 	if mat.IncrementalKey != "" {

@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
@@ -278,6 +279,15 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
+	if value, exists := asset.Parameters["incremental_strategy"]; exists && value != "" {
+		if !python.IsIngestrStrategySupported(value) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Incremental strategy '%s' is not supported for ingestr assets. Supported strategies are: %s", value, python.GetSupportedIngestrStrategiesString()),
+			})
+		}
+	}
+
 	updateOnMergeKeys := asset.ColumnNamesWithUpdateOnMerge()
 	if len(updateOnMergeKeys) > 0 {
 		issues = append(issues, &Issue{
@@ -484,6 +494,17 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "A task with materialization must have a connection defined",
+		})
+	}
+
+	if asset.Materialization.Strategy == "" || asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
+		return issues, nil
+	}
+
+	if !python.IsPythonMaterializationStrategySupported(asset.Materialization.Strategy) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Materialization strategy '%s' is not supported for Python assets. Supported strategies are: %s", asset.Materialization.Strategy, python.GetSupportedPythonStrategiesString()),
 		})
 	}
 
