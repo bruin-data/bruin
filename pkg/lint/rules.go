@@ -497,13 +497,15 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 		})
 	}
 
-	if asset.Materialization.Strategy != "" && asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
-		if !python.IsPythonMaterializationStrategySupported(asset.Materialization.Strategy) {
-			issues = append(issues, &Issue{
-				Task:        asset,
-				Description: fmt.Sprintf("Materialization strategy '%s' is not supported for Python assets. Supported strategies are: %s", asset.Materialization.Strategy, python.GetSupportedPythonStrategiesString()),
-			})
-		}
+	if asset.Materialization.Strategy == "" || asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
+		return issues, nil
+	}
+
+	if !python.IsPythonMaterializationStrategySupported(asset.Materialization.Strategy) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Materialization strategy '%s' is not supported for Python assets. Supported strategies are: %s", asset.Materialization.Strategy, python.GetSupportedPythonStrategiesString()),
+		})
 	}
 
 	return issues, nil
