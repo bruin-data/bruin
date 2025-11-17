@@ -76,7 +76,7 @@ jobs:
         if: matrix.platform == 'depot-windows-2022'
         uses: Cyberboss/install-winget@v1
       - name: Install R (Ubuntu)
-        if: matrix.platform == 'ubuntu-latest'
+        if: matrix.platform == 'depot-ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y r-base
