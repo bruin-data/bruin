@@ -16,7 +16,6 @@ var BruinToIngestrStrategyMap = map[pipeline.MaterializationStrategy]string{
 // SupportedPythonMaterializationStrategies lists all materialization strategies supported by Python assets.
 var SupportedPythonMaterializationStrategies = []pipeline.MaterializationStrategy{
 	pipeline.MaterializationStrategyCreateReplace,
-	"replace",
 	pipeline.MaterializationStrategyAppend,
 	pipeline.MaterializationStrategyMerge,
 	pipeline.MaterializationStrategyDeleteInsert,
