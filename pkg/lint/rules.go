@@ -279,6 +279,15 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
+	if value, exists := asset.Parameters["incremental_strategy"]; exists && value != "" {
+		if !python.IsIngestrStrategySupported(value) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Incremental strategy '%s' is not supported for ingestr assets. Supported strategies are: %s", value, python.GetSupportedIngestrStrategiesString()),
+			})
+		}
+	}
+
 	updateOnMergeKeys := asset.ColumnNamesWithUpdateOnMerge()
 	if len(updateOnMergeKeys) > 0 {
 		issues = append(issues, &Issue{
@@ -488,11 +497,12 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 		})
 	}
 
+	// Validate that the materialization strategy is supported for Python assets
 	if asset.Materialization.Strategy != "" && asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
 		if !python.IsPythonMaterializationStrategySupported(asset.Materialization.Strategy) {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: fmt.Sprintf("Materialization strategy '%s' is not supported for Python assets. Supported strategies are: %s", asset.Materialization.Strategy, python.GetSupportedStrategiesString()),
+				Description: fmt.Sprintf("Materialization strategy '%s' is not supported for Python assets. Supported strategies are: %s", asset.Materialization.Strategy, python.GetSupportedPythonStrategiesString()),
 			})
 		}
 	}

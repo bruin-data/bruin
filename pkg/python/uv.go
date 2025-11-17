@@ -301,6 +301,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	if mat.Strategy != "" {
+		// Translate Bruin strategy to ingestr strategy
 		ingestrStrategy, ok := TranslateBruinStrategyToIngestr(mat.Strategy)
 		if ok {
 			asset.Parameters["incremental_strategy"] = ingestrStrategy
