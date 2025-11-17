@@ -497,7 +497,6 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 		})
 	}
 
-	// Validate that the materialization strategy is supported for Python assets
 	if asset.Materialization.Strategy != "" && asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
 		if !python.IsPythonMaterializationStrategySupported(asset.Materialization.Strategy) {
 			issues = append(issues, &Issue{

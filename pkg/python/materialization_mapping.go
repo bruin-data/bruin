@@ -15,11 +15,13 @@ var BruinToIngestrStrategyMap = map[pipeline.MaterializationStrategy]string{
 }
 
 // SupportedPythonMaterializationStrategies lists all materialization strategies supported by Python assets
-var SupportedPythonMaterializationStrategies = []pipeline.MaterializationStrategy{
-	pipeline.MaterializationStrategyCreateReplace,
-	pipeline.MaterializationStrategyAppend,
-	pipeline.MaterializationStrategyMerge,
-	pipeline.MaterializationStrategyDeleteInsert,
+var SupportedPythonMaterializationStrategies []pipeline.MaterializationStrategy
+
+func init() {
+	SupportedPythonMaterializationStrategies = make([]pipeline.MaterializationStrategy, 0, len(BruinToIngestrStrategyMap))
+	for strategy := range BruinToIngestrStrategyMap {
+		SupportedPythonMaterializationStrategies = append(SupportedPythonMaterializationStrategies, strategy)
+	}
 }
 
 // IsPythonMaterializationStrategySupported checks if a given strategy is supported for Python assets

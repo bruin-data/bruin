@@ -2563,6 +2563,55 @@ func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
 			want:    []*Issue{},
 			wantErr: false,
 		},
+		{
+			name: "valid python asset with supported strategy",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type:     pipeline.MaterializationTypeTable,
+							Strategy: pipeline.MaterializationStrategyMerge,
+						},
+						Connection: "conn1",
+					},
+				},
+			},
+			want:    []*Issue{},
+			wantErr: false,
+		},
+		{
+			name: "invalid python asset with unsupported strategy",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type:     pipeline.MaterializationTypeTable,
+							Strategy: pipeline.MaterializationStrategySCD2ByTime,
+						},
+						Connection: "conn1",
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type:     pipeline.MaterializationTypeTable,
+							Strategy: pipeline.MaterializationStrategySCD2ByTime,
+						},
+						Connection: "conn1",
+					},
+					Description: "Materialization strategy 'scd2_by_time' is not supported for Python assets. Supported strategies are: create+replace, append, merge, delete+insert",
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
