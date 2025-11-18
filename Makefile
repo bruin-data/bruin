@@ -20,10 +20,10 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations integration-test-cloud
+.PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud
 all: clean deps test build
 
-deps: tools
+deps: 
 	@printf "$(OK_COLOR)==> Installing dependencies$(NO_COLOR)\n"
 	@go mod tidy
 
@@ -83,40 +83,19 @@ test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
 	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
 
-format: tools lint-python
+format: lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
 	go vet -tags="no_duckdb_arrow" ./... & 
 
 	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
-	gci write cmd pkg integration-tests/integration_test.go main.go &
+	go tool gci write cmd pkg integration-tests/integration_test.go main.go &
 
 	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
-	gofumpt -w cmd pkg &
+	go tool gofumpt -w cmd pkg &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
+	go tool golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
 	wait
-
-tools:
-	@if ! command -v gci > /dev/null ; then \
-		echo ">> [$@]: gci not found: installing"; \
-		go install github.com/daixiang0/gci@latest; \
-	fi
-
-	@if ! command -v gofumpt > /dev/null ; then \
-		echo ">> [$@]: gofumpt not found: installing"; \
-		go install mvdan.cc/gofumpt@latest; \
-	fi
-
-	@if ! command -v golangci-lint > /dev/null ; then \
-		echo ">> [$@]: golangci-lint not found: installing"; \
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.63.2; \
-	fi
-
-tools-update:
-	go install github.com/daixiang0/gci@latest; \
-	go install mvdan.cc/gofumpt@latest; \
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.63.2;
 
 lint-python:
 	pip install sqlglot ruff
