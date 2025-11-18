@@ -53,7 +53,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: false
       - run: make test
 
 
@@ -71,7 +71,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: false
       - name: Install winget
         if: matrix.platform == 'depot-windows-2022'
         uses: Cyberboss/install-winget@v1
@@ -92,6 +92,9 @@ jobs:
     runs-on: depot-ubuntu-latest
     name: Docker Build
     permissions:
+      # allow issuing OIDC tokens for this workflow run
+      id-token: write
+      # allow at least reading the repo contents, add other permissions if necessary
       contents: read
       packages: write
     steps:
@@ -113,15 +116,13 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: depot/build-push-action@v1
         with:
           context: .
           platforms: linux/amd64
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: ${{ env.IS_FORK && 'type=gha' || 'type=gha\ntype=registry,ref=ghcr.io/bruin-data/bruin/cache' }}
-          cache-to:   ${{ env.IS_FORK && 'type=gha,mode=max' || 'type=gha,mode=max\ntype=registry,ref=ghcr.io/bruin-data/bruin/cache,mode=max' }}
           build-args: |
             VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
             BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
@@ -157,7 +158,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: false
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:

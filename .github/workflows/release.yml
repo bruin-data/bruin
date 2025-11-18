@@ -61,7 +61,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: false
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache darwin
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: false
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache linux
@@ -185,6 +185,9 @@ jobs:
     name: Docker Build
     needs: [release-windows, release-unix]
     permissions:
+      # allow issuing OIDC tokens for this workflow run
+      id-token: write
+      # allow at least reading the repo contents, add other permissions if necessary
       contents: read
       packages: write
     steps:
@@ -206,15 +209,13 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: depot/build-push-action@v1
         with:
           context: .
           platforms: linux/amd64, linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache:latest
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache:latest,mode=max
           build-args: |
             VERSION=${{ github.ref_name }}
             BRANCH_NAME=${{ github.ref_name }}
