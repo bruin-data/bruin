@@ -78,12 +78,15 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 		c.ServiceAccountJSON = string(contents)
 	}
 
-	return json.Marshal(map[string]string{
-		"name":                 c.Name,
-		"service_account_json": c.ServiceAccountJSON,
-		"service_account_file": c.ServiceAccountFile,
-		"project_id":           c.ProjectID,
-	})
+	marshalable := map[string]interface{}{
+		"name":                                c.Name,
+		"service_account_json":                c.ServiceAccountJSON,
+		"service_account_file":                c.ServiceAccountFile,
+		"project_id":                          c.ProjectID,
+		"use_application_default_credentials": c.UseApplicationDefaultCredentials,
+	}
+
+	return json.Marshal(marshalable)
 }
 
 type AthenaConnection struct { //nolint:recvcheck
