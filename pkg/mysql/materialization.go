@@ -25,6 +25,8 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
 		pipeline.MaterializationStrategyMerge:         errorMaterializer,
 		pipeline.MaterializationStrategyDDL:           errorMaterializer,
+		pipeline.MaterializationStrategySCD2ByColumn:  errorMaterializer,
+		pipeline.MaterializationStrategySCD2ByTime:    errorMaterializer,
 	},
 	pipeline.MaterializationTypeTable: {
 		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
@@ -91,9 +93,11 @@ func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, erro
 }
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
-	if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime ||
-		asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn {
-		return "", fmt.Errorf("materialization strategy %s is not supported during full refresh for MySQL", asset.Materialization.Strategy)
+	if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime {
+		return buildSCD2ByTimefullRefresh(asset, query)
+	}
+	if asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn {
+		return buildSCD2ByColumnfullRefresh(asset, query)
 	}
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")

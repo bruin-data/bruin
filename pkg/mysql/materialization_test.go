@@ -19,15 +19,15 @@ func TestMaterializer_Render(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name        string
-		asset       *pipeline.Asset
-		query       string
-		fullRefresh bool
-		wantErr     bool
-		expectedErr string
-		wantExact   string
+		name         string
+		asset        *pipeline.Asset
+		query        string
+		fullRefresh  bool
+		wantErr      bool
+		expectedErr  string
+		wantExact    string
 		wantTemplate string
-		wantRegex   *regexp.Regexp
+		wantRegex    *regexp.Regexp
 	}{
 		{
 			name: "returns raw query when materialization disabled",
@@ -263,7 +263,7 @@ COMMIT;$`),
 				");",
 		},
 		{
-			name: "scd2 by time unsupported",
+			name: "scd2 by time requires incremental key",
 			asset: &pipeline.Asset{
 				Name: "analytics.orders",
 				Materialization: pipeline.Materialization{
@@ -273,20 +273,7 @@ COMMIT;$`),
 			},
 			query:       "SELECT 1",
 			wantErr:     true,
-			expectedErr: "materialization strategy scd2_by_time is not supported",
-		},
-		{
-			name: "scd2 by column unsupported",
-			asset: &pipeline.Asset{
-				Name: "analytics.orders",
-				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
-				},
-			},
-			query:       "SELECT 1",
-			wantErr:     true,
-			expectedErr: "materialization strategy scd2_by_column is not supported",
+			expectedErr: "incremental_key is required for SCD2_by_time strategy",
 		},
 		{
 			name: "scd2 by time unsupported",
