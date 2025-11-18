@@ -137,9 +137,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
-      - run: make tools
       - name: Run golangci-lint
-        run: golangci-lint run --timeout 10m60s ./...
+        run: go tool golangci-lint run --timeout 10m60s ./...
 
   goreleaser-windows:
     runs-on: depot-windows-2022
