@@ -38,7 +38,10 @@ table td:first-child {
 | `--connection`, `-c` | str | - | Name of the default connection to use when connection is not specified in table arguments |
 | `--tolerance`, `-t` | float | `0.001` | Tolerance percentage for considering values equal. Values with percentage difference below this threshold are considered equal |
 | `--config-file` | str | `.bruin.yml` | Optional path to the `.bruin.yml` configuration file . Other [secret backends](../secrets/overview.md) can be used.|
+| `--schema-only` | bool | `false` | Compare only table schemas without analyzing row counts or column distributions |
 | `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
+| `--target-dialect` | str | auto-detect | Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, generic). Auto-detected from connection types if not specified |
+| `--reverse` | bool | `false` | Reverse the direction of ALTER statements (transform Table1 to match Table2 instead of Table2 to match Table1) |
 
 ## Table Identifier Format
 
@@ -108,6 +111,33 @@ The command generates several detailed tables:
 4. **Column Differences:** Specific differences for columns that exist in both tables
 5. **Missing Columns:** Columns that exist in one table but not the other
 6. **Statistical Comparison:** Detailed statistics for each common column
+7. **ALTER TABLE Statements:** SQL statements to synchronize the schemas (when differences are found)
+
+### ALTER TABLE Statement Generation
+
+When schema differences are detected, the command automatically generates ALTER TABLE SQL statements to synchronize the schemas. These statements are output to stdout (separate from the comparison tables which go to stderr), making it easy to capture and review them.
+
+The generated statements can:
+- Add missing columns
+- Change column data types
+- Modify column nullability
+- Be combined into a single ALTER TABLE statement where the database dialect supports it
+
+**Direction of Changes:**
+- By default, statements transform Table2 to match Table1
+- Use `--reverse` to transform Table1 to match Table2 instead
+
+**Dialect Detection:**
+- If both connections are the same type (e.g., both PostgreSQL), uses that dialect
+- If connections are different types, uses the second table's dialect
+- Can be overridden with `--target-dialect` flag
+
+**Supported Dialects:**
+- PostgreSQL (`postgresql`)
+- Snowflake (`snowflake`)
+- BigQuery (`bigquery`)
+- DuckDB (`duckdb`)
+- Generic SQL (`generic`)
 
 ## Examples
 
@@ -143,6 +173,61 @@ Specify a different configuration file:
 ```bash
 bruin data-diff --config-file /path/to/custom/.bruin.yml prod:table1 staging:table2
 ```
+
+### Generating ALTER TABLE Statements
+
+Compare schemas and generate SQL statements to synchronize them:
+```bash
+bruin data-diff prod_db:users staging_db:users
+```
+
+Output (stdout):
+```sql
+-- ALTER TABLE statements to synchronize schemas:
+ALTER TABLE "users"
+  ADD COLUMN "email" VARCHAR(255) NOT NULL,
+  ALTER COLUMN "age" TYPE INTEGER,
+  ALTER COLUMN "bio" DROP NOT NULL,
+  DROP COLUMN "legacy_code";
+```
+
+Columns that only exist in the table being modified are now automatically dropped, alongside column additions and property updates, so the schema truly matches the desired definition.
+
+### Capturing ALTER Statements
+
+Since ALTER statements are sent to stdout, you can easily capture them:
+```bash
+bruin data-diff prod:users staging:users > schema_sync.sql
+```
+
+The comparison tables will still be displayed on stderr, while the SQL goes to the file.
+
+### Reversing ALTER Direction
+
+By default, statements modify Table2 to match Table1. To reverse this:
+```bash
+bruin data-diff --reverse prod:users staging:users
+```
+
+This will generate statements to modify `prod:users` instead of `staging:users`.
+
+### Specifying SQL Dialect
+
+Override auto-detection and specify the target dialect explicitly:
+```bash
+bruin data-diff --target-dialect postgresql prod_duck:users staging_bq:users
+```
+
+This generates PostgreSQL-compatible ALTER statements even when comparing DuckDB and BigQuery tables.
+
+### Schema-Only Comparison
+
+Compare only table schemas without statistical analysis:
+```bash
+bruin data-diff --schema-only prod:large_table staging:large_table
+```
+
+This is faster for large tables when you only need schema differences.
 
 ## Supported Data Platforms
 

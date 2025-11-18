@@ -1,7 +1,12 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/bruin-data/bruin/pkg/diff"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCalculatePercentageDiff(t *testing.T) {
@@ -353,4 +358,181 @@ func TestFormatDiffValue(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGenerateAlterStatements(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns empty when no schema differences", func(t *testing.T) {
+		t.Parallel()
+		result := diff.SchemaComparisonResult{
+			HasSchemaDifferences: false,
+			Table1: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "table1"},
+			},
+			Table2: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "table2"},
+			},
+		}
+
+		statements := generateAlterStatements(result, "postgres", "postgres", "", false)
+		assert.Empty(t, statements)
+	})
+
+	t.Run("uses explicit dialect when provided", func(t *testing.T) {
+		t.Parallel()
+		result := diff.SchemaComparisonResult{
+			HasSchemaDifferences: true,
+			Table1: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "users"},
+			},
+			Table2: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "users_copy"},
+			},
+			MissingColumns: []diff.MissingColumn{
+				{
+					ColumnName:  "email",
+					Type:        "VARCHAR(255)",
+					Nullable:    false,
+					MissingFrom: "users_copy",
+					TableName:   "users",
+				},
+			},
+		}
+
+		statements := generateAlterStatements(result, "postgres", "duckdb", "bigquery", false)
+		require.Len(t, statements, 1)
+		// BigQuery uses backticks
+		assert.Contains(t, statements[0], "`users_copy`")
+	})
+
+	t.Run("auto-detects dialect from same connection types", func(t *testing.T) {
+		t.Parallel()
+		result := diff.SchemaComparisonResult{
+			HasSchemaDifferences: true,
+			Table1: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "products"},
+			},
+			Table2: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "products_v2"},
+			},
+			MissingColumns: []diff.MissingColumn{
+				{
+					ColumnName:  "description",
+					Type:        "TEXT",
+					Nullable:    true,
+					MissingFrom: "products_v2",
+					TableName:   "products",
+				},
+			},
+		}
+
+		statements := generateAlterStatements(result, "postgres", "postgres", "", false)
+		require.Len(t, statements, 1)
+		// PostgreSQL uses double quotes
+		assert.Contains(t, statements[0], `"products_v2"`)
+	})
+
+	t.Run("auto-detects dialect from different connection types", func(t *testing.T) {
+		t.Parallel()
+		result := diff.SchemaComparisonResult{
+			HasSchemaDifferences: true,
+			Table1: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "orders"},
+			},
+			Table2: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "orders_staging"},
+			},
+			ColumnDifferences: []diff.ColumnDifference{
+				{
+					ColumnName: "status",
+					TypeDifference: &diff.TypeDifference{
+						Table1Type: "VARCHAR(20)",
+						Table2Type: "VARCHAR(10)",
+					},
+				},
+			},
+		}
+
+		// Should use second connection's dialect (snowflake)
+		statements := generateAlterStatements(result, "postgres", "snowflake", "", false)
+		require.Len(t, statements, 1)
+		assert.Contains(t, statements[0], `"orders_staging"`)
+		assert.Contains(t, statements[0], "SET DATA TYPE") // Snowflake syntax
+	})
+
+	t.Run("respects reverse flag", func(t *testing.T) {
+		t.Parallel()
+		result := diff.SchemaComparisonResult{
+			HasSchemaDifferences: true,
+			Table1: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "source"},
+			},
+			Table2: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "target"},
+			},
+			MissingColumns: []diff.MissingColumn{
+				{
+					ColumnName:  "new_column",
+					Type:        "INTEGER",
+					Nullable:    false,
+					MissingFrom: "target",
+					TableName:   "source",
+				},
+			},
+		}
+
+		// Without reverse: modifies target to match source (add new_column to target)
+		statements := generateAlterStatements(result, "duckdb", "duckdb", "", false)
+		require.Len(t, statements, 1)
+		assert.Contains(t, statements[0], `"target"`)
+		assert.Contains(t, statements[0], "ADD COLUMN")
+
+		// With reverse: modifies source to match target (drop new_column from source)
+		statementsReverse := generateAlterStatements(result, "duckdb", "duckdb", "", true)
+		require.Len(t, statementsReverse, 1)
+		assert.Contains(t, statementsReverse[0], `"source"`)
+		assert.Contains(t, statementsReverse[0], "DROP COLUMN")
+	})
+
+	t.Run("generates statements for multiple changes", func(t *testing.T) {
+		t.Parallel()
+		result := diff.SchemaComparisonResult{
+			HasSchemaDifferences: true,
+			Table1: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "employees"},
+			},
+			Table2: &diff.TableSummaryResult{
+				Table: &diff.Table{Name: "employees_temp"},
+			},
+			MissingColumns: []diff.MissingColumn{
+				{
+					ColumnName:  "department",
+					Type:        "VARCHAR(100)",
+					Nullable:    false,
+					MissingFrom: "employees_temp",
+					TableName:   "employees",
+				},
+			},
+			ColumnDifferences: []diff.ColumnDifference{
+				{
+					ColumnName: "salary",
+					TypeDifference: &diff.TypeDifference{
+						Table1Type: "DECIMAL(12,2)",
+						Table2Type: "INTEGER",
+					},
+				},
+			},
+		}
+
+		statements := generateAlterStatements(result, "duckdb", "duckdb", "", false)
+		// DuckDB generates separate statements for each change
+		require.Len(t, statements, 2)
+
+		// Check that statements contain the expected operations
+		allStatements := strings.Join(statements, " ")
+		assert.Contains(t, allStatements, `"employees_temp"`)
+		assert.Contains(t, allStatements, "ADD COLUMN")
+		assert.Contains(t, allStatements, "ALTER COLUMN")
+	})
 }
