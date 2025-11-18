@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 
@@ -18,14 +19,15 @@ func TestMaterializer_Render(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name        string
-		asset       *pipeline.Asset
-		query       string
-		fullRefresh bool
-		wantErr     bool
-		expectedErr string
-		wantExact   string
-		wantRegex   *regexp.Regexp
+		name         string
+		asset        *pipeline.Asset
+		query        string
+		fullRefresh  bool
+		wantErr      bool
+		expectedErr  string
+		wantExact    string
+		wantTemplate string
+		wantRegex    *regexp.Regexp
 	}{
 		{
 			name: "returns raw query when materialization disabled",
@@ -261,6 +263,19 @@ COMMIT;$`),
 				");",
 		},
 		{
+			name: "scd2 by time requires incremental key",
+			asset: &pipeline.Asset{
+				Name: "analytics.orders",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+				},
+			},
+			query:       "SELECT 1",
+			wantErr:     true,
+			expectedErr: "incremental_key is required for SCD2_by_time strategy",
+		},
+		{
 			name: "scd2 by time unsupported",
 			asset: &pipeline.Asset{
 				Name: "analytics.orders",
@@ -271,20 +286,156 @@ COMMIT;$`),
 			},
 			query:       "SELECT 1",
 			wantErr:     true,
-			expectedErr: "materialization strategy scd2_by_time is not supported",
+			expectedErr: "incremental_key is required for SCD2_by_time strategy",
 		},
 		{
-			name: "scd2 by column unsupported",
+			name: "scd2 by time incremental",
 			asset: &pipeline.Asset{
-				Name: "analytics.orders",
+				Name: "analytics.history",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "event_time",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+					{Name: "event_time", Type: "TIMESTAMP"},
+					{Name: "country", Type: "VARCHAR(16)"},
+				},
+			},
+			query: "SELECT id, event_time, country FROM source",
+			wantTemplate: "START TRANSACTION;\n" +
+				"DROP TEMPORARY TABLE IF EXISTS %[1]s;\n" +
+				"CREATE TEMPORARY TABLE %[1]s AS SELECT id, event_time, country FROM source;\n" +
+				"UPDATE analytics.history AS target JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = CAST(source.event_time AS DATETIME), target._is_current = FALSE WHERE target._is_current = TRUE AND target._valid_from < CAST(source.event_time AS DATETIME);\n" +
+				"UPDATE analytics.history AS target LEFT JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = CURRENT_TIMESTAMP, target._is_current = FALSE WHERE target._is_current = TRUE AND source.id IS NULL;\n" +
+				"INSERT INTO analytics.history (id, event_time, country, _valid_from, _valid_until, _is_current)\n" +
+				"SELECT source.id, source.event_time, source.country, CAST(source.event_time AS DATETIME), '9999-12-31 23:59:59', TRUE\n" +
+				"FROM %[1]s AS source\n" +
+				"LEFT JOIN analytics.history AS current ON current.id = source.id AND current._is_current = TRUE\n" +
+				"WHERE current.id IS NULL OR current._valid_from < CAST(source.event_time AS DATETIME);\n" +
+				"DROP TEMPORARY TABLE IF EXISTS %[1]s;\n" +
+				"COMMIT;",
+		},
+		{
+			name: "scd2 by time full refresh",
+			asset: &pipeline.Asset{
+				Name: "analytics.history",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "event_time",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+					{Name: "event_time", Type: "DATETIME"},
+					{Name: "country", Type: "VARCHAR(16)"},
+				},
+			},
+			query:       "SELECT id, event_time, country FROM source",
+			fullRefresh: true,
+			wantExact: "DROP TABLE IF EXISTS analytics.history;\n" +
+				"CREATE TABLE analytics.history AS\n" +
+				"SELECT\n" +
+				"  src.id,\n" +
+				"  src.event_time,\n" +
+				"  src.country,\n" +
+				"  CAST(src.event_time AS DATETIME) AS _valid_from,\n" +
+				"  '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, event_time, country FROM source\n" +
+				") AS src;",
+		},
+		{
+			name: "scd2 by column requires primary key",
+			asset: &pipeline.Asset{
+				Name: "analytics.history",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
 					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
 				},
+				Columns: []pipeline.Column{
+					{Name: "name", Type: "VARCHAR(50)"},
+				},
 			},
-			query:       "SELECT 1",
+			query:       "SELECT name FROM source",
 			wantErr:     true,
-			expectedErr: "materialization strategy scd2_by_column is not supported",
+			expectedErr: "requires the `primary_key` field to be set",
+		},
+		{
+			name: "scd2 by column requires non-primary-key columns",
+			asset: &pipeline.Asset{
+				Name: "analytics.history",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+				},
+			},
+			query:       "SELECT id FROM source",
+			wantErr:     true,
+			expectedErr: "requires at least one non-primary-key column",
+		},
+		{
+			name: "scd2 by column incremental",
+			asset: &pipeline.Asset{
+				Name: "analytics.history",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR(50)"},
+					{Name: "country", Type: "VARCHAR(16)"},
+				},
+			},
+			query: "SELECT id, name, country FROM source",
+			wantTemplate: "START TRANSACTION;\n" +
+				"DROP TEMPORARY TABLE IF EXISTS %[1]s;\n" +
+				"CREATE TEMPORARY TABLE %[1]s AS SELECT id, name, country FROM source;\n" +
+				"SET @current_scd2_ts = CURRENT_TIMESTAMP;\n" +
+				"UPDATE analytics.history AS target LEFT JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND source.id IS NULL;\n" +
+				"UPDATE analytics.history AS target JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND (NOT (target.name <=> source.name) OR NOT (target.country <=> source.country));\n" +
+				"INSERT INTO analytics.history (id, name, country, _valid_from, _valid_until, _is_current)\n" +
+				"SELECT source.id, source.name, source.country, @current_scd2_ts, '9999-12-31 23:59:59', TRUE\n" +
+				"FROM %[1]s AS source\n" +
+				"LEFT JOIN analytics.history AS current ON current.id = source.id AND current._is_current = TRUE\n" +
+				"WHERE current.id IS NULL OR (NOT (current.name <=> source.name) OR NOT (current.country <=> source.country));\n" +
+				"DROP TEMPORARY TABLE IF EXISTS %[1]s;\n" +
+				"COMMIT;",
+		},
+		{
+			name: "scd2 by column full refresh",
+			asset: &pipeline.Asset{
+				Name: "analytics.history",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR(50)"},
+					{Name: "country", Type: "VARCHAR(16)"},
+				},
+			},
+			query:       "SELECT id, name, country FROM source",
+			fullRefresh: true,
+			wantExact: "DROP TABLE IF EXISTS analytics.history;\n" +
+				"CREATE TABLE analytics.history AS\n" +
+				"SELECT\n" +
+				"  src.id,\n" +
+				"  src.name,\n" +
+				"  src.country,\n" +
+				"  CURRENT_TIMESTAMP AS _valid_from,\n" +
+				"  '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, name, country FROM source\n" +
+				") AS src;",
 		},
 		{
 			name: "unsupported view strategy",
@@ -333,9 +484,19 @@ COMMIT;$`),
 			}
 
 			require.NoError(t, err)
-			if tt.wantRegex != nil {
+			switch {
+			case tt.wantRegex != nil:
 				assert.Regexp(t, tt.wantRegex, got)
-			} else {
+			case tt.wantTemplate != "":
+				re := regexp.MustCompile(`__bruin_[a-z0-9_]+_tmp_[a-z0-9]+`)
+				tempName := re.FindString(got)
+				if tempName == "" {
+					t.Log("materialized SQL:\n" + got)
+				}
+				require.NotEmpty(t, tempName)
+				expected := fmt.Sprintf(tt.wantTemplate, tempName)
+				assert.Equal(t, expected, got)
+			default:
 				assert.Equal(t, tt.wantExact, got)
 			}
 		})
