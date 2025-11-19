@@ -18,6 +18,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -68,51 +69,6 @@ type Client struct {
 	typeMapper *diff.DatabaseTypeMapper
 }
 
-// This function detects authentication errors using Google API's error codes.
-// Reference: https://pkg.go.dev/cloud.google.com/go#section-readme
-func isCredentialError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	var apiErr *googleapi.Error
-	if errors.As(err, &apiErr) {
-		// 401 = Unauthorized (authentication failure)
-		// 403 = Forbidden (authorization/permission failure)
-		if apiErr.Code == 401 || apiErr.Code == 403 {
-			return true
-		}
-	}
-
-	// Also check for credential setup errors that occur before API calls
-	// These are returned during client initialization when ADC cannot find credentials
-	errMsg := err.Error()
-	errLower := strings.ToLower(errMsg)
-
-	// Standard ADC error when credentials are not found
-	if strings.Contains(errLower, "could not find default credentials") {
-		return true
-	}
-
-	// OAuth2 credential errors that occur during client setup
-	credentialSetupErrors := []string{
-		"defaultcredentialserror",        // Error type name from oauth2/google
-		"no such file or directory",      // When GOOGLE_APPLICATION_CREDENTIALS points to missing file
-		"failed to create oauth2 client", // OAuth2 setup failure
-		"unable to retrieve credentials", // Generic credential retrieval failure
-		"invalid_grant",                  // OAuth2 invalid grant error
-		"unauthorized_client",            // OAuth2 client authorization error
-	}
-
-	for _, pattern := range credentialSetupErrors {
-		if strings.Contains(errLower, pattern) {
-			return true
-		}
-	}
-
-	return false
-}
-
 func NewDB(c *Config) (*Client, error) {
 	options := []option.ClientOption{
 		option.WithScopes(scopes...),
@@ -130,6 +86,15 @@ func NewDB(c *Config) (*Client, error) {
 		default:
 			return nil, errors.New("no credentials provided")
 		}
+	} else {
+		// If ADC is enabled, proactively check if credentials are available
+		_, err := google.FindDefaultCredentials(context.Background(), scopes...)
+		if err != nil {
+			return nil, &ADCCredentialError{
+				ClientType:  "BigQuery client",
+				OriginalErr: err,
+			}
+		}
 	}
 	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
 
@@ -139,16 +104,10 @@ func NewDB(c *Config) (*Client, error) {
 		options...,
 	)
 	if err != nil {
-		// If ADC is enabled and the error is credential-related, provide helpful instructions
-		if c.UseApplicationDefaultCredentials && isCredentialError(err) {
-			return nil, &ADCCredentialError{
-				ClientType:  "BigQuery client",
-				OriginalErr: err,
-			}
-		}
 		return nil, errors.Wrap(err, "failed to create bigquery client")
 	}
 
+	// Set location if specified (used for query execution region)
 	if c.Location != "" {
 		client.Location = c.Location
 	}
@@ -189,19 +148,21 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 		default:
 			return nil, errors.New("no credentials provided for Data Transfer client")
 		}
-	}
-	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
-
-	client, err := datatransfer.NewClient(ctx, options...)
-	if err != nil {
-		// If ADC is enabled and the error is credential-related, provide helpful instructions
-		if d.config.UseApplicationDefaultCredentials && isCredentialError(err) {
+	} else {
+		// If ADC is enabled, proactively check if credentials are available
+		_, err := google.FindDefaultCredentials(ctx, scopes...)
+		if err != nil {
 			return nil, &ADCCredentialError{
 				ClientType:  "Data Transfer client",
 				OriginalErr: err,
 			}
 		}
-		return nil, err
+	}
+	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
+
+	client, err := datatransfer.NewClient(ctx, options...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Data Transfer client")
 	}
 	return client, nil
 }
