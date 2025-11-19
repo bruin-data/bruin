@@ -1111,6 +1111,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 
 // HasGCPConnectionWithADC checks if the pipeline uses any GCP connections
 // that have use_application_default_credentials enabled.
+// Returns true and the first matching connection name if found, false otherwise.
 func HasGCPConnectionWithADC(p *pipeline.Pipeline, cm *config.Config) (bool, []string, error) {
 	// Step 1: Get all unique connection names used by the pipeline
 	connectionNames := make(map[string]bool)
@@ -1126,15 +1127,15 @@ func HasGCPConnectionWithADC(p *pipeline.Pipeline, cm *config.Config) (bool, []s
 	}
 
 	// Step 2: Check if any of these connections are GCP with ADC enabled
-	var adcConnections []string
-
+	// Return early once we find the first one since we only need to know if at least one exists
 	for _, gcpConn := range cm.SelectedEnvironment.Connections.GoogleCloudPlatform {
 		if connectionNames[gcpConn.Name] && gcpConn.UseApplicationDefaultCredentials {
-			adcConnections = append(adcConnections, gcpConn.Name)
+			// Return true with the first matching connection name
+			return true, []string{gcpConn.Name}, nil
 		}
 	}
 
-	return len(adcConnections) > 0, adcConnections, nil
+	return false, nil, nil
 }
 
 // CheckAndPromptForGCPCredentials checks if Google Application Default Credentials are available.
