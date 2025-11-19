@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	path2 "path"
 	"path/filepath"
@@ -16,6 +17,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
@@ -760,6 +764,19 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
+			// Check for GCP connections using Application Default Credentials
+			hasADC, adcConnections, err := HasGCPConnectionWithADC(pipelineInfo.Pipeline, cm)
+			if err != nil {
+				logger.Warnf("Failed to check for GCP ADC connections: %v", err)
+			} else if hasADC {
+				infoPrinter.Printf("Pipeline uses GCP connections with Application Default Credentials: %s\n", strings.Join(adcConnections, ", "))
+				// Check if credentials are available using Google's API
+				if err := CheckAndPromptForGCPCredentials(ctx, logger); err != nil {
+					errorPrinter.Printf("Failed to verify Google Application Default Credentials: %v\n", err)
+					return cli.Exit("", 1)
+				}
+			}
+
 			// Re-determine start date based on pipeline configuration and full-refresh flag
 			startDate, err = DetermineStartDate(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
 			if err != nil {
@@ -1090,6 +1107,206 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	}
 
 	return startDate, endDate, inputPath, nil
+}
+
+// HasGCPConnectionWithADC checks if the pipeline uses any GCP connections
+// that have use_application_default_credentials enabled.
+func HasGCPConnectionWithADC(p *pipeline.Pipeline, cm *config.Config) (bool, []string, error) {
+	// Step 1: Get all unique connection names used by the pipeline
+	connectionNames := make(map[string]bool)
+
+	for _, asset := range p.Assets {
+		connNames, err := p.GetAllConnectionNamesForAsset(asset)
+		if err != nil {
+			return false, nil, errors.Wrapf(err, "failed to get connection names for asset %s", asset.Name)
+		}
+		for _, connName := range connNames {
+			connectionNames[connName] = true
+		}
+	}
+
+	// Step 2: Check if any of these connections are GCP with ADC enabled
+	var adcConnections []string
+
+	for _, gcpConn := range cm.SelectedEnvironment.Connections.GoogleCloudPlatform {
+		if connectionNames[gcpConn.Name] && gcpConn.UseApplicationDefaultCredentials {
+			adcConnections = append(adcConnections, gcpConn.Name)
+		}
+	}
+
+	return len(adcConnections) > 0, adcConnections, nil
+}
+
+// CheckAndPromptForGCPCredentials checks if Google Application Default Credentials are available.
+// If not found or invalid, it prompts the user to run gcloud auth application-default login.
+// This function handles the edge case where GOOGLE_APPLICATION_CREDENTIALS is set but points to invalid credentials.
+func CheckAndPromptForGCPCredentials(ctx context.Context, logger logger.Logger) error {
+	// Use Google's API to find default credentials with BigQuery scopes
+	// These are the same scopes used by the BigQuery client
+	scopes := []string{
+		"https://www.googleapis.com/auth/bigquery",
+		"https://www.googleapis.com/auth/cloud-platform",
+		"https://www.googleapis.com/auth/drive",
+	}
+
+	// Check if GOOGLE_APPLICATION_CREDENTIALS is set
+	googleCredsEnv := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	hasGoogleCredsEnv := googleCredsEnv != ""
+
+	// Try to find credentials
+	creds, err := google.FindDefaultCredentials(ctx, scopes...)
+	if err != nil {
+		// Check if this is an invalid_grant error (invalid credentials)
+		errMsg := strings.ToLower(err.Error())
+		isInvalidGrant := strings.Contains(errMsg, "invalid_grant") ||
+			strings.Contains(errMsg, "reauth related error")
+
+		if isInvalidGrant {
+			// Credentials are invalid - if GOOGLE_APPLICATION_CREDENTIALS was set, ask user if they want to unset it
+			if hasGoogleCredsEnv {
+				warningPrinter.Printf("\n⚠️  GOOGLE_APPLICATION_CREDENTIALS is set to '%s' but the credentials are invalid or expired (invalid_grant error).\n", googleCredsEnv)
+				infoPrinter.Println("To use gcloud authentication, GOOGLE_APPLICATION_CREDENTIALS needs to be unset.")
+				infoPrinter.Print("Would you like to unset GOOGLE_APPLICATION_CREDENTIALS and login using gcloud? (y/n): ")
+
+				var response string
+				fmt.Scanln(&response)
+				response = strings.ToLower(strings.TrimSpace(response))
+
+				if response == "y" || response == "yes" {
+					os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
+					infoPrinter.Println("✓ GOOGLE_APPLICATION_CREDENTIALS has been unset.")
+					return promptForGCloudLogin(ctx, logger, true)
+				}
+				// User declined to unset - return error
+				return errors.New("GOOGLE_APPLICATION_CREDENTIALS is set but invalid, and user declined to unset it")
+			} else {
+				warningPrinter.Println("\n⚠️  Google Application Default Credentials are invalid or expired (invalid_grant error).")
+				return promptForGCloudLogin(ctx, logger, true)
+			}
+		}
+
+		// Credentials not found - check if it's a "not found" error
+		// Check for various error message formats that indicate credentials not found
+		if strings.Contains(errMsg, "could not find default credentials") ||
+			strings.Contains(errMsg, "defaultcredentialserror") ||
+			strings.Contains(errMsg, "google: could not find") ||
+			strings.Contains(errMsg, "credentials: could not find") ||
+			strings.Contains(errMsg, "constructing client: credentials") {
+			// Credentials not found - prompt user to login
+			return promptForGCloudLogin(ctx, logger, false)
+		}
+		// Some other error occurred
+		return errors.Wrap(err, "failed to check for Google Application Default Credentials")
+	}
+
+	// Credentials found - validate them by attempting to get a token
+	// This catches the case where GOOGLE_APPLICATION_CREDENTIALS is set but invalid
+	var token *oauth2.Token
+	token, tokenErr := creds.TokenSource.Token()
+	if tokenErr != nil {
+		// Check if this is an invalid_grant error (expired/invalid credentials)
+		errMsg := strings.ToLower(tokenErr.Error())
+		isInvalidGrant := strings.Contains(errMsg, "invalid_grant") ||
+			strings.Contains(errMsg, "reauth related error")
+
+		// Credentials are invalid - if GOOGLE_APPLICATION_CREDENTIALS was set, ask user if they want to unset it
+		if hasGoogleCredsEnv {
+			if isInvalidGrant {
+				warningPrinter.Printf("\n⚠️  GOOGLE_APPLICATION_CREDENTIALS is set to '%s' but the credentials are invalid or expired (invalid_grant error).\n", googleCredsEnv)
+			} else {
+				warningPrinter.Printf("\n⚠️  GOOGLE_APPLICATION_CREDENTIALS is set to '%s' but the credentials are invalid or expired.\n", googleCredsEnv)
+			}
+			infoPrinter.Println("To use gcloud authentication, GOOGLE_APPLICATION_CREDENTIALS needs to be unset.")
+			infoPrinter.Print("Would you like to unset GOOGLE_APPLICATION_CREDENTIALS and login using gcloud? (y/n): ")
+
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+
+			if response == "y" || response == "yes" {
+				os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
+				infoPrinter.Println("✓ GOOGLE_APPLICATION_CREDENTIALS has been unset.")
+				return promptForGCloudLogin(ctx, logger, true)
+			}
+			// User declined to unset - return error
+			return errors.New("GOOGLE_APPLICATION_CREDENTIALS is set but invalid, and user declined to unset it")
+		} else {
+			if isInvalidGrant {
+				warningPrinter.Println("\n⚠️  Google Application Default Credentials are invalid or expired (invalid_grant error).")
+			} else {
+				warningPrinter.Println("\n⚠️  Google Application Default Credentials are invalid or expired.")
+			}
+			return promptForGCloudLogin(ctx, logger, true)
+		}
+	}
+
+	// Credentials found and valid - token retrieved successfully
+	// Verify token is not nil (shouldn't happen if no error, but be defensive)
+	if token == nil {
+		return errors.New("token is nil after successful retrieval")
+	}
+
+	return nil
+}
+
+// promptForGCloudLogin prompts the user to run gcloud auth application-default login
+func promptForGCloudLogin(ctx context.Context, logger logger.Logger, credentialsWereInvalid bool) error {
+	if !credentialsWereInvalid {
+		warningPrinter.Println("\n⚠️  Google Application Default Credentials not found")
+	}
+	infoPrinter.Println("To authenticate, please run:")
+	infoPrinter.Println("  gcloud auth application-default login")
+	infoPrinter.Println()
+
+	// Check if gcloud is available
+	if _, err := exec.LookPath("gcloud"); err != nil {
+		// gcloud not found
+		warningPrinter.Println("Note: gcloud CLI not found in PATH. Please install it or set GOOGLE_APPLICATION_CREDENTIALS")
+		return errors.New("Google Application Default Credentials not found and gcloud CLI is not available")
+	}
+
+	// gcloud is available, ask if user wants to run it now
+	infoPrinter.Print("Would you like to run 'gcloud auth application-default login' now? (y/n): ")
+	var response string
+	fmt.Scanln(&response)
+	response = strings.ToLower(strings.TrimSpace(response))
+
+	if response == "y" || response == "yes" {
+		// User wants to login - run the command
+		cmd := exec.CommandContext(ctx, "gcloud", "auth", "application-default", "login")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return errors.Wrap(err, "failed to run gcloud auth application-default login")
+		}
+		infoPrinter.Println("✓ Successfully authenticated with gcloud")
+
+		// After successful login, verify credentials are now found
+		scopes := []string{
+			"https://www.googleapis.com/auth/bigquery",
+			"https://www.googleapis.com/auth/cloud-platform",
+			"https://www.googleapis.com/auth/drive",
+		}
+		creds, err := google.FindDefaultCredentials(ctx, scopes...)
+		if err != nil {
+			return errors.Wrap(err, "credentials still not found after gcloud login")
+		}
+		// Validate the new credentials work
+		var token *oauth2.Token
+		token, err = creds.TokenSource.Token()
+		if err != nil {
+			return errors.Wrap(err, "credentials still invalid after gcloud login")
+		}
+		// Verify token is not nil
+		if token == nil {
+			return errors.New("token is nil after successful gcloud login")
+		}
+		return nil
+	}
+
+	// User declined to login - return error
+	return errors.New("Google Application Default Credentials not found and user declined to log in")
 }
 
 func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, validateOnlyAssetLevel bool) error {
