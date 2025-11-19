@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"golang.org/x/oauth2/google"
@@ -48,16 +49,15 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 		m["location"] = c.Location
 	}
 
-	// If ADC is enabled, don't include service account fields as they're not used
 	if c.UseApplicationDefaultCredentials {
 		m["use_application_default_credentials"] = c.UseApplicationDefaultCredentials
-	} else {
-		// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
-		if c.ServiceAccountFile != "" {
-			m["service_account_file"] = c.ServiceAccountFile
-		} else if c.ServiceAccountJSON != "" {
-			m["service_account_json"] = c.ServiceAccountJSON
-		}
+	}
+
+	// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
+	if c.ServiceAccountFile != "" {
+		m["service_account_file"] = c.ServiceAccountFile
+	} else if c.ServiceAccountJSON != "" {
+		m["service_account_json"] = c.ServiceAccountJSON
 	}
 	return m, nil
 }
@@ -71,17 +71,6 @@ func (c *GoogleCloudPlatformConnection) GetCredentials() *google.Credentials {
 }
 
 func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
-	// If ADC is enabled, don't read or include service account fields as they're not used
-	if c.UseApplicationDefaultCredentials {
-		return json.Marshal(map[string]string{
-			"name":                                c.Name,
-			"project_id":                          c.ProjectID,
-			"location":                            c.Location,
-			"use_application_default_credentials": "true",
-		})
-	}
-
-	// Only read the file if we're actually going to use the credentials
 	if c.ServiceAccountJSON == "" && c.ServiceAccountFile != "" {
 		contents, err := os.ReadFile(c.ServiceAccountFile)
 		if err != nil {
@@ -97,7 +86,7 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 		"service_account_file":                c.ServiceAccountFile,
 		"project_id":                          c.ProjectID,
 		"location":                            c.Location,
-		"use_application_default_credentials": "false",
+		"use_application_default_credentials": strconv.FormatBool(c.UseApplicationDefaultCredentials),
 	})
 }
 
