@@ -498,6 +498,10 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 	}
 
 	if asset.Materialization.Strategy == "" || asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization strategy is required for Python assets with type 'table'",
+		})
 		return issues, nil
 	}
 
@@ -915,6 +919,10 @@ func EnsureMSTeamsFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeli
 }
 
 func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.Type == pipeline.AssetTypePython {
+		return nil, nil
+	}
+
 	issues := make([]*Issue, 0)
 
 	switch asset.Materialization.Type {
