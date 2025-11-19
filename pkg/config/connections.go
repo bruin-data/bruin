@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"golang.org/x/oauth2/google"
@@ -47,6 +48,7 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 	if c.Location != "" {
 		m["location"] = c.Location
 	}
+
 	if c.UseApplicationDefaultCredentials {
 		m["use_application_default_credentials"] = c.UseApplicationDefaultCredentials
 	}
@@ -79,10 +81,12 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(map[string]string{
-		"name":                 c.Name,
-		"service_account_json": c.ServiceAccountJSON,
-		"service_account_file": c.ServiceAccountFile,
-		"project_id":           c.ProjectID,
+		"name":                                c.Name,
+		"service_account_json":                c.ServiceAccountJSON,
+		"service_account_file":                c.ServiceAccountFile,
+		"project_id":                          c.ProjectID,
+		"location":                            c.Location,
+		"use_application_default_credentials": strconv.FormatBool(c.UseApplicationDefaultCredentials),
 	})
 }
 
