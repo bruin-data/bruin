@@ -76,6 +76,82 @@ These resources can fetch data for a specific ad account or all ad accounts in t
 | `creatives` | id | updated_at | merge | Retrieves all creatives for ad account(s). Supports `creatives:ad_account_id` |
 | `segments` | id | updated_at | merge | Retrieves all audience segments for ad account(s). Supports `segments:ad_account_id` |
 
+### Stats / Measurement Data
+
+Snapchat Ads source supports fetching stats/measurement data for campaigns, ad squads, ads, and ad accounts through dedicated stats resources.
+
+#### Stats Resources
+
+| Table | Inc Strategy | Details |
+|-------|--------------|---------|
+| `campaigns_stats` | replace | Retrieves stats for all campaigns in the organization or specific ad account |
+| `ads_stats` | replace | Retrieves stats for all ads in the organization or specific ad account |
+| `ad_squads_stats` | replace | Retrieves stats for all ad squads in the organization or specific ad account |
+| `ad_accounts_stats` | replace | Retrieves stats for all ad accounts in the organization (Note: only `spend` field is supported) |
+
+#### Stats Table Format
+
+The stats source table follows this format:
+
+```plaintext
+<resource_name>:<granularity>[:<fields>][:<options>]
+```
+
+Or with a specific ad account:
+
+```plaintext
+<resource_name>:<ad_account_id>:<granularity>[:<fields>][:<options>]
+```
+
+**Parameters:**
+
+- `resource_name`: One of `campaigns_stats`, `ads_stats`, `ad_squads_stats`, `ad_accounts_stats`
+- `ad_account_id` (optional): Specific ad account ID to fetch stats for
+- `granularity`: Time granularity - `TOTAL`, `DAY`, `HOUR`, or `LIFETIME`
+- `fields` (optional): Metrics to retrieve (comma-separated). Default: `impressions,spend`
+- `options` (optional): Additional parameters in `key=value,key=value` format
+
+**Available Options:**
+
+| Option | Description | Values |
+|--------|-------------|--------|
+| `breakdown` | Object-level breakdown | `ad`, `adsquad` (Campaign only), `campaign` (Ad Account only) |
+| `dimension` | Insight-level breakdown | `GEO`, `DEMO`, `INTEREST`, `DEVICE` |
+| `pivot` | Pivot for insights breakdown | `country`, `region`, `dma`, `gender`, `age_bucket`, `interest_category_id`, `interest_category_name`, `operating_system`, `make`, `model` |
+| `swipe_up_attribution_window` | Attribution window for swipe ups | `1_DAY`, `7_DAY`, `28_DAY` (default) |
+| `view_attribution_window` | Attribution window for views | `none`, `1_HOUR`, `3_HOUR`, `6_HOUR`, `1_DAY` (default), `7_DAY`, `28_DAY` |
+| `omit_empty` | Omit records with zero data | `false` (default), `true` |
+
+#### Stats Asset Example
+
+To ingest campaign stats with daily granularity, create an asset file:
+
+```yaml
+name: public.snapchat_campaigns_stats
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-snapchatads
+  source_table: 'campaigns_stats:DAY:impressions,spend,swipes'
+
+  destination: postgres
+```
+
+For stats with additional options like breakdown and attribution window:
+
+```yaml
+name: public.snapchat_campaigns_stats_detailed
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-snapchatads
+  source_table: 'campaigns_stats:DAY:impressions,spend,swipes:breakdown=ad,swipe_up_attribution_window=7_DAY'
+
+  destination: postgres
+```
+
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
 bruin run assets/snapchat_ads_ingestion.yml
