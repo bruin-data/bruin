@@ -24,6 +24,17 @@ export default withMermaid({
     title: "Bruin CLI",
     description: "Open-source multi-language data pipelines",
     base: "/bruin/",
+    sitemap: {
+        hostname: 'https://getbruin.com',
+        transformItems: (items) => {
+          return items.map((item) => {
+            const cleaned = item.url.replace(/^\/bruin\//, '');
+            item.url = `https://getbruin.com/docs/bruin/${cleaned}`;
+            return item;
+          });
+        },
+        trailingSlash: true,
+      },
     head: [
         [
             "script",
