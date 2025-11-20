@@ -321,16 +321,15 @@ func (e *ADCCredentialError) Error() string {
 		"Original error: %v\n\n"+
 		"ADC searches for credentials in this order:\n"+
 		"  1. GOOGLE_APPLICATION_CREDENTIALS environment variable\n"+
-		"  2. User credentials from gcloud CLI\n"+
-		"  3. Service account credentials (when running on Google Cloud)\n\n"+
+		"  2. User credentials created by `gcloud auth application-default login` command\n"+
+		"  3. Attached service account credentials (when running on Google Cloud)\n\n"+
 		"To fix this, try one of the following:\n\n"+
-		"  Option 1 - Use gcloud CLI (recommended for local development):\n"+
+		"  Option 1 - Set or update GOOGLE_APPLICATION_CREDENTIALS environment variable:\n"+
+		"    $ export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/credential-file.json\"\n\n"+
+		"  Option 2 - Run the following command to create a default credential file:\n"+
 		"    $ gcloud auth application-default login\n\n"+
-		"  Option 2 - Use a service account key file:\n"+
-		"    $ export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/service-account-key.json\"\n\n"+
 		"For more information:\n"+
-		"  https://cloud.google.com/docs/authentication/application-default-credentials\n"+
-		"  https://pkg.go.dev/cloud.google.com/go#section-readme",
+		"  https://cloud.google.com/docs/authentication/application-default-credentials\n",
 		e.ClientType, e.OriginalErr)
 }
 
