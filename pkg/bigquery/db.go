@@ -1,8 +1,11 @@
 package bigquery
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"regexp"
 	"runtime"
 	"sort"
@@ -16,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/oauth2/google"
@@ -29,6 +33,16 @@ var scopes = []string{
 	"https://www.googleapis.com/auth/cloud-platform",
 	"https://www.googleapis.com/auth/drive",
 }
+
+// AutoGcloudAuthKey is a context key for the auto-gcloud-auth flag.
+type autoGcloudAuthKey struct{}
+
+var AutoGcloudAuthKey = autoGcloudAuthKey{}
+
+// ConnectionNameKey is a context key for the connection name.
+type connectionNameKey struct{}
+
+var ConnectionNameKey = connectionNameKey{}
 
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
@@ -70,6 +84,10 @@ type Client struct {
 }
 
 func NewDB(c *Config) (*Client, error) {
+	return NewDBWithContext(context.Background(), c)
+}
+
+func NewDBWithContext(ctx context.Context, c *Config) (*Client, error) {
 	options := []option.ClientOption{
 		option.WithScopes(scopes...),
 	}
@@ -88,17 +106,49 @@ func NewDB(c *Config) (*Client, error) {
 		}
 	} else {
 		// If ADC is enabled, proactively check if credentials are available
-		_, err := google.FindDefaultCredentials(context.Background(), scopes...)
+		_, err := google.FindDefaultCredentials(ctx, scopes...)
 		if err != nil {
-			return nil, &ADCCredentialError{
-				ClientType:  "BigQuery client",
-				OriginalErr: err,
+			// Check if auto-gcloud-auth flag is set in context
+			if autoAuth, ok := ctx.Value(AutoGcloudAuthKey).(bool); ok && autoAuth {
+				// Check if the error message contains "could not find default credentials"
+				if strings.Contains(err.Error(), "could not find default credentials") {
+					// Get connection name from context if available
+					connectionName := "BigQuery"
+					if name, ok := ctx.Value(ConnectionNameKey).(string); ok && name != "" {
+						connectionName = name
+					}
+					// Prompt user and run gcloud auth application-default login
+					if err := promptAndRunGcloudAuth(connectionName); err != nil {
+						return nil, &ADCCredentialError{
+							ClientType:  "BigQuery client",
+							OriginalErr: err,
+						}
+					}
+					// Retry finding credentials after authentication
+					_, err = google.FindDefaultCredentials(ctx, scopes...)
+					if err != nil {
+						return nil, &ADCCredentialError{
+							ClientType:  "BigQuery client",
+							OriginalErr: err,
+						}
+					}
+				} else {
+					return nil, &ADCCredentialError{
+						ClientType:  "BigQuery client",
+						OriginalErr: err,
+					}
+				}
+			} else {
+				return nil, &ADCCredentialError{
+					ClientType:  "BigQuery client",
+					OriginalErr: err,
+				}
 			}
 		}
 	}
 
 	client, err := bigquery.NewClient(
-		context.Background(),
+		ctx,
 		c.ProjectID,
 		options...,
 	)
@@ -333,6 +383,44 @@ func (e *ADCCredentialError) Error() string {
 
 func (e *ADCCredentialError) Unwrap() error {
 	return e.OriginalErr
+}
+
+// promptAndRunGcloudAuth prompts the user to run gcloud auth application-default login
+// and executes the command if they confirm.
+func promptAndRunGcloudAuth(connectionName string) error {
+	warningColor := color.New(color.FgYellow, color.Bold)
+	commandColor := color.New(color.FgWhite, color.Bold)
+
+	warningColor.Print("\nApplication Default Credentials not found for connection: " )
+	warningColor.Print(connectionName)
+	warningColor.Print(". Would you like to run ")
+	commandColor.Print("'gcloud auth application-default login'")
+	warningColor.Print("? (y/n):")
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read user input: %w", err)
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response != "y" && response != "yes" {
+		return errors.New("user declined to run gcloud auth")
+	}
+
+	infoColor := color.New(color.FgBlue, color.Bold)
+	infoColor.Println("\nRunning 'gcloud auth application-default login'...")
+	cmd := exec.Command("gcloud", "auth", "application-default", "login")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to run gcloud auth application-default login: %w", err)
+	}
+
+	successColor := color.New(color.FgGreen, color.Bold)
+	successColor.Println("Successfully authenticated with gcloud.")
+	return nil
 }
 
 func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {

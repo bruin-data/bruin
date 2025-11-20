@@ -205,7 +205,7 @@ func (m *Manager) GetConnectionDetails(name string) any {
 	return connection
 }
 
-func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
+func (m *Manager) AddBqConnectionFromConfig(ctx context.Context, connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
 		m.BigQuery = make(map[string]*bigquery.Client)
@@ -234,7 +234,9 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 
 	// Set up the BigQuery client using the preferred credentials.
-	db, err := bigquery.NewDB(&bigquery.Config{
+	// Pass connection name through context for better error messages
+	bqCtx := context.WithValue(ctx, bigquery.ConnectionNameKey, connection.Name)
+	db, err := bigquery.NewDBWithContext(bqCtx, &bigquery.Config{
 		ProjectID:                        connection.ProjectID,
 		CredentialsFilePath:              connection.ServiceAccountFile,
 		CredentialsJSON:                  connection.ServiceAccountJSON,
@@ -2466,7 +2468,9 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 
 	processConnections(cm.SelectedEnvironment.Connections.AthenaConnection, connectionManager.AddAthenaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AwsConnection, connectionManager.AddAwsConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.GoogleCloudPlatform, connectionManager.AddBqConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GoogleCloudPlatform, func(conn *config.GoogleCloudPlatformConnection) error {
+		return connectionManager.AddBqConnectionFromConfig(ctx, conn)
+	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Snowflake, connectionManager.AddSfConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Postgres, func(conn *config.PostgresConnection) error {
 		return connectionManager.AddPgConnectionFromConfig(ctx, conn)

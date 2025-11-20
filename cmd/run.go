@@ -601,6 +601,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "query-annotations",
 				Usage: fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
 			},
+			&cli.BoolFlag{
+				Name:    "auto-gcloud-auth",
+				Aliases: []string{"auto"},
+				Usage:   "automatically prompt to run 'gcloud auth application-default login' if default credentials are not found",
+			},
 		},
 		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -687,6 +692,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigQueryAnnotations, runConfig.Annotations)
+			runCtx = context.WithValue(runCtx, bigquery.AutoGcloudAuthKey, c.Bool("auto-gcloud-auth"))
 
 			preview, err := GetPipeline(runCtx, inputPath, runConfig, logger, pipeline.WithOnlyPipeline())
 			if err != nil {
@@ -801,7 +807,7 @@ func Run(isDebug *bool) *cli.Command {
 					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}
 			} else {
-				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
+				connectionManager, errs = connection.NewManagerFromConfigWithContext(runCtx, cm)
 			}
 
 			if len(errs) > 0 {

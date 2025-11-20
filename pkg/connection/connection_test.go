@@ -95,7 +95,7 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 		}),
 	})
 
-	err := m.AddBqConnectionFromConfig(connection)
+	err := m.AddBqConnectionFromConfig(t.Context(), connection)
 	if err != nil {
 		assert.NotContains(t, err.Error(), "credentials are required")
 	}
