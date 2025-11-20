@@ -916,6 +916,9 @@ func EnsureMSTeamsFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeli
 
 func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
+	if asset.Type == pipeline.AssetTypePython {
+		return issues, nil
+	}
 
 	switch asset.Materialization.Type {
 	case pipeline.MaterializationTypeNone:
