@@ -496,15 +496,7 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 			Description: "A task with materialization must have a connection defined",
 		})
 	}
-
-	if asset.Materialization.Strategy == "" || asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "Materialization strategy is required for Python assets with type 'table'",
-		})
-		return issues, nil
-	}
-
+	
 	if !python.IsPythonMaterializationStrategySupported(asset.Materialization.Strategy) {
 		issues = append(issues, &Issue{
 			Task:        asset,
