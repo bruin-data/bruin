@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -22,7 +23,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Parameter constants
+// Parameter constants.
 const (
 	ParamPrompt          = "prompt"
 	ParamModel           = "model"
@@ -38,28 +39,17 @@ const (
 	ParamContinueSession = "continue_session"
 	ParamDebug           = "debug"
 	ParamVerbose         = "verbose"
+	ParamWorkingDir      = "working_dir"
 )
 
-// Valid parameter values
+// Valid parameter values.
 var (
-	ValidModels = map[string]bool{
-		"opus":   true,
-		"sonnet": true,
-		"haiku":  true,
-		// Also allow full model names
-		"claude-3-opus-20240229":         true,
-		"claude-3-5-sonnet-20241022":     true,
-		"claude-3-5-haiku-20241022":      true,
-		"claude-3-sonnet-20240229":       true,
-		"claude-3-haiku-20240307":        true,
-	}
-	
 	ValidOutputFormats = map[string]bool{
 		"text":        true,
 		"json":        true,
 		"stream-json": true,
 	}
-	
+
 	ValidPermissionModes = map[string]bool{
 		"default":           true,
 		"plan":              true,
@@ -68,7 +58,7 @@ var (
 	}
 )
 
-// ClaudeParameters holds all configuration for Claude execution
+// ClaudeParameters holds all configuration for Claude execution.
 type ClaudeParameters struct {
 	Prompt          string
 	Model           string
@@ -84,9 +74,10 @@ type ClaudeParameters struct {
 	ContinueSession bool
 	Debug           bool
 	Verbose         bool
+	WorkingDir      string
 }
 
-// ClaudeResponse represents the JSON response when using json output format
+// ClaudeResponse represents the JSON response when using json output format.
 type ClaudeResponse struct {
 	Content string                 `json:"content"`
 	Model   string                 `json:"model,omitempty"`
@@ -104,7 +95,7 @@ func NewClaudeCodeOperator(renderer *jinja.Renderer) *ClaudeCodeOperator {
 	}
 }
 
-// log is a helper function to write messages to the context writer
+// log is a helper function to write messages to the context writer.
 func log(ctx context.Context, message string) {
 	if ctx.Value(executor.KeyPrinter) == nil {
 		return
@@ -176,12 +167,18 @@ func (o *ClaudeCodeOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 		params.SystemPrompt = renderedSystemPrompt
 	}
 
-	logger.Debugf("Parameters: Model=%s, OutputFormat=%s, PermissionMode=%s", 
+	logger.Debugf("Parameters: Model=%s, OutputFormat=%s, PermissionMode=%s",
 		params.Model, params.OutputFormat, params.PermissionMode)
 
 	// Build command
 	cmdArgs := o.buildCommand(params)
 	cmd := exec.CommandContext(ctx, claudePath, cmdArgs...)
+
+	// Set working directory if specified
+	if params.WorkingDir != "" {
+		cmd.Dir = params.WorkingDir
+		logger.Debugf("Setting working directory: %s", params.WorkingDir)
+	}
 
 	// Log the command for debugging
 	logger.Debugf("Executing command: claude %s", strings.Join(cmdArgs, " "))
@@ -193,7 +190,7 @@ func (o *ClaudeCodeOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 			logger.Debugf("Claude execution failed: %s", string(output))
 			return errors.Wrapf(err, "failed to execute Claude: %s", string(output))
 		}
-		
+
 		var response ClaudeResponse
 		if err := json.Unmarshal(output, &response); err != nil {
 			logger.Debugf("Failed to parse JSON response: %s", string(output))
@@ -201,14 +198,14 @@ func (o *ClaudeCodeOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 			log(ctx, string(output))
 			return errors.Wrap(err, "failed to parse Claude JSON response")
 		}
-		
+
 		if response.Error != "" {
-			return errors.New(fmt.Sprintf("Claude returned error: %s", response.Error))
+			return errors.New("Claude returned error: " + response.Error)
 		}
-		
+
 		// Write the Claude response content to the output
 		log(ctx, response.Content)
-		
+
 		logger.Debugf("Claude response (JSON): %+v", response)
 		// Store the structured response in context for downstream tasks
 		// This could be extended to save to a file or database
@@ -218,31 +215,31 @@ func (o *ClaudeCodeOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 		if ctx.Value(executor.KeyPrinter) != nil {
 			output = ctx.Value(executor.KeyPrinter).(io.Writer)
 		}
-		
+
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			return errors.Wrap(err, "failed to get stdout pipe")
 		}
-		
+
 		stderr, err := cmd.StderrPipe()
 		if err != nil {
 			return errors.Wrap(err, "failed to get stderr pipe")
 		}
-		
+
 		wg := new(errgroup.Group)
 		wg.Go(func() error { return o.consumePipe(stdout, output) })
 		wg.Go(func() error { return o.consumePipe(stderr, output) })
-		
+
 		err = cmd.Start()
 		if err != nil {
 			return errors.Wrap(err, "failed to start Claude command")
 		}
-		
+
 		res := cmd.Wait()
 		if res != nil {
 			return res
 		}
-		
+
 		err = wg.Wait()
 		if err != nil {
 			return errors.Wrap(err, "failed to consume pipe")
@@ -258,7 +255,7 @@ func (o *ClaudeCodeOperator) extractParameters(asset *pipeline.Asset) (*ClaudePa
 	}
 
 	params := &ClaudeParameters{
-		OutputFormat:   "text", // default
+		OutputFormat:   "text",    // default
 		PermissionMode: "default", // default
 	}
 
@@ -337,24 +334,23 @@ func (o *ClaudeCodeOperator) extractParameters(asset *pipeline.Asset) (*ClaudePa
 		params.Verbose = verbose == "true" || verbose == "yes" || verbose == "1"
 	}
 
+	// Optional: working_dir
+	if workingDir, exists := asset.Parameters[ParamWorkingDir]; exists && workingDir != "" {
+		// If working_dir is relative, make it absolute relative to the asset definition file
+		if !filepath.IsAbs(workingDir) {
+			assetDir := filepath.Dir(asset.DefinitionFile.Path)
+			params.WorkingDir = filepath.Join(assetDir, workingDir)
+		} else {
+			params.WorkingDir = workingDir
+		}
+	}
+
 	return params, nil
 }
 
 func (o *ClaudeCodeOperator) validateParameters(params *ClaudeParameters) error {
-	// Validate model if specified
-	if params.Model != "" && !ValidModels[params.Model] {
-		// Check if it looks like a model name (contains "claude")
-		if !strings.Contains(params.Model, "claude") {
-			return fmt.Errorf("invalid model: %s. Valid options are: opus, sonnet, haiku, or full model names like claude-3-5-sonnet-20241022", params.Model)
-		}
-	}
-
-	// Validate fallback model if specified
-	if params.FallbackModel != "" && !ValidModels[params.FallbackModel] {
-		if !strings.Contains(params.FallbackModel, "claude") {
-			return fmt.Errorf("invalid fallback_model: %s", params.FallbackModel)
-		}
-	}
+	// Model and fallback_model are passed directly to Claude CLI without validation
+	// to allow for future model updates without code changes
 
 	// Validate output format
 	if !ValidOutputFormats[params.OutputFormat] {
@@ -370,7 +366,7 @@ func (o *ClaudeCodeOperator) validateParameters(params *ClaudeParameters) error 
 	if params.SessionID != "" {
 		uuidRegex := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 		if !uuidRegex.MatchString(params.SessionID) {
-			return fmt.Errorf("session_id must be a valid UUID")
+			return errors.New("session_id must be a valid UUID")
 		}
 	}
 
@@ -385,7 +381,7 @@ func (o *ClaudeCodeOperator) validateParameters(params *ClaudeParameters) error 
 }
 
 func (o *ClaudeCodeOperator) buildCommand(params *ClaudeParameters) []string {
-	var args []string
+	args := make([]string, 0, 20)
 
 	// Always use print mode for non-interactive execution
 	args = append(args, "-p")
@@ -481,24 +477,24 @@ func (o *ClaudeCodeOperator) consumePipe(pipe io.Reader, output io.Writer) error
 
 func (o *ClaudeCodeOperator) installClaudeCLI(logger logger.Logger) (string, error) {
 	logger.Debug("Installing Claude CLI using official installation script...")
-	
+
 	// Run the official installation script
-	// Note: This requires bash and curl to be available, which may not be the case on Windows
-	// Windows users should install Claude CLI manually or use WSL
+	// Note: This requires bash and curl to be available, which may not be the case on Windows.
+	// Windows users should install Claude CLI manually or use WSL.
 	installCmd := exec.Command("bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash")
-	
+
 	var stdout, stderr bytes.Buffer
 	installCmd.Stdout = &stdout
 	installCmd.Stderr = &stderr
-	
+
 	err := installCmd.Run()
 	if err != nil {
 		logger.Debugf("Installation stderr: %s", stderr.String())
 		return "", errors.Wrapf(err, "failed to install Claude CLI: %s", stderr.String())
 	}
-	
+
 	logger.Debugf("Installation output: %s", stdout.String())
-	
+
 	// After installation, try to find claude again
 	claudePath, err := exec.LookPath("claude")
 	if err != nil {
@@ -508,17 +504,17 @@ func (o *ClaudeCodeOperator) installClaudeCLI(logger logger.Logger) (string, err
 			os.ExpandEnv("$HOME/.local/bin/claude"),
 			os.ExpandEnv("$HOME/bin/claude"),
 		}
-		
+
 		for _, path := range possiblePaths {
 			if _, err := os.Stat(path); err == nil {
 				logger.Debugf("Found Claude CLI at: %s", path)
 				return path, nil
 			}
 		}
-		
+
 		return "", errors.Wrap(err, "Claude CLI installation succeeded but binary not found in PATH")
 	}
-	
+
 	logger.Debugf("Claude CLI found at: %s", claudePath)
 	return claudePath, nil
 }

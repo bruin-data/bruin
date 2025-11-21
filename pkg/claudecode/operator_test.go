@@ -1,16 +1,17 @@
 package claudecode
 
 import (
-	"context"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtractParameters(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		asset       *pipeline.Asset
@@ -24,6 +25,9 @@ func TestExtractParameters(t *testing.T) {
 				Parameters: map[string]string{
 					"prompt": "Test prompt",
 				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
 			},
 			expected: &ClaudeParameters{
 				Prompt:         "Test prompt",
@@ -36,6 +40,9 @@ func TestExtractParameters(t *testing.T) {
 			name: "full parameters",
 			asset: &pipeline.Asset{
 				Name: "test_asset",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
 				Parameters: map[string]string{
 					"prompt":              "Test prompt",
 					"model":               "sonnet",
@@ -68,6 +75,7 @@ func TestExtractParameters(t *testing.T) {
 				ContinueSession: false,
 				Debug:           true,
 				Verbose:         false,
+				WorkingDir:      "",
 			},
 			expectError: false,
 		},
@@ -75,6 +83,9 @@ func TestExtractParameters(t *testing.T) {
 			name: "missing prompt",
 			asset: &pipeline.Asset{
 				Name: "test_asset",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
 				Parameters: map[string]string{
 					"model": "sonnet",
 				},
@@ -86,6 +97,9 @@ func TestExtractParameters(t *testing.T) {
 			name: "empty prompt",
 			asset: &pipeline.Asset{
 				Name: "test_asset",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
 				Parameters: map[string]string{
 					"prompt": "  ",
 				},
@@ -96,22 +110,86 @@ func TestExtractParameters(t *testing.T) {
 		{
 			name: "nil parameters",
 			asset: &pipeline.Asset{
-				Name:       "test_asset",
+				Name: "test_asset",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
 				Parameters: nil,
 			},
 			expected:    nil,
 			expectError: true,
+		},
+		{
+			name: "with absolute working_dir",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Parameters: map[string]string{
+					"prompt":      "Test prompt",
+					"working_dir": "/path/to/project",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+			},
+			expected: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				WorkingDir:     "/path/to/project",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expectError: false,
+		},
+		{
+			name: "with relative working_dir",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Parameters: map[string]string{
+					"prompt":      "Test prompt",
+					"working_dir": "../data",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+			},
+			expected: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				WorkingDir:     "/pipelines/data",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expectError: false,
+		},
+		{
+			name: "with relative dot working_dir",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Parameters: map[string]string{
+					"prompt":      "Test prompt",
+					"working_dir": "./subdir",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+			},
+			expected: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				WorkingDir:     "/pipelines/assets/subdir",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expectError: false,
 		},
 	}
 
 	operator := &ClaudeCodeOperator{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := operator.extractParameters(tt.asset)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
 		})
@@ -119,6 +197,7 @@ func TestExtractParameters(t *testing.T) {
 }
 
 func TestValidateParameters(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		params      *ClaudeParameters
@@ -137,21 +216,10 @@ func TestValidateParameters(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "invalid model",
-			params: &ClaudeParameters{
-				Prompt:       "Test",
-				Model:        "invalid",
-				OutputFormat: "text",
-				PermissionMode: "default",
-			},
-			expectError: true,
-			errorMsg:    "invalid model",
-		},
-		{
 			name: "invalid output format",
 			params: &ClaudeParameters{
-				Prompt:       "Test",
-				OutputFormat: "xml",
+				Prompt:         "Test",
+				OutputFormat:   "xml",
 				PermissionMode: "default",
 			},
 			expectError: true,
@@ -193,20 +261,22 @@ func TestValidateParameters(t *testing.T) {
 	operator := &ClaudeCodeOperator{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := operator.validateParameters(tt.params)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
 func TestBuildCommand(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		params   *ClaudeParameters
@@ -237,7 +307,7 @@ func TestBuildCommand(t *testing.T) {
 				Prompt:          "Test prompt",
 				Model:           "sonnet",
 				FallbackModel:   "haiku",
-				OutputFormat:     "json",
+				OutputFormat:    "json",
 				SystemPrompt:    "Be concise",
 				AllowedDirs:     []string{"/data", "/reports"},
 				AllowedTools:    "Read,Grep",
@@ -271,6 +341,7 @@ func TestBuildCommand(t *testing.T) {
 	operator := &ClaudeCodeOperator{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := operator.buildCommand(tt.params)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -278,57 +349,36 @@ func TestBuildCommand(t *testing.T) {
 }
 
 func TestClaudeCodeOperator_Run_InvalidTaskInstance(t *testing.T) {
+	t.Parallel()
 	renderer := jinja.NewRenderer(make(map[string]interface{}))
-	
+
 	operator := NewClaudeCodeOperator(renderer)
-	
+
 	// Create a non-AssetInstance type
 	invalidInstance := &scheduler.ColumnCheckInstance{}
-	
-	err := operator.Run(context.Background(), invalidInstance)
-	assert.Error(t, err)
+
+	err := operator.Run(t.Context(), invalidInstance)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "claude_code assets can only be run as a main asset")
 }
 
 func TestClaudeCodeOperator_Run_MissingPrompt(t *testing.T) {
+	t.Parallel()
 	renderer := jinja.NewRenderer(make(map[string]interface{}))
-	
+
 	operator := NewClaudeCodeOperator(renderer)
-	
+
 	asset := &pipeline.Asset{
 		Name:       "test_claude_asset",
 		Type:       pipeline.AssetTypeAgentClaudeCode,
 		Parameters: map[string]string{},
 	}
-	
-	instance := &scheduler.AssetInstance{
-		Asset: asset,
-	}
-	
-	err := operator.Run(context.Background(), instance)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "'prompt' parameter is required")
-}
 
-func TestClaudeCodeOperator_Run_InvalidModel(t *testing.T) {
-	renderer := jinja.NewRenderer(make(map[string]interface{}))
-	
-	operator := NewClaudeCodeOperator(renderer)
-	
-	asset := &pipeline.Asset{
-		Name:       "test_claude_asset",
-		Type:       pipeline.AssetTypeAgentClaudeCode,
-		Parameters: map[string]string{
-			"prompt": "Test prompt",
-			"model":  "invalid-model",
-		},
-	}
-	
 	instance := &scheduler.AssetInstance{
 		Asset: asset,
 	}
-	
-	err := operator.Run(context.Background(), instance)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid model")
+
+	err := operator.Run(t.Context(), instance)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "'prompt' parameter is required")
 }
