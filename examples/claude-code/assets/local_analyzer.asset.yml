@@ -1,0 +1,15 @@
+type: agent.claude_code
+description: |-
+  This asset demonstrates using relative paths for working_dir.
+  The dot (.) refers to the directory containing this asset file.
+  This is useful for analyzing or processing files that are
+  co-located with the asset definition.
+
+parameters:
+  allowed_directories: .
+  model: haiku
+  output_format: text
+  prompt: |
+    List and briefly describe all the asset files in this directory.
+    Explain what each asset does based on its configuration.
+  working_dir: .

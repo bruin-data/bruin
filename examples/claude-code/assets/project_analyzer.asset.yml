@@ -1,0 +1,19 @@
+type: agent.claude_code
+description: |-
+  This asset analyzes a project directory from the specified working directory.
+  It performs code quality analysis and provides recommendations.
+
+  The working_dir parameter ensures Claude starts in the correct directory
+  context for the analysis. If a relative path is used, it's resolved relative
+  to this asset file's location. The allowed_directories parameter grants
+  access to read the project files.
+
+parameters:
+  allowed_directories: ../..
+  allowed_tools: Read,Grep,Glob
+  debug: "false"
+  model: sonnet
+  output_format: json
+  prompt: "Analyze the structure and quality of this project directory. \nLook for:\n1. Code organization patterns\n2. Documentation quality\n3. Test coverage\n4. Common issues or anti-patterns\n\nProvide a summary report with recommendations for improvements.\n"
+  system_prompt: "You are a code quality analyst. Provide detailed, actionable feedback \nfocused on maintainability, performance, and best practices.\n"
+  working_dir: ../..
