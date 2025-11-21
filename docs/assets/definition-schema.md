@@ -115,7 +115,7 @@ interval_modifiers:
   start: '{% if start_timestamp|date_format("%H") == "00" %}-20d{% else %}0{% endif %}'
 ```
 
-Supported time units: `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `M` (months).
+Supported time units: `ns` (nanoseconds), `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `M` (months).
 See [interval modifiers](./interval-modifiers) for more details.
 - **Type:** `Object`
 

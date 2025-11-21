@@ -50,15 +50,17 @@ Individual assets can override these defaults by specifying their own `interval_
 
 Each interval is a scalar string with a single unit:
 
-| Unit | Meaning |
-|------|---------|
-| s    | Seconds |
-| m    | Minutes |
-| h    | Hours   |
-| d    | Days    |
-| M    | Months  |
+| Unit | Meaning      |
+|------|--------------|
+| ns   | Nanoseconds  |
+| ms   | Milliseconds |
+| s    | Seconds      |
+| m    | Minutes      |
+| h    | Hours        |
+| d    | Days         |
+| M    | Months       |
 
-✅ Valid: `5m`, `2h`, `1d`,`-1M`
+✅ Valid: `5m`, `2h`, `1d`, `-1M`, `500ms`, `1000ns`
 ❌ Invalid: `1h30m`, `2h:30m`, `90min`
 
 ## Usage

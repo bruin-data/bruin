@@ -1901,6 +1901,34 @@ func TestTimeModifier_UnmarshalYAML_Template(t *testing.T) {
 			},
 		},
 		{
+			name:     "milliseconds modifier",
+			yamlData: "500ms",
+			want: pipeline.TimeModifier{
+				Milliseconds: 500,
+			},
+		},
+		{
+			name:     "negative milliseconds modifier",
+			yamlData: "-100ms",
+			want: pipeline.TimeModifier{
+				Milliseconds: -100,
+			},
+		},
+		{
+			name:     "nanoseconds modifier",
+			yamlData: "1000ns",
+			want: pipeline.TimeModifier{
+				Nanoseconds: 1000,
+			},
+		},
+		{
+			name:     "negative nanoseconds modifier",
+			yamlData: "-500ns",
+			want: pipeline.TimeModifier{
+				Nanoseconds: -500,
+			},
+		},
+		{
 			name:     "invalid format",
 			yamlData: "x",
 			wantErr:  true,
@@ -1954,6 +1982,34 @@ func TestTimeModifier_MarshalYAML_Template(t *testing.T) {
 			},
 			want: "2h",
 		},
+		{
+			name: "milliseconds modifier",
+			modifier: pipeline.TimeModifier{
+				Milliseconds: 500,
+			},
+			want: "500ms",
+		},
+		{
+			name: "negative milliseconds modifier",
+			modifier: pipeline.TimeModifier{
+				Milliseconds: -100,
+			},
+			want: "-100ms",
+		},
+		{
+			name: "nanoseconds modifier",
+			modifier: pipeline.TimeModifier{
+				Nanoseconds: 1000,
+			},
+			want: "1000ns",
+		},
+		{
+			name: "negative nanoseconds modifier",
+			modifier: pipeline.TimeModifier{
+				Nanoseconds: -500,
+			},
+			want: "-500ns",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1981,26 +2037,40 @@ func TestTimeModifier_MarshalJSON_Template(t *testing.T) {
 				Template: "{% if true %}-30d{% endif %}",
 				Days:     5, // Should be included in JSON even with template
 			},
-			want: `{"months":0,"days":5,"hours":0,"minutes":0,"seconds":0,"cron_periods":0,"template":"{% if true %}-30d{% endif %}"}`,
+			want: `{"months":0,"days":5,"hours":0,"minutes":0,"seconds":0,"milliseconds":0,"nanoseconds":0,"cron_periods":0,"template":"{% if true %}-30d{% endif %}"}`,
 		},
 		{
 			name: "only template",
 			modifier: pipeline.TimeModifier{
 				Template: "-2h",
 			},
-			want: `{"months":0,"days":0,"hours":0,"minutes":0,"seconds":0,"cron_periods":0,"template":"-2h"}`,
+			want: `{"months":0,"days":0,"hours":0,"minutes":0,"seconds":0,"milliseconds":0,"nanoseconds":0,"cron_periods":0,"template":"-2h"}`,
 		},
 		{
 			name: "only numeric values",
 			modifier: pipeline.TimeModifier{
 				Days: -30,
 			},
-			want: `{"months":0,"days":-30,"hours":0,"minutes":0,"seconds":0,"cron_periods":0,"template":""}`,
+			want: `{"months":0,"days":-30,"hours":0,"minutes":0,"seconds":0,"milliseconds":0,"nanoseconds":0,"cron_periods":0,"template":""}`,
 		},
 		{
 			name:     "empty modifier",
 			modifier: pipeline.TimeModifier{},
 			want:     "null",
+		},
+		{
+			name: "milliseconds value",
+			modifier: pipeline.TimeModifier{
+				Milliseconds: 500,
+			},
+			want: `{"months":0,"days":0,"hours":0,"minutes":0,"seconds":0,"milliseconds":500,"nanoseconds":0,"cron_periods":0,"template":""}`,
+		},
+		{
+			name: "nanoseconds value",
+			modifier: pipeline.TimeModifier{
+				Nanoseconds: 1000,
+			},
+			want: `{"months":0,"days":0,"hours":0,"minutes":0,"seconds":0,"milliseconds":0,"nanoseconds":1000,"cron_periods":0,"template":""}`,
 		},
 	}
 
