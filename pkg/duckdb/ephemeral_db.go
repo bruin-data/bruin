@@ -5,8 +5,9 @@ package duck
 import (
 	"context"
 	"database/sql"
-
-	"github.com/jmoiron/sqlx"
+	"database/sql/driver"
+	"fmt"
+	"reflect"
 )
 
 type EphemeralConnection struct {
@@ -14,49 +15,298 @@ type EphemeralConnection struct {
 }
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
+	if err := EnsureADBCDriverInstalled(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to ensure ADBC driver is installed: %w", err)
+	}
 	return &EphemeralConnection{config: c}, nil
 }
 
-func (e *EphemeralConnection) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	conn, err := sqlx.Open("duckdb", e.config.ToDBConnectionURI())
+func (e *EphemeralConnection) openDB() (*sql.DB, error) {
+	path := e.config.ToDBConnectionURI()
+	return sql.Open("adbc_duckdb", "driver=duckdb;path="+path)
+}
+
+//nolint:ireturn
+func (e *EphemeralConnection) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
+	db, err := e.openDB()
 	if err != nil {
 		return nil, err
 	}
-	defer func(conn *sqlx.DB) {
-		if err := conn.Close(); err != nil {
-			panic(err)
-		}
-	}(conn)
+	defer db.Close()
 
-	return conn.QueryContext(ctx, query, args...) //nolint
-}
-
-func (e *EphemeralConnection) ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error) {
-	conn, err := sqlx.Open("duckdb", e.config.ToDBConnectionURI())
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer func(conn *sqlx.DB) {
-		if err := conn.Close(); err != nil {
-			panic(err)
-		}
-	}(conn)
+	defer rows.Close()
 
-	return conn.ExecContext(ctx, sql, arguments...)
+	return bufferRows(rows)
 }
 
-func (e *EphemeralConnection) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
-	conn, err := sqlx.Open("duckdb", e.config.ToDBConnectionURI())
+func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, arguments ...any) (sql.Result, error) {
+	db, err := e.openDB()
 	if err != nil {
-		// Cannot return error from this function signature, so we panic.
-		// This is not ideal, but it's the best we can do with the current interface.
-		panic(err)
+		return nil, err
 	}
-	defer func(conn *sqlx.DB) {
-		if err := conn.Close(); err != nil {
-			panic(err)
-		}
-	}(conn)
+	defer db.Close()
 
-	return conn.QueryRowContext(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, sqlStr, arguments...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return driver.RowsAffected(0), rows.Err()
+}
+
+//nolint:ireturn
+func (e *EphemeralConnection) QueryRowContext(ctx context.Context, query string, args ...any) Row {
+	db, err := e.openDB()
+	if err != nil {
+		return &errorRow{err: err}
+	}
+	defer db.Close()
+
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return &errorRow{err: err}
+	}
+	defer rows.Close()
+
+	buffered, err := bufferRows(rows)
+	if err != nil {
+		return &errorRow{err: err}
+	}
+
+	return &bufferedRow{rows: buffered}
+}
+
+// bufferRows reads all rows into memory and returns a bufferedRows that can iterate over them.
+func bufferRows(rows *sql.Rows) (*bufferedRows, error) {
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+
+	var data [][]any
+	for rows.Next() {
+		values := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, err
+		}
+		// Deep copy values - strings must be copied because they may reference Arrow buffers
+		row := make([]any, len(values))
+		for i, v := range values {
+			row[i] = copyValue(v)
+		}
+		data = append(data, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &bufferedRows{
+		columns:     cols,
+		columnTypes: colTypes,
+		data:        data,
+		index:       -1,
+	}, nil
+}
+
+// bufferedRows holds rows data in memory and implements the Rows interface.
+type bufferedRows struct {
+	columns     []string
+	columnTypes []*sql.ColumnType
+	data        [][]any
+	index       int
+	err         error
+}
+
+func (r *bufferedRows) Close() error {
+	return nil
+}
+
+func (r *bufferedRows) Columns() ([]string, error) {
+	return r.columns, nil
+}
+
+func (r *bufferedRows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return r.columnTypes, nil
+}
+
+func (r *bufferedRows) Err() error {
+	return r.err
+}
+
+func (r *bufferedRows) Next() bool {
+	r.index++
+	return r.index < len(r.data)
+}
+
+func (r *bufferedRows) Scan(dest ...any) error {
+	if r.index < 0 || r.index >= len(r.data) {
+		return sql.ErrNoRows
+	}
+	row := r.data[r.index]
+	if len(dest) != len(row) {
+		return fmt.Errorf("sql: expected %d destination arguments in Scan, got %d", len(row), len(dest))
+	}
+	for i, v := range row {
+		if err := convertAssign(dest[i], v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// bufferedRow wraps bufferedRows to implement the Row interface.
+type bufferedRow struct {
+	rows    *bufferedRows
+	scanned bool
+}
+
+func (r *bufferedRow) Scan(dest ...any) error {
+	if r.scanned {
+		return sql.ErrNoRows
+	}
+	r.scanned = true
+
+	if !r.rows.Next() {
+		if err := r.rows.Err(); err != nil {
+			return err
+		}
+		return sql.ErrNoRows
+	}
+	return r.rows.Scan(dest...)
+}
+
+func (r *bufferedRow) Err() error {
+	return r.rows.Err()
+}
+
+type errorRow struct {
+	err error
+}
+
+func (r *errorRow) Scan(_ ...any) error {
+	return r.err
+}
+
+func (r *errorRow) Err() error {
+	return r.err
+}
+
+// copyValue creates a deep copy of a value, ensuring strings and byte slices
+// don't reference Arrow buffer memory that may be freed.
+func copyValue(v any) any {
+	switch val := v.(type) {
+	case string:
+		// Copy string to new backing array
+		b := make([]byte, len(val))
+		copy(b, val)
+		return string(b)
+	case []byte:
+		if val == nil {
+			return nil
+		}
+		cp := make([]byte, len(val))
+		copy(cp, val)
+		return cp
+	default:
+		return v
+	}
+}
+
+// convertAssign copies src to dest, handling pointer destinations.
+// Uses reflection as a fallback for types not explicitly handled.
+func convertAssign(dest, src any) error {
+	switch d := dest.(type) {
+	case *any:
+		*d = src
+		return nil
+	case *string:
+		if src == nil {
+			*d = ""
+		} else if s, ok := src.(string); ok {
+			*d = s
+		} else {
+			*d = fmt.Sprintf("%v", src)
+		}
+		return nil
+	case *int:
+		if src == nil {
+			*d = 0
+		} else if i, ok := src.(int64); ok {
+			*d = int(i)
+		} else if i, ok := src.(int); ok {
+			*d = i
+		}
+		return nil
+	case *int64:
+		if src == nil {
+			*d = 0
+		} else if i, ok := src.(int64); ok {
+			*d = i
+		}
+		return nil
+	case *float64:
+		if src == nil {
+			*d = 0
+		} else if f, ok := src.(float64); ok {
+			*d = f
+		}
+		return nil
+	case *bool:
+		if src == nil {
+			*d = false
+		} else if b, ok := src.(bool); ok {
+			*d = b
+		}
+		return nil
+	case *[]byte:
+		if src == nil {
+			*d = nil
+		} else if b, ok := src.([]byte); ok {
+			*d = b
+		}
+		return nil
+	}
+
+	// Use reflection for any other pointer type
+	destVal := reflect.ValueOf(dest)
+	if destVal.Kind() != reflect.Ptr {
+		return fmt.Errorf("destination must be a pointer, got %T", dest)
+	}
+
+	if src == nil {
+		destVal.Elem().Set(reflect.Zero(destVal.Elem().Type()))
+		return nil
+	}
+
+	srcVal := reflect.ValueOf(src)
+	destElem := destVal.Elem()
+
+	// Direct assignment if types match
+	if srcVal.Type().AssignableTo(destElem.Type()) {
+		destElem.Set(srcVal)
+		return nil
+	}
+
+	// Try conversion if types are convertible
+	if srcVal.Type().ConvertibleTo(destElem.Type()) {
+		destElem.Set(srcVal.Convert(destElem.Type()))
+		return nil
+	}
+
+	return fmt.Errorf("cannot assign %T to %T", src, dest)
 }

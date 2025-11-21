@@ -46,6 +46,10 @@ func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asse
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) Close() {
+	m.Called()
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }

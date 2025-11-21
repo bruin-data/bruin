@@ -2,13 +2,11 @@ package python
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -21,7 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pkg/user"
+	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
@@ -37,7 +35,6 @@ var AvailablePythonVersions = map[string]bool{
 }
 
 const (
-	UvVersion               = "0.6.16"
 	pythonVersionForIngestr = "3.11"
 	ingestrVersion          = "0.14.104"
 	sqlfluffVersion         = "3.4.1"
@@ -56,104 +53,12 @@ var DatabasePrefixToSqlfluffDialect = map[string]string{
 	"clickhouse": "clickhouse",
 }
 
-// UvChecker handles checking and installing the uv package manager.
-type UvChecker struct {
-	mut sync.Mutex
-	cmd CommandRunner
-}
-
-// EnsureUvInstalled checks if uv is installed and installs it if not present, then returns the full path of the binary.
-func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
-	u.mut.Lock()
-	defer u.mut.Unlock()
-
-	// Check if uv is already installed
-	m := user.NewConfigManager(afero.NewOsFs())
-	bruinHomeDirAbsPath, err := m.EnsureAndGetBruinHomeDir()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get bruin home directory")
-	}
-	var binaryName string
-	if runtime.GOOS == "windows" {
-		binaryName = "uv.exe"
-	} else {
-		binaryName = "uv"
-	}
-	uvBinaryPath := filepath.Join(bruinHomeDirAbsPath, binaryName)
-	if _, err := os.Stat(uvBinaryPath); errors.Is(err, os.ErrNotExist) {
-		err = u.installUvCommand(ctx, bruinHomeDirAbsPath)
-		if err != nil {
-			return "", err
-		}
-		return uvBinaryPath, nil
-	}
-
-	cmd := exec.Command(uvBinaryPath, "version", "--no-config", "--output-format", "json")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to check uv version: %w -- Output: %s", err, output)
-	}
-
-	var uvVersion struct {
-		Version string `json:"version"`
-	}
-	if err := json.Unmarshal(output, &uvVersion); err != nil {
-		return "", fmt.Errorf("failed to parse uv version: %w", err)
-	}
-
-	if uvVersion.Version != UvVersion {
-		err = u.installUvCommand(ctx, bruinHomeDirAbsPath)
-		if err != nil {
-			return "", err
-		}
-		return uvBinaryPath, nil
-	}
-
-	return uvBinaryPath, nil
-}
-
+// CtxUseWingetForUv is a context key for enabling winget-based uv installation on Windows.
 const CtxUseWingetForUv = "use_winget_for_uv"
 
-func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
-	var output io.Writer = os.Stdout
-	if ctx.Value(executor.KeyPrinter) != nil {
-		output = ctx.Value(executor.KeyPrinter).(io.Writer)
-	}
-
-	_, _ = output.Write([]byte("===============================\n"))
-	_, _ = output.Write([]byte(fmt.Sprintf("Installing uv v%s...\n", UvVersion)))
-	_, _ = output.Write([]byte("This is a one-time operation.\n"))
-	_, _ = output.Write([]byte("\n"))
-
-	var commandInstance *exec.Cmd
-	if runtime.GOOS == "windows" {
-		// this conditional part is to test the powershell stuff safely.
-		// once we confirm this on different systems we should remove winget altogether.
-		useWinget := false
-		if ctx.Value(CtxUseWingetForUv) != nil {
-			useWinget = ctx.Value(CtxUseWingetForUv).(bool)
-		}
-
-		if useWinget {
-			commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("winget install --accept-package-agreements --accept-source-agreements --silent --id=astral-sh.uv --version %s --location %s -e", UvVersion, dest)) //nolint:gosec
-		} else {
-			commandInstance = exec.Command("powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("$env:NO_MODIFY_PATH=1 ; $env:UV_INSTALL_DIR='~/.bruin' ; irm https://astral.sh/uv/%s/install.ps1 | iex", UvVersion)) //nolint:gosec
-		}
-	} else {
-		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("set -e; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", UvVersion, dest)) //nolint:gosec
-	}
-
-	err := u.cmd.RunAnyCommand(ctx, commandInstance)
-	if err != nil {
-		return fmt.Errorf("failed to install uv: %w", err)
-	}
-
-	_, _ = output.Write([]byte("\n"))
-	_, _ = output.Write([]byte(fmt.Sprintf("Installed uv v%s, continuing...\n", UvVersion)))
-	_, _ = output.Write([]byte("===============================\n"))
-	_, _ = output.Write([]byte("\n"))
-
-	return nil
+// UvChecker handles checking and installing the uv package manager.
+type UvChecker struct {
+	uv.Checker
 }
 
 type uvInstaller interface {

@@ -63,6 +63,10 @@ func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	return nil, errDuckDBNotSupported
 }
 
+// Close is a no-op for the no-duckdb build.
+func (c *Client) Close() {
+}
+
 func (c *Client) convertValue(val interface{}) interface{} {
 	return val
 }

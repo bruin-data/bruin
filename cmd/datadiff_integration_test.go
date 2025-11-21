@@ -8,15 +8,37 @@ import (
 	"testing"
 
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
-	_ "github.com/marcboeker/go-duckdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// openTestDuckDB opens a DuckDB database using the ADBC driver for testing.
+func openTestDuckDB(t *testing.T, dbPath string) *sql.DB {
+	t.Helper()
+	db, err := sql.Open(duck.ADBCDriverName(), "driver=duckdb;path="+dbPath)
+	require.NoError(t, err)
+	return db
+}
+
+// execTestDuckDB executes a statement using QueryContext instead of ExecContext.
+// This works around ADBC driver issues with ExecContext parameter detection.
+func execTestDuckDB(t *testing.T, db *sql.DB, query string) {
+	t.Helper()
+	rows, err := db.QueryContext(t.Context(), query)
+	require.NoError(t, err)
+	defer rows.Close()
+	require.NoError(t, rows.Err())
+}
 
 // TestAlterStatementsExecutability tests that generated ALTER statements can be executed successfully.
 func TestAlterStatementsExecutability(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
+	}
+
+	// Ensure ADBC driver is installed before running tests
+	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
+		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
 	}
 
 	t.Parallel()
@@ -29,33 +51,28 @@ func TestAlterStatementsExecutability(t *testing.T) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
 
-		db, err := sql.Open("duckdb", dbPath)
-		require.NoError(t, err)
+		db := openTestDuckDB(t, dbPath)
 		defer db.Close()
 
 		// Create two tables with different schemas
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE users_source (
 				id INTEGER PRIMARY KEY,
 				name VARCHAR(100) NOT NULL,
 				email VARCHAR(255) NOT NULL
 			)
 		`)
-		require.NoError(t, err)
 
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE users_target (
 				id INTEGER PRIMARY KEY,
 				name VARCHAR(100) NOT NULL
 			)
 		`)
-		require.NoError(t, err)
 
 		// Insert some test data
-		_, err = db.ExecContext(ctx, `INSERT INTO users_source VALUES (1, 'Alice', 'alice@example.com')`)
-		require.NoError(t, err)
-		_, err = db.ExecContext(ctx, `INSERT INTO users_target VALUES (1, 'Alice')`)
-		require.NoError(t, err)
+		execTestDuckDB(t, db, `INSERT INTO users_source VALUES (1, 'Alice', 'alice@example.com')`)
+		execTestDuckDB(t, db, `INSERT INTO users_target VALUES (1, 'Alice')`)
 
 		// Create DuckDB clients
 		config1 := &duck.Config{Path: dbPath}
@@ -83,8 +100,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 				cleanStmt += ";"
 			}
 			t.Logf("Cleaned statement: %s", cleanStmt)
-			_, err = db.ExecContext(ctx, cleanStmt)
-			require.NoError(t, err, "Generated ALTER statement should execute successfully")
+			execTestDuckDB(t, db, cleanStmt)
 		}
 
 		// Verify the schema was updated
@@ -105,26 +121,23 @@ func TestAlterStatementsExecutability(t *testing.T) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test_type_change.db")
 
-		db, err := sql.Open("duckdb", dbPath)
-		require.NoError(t, err)
+		db := openTestDuckDB(t, dbPath)
 		defer db.Close()
 
 		// Create tables with different column types
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE products_source (
 				id INTEGER PRIMARY KEY,
 				price DECIMAL(10,2)
 			)
 		`)
-		require.NoError(t, err)
 
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE products_target (
 				id INTEGER PRIMARY KEY,
 				price INTEGER
 			)
 		`)
-		require.NoError(t, err)
 
 		config := &duck.Config{Path: dbPath}
 		client, err := duck.NewClient(config)
@@ -140,8 +153,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 		// Execute ALTER statements
 		for _, stmt := range statements {
 			t.Logf("Executing: %s", stmt)
-			_, err = db.ExecContext(ctx, stmt)
-			require.NoError(t, err, "Type change ALTER statement should execute successfully")
+			execTestDuckDB(t, db, stmt)
 		}
 
 		// Verify the type was changed
@@ -162,26 +174,23 @@ func TestAlterStatementsExecutability(t *testing.T) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test_nullability.db")
 
-		db, err := sql.Open("duckdb", dbPath)
-		require.NoError(t, err)
+		db := openTestDuckDB(t, dbPath)
 		defer db.Close()
 
 		// Create tables with different nullability
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE items_source (
 				id INTEGER PRIMARY KEY,
 				description TEXT
 			)
 		`)
-		require.NoError(t, err)
 
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE items_target (
 				id INTEGER PRIMARY KEY,
 				description TEXT NOT NULL
 			)
 		`)
-		require.NoError(t, err)
 
 		config := &duck.Config{Path: dbPath}
 		client, err := duck.NewClient(config)
@@ -197,8 +206,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 		// Execute ALTER statements
 		for _, stmt := range statements {
 			t.Logf("Executing: %s", stmt)
-			_, err = db.ExecContext(ctx, stmt)
-			require.NoError(t, err, "Nullability change ALTER statement should execute successfully")
+			execTestDuckDB(t, db, stmt)
 		}
 
 		// Verify nullability was changed
@@ -219,12 +227,11 @@ func TestAlterStatementsExecutability(t *testing.T) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test_multiple.db")
 
-		db, err := sql.Open("duckdb", dbPath)
-		require.NoError(t, err)
+		db := openTestDuckDB(t, dbPath)
 		defer db.Close()
 
 		// Create tables with multiple differences
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE employees_source (
 				id INTEGER PRIMARY KEY,
 				name VARCHAR(100) NOT NULL,
@@ -232,16 +239,14 @@ func TestAlterStatementsExecutability(t *testing.T) {
 				department VARCHAR(50) NOT NULL
 			)
 		`)
-		require.NoError(t, err)
 
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE employees_target (
 				id INTEGER PRIMARY KEY,
 				name VARCHAR(100) NOT NULL,
 				salary INTEGER
 			)
 		`)
-		require.NoError(t, err)
 
 		config := &duck.Config{Path: dbPath}
 		client, err := duck.NewClient(config)
@@ -267,8 +272,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 				cleanStmt += ";"
 			}
 			t.Logf("Cleaned statement: %s", cleanStmt)
-			_, err = db.ExecContext(ctx, cleanStmt)
-			require.NoError(t, err, "ALTER statement should execute successfully")
+			execTestDuckDB(t, db, cleanStmt)
 		}
 
 		// Verify all changes were applied
@@ -298,26 +302,23 @@ func TestAlterStatementsExecutability(t *testing.T) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test_reverse.db")
 
-		db, err := sql.Open("duckdb", dbPath)
-		require.NoError(t, err)
+		db := openTestDuckDB(t, dbPath)
 		defer db.Close()
 
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE orders_source (
 				id INTEGER PRIMARY KEY,
 				amount DECIMAL(10,2)
 			)
 		`)
-		require.NoError(t, err)
 
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE orders_target (
 				id INTEGER PRIMARY KEY,
 				amount DECIMAL(10,2),
 				status VARCHAR(20)
 			)
 		`)
-		require.NoError(t, err)
 
 		config := &duck.Config{Path: dbPath}
 		client, err := duck.NewClient(config)
@@ -335,8 +336,7 @@ func TestAlterStatementsExecutability(t *testing.T) {
 		// Execute the statements
 		for _, stmt := range statements {
 			t.Logf("Executing: %s", stmt)
-			_, err = db.ExecContext(ctx, stmt)
-			require.NoError(t, err, "Reverse ALTER statement should execute successfully")
+			execTestDuckDB(t, db, stmt)
 		}
 
 		// Verify source table was modified
@@ -363,6 +363,11 @@ func TestAlterStatementsWithRealConfig(t *testing.T) {
 		t.Skip("Skipping test: .bruin.yml not found")
 	}
 
+	// Ensure ADBC driver is installed before running tests
+	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
+		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
+	}
+
 	t.Parallel()
 
 	t.Run("detects dialect from config connections", func(t *testing.T) {
@@ -374,19 +379,16 @@ func TestAlterStatementsWithRealConfig(t *testing.T) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "config_test.db")
 
-		db, err := sql.Open("duckdb", dbPath)
-		require.NoError(t, err)
+		db := openTestDuckDB(t, dbPath)
 		defer db.Close()
 
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE test_source (id INTEGER, name VARCHAR(50))
 		`)
-		require.NoError(t, err)
 
-		_, err = db.ExecContext(ctx, `
+		execTestDuckDB(t, db, `
 			CREATE TABLE test_target (id INTEGER)
 		`)
-		require.NoError(t, err)
 
 		config := &duck.Config{Path: dbPath}
 		client, err := duck.NewClient(config)

@@ -22,6 +22,7 @@ type DuckDBClient interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
+	Close()
 }
 
 type BasicOperator struct {
@@ -103,7 +104,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	ansisql.LogQueryIfVerbose(ctx, writer, q.Query)
 
-	return conn.RunQueryWithoutResult(ctx, q)
+	err = conn.RunQueryWithoutResult(ctx, q)
+	// Close the connection pool to release file locks so other processes (like Python) can access the database
+	conn.Close()
+	return err
 }
 
 func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {
