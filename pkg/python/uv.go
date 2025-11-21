@@ -32,6 +32,7 @@ var AvailablePythonVersions = map[string]bool{
 	"3.11": true,
 	"3.12": true,
 	"3.13": true,
+	"3.14": true,
 }
 
 const (
