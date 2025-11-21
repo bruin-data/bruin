@@ -783,13 +783,15 @@ type Asset struct { //nolint:recvcheck
 
 //nolint:recvcheck
 type TimeModifier struct {
-	Months      int    `json:"months" yaml:"months,omitempty" mapstructure:"months"`
-	Days        int    `json:"days" yaml:"days,omitempty" mapstructure:"days"`
-	Hours       int    `json:"hours" yaml:"hours,omitempty" mapstructure:"hours"`
-	Minutes     int    `json:"minutes" yaml:"minutes,omitempty" mapstructure:"minutes"`
-	Seconds     int    `json:"seconds" yaml:"seconds,omitempty" mapstructure:"seconds"`
-	CronPeriods int    `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
-	Template    string `json:"template" yaml:"template,omitempty" mapstructure:"template"`
+	Months       int    `json:"months" yaml:"months,omitempty" mapstructure:"months"`
+	Days         int    `json:"days" yaml:"days,omitempty" mapstructure:"days"`
+	Hours        int    `json:"hours" yaml:"hours,omitempty" mapstructure:"hours"`
+	Minutes      int    `json:"minutes" yaml:"minutes,omitempty" mapstructure:"minutes"`
+	Seconds      int    `json:"seconds" yaml:"seconds,omitempty" mapstructure:"seconds"`
+	Milliseconds int    `json:"milliseconds" yaml:"milliseconds,omitempty" mapstructure:"milliseconds"`
+	Nanoseconds  int    `json:"nanoseconds" yaml:"nanoseconds,omitempty" mapstructure:"nanoseconds"`
+	CronPeriods  int    `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
+	Template     string `json:"template" yaml:"template,omitempty" mapstructure:"template"`
 }
 
 func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
@@ -812,6 +814,27 @@ func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
 }
 
 func (t *TimeModifier) parseTimeModifier(modifier string) error {
+	// Check for two-character suffixes first (ms, ns)
+	if len(modifier) >= 3 {
+		twoCharSuffix := modifier[len(modifier)-2:]
+		if twoCharSuffix == "ms" || twoCharSuffix == "ns" {
+			numeric := modifier[:len(modifier)-2]
+			num, err := strconv.Atoi(numeric)
+			if err != nil {
+				return fmt.Errorf("invalid numeric portion %q in interval %q: %w", numeric, modifier, err)
+			}
+
+			switch twoCharSuffix {
+			case "ms":
+				t.Milliseconds = num
+			case "ns":
+				t.Nanoseconds = num
+			}
+
+			return nil
+		}
+	}
+
 	suffix := modifier[len(modifier)-1]
 	numeric := modifier[:len(modifier)-1]
 
@@ -832,7 +855,7 @@ func (t *TimeModifier) parseTimeModifier(modifier string) error {
 	case 'M':
 		t.Months = num
 	default:
-		return fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, or M", suffix, modifier)
+		return fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, d, M, ms, or ns", string(suffix), modifier)
 	}
 
 	return nil
@@ -863,7 +886,7 @@ func (t TimeModifier) ResolveTemplateToNew(renderer RendererInterface) (TimeModi
 }
 
 func (t TimeModifier) MarshalJSON() ([]byte, error) {
-	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0 && t.Template == "" {
+	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.Milliseconds == 0 && t.Nanoseconds == 0 && t.CronPeriods == 0 && t.Template == "" {
 		return []byte("null"), nil
 	}
 
@@ -2181,7 +2204,9 @@ func ModifyDate(t time.Time, modifier TimeModifier) time.Time {
 	t = t.AddDate(0, modifier.Months, modifier.Days).
 		Add(time.Duration(modifier.Hours) * time.Hour).
 		Add(time.Duration(modifier.Minutes) * time.Minute).
-		Add(time.Duration(modifier.Seconds) * time.Second)
+		Add(time.Duration(modifier.Seconds) * time.Second).
+		Add(time.Duration(modifier.Milliseconds) * time.Millisecond).
+		Add(time.Duration(modifier.Nanoseconds) * time.Nanosecond)
 
 	return t
 }
@@ -2213,17 +2238,33 @@ func (t TimeModifier) MarshalYAML() (interface{}, error) {
 		return t.Template, nil
 	}
 
+	// Helper to check if only one field is set (excluding the specified one)
+	allZeroExcept := func(exceptDays, exceptMonths, exceptHours, exceptMinutes, exceptSeconds, exceptMilliseconds, exceptNanoseconds bool) bool {
+		return (exceptDays || t.Days == 0) &&
+			(exceptMonths || t.Months == 0) &&
+			(exceptHours || t.Hours == 0) &&
+			(exceptMinutes || t.Minutes == 0) &&
+			(exceptSeconds || t.Seconds == 0) &&
+			(exceptMilliseconds || t.Milliseconds == 0) &&
+			(exceptNanoseconds || t.Nanoseconds == 0) &&
+			t.CronPeriods == 0
+	}
+
 	switch {
-	case t.Days != 0 && t.Months == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
+	case t.Days != 0 && allZeroExcept(true, false, false, false, false, false, false):
 		return fmt.Sprintf("%dd", t.Days), nil
-	case t.Months != 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
+	case t.Months != 0 && allZeroExcept(false, true, false, false, false, false, false):
 		return fmt.Sprintf("%dM", t.Months), nil
-	case t.Hours != 0 && t.Days == 0 && t.Months == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
+	case t.Hours != 0 && allZeroExcept(false, false, true, false, false, false, false):
 		return fmt.Sprintf("%dh", t.Hours), nil
-	case t.Minutes != 0 && t.Days == 0 && t.Months == 0 && t.Hours == 0 && t.Seconds == 0 && t.CronPeriods == 0:
+	case t.Minutes != 0 && allZeroExcept(false, false, false, true, false, false, false):
 		return fmt.Sprintf("%dm", t.Minutes), nil
-	case t.Seconds != 0 && t.Days == 0 && t.Months == 0 && t.Hours == 0 && t.Minutes == 0 && t.CronPeriods == 0:
+	case t.Seconds != 0 && allZeroExcept(false, false, false, false, true, false, false):
 		return fmt.Sprintf("%ds", t.Seconds), nil
+	case t.Milliseconds != 0 && allZeroExcept(false, false, false, false, false, true, false):
+		return fmt.Sprintf("%dms", t.Milliseconds), nil
+	case t.Nanoseconds != 0 && allZeroExcept(false, false, false, false, false, false, true):
+		return fmt.Sprintf("%dns", t.Nanoseconds), nil
 	default:
 		// fallback to struct/object form
 		type Alias TimeModifier
