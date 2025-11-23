@@ -7,6 +7,22 @@ import (
 	"database/sql"
 )
 
+// Row interface abstracts sql.Row to allow custom implementations.
+type Row interface {
+	Scan(dest ...any) error
+	Err() error
+}
+
+// Rows interface abstracts sql.Rows to allow custom implementations that manage connection lifecycle.
+type Rows interface {
+	Close() error
+	Columns() ([]string, error)
+	ColumnTypes() ([]*sql.ColumnType, error)
+	Err() error
+	Next() bool
+	Scan(dest ...any) error
+}
+
 type EphemeralConnection struct {
 	config DuckDBConfig
 }

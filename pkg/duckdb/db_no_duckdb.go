@@ -14,6 +14,16 @@ import (
 
 var errDuckDBNotSupported = errors.New("DuckDB support not available in this build")
 
+// ADBCDriverName returns an empty string in no-duckdb builds.
+func ADBCDriverName() string {
+	return ""
+}
+
+// EnsureADBCDriverInstalled returns an error in no-duckdb builds.
+func EnsureADBCDriverInstalled(ctx context.Context) error {
+	return errDuckDBNotSupported
+}
+
 type Client struct {
 	connection    connection
 	config        DuckDBConfig

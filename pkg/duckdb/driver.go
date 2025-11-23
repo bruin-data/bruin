@@ -21,9 +21,16 @@ var (
 	uvChecker     = &uv.Checker{}
 )
 
+const adbcDriverName = "adbc_duckdb"
+
 //nolint:gochecknoinits
 func init() {
-	sql.Register("adbc_duckdb", sqldriver.Driver{Driver: &drivermgr.Driver{}})
+	sql.Register(adbcDriverName, sqldriver.Driver{Driver: &drivermgr.Driver{}})
+}
+
+// ADBCDriverName returns the registered SQL driver name for ADBC DuckDB.
+func ADBCDriverName() string {
+	return adbcDriverName
 }
 
 func EnsureADBCDriverInstalled(ctx context.Context) error {
