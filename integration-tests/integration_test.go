@@ -1,9 +1,11 @@
 package main_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
@@ -12,88 +14,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	stateForFirstRun = &scheduler.PipelineState{
-		Parameters: scheduler.RunConfig{
-			Downstream:   false,
-			Workers:      16,
-			Environment:  "env-continue",
-			Force:        false,
-			PushMetadata: false,
-			NoLogFile:    false,
-			FullRefresh:  false,
-			UsePip:       false,
-			Tag:          "",
-			ExcludeTag:   "",
-			Only:         nil,
-		},
-		Metadata: scheduler.Metadata{
-			Version: "dev",
-			OS:      runtime.GOOS,
-		},
-		State: []*scheduler.PipelineAssetState{
-			{
-				Name:   "product_categories",
-				Status: "succeeded",
-			},
-			{
-				Name:   "product_price_summary",
-				Status: "succeeded",
-			},
-			{
-				Name:   "products",
-				Status: "succeeded",
-			},
-			{
-				Name:   "shipping_providers",
-				Status: "failed",
-			},
-		},
-		Version:           "1.0.0",
-		CompatibilityHash: "e62a4c57b82d5452bc57cab24f45eb4abda2a737b0269492de0030fba452ed7e",
+// loadPipelineState loads a pipeline state from a JSON expectation file.
+// It replaces the __RUNTIME_OS__ placeholder with the actual runtime OS.
+func loadPipelineState(currentFolder, filename string) *scheduler.PipelineState {
+	filePath := filepath.Join(currentFolder, "expectations", filename)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		panic(err)
 	}
-	stateForContinueRun = &scheduler.PipelineState{
-		Parameters: scheduler.RunConfig{
-			Downstream:   false,
-			StartDate:    "2024-12-22 00:00:00.000000",
-			EndDate:      "2024-12-22 23:59:59.999999",
-			Workers:      16,
-			Environment:  "env-continue",
-			Force:        false,
-			PushMetadata: false,
-			NoLogFile:    false,
-			FullRefresh:  false,
-			UsePip:       false,
-			Tag:          "",
-			ExcludeTag:   "",
-			Only:         nil,
-		},
-		Metadata: scheduler.Metadata{
-			Version: "dev",
-			OS:      runtime.GOOS,
-		},
-		State: []*scheduler.PipelineAssetState{
-			{
-				Name:   "product_categories",
-				Status: "skipped",
-			},
-			{
-				Name:   "product_price_summary",
-				Status: "skipped",
-			},
-			{
-				Name:   "products",
-				Status: "skipped",
-			},
-			{
-				Name:   "shipping_providers",
-				Status: "succeeded",
-			},
-		},
-		Version:           "1.0.0",
-		CompatibilityHash: "e62a4c57b82d5452bc57cab24f45eb4abda2a737b0269492de0030fba452ed7e",
+
+	// Replace the runtime OS placeholder with the actual OS
+	contentStr := strings.ReplaceAll(string(content), "__RUNTIME_OS__", runtime.GOOS)
+
+	var state scheduler.PipelineState
+	if err := json.Unmarshal([]byte(contentStr), &state); err != nil {
+		panic(err)
 	}
-)
+
+	return &state
+}
 
 func cleanupDuckDBFiles(t *testing.T) {
 	duckdbFilesDir := "duckdb-files"
@@ -943,7 +882,7 @@ func TestIndividualTasks(t *testing.T) {
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_connections_schema.json")),
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "expectations/expected_connections_schema.json")),
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
@@ -961,7 +900,7 @@ func TestIndividualTasks(t *testing.T) {
 				SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_connections.json")),
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "expectations/expected_connections.json")),
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
@@ -1384,7 +1323,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
-							e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), stateForFirstRun),
+							e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), loadPipelineState(currentFolder, "continue_pipeline_state_first_run.json")),
 						},
 					},
 					{
@@ -1409,7 +1348,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
-							e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), stateForContinueRun),
+							e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), loadPipelineState(currentFolder, "continue_pipeline_state_continue_run.json")),
 						},
 					},
 					{
@@ -1462,7 +1401,7 @@ func TestWorkflowTasks(t *testing.T) {
 						WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin.yaml")),
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "expectations/expected_bruin.yaml")),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -1476,7 +1415,7 @@ func TestWorkflowTasks(t *testing.T) {
 						WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin.yaml")),
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "expectations/expected_bruin.yaml")),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -1490,7 +1429,7 @@ func TestWorkflowTasks(t *testing.T) {
 						WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin_chess.yaml")),
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "expectations/expected_bruin_chess.yaml")),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,

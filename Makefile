@@ -129,8 +129,8 @@ refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Updating run-seed-data expectations...$(NO_COLOR)"
 	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/run-seed-data/assets/seed.asset.yml | $(JQ_REL_PATH) > test-pipelines/run-seed-data/expectations/seed.asset.yml.json
 	@echo "$(OK_COLOR)==> Updating connection expectations...$(NO_COLOR)"
-	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expected_connections_schema.json
-	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expected_connections.json
+	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expectations/expected_connections_schema.json
+	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expectations/expected_connections.json
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
 
 # sometimes vendoring doesn't move the precompiled library
