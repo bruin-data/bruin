@@ -61,6 +61,34 @@ Define the column that will be used for the partitioning of the resulting table.
 - **Type:** `String`
 - **Default:** none
 
+#### Range Bucket Partitioning (BigQuery)
+For BigQuery, you can use range bucket partitioning to partition by integer ranges. This is useful when you want to partition by non-time dimensions like customer IDs, order IDs, or other integer columns.
+
+**Syntax:**
+```yaml
+materialization:
+  type: table
+  partition_by: "RANGE_BUCKET(column_name, GENERATE_ARRAY(start, end, interval))"
+```
+
+**Example:**
+```yaml
+materialization:
+  type: table
+  partition_by: "RANGE_BUCKET(customer_id, GENERATE_ARRAY(0, 1000, 100))"
+```
+
+This creates partitions for ranges [0-99], [100-199], [200-299], ..., [900-999]. Values outside the range go to a special `__UNPARTITIONED__` partition.
+
+**When to use range bucket partitioning:**
+- You have an INTEGER column with predictable distribution
+- You want to partition by non-time dimensions (customer_id, order_id, user_id, etc.)
+- You need to optimize queries that filter by integer ranges
+- You want more control over partition sizes than time-based partitioning provides
+
+> [!NOTE]
+> Range bucket partitioning is currently only supported for BigQuery. For other platforms, use time-based partitioning or simple column-based partitioning as supported by the platform.
+
 
 ### `materialization > cluster_by`
 Define the columns that will be used for the clustering of the resulting table. This is used to instruct the data warehouse to set the columns for the clustering.
@@ -352,6 +380,31 @@ The strategy also supports partitioning and clustering for data warehouses that 
 in the materialization definition with the following keys:
 - `partition_by`
 - `cluster_by`
+
+**Example with range bucket partitioning (BigQuery):**
+```bruin-sql
+/* @bruin
+name: dashboard.customers
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: ddl
+  partition_by: "RANGE_BUCKET(customer_id, GENERATE_ARRAY(0, 100000, 1000))"
+
+columns:
+  - name: customer_id
+    type: INT64
+    description: "Unique customer identifier"
+    primary_key: true
+  - name: customer_name
+    type: STRING
+    description: "Customer name"
+  - name: registration_date
+    type: DATE
+    description: "Date when customer registered"
+@bruin */
+```
 
 ### `scd2_by_column`
 
