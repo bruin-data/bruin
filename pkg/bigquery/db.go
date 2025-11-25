@@ -96,7 +96,6 @@ func NewDB(c *Config) (*Client, error) {
 			}
 		}
 	}
-	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
 
 	client, err := bigquery.NewClient(
 		context.Background(),
@@ -158,7 +157,6 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 			}
 		}
 	}
-	// If ADC is enabled, we don't add any credential options - let Google SDK find them automatically
 
 	client, err := datatransfer.NewClient(ctx, options...)
 	if err != nil {
