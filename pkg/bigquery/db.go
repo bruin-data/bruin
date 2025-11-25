@@ -44,6 +44,24 @@ type connectionNameKey struct{}
 
 var ConnectionNameKey = connectionNameKey{}
 
+// getAutoGcloudAuthFromContext extracts the auto-gcloud-auth flag from context.
+// Returns false if not set or not a bool.
+func getAutoGcloudAuthFromContext(ctx context.Context) bool {
+	if autoAuth, ok := ctx.Value(AutoGcloudAuthKey).(bool); ok {
+		return autoAuth
+	}
+	return false
+}
+
+// getConnectionNameFromContext extracts the connection name from context.
+// Returns empty string if not set.
+func getConnectionNameFromContext(ctx context.Context) string {
+	if name, ok := ctx.Value(ConnectionNameKey).(string); ok && name != "" {
+		return name
+	}
+	return ""
+}
+
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Ping(ctx context.Context) error
@@ -109,13 +127,13 @@ func NewDBWithContext(ctx context.Context, c *Config) (*Client, error) {
 		_, err := google.FindDefaultCredentials(ctx, scopes...)
 		if err != nil {
 			// Check if auto-gcloud-auth flag is set in context
-			if autoAuth, ok := ctx.Value(AutoGcloudAuthKey).(bool); ok && autoAuth {
+			if getAutoGcloudAuthFromContext(ctx) {
 				// Check if the error message contains "could not find default credentials"
 				if strings.Contains(err.Error(), "could not find default credentials") {
-					// Get connection name from context if available
-					connectionName := "BigQuery"
-					if name, ok := ctx.Value(ConnectionNameKey).(string); ok && name != "" {
-						connectionName = name
+					// Get connection name from context
+					connectionName := getConnectionNameFromContext(ctx)
+					if connectionName == "" {
+						connectionName = "Google Cloud Platform"
 					}
 					// Prompt user and run gcloud auth application-default login
 					if err := promptAndRunGcloudAuth(connectionName); err != nil {
@@ -391,7 +409,7 @@ func promptAndRunGcloudAuth(connectionName string) error {
 	warningColor := color.New(color.FgYellow, color.Bold)
 	commandColor := color.New(color.FgWhite, color.Bold)
 
-	warningColor.Print("\nApplication Default Credentials not found for connection: " )
+	warningColor.Print("\nApplication Default Credentials not found for connection: ")
 	warningColor.Print(connectionName)
 	warningColor.Print(". Would you like to run ")
 	commandColor.Print("'gcloud auth application-default login'")
