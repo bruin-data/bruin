@@ -1,0 +1,524 @@
+{
+  "default_environment_name": "default",
+  "selected_environment_name": "default",
+  "selected_environment": {
+    "connections": {
+      "generic": [
+        {
+          "name": "KEY1",
+          "value": "value1"
+        }
+      ],
+      "duckdb": [
+        {
+          "name": "duckdb-default",
+          "path": "duckdb-files/duckdb.db"
+        },
+        {
+          "name": "duckdb-variables",
+          "path": "duckdb-files/variables.db"
+        },
+        {
+          "name": "duckdb-scd2-by-column",
+          "path": "duckdb-files/scd2-by-column.db"
+        },
+        {
+          "name": "duckdb-scd2-by-time",
+          "path": "duckdb-files/scd2-by-time.db"
+        },
+        {
+          "name": "duckdb-start-date-flags",
+          "path": "duckdb-files/start-date-flags.db"
+        },
+        {
+          "name": "duckdb-mat-test",
+          "path": "duckdb-files/materialization-test.db"
+        }
+      ],
+      "chess": [
+        {
+          "name": "chess-default",
+          "players": [
+            "erik",
+            "vadimer2"
+          ]
+        }
+      ]
+    },
+    "schema_prefix": ""
+  },
+  "environments": {
+    "default": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "duckdb-files/duckdb.db"
+          },
+          {
+            "name": "duckdb-variables",
+            "path": "duckdb-files/variables.db"
+          },
+          {
+            "name": "duckdb-scd2-by-column",
+            "path": "duckdb-files/scd2-by-column.db"
+          },
+          {
+            "name": "duckdb-scd2-by-time",
+            "path": "duckdb-files/scd2-by-time.db"
+          },
+          {
+            "name": "duckdb-start-date-flags",
+            "path": "duckdb-files/start-date-flags.db"
+          },
+          {
+            "name": "duckdb-mat-test",
+            "path": "duckdb-files/materialization-test.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-continue": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-continue",
+            "path": "duckdb-files/continue.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-custom-check-count-false": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-custom-check-count-false",
+            "path": "duckdb-files/duckdb-custom-check-count-false.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-custom-check-count-true": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-custom-check-count-true",
+            "path": "duckdb-files/duckdb-custom-check-count-true.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-duckdb-ddl": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ddl",
+            "path": "duckdb-files/duckdb-ddl.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-duckdb-decimal": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-decimal",
+            "path": "duckdb-files/duckdb-decimal.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-ingestr": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ingestr",
+            "path": "duckdb-files/ingestr.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-ingestr",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-interval-modifiers": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-interval-modifiers",
+            "path": "duckdb-files/interval-modifiers.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-push-metadata": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-push-metadata",
+            "path": "duckdb-files/push-metadata.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-query-asset": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-asset",
+            "path": "duckdb-files/query-asset.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-query-export": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-export",
+            "path": "duckdb-files/env-query-export.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-render-template-this": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-render-template-this",
+            "path": "duckdb-files/render-template-this.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-default-option": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          },
+          {
+            "name": "KEY2",
+            "value": "value2"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-env-run-default-option",
+            "path": "duckdb-files/env-run-default-option.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-default-option",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-main-with-downstream": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-main-with-downstream",
+            "path": "duckdb-files/run-main-with-downstream.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-main-with-downstream",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-main-with-filters": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-main-with-filters",
+            "path": "duckdb-files/run-main-with-filters.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-main-with-filters",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-malformed-sql": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-malformed-sql",
+            "path": "duckdb-files/run-malformed-sql.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-malformed-sql",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-nameless-asset": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-nameless-asset",
+            "path": "duckdb-files/run-nameless-asset.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-non-wait-symbolic": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-env-run-non-wait-symbolic",
+            "path": "duckdb-files/env-run-non-wait-symbolic.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-python-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-python-materialization",
+            "path": "duckdb-files/run-python-materialization.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-seed-data": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-seed-data",
+            "path": "duckdb-files/run-seed-data.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-with-downstream": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-downstream",
+            "path": "duckdb-files/run-with-downstream.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-with-downstream",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-with-filters": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-filters",
+            "path": "duckdb-files/run-with-filters.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-with-filters",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-with-tags": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-tags",
+            "path": "duckdb-files/run-with-tags.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-with-tags",
+            "players": [
+              "erik",
+              "vadimer2"
+            ]
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-scd2-by-column": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-scd2-by-column",
+            "path": "duckdb-files/scd2-by-column.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-scd2-by-time": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-scd2-by-time",
+            "path": "duckdb-files/scd2-by-time.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-start-date-flags": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-start-date-flags",
+            "path": "duckdb-files/start-date-flags.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-time-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-time-materialization",
+            "path": "duckdb-files/time-materialization.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-validate-asset-time-interval": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-validate-asset-time-interval",
+            "path": "duckdb-files/validate-asset-time-interval.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-validate-with-exclude-tag": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-validate-with-exclude-tag",
+            "path": "duckdb-files/validate-with-exclude-tag.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    }
+  }
+}
