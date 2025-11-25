@@ -17,7 +17,7 @@ import (
 // loadPipelineState loads a pipeline state from a JSON expectation file.
 // It replaces the __RUNTIME_OS__ placeholder with the actual runtime OS.
 func loadPipelineState(currentFolder, filename string) *scheduler.PipelineState {
-	filePath := filepath.Join(currentFolder, "expectations", filename)
+	filePath := filepath.Join(currentFolder, "test-pipelines/continue-pipeline/expectations", filename)
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		panic(err)
