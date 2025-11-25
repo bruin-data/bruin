@@ -1570,6 +1570,7 @@ func SetupExecutors(
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuery) ||
 		estimateCustomCheckType == pipeline.AssetTypeMySQLQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMySQLSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuerySensor) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLTableSensor) {
 		mysqlOperator := mysql.NewBasicOperator(conn, wholeFileExtractor, mysql.NewMaterializer(fullRefresh), parser)
@@ -1580,6 +1581,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeMain] = mysqlOperator
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeMySQLSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeMySQLSeed][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMySQLSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeMySQLQuerySensor][scheduler.TaskInstanceTypeMain] = mysqlQuerySensor
 		mainExecutors[pipeline.AssetTypeMySQLQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
