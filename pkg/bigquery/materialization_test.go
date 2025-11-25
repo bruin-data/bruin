@@ -533,6 +533,21 @@ func TestBuildDDLQuery(t *testing.T) {
 			want: "CREATE TABLE IF NOT EXISTS my_partitioned_clustered_table (\n  id INT64,\n  timestamp TIMESTAMP OPTIONS(description=\"Event timestamp\"),\n  category STRING OPTIONS(description=\"Category of the item\")\n)\nPARTITION BY timestamp\nCLUSTER BY category",
 		},
 		{
+			name: "table with range bucket partitioning",
+			asset: &pipeline.Asset{
+				Name: "my_range_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "customer_id", Type: "INT64"},
+					{Name: "customer_name", Type: "STRING"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "RANGE_BUCKET(customer_id, GENERATE_ARRAY(0, 1000, 100))",
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_range_partitioned_table (\n  customer_id INT64,\n  customer_name STRING\n)\nPARTITION BY RANGE_BUCKET(customer_id, GENERATE_ARRAY(0, 1000, 100))",
+		},
+		{
 			name: "table with primary key",
 			asset: &pipeline.Asset{
 				Name: "my_table_with_pk",

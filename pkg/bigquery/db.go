@@ -467,7 +467,12 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 	}
 
 	// Compile the regex for parsing partition expressions
-	partitionRegex := regexp.MustCompile(`^\s*(?:(?:date(?:time)?_trunc|timestamp_trunc|date_trunc)\(\s*([A-Za-z_][\w.]*)\s*,\s*(day|hour|month|year)\s*\)|date\(\s*([A-Za-z_][\w.]*)\s*\)|([A-Za-z_][\w.]*)\s*)$`)
+	// Pattern matches:
+	// 1. RANGE_BUCKET(column, GENERATE_ARRAY(...)) - range bucket partitioning
+	// 2. date_trunc/timestamp_trunc functions
+	// 3. date() function
+	// 4. simple column name
+	partitionRegex := regexp.MustCompile(`^\s*(?:range_bucket\s*\(\s*([A-Za-z_][\w.]*)\s*,.*\)|(?:date(?:time)?_trunc|timestamp_trunc|date_trunc)\(\s*([A-Za-z_][\w.]*)\s*,\s*(day|hour|month|year)\s*\)|date\(\s*([A-Za-z_][\w.]*)\s*\)|([A-Za-z_][\w.]*)\s*)$`)
 
 	// Parse the asset's partition expression
 	assetPartitionBy := strings.ToLower(strings.TrimSpace(asset.Materialization.PartitionBy))
@@ -475,22 +480,27 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 
 	var assetColumn string
 	var assetPartitionType string
+	isRangeBucket := false
 
-	// if match, FindStringSubmatch() returns a slice of exactly 5 elements [fullMatch, group1, group2, group3, group4], else returns nil.
+	// if match, FindStringSubmatch() returns a slice with groups
 	if assetMatches != nil {
 		// Extract column and partition type from regex matches
 		switch {
-		case assetMatches[1] != "" && assetMatches[2] != "":
-			// date_trunc/timestamp_trunc case
+		case assetMatches[1] != "":
+			// RANGE_BUCKET case - group 1 is the column name
 			assetColumn = strings.ToLower(assetMatches[1])
-			assetPartitionType = strings.ToLower(assetMatches[2])
-		case assetMatches[3] != "":
-			// date() case
-			assetColumn = strings.ToLower(assetMatches[3])
-			assetPartitionType = "day" // date() defaults to day partitioning
+			isRangeBucket = true
+		case assetMatches[2] != "" && assetMatches[3] != "":
+			// date_trunc/timestamp_trunc case
+			assetColumn = strings.ToLower(assetMatches[2])
+			assetPartitionType = strings.ToLower(assetMatches[3])
 		case assetMatches[4] != "":
-			// simple column case
+			// date() case
 			assetColumn = strings.ToLower(assetMatches[4])
+			assetPartitionType = "day" // date() defaults to day partitioning
+		case assetMatches[5] != "":
+			// simple column case
+			assetColumn = strings.ToLower(assetMatches[5])
 			assetPartitionType = "day" // default to day partitioning
 		}
 	}
@@ -519,8 +529,14 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 		metaField := strings.ToLower(meta.RangePartitioning.Field)
 
 		// For range partitioning, only compare the column name
+		// If asset specifies RANGE_BUCKET, it should match range partitioning
 		if metaField != assetColumn {
 			return false
+		}
+		// If asset has RANGE_BUCKET syntax, it should match range partitioning
+		if !isRangeBucket {
+			// Asset doesn't have RANGE_BUCKET syntax but table has range partitioning
+			// This could be a simple column name that matches, which is acceptable
 		}
 	}
 	return true
