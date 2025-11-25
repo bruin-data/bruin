@@ -646,14 +646,14 @@ func (m *Manager) AddMongoAtlasConnectionFromConfig(connection *config.MongoAtla
 	return nil
 }
 
-func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnection) error {
+func (m *Manager) AddMySQLConnectionFromConfig(ctx context.Context, connection *config.MySQLConnection) error {
 	m.mutex.Lock()
 	if m.Mysql == nil {
 		m.Mysql = make(map[string]*mysql.Client)
 	}
 	m.mutex.Unlock()
 
-	client, err := mysql.NewClient(&mysql.Config{
+	client, err := mysql.NewClientWithContext(ctx, &mysql.Config{
 		Username: connection.Username,
 		Password: connection.Password,
 		Host:     connection.Host,
@@ -2481,7 +2481,9 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.MySQL, func(conn *config.MySQLConnection) error {
+		return connectionManager.AddMySQLConnectionFromConfig(ctx, conn)
+	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Allium, connectionManager.AddAlliumConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.HANA, connectionManager.AddHANAConnectionFromConfig, &wg, &errList, &mu)

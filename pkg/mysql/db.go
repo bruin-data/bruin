@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -31,6 +32,7 @@ type DB interface {
 type Client struct {
 	conn   *sqlx.DB
 	config MySQLConfig
+	mutex  sync.Mutex
 }
 
 type MySQLConfig interface {
@@ -39,15 +41,32 @@ type MySQLConfig interface {
 }
 
 func NewClient(c MySQLConfig) (*Client, error) {
-	conn, err := sqlx.Connect("mysql", c.ToDBConnectionURI())
-	if err != nil {
-		return nil, err
+	return NewClientWithContext(context.Background(), c)
+}
+
+func NewClientWithContext(ctx context.Context, c MySQLConfig) (*Client, error) {
+	// Don't connect here - use lazy initialization when queries execute
+	return &Client{
+		config: c,
+		mutex:  sync.Mutex{},
+	}, nil
+}
+
+func (c *Client) initializeDB(ctx context.Context) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if c.conn != nil {
+		return nil
 	}
 
-	return &Client{
-		conn:   conn,
-		config: c,
-	}, nil
+	conn, err := sqlx.ConnectContext(ctx, "mysql", c.config.ToDBConnectionURI())
+	if err != nil {
+		return errors.Wrapf(err, "failed to connect to mysql")
+	}
+
+	c.conn = conn
+	return nil
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
@@ -60,6 +79,9 @@ func (c *Client) GetIngestrURI() (string, error) {
 //}
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+	if err := c.initializeDB(ctx); err != nil {
+		return err
+	}
 	_, err := c.conn.ExecContext(ctx, query.String())
 	if err != nil {
 		return errors.Wrap(err, "failed to execute query")
@@ -69,6 +91,9 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 }
 
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	if err := c.initializeDB(ctx); err != nil {
+		return nil, err
+	}
 	rows, err := c.conn.QueryContext(ctx, query.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute query")
@@ -111,6 +136,9 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	if err := c.initializeDB(ctx); err != nil {
+		return nil, err
+	}
 	queryString := queryObj.String()
 	rows, err := c.conn.QueryContext(ctx, queryString)
 	if err != nil {
