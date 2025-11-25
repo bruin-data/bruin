@@ -480,7 +480,6 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 
 	var assetColumn string
 	var assetPartitionType string
-	isRangeBucket := false
 
 	// if match, FindStringSubmatch() returns a slice with groups
 	if assetMatches != nil {
@@ -489,7 +488,6 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 		case assetMatches[1] != "":
 			// RANGE_BUCKET case - group 1 is the column name
 			assetColumn = strings.ToLower(assetMatches[1])
-			isRangeBucket = true
 		case assetMatches[2] != "" && assetMatches[3] != "":
 			// date_trunc/timestamp_trunc case
 			assetColumn = strings.ToLower(assetMatches[2])
@@ -533,11 +531,9 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 		if metaField != assetColumn {
 			return false
 		}
-		// If asset has RANGE_BUCKET syntax, it should match range partitioning
-		if !isRangeBucket {
-			// Asset doesn't have RANGE_BUCKET syntax but table has range partitioning
-			// This could be a simple column name that matches, which is acceptable
-		}
+		// Note: If asset has RANGE_BUCKET syntax, it should match range partitioning.
+		// If asset doesn't have RANGE_BUCKET syntax but table has range partitioning,
+		// a simple column name that matches is acceptable.
 	}
 	return true
 }
