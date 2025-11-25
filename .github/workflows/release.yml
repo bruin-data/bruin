@@ -43,8 +43,11 @@ jobs:
         shell: bash
         run: |
           choco install r.project -y
-      - run: make ${{ matrix.suite }}
+      - name: Run test suite
         shell: bash
+        run: |
+          [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          make ${{ matrix.suite }}
 
   prepare-darwin:
     runs-on: depot-ubuntu-latest
