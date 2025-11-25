@@ -18,7 +18,7 @@ export CGO_LDFLAGS=-Wl,-w
 export LDFLAGS=-Wl,-w
 endif
 
-JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
+JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
 .PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud
 all: clean deps test build
