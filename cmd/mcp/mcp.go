@@ -132,8 +132,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 				},
 			},
 		}
-	case "initialized":
-		// this is also part of  the mcp handshake
+	case "initialized", "notifications/initialized":
 		if req.ID == nil {
 			return JSONRPCResponse{}
 		}
