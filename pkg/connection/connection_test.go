@@ -1,6 +1,10 @@
 package connection
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"testing"
 
@@ -581,4 +585,183 @@ func TestManager_AddAwsConnectionFromConfig(t *testing.T) {
 	assert.Equal(t, "test", awsConn.Name)
 	assert.Equal(t, "AKIAEXAMPLE", awsConn.AccessKey)
 	assert.Equal(t, "SECRETKEYEXAMPLE", awsConn.SecretKey)
+}
+
+func Test_convertPKCS1ToPKCS8(t *testing.T) {
+	t.Parallel()
+
+	// Generate a test RSA private key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	// Create PKCS#1 formatted key
+	pkcs1Bytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	pkcs1Block := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: pkcs1Bytes,
+	}
+	pkcs1PEM := string(pem.EncodeToMemory(pkcs1Block))
+
+	// Create PKCS#8 formatted key for comparison
+	pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	require.NoError(t, err)
+	pkcs8Block := &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: pkcs8Bytes,
+	}
+	pkcs8PEM := string(pem.EncodeToMemory(pkcs8Block))
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+		validate func(t *testing.T, result string)
+	}{
+		{
+			name:     "valid PKCS#1 key should be converted to PKCS#8",
+			input:    pkcs1PEM,
+			expected: "", // We'll validate this differently since exact output may vary
+			validate: func(t *testing.T, result string) {
+				// Verify the result is in PKCS#8 format
+				block, _ := pem.Decode([]byte(result))
+				require.NotNil(t, block)
+				assert.Equal(t, "PRIVATE KEY", block.Type)
+
+				// Verify we can parse it as PKCS#8
+				parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+				require.NoError(t, err)
+
+				// Verify it's the same RSA key
+				rsaKey, ok := parsedKey.(*rsa.PrivateKey)
+				require.True(t, ok)
+				assert.True(t, privateKey.Equal(rsaKey))
+			},
+		},
+		{
+			name:     "already PKCS#8 key should remain unchanged",
+			input:    pkcs8PEM,
+			expected: pkcs8PEM,
+			validate: func(t *testing.T, result string) {
+				assert.Equal(t, pkcs8PEM, result)
+			},
+		},
+		{
+			name:     "empty string should remain unchanged",
+			input:    "",
+			expected: "",
+			validate: func(t *testing.T, result string) {
+				assert.Equal(t, "", result)
+			},
+		},
+		{
+			name:     "invalid PEM should remain unchanged",
+			input:    "not a valid PEM",
+			expected: "not a valid PEM",
+			validate: func(t *testing.T, result string) {
+				assert.Equal(t, "not a valid PEM", result)
+			},
+		},
+		{
+			name: "malformed PKCS#1 key should remain unchanged",
+			input: `-----BEGIN RSA PRIVATE KEY-----
+invalid data here
+-----END RSA PRIVATE KEY-----`,
+			expected: `-----BEGIN RSA PRIVATE KEY-----
+invalid data here
+-----END RSA PRIVATE KEY-----`,
+			validate: func(t *testing.T, result string) {
+				expected := `-----BEGIN RSA PRIVATE KEY-----
+invalid data here
+-----END RSA PRIVATE KEY-----`
+				assert.Equal(t, expected, result)
+			},
+		},
+		{
+			name: "non-RSA key type should remain unchanged",
+			input: `-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg
+-----END PRIVATE KEY-----`,
+			expected: `-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg
+-----END PRIVATE KEY-----`,
+			validate: func(t *testing.T, result string) {
+				expected := `-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg
+-----END PRIVATE KEY-----`
+				assert.Equal(t, expected, result)
+			},
+		},
+		{
+			name: "certificate (non-private key) should remain unchanged",
+			input: `-----BEGIN CERTIFICATE-----
+MIIB...
+-----END CERTIFICATE-----`,
+			expected: `-----BEGIN CERTIFICATE-----
+MIIB...
+-----END CERTIFICATE-----`,
+			validate: func(t *testing.T, result string) {
+				expected := `-----BEGIN CERTIFICATE-----
+MIIB...
+-----END CERTIFICATE-----`
+				assert.Equal(t, expected, result)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := convertPKCS1ToPKCS8(tt.input)
+
+			if tt.expected != "" {
+				assert.Equal(t, tt.expected, result)
+			}
+
+			if tt.validate != nil {
+				tt.validate(t, result)
+			}
+		})
+	}
+}
+
+func Test_convertPKCS1ToPKCS8_Integration(t *testing.T) {
+	t.Parallel()
+
+	// Test that demonstrates the actual conversion working end-to-end
+	t.Run("full conversion flow", func(t *testing.T) {
+		t.Parallel()
+
+		// Generate a real RSA key
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		// Convert to PKCS#1 PEM
+		pkcs1Bytes := x509.MarshalPKCS1PrivateKey(privateKey)
+		pkcs1Block := &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: pkcs1Bytes,
+		}
+		pkcs1PEM := string(pem.EncodeToMemory(pkcs1Block))
+
+		// Convert using our function
+		result := convertPKCS1ToPKCS8(pkcs1PEM)
+
+		// Verify the result
+		assert.NotEqual(t, pkcs1PEM, result, "Output should be different from input")
+		assert.Contains(t, result, "-----BEGIN PRIVATE KEY-----")
+		assert.Contains(t, result, "-----END PRIVATE KEY-----")
+		assert.NotContains(t, result, "RSA PRIVATE KEY")
+
+		// Parse the result and verify it's the same key
+		block, _ := pem.Decode([]byte(result))
+		require.NotNil(t, block)
+
+		parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		require.NoError(t, err)
+
+		rsaKey, ok := parsedKey.(*rsa.PrivateKey)
+		require.True(t, ok)
+		assert.True(t, privateKey.Equal(rsaKey))
+	})
 }
