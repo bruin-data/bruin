@@ -236,6 +236,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			mat := new(mockMaterializer)
 			mat.On("IsFullRefresh").Return(false)
 			client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
+			client.On("UsesApplicationDefaultCredentials").Return(false)
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "gcp-default").Return(client)
 			if tt.setup != nil {
@@ -316,6 +317,7 @@ func TestMetadataPushOperator_Run(t *testing.T) {
 			t.Parallel()
 
 			client := new(mockQuerierWithResult)
+			client.On("UsesApplicationDefaultCredentials").Return(false)
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "gcp-default").Return(client)
 
@@ -417,6 +419,7 @@ func TestBasicOperator_RunTask_WithRenderer(t *testing.T) {
 			mat := new(mockMaterializer)
 			mat.On("IsFullRefresh").Return(false)
 			client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
+			client.On("UsesApplicationDefaultCredentials").Return(false)
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "gcp-default").Return(client)
 			if tt.setup != nil {
@@ -466,6 +469,7 @@ func TestBasicOperator_QueryAnnotations_Default(t *testing.T) {
 			executedQuery = args.Get(1).(*query.Query)
 		}).Return(nil)
 
+	client.On("UsesApplicationDefaultCredentials").Return(false)
 	conn := new(mockConnectionFetcher)
 	conn.On("GetConnection", "gcp-default").Return(client)
 
@@ -519,6 +523,7 @@ func TestBasicOperator_QueryAnnotations_CustomJSON(t *testing.T) {
 			executedQuery = args.Get(1).(*query.Query)
 		}).Return(nil)
 
+	client.On("UsesApplicationDefaultCredentials").Return(false)
 	conn := new(mockConnectionFetcher)
 	conn.On("GetConnection", "gcp-default").Return(client)
 
