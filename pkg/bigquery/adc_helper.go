@@ -26,16 +26,6 @@ func checkADCCredentials(ctx context.Context, conn DB) error {
 	return err
 }
 
-// ensureADCCredentials verifies that ADC credentials are available for a BigQuery operation.
-// This is a verification step - credentials should already be checked before pipeline execution
-// via CheckADCCredentialsForPipeline. Returns an error if credentials are not available.
-func ensureADCCredentials(ctx context.Context, connName string, conn DB) error {
-	if err := checkADCCredentials(ctx, conn); err != nil {
-		return errors.Wrapf(err, "ADC credentials not available for BigQuery connection '%s' (should have been checked before execution)", connName)
-	}
-	return nil
-}
-
 // ensureADCCredentialsWithPrompt checks for ADC credentials and prompts the user if needed.
 // This is used before pipeline execution starts to ensure credentials are available.
 func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn DB) error {

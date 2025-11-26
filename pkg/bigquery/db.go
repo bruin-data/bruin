@@ -80,7 +80,7 @@ func NewDB(c *Config) (*Client, error) {
 	// This allows pipelines without BigQuery assets to run even if ADC is not configured
 	if c.UseApplicationDefaultCredentials {
 		return &Client{
-			client:     nil, // Will be created lazily when ensureADCCredentials runs
+			client:     nil, // Will be created lazily when ensureClient is called
 			config:     c,
 			typeMapper: diff.NewBigQueryTypeMapper(),
 		}, nil
