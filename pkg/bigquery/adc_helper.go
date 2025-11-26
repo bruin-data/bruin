@@ -202,7 +202,7 @@ func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, c
 	return nil
 }
 
-// isBigQueryAssetType checks if the given asset type is a BigQuery type
+// isBigQueryAssetType checks if the given asset type is a BigQuery type.
 func isBigQueryAssetType(assetType pipeline.AssetType) bool {
 	mapping, ok := pipeline.AssetTypeConnectionMapping[assetType]
 	return ok && mapping == "google_cloud_platform"
