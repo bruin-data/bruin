@@ -204,6 +204,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", mock.Anything).Return(client, nil)
 			client.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
+			client.On("Close").Return()
 
 			if tt.setup != nil {
 				tt.setup(&fields{
