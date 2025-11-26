@@ -90,7 +90,7 @@ func runMCPServer(debug bool) error {
 		}
 		response := processRequest(rpcRequest, debug)
 
-		if response.JSONRPC != "" {
+		if response.JSONRPC != "" && response.ID != nil {
 			responseJSON, err := json.Marshal(response)
 			if err != nil {
 				if debug {
