@@ -137,7 +137,7 @@ func (d *Client) UsesApplicationDefaultCredentials() bool {
 
 // createClient creates the underlying BigQuery client if it doesn't exist.
 // This is used for lazy initialization when ADC credentials weren't available at startup.
-func (d *Client) createClient() error {
+func (d *Client) createClient(ctx context.Context) error {
 	d.clientMutex.Lock()
 	defer d.clientMutex.Unlock()
 
@@ -165,7 +165,7 @@ func (d *Client) createClient() error {
 	}
 
 	client, err := bigquery.NewClient(
-		context.Background(),
+		ctx,
 		d.config.ProjectID,
 		options...,
 	)
@@ -183,9 +183,9 @@ func (d *Client) createClient() error {
 }
 
 // ensureClient ensures the underlying BigQuery client exists, creating it if necessary.
-func (d *Client) ensureClient() error {
+func (d *Client) ensureClient(ctx context.Context) error {
 	if d.client == nil {
-		return d.createClient()
+		return d.createClient(ctx)
 	}
 	return nil
 }
@@ -226,7 +226,7 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return false, err
 	}
 	q := d.client.Query(query.ToDryRunQuery())
@@ -246,7 +246,7 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 }
 
 func (d *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return err
 	}
 	q := d.client.Query(query.String())
@@ -259,7 +259,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 }
 
 func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return nil, err
 	}
 	q := d.client.Query(query.String())
@@ -291,7 +291,7 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return nil, err
 	}
 	q := d.client.Query(queryObj.String())
@@ -343,7 +343,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 }
 
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return nil, err
 	}
 	q := d.client.Query(queryObj.String())
@@ -410,8 +410,8 @@ func (e *ADCCredentialError) Unwrap() error {
 	return e.OriginalErr
 }
 
-func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {
-	if err := d.ensureClient(); err != nil {
+func (d *Client) getTableRef(ctx context.Context, tableName string) (*bigquery.Table, error) {
+	if err := d.ensureClient(ctx); err != nil {
 		return nil, err
 	}
 	tableComponents := strings.Split(tableName, ".")
@@ -444,7 +444,7 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	if asset.Description == "" && (len(asset.Columns) == 0 || !anyColumnHasDescription) {
 		return NoMetadataUpdatedError{}
 	}
-	tableRef, err := d.getTableRef(asset.Name)
+	tableRef, err := d.getTableRef(ctx, asset.Name)
 	if err != nil {
 		return err
 	}
@@ -630,7 +630,7 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 }
 
 func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return err
 	}
 	tableName := asset.Name
@@ -697,7 +697,7 @@ func (d *Client) IsMaterializationTypeMismatch(ctx context.Context, meta *bigque
 }
 
 func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
-	tableRef, err := d.getTableRef(tableName)
+	tableRef, err := d.getTableRef(ctx, tableName)
 	if err != nil {
 		return err
 	}
@@ -1125,7 +1125,7 @@ func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 }
 
 func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string) ([]*ansisql.DBColumn, error) {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return nil, err
 	}
 	meta, err := d.client.Dataset(datasetID).Table(tableID).Metadata(ctx)
@@ -1149,7 +1149,7 @@ func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string)
 }
 
 func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return nil, err
 	}
 	var databases []string
@@ -1175,7 +1175,7 @@ func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
 // It takes a context and dataset name as parameters and returns a slice of table names.
 // The method handles errors appropriately and returns an empty slice if the dataset has no tables.
 func (d *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return nil, err
 	}
 	// Validate dataset name
@@ -1234,7 +1234,7 @@ func (d *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 }
 
 func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
-	if err := d.ensureClient(); err != nil {
+	if err := d.ensureClient(ctx); err != nil {
 		return nil, err
 	}
 	projectID := d.config.ProjectID
