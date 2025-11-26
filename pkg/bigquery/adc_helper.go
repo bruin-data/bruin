@@ -135,9 +135,9 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 	}
 
 	// Create the BigQuery client if it was nil (lazy initialization)
-	// Type assert to *Client to access ensureClient method
+	// Type assert to *Client to access ensureClientInitialized method
 	if bqClient, ok := conn.(*Client); ok {
-		if err := bqClient.ensureClient(ctx); err != nil {
+		if err := bqClient.ensureClientInitialized(ctx); err != nil {
 			return errors.Wrap(err, "failed to create BigQuery client after ADC authentication")
 		}
 	}

@@ -80,7 +80,7 @@ func NewDB(c *Config) (*Client, error) {
 	// This allows pipelines without BigQuery assets to run even if ADC is not configured
 	if c.UseApplicationDefaultCredentials {
 		return &Client{
-			client:     nil, // Will be created lazily when ensureClient is called
+			client:     nil, // Will be created lazily when ensureClientInitialized is called
 			config:     c,
 			typeMapper: diff.NewBigQueryTypeMapper(),
 		}, nil
@@ -182,8 +182,10 @@ func (d *Client) createClient(ctx context.Context) error {
 	return nil
 }
 
-// ensureClient ensures the underlying BigQuery client exists, creating it if necessary.
-func (d *Client) ensureClient(ctx context.Context) error {
+// ensureClientInitialized ensures the underlying BigQuery client exists, creating it if necessary.
+// This is required for ADC (Application Default Credentials) lazy initialization - the client
+// may be nil when ADC is enabled and credentials weren't available at startup.
+func (d *Client) ensureClientInitialized(ctx context.Context) error {
 	if d.client == nil {
 		return d.createClient(ctx)
 	}
@@ -226,7 +228,7 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return false, err
 	}
 	q := d.client.Query(query.ToDryRunQuery())
@@ -246,7 +248,7 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 }
 
 func (d *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return err
 	}
 	q := d.client.Query(query.String())
@@ -259,7 +261,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 }
 
 func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
 	q := d.client.Query(query.String())
@@ -291,7 +293,7 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
 	q := d.client.Query(queryObj.String())
@@ -343,7 +345,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 }
 
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
 	q := d.client.Query(queryObj.String())
@@ -411,7 +413,7 @@ func (e *ADCCredentialError) Unwrap() error {
 }
 
 func (d *Client) getTableRef(ctx context.Context, tableName string) (*bigquery.Table, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
 	tableComponents := strings.Split(tableName, ".")
@@ -630,7 +632,7 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 }
 
 func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return err
 	}
 	tableName := asset.Name
@@ -1125,7 +1127,7 @@ func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 }
 
 func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string) ([]*ansisql.DBColumn, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
 	meta, err := d.client.Dataset(datasetID).Table(tableID).Metadata(ctx)
@@ -1149,7 +1151,7 @@ func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string)
 }
 
 func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
 	var databases []string
@@ -1175,7 +1177,7 @@ func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
 // It takes a context and dataset name as parameters and returns a slice of table names.
 // The method handles errors appropriately and returns an empty slice if the dataset has no tables.
 func (d *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
 	// Validate dataset name
@@ -1234,7 +1236,7 @@ func (d *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 }
 
 func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
-	if err := d.ensureClient(ctx); err != nil {
+	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
 	projectID := d.config.ProjectID
