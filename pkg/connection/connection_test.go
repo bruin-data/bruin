@@ -711,13 +711,13 @@ MIIB...
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			result := convertPKCS1ToPKCS8(tt.input)
-			
+
 			if tt.expected != "" {
 				assert.Equal(t, tt.expected, result)
 			}
-			
+
 			if tt.validate != nil {
 				tt.validate(t, result)
 			}
@@ -756,10 +756,10 @@ func Test_convertPKCS1ToPKCS8_Integration(t *testing.T) {
 		// Parse the result and verify it's the same key
 		block, _ := pem.Decode([]byte(result))
 		require.NotNil(t, block)
-		
+
 		parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		require.NoError(t, err)
-		
+
 		rsaKey, ok := parsedKey.(*rsa.PrivateKey)
 		require.True(t, ok)
 		assert.True(t, privateKey.Equal(rsaKey))
