@@ -90,7 +90,7 @@ func runMCPServer(debug bool) error {
 		}
 		response := processRequest(rpcRequest, debug)
 
-		if response.JSONRPC != "" {
+		if response.JSONRPC != "" && response.ID != nil {
 			responseJSON, err := json.Marshal(response)
 			if err != nil {
 				if debug {
@@ -132,8 +132,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 				},
 			},
 		}
-	case "initialized":
-		// this is also part of  the mcp handshake
+	case "initialized", "notifications/initialized":
 		if req.ID == nil {
 			return JSONRPCResponse{}
 		}
