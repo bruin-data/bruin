@@ -65,29 +65,10 @@ var (
 )
 
 type Client struct {
-	client     *bigquery.Client
-	config     *Config
-	typeMapper *diff.DatabaseTypeMapper
-}
-
-// ValidateCredentials validates BigQuery credentials without creating a client.
-// This is useful for early validation during connection setup.
-// Note: This function does not proactively check for ADC credentials - those will be
-// validated when the client is actually used, allowing pipelines without BigQuery
-// assets to run even if ADC is not configured.
-func ValidateCredentials(c *Config) error {
-	// Check if ADC is explicitly enabled
-	if !c.UseApplicationDefaultCredentials {
-		// Validate that explicit credentials are provided
-		hasCredentials := c.CredentialsJSON != "" || c.CredentialsFilePath != "" || c.Credentials != nil
-		if !hasCredentials {
-			return errors.New("no credentials provided")
-		}
-	}
-	// If ADC is enabled, we don't proactively check for credentials here.
-	// The Google client library will validate ADC when the client is actually used,
-	// and our ADC error handler will prompt the user if needed.
-	return nil
+	client      *bigquery.Client
+	config      *Config
+	typeMapper  *diff.DatabaseTypeMapper
+	clientMutex sync.Mutex // Protects lazy client creation
 }
 
 func NewDB(c *Config) (*Client, error) {
@@ -95,22 +76,27 @@ func NewDB(c *Config) (*Client, error) {
 		option.WithScopes(scopes...),
 	}
 
-	// Check if ADC is explicitly enabled
-	if !c.UseApplicationDefaultCredentials {
-		switch {
-		case c.CredentialsJSON != "":
-			options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
-		case c.CredentialsFilePath != "":
-			options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
-		case c.Credentials != nil:
-			options = append(options, option.WithCredentials(c.Credentials))
-		default:
-			return nil, errors.New("no credentials provided")
-		}
+	// If ADC is enabled, create the client lazily (when it's actually used)
+	// This allows pipelines without BigQuery assets to run even if ADC is not configured
+	if c.UseApplicationDefaultCredentials {
+		return &Client{
+			client:     nil, // Will be created lazily when ensureADCCredentials runs
+			config:     c,
+			typeMapper: diff.NewBigQueryTypeMapper(),
+		}, nil
 	}
-	// Note: We don't validate ADC here. If ADC is enabled, the Google client library
-	// will validate credentials when the client is actually used (e.g., on first query).
-	// This allows pipelines without BigQuery assets to run even if ADC is not configured.
+
+	// For explicit credentials, create the client immediately
+	switch {
+	case c.CredentialsJSON != "":
+		options = append(options, option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
+	case c.CredentialsFilePath != "":
+		options = append(options, option.WithCredentialsFile(c.CredentialsFilePath))
+	case c.Credentials != nil:
+		options = append(options, option.WithCredentials(c.Credentials))
+	default:
+		return nil, errors.New("no credentials provided")
+	}
 
 	client, err := bigquery.NewClient(
 		context.Background(),
@@ -149,6 +135,61 @@ func (d *Client) UsesApplicationDefaultCredentials() bool {
 	return d.config.UseApplicationDefaultCredentials
 }
 
+// createClient creates the underlying BigQuery client if it doesn't exist.
+// This is used for lazy initialization when ADC credentials weren't available at startup.
+func (d *Client) createClient() error {
+	d.clientMutex.Lock()
+	defer d.clientMutex.Unlock()
+
+	// Double-check in case another goroutine created it
+	if d.client != nil {
+		return nil
+	}
+
+	options := []option.ClientOption{
+		option.WithScopes(scopes...),
+	}
+
+	// If ADC is enabled, no explicit credentials are needed
+	if !d.config.UseApplicationDefaultCredentials {
+		switch {
+		case d.config.CredentialsJSON != "":
+			options = append(options, option.WithCredentialsJSON([]byte(d.config.CredentialsJSON)))
+		case d.config.CredentialsFilePath != "":
+			options = append(options, option.WithCredentialsFile(d.config.CredentialsFilePath))
+		case d.config.Credentials != nil:
+			options = append(options, option.WithCredentials(d.config.Credentials))
+		default:
+			return errors.New("no credentials provided")
+		}
+	}
+
+	client, err := bigquery.NewClient(
+		context.Background(),
+		d.config.ProjectID,
+		options...,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to create bigquery client")
+	}
+
+	// Set location if specified
+	if d.config.Location != "" {
+		client.Location = d.config.Location
+	}
+
+	d.client = client
+	return nil
+}
+
+// ensureClient ensures the underlying BigQuery client exists, creating it if necessary.
+func (d *Client) ensureClient() error {
+	if d.client == nil {
+		return d.createClient()
+	}
+	return nil
+}
+
 func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Client, error) {
 	options := []option.ClientOption{
 		option.WithScopes(scopes...),
@@ -185,6 +226,9 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
+	if err := d.ensureClient(); err != nil {
+		return false, err
+	}
 	q := d.client.Query(query.ToDryRunQuery())
 	q.DryRun = true
 
@@ -202,6 +246,9 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 }
 
 func (d *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+	if err := d.ensureClient(); err != nil {
+		return err
+	}
 	q := d.client.Query(query.String())
 	_, err := q.Read(ctx)
 	if err != nil {
@@ -212,6 +259,9 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 }
 
 func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	if err := d.ensureClient(); err != nil {
+		return nil, err
+	}
 	q := d.client.Query(query.String())
 	rows, err := q.Read(ctx)
 	if err != nil {
@@ -241,6 +291,9 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	if err := d.ensureClient(); err != nil {
+		return nil, err
+	}
 	q := d.client.Query(queryObj.String())
 	rows, err := q.Read(ctx)
 	if err != nil {
@@ -290,6 +343,9 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 }
 
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
+	if err := d.ensureClient(); err != nil {
+		return nil, err
+	}
 	q := d.client.Query(queryObj.String())
 	q.DryRun = true
 
@@ -355,6 +411,9 @@ func (e *ADCCredentialError) Unwrap() error {
 }
 
 func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {
+	if err := d.ensureClient(); err != nil {
+		return nil, err
+	}
 	tableComponents := strings.Split(tableName, ".")
 	// Check for empty components
 	for _, component := range tableComponents {
@@ -571,6 +630,9 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 }
 
 func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
+	if err := d.ensureClient(); err != nil {
+		return err
+	}
 	tableName := asset.Name
 	tableComponents := strings.Split(tableName, ".")
 	var datasetName string
@@ -1063,6 +1125,9 @@ func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 }
 
 func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string) ([]*ansisql.DBColumn, error) {
+	if err := d.ensureClient(); err != nil {
+		return nil, err
+	}
 	meta, err := d.client.Dataset(datasetID).Table(tableID).Metadata(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metadata for table %s.%s: %w", datasetID, tableID, err)
@@ -1084,6 +1149,9 @@ func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string)
 }
 
 func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
+	if err := d.ensureClient(); err != nil {
+		return nil, err
+	}
 	var databases []string
 
 	datasetsIter := d.client.Datasets(ctx)
@@ -1107,6 +1175,9 @@ func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
 // It takes a context and dataset name as parameters and returns a slice of table names.
 // The method handles errors appropriately and returns an empty slice if the dataset has no tables.
 func (d *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+	if err := d.ensureClient(); err != nil {
+		return nil, err
+	}
 	// Validate dataset name
 	if databaseName == "" {
 		return nil, errors.New("database name cannot be empty")
@@ -1163,6 +1234,9 @@ func (d *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 }
 
 func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	if err := d.ensureClient(); err != nil {
+		return nil, err
+	}
 	projectID := d.config.ProjectID
 
 	summary := &ansisql.DBDatabase{
