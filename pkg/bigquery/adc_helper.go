@@ -16,11 +16,29 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-// ensureADCCredentials proactively checks for ADC credentials before executing a BigQuery operation.
-// If the connection uses ADC and credentials are not found, it prompts the user to run
-// `gcloud auth application-default login`. Returns an error if credentials are still not
-// available after prompting, or nil if credentials are available or not needed.
+// ensureADCCredentials verifies that ADC credentials are available for a BigQuery operation.
+// This is a verification step - credentials should already be checked before pipeline execution
+// via CheckADCCredentialsForPipeline. Returns an error if credentials are not available.
 func ensureADCCredentials(ctx context.Context, connName string, conn DB) error {
+	// Check if the connection uses ADC
+	if !conn.UsesApplicationDefaultCredentials() {
+		// Connection doesn't use ADC, no need to check
+		return nil
+	}
+
+	// ADC is enabled - verify credentials are available
+	_, err := google.FindDefaultCredentials(ctx, scopes...)
+	if err != nil {
+		// Credentials not available - this shouldn't happen if CheckADCCredentialsForPipeline ran
+		return errors.Wrapf(err, "ADC credentials not available for BigQuery connection '%s' (should have been checked before execution)", connName)
+	}
+
+	return nil
+}
+
+// ensureADCCredentialsWithPrompt checks for ADC credentials and prompts the user if needed.
+// This is used before pipeline execution starts to ensure credentials are available.
+func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn DB) error {
 	// Check if the connection uses ADC
 	if !conn.UsesApplicationDefaultCredentials() {
 		// Connection doesn't use ADC, no need to check
@@ -43,10 +61,6 @@ func ensureADCCredentials(ctx context.Context, connName string, conn DB) error {
 			output = w
 		}
 	}
-
-	// Note: ADC credentials should already be checked before pipeline execution starts
-	// via CheckADCCredentialsForPipeline. This function serves as a verification step
-	// and will prompt if credentials are still not available (shouldn't happen normally).
 
 	// Flush any pending output and add visual separation
 	fmt.Fprintf(output, "\n")
@@ -73,10 +87,6 @@ func ensureADCCredentials(ctx context.Context, connName string, conn DB) error {
 			OriginalErr: err,
 		}
 	}
-
-	// Note: The mutex is already held by the worker for BigQuery tasks,
-	// so we don't need to acquire it here. The worker will hold it during
-	// the entire task execution, which includes this prompt.
 
 	// Write prompt message to stderr for better visibility
 	// Add multiple newlines to separate from other output
@@ -143,11 +153,6 @@ func ensureADCCredentials(ctx context.Context, connName string, conn DB) error {
 		return errors.Wrap(err, "ADC credentials still not available after authentication")
 	}
 
-	// If the client was created with nil (due to ADC error), create it now
-	// We need to get the actual Client instance from the connection manager
-	// Since conn is the DB interface, we can't directly access the client field
-	// The ensureClient() method will be called when the client is first used
-
 	return nil
 }
 
@@ -198,7 +203,7 @@ func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, c
 		}
 
 		// Check and prompt for ADC credentials if needed
-		if err := ensureADCCredentials(ctx, connName, bqConn); err != nil {
+		if err := ensureADCCredentialsWithPrompt(ctx, connName, bqConn); err != nil {
 			return err
 		}
 	}
