@@ -34,32 +34,17 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 		return nil
 	}
 
-	// ADC credentials not found - prompt the user
-	writer := ctx.Value(executor.KeyPrinter)
-	var output io.Writer = os.Stdout
-	if writer != nil {
-		if w, ok := writer.(io.Writer); ok {
-			output = w
-		}
-	}
-
-	// Flush any pending output and add visual separation
-	fmt.Fprintf(output, "\n")
-	if flusher, ok := output.(interface{ Flush() }); ok {
-		flusher.Flush()
-	}
-
-	// Write warning message to stdout (for logging)
-	fmt.Fprintf(output, "⚠️  Application Default Credentials (ADC) not found for BigQuery connection '%s'.\n", connName)
-	fmt.Fprintf(output, "   This connection is configured to use ADC but credentials are not available.\n\n")
-	if flusher, ok := output.(interface{ Flush() }); ok {
-		flusher.Flush()
-	}
-
 	// Check if gcloud is available
 	if !isGcloudAvailable() {
-		fmt.Fprintf(output, "   gcloud CLI is not available. Please install it and run:\n")
-		fmt.Fprintf(output, "   $ gcloud auth application-default login\n\n")
+		writer := ctx.Value(executor.KeyPrinter)
+		var output io.Writer = os.Stdout
+		if writer != nil {
+			if w, ok := writer.(io.Writer); ok {
+				output = w
+			}
+		}
+		fmt.Fprintf(output, "ADC credentials not found for BigQuery connection '%s'.\n", connName)
+		fmt.Fprintf(output, "gcloud CLI not available. Install it and run: gcloud auth application-default login\n")
 		if flusher, ok := output.(interface{ Flush() }); ok {
 			flusher.Flush()
 		}
@@ -70,32 +55,19 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 	}
 
 	// Write prompt message to stderr for better visibility
-	// Add multiple newlines to separate from other output
-	fmt.Fprintf(os.Stderr, "\n\n\n")
-	fmt.Fprintf(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Fprintf(os.Stderr, "⚠️  BigQuery Authentication Required\n")
-	fmt.Fprintf(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Fprintf(os.Stderr, "Application Default Credentials (ADC) not found for connection '%s'.\n", connName)
-	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "Would you like to run 'gcloud auth application-default login' now?\n")
-	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "ADC credentials not found for connection '%s'.\n", connName)
 
 	// Prompt the user (promptui uses stderr by default, but we'll be explicit)
+	// Note: promptui automatically adds "?" and "[y/N]" when IsConfirm is true
 	prompt := promptui.Prompt{
-		Label:     "Run 'gcloud auth application-default login'?",
+		Label:     "Run 'gcloud auth application-default login'",
 		IsConfirm: true,
 		Stdin:     os.Stdin,
 	}
 
 	result, promptErr := prompt.Run()
 	if promptErr != nil || strings.ToLower(result) != "y" {
-		fmt.Fprintf(os.Stderr, "\n❌ Operation cancelled. Please run 'gcloud auth application-default login' manually.\n\n")
-		fmt.Fprintf(output, "   Operation cancelled. Please run 'gcloud auth application-default login' manually.\n\n")
-		if flusher, ok := output.(interface{ Flush() }); ok {
-			flusher.Flush()
-		}
+		fmt.Fprintf(os.Stderr, "Cancelled. Run 'gcloud auth application-default login' manually.\n")
 		return &ADCCredentialError{
 			ClientType:  "BigQuery client",
 			OriginalErr: err,
@@ -103,12 +75,7 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 	}
 
 	// Run gcloud command
-	fmt.Fprintf(os.Stderr, "\n🔐 Running: gcloud auth application-default login\n")
-	fmt.Fprintf(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(output, "   Running: gcloud auth application-default login\n")
-	if flusher, ok := output.(interface{ Flush() }); ok {
-		flusher.Flush()
-	}
+	fmt.Fprintf(os.Stderr, "Running: gcloud auth application-default login\n")
 
 	cmd := exec.Command("gcloud", "auth", "application-default", "login")
 	cmd.Stdout = os.Stderr // gcloud output to stderr for visibility
@@ -116,17 +83,10 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 	cmd.Stdin = os.Stdin
 
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "\n")
 		return errors.Wrapf(err, "failed to run 'gcloud auth application-default login': %v", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Fprintf(os.Stderr, "✓ Successfully authenticated with gcloud.\n")
-	fmt.Fprintf(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(output, "   ✓ Successfully authenticated with gcloud.\n\n")
-	if flusher, ok := output.(interface{ Flush() }); ok {
-		flusher.Flush()
-	}
+	fmt.Fprintf(os.Stderr, "Successfully authenticated with gcloud.\n")
 
 	// Verify credentials are now available
 	_, err = google.FindDefaultCredentials(ctx, scopes...)

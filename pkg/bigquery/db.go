@@ -392,14 +392,8 @@ type ADCCredentialError struct {
 }
 
 func (e *ADCCredentialError) Error() string {
-	return fmt.Sprintf("Application Default Credentials (ADC) not found for %s.\n\n"+
-		"Error: %v\n\n"+
-		"Quick fix (recommended):\n"+
-		"  $ gcloud auth application-default login\n\n"+
-		"Alternative: Set GOOGLE_APPLICATION_CREDENTIALS environment variable:\n"+
-		"  $ export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/credential-file.json\"\n\n"+
-		"Note: When running a pipeline, Bruin will prompt you to run the gcloud command automatically.\n\n"+
-		"More info: https://cloud.google.com/docs/nauthentication/application-default-credentials",
+	return fmt.Sprintf("ADC credentials not found for %s: %v\n"+
+		"Run: gcloud auth application-default login",
 		e.ClientType, e.OriginalErr)
 }
 
