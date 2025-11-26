@@ -1,0 +1,49 @@
+{
+  "parameters": {
+    "downstream": false,
+    "startDate": "",
+    "endDate": "",
+    "workers": 16,
+    "environment": "env-continue",
+    "force": false,
+    "pushMetadata": false,
+    "noLogFile": false,
+    "fullRefresh": false,
+    "useUV": false,
+    "tag": "",
+    "excludeTag": "",
+    "only": null,
+    "output": "",
+    "expUseWingetForUv": false,
+    "configFilePath": "",
+    "sensorMode": "",
+    "applyIntervalModifiers": false,
+    "annotations": ""
+  },
+  "metadata": {
+    "version": "dev",
+    "os": "__RUNTIME_OS__"
+  },
+  "state": [
+    {
+      "name": "product_categories",
+      "status": "succeeded"
+    },
+    {
+      "name": "product_price_summary",
+      "status": "succeeded"
+    },
+    {
+      "name": "products",
+      "status": "succeeded"
+    },
+    {
+      "name": "shipping_providers",
+      "status": "failed"
+    }
+  ],
+  "version": "1.0.0",
+  "timestamp": "0001-01-01T00:00:00Z",
+  "run_id": "",
+  "compatibility_hash": "e62a4c57b82d5452bc57cab24f45eb4abda2a737b0269492de0030fba452ed7e"
+}

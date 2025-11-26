@@ -1,7 +1,7 @@
 # Elasticsearch
 [Elasticsearch](https://www.elastic.co/elasticsearch) is a distributed, RESTful search and analytics engine designed for fast and scalable data retrieval and storage.
 
-Bruin supports Elasticsearch as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Elasticsearch into your data warehouse.
+Bruin supports Elasticsearch both as a source and as a destination for [Ingestr assets](/assets/ingestr). You can use it to ingest data from Elasticsearch into your data warehouse, or load data from other sources into Elasticsearch.
 
 In order to set up Elasticsearch connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
@@ -49,7 +49,37 @@ parameters:
 - `source_table`: The name of the Elasticsearch index from which you want to ingest data.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+```
 bruin run assets/elasticsearch_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given Elasticsearch table into your Postgres database.
+
+## Using Elasticsearch as a Destination
+
+Elasticsearch can also be used as a destination to load data from other sources. This is useful for building search indexes or consolidating data for analytics.
+
+### Example: Loading data into Elasticsearch
+
+To use Elasticsearch as a destination, create an asset file that specifies Elasticsearch as the `destination`:
+
+```yaml
+name: elasticsearch.my_index
+type: ingestr
+connection: elasticsearch
+
+parameters:
+  source_connection: postgres
+  source_table: 'public.my_table'
+
+  destination: elasticsearch
+```
+
+When you run this asset, Bruin will:
+- Load data from the source into the specified Elasticsearch index
+- Create the index automatically if it doesn't exist
+- Use a 'replace' strategy, which deletes the existing index before loading new data
+
+**Important Notes:**
+- For cloud Elasticsearch instances, HTTPS (port 443) is typically used and the `secure` parameter defaults to `true`
+- For local Elasticsearch instances without HTTPS, set `secure: "false"` in the connection configuration
+- The target index will be created with the full name specified in the asset (e.g., `name: elasticsearch.my_index` creates an index called `elasticsearch.my_index`)

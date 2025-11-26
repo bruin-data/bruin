@@ -18,7 +18,7 @@ export CGO_LDFLAGS=-Wl,-w
 export LDFLAGS=-Wl,-w
 endif
 
-JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
+JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
 .PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud
 all: clean deps test build
@@ -129,8 +129,8 @@ refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Updating run-seed-data expectations...$(NO_COLOR)"
 	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/run-seed-data/assets/seed.asset.yml | $(JQ_REL_PATH) > test-pipelines/run-seed-data/expectations/seed.asset.yml.json
 	@echo "$(OK_COLOR)==> Updating connection expectations...$(NO_COLOR)"
-	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expected_connections_schema.json
-	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expected_connections.json
+	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expectations/expected_connections_schema.json
+	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expectations/expected_connections.json
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
 
 # sometimes vendoring doesn't move the precompiled library
