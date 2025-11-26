@@ -1054,7 +1054,7 @@ func TestClient_getTableRef(t *testing.T) {
 				},
 			}
 
-			tableRef, err := d.getTableRef(tt.tableName)
+			tableRef, err := d.getTableRef(t.Context(), tt.tableName)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -1165,7 +1165,7 @@ func TestClient_getTableRef_TableNameValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tableRef, err := client.getTableRef(tt.tableName)
+			tableRef, err := client.getTableRef(t.Context(), tt.tableName)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
