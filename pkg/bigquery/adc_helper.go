@@ -16,44 +16,35 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
+// checkADCCredentials checks if ADC credentials are available. Returns the error from
+// FindDefaultCredentials if credentials are not available, or nil if available or not needed.
+func checkADCCredentials(ctx context.Context, conn DB) error {
+	if !conn.UsesApplicationDefaultCredentials() {
+		return nil
+	}
+	_, err := google.FindDefaultCredentials(ctx, scopes...)
+	return err
+}
+
 // ensureADCCredentials verifies that ADC credentials are available for a BigQuery operation.
 // This is a verification step - credentials should already be checked before pipeline execution
 // via CheckADCCredentialsForPipeline. Returns an error if credentials are not available.
 func ensureADCCredentials(ctx context.Context, connName string, conn DB) error {
-	// Check if the connection uses ADC
-	if !conn.UsesApplicationDefaultCredentials() {
-		// Connection doesn't use ADC, no need to check
-		return nil
-	}
-
-	// ADC is enabled - verify credentials are available
-	_, err := google.FindDefaultCredentials(ctx, scopes...)
-	if err != nil {
-		// Credentials not available - this shouldn't happen if CheckADCCredentialsForPipeline ran
+	if err := checkADCCredentials(ctx, conn); err != nil {
 		return errors.Wrapf(err, "ADC credentials not available for BigQuery connection '%s' (should have been checked before execution)", connName)
 	}
-
 	return nil
 }
 
 // ensureADCCredentialsWithPrompt checks for ADC credentials and prompts the user if needed.
 // This is used before pipeline execution starts to ensure credentials are available.
 func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn DB) error {
-	// Check if the connection uses ADC
-	if !conn.UsesApplicationDefaultCredentials() {
-		// Connection doesn't use ADC, no need to check
-		return nil
-	}
-
-	// ADC is enabled - proactively check if credentials are available
-	_, err := google.FindDefaultCredentials(ctx, scopes...)
+	err := checkADCCredentials(ctx, conn)
 	if err == nil {
-		// Credentials are available, proceed
 		return nil
 	}
 
 	// ADC credentials not found - prompt the user
-	// Use stderr for the prompt to ensure it's visible even when stdout is buffered
 	writer := ctx.Value(executor.KeyPrinter)
 	var output io.Writer = os.Stdout
 	if writer != nil {
@@ -213,9 +204,6 @@ func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, c
 
 // isBigQueryAssetType checks if the given asset type is a BigQuery type
 func isBigQueryAssetType(assetType pipeline.AssetType) bool {
-	return assetType == pipeline.AssetTypeBigqueryQuery ||
-		assetType == pipeline.AssetTypeBigqueryTableSensor ||
-		assetType == pipeline.AssetTypeBigqueryQuerySensor ||
-		assetType == pipeline.AssetTypeBigquerySource ||
-		assetType == pipeline.AssetTypeBigquerySeed
+	mapping, ok := pipeline.AssetTypeConnectionMapping[assetType]
+	return ok && mapping == "google_cloud_platform"
 }
