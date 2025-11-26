@@ -56,6 +56,7 @@ type DB interface {
 	Selector
 	MetadataUpdater
 	TableManager
+	UsesApplicationDefaultCredentials() bool
 }
 
 var (
@@ -67,6 +68,26 @@ type Client struct {
 	client     *bigquery.Client
 	config     *Config
 	typeMapper *diff.DatabaseTypeMapper
+}
+
+// ValidateCredentials validates BigQuery credentials without creating a client.
+// This is useful for early validation during connection setup.
+// Note: This function does not proactively check for ADC credentials - those will be
+// validated when the client is actually used, allowing pipelines without BigQuery
+// assets to run even if ADC is not configured.
+func ValidateCredentials(c *Config) error {
+	// Check if ADC is explicitly enabled
+	if !c.UseApplicationDefaultCredentials {
+		// Validate that explicit credentials are provided
+		hasCredentials := c.CredentialsJSON != "" || c.CredentialsFilePath != "" || c.Credentials != nil
+		if !hasCredentials {
+			return errors.New("no credentials provided")
+		}
+	}
+	// If ADC is enabled, we don't proactively check for credentials here.
+	// The Google client library will validate ADC when the client is actually used,
+	// and our ADC error handler will prompt the user if needed.
+	return nil
 }
 
 func NewDB(c *Config) (*Client, error) {
@@ -86,16 +107,10 @@ func NewDB(c *Config) (*Client, error) {
 		default:
 			return nil, errors.New("no credentials provided")
 		}
-	} else {
-		// If ADC is enabled, proactively check if credentials are available
-		_, err := google.FindDefaultCredentials(context.Background(), scopes...)
-		if err != nil {
-			return nil, &ADCCredentialError{
-				ClientType:  "BigQuery client",
-				OriginalErr: err,
-			}
-		}
 	}
+	// Note: We don't validate ADC here. If ADC is enabled, the Google client library
+	// will validate credentials when the client is actually used (e.g., on first query).
+	// This allows pipelines without BigQuery assets to run even if ADC is not configured.
 
 	client, err := bigquery.NewClient(
 		context.Background(),
@@ -128,6 +143,10 @@ func (d *Client) ProjectID() string {
 
 func (d *Client) Location() string {
 	return d.config.Location
+}
+
+func (d *Client) UsesApplicationDefaultCredentials() bool {
+	return d.config.UseApplicationDefaultCredentials
 }
 
 func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Client, error) {
