@@ -392,19 +392,14 @@ type ADCCredentialError struct {
 }
 
 func (e *ADCCredentialError) Error() string {
-	return fmt.Sprintf("failed to create %s using Application Default Credentials (ADC).\n\n"+
-		"Original error: %v\n\n"+
-		"ADC searches for credentials in this order:\n"+
-		"  1. GOOGLE_APPLICATION_CREDENTIALS environment variable\n"+
-		"  2. User credentials created by `gcloud auth application-default login` command\n"+
-		"  3. Attached service account credentials (when running on Google Cloud)\n\n"+
-		"To fix this, try one of the following:\n\n"+
-		"  Option 1 - Set or update GOOGLE_APPLICATION_CREDENTIALS environment variable:\n"+
-		"    $ export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/credential-file.json\"\n\n"+
-		"  Option 2 - Run the following command to create a default credential file:\n"+
-		"    $ gcloud auth application-default login\n\n"+
-		"For more information:\n"+
-		"  https://cloud.google.com/docs/authentication/application-default-credentials\n",
+	return fmt.Sprintf("Application Default Credentials (ADC) not found for %s.\n\n"+
+		"Error: %v\n\n"+
+		"Quick fix (recommended):\n"+
+		"  $ gcloud auth application-default login\n\n"+
+		"Alternative: Set GOOGLE_APPLICATION_CREDENTIALS environment variable:\n"+
+		"  $ export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/credential-file.json\"\n\n"+
+		"Note: When running a pipeline, Bruin will prompt you to run the gcloud command automatically.\n\n"+
+		"More info: https://cloud.google.com/docs/nauthentication/application-default-credentials",
 		e.ClientType, e.OriginalErr)
 }
 
