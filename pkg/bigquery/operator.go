@@ -57,6 +57,24 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	// Check for ADC credentials and acquire block mutex EARLY, before any other work
+	// This ensures other workers are blocked before they can start their tasks
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+
+	conn, ok := o.connection.GetConnection(connName).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
+	}
+
+	// Proactively check for ADC credentials before executing operations
+	// This will acquire the block mutex if prompting is needed
+	if err := ensureADCCredentials(ctx, connName, conn); err != nil {
+		return err
+	}
+
 	extractor, err := o.extractor.CloneForAsset(ctx, p, t)
 	if err != nil {
 		return errors.Wrapf(err, "failed to clone extractor for asset %s", t.Name)
@@ -94,21 +112,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 
 		q.Query = renderedQueries[0].Query
-	}
-
-	connName, err := p.GetConnectionNameForAsset(t)
-	if err != nil {
-		return err
-	}
-
-	conn, ok := o.connection.GetConnection(connName).(DB)
-	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
-	}
-
-	// Proactively check for ADC credentials before executing operations
-	if err := ensureADCCredentials(ctx, connName, conn); err != nil {
-		return err
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
