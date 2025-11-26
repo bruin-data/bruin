@@ -106,11 +106,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
-	// Proactively check for ADC credentials before executing operations
-	if err := ensureADCCredentials(ctx, connName, conn); err != nil {
-		return err
-	}
-
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
 		if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
 			return err
@@ -226,11 +221,6 @@ func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstanc
 		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", conn)
 	}
 
-	// Proactively check for ADC credentials before executing operations
-	if err := ensureADCCredentials(ctx, conn, client); err != nil {
-		return err
-	}
-
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if writer == nil {
 		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
@@ -293,11 +283,6 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	conn, ok := o.connection.GetConnection(connName).(DB)
 	if !ok {
 		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
-	}
-
-	// Proactively check for ADC credentials before executing operations
-	if err := ensureADCCredentials(ctx, connName, conn); err != nil {
-		return err
 	}
 
 	trimmedQuery := helpers.TrimToLength(qry[0].Query, 50)
@@ -372,11 +357,6 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	conn, ok := ts.connection.GetConnection(connName).(DB)
 	if !ok {
 		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
-	}
-
-	// Proactively check for ADC credentials before executing operations
-	if err := ensureADCCredentials(ctx, connName, conn); err != nil {
-		return err
 	}
 
 	qq, err := conn.BuildTableExistsQuery(tableName)
