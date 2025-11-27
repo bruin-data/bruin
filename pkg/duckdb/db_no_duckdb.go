@@ -14,6 +14,16 @@ import (
 
 var errDuckDBNotSupported = errors.New("DuckDB support not available in this build")
 
+// ADBCDriverName returns an empty string in no-duckdb builds.
+func ADBCDriverName() string {
+	return ""
+}
+
+// EnsureADBCDriverInstalled returns an error in no-duckdb builds.
+func EnsureADBCDriverInstalled(ctx context.Context) error {
+	return errDuckDBNotSupported
+}
+
 type Client struct {
 	connection    connection
 	config        DuckDBConfig
@@ -61,6 +71,10 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	return nil, errDuckDBNotSupported
+}
+
+// Close is a no-op for the no-duckdb build.
+func (c *Client) Close() {
 }
 
 func (c *Client) convertValue(val interface{}) interface{} {

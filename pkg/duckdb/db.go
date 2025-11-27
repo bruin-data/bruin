@@ -9,14 +9,91 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
+	"time"
 
+	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/marcboeker/go-duckdb"   //nolint:stylecheck
-	_ "github.com/marcboeker/go-duckdb" //nolint:stylecheck
+	"github.com/jmoiron/sqlx"
 )
+
+// arrowTypeToDuckDBType maps Arrow type names (from ADBC driver) to DuckDB type names.
+// The ADBC driver returns Arrow type names, but we want to maintain backward compatibility
+// with DuckDB-style type names for existing code and tests.
+var arrowTypeToDuckDBType = map[string]string{
+	"utf8":          "VARCHAR",
+	"large_utf8":    "VARCHAR",
+	"int8":          "TINYINT",
+	"int16":         "SMALLINT",
+	"int32":         "INTEGER",
+	"int64":         "BIGINT",
+	"uint8":         "UTINYINT",
+	"uint16":        "USMALLINT",
+	"uint32":        "UINTEGER",
+	"uint64":        "UBIGINT",
+	"float16":       "FLOAT",
+	"float32":       "FLOAT",
+	"float64":       "DOUBLE",
+	"bool":          "BOOLEAN",
+	"date32":        "DATE",
+	"date64":        "DATE",
+	"time32[s]":     "TIME",
+	"time32[ms]":    "TIME",
+	"time64[us]":    "TIME",
+	"time64[ns]":    "TIME",
+	"timestamp[s]":  "TIMESTAMP",
+	"timestamp[ms]": "TIMESTAMP",
+	"timestamp[us]": "TIMESTAMP",
+	"timestamp[ns]": "TIMESTAMP",
+	"binary":        "BLOB",
+	"large_binary":  "BLOB",
+	"null":          "NULL",
+}
+
+// normalizeTypeName converts an Arrow type name to a DuckDB type name if needed.
+func normalizeTypeName(arrowType string) string {
+	// Check direct mapping first
+	if duckType, ok := arrowTypeToDuckDBType[arrowType]; ok {
+		return duckType
+	}
+
+	// Handle parameterized types like timestamp[us, tz=UTC]
+	if strings.HasPrefix(arrowType, "timestamp[") {
+		return "TIMESTAMP"
+	}
+	if strings.HasPrefix(arrowType, "time32[") || strings.HasPrefix(arrowType, "time64[") {
+		return "TIME"
+	}
+	if strings.HasPrefix(arrowType, "decimal") {
+		// Handle decimal types like "decimal128(5, 2)" -> "DECIMAL(5,2)"
+		// Extract precision and scale from the type string
+		if idx := strings.Index(arrowType, "("); idx != -1 {
+			params := arrowType[idx:]
+			// Remove any spaces in the parameters
+			params = strings.ReplaceAll(params, " ", "")
+			return "DECIMAL" + params
+		}
+		return "DECIMAL"
+	}
+	if strings.HasPrefix(arrowType, "list<") {
+		return "LIST"
+	}
+	if strings.HasPrefix(arrowType, "struct<") {
+		return "STRUCT"
+	}
+	if strings.HasPrefix(arrowType, "map<") {
+		return "MAP"
+	}
+	if strings.HasPrefix(arrowType, "fixed_size_binary") {
+		return "BLOB"
+	}
+
+	// Return the original type if no mapping found (may already be a DuckDB type)
+	return arrowType
+}
 
 type Client struct {
 	connection    connection
@@ -30,10 +107,50 @@ type DuckDBConfig interface {
 	GetIngestrURI() string
 }
 
+// Row interface abstracts sql.Row to allow custom implementations.
+type Row interface {
+	Scan(dest ...any) error
+	Err() error
+}
+
+// Rows interface abstracts sql.Rows to allow custom implementations that manage connection lifecycle.
+type Rows interface {
+	Close() error
+	Columns() ([]string, error)
+	ColumnTypes() ([]*sql.ColumnType, error)
+	Err() error
+	Next() bool
+	Scan(dest ...any) error
+}
+
 type connection interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryContext(ctx context.Context, query string, args ...any) (Rows, error)
 	ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...any) Row
+}
+
+// sqlxWrapper wraps *sqlx.DB to implement the connection interface.
+// This is needed because *sqlx.DB returns *sql.Rows but our interface returns Rows.
+type sqlxWrapper struct {
+	db *sqlx.DB
+}
+
+func newSqlxWrapper(db *sqlx.DB) *sqlxWrapper {
+	return &sqlxWrapper{db: db}
+}
+
+//nolint:ireturn
+func (w *sqlxWrapper) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
+	return w.db.QueryContext(ctx, query, args...) //nolint:rowserrcheck
+}
+
+func (w *sqlxWrapper) ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error) {
+	return w.db.ExecContext(ctx, sql, arguments...)
+}
+
+//nolint:ireturn
+func (w *sqlxWrapper) QueryRowContext(ctx context.Context, query string, args ...any) Row {
+	return w.db.QueryRowContext(ctx, query, args...)
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
@@ -80,15 +197,21 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
 
-	defer rows.Close()
-
 	result := make([][]interface{}, 0)
 
 	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get column types for value conversion
+	columnTypes, err := rows.ColumnTypes()
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +230,7 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 		// Convert DuckDB-specific types (especially decimals)
 		for i, val := range columns {
-			columns[i] = c.convertValue(val)
+			columns[i] = c.convertValueWithType(val, columnTypes[i])
 		}
 
 		result = append(result, columns)
@@ -124,11 +247,11 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
-
-	defer rows.Close()
 
 	// Initialize QueryResult
 	result := &query.QueryResult{
@@ -149,7 +272,8 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	}
 	typeStrings := make([]string, len(columnTypes))
 	for i, ct := range columnTypes {
-		typeStrings[i] = ct.DatabaseTypeName()
+		// Normalize Arrow type names to DuckDB type names for backward compatibility
+		typeStrings[i] = normalizeTypeName(ct.DatabaseTypeName())
 	}
 	result.ColumnTypes = typeStrings
 
@@ -167,7 +291,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 
 		// Convert DuckDB-specific types (especially decimals)
 		for i, val := range columns {
-			columns[i] = c.convertValue(val)
+			columns[i] = c.convertValueWithType(val, columnTypes[i])
 		}
 
 		result.Rows = append(result.Rows, columns)
@@ -176,16 +300,70 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	return result, nil
 }
 
-func (c *Client) convertValue(val interface{}) interface{} {
-	if val == nil {
-		return nil
-	}
+func (c *Client) convertValueWithType(val interface{}, colType *sql.ColumnType) interface{} {
+	// The ADBC sqldriver returns data from Arrow buffers that may be memory-mapped.
+	// We need to copy certain types to ensure we own the memory before the rows are closed.
 
-	if decimal, ok := val.(duckdb.Decimal); ok {
-		return decimal.Float64()
+	switch v := val.(type) {
+	case string:
+		// Copy strings to avoid using memory that may be freed when Arrow buffers are released
+		return copyString(v)
+	case []byte:
+		// Copy byte slices as well
+		cp := make([]byte, len(v))
+		copy(cp, v)
+		return cp
+	case decimal128.Num:
+		// sqldriver returns decimal128.Num directly; convert to float64 with proper scale
+		return convertDecimal128(v, colType)
+	case time.Time:
+		// Format to RFC3339 for consistent JSON serialization
+		return v.Format(time.RFC3339)
+	default:
+		// The sqldriver may return decimal128.Num as a struct that doesn't match the type assertion
+		// Try to handle it via reflection
+		if converted := tryConvertDecimal(val, colType); converted != nil {
+			return converted
+		}
+		return val
 	}
+}
 
-	return val
+// convertDecimal128 converts a decimal128.Num to float64 with proper scale.
+func convertDecimal128(v decimal128.Num, colType *sql.ColumnType) float64 {
+	var scale int64
+	if colType != nil {
+		_, s, ok := colType.DecimalSize()
+		if ok {
+			scale = s
+		}
+	}
+	floatVal := v.ToFloat64(int32(scale))
+	// Round to avoid float precision issues
+	if scale > 0 {
+		multiplier := 1.0
+		for range scale {
+			multiplier *= 10
+		}
+		floatVal = float64(int64(floatVal*multiplier+0.5)) / multiplier
+	}
+	return floatVal
+}
+
+// tryConvertDecimal attempts to convert a value to float64 if it's a decimal struct.
+func tryConvertDecimal(val interface{}, colType *sql.ColumnType) interface{} {
+	// Check if the value is a decimal128.Num type
+	if d, ok := val.(decimal128.Num); ok {
+		return convertDecimal128(d, colType)
+	}
+	return nil
+}
+
+// copyString creates a copy of a string to avoid ADBC memory issues.
+// The ADBC driver uses Arrow buffers that may be freed after rows are closed,
+// so we need to copy string data to ensure we own the memory.
+func copyString(s string) string {
+	return string([]byte(s))
 }
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
@@ -193,6 +371,9 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 }
 
 func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
+
 	var rowCount int64
 
 	// Get row count only if not in schema-only mode
@@ -260,6 +441,10 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 		if err := schemaRows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
 			return nil, fmt.Errorf("failed to scan PRAGMA table_info result for table '%s': %w", tableName, err)
 		}
+
+		// Copy strings to avoid ADBC memory issues
+		name = copyString(name)
+		colType = copyString(colType)
 
 		normalizedType := c.typeMapper.MapType(colType)
 
@@ -477,6 +662,9 @@ func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 }
 
 func (c *Client) GetDatabases(ctx context.Context) ([]string, error) {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
+
 	q := `
 SELECT DISTINCT table_schema
 FROM information_schema.tables
@@ -496,7 +684,7 @@ ORDER BY table_schema;
 		if err := rows.Scan(&schemaName); err != nil {
 			return nil, fmt.Errorf("failed to scan schema name: %w", err)
 		}
-		databases = append(databases, schemaName)
+		databases = append(databases, copyString(schemaName))
 	}
 
 	if err = rows.Err(); err != nil {
@@ -510,6 +698,9 @@ func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, 
 	if databaseName == "" {
 		return nil, errors.New("database name cannot be empty")
 	}
+
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
 
 	q := `
 SELECT table_name
@@ -531,7 +722,7 @@ ORDER BY table_name;
 		if err := rows.Scan(&tableName); err != nil {
 			return nil, fmt.Errorf("failed to scan table name: %w", err)
 		}
-		tables = append(tables, tableName)
+		tables = append(tables, copyString(tableName))
 	}
 
 	if err = rows.Err(); err != nil {
@@ -549,8 +740,11 @@ func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 		return nil, errors.New("table name cannot be empty")
 	}
 
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
+
 	q := `
-SELECT 
+SELECT
     column_name,
     data_type,
     is_nullable,
@@ -580,8 +774,8 @@ ORDER BY ordinal_position;
 		}
 
 		column := &ansisql.DBColumn{
-			Name:       columnName,
-			Type:       dataType,
+			Name:       copyString(columnName),
+			Type:       copyString(dataType),
 			Nullable:   isNullable == "YES",
 			PrimaryKey: false,
 			Unique:     false,
@@ -597,7 +791,13 @@ ORDER BY ordinal_position;
 	return columns, nil
 }
 
+// Close is a no-op since connections are opened and closed per operation.
+func (c *Client) Close() {}
+
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
+
 	// DuckDB uses a catalog approach, we'll use the INFORMATION_SCHEMA
 	// First, let's get all schemas and tables
 	q := `
@@ -629,6 +829,10 @@ ORDER BY table_schema, table_name;
 		if err := rows.Scan(&schemaName, &tableName); err != nil {
 			return nil, fmt.Errorf("failed to scan schema and table names: %w", err)
 		}
+
+		// Copy strings to avoid ADBC memory issues
+		schemaName = copyString(schemaName)
+		tableName = copyString(tableName)
 
 		// Create schema if it doesn't exist
 		if _, exists := schemas[schemaName]; !exists {

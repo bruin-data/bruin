@@ -85,8 +85,11 @@ jobs:
         shell: bash
         run: |
           choco install r.project -y
-      - run: make integration-test
+      - name: Run integration tests
         shell: bash
+        run: |
+          [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          make integration-test
 
   dockerBuild:
     runs-on: depot-ubuntu-latest

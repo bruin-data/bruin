@@ -2,6 +2,8 @@ package connection
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"reflect"
 	"regexp"
@@ -205,6 +207,34 @@ func (m *Manager) GetConnectionDetails(name string) any {
 	return connection
 }
 
+func convertPKCS1ToPKCS8(privateKey string) string {
+	block, _ := pem.Decode([]byte(privateKey))
+	if block == nil {
+		return privateKey
+	}
+
+	if block.Type == "RSA PRIVATE KEY" {
+		key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return privateKey
+		}
+
+		pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(key)
+		if err != nil {
+			return privateKey
+		}
+
+		pkcs8Block := &pem.Block{
+			Type:  "PRIVATE KEY",
+			Bytes: pkcs8Bytes,
+		}
+
+		return string(pem.EncodeToMemory(pkcs8Block))
+	}
+
+	return privateKey
+}
+
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
@@ -233,7 +263,8 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		}
 	}
 
-	// Set up the BigQuery client using the preferred credentials.
+	// Note: ADC validation is deferred - it will only happen when the client is actually used.
+	// This allows pipelines without BigQuery assets to run even if ADC is not configured.
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:                        connection.ProjectID,
 		CredentialsFilePath:              connection.ServiceAccountFile,
@@ -274,6 +305,11 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 			return err
 		}
 		privateKey = string(privateKeyBytes)
+	}
+
+	// Convert PKCS#1 to PKCS#8 if needed
+	if privateKey != "" {
+		privateKey = convertPKCS1ToPKCS8(privateKey)
 	}
 
 	db, err := snowflake.NewDB(&snowflake.Config{

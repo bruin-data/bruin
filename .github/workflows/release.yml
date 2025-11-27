@@ -23,12 +23,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-# TODO: Replace with actions/setup-go once issue is resolved https://github.com/actions/setup-go/pull/515
       - name: Setup Go 
-        uses: antontroshin/setup-go@windows-go-mod-cache
+        uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: true
       - name: Install R (Ubuntu)
         if: startsWith(matrix.platform, 'depot-ubuntu')
         run: |
@@ -43,8 +42,11 @@ jobs:
         shell: bash
         run: |
           choco install r.project -y
-      - run: make ${{ matrix.suite }}
+      - name: Run test suite
         shell: bash
+        run: |
+          [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          make ${{ matrix.suite }}
 
   prepare-darwin:
     runs-on: depot-ubuntu-latest
@@ -150,12 +152,11 @@ jobs:
           msystem: UCRT64
           update: true
           install: git mingw-w64-ucrt-x86_64-gcc
-# TODO: Replace with actions/setup-go once issue is resolved https://github.com/actions/setup-go/pull/515
       - name: Setup Go 
-        uses: antontroshin/setup-go@windows-go-mod-cache
+        uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache-dependency-path: "go.sum"
+          cache: true
       - name: Release
         uses: goreleaser/goreleaser-action@v6
         with:

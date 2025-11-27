@@ -564,7 +564,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:    "secrets-backend",
 				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault'",
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler'",
 			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
@@ -795,12 +795,18 @@ func Run(isDebug *bool) *cli.Command {
 			var errs []error
 
 			secretsBackend := c.String("secrets-backend")
-			if secretsBackend == "vault" {
+			switch secretsBackend {
+			case "vault":
 				connectionManager, err = secrets.NewVaultClientFromEnv(logger) //nolint:contextcheck
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}
-			} else {
+			case "doppler":
+				connectionManager, err = secrets.NewDopplerClientFromEnv(logger)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "failed to initialize doppler client"))
+				}
+			default:
 				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
 			}
 
@@ -927,6 +933,13 @@ func Run(isDebug *bool) *cli.Command {
 			// Combine timeout context with signal handling
 			exeCtx, cancel := signal.NotifyContext(timeoutCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
+
+			// Check ADC credentials for all BigQuery connections before execution starts
+			// This ensures credentials are available before any tasks begin running
+			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, connectionManager); err != nil {
+				errorPrinter.Printf("Failed to verify BigQuery ADC credentials: %v\n", err)
+				return cli.Exit("", 1)
+			}
 
 			ex.Start(exeCtx, s.WorkQueue, s.Results)
 
@@ -1570,6 +1583,7 @@ func SetupExecutors(
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuery) ||
 		estimateCustomCheckType == pipeline.AssetTypeMySQLQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMySQLSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuerySensor) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLTableSensor) {
 		mysqlOperator := mysql.NewBasicOperator(conn, wholeFileExtractor, mysql.NewMaterializer(fullRefresh), parser)
@@ -1580,6 +1594,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeMain] = mysqlOperator
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
 		mainExecutors[pipeline.AssetTypeMySQLQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeMySQLSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeMySQLSeed][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
+		mainExecutors[pipeline.AssetTypeMySQLSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeMySQLQuerySensor][scheduler.TaskInstanceTypeMain] = mysqlQuerySensor
 		mainExecutors[pipeline.AssetTypeMySQLQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner

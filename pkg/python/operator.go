@@ -85,11 +85,9 @@ func NewLocalOperatorWithUv(config config.ConnectionAndDetailsGetter, envVariabl
 		repoFinder: &git.RepoFinder{},
 		module:     &ModulePathFinder{},
 		runner: &UvPythonRunner{
-			Cmd: cmdRunner,
-			UvInstaller: &UvChecker{
-				cmd: CommandRunner{},
-			},
-			conn: config,
+			Cmd:         cmdRunner,
+			UvInstaller: &UvChecker{},
+			conn:        config,
 		},
 		envVariables: envVariables,
 		config:       config,

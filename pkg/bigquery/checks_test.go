@@ -95,6 +95,11 @@ func (m *mockQuerierWithResult) BuildTableExistsQuery(tableName string) (string,
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockQuerierWithResult) UsesApplicationDefaultCredentials() bool {
+	args := m.Called()
+	return args.Bool(0)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }

@@ -17,6 +17,7 @@ builds:
       - CC=o64-clang
       - CXX=o64-clang++
       - CGO_ENABLED=1
+      - MACOSX_DEPLOYMENT_TARGET=10.15
     flags:
       - -trimpath
  
