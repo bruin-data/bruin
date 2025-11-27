@@ -145,6 +145,16 @@ func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFi
 	return l.LintPipelines(ctx, pipelines)
 }
 
+// hasURIDependencies checks if an asset has any URI dependencies
+func hasURIDependencies(asset *pipeline.Asset) bool {
+	for _, upstream := range asset.Upstreams {
+		if upstream.Type == "uri" {
+			return true
+		}
+	}
+	return false
+}
+
 func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Command) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 	if err != nil {
@@ -210,13 +220,28 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 
 	// now the actual validation starts
 	for _, rule := range rules {
-		issues, err := rule.ValidateAsset(ctx, assetPipeline, asset)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(issues) > 0 {
-			pipelineResult.Issues[rule] = issues
+		levels := rule.GetApplicableLevels()
+		if slices.Contains(levels, LevelCrossPipeline) {
+			// Cross-pipeline rules are only included when asset has URI dependencies
+			issues, err := rule.ValidateCrossPipeline(ctx, pipelines)
+			if err != nil {
+				return nil, err
+			}
+			// Only include issues for this asset
+			for _, issue := range issues {
+				if issue.Task == asset {
+					pipelineResult.Issues[rule] = append(pipelineResult.Issues[rule], issue)
+				}
+			}
+		} else if slices.Contains(levels, LevelAsset) {
+			// Handle asset-level rules
+			issues, err := rule.ValidateAsset(ctx, assetPipeline, asset)
+			if err != nil {
+				return nil, err
+			}
+			if len(issues) > 0 {
+				pipelineResult.Issues[rule] = issues
+			}
 		}
 	}
 
@@ -226,6 +251,11 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 		},
 		AssetWithExcludeTagCount: 0,
 	}, nil
+}
+
+// extracts pipelines from the given path.
+func (l *Linter) ExtractPipelines(ctx context.Context, rootPath string, pipelineDefinitionFileName []string) ([]*pipeline.Pipeline, error) {
+	return l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 }
 
 func (l *Linter) extractPipelinesFromPath(ctx context.Context, rootPath string, pipelineDefinitionFileName []string) ([]*pipeline.Pipeline, error) {
