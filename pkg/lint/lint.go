@@ -220,11 +220,8 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 	// now the actual validation starts
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
-		if slices.Contains(levels, LevelCrossPipeline) {
+		if hasURIDeps && slices.Contains(levels, LevelCrossPipeline) {
 			// Cross-pipeline rules are only included when asset has URI dependencies
-			if !hasURIDeps {
-				continue
-			}
 			issues, err := rule.ValidateCrossPipeline(ctx, pipelines)
 			if err != nil {
 				return nil, err
@@ -235,7 +232,8 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 					pipelineResult.Issues[rule] = append(pipelineResult.Issues[rule], issue)
 				}
 			}
-		} else if slices.Contains(levels, LevelAsset) {
+		}
+		if slices.Contains(levels, LevelAsset) {
 			// Handle asset-level rules
 			issues, err := rule.ValidateAsset(ctx, assetPipeline, asset)
 			if err != nil {
