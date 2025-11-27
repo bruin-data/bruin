@@ -225,33 +225,11 @@ func Lint(isDebug *bool) *cli.Command {
 					printError(ErrExcludeTagNotSupported, c.String("output"), "Exclude tag flag is not supported for asset-only validation")
 					return cli.Exit("", 1)
 				}
-				// Check if asset has URI dependencies before filtering rules
-				tempLinter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, logger, parser)
-				pipelines, err := tempLinter.ExtractPipelines(lintCtx, rootPath, PipelineDefinitionFiles)
-				hasURIDeps := false
-				if err == nil {
-					for _, fp := range pipelines {
-						var a *pipeline.Asset
-						if a = fp.GetAssetByPath(asset); a == nil {
-							a = fp.GetAssetByName(asset)
-						}
-						if a != nil {
-							for _, u := range a.Upstreams {
-								if u.Type == "uri" {
-									hasURIDeps = true
-									break
-								}
-							}
-							break
-						}
-					}
-				}
-				// Filter to asset-level rules, and include cross-pipeline rule if asset has URI deps
+				// Filter to asset-level and cross-pipeline rules
+				// LintAsset will automatically check for URI dependencies and only run cross-pipeline rules when needed
 				filteredRules := lint.FilterRulesByLevel(rules, lint.LevelAsset)
-				if hasURIDeps {
-					crossPipelineRules := lint.FilterRulesByLevel(rules, lint.LevelCrossPipeline)
-					filteredRules = append(filteredRules, crossPipelineRules...)
-				}
+				crossPipelineRules := lint.FilterRulesByLevel(rules, lint.LevelCrossPipeline)
+				filteredRules = append(filteredRules, crossPipelineRules...)
 				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, filteredRules, logger, parser)
 				logger.Debugf("running %d rules for asset-only validation", len(filteredRules))
 				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c)

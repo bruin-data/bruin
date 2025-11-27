@@ -208,11 +208,23 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 		rules = slices.Concat([]Rule{}, rules, assetRules)
 	}
 
+	// Check if asset has URI dependencies to determine if cross-pipeline rules should run
+	hasURIDeps := false
+	for _, upstream := range asset.Upstreams {
+		if upstream.Type == "uri" {
+			hasURIDeps = true
+			break
+		}
+	}
+
 	// now the actual validation starts
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
 		if slices.Contains(levels, LevelCrossPipeline) {
 			// Cross-pipeline rules are only included when asset has URI dependencies
+			if !hasURIDeps {
+				continue
+			}
 			issues, err := rule.ValidateCrossPipeline(ctx, pipelines)
 			if err != nil {
 				return nil, err
@@ -241,11 +253,6 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 		},
 		AssetWithExcludeTagCount: 0,
 	}, nil
-}
-
-// extracts pipelines from the given path.
-func (l *Linter) ExtractPipelines(ctx context.Context, rootPath string, pipelineDefinitionFileName []string) ([]*pipeline.Pipeline, error) {
-	return l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 }
 
 func (l *Linter) extractPipelinesFromPath(ctx context.Context, rootPath string, pipelineDefinitionFileName []string) ([]*pipeline.Pipeline, error) {
