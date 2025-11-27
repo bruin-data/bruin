@@ -49,6 +49,7 @@ table td:first-child {
 | `--exp-use-winget-for-uv` | bool | `false` | Use PowerShell to manage and install `uv` on Windows. Has no effect on non-Windows systems. |
 | `--debug-ingestr-src` | str | - | Use ingestr from the given path instead of the builtin version. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
+| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
 | `--no-validation` | bool | `false` | Skip validation for this run. |
 | `--no-timestamp` | bool | `false` | Skip logging timestamps for this run. |
 | `--no-color` | bool | `false` | Plain log output for this run. |
@@ -195,6 +196,42 @@ metadata_push:
 ```
 
 When pushing the metadata, Bruin will detect the right connection to use, same way as it happens with running the asset.
+
+## Using Alternative Secrets Backends
+
+By default, Bruin reads connection credentials from the `.bruin.yml` file. However, you can use alternative secrets management solutions like HashiCorp Vault or Doppler.
+
+### Using Doppler
+
+To use Doppler as your secrets backend:
+
+```bash
+bruin run --secrets-backend doppler
+```
+
+Or set via environment variable:
+```bash
+export BRUIN_SECRETS_BACKEND=doppler
+bruin run
+```
+
+For more details on configuring Doppler, see the [Doppler secrets documentation](/secrets/doppler).
+
+### Using Vault
+
+To use HashiCorp Vault as your secrets backend:
+
+```bash
+bruin run --secrets-backend vault
+```
+
+Or set via environment variable:
+```bash
+export BRUIN_SECRETS_BACKEND=vault
+bruin run
+```
+
+For more details on configuring Vault, see the [Vault secrets documentation](/secrets/vault).
 
 
 

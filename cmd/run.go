@@ -564,7 +564,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:    "secrets-backend",
 				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault'",
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler'",
 			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
@@ -795,12 +795,18 @@ func Run(isDebug *bool) *cli.Command {
 			var errs []error
 
 			secretsBackend := c.String("secrets-backend")
-			if secretsBackend == "vault" {
+			switch secretsBackend {
+			case "vault":
 				connectionManager, err = secrets.NewVaultClientFromEnv(logger) //nolint:contextcheck
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}
-			} else {
+			case "doppler":
+				connectionManager, err = secrets.NewDopplerClientFromEnv(logger)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "failed to initialize doppler client"))
+				}
+			default:
 				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
 			}
 
