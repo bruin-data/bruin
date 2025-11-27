@@ -145,16 +145,6 @@ func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFi
 	return l.LintPipelines(ctx, pipelines)
 }
 
-// hasURIDependencies checks if an asset has any URI dependencies
-func hasURIDependencies(asset *pipeline.Asset) bool {
-	for _, upstream := range asset.Upstreams {
-		if upstream.Type == "uri" {
-			return true
-		}
-	}
-	return false
-}
-
 func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Command) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 	if err != nil {

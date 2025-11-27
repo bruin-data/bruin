@@ -231,6 +231,7 @@ func TestLinter_LintAsset(t *testing.T) {
 		AssetValidator: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			return nil, errors.New("first rule failed")
 		},
+		ApplicableLevels: []Level{LevelAsset},
 	}
 
 	successRule := &SimpleRule{
@@ -238,6 +239,7 @@ func TestLinter_LintAsset(t *testing.T) {
 		AssetValidator: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			return nil, nil
 		},
+		ApplicableLevels: []Level{LevelAsset},
 	}
 
 	type fields struct {
@@ -485,6 +487,154 @@ func TestLinter_LintAsset(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+
+			m.AssertExpectations(t)
+		})
+	}
+}
+
+func TestLinter_LintAsset_WithURIDependencies(t *testing.T) {
+	t.Parallel()
+
+	assetWithURIDeps := &pipeline.Asset{
+		Name: "my-asset",
+		Upstreams: []pipeline.Upstream{
+			{Type: "uri", Value: "external://dataset1"},
+		},
+	}
+
+	assetWithoutURIDeps := &pipeline.Asset{
+		Name: "my-asset",
+		Upstreams: []pipeline.Upstream{
+			{Type: "asset", Value: "other-asset"},
+		},
+	}
+
+	otherAsset := &pipeline.Asset{
+		Name: "other-asset",
+		URI:  "external://dataset1",
+	}
+
+	crossPipelineRule := &SimpleRule{
+		Identifier: "cross-pipeline-uri-dependencies",
+		CrossPipelineValidator: func(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
+			issues := []*Issue{}
+			for _, pl := range pipelines {
+				for _, asset := range pl.Assets {
+					for _, dep := range asset.Upstreams {
+						if dep.Type == "uri" && dep.Value == "external://missing" {
+							issues = append(issues, &Issue{
+								Task:        asset,
+								Description: "Cross-pipeline URI dependency 'external://missing' not found",
+							})
+						}
+					}
+				}
+			}
+			return issues, nil
+		},
+		ApplicableLevels: []Level{LevelCrossPipeline},
+	}
+
+	assetRule := &SimpleRule{
+		Identifier: "asset-rule",
+		AssetValidator: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			return nil, nil
+		},
+		ApplicableLevels: []Level{LevelAsset},
+	}
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		rules         []Rule
+		wantIssues    int
+		wantURIIssues bool
+	}{
+		{
+			name:          "asset with URI dependencies runs cross-pipeline validation",
+			asset:         assetWithURIDeps,
+			rules:         []Rule{assetRule, crossPipelineRule},
+			wantIssues:    0, // URI exists, no issues
+			wantURIIssues: false,
+		},
+		{
+			name:          "asset without URI dependencies does not run cross-pipeline validation",
+			asset:         assetWithoutURIDeps,
+			rules:         []Rule{assetRule, crossPipelineRule},
+			wantIssues:    0,
+			wantURIIssues: false,
+		},
+		{
+			name: "asset with missing URI dependency gets issue",
+			asset: &pipeline.Asset{
+				Name: "my-asset",
+				Upstreams: []pipeline.Upstream{
+					{Type: "uri", Value: "external://missing"},
+				},
+			},
+			rules:         []Rule{assetRule, crossPipelineRule},
+			wantIssues:    1,
+			wantURIIssues: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pipeline1 := &pipeline.Pipeline{
+				Name: "pipeline1",
+				Assets: []*pipeline.Asset{
+					tt.asset,
+				},
+			}
+
+			pipeline2 := &pipeline.Pipeline{
+				Name: "pipeline2",
+				Assets: []*pipeline.Asset{
+					otherAsset,
+				},
+			}
+
+			m := new(mockPipelineBuilder)
+			m.On("CreatePipelineFromPath", mock.Anything, "path/to/pipeline1", mock.FunctionalOptions(pipeline.WithMutate())).
+				Return(pipeline1, nil)
+			m.On("CreatePipelineFromPath", mock.Anything, "path/to/pipeline2", mock.FunctionalOptions(pipeline.WithMutate())).
+				Return(pipeline2, nil)
+
+			logger := zap.NewNop()
+			l := &Linter{
+				findPipelines: func(root string, fileName []string) ([]string, error) {
+					return []string{"path/to/pipeline1", "path/to/pipeline2"}, nil
+				},
+				builder:   m,
+				rules:     tt.rules,
+				logger:    logger.Sugar(),
+				sqlParser: nil,
+			}
+
+			result, err := l.LintAsset(t.Context(), "some-root-path", []string{"pipeline.yml"}, "my-asset", nil)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Len(t, result.Pipelines, 1)
+
+			issues := result.Pipelines[0].Issues
+			totalIssues := 0
+			hasURIIssue := false
+			for rule, ruleIssues := range issues {
+				totalIssues += len(ruleIssues)
+				if rule.Name() == "cross-pipeline-uri-dependencies" {
+					hasURIIssue = true
+					// Verify issue is for the correct asset
+					for _, issue := range ruleIssues {
+						require.Equal(t, tt.asset.Name, issue.Task.Name)
+					}
+				}
+			}
+
+			assert.Equal(t, tt.wantIssues, totalIssues, "expected %d issues, got %d", tt.wantIssues, totalIssues)
+			assert.Equal(t, tt.wantURIIssues, hasURIIssue, "expected URI issue: %v, got: %v", tt.wantURIIssues, hasURIIssue)
 
 			m.AssertExpectations(t)
 		})
