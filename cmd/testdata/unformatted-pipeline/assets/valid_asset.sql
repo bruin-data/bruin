@@ -36,29 +36,34 @@ columns:
 WITH game_results AS (
     SELECT
         CASE
-            WHEN g.white->>'result' = 'win' THEN g.white->>'@id'
-            WHEN g.black->>'result' = 'win' THEN g.black->>'@id'
-            ELSE NULL
-            END AS winner_aid,
-        g.white->>'@id' AS white_aid,
-    g.black->>'@id' AS black_aid
-FROM chess_playground.games g
-    )
+            WHEN g.white ->> 'result' = 'win' THEN g.white ->> '@id'
+            WHEN g.black ->> 'result' = 'win' THEN g.black ->> '@id'
+        END AS winner_aid,
+        g.white ->> '@id' AS white_aid,
+        g.black ->> '@id' AS black_aid
+    FROM chess_playground.games AS g
+)
 
 SELECT
     p.username,
     p.aid,
     COUNT(*) AS total_games,
-    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) +
-    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS total_wins,
+    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END)
+    + COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS total_wins,
     ROUND(
-            (COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) +
-             COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END)) * 100.0 /
-            NULLIF(COUNT(*), 0),
-            2
+        (
+            COUNT(
+                CASE
+                    WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1
+                END
+            )
+            + COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END)
+        ) * 100.0
+        / NULLIF(COUNT(*), 0),
+        2
     ) AS win_rate
-FROM chess_playground.profiles p
-         LEFT JOIN game_results g
-                   ON p.aid IN (g.white_aid, g.black_aid)
+FROM chess_playground.profiles AS p
+LEFT JOIN game_results AS g
+    ON p.aid IN (g.white_aid, g.black_aid)
 GROUP BY p.username, p.aid
 ORDER BY total_games DESC;
