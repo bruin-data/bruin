@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	Version = "0.6.16"
+	Version = "0.9.13"
 
 	// Shell is the shell to use for running commands.
 	Shell = "/bin/sh"
@@ -56,7 +56,7 @@ func (u *Checker) EnsureUvInstalled(ctx context.Context) (string, error) {
 		return uvBinaryPath, nil
 	}
 
-	cmd := exec.Command(uvBinaryPath, "version", "--no-config", "--output-format", "json")
+	cmd := exec.Command(uvBinaryPath, "self", "version", "--output-format", "json")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to check uv version: %w -- Output: %s", err, output)
