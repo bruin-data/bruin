@@ -56,6 +56,19 @@ jobs:
           cache: false
       - run: make test
 
+  install-windows:
+    runs-on: windows-latest
+    name: Installer Script on Windows
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use install script
+        shell: bash
+        run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${GITHUB_REF##*/}
+      - name: Test Pipeline
+        shell: bash
+        run: /c/Users/runneradmin/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && /c/Users/runneradmin/.local/bin/bruin.exe run .
+
+
 
   end2end:
     strategy:
