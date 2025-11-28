@@ -68,6 +68,7 @@ execute() {
   current_shell=$(basename "$SHELL")
   echo "Configuring PATH for shell: ${current_shell}"
   echo "Adding ${BINDIR} to PATH:"
+  ls -la "${$HOME}"
   echo "will run --> export PATH=\"\$PATH:${BINDIR}\"" "$HOME/.${current_shell}rc"
 
   case "$current_shell" in
