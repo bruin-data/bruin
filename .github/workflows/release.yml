@@ -299,12 +299,15 @@ jobs:
     needs: [release-windows, release-unix]
     steps:
       - uses: actions/checkout@v3
+      - name: Show directories
+        shell: bash
+        run: pwd && cd && pwd
       - name: Use install script
         shell: bash
         run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${GITHUB_REF##*/}
       - name: Test Pipeline
         shell: bash
-        run: $HOME/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && $HOME/.local/bin/bruin.exe run .
+        run: cd && .local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && $HOME/.local/bin/bruin.exe run .
 
   install-unix:
     runs-on: ubuntu-latest
