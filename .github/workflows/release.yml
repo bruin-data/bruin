@@ -302,7 +302,8 @@ jobs:
       - name: Use install script
         shell: bash
         run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${GITHUB_REF##*/}
-      - shell: bash
+      - name: Show directories
+        shell: bash
         run: pwd && cd && pwd
 
       - name: Test Pipeline
