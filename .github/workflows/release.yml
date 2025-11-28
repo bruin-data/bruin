@@ -307,7 +307,7 @@ jobs:
         run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${GITHUB_REF##*/}
       - name: Test Pipeline
         shell: bash
-        run: cd && $HOME/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && ../.local/bin/bruin.exe run .
+        run: cd && .local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && ../.local/bin/bruin.exe run .
 
   install-unix:
     runs-on: ubuntu-latest
