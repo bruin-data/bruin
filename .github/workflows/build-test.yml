@@ -61,6 +61,9 @@ jobs:
     name: LETS GOOO
     steps:
       - uses: actions/checkout@v3
+      - name: Show directories
+        shell: bash
+        run: pwd && cd && pwd
       - name: Use install scriptoooo
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/patch/fix-release/install.sh | sh -s 
