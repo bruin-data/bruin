@@ -66,7 +66,7 @@ jobs:
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/patch/fix-release/install.sh | sh -s 
       - name: Test Pipeline
         shell: bash
-        run: /c/Users/runneradmin/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && /c/Users/runneradmin/.local/bin/bruin.exe run .
+        run: /c/Users/${USER}/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && /c/Users/${USER}/.local/bin/bruin.exe run .
 
 
 
