@@ -56,12 +56,12 @@ jobs:
           cache: false
       - run: make test
 
-  install-windows:
+  install-windooooooos:
     runs-on: windows-latest
-    name: Installer Script on Windows
+    name: LETS GOOO
     steps:
       - uses: actions/checkout@v3
-      - name: Use install script
+      - name: Use install scriptoooo
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/patch/fix-release/install.sh | sh -s 
       - name: Test Pipeline
