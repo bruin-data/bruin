@@ -225,9 +225,13 @@ func Lint(isDebug *bool) *cli.Command {
 					printError(ErrExcludeTagNotSupported, c.String("output"), "Exclude tag flag is not supported for asset-only validation")
 					return cli.Exit("", 1)
 				}
-				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
-				logger.Debugf("running %d rules for asset-only validation", len(rules))
-				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, logger, parser)
+				// Filter to asset-level and cross-pipeline rules
+				// LintAsset will automatically check for URI dependencies and only run cross-pipeline rules when needed
+				filteredRules := lint.FilterRulesByLevel(rules, lint.LevelAsset)
+				crossPipelineRules := lint.FilterRulesByLevel(rules, lint.LevelCrossPipeline)
+				filteredRules = append(filteredRules, crossPipelineRules...)
+				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, filteredRules, logger, parser)
+				logger.Debugf("running %d rules for asset-only validation", len(filteredRules))
 				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c)
 			}
 
