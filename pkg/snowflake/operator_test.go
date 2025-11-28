@@ -21,7 +21,8 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 }
 
 func (m *mockExtractor) CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (query.QueryExtractor, error) {
-	return m, nil
+	res := m.Called(ctx, pipeline, asset)
+	return res.Get(0).(query.QueryExtractor), res.Error(1)
 }
 
 func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
@@ -204,6 +205,10 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 			client := new(mockQuerierWithResult)
 			extractor := new(mockExtractor)
+			preExtractor := new(mockExtractor)
+			preExtractor.On("ExtractQueriesFromString", mock.Anything).Return([]*query.Query{}, errors.New("should not be called"))
+			preExtractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).
+				Return(extractor, nil)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
 			mat.On("IsFullRefresh").Return(false)
@@ -221,7 +226,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 			o := BasicOperator{
 				connection:   conn,
-				extractor:    extractor,
+				extractor:    preExtractor,
 				materializer: mat,
 			}
 
