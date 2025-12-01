@@ -1,0 +1,19 @@
+name: my_agentic_workload
+type: agent.claude_code
+description: Example Claude Code asset that uses AI to analyze data
+owner: data-team@company.com
+tags:
+  - ai
+  - analysis
+  - claude
+
+parameters:
+  prompt: |
+    Analyze the data pipeline and provide insights.
+    
+    Please provide:
+    1. A summary of the data processed
+    2. Any anomalies or patterns detected
+    3. Recommendations for optimization
+    
+    Use structured output and be concise in your analysis.

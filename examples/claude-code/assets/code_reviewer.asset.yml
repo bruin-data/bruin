@@ -1,0 +1,34 @@
+name: code_reviewer
+type: agent.claude_code
+description: AI-powered code review assistant
+owner: engineering@company.com
+tags:
+  - code-review
+  - quality
+  - ai
+
+parameters:
+  prompt: |
+    Review the following SQL query for best practices and potential issues:
+    
+    ```sql
+    SELECT 
+      customer_id,
+      COUNT(*) as order_count,
+      SUM(total_amount) as total_spent
+    FROM orders
+    WHERE created_date >= '2024-01-01'
+    GROUP BY customer_id
+    HAVING COUNT(*) > 5
+    ORDER BY total_spent DESC
+    LIMIT 100
+    ```
+    
+    Please check for:
+    1. Performance optimization opportunities
+    2. SQL best practices
+    3. Potential edge cases
+    4. Security considerations
+    5. Readability improvements
+    
+    Provide specific suggestions for improvement.

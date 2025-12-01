@@ -1,0 +1,384 @@
+package claudecode
+
+import (
+	"testing"
+
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestExtractParameters(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		expected    *ClaudeParameters
+		expectError bool
+	}{
+		{
+			name: "minimal valid parameters",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Parameters: map[string]string{
+					"prompt": "Test prompt",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+			},
+			expected: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expectError: false,
+		},
+		{
+			name: "full parameters",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+				Parameters: map[string]string{
+					"prompt":              "Test prompt",
+					"model":               "sonnet",
+					"fallback_model":      "haiku",
+					"output_format":       "json",
+					"system_prompt":       "Be concise",
+					"allowed_directories": "/data,/reports",
+					"allowed_tools":       "Read,Grep",
+					"disallowed_tools":    "Edit,Write",
+					"skip_permissions":    "true",
+					"permission_mode":     "plan",
+					"session_id":          "123e4567-e89b-12d3-a456-426614174000",
+					"continue_session":    "false",
+					"debug":               "true",
+					"verbose":             "false",
+				},
+			},
+			expected: &ClaudeParameters{
+				Prompt:          "Test prompt",
+				Model:           "sonnet",
+				FallbackModel:   "haiku",
+				OutputFormat:    "json",
+				SystemPrompt:    "Be concise",
+				AllowedDirs:     []string{"/data", "/reports"},
+				AllowedTools:    "Read,Grep",
+				DisallowedTools: "Edit,Write",
+				SkipPermissions: true,
+				PermissionMode:  "plan",
+				SessionID:       "123e4567-e89b-12d3-a456-426614174000",
+				ContinueSession: false,
+				Debug:           true,
+				Verbose:         false,
+				WorkingDir:      "",
+			},
+			expectError: false,
+		},
+		{
+			name: "missing prompt",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+				Parameters: map[string]string{
+					"model": "sonnet",
+				},
+			},
+			expected:    nil,
+			expectError: true,
+		},
+		{
+			name: "empty prompt",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+				Parameters: map[string]string{
+					"prompt": "  ",
+				},
+			},
+			expected:    nil,
+			expectError: true,
+		},
+		{
+			name: "nil parameters",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+				Parameters: nil,
+			},
+			expected:    nil,
+			expectError: true,
+		},
+		{
+			name: "with absolute working_dir",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Parameters: map[string]string{
+					"prompt":      "Test prompt",
+					"working_dir": "/path/to/project",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+			},
+			expected: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				WorkingDir:     "/path/to/project",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expectError: false,
+		},
+		{
+			name: "with relative working_dir",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Parameters: map[string]string{
+					"prompt":      "Test prompt",
+					"working_dir": "../data",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+			},
+			expected: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				WorkingDir:     "/pipelines/data",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expectError: false,
+		},
+		{
+			name: "with relative dot working_dir",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Parameters: map[string]string{
+					"prompt":      "Test prompt",
+					"working_dir": "./subdir",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/pipelines/assets/test.asset.yml",
+				},
+			},
+			expected: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				WorkingDir:     "/pipelines/assets/subdir",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expectError: false,
+		},
+	}
+
+	operator := &ClaudeCodeOperator{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := operator.extractParameters(tt.asset)
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestValidateParameters(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		params      *ClaudeParameters
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid parameters",
+			params: &ClaudeParameters{
+				Prompt:         "Test",
+				Model:          "sonnet",
+				OutputFormat:   "json",
+				PermissionMode: "plan",
+				SessionID:      "123e4567-e89b-12d3-a456-426614174000",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid output format",
+			params: &ClaudeParameters{
+				Prompt:         "Test",
+				OutputFormat:   "xml",
+				PermissionMode: "default",
+			},
+			expectError: true,
+			errorMsg:    "invalid output_format",
+		},
+		{
+			name: "invalid permission mode",
+			params: &ClaudeParameters{
+				Prompt:         "Test",
+				OutputFormat:   "text",
+				PermissionMode: "invalid",
+			},
+			expectError: true,
+			errorMsg:    "invalid permission_mode",
+		},
+		{
+			name: "invalid session ID format",
+			params: &ClaudeParameters{
+				Prompt:         "Test",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+				SessionID:      "not-a-uuid",
+			},
+			expectError: true,
+			errorMsg:    "valid UUID",
+		},
+		{
+			name: "allow claude model names",
+			params: &ClaudeParameters{
+				Prompt:         "Test",
+				Model:          "claude-3-5-sonnet-20241022",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expectError: false,
+		},
+	}
+
+	operator := &ClaudeCodeOperator{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := operator.validateParameters(tt.params)
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestBuildCommand(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		params   *ClaudeParameters
+		expected []string
+	}{
+		{
+			name: "minimal command",
+			params: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				OutputFormat:   "text",
+				PermissionMode: "default",
+			},
+			expected: []string{"-p", "Test prompt"},
+		},
+		{
+			name: "with model and output format",
+			params: &ClaudeParameters{
+				Prompt:         "Test prompt",
+				Model:          "sonnet",
+				OutputFormat:   "json",
+				PermissionMode: "default",
+			},
+			expected: []string{"-p", "--output-format", "json", "--model", "sonnet", "Test prompt"},
+		},
+		{
+			name: "full command",
+			params: &ClaudeParameters{
+				Prompt:          "Test prompt",
+				Model:           "sonnet",
+				FallbackModel:   "haiku",
+				OutputFormat:    "json",
+				SystemPrompt:    "Be concise",
+				AllowedDirs:     []string{"/data", "/reports"},
+				AllowedTools:    "Read,Grep",
+				DisallowedTools: "Edit,Write",
+				SkipPermissions: true,
+				PermissionMode:  "plan",
+				SessionID:       "123e4567-e89b-12d3-a456-426614174000",
+				Debug:           true,
+				Verbose:         true,
+			},
+			expected: []string{
+				"-p",
+				"--output-format", "json",
+				"--model", "sonnet",
+				"--fallback-model", "haiku",
+				"--append-system-prompt", "Be concise",
+				"--add-dir", "/data",
+				"--add-dir", "/reports",
+				"--allowed-tools", "Read,Grep",
+				"--disallowed-tools", "Edit,Write",
+				"--dangerously-skip-permissions",
+				"--permission-mode", "plan",
+				"--session-id", "123e4567-e89b-12d3-a456-426614174000",
+				"--debug",
+				"--verbose",
+				"Test prompt",
+			},
+		},
+	}
+
+	operator := &ClaudeCodeOperator{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := operator.buildCommand(tt.params)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestClaudeCodeOperator_Run_InvalidTaskInstance(t *testing.T) {
+	t.Parallel()
+	renderer := jinja.NewRenderer(make(map[string]interface{}))
+
+	operator := NewClaudeCodeOperator(renderer)
+
+	// Create a non-AssetInstance type
+	invalidInstance := &scheduler.ColumnCheckInstance{}
+
+	err := operator.Run(t.Context(), invalidInstance)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "claude_code assets can only be run as a main asset")
+}
+
+func TestClaudeCodeOperator_Run_MissingPrompt(t *testing.T) {
+	t.Parallel()
+	renderer := jinja.NewRenderer(make(map[string]interface{}))
+
+	operator := NewClaudeCodeOperator(renderer)
+
+	asset := &pipeline.Asset{
+		Name:       "test_claude_asset",
+		Type:       pipeline.AssetTypeAgentClaudeCode,
+		Parameters: map[string]string{},
+	}
+
+	instance := &scheduler.AssetInstance{
+		Asset: asset,
+	}
+
+	err := operator.Run(t.Context(), instance)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "'prompt' parameter is required")
+}

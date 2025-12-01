@@ -1,0 +1,24 @@
+name: sandbox_executor
+type: agent.claude_code
+description: Execute in sandbox mode with bypassed permissions
+owner: automation@company.com
+tags:
+  - sandbox
+  - automation
+  - ci-cd
+
+parameters:
+  prompt: |
+    Generate and validate SQL queries for the data warehouse migration.
+    Create optimized queries for:
+    1. Customer aggregations
+    2. Sales summaries
+    3. Inventory snapshots
+  
+  model: sonnet
+  output_format: text
+  skip_permissions: "true"
+  permission_mode: bypassPermissions
+  system_prompt: |
+    Generate production-ready SQL queries.
+    Include comments and performance hints.

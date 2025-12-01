@@ -1,0 +1,53 @@
+name: sales_metrics_extractor
+type: agent.claude_code
+description: Extract structured metrics from sales data for downstream processing
+owner: data-pipeline@company.com
+tags:
+  - etl
+  - metrics
+  - json
+
+parameters:
+  prompt: |
+    Analyze the sales data for {{start_date}} and extract key metrics.
+    
+    Return a JSON object with exactly these fields:
+    {
+      "date": "{{start_date}}",
+      "total_revenue": <number>,
+      "total_orders": <integer>,
+      "average_order_value": <number>,
+      "top_product": {
+        "name": <string>,
+        "revenue": <number>
+      },
+      "growth_percentage": <number>,
+      "anomalies_detected": <boolean>,
+      "recommendations": [<string>, ...]
+    }
+    
+    Ensure all numbers are valid JSON numbers (no currency symbols or commas).
+  
+  model: sonnet
+  fallback_model: haiku
+  output_format: json
+  system_prompt: |
+    You are a data extraction specialist. Always return valid, parseable JSON.
+    Use realistic but hypothetical data for this example.
+    Be precise with number formats and data types.
+
+# This asset's JSON output can be consumed by downstream SQL queries:
+# 
+# Example downstream SQL asset:
+# ```sql
+# WITH metrics AS (
+#   SELECT 
+#     JSON_EXTRACT_SCALAR(output, '$.date') as analysis_date,
+#     CAST(JSON_EXTRACT_SCALAR(output, '$.total_revenue') AS FLOAT64) as revenue,
+#     CAST(JSON_EXTRACT_SCALAR(output, '$.total_orders') AS INT64) as orders,
+#     JSON_EXTRACT_SCALAR(output, '$.top_product.name') as top_product
+#   FROM claude_outputs
+#   WHERE asset_name = 'sales_metrics_extractor'
+# )
+# SELECT * FROM metrics
+# ```

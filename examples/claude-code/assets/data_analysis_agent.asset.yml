@@ -1,0 +1,25 @@
+name: data_analysis_agent
+type: agent.claude_code
+description: AI-powered data analysis using Claude Code CLI
+owner: analytics@company.com
+tags:
+  - ai-agent
+  - analysis
+  - claude
+
+parameters:
+  prompt: |
+    Perform a comprehensive data analysis for the following context:
+    
+    Date Range: {{start_date}} to {{end_date}}
+    DateTime Range: {{start_datetime}} to {{end_datetime}}
+    Pipeline: {{pipeline}}
+    Run ID: {{run_id}}
+    
+    Tasks:
+    1. Analyze data quality metrics
+    2. Identify any anomalies or outliers
+    3. Suggest performance optimizations
+    4. Generate a summary report
+    
+    Please format your response as structured JSON for easy parsing.

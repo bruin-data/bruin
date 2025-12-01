@@ -113,6 +113,7 @@ const (
 	AssetTypeGoodData               = AssetType("gooddata")
 	AssetTypeS3KeySensor            = AssetType("s3.sensor.key_sensor")
 	AssetTypeElasticsearch          = AssetType("elasticsearch")
+	AssetTypeAgentClaudeCode        = AssetType("agent.claude_code")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")

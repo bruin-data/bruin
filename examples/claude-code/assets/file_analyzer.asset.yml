@@ -1,0 +1,28 @@
+name: file_analyzer
+type: agent.claude_code
+description: Analyze files in specified directories with restricted permissions
+owner: security@company.com
+tags:
+  - file-analysis
+  - security
+  - restricted
+
+parameters:
+  prompt: |
+    Analyze the Python files in the allowed directories and provide:
+    1. Code quality assessment
+    2. Security vulnerabilities
+    3. Performance issues
+    4. Suggested improvements
+    
+    Focus on files modified in the last 24 hours.
+  
+  model: opus
+  output_format: text
+  allowed_directories: "./src,./tests"
+  allowed_tools: "Read,Grep,Glob"
+  disallowed_tools: "Edit,Write,Bash"
+  permission_mode: plan
+  system_prompt: |
+    You are a code reviewer. Be thorough but constructive.
+    Focus on security and performance issues.

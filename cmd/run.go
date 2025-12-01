@@ -20,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/claudecode"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
@@ -1606,6 +1607,11 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeMain] = mysqlTableSensor
 		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeColumnCheck] = mysqlCheckRunner
 		mainExecutors[pipeline.AssetTypeMySQLTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeAgentClaudeCode) {
+		claudeCodeOperator := claudecode.NewClaudeCodeOperator(renderer)
+		mainExecutors[pipeline.AssetTypeAgentClaudeCode][scheduler.TaskInstanceTypeMain] = claudeCodeOperator
 	}
 
 	return mainExecutors, nil
