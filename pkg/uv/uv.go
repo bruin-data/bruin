@@ -56,17 +56,13 @@ func (u *Checker) EnsureUvInstalled(ctx context.Context) (string, error) {
 		return uvBinaryPath, nil
 	}
 
-	cmd := exec.Command(uvBinaryPath, "self", "version", "--output-format", "json")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to check uv version: %w -- Output: %s", err, output)
-	}
-
 	var uvVersion struct {
 		Version string `json:"version"`
 	}
-	if err := json.Unmarshal(output, &uvVersion); err != nil {
-		return "", fmt.Errorf("failed to parse uv version: %w", err)
+	cmd := exec.Command(uvBinaryPath, "self", "version", "--output-format", "json")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		_ = json.Unmarshal(output, &uvVersion)
 	}
 
 	if uvVersion.Version != Version {
