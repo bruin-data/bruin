@@ -5,12 +5,12 @@ import (
 )
 
 type Config struct {
-	APIKey string
+	APIToken string
 }
 
 func (c *Config) GetIngestrURI() string {
 	params := url.Values{}
-	params.Set("api_token", c.APIKey)
+	params.Set("api_token", c.APIToken)
 
 	uri := url.URL{
 		Scheme:   "bruin",
