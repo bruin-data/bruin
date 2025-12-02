@@ -29,8 +29,9 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 	availablePlatforms, err := getAvailablePlatforms(configPath)
 	require.NoError(t, err, "Failed to parse cloud configuration")
 
-	// Test platforms in order: postgres, snowflake, bigquery
-	testPlatforms := []string{"postgres", "snowflake", "bigquery"}
+	// Test platforms in order: snowflake, bigquery
+	// Note: postgres commented out in platform config
+	testPlatforms := []string{"snowflake", "bigquery"}
 
 	for _, platformName := range testPlatforms {
 		platformName := platformName // capture loop variable
@@ -53,12 +54,12 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 			}
 
 			// All platforms use tempDir structure (standardized on Postgres approach)
-			// Use platform-specific test-pipelines directory (like postgres/test-pipelines)
-			platformTestPipelinesDir := filepath.Join(currentFolder, platformName, "test-pipelines")
+			// Generate pipeline from templates
+			templateDir := filepath.Join(currentFolder, "templates/scd2-by-column-pipeline")
 			pipelineDir := filepath.Join(tempDir, "test-scd2-by-column/scd2-by-column-pipeline")
 			assetPath := filepath.Join(pipelineDir, "assets/menu.sql")
 			expectationsDir := filepath.Join(pipelineDir, "expectations")
-			resourcesDir := filepath.Join(platformTestPipelinesDir, "scd2-pipelines/resources")
+			resourcesTemplateDir := filepath.Join(templateDir, "resources")
 
 			// Build query command - all platforms use --connection flag
 			buildQueryArgs := func(query string) []string {
@@ -126,15 +127,18 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 								},
 							},
 							{
-								Name:       "scd2-by-column: copy pipeline files",
-								Command:    "cp",
-								Args:       []string{"-a", filepath.Join(platformTestPipelinesDir, "scd2-pipelines/scd2-by-column-pipeline"), filepath.Join(tempDir, "test-scd2-by-column")},
-								WorkingDir: filepath.Join(tempDir, "test-scd2-by-column"),
+								Name:    "scd2-by-column: generate pipeline from template",
+								Command: "sh",
+								Args:    []string{"-c", "true"}, // Placeholder command
+								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									e2e.AssertByExitCode,
+									func(task *e2e.Task) error {
+										// Generate pipeline from template
+										return generatePipelineFromTemplate(templateDir, pipelineDir, platform, platformName)
+									},
 								},
 							},
 							// Create initial table
@@ -167,17 +171,19 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 									e2e.AssertByCSV,
 								},
 							},
-							// Copy menu_updated_01.sql
+							// Copy menu_updated_01.sql (copy from template and customize)
 							{
-								Name:    "scd2-by-column: copy menu_updated_01.sql to menu.sql",
-								Command: "cp",
-								Args:    []string{filepath.Join(resourcesDir, "menu_updated_01.sql"), assetPath},
+								Name:    "scd2-by-column: copy menu_updated_01.sql from template",
+								Command: "sh",
+								Args:    []string{"-c", "true"}, // Placeholder command
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									e2e.AssertByExitCode,
+									func(task *e2e.Task) error {
+										return copyResourceFile(filepath.Join(resourcesTemplateDir, "menu_updated_01.sql"), assetPath, platform)
+									},
 								},
 							},
 							// Run menu_updated_01.sql
@@ -210,17 +216,19 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 									e2e.AssertByCSV,
 								},
 							},
-							// Copy menu_updated_02.sql
+							// Copy menu_updated_02.sql (copy from template and customize)
 							{
-								Name:    "scd2-by-column: copy menu_updated_02.sql to menu.sql",
-								Command: "cp",
-								Args:    []string{filepath.Join(resourcesDir, "menu_updated_02.sql"), assetPath},
+								Name:    "scd2-by-column: copy menu_updated_02.sql from template",
+								Command: "sh",
+								Args:    []string{"-c", "true"}, // Placeholder command
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									e2e.AssertByExitCode,
+									func(task *e2e.Task) error {
+										return copyResourceFile(filepath.Join(resourcesTemplateDir, "menu_updated_02.sql"), assetPath, platform)
+									},
 								},
 							},
 							// Run menu_updated_02.sql

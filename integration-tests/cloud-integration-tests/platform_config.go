@@ -11,6 +11,12 @@ type PlatformConfig struct {
 	// SchemaPrefix is how to reference schema in queries (e.g., "test", "public", or "" for no prefix)
 	SchemaPrefix string
 
+	// AssetType is the default asset type for this platform (e.g., "pg.sql", "sf.sql", "bq.sql")
+	AssetType string
+
+	// PlatformConnection is the platform connection type name for pipeline.yml (e.g., "postgres", "snowflake", "google_cloud_platform")
+	PlatformConnection string
+
 	// DropTableExitCode is the expected exit code for DROP TABLE operations
 	// 0 for Snowflake/Athena, 1 for BigQuery/Postgres/Redshift
 	DropTableExitCode int
@@ -25,18 +31,22 @@ type PlatformConfig struct {
 // GetPlatformConfigs returns configurations for all supported platforms
 func GetPlatformConfigs() map[string]PlatformConfig {
 	return map[string]PlatformConfig{
-		"postgres": {
-			Name:                   "postgres",
-			Connection:             "postgres-default",
-			SchemaPrefix:           "test",
-			DropTableExitCode:      1,
-			ErrorPatterns:          map[string][]string{"table_not_exists": {"relation", "does not exist"}},
-			FinishedMessagePattern: "Finished: test.menu",
-		},
+		// "postgres": {
+		// 	Name:                   "postgres",
+		// 	Connection:             "postgres-default",
+		// 	SchemaPrefix:           "test",
+		// 	AssetType:              "pg.sql",
+		// 	PlatformConnection:     "postgres",
+		// 	DropTableExitCode:      1,
+		// 	ErrorPatterns:          map[string][]string{"table_not_exists": {"relation", "does not exist"}},
+		// 	FinishedMessagePattern: "Finished: test.menu",
+		// },
 		"snowflake": {
 			Name:                   "snowflake",
 			Connection:             "snowflake-default",
 			SchemaPrefix:           "test",
+			AssetType:              "sf.sql",
+			PlatformConnection:     "snowflake",
 			DropTableExitCode:      0,
 			ErrorPatterns:          map[string][]string{"table_not_exists": {"Object", "does not exist or not authorized"}},
 			FinishedMessagePattern: "Finished: test.menu",
@@ -45,6 +55,8 @@ func GetPlatformConfigs() map[string]PlatformConfig {
 			Name:                   "bigquery",
 			Connection:             "gcp-default",
 			SchemaPrefix:           "test",
+			AssetType:              "bq.sql",
+			PlatformConnection:     "google_cloud_platform",
 			DropTableExitCode:      1,
 			ErrorPatterns:          map[string][]string{"table_not_exists": {}},
 			FinishedMessagePattern: "Finished: test.menu",

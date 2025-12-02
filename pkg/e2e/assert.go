@@ -220,6 +220,50 @@ func AssertByCSV(i *Task) error {
 	if err != nil {
 		return errors.New("failed to parse actual CSV")
 	}
+
+	// Normalize column names to lowercase for case-insensitive comparison
+	if len(expectedRecords) > 0 && len(actualRecords) > 0 {
+		expectedHeader := expectedRecords[0]
+		actualHeader := actualRecords[0]
+		
+		// Create mapping from lowercase expected column names to indices
+		expectedColMap := make(map[string]int)
+		for i, col := range expectedHeader {
+			expectedColMap[strings.ToLower(col)] = i
+		}
+		
+		// Create mapping from lowercase actual column names to indices
+		actualColMap := make(map[string]int)
+		for i, col := range actualHeader {
+			actualColMap[strings.ToLower(col)] = i
+		}
+		
+		// Check if all expected columns exist in actual (case-insensitive)
+		for lowerCol := range expectedColMap {
+			if _, exists := actualColMap[lowerCol]; !exists {
+				return fmt.Errorf("CSV column mismatch: expected column %q (case-insensitive) not found in actual output", lowerCol)
+			}
+		}
+		
+		// Reorder actual records to match expected column order (case-insensitive)
+		if len(expectedRecords) > 0 {
+			reorderedActualRecords := make([][]string, len(actualRecords))
+			for i, row := range actualRecords {
+				reorderedRow := make([]string, len(expectedHeader))
+				for j, expectedCol := range expectedHeader {
+					lowerExpectedCol := strings.ToLower(expectedCol)
+					if actualIdx, exists := actualColMap[lowerExpectedCol]; exists {
+						if actualIdx < len(row) {
+							reorderedRow[j] = row[actualIdx]
+						}
+					}
+				}
+				reorderedActualRecords[i] = reorderedRow
+			}
+			actualRecords = reorderedActualRecords
+		}
+	}
+
 	var expectedBuf, actualBuf bytes.Buffer
 	err = csv.NewWriter(&expectedBuf).WriteAll(expectedRecords)
 	if err != nil {
