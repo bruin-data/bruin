@@ -441,7 +441,7 @@ environments:
           workspace_id: "test-workspace-id"
       bruin:
         - name: "bruin-1"
-          api_key: "test-api-key"
+          api_token: "test-api-token"
       primer:
         - name: "primer-1"
           api_key: "test-api-key"

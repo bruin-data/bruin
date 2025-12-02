@@ -2355,7 +2355,7 @@ func (m *Manager) AddBruinCloudConnectionFromConfig(connection *config.BruinClou
 	}
 
 	client, err := bruincloud.NewClient(bruincloud.Config{
-		APIKey: connection.APIKey,
+		APIToken: connection.APIToken,
 	})
 	if err != nil {
 		return err

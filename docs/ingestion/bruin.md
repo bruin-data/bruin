@@ -16,17 +16,17 @@ To connect to Bruin Cloud, you need to add a configuration item to the connectio
     connections:
       bruin:
         - name: "my-bruin"
-          api_key: "your_api_key_here"
+          api_token: "your_api_token_here"
 ```
-- `api_key`: The API key used for authentication with the Bruin API.
+- `api_token`: The API token used for authentication with the Bruin API.
 
-### How to get your API key
+### How to get your API token
 
 1. Go to [cloud.getbruin.com](https://cloud.getbruin.com)
 2. Navigate to **Teams** section
 3. Click on **Create API Token**
 4. Make sure **Pipeline List** is selected as the permission
-5. Copy the generated API key
+5. Copy the generated API token
 
 ### Step 2: Create an asset file for data ingestion
 

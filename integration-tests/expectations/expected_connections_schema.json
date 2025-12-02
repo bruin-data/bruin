@@ -250,7 +250,7 @@
         "name": {
           "type": "string"
         },
-        "api_key": {
+        "api_token": {
           "type": "string"
         }
       },
@@ -258,7 +258,7 @@
       "type": "object",
       "required": [
         "name",
-        "api_key"
+        "api_token"
       ]
     },
     "ChessConnection": {
