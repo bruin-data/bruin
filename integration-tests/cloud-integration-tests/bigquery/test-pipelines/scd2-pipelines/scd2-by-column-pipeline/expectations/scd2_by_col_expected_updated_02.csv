@@ -1,4 +1,4 @@
-id,name,price,_is_current
+ID,Name,Price,_is_current
 1,Cola,3.99,false
 1,Cola,7.99,false
 1,Cola,0.99,true
