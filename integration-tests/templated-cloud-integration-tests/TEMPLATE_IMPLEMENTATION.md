@@ -18,7 +18,7 @@ Defines platform-specific configurations for templated tests.
   - Temp directory usage
   - Error message patterns
 
-### 2. `cloud-template_test.go`
+### 2. `template_test.go`
 Templated test implementation for SCD2-by-column workflow.
 
 **Key Features:**

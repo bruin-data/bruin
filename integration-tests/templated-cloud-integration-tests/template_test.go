@@ -17,7 +17,7 @@ func TestWorkflows(t *testing.T) {
 
 	projectRoot := filepath.Join(currentFolder, "../../")
 	binary := filepath.Join(projectRoot, "bin/bruin")
-	configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
+	configFlags := []string{"--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml")}
 
 	// Get available platforms from cloud config
 	configPath := filepath.Join(currentFolder, ".bruin.cloud.yml")
@@ -507,7 +507,7 @@ func TestPingConnections(t *testing.T) {
 
 	projectRoot := filepath.Join(currentFolder, "../../")
 	binary := filepath.Join(projectRoot, "bin/bruin")
-	configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
+	configFlags := []string{"--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml")}
 
 	// Get available platforms from cloud config
 	configPath := filepath.Join(currentFolder, ".bruin.cloud.yml")
