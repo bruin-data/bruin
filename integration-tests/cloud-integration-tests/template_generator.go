@@ -10,7 +10,8 @@ import (
 
 // generatePipelineFromTemplate generates a pipeline from templates by copying files
 // and doing simple string replacements for platform-specific values (like bruin init)
-func generatePipelineFromTemplate(templateDir, targetDir string, platform PlatformConfig, platformName string) error {
+// pipelineName is the name of the pipeline directory in test-pipelines (e.g., "scd2-by-column-pipeline", "scd2-by-time-pipeline")
+func generatePipelineFromTemplate(templateDir, targetDir string, platform PlatformConfig, platformName, pipelineName string) error {
 	// Copy pipeline.yml and add platform-specific defaults
 	if err := copyAndCustomizePipelineYml(templateDir, targetDir, platform); err != nil {
 		return errors.Wrap(err, "failed to copy pipeline.yml")
@@ -23,10 +24,20 @@ func generatePipelineFromTemplate(templateDir, targetDir string, platform Platfo
 		return errors.Wrap(err, "failed to copy assets")
 	}
 
+	// Copy resources directory (these are copied as-is, customization happens when they are copied to assets)
+	resourcesSourceDir := filepath.Join(templateDir, "resources")
+	resourcesTargetDir := filepath.Join(targetDir, "resources")
+	if err := copyDir(resourcesSourceDir, resourcesTargetDir); err != nil {
+		// Resources directory is optional, so we don't fail if it doesn't exist
+		if !os.IsNotExist(err) {
+			return errors.Wrap(err, "failed to copy resources directory")
+		}
+	}
+
 	// Copy expectations directory (platform-specific expectations)
 	// templateDir is like: .../templates/scd2-by-column-pipeline
-	// We need to go to: .../{platformName}/test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations
-	expectationsSource := filepath.Join(filepath.Dir(filepath.Dir(templateDir)), platformName, "test-pipelines", "scd2-pipelines", "scd2-by-column-pipeline", "expectations")
+	// We need to go to: .../templates/expectations/{platformName}/{pipelineName}
+	expectationsSource := filepath.Join(filepath.Dir(templateDir), "expectations", platformName, pipelineName)
 	expectationsTarget := filepath.Join(targetDir, "expectations")
 	if err := copyDir(expectationsSource, expectationsTarget); err != nil {
 		return errors.Wrap(err, "failed to copy expectations directory")
@@ -140,10 +151,11 @@ func copyAndCustomizeAssets(sourceDir, targetDir string, platform PlatformConfig
 // customizeAssetContent updates asset name with schema prefix if needed
 // Type is not added here - it comes from pipeline.yml default
 func customizeAssetContent(content string, platform PlatformConfig) string {
-	// Simply replace "name: test.menu" with "name: {schema}.menu" if schema prefix is different
+	// Replace "name: test.{table}" with "name: {schema}.{table}" if schema prefix is different
 	// Most platforms use "test" as schema, so this might not change anything
 	if platform.SchemaPrefix != "test" {
 		content = strings.ReplaceAll(content, "name: test.menu", "name: "+platform.SchemaPrefix+".menu")
+		content = strings.ReplaceAll(content, "name: test.products", "name: "+platform.SchemaPrefix+".products")
 	}
 	return content
 }
