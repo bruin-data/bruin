@@ -35,13 +35,14 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Specifies the asset's type. Set this to `ingestr` to use the ingestr data pipeline. For Primer, it will be always `ingestr`
 - `source_connection`: The name of the Primer connection defined in `.bruin.yml`
-- `source_table`: The name of the table in Primer to ingest. Available tables:
+- `source_table`: The name of the table in Primer to ingest.
+- `destination`: The name of the destination connection.
+
+## Available Source Tables
 
 | Table    | PK  | Inc Key | Inc Strategy | Details |
 |----------|-----|---------|--------------|---------|
 | payments | id  | -       | merge        | Retrieves payment details from Primer |
-
-- `destination`: The name of the destination connection.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
