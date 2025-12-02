@@ -3,7 +3,7 @@
 
 Bruin supports Primer as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Primer into your data platform.
 
-To set up a Primer connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need an `api_key`. For details on how to obtain these credentials, please refer to the [Primer API documentation](https://primer.io/docs/api).
+To set up a Primer connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need an `api_key`. For details on how to obtain these credentials, please refer to the [Primer API documentation](https://primer.io/docs/api-reference/get-started/overview).
 
 Follow the steps below to set up Primer correctly as a data source and run ingestion.
 
