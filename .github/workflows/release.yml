@@ -182,7 +182,7 @@ jobs:
           # ✅ make Windows CGO use MinGW-UCRT and link runtime statically
           CGO_ENABLED: 1
           CC: x86_64-w64-mingw32-gcc
-          CGO_LDFLAGS: "-static-libgcc -static-libstdc++"
+          CGO_LDFLAGS: "-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
