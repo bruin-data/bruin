@@ -10,7 +10,7 @@ type Config struct {
 
 func (c *Config) GetIngestrURI() string {
 	params := url.Values{}
-	params.Set("api_key", c.APIKey)
+	params.Set("api_token", c.APIKey)
 
 	uri := url.URL{
 		Scheme:   "bruin",
