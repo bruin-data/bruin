@@ -704,6 +704,12 @@ func TestLoadFromFile(t *testing.T) {
 					WorkspaceID: "test-workspace-id",
 				},
 			},
+			BruinCloud: []BruinCloudConnection{
+				{
+					Name:   "bruin-1",
+					APIKey: "test-api-key",
+				},
+			},
 		},
 	}
 

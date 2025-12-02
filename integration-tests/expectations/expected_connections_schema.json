@@ -245,6 +245,22 @@
         "region"
       ]
     },
+    "BruinCloudConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "ChessConnection": {
       "properties": {
         "name": {
@@ -858,6 +874,12 @@
         "plusvibeai": {
           "items": {
             "$ref": "#/$defs/PlusVibeAIConnection"
+          },
+          "type": "array"
+        },
+        "bruin": {
+          "items": {
+            "$ref": "#/$defs/BruinCloudConnection"
           },
           "type": "array"
         }
