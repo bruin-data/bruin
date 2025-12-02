@@ -142,16 +142,8 @@ jobs:
   release-windows:
     runs-on: depot-windows-latest
     needs: [prepare-linux,  prepare-darwin, integration-tests]
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
       - uses: actions/checkout@v3
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: git mingw-w64-ucrt-x86_64-gcc
       - name: Setup Go 
         uses: actions/setup-go@v4
         with:
