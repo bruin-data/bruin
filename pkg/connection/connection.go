@@ -74,6 +74,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/plusvibeai"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/primer"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
@@ -170,6 +171,7 @@ type Manager struct {
 	Monday               map[string]*monday.Client
 	PlusVibeAI           map[string]*plusvibeai.Client
 	BruinCloud           map[string]*bruincloud.Client
+	Primer               map[string]*primer.Client
 	EMRSeverless         map[string]*emr_serverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
 	AppLovin             map[string]*applovin.Client
@@ -2364,6 +2366,26 @@ func (m *Manager) AddBruinCloudConnectionFromConfig(connection *config.BruinClou
 	return nil
 }
 
+func (m *Manager) AddPrimerConnectionFromConfig(connection *config.PrimerConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Primer == nil {
+		m.Primer = make(map[string]*primer.Client)
+	}
+
+	client, err := primer.NewClient(primer.Config{
+		APIKey:     connection.APIKey,
+		APIVersion: connection.APIVersion,
+	})
+	if err != nil {
+		return err
+	}
+	m.Primer[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2599,6 +2621,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Monday, connectionManager.AddMondayConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.PlusVibeAI, connectionManager.AddPlusVibeAIConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.BruinCloud, connectionManager.AddBruinCloudConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Primer, connectionManager.AddPrimerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)

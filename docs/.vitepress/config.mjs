@@ -269,6 +269,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "PhantomBuster", link: "/ingestion/phantombuster"},
                             {text: "Pipedrive", link: "/ingestion/pipedrive"},
                             {text: "Pinterest", link: "/ingestion/pinterest"},
+                            {text: "Primer", link: "/ingestion/primer"},
                             {text: "Trustpilot", link: "/ingestion/trustpilot"},
                             {text: "QuickBooks", link: "/ingestion/quickbooks"},
                             {text: "Revenuecat", link: "/ingestion/revenuecat"},
