@@ -882,6 +882,12 @@
             "$ref": "#/$defs/BruinCloudConnection"
           },
           "type": "array"
+        },
+        "primer": {
+          "items": {
+            "$ref": "#/$defs/PrimerConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -2133,6 +2139,22 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "PrimerConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "QuickBooksConnection": {

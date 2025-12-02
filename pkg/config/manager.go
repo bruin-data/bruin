@@ -113,6 +113,7 @@ type Connections struct {
 	Monday              []MondayConnection              `yaml:"monday,omitempty" json:"monday,omitempty" mapstructure:"monday"`
 	PlusVibeAI          []PlusVibeAIConnection          `yaml:"plusvibeai,omitempty" json:"plusvibeai,omitempty" mapstructure:"plusvibeai"`
 	BruinCloud          []BruinCloudConnection          `yaml:"bruin,omitempty" json:"bruin,omitempty" mapstructure:"bruin"`
+	Primer              []PrimerConnection              `yaml:"primer,omitempty" json:"primer,omitempty" mapstructure:"primer"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -1058,6 +1059,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.BruinCloud = append(env.Connections.BruinCloud, conn)
+	case "primer":
+		var conn PrimerConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Primer = append(env.Connections.Primer, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1259,6 +1267,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.PlusVibeAI = removeConnection(env.Connections.PlusVibeAI, connectionName)
 	case "bruin":
 		env.Connections.BruinCloud = removeConnection(env.Connections.BruinCloud, connectionName)
+	case "primer":
+		env.Connections.Primer = removeConnection(env.Connections.Primer, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1377,6 +1387,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
 	mergeConnectionList(&c.BruinCloud, source.BruinCloud)
+	mergeConnectionList(&c.Primer, source.Primer)
 	c.buildConnectionKeyMap()
 	return nil
 }

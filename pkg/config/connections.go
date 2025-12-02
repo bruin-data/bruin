@@ -1175,3 +1175,12 @@ type BruinCloudConnection struct {
 func (c BruinCloudConnection) GetName() string {
 	return c.Name
 }
+
+type PrimerConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c PrimerConnection) GetName() string {
+	return c.Name
+}

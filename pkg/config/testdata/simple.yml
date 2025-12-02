@@ -442,6 +442,9 @@ environments:
       bruin:
         - name: "bruin-1"
           api_key: "test-api-key"
+      primer:
+        - name: "primer-1"
+          api_key: "test-api-key"
 
   prod:
     connections:
