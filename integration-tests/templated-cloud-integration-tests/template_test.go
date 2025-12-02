@@ -81,19 +81,6 @@ func TestWorkflows(t *testing.T) {
 				t.Fatalf("Platform config not found for: %s", platformName)
 			}
 
-			// All platforms use tempDir structure (standardized on Postgres approach)
-			// Define workflows for both scd2-by-column and scd2-by-time
-
-			// SCD2-by-column setup
-			scd2ByColumnTemplateDir := filepath.Join(currentFolder, "templates/scd2-by-column-pipeline")
-			scd2ByColumnPipelineDir := filepath.Join(tempDir, "test-scd2-by-column/scd2-by-column-pipeline")
-			scd2ByColumnResourcesTemplateDir := filepath.Join(scd2ByColumnTemplateDir, "resources")
-
-			// SCD2-by-time setup
-			scd2ByTimeTemplateDir := filepath.Join(currentFolder, "templates/scd2-by-time-pipeline")
-			scd2ByTimePipelineDir := filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline")
-			scd2ByTimeResourcesTemplateDir := filepath.Join(scd2ByTimeTemplateDir, "resources")
-
 			tests := []struct {
 				name               string
 				workflow           e2e.Workflow
@@ -145,7 +132,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:       "scd2-by-column: copy pipeline files",
 								Command:    "cp",
-								Args:       []string{"-a", scd2ByColumnTemplateDir, filepath.Join(tempDir, "test-scd2-by-column")},
+								Args:       []string{"-a", filepath.Join(currentFolder, "templates/scd2-by-column-pipeline"), filepath.Join(tempDir, "test-scd2-by-column")},
 								WorkingDir: filepath.Join(tempDir, "test-scd2-by-column"),
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -204,7 +191,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:    "scd2-by-column: copy menu_updated_01.sql to menu.sql",
 								Command: "cp",
-								Args:    []string{filepath.Join(scd2ByColumnResourcesTemplateDir, "menu_updated_01.sql"), filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")},
+								Args:    []string{filepath.Join(currentFolder, "templates/scd2-by-column-pipeline/resources/menu_updated_01.sql"), filepath.Join(tempDir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql")},
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -217,7 +204,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:    "scd2-by-column: run menu_updated_01.sql with SCD2 materialization",
 								Command: binary,
-								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")),
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql")),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -247,7 +234,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:    "scd2-by-column: copy menu_updated_02.sql to menu.sql",
 								Command: "cp",
-								Args:    []string{filepath.Join(scd2ByColumnResourcesTemplateDir, "menu_updated_02.sql"), filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")},
+								Args:    []string{filepath.Join(currentFolder, "templates/scd2-by-column-pipeline/resources/menu_updated_02.sql"), filepath.Join(tempDir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql")},
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -260,7 +247,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:    "scd2-by-column: run menu_updated_02.sql with SCD2 materialization",
 								Command: binary,
-								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")),
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-scd2-by-column/scd2-by-column-pipeline/assets/menu.sql")),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -361,7 +348,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:       "scd2-by-time: copy pipeline files",
 								Command:    "cp",
-								Args:       []string{"-a", scd2ByTimeTemplateDir, filepath.Join(tempDir, "test-scd2-by-time")},
+								Args:       []string{"-a", filepath.Join(currentFolder, "templates/scd2-by-time-pipeline"), filepath.Join(tempDir, "test-scd2-by-time")},
 								WorkingDir: filepath.Join(tempDir, "test-scd2-by-time"),
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -420,7 +407,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:    "scd2-by-time: copy products_updated_01.sql to products.sql",
 								Command: "cp",
-								Args:    []string{filepath.Join(scd2ByTimeResourcesTemplateDir, "products_updated_01.sql"), filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")},
+								Args:    []string{filepath.Join(currentFolder, "templates/scd2-by-time-pipeline/resources/products_updated_01.sql"), filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")},
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -433,7 +420,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:    "scd2-by-time: run products_updated_01.sql with SCD2 materialization",
 								Command: binary,
-								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")),
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -463,7 +450,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:    "scd2-by-time: copy products_updated_02.sql to products.sql",
 								Command: "cp",
-								Args:    []string{filepath.Join(scd2ByTimeResourcesTemplateDir, "products_updated_02.sql"), filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")},
+								Args:    []string{filepath.Join(currentFolder, "templates/scd2-by-time-pipeline/resources/products_updated_02.sql"), filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")},
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -476,7 +463,7 @@ func TestWorkflows(t *testing.T) {
 							{
 								Name:    "scd2-by-time: run products_updated_02.sql with SCD2 materialization",
 								Command: binary,
-								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")),
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/assets/products.sql")),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
