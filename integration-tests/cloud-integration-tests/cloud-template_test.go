@@ -60,25 +60,6 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 			expectationsDir := filepath.Join(pipelineDir, "expectations")
 			resourcesTemplateDir := filepath.Join(templateDir, "resources")
 
-			// Build query command - all platforms use --connection flag
-			buildQueryArgs := func(query string) []string {
-				args := append([]string{"query"}, configFlags...)
-				args = append(args, "--connection", platform.Connection, "--query", query, "--output", "csv")
-				return args
-			}
-
-			// Build drop table query command - uses config file with connection (like Postgres)
-			buildDropTableArgs := func() []string {
-				query := "DROP TABLE IF EXISTS " + platform.SchemaPrefix + ".menu;"
-				return append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", query)
-			}
-
-			// Build select table query command - uses config file with connection (like Postgres)
-			buildSelectTableArgs := func() []string {
-				query := "SELECT * FROM " + platform.SchemaPrefix + ".menu;"
-				return append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", query)
-			}
-
 			tests := []struct {
 				name     string
 				workflow e2e.Workflow
@@ -92,7 +73,7 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 							{
 								Name:    "scd2-by-column: drop table if exists",
 								Command: binary,
-								Args:    buildDropTableArgs(),
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "DROP TABLE IF EXISTS test.menu;"),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: platform.DropTableExitCode,
@@ -159,7 +140,7 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 							{
 								Name:    "scd2-by-column: query the initial table",
 								Command: binary,
-								Args:    buildQueryArgs("SELECT ID, Name, Price, _is_current FROM " + platform.SchemaPrefix + ".menu ORDER BY ID, _valid_from;"),
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "SELECT id, name, price, _is_current FROM test.menu ORDER BY id, _valid_from;", "--output", "csv"),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -204,7 +185,7 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 							{
 								Name:    "scd2-by-column: query the updated table 01",
 								Command: binary,
-								Args:    buildQueryArgs("SELECT ID, Name, Price, _is_current FROM " + platform.SchemaPrefix + ".menu ORDER BY ID, _valid_from;"),
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "SELECT id, name, price, _is_current FROM test.menu ORDER BY id, _valid_from;", "--output", "csv"),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -249,7 +230,7 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 							{
 								Name:    "scd2-by-column: query the updated table 02",
 								Command: binary,
-								Args:    buildQueryArgs("SELECT ID, Name, Price, _is_current FROM " + platform.SchemaPrefix + ".menu ORDER BY ID, _valid_from;"),
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "SELECT id, name, price, _is_current FROM test.menu ORDER BY id, _valid_from;", "--output", "csv"),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -264,7 +245,7 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 							{
 								Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
 								Command: binary,
-								Args:    buildDropTableArgs(),
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "DROP TABLE IF EXISTS test.menu;"),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: platform.DropTableExitCode,
@@ -277,7 +258,7 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 							{
 								Name:    "scd2-by-column: confirm the table is dropped",
 								Command: binary,
-								Args:    buildSelectTableArgs(),
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "SELECT * FROM test.menu;"),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 1,
