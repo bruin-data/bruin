@@ -283,3 +283,70 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 		})
 	}
 }
+
+func TestPingConnections(t *testing.T) {
+	t.Parallel()
+
+	currentFolder, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current working directory")
+
+	projectRoot := filepath.Join(currentFolder, "../../")
+	binary := filepath.Join(projectRoot, "bin/bruin")
+	configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
+
+	// Get available platforms from cloud config
+	configPath := filepath.Join(currentFolder, ".bruin.cloud.yml")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Skip("Cloud configuration file not found - skipping connection ping tests")
+		return
+	}
+
+	availablePlatforms, err := getAvailablePlatforms(configPath)
+	require.NoError(t, err, "Failed to parse cloud configuration")
+
+	// Test all configured platforms
+	testPlatforms := []string{"postgres", "snowflake", "bigquery", "athena"}
+
+	for _, platformName := range testPlatforms {
+		platformName := platformName // capture loop variable
+		t.Run(platformName, func(t *testing.T) {
+			t.Parallel()
+
+			// Check if platform is available
+			if !availablePlatforms[platformName] {
+				t.Skipf("Skipping %s - no connection configured", platformName)
+				return
+			}
+
+			// Get platform config
+			platform, ok := GetPlatformConfig(platformName)
+			if !ok {
+				t.Fatalf("Platform config not found for: %s", platformName)
+			}
+
+			// Ping connection with SELECT 1
+			workflow := e2e.Workflow{
+				Name: platform.Name + "-ping",
+				Steps: []e2e.Task{
+					{
+						Name:    "ping connection",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "SELECT 1;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			}
+
+			err := workflow.Run()
+			require.NoError(t, err, "Failed to ping connection for %s: %v", platformName, err)
+
+			t.Logf("Successfully pinged connection for %s", platformName)
+		})
+	}
+}
