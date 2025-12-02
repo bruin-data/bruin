@@ -706,7 +706,7 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			BruinCloud: []BruinCloudConnection{
 				{
-					Name:   "bruin-1",
+					Name:     "bruin-1",
 					APIToken: "test-api-token",
 				},
 			},
