@@ -1,6 +1,0 @@
-id,name,price,_is_current
-1,Cola,3.99,false
-1,Cola,7.99,true
-2,Tea,4.99,true
-3,Coffee,5.99,false
-4,Fanta,1.99,true

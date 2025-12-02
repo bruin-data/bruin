@@ -34,10 +34,10 @@ func generatePipelineFromTemplate(templateDir, targetDir string, platform Platfo
 		}
 	}
 
-	// Copy expectations directory (platform-specific expectations)
+	// Copy expectations directory (shared expectations for all platforms)
 	// templateDir is like: .../templates/scd2-by-column-pipeline
-	// We need to go to: .../templates/expectations/{platformName}/{pipelineName}
-	expectationsSource := filepath.Join(filepath.Dir(templateDir), "expectations", platformName, pipelineName)
+	// We need to go to: .../templates/expectations/{pipelineName}
+	expectationsSource := filepath.Join(filepath.Dir(templateDir), "expectations", pipelineName)
 	expectationsTarget := filepath.Join(targetDir, "expectations")
 	if err := copyDir(expectationsSource, expectationsTarget); err != nil {
 		return errors.Wrap(err, "failed to copy expectations directory")

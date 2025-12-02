@@ -1,6 +1,0 @@
-id,name,price,_is_current
-1,Cola,{399 -2 false finite true},false
-1,Cola,{799 -2 false finite true},true
-2,Tea,{499 -2 false finite true},true
-3,Coffee,{599 -2 false finite true},false
-4,Fanta,{199 -2 false finite true},true
