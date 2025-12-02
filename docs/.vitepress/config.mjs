@@ -226,6 +226,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "AppLovin Max", link: "/ingestion/applovin_max"},
                             {text: "Asana", link: "/ingestion/asana"},
                             {text: "Attio", link: "/ingestion/attio"},
+                            {text: "Bruin", link: "/ingestion/bruin"},
                             {text: "Chess", link: "/ingestion/chess"},
                             {text: "ClickUp", link: "/ingestion/clickup"},
                             {text: "Couchbase", link: "/ingestion/couchbase"},
