@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -86,15 +87,11 @@ func TestWorkflows(t *testing.T) {
 			// SCD2-by-column setup
 			scd2ByColumnTemplateDir := filepath.Join(currentFolder, "templates/scd2-by-column-pipeline")
 			scd2ByColumnPipelineDir := filepath.Join(tempDir, "test-scd2-by-column/scd2-by-column-pipeline")
-			scd2ByColumnAssetPath := filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")
-			scd2ByColumnExpectationsDir := filepath.Join(scd2ByColumnPipelineDir, "expectations")
 			scd2ByColumnResourcesTemplateDir := filepath.Join(scd2ByColumnTemplateDir, "resources")
 
 			// SCD2-by-time setup
 			scd2ByTimeTemplateDir := filepath.Join(currentFolder, "templates/scd2-by-time-pipeline")
 			scd2ByTimePipelineDir := filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline")
-			scd2ByTimeAssetPath := filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")
-			scd2ByTimeExpectationsDir := filepath.Join(scd2ByTimePipelineDir, "expectations")
 			scd2ByTimeResourcesTemplateDir := filepath.Join(scd2ByTimeTemplateDir, "resources")
 
 			tests := []struct {
@@ -146,18 +143,31 @@ func TestWorkflows(t *testing.T) {
 								},
 							},
 							{
-								Name:    "scd2-by-column: generate pipeline from template",
-								Command: "sh",
-								Args:    []string{"-c", "true"}, // Placeholder command
-								Env:     []string{},
+								Name:       "scd2-by-column: copy pipeline files",
+								Command:    "cp",
+								Args:       []string{"-a", scd2ByColumnTemplateDir, filepath.Join(tempDir, "test-scd2-by-column")},
+								WorkingDir: filepath.Join(tempDir, "test-scd2-by-column"),
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									func(task *e2e.Task) error {
-										// Generate pipeline from template
-										return generatePipelineFromTemplate(scd2ByColumnTemplateDir, scd2ByColumnPipelineDir, platform, platformName, "scd2-by-column-pipeline")
-									},
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:    "scd2-by-column: patch pipeline.yml with platform defaults",
+								Command: binary,
+								Args: []string{
+									"internal", "patch-pipeline",
+									filepath.Join(tempDir, "test-scd2-by-column/scd2-by-column-pipeline/pipeline.yml"),
+									"--body", fmt.Sprintf(`{"default_connections":{"%s":"%s"},"default":{"type":"%s"}}`, platform.PlatformConnection, platform.Connection, platform.AssetType),
+								},
+								Env: []string{},
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
 								},
 							},
 							// Create initial table
@@ -183,33 +193,31 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									CSVFile:  filepath.Join(scd2ByColumnExpectationsDir, "scd2_by_col_expected_initial.csv"),
+									CSVFile:  filepath.Join(currentFolder, "templates/expectations/scd2-by-column-pipeline/scd2_by_col_expected_initial.csv"),
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,
 									e2e.AssertByCSV,
 								},
 							},
-							// Copy menu_updated_01.sql (copy from template and customize)
+							// Copy menu_updated_01.sql (copy from template)
 							{
-								Name:    "scd2-by-column: copy menu_updated_01.sql from template",
-								Command: "sh",
-								Args:    []string{"-c", "true"}, // Placeholder command
+								Name:    "scd2-by-column: copy menu_updated_01.sql to menu.sql",
+								Command: "cp",
+								Args:    []string{filepath.Join(scd2ByColumnResourcesTemplateDir, "menu_updated_01.sql"), filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")},
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									func(task *e2e.Task) error {
-										return copyResourceFile(filepath.Join(scd2ByColumnResourcesTemplateDir, "menu_updated_01.sql"), scd2ByColumnAssetPath, platform)
-									},
+									e2e.AssertByExitCode,
 								},
 							},
 							// Run menu_updated_01.sql
 							{
 								Name:    "scd2-by-column: run menu_updated_01.sql with SCD2 materialization",
 								Command: binary,
-								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", scd2ByColumnAssetPath),
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -228,33 +236,31 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									CSVFile:  filepath.Join(scd2ByColumnExpectationsDir, "scd2_by_col_expected_updated_01.csv"),
+									CSVFile:  filepath.Join(currentFolder, "templates/expectations/scd2-by-column-pipeline/scd2_by_col_expected_updated_01.csv"),
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,
 									e2e.AssertByCSV,
 								},
 							},
-							// Copy menu_updated_02.sql (copy from template and customize)
+							// Copy menu_updated_02.sql (copy from template)
 							{
-								Name:    "scd2-by-column: copy menu_updated_02.sql from template",
-								Command: "sh",
-								Args:    []string{"-c", "true"}, // Placeholder command
+								Name:    "scd2-by-column: copy menu_updated_02.sql to menu.sql",
+								Command: "cp",
+								Args:    []string{filepath.Join(scd2ByColumnResourcesTemplateDir, "menu_updated_02.sql"), filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")},
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									func(task *e2e.Task) error {
-										return copyResourceFile(filepath.Join(scd2ByColumnResourcesTemplateDir, "menu_updated_02.sql"), scd2ByColumnAssetPath, platform)
-									},
+									e2e.AssertByExitCode,
 								},
 							},
 							// Run menu_updated_02.sql
 							{
 								Name:    "scd2-by-column: run menu_updated_02.sql with SCD2 materialization",
 								Command: binary,
-								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", scd2ByColumnAssetPath),
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(scd2ByColumnPipelineDir, "assets/menu.sql")),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -273,7 +279,7 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									CSVFile:  filepath.Join(scd2ByColumnExpectationsDir, "scd2_by_col_expected_updated_02.csv"),
+									CSVFile:  filepath.Join(currentFolder, "templates/expectations/scd2-by-column-pipeline/scd2_by_col_expected_updated_02.csv"),
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,
@@ -353,18 +359,31 @@ func TestWorkflows(t *testing.T) {
 								},
 							},
 							{
-								Name:    "scd2-by-time: generate pipeline from template",
-								Command: "sh",
-								Args:    []string{"-c", "true"}, // Placeholder command
-								Env:     []string{},
+								Name:       "scd2-by-time: copy pipeline files",
+								Command:    "cp",
+								Args:       []string{"-a", scd2ByTimeTemplateDir, filepath.Join(tempDir, "test-scd2-by-time")},
+								WorkingDir: filepath.Join(tempDir, "test-scd2-by-time"),
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									func(task *e2e.Task) error {
-										// Generate pipeline from template
-										return generatePipelineFromTemplate(scd2ByTimeTemplateDir, scd2ByTimePipelineDir, platform, platformName, "scd2-by-time-pipeline")
-									},
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:    "scd2-by-time: patch pipeline.yml with platform defaults",
+								Command: binary,
+								Args: []string{
+									"internal", "patch-pipeline",
+									filepath.Join(tempDir, "test-scd2-by-time/scd2-by-time-pipeline/pipeline.yml"),
+									"--body", fmt.Sprintf(`{"default_connections":{"%s":"%s"},"default":{"type":"%s"}}`, platform.PlatformConnection, platform.Connection, platform.AssetType),
+								},
+								Env: []string{},
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
 								},
 							},
 							// Create initial table
@@ -390,33 +409,31 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									CSVFile:  filepath.Join(scd2ByTimeExpectationsDir, "scd2_by_time_expected_initial.csv"),
+									CSVFile:  filepath.Join(currentFolder, "templates/expectations/scd2-by-time-pipeline/scd2_by_time_expected_initial.csv"),
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,
 									e2e.AssertByCSV,
 								},
 							},
-							// Copy products_updated_01.sql (copy from template and customize)
+							// Copy products_updated_01.sql (copy from template)
 							{
-								Name:    "scd2-by-time: copy products_updated_01.sql from template",
-								Command: "sh",
-								Args:    []string{"-c", "true"}, // Placeholder command
+								Name:    "scd2-by-time: copy products_updated_01.sql to products.sql",
+								Command: "cp",
+								Args:    []string{filepath.Join(scd2ByTimeResourcesTemplateDir, "products_updated_01.sql"), filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")},
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									func(task *e2e.Task) error {
-										return copyResourceFile(filepath.Join(scd2ByTimeResourcesTemplateDir, "products_updated_01.sql"), scd2ByTimeAssetPath, platform)
-									},
+									e2e.AssertByExitCode,
 								},
 							},
 							// Run products_updated_01.sql
 							{
 								Name:    "scd2-by-time: run products_updated_01.sql with SCD2 materialization",
 								Command: binary,
-								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", scd2ByTimeAssetPath),
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -435,33 +452,31 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									CSVFile:  filepath.Join(scd2ByTimeExpectationsDir, "scd2_by_time_expected_update_01.csv"),
+									CSVFile:  filepath.Join(currentFolder, "templates/expectations/scd2-by-time-pipeline/scd2_by_time_expected_update_01.csv"),
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,
 									e2e.AssertByCSV,
 								},
 							},
-							// Copy products_updated_02.sql (copy from template and customize)
+							// Copy products_updated_02.sql (copy from template)
 							{
-								Name:    "scd2-by-time: copy products_updated_02.sql from template",
-								Command: "sh",
-								Args:    []string{"-c", "true"}, // Placeholder command
+								Name:    "scd2-by-time: copy products_updated_02.sql to products.sql",
+								Command: "cp",
+								Args:    []string{filepath.Join(scd2ByTimeResourcesTemplateDir, "products_updated_02.sql"), filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")},
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
 								},
 								Asserts: []func(*e2e.Task) error{
-									func(task *e2e.Task) error {
-										return copyResourceFile(filepath.Join(scd2ByTimeResourcesTemplateDir, "products_updated_02.sql"), scd2ByTimeAssetPath, platform)
-									},
+									e2e.AssertByExitCode,
 								},
 							},
 							// Run products_updated_02.sql
 							{
 								Name:    "scd2-by-time: run products_updated_02.sql with SCD2 materialization",
 								Command: binary,
-								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", scd2ByTimeAssetPath),
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(scd2ByTimePipelineDir, "assets/products.sql")),
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
@@ -480,7 +495,7 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									CSVFile:  filepath.Join(scd2ByTimeExpectationsDir, "scd2_by_time_expected_update_02.csv"),
+									CSVFile:  filepath.Join(currentFolder, "templates/expectations/scd2-by-time-pipeline/scd2_by_time_expected_update_02.csv"),
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,

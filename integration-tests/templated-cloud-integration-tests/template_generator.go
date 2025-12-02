@@ -191,25 +191,3 @@ func copyDir(src, dst string) error {
 	})
 }
 
-// copyResourceFile copies a resource file and customizes it for the platform
-func copyResourceFile(templateDir, targetPath string, platform PlatformConfig) error {
-	// Read the resource file
-	content, err := os.ReadFile(templateDir)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read resource file: %s", templateDir)
-	}
-
-	// Customize content
-	customized := customizeAssetContent(string(content), platform)
-
-	// Write to target
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
-		return errors.Wrapf(err, "failed to create target directory")
-	}
-
-	if err := os.WriteFile(targetPath, []byte(customized), 0o644); err != nil {
-		return errors.Wrapf(err, "failed to write resource file")
-	}
-
-	return nil
-}
