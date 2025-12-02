@@ -31,16 +31,16 @@ type PlatformConfig struct {
 // GetPlatformConfigs returns configurations for all supported platforms
 func GetPlatformConfigs() map[string]PlatformConfig {
 	return map[string]PlatformConfig{
-		// "postgres": {
-		// 	Name:                   "postgres",
-		// 	Connection:             "postgres-default",
-		// 	SchemaPrefix:           "test",
-		// 	AssetType:              "pg.sql",
-		// 	PlatformConnection:     "postgres",
-		// 	DropTableExitCode:      1,
-		// 	ErrorPatterns:          map[string][]string{"table_not_exists": {"relation", "does not exist"}},
-		// 	FinishedMessagePattern: "Finished: test.menu",
-		// },
+		"postgres": {
+			Name:                   "postgres",
+			Connection:             "postgres-default",
+			SchemaPrefix:           "test",
+			AssetType:              "pg.sql",
+			PlatformConnection:     "postgres",
+			DropTableExitCode:      1,
+			ErrorPatterns:          map[string][]string{"table_not_exists": {"relation", "does not exist"}},
+			FinishedMessagePattern: "Finished: test.menu",
+		},
 		"snowflake": {
 			Name:                   "snowflake",
 			Connection:             "snowflake-default",

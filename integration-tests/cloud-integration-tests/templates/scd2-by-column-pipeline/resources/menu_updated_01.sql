@@ -5,20 +5,20 @@ materialization:
   strategy: scd2_by_column
 
 columns:
-  - name: "ID"
+  - name: ID
     type: INTEGER
     description: "Unique identifier for Menu Item"
     primary_key: true
     checks:
       - name: not_null
       - name: positive
-  - name: "Name"
+  - name: Name
     type: VARCHAR
     description: "Name of the Menu Item"
     primary_key: true
     checks:
       - name: not_null
-  - name: "Price"
+  - name: Price
     type: FLOAT
     description: "Price of the Menu Item"
 @bruin */

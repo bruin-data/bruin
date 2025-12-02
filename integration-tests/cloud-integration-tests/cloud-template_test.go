@@ -29,9 +29,8 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 	availablePlatforms, err := getAvailablePlatforms(configPath)
 	require.NoError(t, err, "Failed to parse cloud configuration")
 
-	// Test platforms in order: snowflake, bigquery
-	// Note: postgres commented out in platform config
-	testPlatforms := []string{"snowflake", "bigquery"}
+	// Test platforms in order: postgres, snowflake, bigquery
+	testPlatforms := []string{"postgres", "snowflake", "bigquery"}
 
 	for _, platformName := range testPlatforms {
 		platformName := platformName // capture loop variable
