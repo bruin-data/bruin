@@ -1,9 +1,13 @@
-1. Create platform config struct (define connection names, schema patterns, exit codes, etc.)
-2. Create new test file: cloud-template_test.go
-3. Template one common test: SCD2-by-column
-4. Use already existing pipelines for now (no need to template SQL files yet)
-5. Test with 2-3 platforms (e.g., Postgres, Snowflake, BigQuery) to validate approach
-6. Iterate based on learnings before templating more tests
+DONE 1. Create platform config struct (define connection names, schema patterns, exit codes, etc.)
+DONE 2. Create new test file: cloud-template_test.go
+DONE 3. Template one common test: SCD2-by-column
+DONE . Test with 2-3 platforms (e.g., Postgres, Snowflake, BigQuery) to validate approach
+5. Iterate based on learnings before templating more tests
+
+6. Move expectations
+7. Move test into own folder including .cloud.bruin.yml and update tests
+8. Add matrix for which tests apply to which platforms 
+9. add all final tests
 
 
 
