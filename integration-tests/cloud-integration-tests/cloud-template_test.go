@@ -19,8 +19,6 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 	binary := filepath.Join(projectRoot, "bin/bruin")
 	configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 
-	tempDir := t.TempDir()
-
 	// Get available platforms from cloud config
 	configPath := filepath.Join(currentFolder, ".bruin.cloud.yml")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -38,6 +36,9 @@ func TestTemplatedSCD2ByColumn(t *testing.T) {
 		platformName := platformName // capture loop variable
 		t.Run(platformName, func(t *testing.T) {
 			t.Parallel()
+
+			// Each platform gets its own temp directory
+			tempDir := t.TempDir()
 
 			// Check if platform is available
 			if !availablePlatforms[platformName] {
