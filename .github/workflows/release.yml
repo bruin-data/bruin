@@ -157,6 +157,7 @@ jobs:
             git
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-gcc-libs
+            mingw-w64-ucrt-x86_64-winpthreads
 
       - name: Setup Go
         uses: actions/setup-go@v4
