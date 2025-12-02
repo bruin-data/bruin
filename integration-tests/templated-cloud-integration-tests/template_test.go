@@ -9,6 +9,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// buildAdditionalWorkflows creates workflow definitions for tests beyond scd2-by-column and scd2-by-time
+// This function can be expanded to add more workflow types as templates are created
+func buildAdditionalWorkflows(platform PlatformConfig, platformName string, tempDir string, currentFolder string, binary string, configFlags []string, testAvailability map[string][]string, isTestAvailable func(string, string) bool) []struct {
+	name     string
+	workflow e2e.Workflow
+} {
+	var additionalTests []struct {
+		name     string
+		workflow e2e.Workflow
+	}
+
+	// For now, we'll add placeholder workflows that can be expanded
+	// Each test type will need its own template structure similar to scd2-by-column
+
+	// TODO: Add implementations for:
+	// - ddl-create-and-validate
+	// - products-create-and-validate
+	// - merge-with-nulls
+	// - dry-run (BigQuery only)
+	// - drop-on-mismatch
+	// - merge-sql
+
+	// These will require creating templates similar to scd2-by-column-pipeline
+	// For now, we return empty slice - tests can be added incrementally
+
+	return additionalTests
+}
+
 func TestWorkflows(t *testing.T) {
 	t.Parallel()
 
@@ -70,11 +98,13 @@ func TestWorkflows(t *testing.T) {
 			scd2ByTimeResourcesTemplateDir := filepath.Join(scd2ByTimeTemplateDir, "resources")
 
 			tests := []struct {
-				name     string
-				workflow e2e.Workflow
+				name               string
+				workflow           e2e.Workflow
+				availablePlatforms []string // List of platforms where this test is available
 			}{
 				{
-					name: platform.Name + "-scd2-by-column",
+					name:               platform.Name + "-scd2-by-column",
+					availablePlatforms: []string{"postgres", "snowflake", "bigquery"},
 					workflow: e2e.Workflow{
 						Name: platform.Name + "-scd2-by-column",
 						Steps: []e2e.Task{
@@ -280,7 +310,8 @@ func TestWorkflows(t *testing.T) {
 					},
 				},
 				{
-					name: platform.Name + "-scd2-by-time",
+					name:               platform.Name + "-scd2-by-time",
+					availablePlatforms: []string{"postgres", "snowflake", "bigquery"},
 					workflow: e2e.Workflow{
 						Name: platform.Name + "-scd2-by-time",
 						Steps: []e2e.Task{
@@ -485,10 +516,27 @@ func TestWorkflows(t *testing.T) {
 						},
 					},
 				},
+				// Additional workflows will be added here as templates are created
+				// For now, the availability map above controls which tests are available
+				// Tests not in the availability map or not available for the platform will be skipped
 			}
 
 			for _, tt := range tests {
+				tt := tt // capture loop variable
 				t.Run(tt.name, func(t *testing.T) {
+					// Skip test if not available for this platform
+					available := false
+					for _, p := range tt.availablePlatforms {
+						if p == platformName {
+							available = true
+							break
+						}
+					}
+					if !available {
+						t.Skipf("Skipping %s - not available for platform %s", tt.name, platformName)
+						return
+					}
+
 					err := tt.workflow.Run()
 					require.NoError(t, err, "Workflow %s failed: %v", tt.workflow.Name, err)
 
