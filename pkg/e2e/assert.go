@@ -246,9 +246,19 @@ func AssertByCSV(i *Task) error {
 		}
 		
 		// Reorder actual records to match expected column order (case-insensitive)
+		// Also normalize headers to lowercase for consistent comparison
 		if len(expectedRecords) > 0 {
 			reorderedActualRecords := make([][]string, len(actualRecords))
-			for i, row := range actualRecords {
+			// Normalize header row to lowercase
+			normalizedHeader := make([]string, len(expectedHeader))
+			for j, expectedCol := range expectedHeader {
+				normalizedHeader[j] = strings.ToLower(expectedCol)
+			}
+			reorderedActualRecords[0] = normalizedHeader
+			
+			// Reorder data rows
+			for i := 1; i < len(actualRecords); i++ {
+				row := actualRecords[i]
 				reorderedRow := make([]string, len(expectedHeader))
 				for j, expectedCol := range expectedHeader {
 					lowerExpectedCol := strings.ToLower(expectedCol)
@@ -261,6 +271,13 @@ func AssertByCSV(i *Task) error {
 				reorderedActualRecords[i] = reorderedRow
 			}
 			actualRecords = reorderedActualRecords
+			
+			// Also normalize expected header to lowercase for consistent comparison
+			normalizedExpectedHeader := make([]string, len(expectedHeader))
+			for j, col := range expectedHeader {
+				normalizedExpectedHeader[j] = strings.ToLower(col)
+			}
+			expectedRecords[0] = normalizedExpectedHeader
 		}
 	}
 
