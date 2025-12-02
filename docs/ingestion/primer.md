@@ -42,7 +42,7 @@ parameters:
 
 | Table    | PK  | Inc Key | Inc Strategy | Details |
 |----------|-----|---------|--------------|---------|
-| payments | id  | -       | merge        | Retrieves payment details from Primer |
+| payments | id  | dateUpdated  | merge        | Retrieves payment details from Primer |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
