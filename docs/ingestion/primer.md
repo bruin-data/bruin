@@ -15,10 +15,8 @@ connections:
       primer:
         - name: "my-primer"
           api_key: "your-api-key"
-          api_version: "2.4"  # optional, defaults to 2.4
 ```
 - `api_key`: API key used for authentication with the Primer API
-- `api_version`: (optional) The API version to use, defaults to "2.4"
 
 ### Step 2: Create an asset file for data ingestion
 To ingest data from Primer, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., primer_ingestion.yml) inside the assets folder and add the following content:

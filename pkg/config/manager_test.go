@@ -712,9 +712,8 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Primer: []PrimerConnection{
 				{
-					Name:       "primer-1",
-					APIKey:     "test-api-key",
-					APIVersion: "2.4",
+					Name:   "primer-1",
+					APIKey: "test-api-key",
 				},
 			},
 		},

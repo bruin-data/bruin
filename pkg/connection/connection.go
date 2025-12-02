@@ -2374,8 +2374,7 @@ func (m *Manager) AddPrimerConnectionFromConfig(connection *config.PrimerConnect
 	}
 
 	client, err := primer.NewClient(primer.Config{
-		APIKey:     connection.APIKey,
-		APIVersion: connection.APIVersion,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
