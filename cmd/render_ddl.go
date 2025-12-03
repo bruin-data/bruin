@@ -16,14 +16,12 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
-	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
-	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -220,12 +218,8 @@ func RenderDDL() *cli.Command {
 					pipeline.AssetTypeRedshiftQuerySensor:   postgres.NewDDLMaterializer(),
 					pipeline.AssetTypePostgresQuery:         postgres.NewDDLMaterializer(),
 					pipeline.AssetTypePostgresQuerySensor:   postgres.NewDDLMaterializer(),
-					pipeline.AssetTypeMsSQLQuery:            mssql.NewDDLMaterializer(),
-					pipeline.AssetTypeMsSQLQuerySensor:      mssql.NewDDLMaterializer(),
 					pipeline.AssetTypeDatabricksQuery:       databricks.NewDDLRenderer(),
 					pipeline.AssetTypeDatabricksQuerySensor: databricks.NewDDLRenderer(),
-					pipeline.AssetTypeSynapseQuery:          synapse.NewDDLRenderer(),
-					pipeline.AssetTypeSynapseQuerySensor:    synapse.NewDDLRenderer(),
 					pipeline.AssetTypeAthenaQuery:           athena.NewDDLRenderer(resultsLocation),
 					pipeline.AssetTypeAthenaSQLSensor:       athena.NewDDLRenderer(resultsLocation),
 					pipeline.AssetTypeDuckDBQuery:           duck.NewDDLMaterializer(),
