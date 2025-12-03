@@ -50,16 +50,8 @@ func RenderDDL() *cli.Command {
 				Name:  "apply-interval-modifiers",
 				Usage: "applies interval modifiers if flag is given",
 			},
-			&cli.StringSliceFlag{
-				Name:  "var",
-				Usage: "override pipeline variables with custom values",
-			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			if vars := c.StringSlice("var"); len(vars) > 0 {
-				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
-			}
-
 			inputPath := c.Args().Get(0)
 			if inputPath == "" {
 				if c.String("output") == "json" {
