@@ -592,7 +592,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM s1\n" +
-				"  JOIN   \"my\".\"asset\" AS t1 USING (\"id\")\n" +
+				"  JOIN   \"my\".\"asset\" AS t1 USING (id)\n" +
 				"  WHERE  t1._valid_from < s1.\"ts\" AND t1._is_current\n" +
 				") AS source\n" +
 				"ON  target.\"id\" = source.\"id\" AND target._is_current AND source._is_current\n" +
@@ -642,7 +642,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM s1\n" +
-				"  JOIN   \"my\".\"asset\" AS t1 USING (\"id\", \"event_type\")\n" +
+				"  JOIN   \"my\".\"asset\" AS t1 USING (id, event_type)\n" +
 				"  WHERE  t1._valid_from < s1.\"ts\" AND t1._is_current\n" +
 				") AS source\n" +
 				"ON  target.\"id\" = source.\"id\" AND target.\"event_type\" = source.\"event_type\" AND target._is_current AND source._is_current\n" +
