@@ -47,6 +47,7 @@ builds:
       - CC=aarch64-linux-gnu-gcc
       - CXX=aarch64-linux-gnu-g++
       - CGO_ENABLED=1
+      - CGO_LDFLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
     flags:
       - -trimpath
     ldflags:
@@ -62,6 +63,7 @@ builds:
       - CC=x86_64-w64-mingw32-gcc
       - CXX=x86_64-w64-mingw32-g++
       - CGO_ENABLED=1
+      - CGO_LDFLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
     ldflags:
       - -s -w -X main.version={{ .Env.VERSION }} -X main.commit={{ .Env.COMMIT_SHA }} -X main.telemetryKey={{ .Env.TELEMETRY_KEY }}
     flags:
