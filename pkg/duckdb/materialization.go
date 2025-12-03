@@ -14,6 +14,15 @@ func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
 	return &pipeline.Materializer{
 		MaterializationMap: matMap,
 		FullRefresh:        fullRefresh,
+		ForceDDL:           false,
+	}
+}
+
+func NewDDLMaterializer() *pipeline.Materializer {
+	return &pipeline.Materializer{
+		MaterializationMap: matMap,
+		FullRefresh:        false,
+		ForceDDL:           true,
 	}
 }
 
