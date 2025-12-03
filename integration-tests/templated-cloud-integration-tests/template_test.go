@@ -10,34 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// buildAdditionalWorkflows creates workflow definitions for tests beyond scd2-by-column and scd2-by-time
-// This function can be expanded to add more workflow types as templates are created
-func buildAdditionalWorkflows(platform PlatformConfig, platformName string, tempDir string, currentFolder string, binary string, configFlags []string, testAvailability map[string][]string, isTestAvailable func(string, string) bool) []struct {
-	name     string
-	workflow e2e.Workflow
-} {
-	var additionalTests []struct {
-		name     string
-		workflow e2e.Workflow
-	}
-
-	// For now, we'll add placeholder workflows that can be expanded
-	// Each test type will need its own template structure similar to scd2-by-column
-
-	// TODO: Add implementations for:
-	// - ddl-create-and-validate
-	// - products-create-and-validate
-	// - merge-with-nulls
-	// - dry-run (BigQuery only)
-	// - drop-on-mismatch
-	// - merge-sql
-
-	// These will require creating templates similar to scd2-by-column-pipeline
-	// For now, we return empty slice - tests can be added incrementally
-
-	return additionalTests
-}
-
 func TestWorkflows(t *testing.T) {
 	t.Parallel()
 

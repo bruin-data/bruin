@@ -225,26 +225,26 @@ func AssertByCSV(i *Task) error {
 	if len(expectedRecords) > 0 && len(actualRecords) > 0 {
 		expectedHeader := expectedRecords[0]
 		actualHeader := actualRecords[0]
-		
+
 		// Create mapping from lowercase expected column names to indices
 		expectedColMap := make(map[string]int)
 		for i, col := range expectedHeader {
 			expectedColMap[strings.ToLower(col)] = i
 		}
-		
+
 		// Create mapping from lowercase actual column names to indices
 		actualColMap := make(map[string]int)
 		for i, col := range actualHeader {
 			actualColMap[strings.ToLower(col)] = i
 		}
-		
+
 		// Check if all expected columns exist in actual (case-insensitive)
 		for lowerCol := range expectedColMap {
 			if _, exists := actualColMap[lowerCol]; !exists {
 				return fmt.Errorf("CSV column mismatch: expected column %q (case-insensitive) not found in actual output", lowerCol)
 			}
 		}
-		
+
 		// Reorder actual records to match expected column order (case-insensitive)
 		// Also normalize headers to lowercase for consistent comparison
 		if len(expectedRecords) > 0 {
@@ -255,7 +255,7 @@ func AssertByCSV(i *Task) error {
 				normalizedHeader[j] = strings.ToLower(expectedCol)
 			}
 			reorderedActualRecords[0] = normalizedHeader
-			
+
 			// Reorder data rows
 			for i := 1; i < len(actualRecords); i++ {
 				row := actualRecords[i]
@@ -271,7 +271,7 @@ func AssertByCSV(i *Task) error {
 				reorderedActualRecords[i] = reorderedRow
 			}
 			actualRecords = reorderedActualRecords
-			
+
 			// Also normalize expected header to lowercase for consistent comparison
 			normalizedExpectedHeader := make([]string, len(expectedHeader))
 			for j, col := range expectedHeader {
