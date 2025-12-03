@@ -812,13 +812,13 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM   s1\n" +
-				"  JOIN   \"my\".\"asset\" AS t1 USING (\"id\")\n" +
-				"  WHERE  (t1.\"col1\" != s1.\"col1\" OR t1.\"col2\" != s1.\"col2\" OR t1.\"col3\" != s1.\"col3\" OR t1.\"col4\" != s1.\"col4\") AND t1._is_current\n" +
+				"  JOIN   \"my\".\"asset\" AS t1 USING (id)\n" +
+				"  WHERE  (t1.col1 != s1.col1 OR t1.col2 != s1.col2 OR t1.col3 != s1.col3 OR t1.col4 != s1.col4) AND t1._is_current\n" +
 				") AS source\n" +
-				"ON  target.\"id\" = source.\"id\" AND target._is_current AND source._is_current\n" +
+				"ON  target.id = source.id AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"    target.\"col1\" != source.\"col1\" OR target.\"col2\" != source.\"col2\" OR target.\"col3\" != source.\"col3\" OR target.\"col4\" != source.\"col4\"\n" +
+				"    target.col1 != source.col1 OR target.col2 != source.col2 OR target.col3 != source.col3 OR target.col4 != source.col4\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
 				"    _valid_until = CURRENT_TIMESTAMP,\n" +
@@ -830,8 +830,8 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"    _is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (\"id\", \"col1\", \"col2\", \"col3\", \"col4\", _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.\"id\", source.\"col1\", source.\"col2\", source.\"col3\", source.\"col4\", CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
+				"  INSERT (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
 		},
 		{
 			name: "scd2_multiple_primary_keys",
@@ -859,13 +859,13 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
 				"  FROM   s1\n" +
-				"  JOIN   \"my\".\"asset\" AS t1 USING (\"id\", \"category\")\n" +
-				"  WHERE  (t1.\"name\" != s1.\"name\" OR t1.\"price\" != s1.\"price\") AND t1._is_current\n" +
+				"  JOIN   \"my\".\"asset\" AS t1 USING (id, category)\n" +
+				"  WHERE  (t1.name != s1.name OR t1.price != s1.price) AND t1._is_current\n" +
 				") AS source\n" +
-				"ON  target.\"id\" = source.\"id\" AND target.\"category\" = source.\"category\" AND target._is_current AND source._is_current\n" +
+				"ON  target.id = source.id AND target.category = source.category AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"    target.\"name\" != source.\"name\" OR target.\"price\" != source.\"price\"\n" +
+				"    target.name != source.name OR target.price != source.price\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
 				"    _valid_until = CURRENT_TIMESTAMP,\n" +
@@ -877,8 +877,8 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"    _is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (\"id\", \"category\", \"name\", \"price\", _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.\"id\", source.\"category\", source.\"name\", source.\"price\", CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
+				"  INSERT (id, category, name, price, _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.id, source.category, source.name, source.price, CURRENT_TIMESTAMP, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
 		},
 		{
 			name: "scd2_full_refresh_by_column",
