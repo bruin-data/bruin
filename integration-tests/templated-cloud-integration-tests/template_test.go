@@ -165,7 +165,7 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									Contains: []string{platform.FinishedMessagePattern},
+									Contains: []string{"Finished: test.menu"},
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,
@@ -208,7 +208,7 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									Contains: []string{platform.FinishedMessagePattern},
+									Contains: []string{"Finished: test.menu"},
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,
@@ -251,7 +251,7 @@ func TestWorkflows(t *testing.T) {
 								Env:     []string{},
 								Expected: e2e.Output{
 									ExitCode: 0,
-									Contains: []string{platform.FinishedMessagePattern},
+									Contains: []string{"Finished: test.menu"},
 								},
 								Asserts: []func(*e2e.Task) error{
 									e2e.AssertByExitCode,
