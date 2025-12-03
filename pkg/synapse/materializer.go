@@ -13,6 +13,7 @@ import (
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
 	fullRefresh        bool
+	forceDDL           bool
 }
 
 func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, error) {
@@ -22,7 +23,9 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	}
 
 	strategy := mat.Strategy
-	if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable {
+	if m.forceDDL {
+		strategy = pipeline.MaterializationStrategyDDL
+	} else if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable {
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
 
@@ -38,6 +41,15 @@ func NewMaterializer(fullRefresh bool) *Materializer {
 	return &Materializer{
 		MaterializationMap: matMap,
 		fullRefresh:        fullRefresh,
+		forceDDL:           false,
+	}
+}
+
+func NewDDLMaterializer() *Materializer {
+	return &Materializer{
+		MaterializationMap: matMap,
+		fullRefresh:        false,
+		forceDDL:           true,
 	}
 }
 
@@ -48,6 +60,12 @@ type Renderer struct {
 func NewRenderer(fullRefresh bool) *Renderer {
 	return &Renderer{
 		mat: NewMaterializer(fullRefresh),
+	}
+}
+
+func NewDDLRenderer() *Renderer {
+	return &Renderer{
+		mat: NewDDLMaterializer(),
 	}
 }
 
