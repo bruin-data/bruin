@@ -518,9 +518,143 @@ func TestWorkflows(t *testing.T) {
 						},
 					},
 				},
-				// Additional workflows will be added here as templates are created
-				// For now, the availability map above controls which tests are available
-				// Tests not in the availability map or not available for the platform will be skipped
+				// BigQuery-specific test: merge-with-nulls
+				{
+					name:               platform.Name + "-merge-with-nulls",
+					availablePlatforms: []string{"bigquery"},
+					workflow: e2e.Workflow{
+						Name: platform.Name + "-merge-with-nulls",
+						Steps: []e2e.Task{
+							{
+								Name:    "merge-with-nulls: create test directory",
+								Command: "mkdir",
+								Args:    []string{"-p", filepath.Join(tempDir, "test-nullable-pipeline")},
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:       "merge-with-nulls: initialize git repository",
+								Command:    "git",
+								Args:       []string{"init"},
+								WorkingDir: filepath.Join(tempDir, "test-nullable-pipeline"),
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:       "merge-with-nulls: copy pipeline files",
+								Command:    "cp",
+								Args:       []string{"-a", filepath.Join(currentFolder, "templates/nullable-pipeline"), filepath.Join(tempDir, "test-nullable-pipeline")},
+								WorkingDir: filepath.Join(tempDir, "test-nullable-pipeline"),
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:    "merge-with-nulls: patch pipeline.yml with platform defaults",
+								Command: binary,
+								Args: []string{
+									"internal", "patch-pipeline",
+									filepath.Join(tempDir, "test-nullable-pipeline/nullable-pipeline/pipeline.yml"),
+									"--body", fmt.Sprintf(`{"default_connections":{"%s":"%s"},"default":{"type":"%s"}}`, platform.PlatformConnection, platform.Connection, platform.AssetType),
+								},
+								Env: []string{},
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:    "merge-with-nulls: create the initial table",
+								Command: binary,
+								Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-nullable-pipeline/nullable-pipeline/assets/nulltable.sql")),
+								Env:     []string{},
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:    "merge-with-nulls: query the initial table",
+								Command: binary,
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "SELECT * FROM dataset.nulltable ORDER BY id;", "--output", "csv"),
+								Env:     []string{},
+								Expected: e2e.Output{
+									ExitCode: 0,
+									CSVFile:  filepath.Join(currentFolder, "templates/expectations/nullable-pipeline/initial.csv"),
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+									e2e.AssertByCSV,
+								},
+							},
+							{
+								Name:    "merge-with-nulls: copy nulltable_merge.sql to nulltable.sql",
+								Command: "cp",
+								Args:    []string{filepath.Join(tempDir, "test-nullable-pipeline/nullable-pipeline/resources/nulltable_merge.sql"), filepath.Join(tempDir, "test-nullable-pipeline/nullable-pipeline/assets/nulltable.sql")},
+								Env:     []string{},
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:    "merge-with-nulls: update table with merge",
+								Command: binary,
+								Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-nullable-pipeline/nullable-pipeline/assets/nulltable.sql")),
+								Env:     []string{},
+								Expected: e2e.Output{
+									ExitCode: 0,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+								},
+							},
+							{
+								Name:    "merge-with-nulls: query the updated table",
+								Command: binary,
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "SELECT * FROM dataset.nulltable ORDER BY id;", "--output", "csv"),
+								Env:     []string{},
+								Expected: e2e.Output{
+									ExitCode: 0,
+									CSVFile:  filepath.Join(currentFolder, "templates/expectations/nullable-pipeline/updated.csv"),
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+									e2e.AssertByCSV,
+								},
+							},
+							{
+								Name:    "merge-with-nulls: drop the table",
+								Command: binary,
+								Args:    append(append([]string{"query"}, configFlags...), "--connection", platform.Connection, "--query", "DROP TABLE IF EXISTS dataset.nulltable;"),
+								Env:     []string{},
+								Expected: e2e.Output{
+									ExitCode: platform.DropTableExitCode,
+								},
+								Asserts: []func(*e2e.Task) error{
+									e2e.AssertByExitCode,
+								},
+							},
+						},
+					},
+				},
 			}
 
 			for _, tt := range tests {
