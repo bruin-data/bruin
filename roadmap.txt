@@ -7,7 +7,7 @@ DONE 5. Iterate based on learnings before templating more tests
 DONE 6. Move expectations
 DONE 7. Move test into own folder including .cloud.bruin.yml and update tests
 DONE 8. Add matrix for which tests apply to which platforms 
-9. add one or two platform specific tests
+DONE 9. add one or two platform specific tests
 10. all final tests
 
 
