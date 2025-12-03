@@ -62,6 +62,7 @@ func main() {
 			cmd.Lint(&isDebug),
 			cmd.Run(&isDebug),
 			cmd.Render(),
+			cmd.RenderDDL(),
 			cmd.Lineage(),
 			cmd.CleanCmd(),
 			cmd.Format(&isDebug),
