@@ -20,7 +20,7 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud
+.PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud cloud-e2e-test
 all: clean deps test build
 
 deps: 
@@ -73,6 +73,30 @@ integration-test-cloud: build
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
 	@cd integration-tests/cloud-integration-tests && env SILENT=1 go test -count=1 -v .
+
+cloud-e2e-test: build-no-duckdb
+	@cp "$(BUILD_DIR)/$(NAME)-no-duckdb" "$(BUILD_DIR)/$(NAME)" || true
+	@touch integration-tests/templated-cloud-integration-tests/.git
+	@touch integration-tests/templated-cloud-integration-tests/bruin
+	@rm -rf integration-tests/templated-cloud-integration-tests/.git
+	@rm integration-tests/templated-cloud-integration-tests/bruin
+	@echo "$(OK_COLOR)==> Running templated cloud E2E tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@if [ -n "$(platform)" ] && [ -n "$(test)" ]; then \
+		if echo "$(test)" | grep -q "^$(platform)-"; then \
+			test_name="$(test)"; \
+		else \
+			test_name="$(platform)-$(test)"; \
+		fi; \
+		echo "$(OK_COLOR)==> Running $(platform) $$test_name test...$(NO_COLOR)"; \
+		cd integration-tests/templated-cloud-integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -timeout 5m -count=1 -v -run "^TestWorkflows/$(platform)/$$test_name$$" .; \
+	elif [ -n "$(platform)" ]; then \
+		echo "$(OK_COLOR)==> Running all $(platform) tests...$(NO_COLOR)"; \
+		cd integration-tests/templated-cloud-integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -timeout 5m -count=1 -v -run "^TestWorkflows/$(platform)" .; \
+	else \
+		echo "$(OK_COLOR)==> Running all templated cloud E2E tests...$(NO_COLOR)"; \
+		cd integration-tests/templated-cloud-integration-tests && env SILENT=1 go test -tags="no_duckdb_arrow" -timeout 5m -count=1 -v -run "^TestWorkflows$$" .; \
+	fi
 
 clean:
 	@rm -rf ./bin
