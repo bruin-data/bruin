@@ -91,9 +91,10 @@ const (
 	AssetTypeClickHouseQuerySensor  = AssetType("clickhouse.sensor.query")
 	AssetTypeClickHouseTableSensor  = AssetType("clickhouse.sensor.table")
 	AssetTypeClickHouseSource       = AssetType("clickhouse.source")
-	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
-	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
-	AssetTypeTrinoQuery             = AssetType("trino.sql")
+	AssetTypeEMRServerlessSpark         = AssetType("emr_serverless.spark")
+	AssetTypeEMRServerlessPyspark       = AssetType("emr_serverless.pyspark")
+	AssetTypeDataprocServerlessPyspark  = AssetType("dataproc_serverless.pyspark")
+	AssetTypeTrinoQuery                 = AssetType("trino.sql")
 	AssetTypeTrinoQuerySensor       = AssetType("trino.sensor.query")
 	AssetTypeOracleQuery            = AssetType("oracle.sql")
 	AssetTypeOracleSource           = AssetType("oracle.source")
@@ -635,9 +636,10 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeClickHouseQuerySensor: "clickhouse",
 	AssetTypeClickHouseTableSensor: "clickhouse",
 	AssetTypeClickHouseSource:      "clickhouse",
-	AssetTypeEMRServerlessSpark:    "emr_serverless",
-	AssetTypeEMRServerlessPyspark:  "emr_serverless",
-	AssetTypeTrinoQuery:            "trino",
+	AssetTypeEMRServerlessSpark:        "emr_serverless",
+	AssetTypeEMRServerlessPyspark:      "emr_serverless",
+	AssetTypeDataprocServerlessPyspark: "dataproc_serverless",
+	AssetTypeTrinoQuery:                "trino",
 	AssetTypeTrinoQuerySensor:      "trino",
 	AssetTypeOracleQuery:           "oracle",
 	AssetTypeOracleSource:          "oracle",

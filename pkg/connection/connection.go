@@ -35,6 +35,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
+	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fluxx"
@@ -173,6 +174,7 @@ type Manager struct {
 	BruinCloud           map[string]*bruincloud.Client
 	Primer               map[string]*primer.Client
 	EMRSeverless         map[string]*emr_serverless.Client
+	DataprocServerless   map[string]*dataprocserverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
 	AppLovin             map[string]*applovin.Client
 	Salesforce           map[string]*salesforce.Client
@@ -2409,6 +2411,29 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 	return nil
 }
 
+func (m *Manager) AddDataprocServerlessConnectionFromConfig(connection *config.DataprocServerlessConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.DataprocServerless == nil {
+		m.DataprocServerless = make(map[string]*dataprocserverless.Client)
+	}
+	client, err := dataprocserverless.NewClient(dataprocserverless.Config{
+		Project:               connection.Project,
+		Region:                connection.Region,
+		ServiceAccountKey:     connection.ServiceAccountKey,
+		ServiceAccountKeyPath: connection.ServiceAccountKeyPath,
+		Workspace:             connection.Workspace,
+	})
+	if err != nil {
+		return err
+	}
+	m.DataprocServerless[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddGenericConnectionFromConfig(connection *config.GenericConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2610,6 +2635,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Wise, connectionManager.AddWiseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.DataprocServerless, connectionManager.AddDataprocServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
