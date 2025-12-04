@@ -28,99 +28,99 @@ const (
 	CommentTask TaskDefinitionType = "comment"
 	YamlTask    TaskDefinitionType = "yaml"
 
-	AssetTypePython                 = AssetType("python")
-	AssetTypeR                      = AssetType("r")
-	AssetTypeSnowflakeQuery         = AssetType("sf.sql")
-	AssetTypeSnowflakeSeed          = AssetType("sf.seed")
-	AssetTypeSnowflakeQuerySensor   = AssetType("sf.sensor.query")
-	AssetTypeSnowflakeTableSensor   = AssetType("sf.sensor.table")
-	AssetTypeBigqueryQuery          = AssetType("bq.sql")
-	AssetTypeBigqueryTableSensor    = AssetType("bq.sensor.table")
-	AssetTypeBigqueryQuerySensor    = AssetType("bq.sensor.query")
-	AssetTypeBigquerySource         = AssetType("bq.source")
-	AssetTypeBigquerySeed           = AssetType("bq.seed")
-	AssetTypeSnowflakeSource        = AssetType("sf.source")
-	AssetTypePostgresSource         = AssetType("pg.source")
-	AssetTypeRedshiftSource         = AssetType("rs.source")
-	AssetTypeMsSQLSource            = AssetType("ms.source")
-	AssetTypeMsSQLTableSensor       = AssetType("ms.sensor.table")
-	AssetTypeDatabricksSource       = AssetType("databricks.source")
-	AssetTypeSynapseSource          = AssetType("synapse.source")
-	AssetTypeSynapseTableSensor     = AssetType("synapse.sensor.table")
-	AssetTypeAthenaSource           = AssetType("athena.source")
-	AssetTypeDuckDBSource           = AssetType("duckdb.source")
-	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
-	AssetTypeDuckDBSeed             = AssetType("duckdb.seed")
-	AssetTypeDuckDBQuerySensor      = AssetType("duckdb.sensor.query")
-	AssetTypeMotherduckQuery        = AssetType("motherduck.sql")
-	AssetTypeEmpty                  = AssetType("empty")
-	AssetTypePostgresQuery          = AssetType("pg.sql")
-	AssetTypePostgresSeed           = AssetType("pg.seed")
-	AssetTypeMySQLQuery             = AssetType("my.sql")
-	AssetTypeMySQLSeed              = AssetType("my.seed")
-	AssetTypeMySQLQuerySensor       = AssetType("my.sensor.query")
-	AssetTypeMySQLTableSensor       = AssetType("my.sensor.table")
-	AssetTypePostgresQuerySensor    = AssetType("pg.sensor.query")
-	AssetTypePostgresTableSensor    = AssetType("pg.sensor.table")
-	AssetTypeRedshiftQuery          = AssetType("rs.sql")
-	AssetTypeRedshiftSeed           = AssetType("rs.seed")
-	AssetTypeRedshiftQuerySensor    = AssetType("rs.sensor.query")
-	AssetTypeRedshiftTableSensor    = AssetType("rs.sensor.table")
-	AssetTypeAthenaQuery            = AssetType("athena.sql")
-	AssetTypeAthenaSQLSensor        = AssetType("athena.sensor.query")
-	AssetTypeAthenaTableSensor      = AssetType("athena.sensor.table")
-	AssetTypeAthenaSeed             = AssetType("athena.seed")
-	AssetTypeMsSQLQuery             = AssetType("ms.sql")
-	AssetTypeMsSQLSeed              = AssetType("ms.seed")
-	AssetTypeMsSQLQuerySensor       = AssetType("ms.sensor.query")
-	AssetTypeDatabricksQuery        = AssetType("databricks.sql")
-	AssetTypeDatabricksSeed         = AssetType("databricks.seed")
-	AssetTypeDatabricksTableSensor  = AssetType("databricks.sensor.table")
-	AssetTypeDatabricksQuerySensor  = AssetType("databricks.sensor.query")
-	AssetTypeSynapseQuery           = AssetType("synapse.sql")
-	AssetTypeSynapseSeed            = AssetType("synapse.seed")
-	AssetTypeSynapseQuerySensor     = AssetType("synapse.sensor.query")
-	AssetTypeIngestr                = AssetType("ingestr")
-	AssetTypeTableau                = AssetType("tableau")
-	AssetTypeTableauDatasource      = AssetType("tableau.datasource")
-	AssetTypeTableauWorkbook        = AssetType("tableau.workbook")
-	AssetTypeTableauWorksheet       = AssetType("tableau.worksheet")
-	AssetTypeTableauDashboard       = AssetType("tableau.dashboard")
-	AssetTypeClickHouse             = AssetType("clickhouse.sql")
-	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
-	AssetTypeClickHouseQuerySensor  = AssetType("clickhouse.sensor.query")
-	AssetTypeClickHouseTableSensor  = AssetType("clickhouse.sensor.table")
-	AssetTypeClickHouseSource       = AssetType("clickhouse.source")
-	AssetTypeEMRServerlessSpark         = AssetType("emr_serverless.spark")
-	AssetTypeEMRServerlessPyspark       = AssetType("emr_serverless.pyspark")
-	AssetTypeDataprocServerlessPyspark  = AssetType("dataproc_serverless.pyspark")
-	AssetTypeTrinoQuery                 = AssetType("trino.sql")
-	AssetTypeTrinoQuerySensor       = AssetType("trino.sensor.query")
-	AssetTypeOracleQuery            = AssetType("oracle.sql")
-	AssetTypeOracleSource           = AssetType("oracle.source")
-	AssetTypeLooker                 = AssetType("looker")
-	AssetTypeLookerStudio           = AssetType("looker_studio")
-	AssetTypePowerBI                = AssetType("powerbi")
-	AssetTypeQlikSense              = AssetType("qliksense")
-	AssetTypeQlikView               = AssetType("qlikview")
-	AssetTypeSisense                = AssetType("sisense")
-	AssetTypeDomo                   = AssetType("domo")
-	AssetTypeQuicksight             = AssetType("quicksight")
-	AssetTypeMetabase               = AssetType("metabase")
-	AssetTypeGrafana                = AssetType("grafana")
-	AssetTypeSuperset               = AssetType("superset")
-	AssetTypeModeBI                 = AssetType("modebi")
-	AssetTypeRedash                 = AssetType("redash")
-	AssetTypeGoodData               = AssetType("gooddata")
-	AssetTypeS3KeySensor            = AssetType("s3.sensor.key_sensor")
-	AssetTypeElasticsearch          = AssetType("elasticsearch")
-	AssetTypeAgentClaudeCode        = AssetType("agent.claude_code")
-	RunConfigFullRefresh            = RunConfig("full-refresh")
-	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
-	RunConfigStartDate              = RunConfig("start-date")
-	RunConfigEndDate                = RunConfig("end-date")
-	RunConfigRunID                  = RunConfig("run-id")
-	RunConfigQueryAnnotations       = RunConfig("query-annotations")
+	AssetTypePython                    = AssetType("python")
+	AssetTypeR                         = AssetType("r")
+	AssetTypeSnowflakeQuery            = AssetType("sf.sql")
+	AssetTypeSnowflakeSeed             = AssetType("sf.seed")
+	AssetTypeSnowflakeQuerySensor      = AssetType("sf.sensor.query")
+	AssetTypeSnowflakeTableSensor      = AssetType("sf.sensor.table")
+	AssetTypeBigqueryQuery             = AssetType("bq.sql")
+	AssetTypeBigqueryTableSensor       = AssetType("bq.sensor.table")
+	AssetTypeBigqueryQuerySensor       = AssetType("bq.sensor.query")
+	AssetTypeBigquerySource            = AssetType("bq.source")
+	AssetTypeBigquerySeed              = AssetType("bq.seed")
+	AssetTypeSnowflakeSource           = AssetType("sf.source")
+	AssetTypePostgresSource            = AssetType("pg.source")
+	AssetTypeRedshiftSource            = AssetType("rs.source")
+	AssetTypeMsSQLSource               = AssetType("ms.source")
+	AssetTypeMsSQLTableSensor          = AssetType("ms.sensor.table")
+	AssetTypeDatabricksSource          = AssetType("databricks.source")
+	AssetTypeSynapseSource             = AssetType("synapse.source")
+	AssetTypeSynapseTableSensor        = AssetType("synapse.sensor.table")
+	AssetTypeAthenaSource              = AssetType("athena.source")
+	AssetTypeDuckDBSource              = AssetType("duckdb.source")
+	AssetTypeDuckDBQuery               = AssetType("duckdb.sql")
+	AssetTypeDuckDBSeed                = AssetType("duckdb.seed")
+	AssetTypeDuckDBQuerySensor         = AssetType("duckdb.sensor.query")
+	AssetTypeMotherduckQuery           = AssetType("motherduck.sql")
+	AssetTypeEmpty                     = AssetType("empty")
+	AssetTypePostgresQuery             = AssetType("pg.sql")
+	AssetTypePostgresSeed              = AssetType("pg.seed")
+	AssetTypeMySQLQuery                = AssetType("my.sql")
+	AssetTypeMySQLSeed                 = AssetType("my.seed")
+	AssetTypeMySQLQuerySensor          = AssetType("my.sensor.query")
+	AssetTypeMySQLTableSensor          = AssetType("my.sensor.table")
+	AssetTypePostgresQuerySensor       = AssetType("pg.sensor.query")
+	AssetTypePostgresTableSensor       = AssetType("pg.sensor.table")
+	AssetTypeRedshiftQuery             = AssetType("rs.sql")
+	AssetTypeRedshiftSeed              = AssetType("rs.seed")
+	AssetTypeRedshiftQuerySensor       = AssetType("rs.sensor.query")
+	AssetTypeRedshiftTableSensor       = AssetType("rs.sensor.table")
+	AssetTypeAthenaQuery               = AssetType("athena.sql")
+	AssetTypeAthenaSQLSensor           = AssetType("athena.sensor.query")
+	AssetTypeAthenaTableSensor         = AssetType("athena.sensor.table")
+	AssetTypeAthenaSeed                = AssetType("athena.seed")
+	AssetTypeMsSQLQuery                = AssetType("ms.sql")
+	AssetTypeMsSQLSeed                 = AssetType("ms.seed")
+	AssetTypeMsSQLQuerySensor          = AssetType("ms.sensor.query")
+	AssetTypeDatabricksQuery           = AssetType("databricks.sql")
+	AssetTypeDatabricksSeed            = AssetType("databricks.seed")
+	AssetTypeDatabricksTableSensor     = AssetType("databricks.sensor.table")
+	AssetTypeDatabricksQuerySensor     = AssetType("databricks.sensor.query")
+	AssetTypeSynapseQuery              = AssetType("synapse.sql")
+	AssetTypeSynapseSeed               = AssetType("synapse.seed")
+	AssetTypeSynapseQuerySensor        = AssetType("synapse.sensor.query")
+	AssetTypeIngestr                   = AssetType("ingestr")
+	AssetTypeTableau                   = AssetType("tableau")
+	AssetTypeTableauDatasource         = AssetType("tableau.datasource")
+	AssetTypeTableauWorkbook           = AssetType("tableau.workbook")
+	AssetTypeTableauWorksheet          = AssetType("tableau.worksheet")
+	AssetTypeTableauDashboard          = AssetType("tableau.dashboard")
+	AssetTypeClickHouse                = AssetType("clickhouse.sql")
+	AssetTypeClickHouseSeed            = AssetType("clickhouse.seed")
+	AssetTypeClickHouseQuerySensor     = AssetType("clickhouse.sensor.query")
+	AssetTypeClickHouseTableSensor     = AssetType("clickhouse.sensor.table")
+	AssetTypeClickHouseSource          = AssetType("clickhouse.source")
+	AssetTypeEMRServerlessSpark        = AssetType("emr_serverless.spark")
+	AssetTypeEMRServerlessPyspark      = AssetType("emr_serverless.pyspark")
+	AssetTypeDataprocServerlessPyspark = AssetType("dataproc_serverless.pyspark")
+	AssetTypeTrinoQuery                = AssetType("trino.sql")
+	AssetTypeTrinoQuerySensor          = AssetType("trino.sensor.query")
+	AssetTypeOracleQuery               = AssetType("oracle.sql")
+	AssetTypeOracleSource              = AssetType("oracle.source")
+	AssetTypeLooker                    = AssetType("looker")
+	AssetTypeLookerStudio              = AssetType("looker_studio")
+	AssetTypePowerBI                   = AssetType("powerbi")
+	AssetTypeQlikSense                 = AssetType("qliksense")
+	AssetTypeQlikView                  = AssetType("qlikview")
+	AssetTypeSisense                   = AssetType("sisense")
+	AssetTypeDomo                      = AssetType("domo")
+	AssetTypeQuicksight                = AssetType("quicksight")
+	AssetTypeMetabase                  = AssetType("metabase")
+	AssetTypeGrafana                   = AssetType("grafana")
+	AssetTypeSuperset                  = AssetType("superset")
+	AssetTypeModeBI                    = AssetType("modebi")
+	AssetTypeRedash                    = AssetType("redash")
+	AssetTypeGoodData                  = AssetType("gooddata")
+	AssetTypeS3KeySensor               = AssetType("s3.sensor.key_sensor")
+	AssetTypeElasticsearch             = AssetType("elasticsearch")
+	AssetTypeAgentClaudeCode           = AssetType("agent.claude_code")
+	RunConfigFullRefresh               = RunConfig("full-refresh")
+	RunConfigApplyIntervalModifiers    = RunConfig("apply-interval-modifiers")
+	RunConfigStartDate                 = RunConfig("start-date")
+	RunConfigEndDate                   = RunConfig("end-date")
+	RunConfigRunID                     = RunConfig("run-id")
+	RunConfigQueryAnnotations          = RunConfig("query-annotations")
 )
 
 var defaultMapping = map[string]string{
@@ -162,6 +162,7 @@ var defaultMapping = map[string]string{
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
 	"emr_serverless":        "emr_serverless-default",
+	"dataproc_serverless":   "dataproc_serverless-default",
 	"trino":                 "trino-default",
 	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
@@ -588,63 +589,63 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigquerySource:      "google_cloud_platform",
 	AssetTypeBigqueryQuerySensor: "google_cloud_platform",
 
-	AssetTypeSnowflakeQuery:        "snowflake",
-	AssetTypeSnowflakeQuerySensor:  "snowflake",
-	AssetTypeSnowflakeTableSensor:  "snowflake",
-	AssetTypeSnowflakeSeed:         "snowflake",
-	AssetTypeSnowflakeSource:       "snowflake",
-	AssetTypePostgresQuery:         "postgres",
-	AssetTypePostgresSeed:          "postgres",
-	AssetTypePostgresQuerySensor:   "postgres",
-	AssetTypePostgresTableSensor:   "postgres",
-	AssetTypePostgresSource:        "postgres",
-	AssetTypeMySQLQuery:            "mysql",
-	AssetTypeMySQLSeed:             "mysql",
-	AssetTypeMySQLQuerySensor:      "mysql",
-	AssetTypeMySQLTableSensor:      "mysql",
-	AssetTypeRedshiftQuery:         "redshift",
-	AssetTypeRedshiftSeed:          "redshift",
-	AssetTypeRedshiftQuerySensor:   "redshift",
-	AssetTypeRedshiftSource:        "redshift",
-	AssetTypeRedshiftTableSensor:   "redshift",
-	AssetTypeMsSQLQuery:            "mssql",
-	AssetTypeMsSQLSeed:             "mssql",
-	AssetTypeMsSQLQuerySensor:      "mssql",
-	AssetTypeMsSQLTableSensor:      "mssql",
-	AssetTypeMsSQLSource:           "mssql",
-	AssetTypeDatabricksQuery:       "databricks",
-	AssetTypeDatabricksSeed:        "databricks",
-	AssetTypeDatabricksQuerySensor: "databricks",
-	AssetTypeDatabricksSource:      "databricks",
-	AssetTypeDatabricksTableSensor: "databricks",
-	AssetTypeSynapseQuery:          "synapse",
-	AssetTypeSynapseSeed:           "synapse",
-	AssetTypeSynapseQuerySensor:    "synapse",
-	AssetTypeSynapseSource:         "synapse",
-	AssetTypeAthenaQuery:           "athena",
-	AssetTypeAthenaSeed:            "athena",
-	AssetTypeAthenaSQLSensor:       "athena",
-	AssetTypeAthenaTableSensor:     "athena",
-	AssetTypeAthenaSource:          "athena",
-	AssetTypeDuckDBQuery:           "duckdb",
-	AssetTypeDuckDBSeed:            "duckdb",
-	AssetTypeDuckDBQuerySensor:     "duckdb",
-	AssetTypeDuckDBSource:          "duckdb",
-	AssetTypeMotherduckQuery:       "motherduck",
-	AssetTypeClickHouse:            "clickhouse",
-	AssetTypeClickHouseSeed:        "clickhouse",
-	AssetTypeClickHouseQuerySensor: "clickhouse",
-	AssetTypeClickHouseTableSensor: "clickhouse",
-	AssetTypeClickHouseSource:      "clickhouse",
+	AssetTypeSnowflakeQuery:            "snowflake",
+	AssetTypeSnowflakeQuerySensor:      "snowflake",
+	AssetTypeSnowflakeTableSensor:      "snowflake",
+	AssetTypeSnowflakeSeed:             "snowflake",
+	AssetTypeSnowflakeSource:           "snowflake",
+	AssetTypePostgresQuery:             "postgres",
+	AssetTypePostgresSeed:              "postgres",
+	AssetTypePostgresQuerySensor:       "postgres",
+	AssetTypePostgresTableSensor:       "postgres",
+	AssetTypePostgresSource:            "postgres",
+	AssetTypeMySQLQuery:                "mysql",
+	AssetTypeMySQLSeed:                 "mysql",
+	AssetTypeMySQLQuerySensor:          "mysql",
+	AssetTypeMySQLTableSensor:          "mysql",
+	AssetTypeRedshiftQuery:             "redshift",
+	AssetTypeRedshiftSeed:              "redshift",
+	AssetTypeRedshiftQuerySensor:       "redshift",
+	AssetTypeRedshiftSource:            "redshift",
+	AssetTypeRedshiftTableSensor:       "redshift",
+	AssetTypeMsSQLQuery:                "mssql",
+	AssetTypeMsSQLSeed:                 "mssql",
+	AssetTypeMsSQLQuerySensor:          "mssql",
+	AssetTypeMsSQLTableSensor:          "mssql",
+	AssetTypeMsSQLSource:               "mssql",
+	AssetTypeDatabricksQuery:           "databricks",
+	AssetTypeDatabricksSeed:            "databricks",
+	AssetTypeDatabricksQuerySensor:     "databricks",
+	AssetTypeDatabricksSource:          "databricks",
+	AssetTypeDatabricksTableSensor:     "databricks",
+	AssetTypeSynapseQuery:              "synapse",
+	AssetTypeSynapseSeed:               "synapse",
+	AssetTypeSynapseQuerySensor:        "synapse",
+	AssetTypeSynapseSource:             "synapse",
+	AssetTypeAthenaQuery:               "athena",
+	AssetTypeAthenaSeed:                "athena",
+	AssetTypeAthenaSQLSensor:           "athena",
+	AssetTypeAthenaTableSensor:         "athena",
+	AssetTypeAthenaSource:              "athena",
+	AssetTypeDuckDBQuery:               "duckdb",
+	AssetTypeDuckDBSeed:                "duckdb",
+	AssetTypeDuckDBQuerySensor:         "duckdb",
+	AssetTypeDuckDBSource:              "duckdb",
+	AssetTypeMotherduckQuery:           "motherduck",
+	AssetTypeClickHouse:                "clickhouse",
+	AssetTypeClickHouseSeed:            "clickhouse",
+	AssetTypeClickHouseQuerySensor:     "clickhouse",
+	AssetTypeClickHouseTableSensor:     "clickhouse",
+	AssetTypeClickHouseSource:          "clickhouse",
 	AssetTypeEMRServerlessSpark:        "emr_serverless",
 	AssetTypeEMRServerlessPyspark:      "emr_serverless",
 	AssetTypeDataprocServerlessPyspark: "dataproc_serverless",
 	AssetTypeTrinoQuery:                "trino",
-	AssetTypeTrinoQuerySensor:      "trino",
-	AssetTypeOracleQuery:           "oracle",
-	AssetTypeOracleSource:          "oracle",
-	AssetTypeS3KeySensor:           "aws",
-	AssetTypeElasticsearch:         "elasticsearch",
+	AssetTypeTrinoQuerySensor:          "trino",
+	AssetTypeOracleQuery:               "oracle",
+	AssetTypeOracleSource:              "oracle",
+	AssetTypeS3KeySensor:               "aws",
+	AssetTypeElasticsearch:             "elasticsearch",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
