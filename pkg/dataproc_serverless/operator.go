@@ -7,15 +7,15 @@ import (
 	"log"
 	"time"
 
-	"cloud.google.com/go/dataproc/v2/apiv1"
+	dataproc "cloud.google.com/go/dataproc/v2/apiv1"
 	"cloud.google.com/go/logging/logadmin"
 	"cloud.google.com/go/storage"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/poll"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"google.golang.org/api/option"
 )
 
 type BasicOperator struct {
@@ -75,7 +75,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		params:        params,
 		asset:         asset,
 		pipeline:      ti.GetPipeline(),
-		poll: &PollTimer{
+		poll: &poll.Timer{
 			BaseDuration: time.Second,
 			// maximum backoff: 32 seconds
 			MaxRetry: 5,
@@ -99,17 +99,4 @@ func cloneEnv(env map[string]string) map[string]string {
 		clone[k] = v
 	}
 	return clone
-}
-
-// getClientOptions returns the appropriate options for GCP client authentication.
-// Returns an empty slice when using Application Default Credentials.
-func (c *Client) getClientOptions() []option.ClientOption {
-	if c.ServiceAccountJSON != "" {
-		return []option.ClientOption{option.WithCredentialsJSON([]byte(c.ServiceAccountJSON))}
-	}
-	if c.ServiceAccountFile != "" {
-		return []option.ClientOption{option.WithCredentialsFile(c.ServiceAccountFile)}
-	}
-	// Use Application Default Credentials - no explicit option needed
-	return []option.ClientOption{}
 }

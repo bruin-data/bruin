@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/poll"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
@@ -67,7 +68,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		params:    params,
 		asset:     asset,
 		pipeline:  ti.GetPipeline(),
-		poll: &PollTimer{
+		poll: &poll.Timer{
 			BaseDuration: time.Second,
 
 			// maximum backoff: 32 seconds

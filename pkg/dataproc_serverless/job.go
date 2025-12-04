@@ -18,6 +18,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/poll"
 	"github.com/google/uuid"
 )
 
@@ -88,7 +89,7 @@ type Job struct {
 	asset         *pipeline.Asset
 	pipeline      *pipeline.Pipeline
 	params        *JobRunParams
-	poll          *PollTimer
+	poll          *poll.Timer
 	env           map[string]string
 }
 

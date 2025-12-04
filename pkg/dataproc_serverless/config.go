@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"google.golang.org/api/option"
 )
 
 type MissingFieldsError struct {
@@ -33,7 +34,6 @@ func (c *Config) validate() error {
 		missing = append(missing, "workspace")
 	}
 
-	// check for credentials: either service_account_json, service_account_file, or use_application_default_credentials
 	hasCredentials := c.ServiceAccountJSON != "" || c.ServiceAccountFile != "" || c.UseApplicationDefaultCredentials
 	if !hasCredentials {
 		missing = append(missing, "service_account_json, service_account_file, or use_application_default_credentials")
@@ -47,6 +47,19 @@ func (c *Config) validate() error {
 
 type Client struct {
 	Config
+}
+
+// getClientOptions returns the appropriate options for GCP client authentication.
+// Returns an empty slice when using Application Default Credentials.
+func (c *Client) getClientOptions() []option.ClientOption {
+	if c.ServiceAccountJSON != "" {
+		return []option.ClientOption{option.WithCredentialsJSON([]byte(c.ServiceAccountJSON))}
+	}
+	if c.ServiceAccountFile != "" {
+		return []option.ClientOption{option.WithCredentialsFile(c.ServiceAccountFile)}
+	}
+	// Use Application Default Credentials - no explicit option needed
+	return []option.ClientOption{}
 }
 
 func NewClient(c Config) (*Client, error) {
