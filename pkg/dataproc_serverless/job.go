@@ -50,8 +50,8 @@ type JobRunParams struct {
 
 func parseParams(cfg *Client, params map[string]string) *JobRunParams {
 	jobParams := JobRunParams{
-		Project:        cfg.Project,
-		Region:         cfg.Region,
+		Project:        cfg.ProjectID,
+		Region:         cfg.Location,
 		RuntimeVersion: params["runtime_version"],
 		Config:         params["config"],
 		Workspace:      cfg.Workspace,

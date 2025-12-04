@@ -2418,11 +2418,8 @@ func (m *Manager) AddDataprocServerlessConnectionFromConfig(connection *config.D
 		m.DataprocServerless = make(map[string]*dataprocserverless.Client)
 	}
 	client, err := dataprocserverless.NewClient(dataprocserverless.Config{
-		Project:               connection.Project,
-		Region:                connection.Region,
-		ServiceAccountKey:     connection.ServiceAccountKey,
-		ServiceAccountKeyPath: connection.ServiceAccountKeyPath,
-		Workspace:             connection.Workspace,
+		GoogleCloudPlatformConnection: connection.GoogleCloudPlatformConnection,
+		Workspace:                     connection.Workspace,
 	})
 	if err != nil {
 		return err

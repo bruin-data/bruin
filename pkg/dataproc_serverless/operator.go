@@ -42,24 +42,21 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	}
 
 	params := parseParams(conn, asset.Parameters)
-	credentialsOption, err := conn.getCredentialsOption()
-	if err != nil {
-		return fmt.Errorf("error getting credentials: %w", err)
-	}
+	clientOptions := conn.getClientOptions()
 
-	batchClient, err := dataproc.NewBatchControllerClient(ctx, credentialsOption)
+	batchClient, err := dataproc.NewBatchControllerClient(ctx, clientOptions...)
 	if err != nil {
 		return fmt.Errorf("error creating dataproc batch client: %w", err)
 	}
 	defer batchClient.Close()
 
-	storageClient, err := storage.NewClient(ctx, credentialsOption)
+	storageClient, err := storage.NewClient(ctx, clientOptions...)
 	if err != nil {
 		return fmt.Errorf("error creating storage client: %w", err)
 	}
 	defer storageClient.Close()
 
-	logClient, err := logadmin.NewClient(ctx, conn.Project, credentialsOption)
+	logClient, err := logadmin.NewClient(ctx, conn.ProjectID, clientOptions...)
 	if err != nil {
 		return fmt.Errorf("error creating logging client: %w", err)
 	}
@@ -104,13 +101,15 @@ func cloneEnv(env map[string]string) map[string]string {
 	return clone
 }
 
-// getCredentialsOption returns the appropriate option for GCP client authentication.
-func (c *Client) getCredentialsOption() (option.ClientOption, error) {
-	if c.ServiceAccountKey != "" {
-		return option.WithCredentialsJSON([]byte(c.ServiceAccountKey)), nil
+// getClientOptions returns the appropriate options for GCP client authentication.
+// Returns an empty slice when using Application Default Credentials.
+func (c *Client) getClientOptions() []option.ClientOption {
+	if c.ServiceAccountJSON != "" {
+		return []option.ClientOption{option.WithCredentialsJSON([]byte(c.ServiceAccountJSON))}
 	}
-	if c.ServiceAccountKeyPath != "" {
-		return option.WithCredentialsFile(c.ServiceAccountKeyPath), nil
+	if c.ServiceAccountFile != "" {
+		return []option.ClientOption{option.WithCredentialsFile(c.ServiceAccountFile)}
 	}
-	return nil, fmt.Errorf("no credentials provided")
+	// Use Application Default Credentials - no explicit option needed
+	return []option.ClientOption{}
 }

@@ -899,16 +899,8 @@ func (c EMRServerlessConnection) GetName() string {
 }
 
 type DataprocServerlessConnection struct {
-	Name                  string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Project               string `yaml:"project" json:"project" mapstructure:"project"`
-	Region                string `yaml:"region" json:"region" mapstructure:"region"`
-	ServiceAccountKey     string `yaml:"service_account_key,omitempty" json:"service_account_key,omitempty" jsonschema:"oneof_required=service_account_key" mapstructure:"service_account_key"`
-	ServiceAccountKeyPath string `yaml:"service_account_key_path,omitempty" json:"service_account_key_path,omitempty" jsonschema:"oneof_required=service_account_key_path" mapstructure:"service_account_key_path"`
-	Workspace             string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
-}
-
-func (c DataprocServerlessConnection) GetName() string {
-	return c.Name
+	GoogleCloudPlatformConnection `yaml:",inline" json:",inline" mapstructure:",squash"`
+	Workspace                     string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
 }
 
 type GoogleAnalyticsConnection struct {
