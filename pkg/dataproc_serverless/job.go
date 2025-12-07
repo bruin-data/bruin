@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/dataproc/v2/apiv1"
+	dataproc "cloud.google.com/go/dataproc/v2/apiv1"
 	"cloud.google.com/go/dataproc/v2/apiv1/dataprocpb"
 	"cloud.google.com/go/logging/logadmin"
 	"cloud.google.com/go/storage"
@@ -214,7 +214,7 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 	sparkProperties := make(map[string]string)
 	for key, val := range job.env {
 		sparkProperties[fmt.Sprintf("spark.executorEnv.%s", key)] = val
-		sparkProperties[fmt.Sprintf("spark.yarn.appMasterEnv.%s", key)] = val
+		sparkProperties[fmt.Sprintf("spark.dataproc.driverEnv.%s", key)] = val
 	}
 
 	// Parse additional config from params
