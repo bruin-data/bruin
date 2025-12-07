@@ -44,7 +44,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	params := parseParams(conn, asset.Parameters)
 	clientOptions := conn.getClientOptions()
 
-	batchClient, err := dataproc.NewBatchControllerClient(ctx, clientOptions...)
+	batchClient, err := dataproc.NewBatchControllerRESTClient(ctx, clientOptions...)
 	if err != nil {
 		return fmt.Errorf("error creating dataproc batch client: %w", err)
 	}
