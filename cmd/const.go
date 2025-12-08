@@ -120,7 +120,7 @@ func parseVariable(variable string) (map[string]any, error) {
 	return map[string]any{key: value}, nil
 }
 
-// unmarshalWithIntegerPreservation unmarshals JSON while preserving integer types
+// unmarshalWithIntegerPreservation unmarshals JSON while preserving integer types.
 // instead of converting all numbers to float64
 func unmarshalWithIntegerPreservation(data []byte, v any) error {
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
@@ -136,7 +136,7 @@ func unmarshalWithIntegerPreservation(data []byte, v any) error {
 	return nil
 }
 
-// convertNumbers recursively converts json.Number values to int64 or float64
+// convertNumbers recursively converts json.Number values to int64 or float64.
 func convertNumbers(v any) {
 	switch val := v.(type) {
 	case *map[string]any:
