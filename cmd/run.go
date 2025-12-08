@@ -1154,7 +1154,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 
 func printSingleCheckError(result *scheduler.TaskExecutionResult) {
 	fmt.Println()
-	errorPrinter.Println("Check Failed")
+	infoPrinter.Println("Check Failed")
 	fmt.Println(strings.Repeat("-", 12))
 	fmt.Println()
 
