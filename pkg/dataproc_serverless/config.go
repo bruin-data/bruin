@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/config"
 	"google.golang.org/api/option"
 )
 
@@ -17,9 +16,11 @@ func (e *MissingFieldsError) Error() string {
 }
 
 type Config struct {
-	config.GoogleCloudPlatformConnection
-	Workspace string `yaml:"workspace"`
-	Region    string `yaml:"region"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty"`
+	ProjectID          string `yaml:"project_id,omitempty"`
+	Region             string `yaml:"region" json:"region"`
+	Workspace          string `yaml:"workspace"`
 }
 
 func (c *Config) validate() error {
@@ -28,9 +29,6 @@ func (c *Config) validate() error {
 	if c.ProjectID == "" {
 		missing = append(missing, "project_id")
 	}
-	if c.Location == "" {
-		missing = append(missing, "location")
-	}
 	if c.Region == "" {
 		missing = append(missing, "region")
 	}
@@ -38,7 +36,7 @@ func (c *Config) validate() error {
 		missing = append(missing, "workspace")
 	}
 
-	hasCredentials := c.ServiceAccountJSON != "" || c.ServiceAccountFile != "" || c.UseApplicationDefaultCredentials
+	hasCredentials := c.ServiceAccountJSON != "" || c.ServiceAccountFile != ""
 	if !hasCredentials {
 		missing = append(missing, "service_account_json, service_account_file, or use_application_default_credentials")
 	}
