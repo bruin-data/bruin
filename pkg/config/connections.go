@@ -901,6 +901,7 @@ func (c EMRServerlessConnection) GetName() string {
 type DataprocServerlessConnection struct {
 	GoogleCloudPlatformConnection `yaml:",inline" json:",inline" mapstructure:",squash"`
 	Workspace                     string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+	Region                        string `yaml:"region" json:"region" mapstructure:"region"`
 }
 
 type GoogleAnalyticsConnection struct {

@@ -30,12 +30,12 @@ import (
 	"github.com/bruin-data/bruin/pkg/couchbase"
 	"github.com/bruin-data/bruin/pkg/cursor"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/db2"
 	"github.com/bruin-data/bruin/pkg/docebo"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
-	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fluxx"
@@ -2420,6 +2420,7 @@ func (m *Manager) AddDataprocServerlessConnectionFromConfig(connection *config.D
 	client, err := dataprocserverless.NewClient(dataprocserverless.Config{
 		GoogleCloudPlatformConnection: connection.GoogleCloudPlatformConnection,
 		Workspace:                     connection.Workspace,
+		Region:                        connection.Region,
 	})
 	if err != nil {
 		return err

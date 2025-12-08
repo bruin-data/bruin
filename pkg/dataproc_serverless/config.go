@@ -19,6 +19,7 @@ func (e *MissingFieldsError) Error() string {
 type Config struct {
 	config.GoogleCloudPlatformConnection
 	Workspace string `yaml:"workspace"`
+	Region    string `yaml:"region"`
 }
 
 func (c *Config) validate() error {
@@ -29,6 +30,9 @@ func (c *Config) validate() error {
 	}
 	if c.Location == "" {
 		missing = append(missing, "location")
+	}
+	if c.Region == "" {
+		missing = append(missing, "region")
 	}
 	if c.Workspace == "" {
 		missing = append(missing, "workspace")
