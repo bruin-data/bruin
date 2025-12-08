@@ -95,7 +95,7 @@ func parseVariable(variable string) (map[string]any, error) {
 	var composite map[string]any
 	variable = strings.TrimSpace(variable)
 
-	err := json.Unmarshal([]byte(variable), &composite)
+	err := unmarshalWithIntegerPreservation([]byte(variable), &composite)
 	if err == nil {
 		return composite, nil
 	}
@@ -114,8 +114,69 @@ func parseVariable(variable string) (map[string]any, error) {
 	valueStr := segments[1]
 
 	var value any
-	if err := json.Unmarshal([]byte(valueStr), &value); err != nil {
+	if err := unmarshalWithIntegerPreservation([]byte(valueStr), &value); err != nil {
 		return nil, err
 	}
 	return map[string]any{key: value}, nil
+}
+
+// unmarshalWithIntegerPreservation unmarshals JSON while preserving integer types
+// instead of converting all numbers to float64.
+func unmarshalWithIntegerPreservation(data []byte, v any) error {
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.UseNumber()
+
+	err := decoder.Decode(v)
+	if err != nil {
+		return err
+	}
+
+	// Convert json.Number values to appropriate int or float types
+	convertNumbers(v)
+	return nil
+}
+
+// convertNumbers recursively converts json.Number values to int64 or float64.
+func convertNumbers(v any) {
+	switch val := v.(type) {
+	case *map[string]any:
+		convertNumbersInMap(*val)
+	case map[string]any:
+		convertNumbersInMap(val)
+	case *[]any:
+		convertNumbersInSlice(*val)
+	case []any:
+		convertNumbersInSlice(val)
+	case *any:
+		convertNumbers(*val)
+	}
+}
+
+func convertNumbersInMap(m map[string]any) {
+	for key, value := range m {
+		if num, ok := value.(json.Number); ok {
+			if intVal, err := num.Int64(); err == nil {
+				m[key] = intVal
+			} else if floatVal, err := num.Float64(); err == nil {
+				m[key] = floatVal
+			}
+		} else {
+			convertNumbers(value)
+			m[key] = value
+		}
+	}
+}
+
+func convertNumbersInSlice(s []any) {
+	for i, value := range s {
+		if num, ok := value.(json.Number); ok {
+			if intVal, err := num.Int64(); err == nil {
+				s[i] = intVal
+			} else if floatVal, err := num.Float64(); err == nil {
+				s[i] = floatVal
+			}
+		} else {
+			convertNumbers(value)
+		}
+	}
 }
