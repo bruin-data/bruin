@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -51,7 +50,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/fatih/color"
-	pkgerrors "github.com/pkg/errors"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 	"github.com/xlab/treeprint"
@@ -797,7 +796,7 @@ func Run(isDebug *bool) *cli.Command {
 			if secretsBackend == "vault" {
 				connectionManager, err = secrets.NewVaultClientFromEnv(logger) //nolint:contextcheck
 				if err != nil {
-					errs = append(errs, pkgerrors.Wrap(err, "failed to initialize vault client"))
+					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}
 			} else {
 				connectionManager, errs = connection.NewManagerFromConfig(cm)
@@ -1159,8 +1158,8 @@ func printSingleCheckError(result *scheduler.TaskExecutionResult) {
 	fmt.Println(strings.Repeat("-", 12))
 	fmt.Println()
 
-	var checkErr *ansisql.CheckError
-	if errors.As(result.Error, &checkErr) {
+	checkErr, ok := result.Error.(*ansisql.CheckError)
+	if ok {
 		fmt.Printf("Error: %s\n", checkErr.Message)
 		fmt.Println()
 		fmt.Printf("Result: %d (expected: %d)\n", checkErr.Result, checkErr.Expected)
@@ -1623,13 +1622,13 @@ func (c *clearFileWriter) Write(p []byte) (int, error) {
 func logOutput(logPath string) (func(), error) {
 	err := os.MkdirAll(filepath.Dir(logPath), 0o755)
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to create log directory")
+		return nil, errors.Wrap(err, "failed to create log directory")
 	}
 
 	// open file read/write | create if not exist | clear file at open if exists
 	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to open log file")
+		return nil, errors.Wrap(err, "failed to open log file")
 	}
 
 	// save existing stdout | MultiWriter writes to saved stdout and file
@@ -1638,7 +1637,7 @@ func logOutput(logPath string) (func(), error) {
 	// get pipe reader and writer | writes to pipe writer come out pipe reader
 	r, w, err := os.Pipe()
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to create log pipe")
+		return nil, errors.Wrap(err, "failed to create log pipe")
 	}
 
 	// replace stdout,stderr with pipe writer | all writes to stdout, stderr will go through pipe instead (fmt.print, log)
