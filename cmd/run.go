@@ -1153,17 +1153,15 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 }
 
 func printSingleCheckError(result *scheduler.TaskExecutionResult) {
-	fmt.Println()
-	infoPrinter.Println("Check Failed")
+	infoPrinter.Println("\nCheck Failed")
 	fmt.Println(strings.Repeat("-", 12))
-	fmt.Println()
 
 	checkErr, ok := result.Error.(*ansisql.CheckError) //nolint:errorlint
 	if ok {
 		infoPrinter.Printf("Error: %s\n\n", checkErr.Message)
 		infoPrinter.Printf("Result: %d (expected: %d)\n\n", checkErr.Result, checkErr.Expected)
 		infoPrinter.Println("Query:")
-		fmt.Println(checkErr.Query)
+		infoPrinter.Println(checkErr.Query)
 	} else {
 		errorPrinter.Printf("Error: %s\n", result.Error)
 	}
