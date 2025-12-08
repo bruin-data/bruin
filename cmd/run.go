@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -50,7 +51,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
+	pkgerrors "github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 	"github.com/xlab/treeprint"
@@ -796,7 +797,7 @@ func Run(isDebug *bool) *cli.Command {
 			if secretsBackend == "vault" {
 				connectionManager, err = secrets.NewVaultClientFromEnv(logger) //nolint:contextcheck
 				if err != nil {
-					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
+					errs = append(errs, pkgerrors.Wrap(err, "failed to initialize vault client"))
 				}
 			} else {
 				connectionManager, errs = connection.NewManagerFromConfig(cm)
@@ -944,8 +945,12 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			if len(errorsInTaskResults) > 0 {
-				printExecutionSummary(results, s, duration, len(results))
-				printErrorsInResults(errorsInTaskResults, s)
+				if singleCheckID != "" {
+					printSingleCheckError(errorsInTaskResults[0])
+				} else {
+					printExecutionSummary(results, s, duration, len(results))
+					printErrorsInResults(errorsInTaskResults, s)
+				}
 				return cli.Exit("", 1)
 			}
 
@@ -1146,6 +1151,27 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 	fmt.Println()
 	fmt.Println(tree.String())
+}
+
+func printSingleCheckError(result *scheduler.TaskExecutionResult) {
+	fmt.Println()
+	fmt.Println("Check Failed")
+	fmt.Println(strings.Repeat("-", 12))
+	fmt.Println()
+
+	var checkErr *ansisql.CheckError
+	if errors.As(result.Error, &checkErr) {
+		fmt.Printf("Error: %s\n", checkErr.Message)
+		fmt.Println()
+		fmt.Printf("Result: %d (expected: %d)\n", checkErr.Result, checkErr.Expected)
+		fmt.Println()
+		fmt.Println("Query:")
+		fmt.Println(checkErr.Query)
+		fmt.Println()
+	} else {
+		fmt.Printf("Error: %s\n", result.Error)
+		fmt.Println()
+	}
 }
 
 //nolint:maintidx
@@ -1597,13 +1623,13 @@ func (c *clearFileWriter) Write(p []byte) (int, error) {
 func logOutput(logPath string) (func(), error) {
 	err := os.MkdirAll(filepath.Dir(logPath), 0o755)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create log directory")
+		return nil, pkgerrors.Wrap(err, "failed to create log directory")
 	}
 
 	// open file read/write | create if not exist | clear file at open if exists
 	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open log file")
+		return nil, pkgerrors.Wrap(err, "failed to open log file")
 	}
 
 	// save existing stdout | MultiWriter writes to saved stdout and file
@@ -1612,7 +1638,7 @@ func logOutput(logPath string) (func(), error) {
 	// get pipe reader and writer | writes to pipe writer come out pipe reader
 	r, w, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create log pipe")
+		return nil, pkgerrors.Wrap(err, "failed to create log pipe")
 	}
 
 	// replace stdout,stderr with pipe writer | all writes to stdout, stderr will go through pipe instead (fmt.print, log)
