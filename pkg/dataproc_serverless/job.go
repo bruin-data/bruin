@@ -19,7 +19,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/poll"
-	"github.com/google/uuid"
 )
 
 type batchError struct {
@@ -90,6 +89,7 @@ type Job struct {
 	pipeline      *pipeline.Pipeline
 	params        *JobRunParams
 	poll          *poll.Timer
+	id            string
 	env           map[string]string
 }
 
@@ -105,11 +105,7 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing workspace URL: %w", err)
 	}
-	jobID, err := uuid.NewV7()
-	if err != nil {
-		return nil, fmt.Errorf("error generating job ID: %w", err)
-	}
-	jobURI := workspaceURI.JoinPath(job.pipeline.Name, jobID.String())
+	jobURI := workspaceURI.JoinPath(job.pipeline.Name, job.id)
 
 	bucket := job.storageClient.Bucket(workspaceURI.Host)
 
@@ -243,11 +239,9 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 		},
 	}
 
-	batchID := fmt.Sprintf("bruin-%s", uuid.New().String()[:8])
-
 	return &dataprocpb.CreateBatchRequest{
 		Parent:  fmt.Sprintf("projects/%s/locations/%s", job.params.Project, job.params.Region),
-		BatchId: batchID,
+		BatchId: job.id,
 		Batch:   batch,
 	}
 }

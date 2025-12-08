@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/poll"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/google/uuid"
 )
 
 type BasicOperator struct {
@@ -81,6 +82,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 			MaxRetry: 5,
 		},
 		env: envVars,
+		id:  uuid.New().String(),
 	}
 
 	return job.Run(ctx)
