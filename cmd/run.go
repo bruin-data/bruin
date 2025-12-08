@@ -1158,7 +1158,7 @@ func printSingleCheckError(result *scheduler.TaskExecutionResult) {
 	fmt.Println(strings.Repeat("-", 12))
 	fmt.Println()
 
-	checkErr, ok := result.Error.(*ansisql.CheckError)
+	checkErr, ok := result.Error.(*ansisql.CheckError) //nolint:errorlint
 	if ok {
 		fmt.Printf("Error: %s\n", checkErr.Message)
 		fmt.Println()
