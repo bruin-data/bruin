@@ -3,9 +3,11 @@ package ansisql
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -75,6 +77,9 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 	if !ok {
 		return errors.Errorf("connection '%s' cannot be used for the check '%s'", connectionName, c.checkName)
 	}
+
+	w, _ := ctx.Value(executor.KeyPrinter).(io.Writer)
+	fmt.Fprintf(w, "Executing query:\n%s\n\n", c.queryInstance.Query)
 
 	res, err := s.Select(ctx, c.queryInstance)
 	if err != nil {
