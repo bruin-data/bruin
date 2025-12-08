@@ -125,12 +125,12 @@ func parseVariable(variable string) (map[string]any, error) {
 func unmarshalWithIntegerPreservation(data []byte, v any) error {
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
 	decoder.UseNumber()
-	
+
 	err := decoder.Decode(v)
 	if err != nil {
 		return err
 	}
-	
+
 	// Convert json.Number values to appropriate int or float types
 	convertNumbers(v)
 	return nil
