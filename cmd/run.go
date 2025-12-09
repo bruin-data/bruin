@@ -960,8 +960,12 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			if len(errorsInTaskResults) > 0 {
-				printExecutionSummary(results, s, duration, len(results))
-				printErrorsInResults(errorsInTaskResults, s)
+				if singleCheckID != "" {
+					printSingleCheckError(errorsInTaskResults[0])
+				} else {
+					printExecutionSummary(results, s, duration, len(results))
+					printErrorsInResults(errorsInTaskResults, s)
+				}
 				return cli.Exit("", 1)
 			}
 
@@ -1162,6 +1166,21 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 	fmt.Println()
 	fmt.Println(tree.String())
+}
+
+func printSingleCheckError(result *scheduler.TaskExecutionResult) {
+	infoPrinter.Println("\nCheck Failed")
+	infoPrinter.Println(strings.Repeat("-", 12))
+
+	checkErr, ok := result.Error.(*ansisql.CheckError) //nolint:errorlint
+	if ok {
+		infoPrinter.Printf("Error: %s\n\n", checkErr.Message)
+		infoPrinter.Printf("Result: %d (expected: %d)\n\n", checkErr.Result, checkErr.Expected)
+		infoPrinter.Println("Query:")
+		infoPrinter.Println(checkErr.Query)
+	} else {
+		errorPrinter.Printf("Error: %s\n", result.Error)
+	}
 }
 
 //nolint:maintidx
