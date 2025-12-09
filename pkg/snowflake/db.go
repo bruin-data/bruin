@@ -65,6 +65,22 @@ func (db *DB) initializeDB(ctx context.Context) error {
 	return nil
 }
 
+// logSnowflakeQueryID tries to read a query ID from the channel and prints it.
+// It is non-blocking, so it is safe to call even if no ID was sent.
+func logSnowflakeQueryID(ch <-chan string) {
+	if ch == nil {
+		return
+	}
+
+	select {
+	case qid := <-ch:
+		if qid != "" {
+			fmt.Printf("Snowflake query ID: %s\n", qid)
+		}
+	default:
+	}
+}
+
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	_, err := db.Select(ctx, query)
 	return err
@@ -78,6 +94,10 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
+
+	// Attach a query ID channel and multi-statement context
+	qidChan := make(chan string, 1)
+	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create snowflake context")
@@ -85,6 +105,9 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
+	// Try to print the query ID once the function returns
+	defer logSnowflakeQueryID(qidChan)
+
 	if err == nil {
 		err = rows.Err()
 	}
@@ -131,6 +154,9 @@ func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][
 		return nil, err
 	}
 
+	// Attach a query ID channel and multi-statement context
+	qidChan := make(chan string, 1)
+	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create snowflake context")
@@ -138,6 +164,9 @@ func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][
 
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
+	// Try to print the query ID once the function returns
+	defer logSnowflakeQueryID(qidChan)
+
 	if err == nil {
 		err = rows.Err()
 	}
@@ -196,12 +225,19 @@ func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	if err := db.initializeDB(ctx); err != nil {
 		return false, err
 	}
+
+	// Attach a query ID channel and multi-statement context
+	qidChan := make(chan string, 1)
+	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to create snowflake context")
 	}
 
 	rows, err := db.conn.QueryContext(ctx, query.ToExplainQuery())
+	// Try to print the query ID once the function returns
+	defer logSnowflakeQueryID(qidChan)
+
 	if err == nil {
 		err = rows.Err()
 	}
@@ -244,6 +280,9 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 		return nil, err
 	}
 	// Prepare Snowflake context for the query execution
+	// Attach a query ID channel and multi-statement context
+	qidChan := make(chan string, 1)
+	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create snowflake context")
@@ -252,6 +291,9 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	// Convert query object to string and execute it
 	queryString := queryObj.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
+	// Try to print the query ID once the function returns
+	defer logSnowflakeQueryID(qidChan)
+
 	if err != nil {
 		errorMessage := err.Error()
 		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
