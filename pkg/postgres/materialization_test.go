@@ -114,7 +114,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
 				`DELETE FROM "my"\."asset" WHERE "dt" in \(SELECT DISTINCT "dt" FROM __bruin_tmp_.+\);` + "\n" +
 				`INSERT INTO "my"\."asset" SELECT \* FROM __bruin_tmp_.+;` + "\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
@@ -132,7 +132,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1, NOW() as \"eventTime\"",
 			want: "^BEGIN TRANSACTION;\n" +
-				`CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1, NOW\(\) as "eventTime"\n;\n` +
+				`CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1, NOW\(\) as "eventTime";\n` +
 				`DELETE FROM "my"\."asset" WHERE "eventTime" in \(SELECT DISTINCT "eventTime" FROM __bruin_tmp_.+\);` + "\n" +
 				`INSERT INTO "my"\."asset" SELECT \* FROM __bruin_tmp_.+;` + "\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
