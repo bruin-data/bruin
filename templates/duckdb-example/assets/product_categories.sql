@@ -11,7 +11,7 @@ columns:
     primary_key: true
     checks:
       - name: not_null
-      - name: negative
+      - name: non_negative
   - name: category_name
     type: VARCHAR
     description: "Name of the product category"
