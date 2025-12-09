@@ -935,13 +935,6 @@ func Run(isDebug *bool) *cli.Command {
 			exeCtx, cancel := signal.NotifyContext(timeoutCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 
-			// Check ADC credentials for all BigQuery connections before execution starts
-			// This ensures credentials are available before any tasks begin running
-			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, connectionManager); err != nil {
-				errorPrinter.Printf("Failed to verify BigQuery ADC credentials: %v\n", err)
-				return cli.Exit("", 1)
-			}
-
 			ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 			start := time.Now()

@@ -7,14 +7,17 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/manifoldco/promptui"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2/google"
 )
+
+// adcPromptMutex ensures only one ADC credential prompt happens at a time across all BigQuery assets.
+// This prevents multiple parallel assets from all prompting the user simultaneously.
+var adcPromptMutex sync.Mutex
 
 // checkADCCredentials checks if ADC credentials are available. Returns the error from
 // FindDefaultCredentials if credentials are not available, or nil if available or not needed.
@@ -27,9 +30,21 @@ func checkADCCredentials(ctx context.Context, conn DB) error {
 }
 
 // ensureADCCredentialsWithPrompt checks for ADC credentials and prompts the user if needed.
-// This is used before pipeline execution starts to ensure credentials are available.
+// Uses a global mutex to ensure only one prompt happens at a time when multiple BigQuery
+// assets run in parallel.
 func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn DB) error {
+	// Quick check without lock - if credentials are available, no need to acquire mutex
 	err := checkADCCredentials(ctx, conn)
+	if err == nil {
+		return nil
+	}
+
+	// Acquire mutex to ensure only one prompt at a time
+	adcPromptMutex.Lock()
+	defer adcPromptMutex.Unlock()
+
+	// Re-check after acquiring lock - another goroutine may have completed authentication
+	err = checkADCCredentials(ctx, conn)
 	if err == nil {
 		return nil
 	}
@@ -94,14 +109,6 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 		return errors.Wrap(err, "ADC credentials still not available after authentication")
 	}
 
-	// Create the BigQuery client if it was nil (lazy initialization)
-	// Type assert to *Client to access ensureClientInitialized method
-	if bqClient, ok := conn.(*Client); ok {
-		if err := bqClient.ensureClientInitialized(ctx); err != nil {
-			return errors.Wrap(err, "failed to create BigQuery client after ADC authentication")
-		}
-	}
-
 	return nil
 }
 
@@ -109,59 +116,4 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 func isGcloudAvailable() bool {
 	_, err := exec.LookPath("gcloud")
 	return err == nil
-}
-
-// CheckADCCredentialsForPipeline checks ADC credentials for all BigQuery connections
-// used in the pipeline before execution starts. This ensures credentials are available
-// before any tasks begin running, avoiding prompts during parallel execution.
-func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, connGetter config.ConnectionGetter) error {
-	// Collect unique BigQuery connection names from all assets
-	bigQueryConnections := make(map[string]bool)
-
-	for _, asset := range p.Assets {
-		// Check if this is a BigQuery asset
-		if !isBigQueryAssetType(asset.Type) {
-			continue
-		}
-
-		// Get the connection name for this asset
-		connName, err := p.GetConnectionNameForAsset(asset)
-		if err != nil {
-			// Skip assets where we can't determine the connection
-			continue
-		}
-
-		bigQueryConnections[connName] = true
-	}
-
-	// Check each unique BigQuery connection
-	for connName := range bigQueryConnections {
-		conn := connGetter.GetConnection(connName)
-		if conn == nil {
-			continue
-		}
-
-		bqConn, ok := conn.(DB)
-		if !ok {
-			continue
-		}
-
-		// Check if this connection uses ADC
-		if !bqConn.UsesApplicationDefaultCredentials() {
-			continue
-		}
-
-		// Check and prompt for ADC credentials if needed
-		if err := ensureADCCredentialsWithPrompt(ctx, connName, bqConn); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// isBigQueryAssetType checks if the given asset type is a BigQuery type.
-func isBigQueryAssetType(assetType pipeline.AssetType) bool {
-	mapping, ok := pipeline.AssetTypeConnectionMapping[assetType]
-	return ok && mapping == "google_cloud_platform"
 }

@@ -185,11 +185,20 @@ func (d *Client) createClient(ctx context.Context) error {
 // ensureClientInitialized ensures the underlying BigQuery client exists, creating it if necessary.
 // This is required for ADC (Application Default Credentials) lazy initialization - the client
 // may be nil when ADC is enabled and credentials weren't available at startup.
+// For ADC connections, this will prompt the user for authentication if credentials are not available.
 func (d *Client) ensureClientInitialized(ctx context.Context) error {
-	if d.client == nil {
-		return d.createClient(ctx)
+	if d.client != nil {
+		return nil
 	}
-	return nil
+
+	// If using ADC, check and prompt for credentials if needed
+	if d.config.UseApplicationDefaultCredentials {
+		if err := ensureADCCredentialsWithPrompt(ctx, d.config.ProjectID, d); err != nil {
+			return err
+		}
+	}
+
+	return d.createClient(ctx)
 }
 
 func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Client, error) {
