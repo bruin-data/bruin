@@ -2,7 +2,7 @@
 name: drivers
 materialization:
    type: table
-   strategy: append
+   strategy: create+replace
 columns:
   - name: id
     type: integer
