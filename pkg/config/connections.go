@@ -905,6 +905,7 @@ type DataprocServerlessConnection struct {
 	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	Region             string `yaml:"region" json:"region" mapstructure:"region"`
 	Workspace          string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+	ExecutionRole      string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
 }
 
 func (c DataprocServerlessConnection) GetName() string {

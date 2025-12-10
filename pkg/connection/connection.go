@@ -2423,6 +2423,7 @@ func (m *Manager) AddDataprocServerlessConnectionFromConfig(connection *config.D
 		ProjectID:          connection.ProjectID,
 		Workspace:          connection.Workspace,
 		Region:             connection.Region,
+		ExecutionRole:      connection.ExecutionRole,
 	})
 	if err != nil {
 		return err

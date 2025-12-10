@@ -46,6 +46,7 @@ type JobRunParams struct {
 	Args           []string
 	Timeout        time.Duration
 	Workspace      string
+	ExecutionRole  string
 }
 
 func parseParams(cfg *Client, params map[string]string) *JobRunParams {
@@ -55,6 +56,7 @@ func parseParams(cfg *Client, params map[string]string) *JobRunParams {
 		RuntimeVersion: params["runtime_version"],
 		Config:         params["config"],
 		Workspace:      cfg.Workspace,
+		ExecutionRole:  cfg.ExecutionRole,
 	}
 
 	// default runtime version
@@ -237,6 +239,7 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 			Version:    job.params.RuntimeVersion,
 			Properties: sparkProperties,
 		},
+		EnvironmentConfig: batchEnvironmentConfig(job.params.ExecutionRole),
 	}
 
 	return &dataprocpb.CreateBatchRequest{
@@ -347,5 +350,17 @@ func (job Job) buildLogConsumer(ctx context.Context, batchID string) LogConsumer
 		region:    job.params.Region,
 		batchID:   batchID,
 		lastFetch: time.Now(),
+	}
+}
+
+func batchEnvironmentConfig(role string) *dataprocpb.EnvironmentConfig {
+	if strings.TrimSpace(role) == "" {
+		return nil
+	}
+
+	return &dataprocpb.EnvironmentConfig{
+		ExecutionConfig: &dataprocpb.ExecutionConfig{
+			ServiceAccount: role,
+		},
 	}
 }

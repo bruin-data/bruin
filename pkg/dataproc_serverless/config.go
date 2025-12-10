@@ -21,6 +21,7 @@ type Config struct {
 	ProjectID          string `yaml:"project_id,omitempty"`
 	Region             string `yaml:"region" json:"region"`
 	Workspace          string `yaml:"workspace"`
+	ExecutionRole      string `yaml:"execution_role"`
 }
 
 func (c *Config) validate() error {
