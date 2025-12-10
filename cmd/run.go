@@ -939,9 +939,10 @@ func Run(isDebug *bool) *cli.Command {
 			exeCtx, cancel := signal.NotifyContext(timeoutCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 
-			// Check ADC credentials for all BigQuery connections before execution starts
+			// Check ADC credentials for BigQuery connections used by pending assets
 			// This ensures credentials are available before any tasks begin running
-			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, connectionManager); err != nil {
+			pendingAssets := getPendingAssets(s)
+			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, pendingAssets, connectionManager); err != nil {
 				errorPrinter.Printf("Failed to verify BigQuery ADC credentials: %v\n", err)
 				return cli.Exit("", 1)
 			}
@@ -1924,4 +1925,22 @@ func Validate(shouldvalidate bool, assetCounter assetCounter, lintChecker lintCh
 	}
 
 	return lintChecker(ctx, foundPipeline, pipelinePath, logger, true)
+}
+
+// getPendingAssets extracts unique assets from pending task instances in the scheduler.
+func getPendingAssets(s *scheduler.Scheduler) []*pipeline.Asset {
+	pendingInstances := s.GetTaskInstancesByStatus(scheduler.Pending)
+	seen := make(map[string]bool)
+	assets := make([]*pipeline.Asset, 0)
+
+	for _, instance := range pendingInstances {
+		asset := instance.GetAsset()
+		if seen[asset.Name] {
+			continue
+		}
+		seen[asset.Name] = true
+		assets = append(assets, asset)
+	}
+
+	return assets
 }
