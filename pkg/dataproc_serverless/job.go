@@ -19,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/poll"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 type batchError struct {
@@ -239,7 +240,7 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 			Version:    job.params.RuntimeVersion,
 			Properties: sparkProperties,
 		},
-		EnvironmentConfig: batchEnvironmentConfig(job.params.ExecutionRole),
+		EnvironmentConfig: batchEnvironmentConfig(job.params.ExecutionRole, job.params.Timeout),
 	}
 
 	return &dataprocpb.CreateBatchRequest{
@@ -353,14 +354,15 @@ func (job Job) buildLogConsumer(ctx context.Context, batchID string) LogConsumer
 	}
 }
 
-func batchEnvironmentConfig(role string) *dataprocpb.EnvironmentConfig {
-	if strings.TrimSpace(role) == "" {
-		return nil
+func batchEnvironmentConfig(role string, timeout time.Duration) *dataprocpb.EnvironmentConfig {
+	cfg := &dataprocpb.EnvironmentConfig{
+		ExecutionConfig: &dataprocpb.ExecutionConfig{},
 	}
-
-	return &dataprocpb.EnvironmentConfig{
-		ExecutionConfig: &dataprocpb.ExecutionConfig{
-			ServiceAccount: role,
-		},
+	if strings.TrimSpace(role) != "" {
+		cfg.ExecutionConfig.ServiceAccount = role
 	}
+	if timeout != 0 {
+		cfg.ExecutionConfig.Ttl = durationpb.New(timeout)
+	}
+	return cfg
 }
