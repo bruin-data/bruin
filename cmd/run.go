@@ -969,6 +969,12 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// Print single check success if running a single check
+			if singleCheckID != "" && len(results) > 0 {
+				printSingleCheckSuccess(results[0])
+				return nil
+			}
+
 			// Print execution summary (unless minimal-logs is enabled)
 			minimalLogs := c.Bool("minimal-logs")
 			if minimalLogs {
@@ -1169,17 +1175,39 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 }
 
 func printSingleCheckError(result *scheduler.TaskExecutionResult) {
-	infoPrinter.Println("\nCheck Failed")
-	infoPrinter.Println(strings.Repeat("-", 12))
+	fmt.Println("\nCheck Failed")
+	fmt.Println(strings.Repeat("-", 12))
 
 	checkErr, ok := result.Error.(*ansisql.CheckError) //nolint:errorlint
 	if ok {
-		infoPrinter.Printf("Error: %s\n\n", checkErr.Message)
-		infoPrinter.Printf("Result: %d (expected: %d)\n\n", checkErr.Result, checkErr.Expected)
-		infoPrinter.Println("Query:")
-		infoPrinter.Println(checkErr.Query)
+		fmt.Printf("Error: %s\n\n", checkErr.Message)
+		fmt.Printf("Result: %d (expected: %d)\n\n", checkErr.Result, checkErr.Expected)
+		fmt.Println("Query:")
+		fmt.Println(checkErr.Query + "\n")
 	} else {
-		errorPrinter.Printf("Error: %s\n", result.Error)
+		fmt.Printf("Error: %s\n", result.Error)
+	}
+}
+
+func printSingleCheckSuccess(result *scheduler.TaskExecutionResult) {
+	fmt.Println("\nCheck Passed")
+	fmt.Println(strings.Repeat("-", 12))
+
+	switch instance := result.Instance.(type) {
+	case *scheduler.ColumnCheckInstance:
+		fmt.Printf("Check: %s.%s\n", instance.Column.Name, instance.Check.Name)
+		fmt.Printf("Asset: %s\n\n", instance.GetAsset().Name)
+		if instance.ExecutedQuery != "" {
+			fmt.Println("Query:")
+			fmt.Println(instance.ExecutedQuery)
+		}
+	case *scheduler.CustomCheckInstance:
+		fmt.Printf("Check: %s (custom)\n", instance.Check.Name)
+		fmt.Printf("Asset: %s\n\n", instance.GetAsset().Name)
+		if instance.ExecutedQuery != "" {
+			fmt.Println("Query:")
+			fmt.Println(instance.ExecutedQuery)
+		}
 	}
 }
 

@@ -59,6 +59,7 @@ func (c *CountableQueryCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 		return errors.Wrap(err, "failed to add annotation comment")
 	}
 	c.queryInstance = annotatedQuery
+	ti.ExecutedQuery = c.queryInstance.Query
 
 	return c.check(ctx, conn)
 }
@@ -74,6 +75,7 @@ func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.Cus
 		return errors.Wrap(err, "failed to add annotation comment")
 	}
 	c.queryInstance = annotatedQuery
+	ti.ExecutedQuery = c.queryInstance.Query
 
 	return c.check(ctx, conn)
 }

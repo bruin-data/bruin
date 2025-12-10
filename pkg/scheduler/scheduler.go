@@ -225,6 +225,7 @@ type ColumnCheckInstance struct {
 	parentID string
 	Column   *pipeline.Column
 	Check    *pipeline.ColumnCheck
+	ExecutedQuery string
 }
 
 func (t *ColumnCheckInstance) GetType() TaskInstanceType {
@@ -243,6 +244,7 @@ type CustomCheckInstance struct {
 	*AssetInstance
 
 	Check *pipeline.CustomCheck
+	ExecutedQuery string
 }
 
 func (t *CustomCheckInstance) GetType() TaskInstanceType {
