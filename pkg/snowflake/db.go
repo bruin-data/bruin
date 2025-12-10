@@ -69,8 +69,8 @@ func (db *DB) initializeDB(ctx context.Context) error {
 // logSnowflakeQueryID tries to read a query ID from the channel and prints it.
 // It is non-blocking, so it is safe to call even if no ID was sent.
 func logSnowflakeQueryID(ctx context.Context, ch <-chan string) {
-	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
-	if writer == nil {
+	writer, ok := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if !ok {
 		return
 	}
 
