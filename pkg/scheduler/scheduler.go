@@ -227,9 +227,10 @@ func (t *AssetInstance) AddDownstream(task TaskInstance) {
 type ColumnCheckInstance struct {
 	*AssetInstance
 
-	parentID string
-	Column   *pipeline.Column
-	Check    *pipeline.ColumnCheck
+	parentID      string
+	Column        *pipeline.Column
+	Check         *pipeline.ColumnCheck
+	ExecutedQuery string
 }
 
 func (t *ColumnCheckInstance) GetType() TaskInstanceType {
@@ -247,7 +248,8 @@ func (t *ColumnCheckInstance) Blocking() bool {
 type CustomCheckInstance struct {
 	*AssetInstance
 
-	Check *pipeline.CustomCheck
+	Check         *pipeline.CustomCheck
+	ExecutedQuery string
 }
 
 func (t *CustomCheckInstance) GetType() TaskInstanceType {
