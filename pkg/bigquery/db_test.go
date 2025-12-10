@@ -1486,6 +1486,48 @@ func TestIsSamePartitioning(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "matching range bucket partitioning",
+			meta: &bigquery.TableMetadata{
+				RangePartitioning: &bigquery.RangePartitioning{
+					Field: "customer_id",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "RANGE_BUCKET(customer_id, GENERATE_ARRAY(0, 1000, 100))",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "matching range bucket partitioning - case insensitive",
+			meta: &bigquery.TableMetadata{
+				RangePartitioning: &bigquery.RangePartitioning{
+					Field: "customer_id",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "range_bucket(customer_id, generate_array(0, 1000, 100))",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mismatched range bucket partitioning - different column",
+			meta: &bigquery.TableMetadata{
+				RangePartitioning: &bigquery.RangePartitioning{
+					Field: "customer_id",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "RANGE_BUCKET(order_id, GENERATE_ARRAY(0, 1000, 100))",
+				},
+			},
+			expected: false,
+		},
+		{
 			name: "no partitioning in metadata but asset wants it",
 			meta: &bigquery.TableMetadata{},
 			asset: &pipeline.Asset{
