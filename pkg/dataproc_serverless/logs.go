@@ -2,6 +2,7 @@ package dataprocserverless
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ type LogLine struct {
 
 // CloudLoggingConsumer streams logs from Cloud Logging for a Dataproc Serverless batch job.
 type CloudLoggingConsumer struct {
-	ctx       context.Context
+	ctx       context.Context //nolint:containedctx
 	client    *logadmin.Client
 	project   string
 	region    string
@@ -49,7 +50,7 @@ func (l *CloudLoggingConsumer) Next() []LogLine {
 
 	for {
 		entry, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {

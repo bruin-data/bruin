@@ -213,8 +213,8 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 	// Add environment variables via Spark properties
 	sparkProperties := make(map[string]string)
 	for key, val := range job.env {
-		sparkProperties[fmt.Sprintf("spark.executorEnv.%s", key)] = val
-		sparkProperties[fmt.Sprintf("spark.dataproc.driverEnv.%s", key)] = val
+		sparkProperties["spark.executorEnv."+key] = val
+		sparkProperties["spark.dataproc.driverEnv."+key] = val
 	}
 
 	// Parse additional config from params
@@ -256,21 +256,22 @@ func (job Job) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("error preparing workspace: %w", err)
 	}
-	defer job.deleteWorkspace(ws)
+	defer job.deleteWorkspace(ws) //nolint:contextcheck
 
 	job.logger.Printf("uploading workspace to %s", ws.Root.String())
 
 	req := job.buildBatchConfig(ws)
-	job.logger.Printf("submitting batch job: %s", req.BatchId)
+	job.logger.Printf("submitting batch job: %s", req.GetBatchId())
 
 	operation, err := job.batchClient.CreateBatch(ctx, req)
 	if err != nil {
 		return fmt.Errorf("error submitting batch: %w", err)
 	}
 
-	defer func() {
+	defer func() { //nolint:contextcheck
 		if err != nil && !errors.As(err, &batchError{}) {
 			job.logger.Printf("error detected. attempting to delete batch.")
+			//nolint:errcheck
 			job.batchClient.CancelOperation(context.Background(), &longrunningpb.CancelOperationRequest{
 				Name: operation.Name(),
 			})
@@ -291,7 +292,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 
 	var (
 		previousState = dataprocpb.Batch_STATE_UNSPECIFIED
-		jobLogs       = job.buildLogConsumer(ctx, req.BatchId)
+		jobLogs       = job.buildLogConsumer(ctx, req.GetBatchId())
 	)
 
 	for {
@@ -308,26 +309,26 @@ func (job Job) Run(ctx context.Context) (err error) {
 			}
 			job.poll.Reset()
 
-			if previousState != batch.State {
+			if previousState != batch.GetState() {
 				job.logger.Printf(
 					"%s | %s | %s",
-					req.BatchId,
-					batch.State.String(),
-					batch.StateMessage,
+					req.GetBatchId(),
+					batch.GetState().String(),
+					batch.GetStateMessage(),
 				)
-				previousState = batch.State
+				previousState = batch.GetState()
 			}
 
 			for _, line := range jobLogs.Next() {
 				job.logger.Printf("%s | %s", line.Source, line.Message)
 			}
 
-			switch batch.State { //nolint:exhaustive
+			switch batch.GetState() { //nolint:exhaustive
 			case dataprocpb.Batch_FAILED, dataprocpb.Batch_CANCELLED:
 				return batchError{
-					BatchID: req.BatchId,
-					State:   batch.State,
-					Details: batch.StateMessage,
+					BatchID: req.GetBatchId(),
+					State:   batch.GetState(),
+					Details: batch.GetStateMessage(),
 				}
 			case dataprocpb.Batch_SUCCEEDED:
 				// Drain remaining logs
