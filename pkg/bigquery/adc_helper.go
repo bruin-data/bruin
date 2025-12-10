@@ -157,6 +157,31 @@ func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, a
 					}
 				}
 			}
+			continue
+		}
+
+		// Check ingestr assets for BigQuery source or destination
+		if asset.Type == pipeline.AssetTypeIngestr {
+			// Check if destination is BigQuery
+			if dest, ok := asset.Parameters["destination"]; ok && dest == "bigquery" {
+				// Get destination connection name
+				if destConn, ok := asset.Parameters["destination_connection"]; ok {
+					bigQueryConnections[destConn] = true
+				} else {
+					// Infer from pipeline defaults
+					connName, err := p.GetConnectionNameForAsset(asset)
+					if err == nil {
+						bigQueryConnections[connName] = true
+					}
+				}
+			}
+
+			// Check if source is BigQuery
+			if source, ok := asset.Parameters["source"]; ok && source == "bigquery" {
+				if sourceConn, ok := asset.Parameters["source_connection"]; ok {
+					bigQueryConnections[sourceConn] = true
+				}
+			}
 		}
 	}
 
