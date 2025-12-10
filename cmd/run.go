@@ -25,6 +25,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/date"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
@@ -1625,6 +1626,14 @@ func SetupExecutors(
 			mainExecutors[typ][scheduler.TaskInstanceTypeColumnCheck] = emrCheckRunner
 			mainExecutors[typ][scheduler.TaskInstanceTypeCustomCheck] = emrCustomCheckRunner
 		}
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeDataprocServerlessPyspark) {
+		dataprocServerlessOperator, err := dataprocserverless.NewBasicOperator(conn, jinjaVariables)
+		if err != nil {
+			return nil, err
+		}
+		mainExecutors[pipeline.AssetTypeDataprocServerlessPyspark][scheduler.TaskInstanceTypeMain] = dataprocServerlessOperator
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeS3KeySensor) {
