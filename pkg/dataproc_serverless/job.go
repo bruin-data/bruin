@@ -15,6 +15,7 @@ import (
 	dataproc "cloud.google.com/go/dataproc/v2/apiv1"
 	"cloud.google.com/go/dataproc/v2/apiv1/dataprocpb"
 	"cloud.google.com/go/logging/logadmin"
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"cloud.google.com/go/storage"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -262,31 +263,31 @@ func (job Job) Run(ctx context.Context) (err error) {
 	req := job.buildBatchConfig(ws)
 	job.logger.Printf("submitting batch job: %s", req.BatchId)
 
-	op, err := job.batchClient.CreateBatch(ctx, req)
+	operation, err := job.batchClient.CreateBatch(ctx, req)
 	if err != nil {
 		return fmt.Errorf("error submitting batch: %w", err)
 	}
 
-	// Get the batch name from the operation metadata
-	batchName := ""
-	if metadata, err := op.Metadata(); err == nil && metadata != nil {
-		batchName = metadata.GetBatch()
-	}
-	if batchName == "" {
-		batchName = fmt.Sprintf("projects/%s/locations/%s/batches/%s",
-			job.params.Project, job.params.Region, req.BatchId)
-	}
-
-	job.logger.Printf("created batch: %s", batchName)
-
 	defer func() {
 		if err != nil && !errors.As(err, &batchError{}) {
 			job.logger.Printf("error detected. attempting to delete batch.")
-			job.batchClient.DeleteBatch(context.Background(), &dataprocpb.DeleteBatchRequest{ //nolint
-				Name: batchName,
+			job.batchClient.CancelOperation(context.Background(), &longrunningpb.CancelOperationRequest{
+				Name: operation.Name(),
 			})
 		}
 	}()
+
+	_, err = operation.Poll(ctx)
+	if err != nil {
+		return fmt.Errorf("error fetching batch state: %w", err)
+	}
+
+	meta, err := operation.Metadata()
+	if err != nil {
+		return fmt.Errorf("error fetching batch metadata: %w", err)
+	}
+
+	job.logger.Printf("created batch: %s", meta.GetBatch())
 
 	var (
 		previousState = dataprocpb.Batch_STATE_UNSPECIFIED
@@ -299,7 +300,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 			return ctx.Err()
 		case <-time.After(job.poll.Duration()):
 			batch, err := job.batchClient.GetBatch(ctx, &dataprocpb.GetBatchRequest{
-				Name: batchName,
+				Name: meta.GetBatch(),
 			})
 			if err != nil {
 				job.poll.Increase()

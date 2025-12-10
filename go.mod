@@ -12,6 +12,7 @@ require (
 	cloud.google.com/go/bigquery v1.72.0
 	cloud.google.com/go/dataproc/v2 v2.11.2
 	cloud.google.com/go/logging v1.13.0
+	cloud.google.com/go/longrunning v0.6.7
 	cloud.google.com/go/storage v1.56.0
 	github.com/BurntSushi/toml v1.5.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.37.1
@@ -82,7 +83,6 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.5.2 // indirect
-	cloud.google.com/go/longrunning v0.6.7 // indirect
 	cloud.google.com/go/monitoring v1.24.2 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/4meepo/tagalign v1.4.2 // indirect
