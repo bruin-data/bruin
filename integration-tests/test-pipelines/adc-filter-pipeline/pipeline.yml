@@ -1,0 +1,6 @@
+name: adc_filter_test
+
+default_connections:
+  duckdb: "duckdb-adc-filter"
+  google_cloud_platform: "gcp-adc-filter"
+
