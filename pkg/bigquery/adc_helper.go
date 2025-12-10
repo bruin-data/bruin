@@ -164,9 +164,8 @@ func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, a
 		if asset.Type == pipeline.AssetTypeIngestr {
 			// Check if source connection is BigQuery
 			if sourceConn, ok := asset.Parameters["source_connection"]; ok {
-				conn := connGetter.GetConnection(sourceConn)
-				if conn != nil {
-					if _, ok := conn.(DB); ok {
+				if conn := connGetter.GetConnection(sourceConn); conn != nil {
+					if _, isBQ := conn.(DB); isBQ {
 						bigQueryConnections[sourceConn] = true
 					}
 				}
