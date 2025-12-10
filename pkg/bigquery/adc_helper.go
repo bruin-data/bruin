@@ -118,19 +118,46 @@ func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, a
 	bigQueryConnections := make(map[string]bool)
 
 	for _, asset := range assets {
-		// Check if this is a BigQuery asset
-		if !isBigQueryAssetType(asset.Type) {
+		// Check if this is a BigQuery SQL asset
+		if isBigQueryAssetType(asset.Type) {
+			// Get the connection name for this asset
+			connName, err := p.GetConnectionNameForAsset(asset)
+			if err == nil {
+				bigQueryConnections[connName] = true
+			}
 			continue
 		}
 
-		// Get the connection name for this asset
-		connName, err := p.GetConnectionNameForAsset(asset)
-		if err != nil {
-			// Skip assets where we can't determine the connection
-			continue
-		}
+		// Check Python assets for BigQuery connections
+		if asset.Type == pipeline.AssetTypePython {
+			hasExplicitSecrets := false
 
-		bigQueryConnections[connName] = true
+			// First: Check explicit secrets (preferred, most reliable)
+			for _, secret := range asset.Secrets {
+				hasExplicitSecrets = true
+				conn := connGetter.GetConnection(secret.SecretKey)
+				if conn == nil {
+					continue
+				}
+				// Check if this secret is a BigQuery connection
+				if _, ok := conn.(DB); ok {
+					bigQueryConnections[secret.SecretKey] = true
+				}
+			}
+
+			// Fallback: If no secrets declared, use majority inference
+			// This catches Python assets that might use BigQuery in BQ-majority pipelines
+			if !hasExplicitSecrets {
+				majorityType := p.GetMajorityAssetTypesFromSQLAssets(pipeline.AssetTypeBigqueryQuery)
+				if isBigQueryAssetType(majorityType) {
+					// Pipeline is BQ-majority, assume Python might use BQ
+					connName, err := p.GetConnectionNameForAsset(asset)
+					if err == nil {
+						bigQueryConnections[connName] = true
+					}
+				}
+			}
+		}
 	}
 
 	// Check each unique BigQuery connection
