@@ -726,7 +726,10 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				ExcludeTag:        runConfig.ExcludeTag,
-				singleCheckID:     singleCheckID,
+				singleCheckID:     scheduler.CheckUniqueID{
+					ID: singleCheckID,
+					Asset: task,
+				},
 			}
 			var pipelineState *scheduler.PipelineState
 			if c.Bool("continue") {
@@ -1748,15 +1751,15 @@ type Filter struct {
 	PushMetaData      bool
 	SingleTask        *pipeline.Asset
 	ExcludeTag        string
-	singleCheckID     string
+	singleCheckID     scheduler.CheckUniqueID // ID of the single check to run, if any
 }
 
 func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
-	if f.singleCheckID == "" {
+	if f.singleCheckID.ID == "" {
 		return nil
 	}
 	s.MarkAll(scheduler.Skipped)
-	err := s.MarkCheckInstancesByID(f.singleCheckID, scheduler.Pending)
+	err := s.MarkCheckInstancesByID(f.singleCheckID.ID, f.singleCheckID.Asset, scheduler.Pending)
 	if err != nil {
 		return err
 	}
