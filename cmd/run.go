@@ -726,8 +726,8 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				ExcludeTag:        runConfig.ExcludeTag,
-				singleCheckID:     scheduler.CheckUniqueID{
-					ID: singleCheckID,
+				singleCheckID: scheduler.CheckUniqueID{
+					ID:    singleCheckID,
 					Asset: task,
 				},
 			}
