@@ -111,14 +111,13 @@ func isGcloudAvailable() bool {
 	return err == nil
 }
 
-// CheckADCCredentialsForPipeline checks ADC credentials for all BigQuery connections
-// used in the pipeline before execution starts. This ensures credentials are available
-// before any tasks begin running, avoiding prompts during parallel execution.
-func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, connGetter config.ConnectionGetter) error {
-	// Collect unique BigQuery connection names from all assets
+// CheckADCCredentialsForPipeline checks ADC credentials for BigQuery connections
+// used by the given assets before execution starts.
+func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, assets []*pipeline.Asset, connGetter config.ConnectionGetter) error {
+	// Collect unique BigQuery connection names from provided assets
 	bigQueryConnections := make(map[string]bool)
 
-	for _, asset := range p.Assets {
+	for _, asset := range assets {
 		// Check if this is a BigQuery asset
 		if !isBigQueryAssetType(asset.Type) {
 			continue
