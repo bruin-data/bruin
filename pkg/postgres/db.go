@@ -76,7 +76,16 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	defer rows.Close()
 
 	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]interface{}, error) {
-		return row.Values()
+		values, err := row.Values()
+		if err != nil {
+			return nil, err
+		}
+		// Convert Postgres-specific types (especially numeric)
+		converted := make([]interface{}, len(values))
+		for i, val := range values {
+			converted[i] = c.convertValue(val)
+		}
+		return converted, nil
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to collect row values")
@@ -116,7 +125,16 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 
 	// Collect rows
 	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]interface{}, error) {
-		return row.Values()
+		values, err := row.Values()
+		if err != nil {
+			return nil, err
+		}
+		// Convert Postgres-specific types (especially numeric)
+		converted := make([]interface{}, len(values))
+		for i, val := range values {
+			converted[i] = c.convertValue(val)
+		}
+		return converted, nil
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to collect row values")
@@ -127,6 +145,38 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		ColumnTypes: columnTypes,
 	}
 	return result, nil
+}
+
+// convertValue converts Postgres-specific types to standard Go types
+// Similar to DuckDB's convertValue, this handles numeric types that need conversion
+func (c *Client) convertValue(val interface{}) interface{} {
+	if val == nil {
+		return nil
+	}
+
+	// Handle pgtype.Numeric (Postgres numeric/decimal types)
+	if numeric, ok := val.(pgtype.Numeric); ok {
+		if !numeric.Valid {
+			return nil
+		}
+		// Convert to float64 for consistent formatting
+		f, err := numeric.Value()
+		if err != nil {
+			return val // Return original if conversion fails
+		}
+		if floatVal, ok := f.(float64); ok {
+			return floatVal
+		}
+		// If Value() returns a string, parse it
+		if strVal, ok := f.(string); ok {
+			if parsed, err := strconv.ParseFloat(strVal, 64); err == nil {
+				return parsed
+			}
+		}
+		return val // Return original if we can't convert
+	}
+
+	return val
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
