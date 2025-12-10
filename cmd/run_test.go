@@ -1016,6 +1016,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 				Assets: []*pipeline.Asset{
 					{
 						Name: "Task1",
+						ID:   "xyz",
 						Type: pipeline.AssetTypeBigqueryQuery,
 						Columns: []pipeline.Column{
 							{
@@ -1034,7 +1035,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
 			},
 			filter: &Filter{
-				singleCheckID: "check-123",
+				singleCheckID: scheduler.CheckUniqueID{ID: "check-123", Asset: &pipeline.Asset{ID: "xyz"}},
 			},
 			expectedPending: []string{"Task1:Column1:Check1"},
 			expectError:     false,
@@ -1046,6 +1047,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 				Assets: []*pipeline.Asset{
 					{
 						Name: "Task1",
+						ID:   "abc",
 						Type: pipeline.AssetTypeBigqueryQuery,
 						CustomChecks: []pipeline.CustomCheck{
 							{ID: "custom-123", Name: "CustomCheck1"},
@@ -1059,7 +1061,45 @@ func TestApplyFilters(t *testing.T) { //nolint
 				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
 			},
 			filter: &Filter{
-				singleCheckID: "custom-123",
+				singleCheckID: scheduler.CheckUniqueID{ID: "custom-123", Asset: &pipeline.Asset{ID: "abc"}},
+			},
+			expectedPending: []string{"Task1:custom-check:customcheck1"},
+			expectError:     false,
+		},
+		{
+			name: "Skip all tasks except single custom check, but theres duplicates check id",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name: "Task0",
+						ID:   "000",
+						Type: pipeline.AssetTypeBigqueryQuery,
+						CustomChecks: []pipeline.CustomCheck{
+							{ID: "custom-123", Name: "CustomCheck1"},
+						},
+					},
+					{
+						Name: "Task1",
+						ID:   "111",
+						Type: pipeline.AssetTypeBigqueryQuery,
+						CustomChecks: []pipeline.CustomCheck{
+							{ID: "custom-123", Name: "CustomCheck1"},
+						},
+					},
+					{
+						Name: "Task2",
+						ID:   "222",
+						Type: pipeline.AssetTypeBigqueryQuery,
+						CustomChecks: []pipeline.CustomCheck{
+							{ID: "custom-123", Name: "CustomCheck1"},
+						},
+					},
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				singleCheckID: scheduler.CheckUniqueID{ID: "custom-123", Asset: &pipeline.Asset{ID: "111"}},
 			},
 			expectedPending: []string{"Task1:custom-check:customcheck1"},
 			expectError:     false,
@@ -1071,6 +1111,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 				Assets: []*pipeline.Asset{
 					{
 						Name: "Task1",
+						ID:   "abc",
 						Type: pipeline.AssetTypeBigqueryQuery,
 						CustomChecks: []pipeline.CustomCheck{
 							{ID: "custom-123", Name: "CustomCheck1"},
@@ -1080,7 +1121,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
 			},
 			filter: &Filter{
-				singleCheckID: "non-existent-id",
+				singleCheckID: scheduler.CheckUniqueID{ID: "non-existing", Asset: &pipeline.Asset{ID: "abc"}},
 			},
 			expectedPending: []string{},
 			expectError:     true,
