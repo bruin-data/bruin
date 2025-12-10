@@ -31,7 +31,7 @@ func (c Config) GetConnectionURI() (string, error) {
 	// If using Application Default Credentials, return simple URI
 	// ingestr will use ADC automatically when no credentials are in the URI
 	if c.UseApplicationDefaultCredentials {
-		URI := fmt.Sprintf("bigquery://%s", c.ProjectID)
+		URI := "bigquery://" + c.ProjectID
 		if c.Location != "" {
 			URI += "?location=" + c.Location
 		}
