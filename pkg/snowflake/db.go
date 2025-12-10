@@ -11,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
@@ -67,7 +68,12 @@ func (db *DB) initializeDB(ctx context.Context) error {
 
 // logSnowflakeQueryID tries to read a query ID from the channel and prints it.
 // It is non-blocking, so it is safe to call even if no ID was sent.
-func logSnowflakeQueryID(ch <-chan string) {
+func logSnowflakeQueryID(ctx context.Context, ch <-chan string) {
+	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if writer == nil {
+		return
+	}
+
 	if ch == nil {
 		return
 	}
@@ -75,7 +81,7 @@ func logSnowflakeQueryID(ch <-chan string) {
 	select {
 	case qid := <-ch:
 		if qid != "" {
-			fmt.Printf("Snowflake query ID: %s\n", qid)
+			_, _ = writer.Write([]byte(fmt.Sprintf("Snowflake query ID: %s\n", qid)))
 		}
 	default:
 	}
@@ -106,7 +112,7 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	// Try to print the query ID once the function returns
-	defer logSnowflakeQueryID(qidChan)
+	defer logSnowflakeQueryID(ctx, qidChan)
 
 	if err == nil {
 		err = rows.Err()
@@ -165,7 +171,7 @@ func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	// Try to print the query ID once the function returns
-	defer logSnowflakeQueryID(qidChan)
+	defer logSnowflakeQueryID(ctx, qidChan)
 
 	if err == nil {
 		err = rows.Err()
@@ -236,7 +242,7 @@ func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 
 	rows, err := db.conn.QueryContext(ctx, query.ToExplainQuery())
 	// Try to print the query ID once the function returns
-	defer logSnowflakeQueryID(qidChan)
+	defer logSnowflakeQueryID(ctx, qidChan)
 
 	if err == nil {
 		err = rows.Err()
@@ -292,7 +298,7 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	queryString := queryObj.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	// Try to print the query ID once the function returns
-	defer logSnowflakeQueryID(qidChan)
+	defer logSnowflakeQueryID(ctx, qidChan)
 
 	if err != nil {
 		errorMessage := err.Error()
