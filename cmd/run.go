@@ -887,8 +887,10 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			sendTelemetry(s, c)
-			infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
-			infoPrinter.Printf("\n%s\n\n", executionStartLog)
+			if !c.Bool("minimal-logs") {
+				infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
+				infoPrinter.Printf("\n%s\n\n", executionStartLog)
+			}
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
 					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
@@ -922,6 +924,7 @@ func Run(isDebug *bool) *cli.Command {
 				DoNotLogTimestamp: c.Bool("no-timestamp"),
 				DoNotLogTaskName:  preview.RunningForAnAsset,
 				NoColor:           c.Bool("no-color"),
+				MinimalLogs:       c.Bool("minimal-logs"),
 			}
 
 			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
@@ -968,8 +971,13 @@ func Run(isDebug *bool) *cli.Command {
 				if singleCheckID != "" {
 					printSingleCheckError(errorsInTaskResults[0])
 				} else {
-					printExecutionSummary(results, s, duration, len(results))
-					printErrorsInResults(errorsInTaskResults, s)
+					if c.Bool("minimal-logs") {
+						summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
+						printErrorsMinimal(errorsInTaskResults)
+					} else {
+						printExecutionSummary(results, s, duration, len(results))
+						printErrorsInResults(errorsInTaskResults, s)
+					}
 				}
 				return cli.Exit("", 1)
 			}
@@ -983,7 +991,7 @@ func Run(isDebug *bool) *cli.Command {
 			// Print execution summary (unless minimal-logs is enabled)
 			minimalLogs := c.Bool("minimal-logs")
 			if minimalLogs {
-				successPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
+				summaryPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
 			} else {
 				printExecutionSummary(results, s, duration, len(results))
 			}
@@ -1177,6 +1185,13 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 	fmt.Println()
 	fmt.Println(tree.String())
+}
+
+func printErrorsMinimal(errorsInTaskResults []*scheduler.TaskExecutionResult) {
+	for _, result := range errorsInTaskResults {
+		assetName := result.Instance.GetAsset().Name
+		fmt.Printf("\n  %s: %s\n", assetName, result.Error)
+	}
 }
 
 func printSingleCheckError(result *scheduler.TaskExecutionResult) {
