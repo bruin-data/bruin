@@ -16,12 +16,14 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -144,6 +146,9 @@ func RenderDDL() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// Force the asset to use DDL strategy for schema generation
+			asset.Materialization.Strategy = pipeline.MaterializationStrategyDDL
+
 			resultsLocation := "s3://{destination-bucket}"
 			if asset.Type == pipeline.AssetTypeAthenaQuery {
 				connName, err := pl.GetConnectionNameForAsset(asset)
@@ -201,23 +206,27 @@ func RenderDDL() *cli.Command {
 					Renderer: forAsset,
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
-					pipeline.AssetTypeMySQLQuery:            mysql.NewDDLMaterializer(),
-					pipeline.AssetTypeBigqueryQuery:         bigquery.NewDDLMaterializer(),
-					pipeline.AssetTypeBigqueryQuerySensor:   bigquery.NewDDLMaterializer(),
-					pipeline.AssetTypeSnowflakeQuery:        snowflake.NewDDLMaterializer(),
-					pipeline.AssetTypeSnowflakeQuerySensor:  snowflake.NewDDLMaterializer(),
-					pipeline.AssetTypeRedshiftQuery:         postgres.NewDDLMaterializer(),
-					pipeline.AssetTypeRedshiftQuerySensor:   postgres.NewDDLMaterializer(),
-					pipeline.AssetTypePostgresQuery:         postgres.NewDDLMaterializer(),
-					pipeline.AssetTypePostgresQuerySensor:   postgres.NewDDLMaterializer(),
-					pipeline.AssetTypeDatabricksQuery:       databricks.NewDDLRenderer(),
-					pipeline.AssetTypeDatabricksQuerySensor: databricks.NewDDLRenderer(),
-					pipeline.AssetTypeAthenaQuery:           athena.NewDDLRenderer(resultsLocation),
-					pipeline.AssetTypeAthenaSQLSensor:       athena.NewDDLRenderer(resultsLocation),
-					pipeline.AssetTypeDuckDBQuery:           duck.NewDDLMaterializer(),
-					pipeline.AssetTypeDuckDBQuerySensor:     duck.NewDDLMaterializer(),
-					pipeline.AssetTypeClickHouse:            clickhouse.NewDDLRenderer(),
-					pipeline.AssetTypeClickHouseQuerySensor: clickhouse.NewDDLRenderer(),
+					pipeline.AssetTypeMySQLQuery:            mysql.NewMaterializer(false),
+					pipeline.AssetTypeBigqueryQuery:         bigquery.NewMaterializer(false),
+					pipeline.AssetTypeBigqueryQuerySensor:   bigquery.NewMaterializer(false),
+					pipeline.AssetTypeSnowflakeQuery:        snowflake.NewMaterializer(false),
+					pipeline.AssetTypeSnowflakeQuerySensor:  snowflake.NewMaterializer(false),
+					pipeline.AssetTypeRedshiftQuery:         postgres.NewMaterializer(false),
+					pipeline.AssetTypeRedshiftQuerySensor:   postgres.NewMaterializer(false),
+					pipeline.AssetTypePostgresQuery:         postgres.NewMaterializer(false),
+					pipeline.AssetTypePostgresQuerySensor:   postgres.NewMaterializer(false),
+					pipeline.AssetTypeMsSQLQuery:            mssql.NewMaterializer(false),
+					pipeline.AssetTypeMsSQLQuerySensor:      mssql.NewMaterializer(false),
+					pipeline.AssetTypeDatabricksQuery:       databricks.NewRenderer(false),
+					pipeline.AssetTypeDatabricksQuerySensor: databricks.NewRenderer(false),
+					pipeline.AssetTypeSynapseQuery:          synapse.NewRenderer(false),
+					pipeline.AssetTypeSynapseQuerySensor:    synapse.NewRenderer(false),
+					pipeline.AssetTypeAthenaQuery:           athena.NewRenderer(false, resultsLocation),
+					pipeline.AssetTypeAthenaSQLSensor:       athena.NewRenderer(false, resultsLocation),
+					pipeline.AssetTypeDuckDBQuery:           duck.NewMaterializer(false),
+					pipeline.AssetTypeDuckDBQuerySensor:     duck.NewMaterializer(false),
+					pipeline.AssetTypeClickHouse:            clickhouse.NewRenderer(false),
+					pipeline.AssetTypeClickHouseQuerySensor: clickhouse.NewRenderer(false),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,

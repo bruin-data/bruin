@@ -13,7 +13,6 @@ import (
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
 	fullRefresh        bool
-	forceDDL           bool
 }
 
 func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, error) {
@@ -23,9 +22,7 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	}
 
 	strategy := mat.Strategy
-	if m.forceDDL {
-		strategy = pipeline.MaterializationStrategyDDL
-	} else if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable {
+	if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable {
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
 
@@ -37,16 +34,11 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
 }
 
-func NewMaterializer(fullRefresh bool, forceDDL bool) *Materializer {
+func NewMaterializer(fullRefresh bool) *Materializer {
 	return &Materializer{
 		MaterializationMap: matMap,
 		fullRefresh:        fullRefresh,
-		forceDDL:           forceDDL,
 	}
-}
-
-func NewDDLMaterializer() *Materializer {
-	return NewMaterializer(false, true)
 }
 
 type Renderer struct {
@@ -55,7 +47,7 @@ type Renderer struct {
 
 func NewRenderer(fullRefresh bool) *Renderer {
 	return &Renderer{
-		mat: NewMaterializer(fullRefresh, false),
+		mat: NewMaterializer(fullRefresh),
 	}
 }
 

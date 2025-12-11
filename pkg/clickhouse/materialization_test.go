@@ -378,7 +378,7 @@ func TestMaterializer_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := NewMaterializer(tt.fullRefresh, false)
+			m := NewMaterializer(tt.fullRefresh)
 			render, err := m.Render(tt.task, tt.query)
 
 			if tt.wantErr {

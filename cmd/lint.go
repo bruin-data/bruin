@@ -400,7 +400,7 @@ func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionMan
 				Renderer: renderer,
 			},
 			Materializer: jinjaRenderedMaterializer{
-				materializer: bigquery.NewMaterializer(fullRefresh, false),
+				materializer: bigquery.NewMaterializer(fullRefresh),
 				renderer:     renderer,
 			},
 			WorkerCount: 32,

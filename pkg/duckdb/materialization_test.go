@@ -347,7 +347,7 @@ COMMIT;`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := NewMaterializer(tt.fullRefresh, false)
+			m := NewMaterializer(tt.fullRefresh)
 			render, err := m.Render(tt.task, tt.query)
 
 			if tt.wantErr {
@@ -645,7 +645,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh, false)
+			m := NewMaterializer(tt.fullRefresh)
 			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -764,7 +764,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh, false)
+			m := NewMaterializer(tt.fullRefresh)
 			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -1031,7 +1031,7 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh, false)
+			m := NewMaterializer(tt.fullRefresh)
 			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -1172,7 +1172,7 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh, false)
+			m := NewMaterializer(tt.fullRefresh)
 			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
