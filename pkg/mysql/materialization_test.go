@@ -472,7 +472,7 @@ COMMIT;$`),
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mat := NewMaterializer(tt.fullRefresh)
+			mat := NewMaterializer(tt.fullRefresh, false)
 			got, err := mat.Render(tt.asset, tt.query)
 
 			if tt.wantErr {

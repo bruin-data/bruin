@@ -21,20 +21,16 @@ func QuoteIdentifier(identifier string) string {
 	return strings.Join(quotedParts, ".")
 }
 
-func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
+func NewMaterializer(fullRefresh bool, forceDDL bool) *pipeline.Materializer {
 	return &pipeline.Materializer{
 		MaterializationMap: matMap,
 		FullRefresh:        fullRefresh,
-		ForceDDL:           false,
+		ForceDDL:           forceDDL,
 	}
 }
 
 func NewDDLMaterializer() *pipeline.Materializer {
-	return &pipeline.Materializer{
-		MaterializationMap: matMap,
-		FullRefresh:        false,
-		ForceDDL:           true,
-	}
+	return NewMaterializer(false, true)
 }
 
 var matMap = pipeline.AssetMaterializationMap{

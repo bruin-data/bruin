@@ -409,7 +409,7 @@ func TestMaterializer_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.task, tt.query, "s3://bucket")
 
 			if tt.wantErr {
@@ -643,7 +643,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.asset, tt.query, "s3://bucket")
 			if tt.wantErr {
 				require.Error(t, err)
@@ -774,7 +774,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.asset, tt.query, "s3://bucket")
 			if tt.wantErr {
 				require.Error(t, err)
@@ -1050,7 +1050,7 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.asset, tt.query, "s3://bucket")
 			if tt.wantErr {
 				require.Error(t, err)
@@ -1203,7 +1203,7 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.asset, tt.query, "s3://bucket")
 			if tt.wantErr {
 				require.Error(t, err)

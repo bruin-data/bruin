@@ -28,12 +28,16 @@ var matMap = pipeline.AssetMaterializationMap{
 	},
 }
 
-func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
+func NewMaterializer(fullRefresh bool, forceDDL bool) *pipeline.Materializer {
 	return &pipeline.Materializer{
 		MaterializationMap: matMap,
 		FullRefresh:        fullRefresh,
-		ForceDDL:           false,
+		ForceDDL:           forceDDL,
 	}
+}
+
+func NewDDLMaterializer() *pipeline.Materializer {
+	return NewMaterializer(false, true)
 }
 
 func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {

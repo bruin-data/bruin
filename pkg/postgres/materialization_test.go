@@ -429,7 +429,7 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.task, tt.query)
 
 			if tt.wantErr {
@@ -698,7 +698,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -914,7 +914,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -1196,7 +1196,7 @@ func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -1430,7 +1430,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewMaterializer(tt.fullRefresh)
+			m := NewMaterializer(tt.fullRefresh, false)
 			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)

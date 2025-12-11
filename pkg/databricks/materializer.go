@@ -41,20 +41,16 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
 }
 
-func NewMaterializer(fullRefresh bool) *Materializer {
+func NewMaterializer(fullRefresh bool, forceDDL bool) *Materializer {
 	return &Materializer{
 		MaterializationMap: matMap,
 		fullRefresh:        fullRefresh,
-		forceDDL:           false,
+		forceDDL:           forceDDL,
 	}
 }
 
 func NewDDLMaterializer() *Materializer {
-	return &Materializer{
-		MaterializationMap: matMap,
-		fullRefresh:        false,
-		forceDDL:           true,
-	}
+	return NewMaterializer(false, true)
 }
 
 type Renderer struct {
@@ -63,7 +59,7 @@ type Renderer struct {
 
 func NewRenderer(fullRefresh bool) *Renderer {
 	return &Renderer{
-		mat: NewMaterializer(fullRefresh),
+		mat: NewMaterializer(fullRefresh, false),
 	}
 }
 
