@@ -18,7 +18,6 @@ type (
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
 	FullRefresh        bool
-	ForceDDL           bool
 }
 
 func (m *Materializer) Render(asset *Asset, query string) (string, error) {
@@ -28,9 +27,7 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	}
 
 	strategy := mat.Strategy
-	if m.ForceDDL {
-		strategy = MaterializationStrategyDDL
-	} else if m.FullRefresh && mat.Type == MaterializationTypeTable {
+	if m.FullRefresh && mat.Type == MaterializationTypeTable {
 		// Only override to CreateReplace if strategy is not explicitly set to DDL
 		// This strategy should never be overridden, even with full refresh
 		if mat.Strategy != MaterializationStrategyDDL {
