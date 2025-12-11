@@ -5,7 +5,6 @@ package duck
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -41,7 +40,7 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 }
 
 func ensureDriverInstalledInternal(ctx context.Context) error {
-	if tryLoadDriver() {
+	if err := tryLoadDriver(); err == nil {
 		return nil
 	}
 
@@ -62,18 +61,23 @@ func ensureDriverInstalledInternal(ctx context.Context) error {
 		return fmt.Errorf("dbc install duckdb failed: %w", err)
 	}
 
-	if !tryLoadDriver() {
-		return errors.New("DuckDB ADBC driver still not available after installation")
+	if err := tryLoadDriver(); err != nil {
+		return fmt.Errorf("DuckDB ADBC driver still not available after installation: %w", err)
 	}
 
 	return nil
 }
 
-func tryLoadDriver() bool {
+func tryLoadDriver() error {
 	db, err := sql.Open("adbc_duckdb", "driver=duckdb;path=:memory:")
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to open duckdb adbc driver: %w", err)
 	}
 	defer db.Close()
-	return db.Ping() == nil
+
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("failed to ping duckdb adbc driver: %w", err)
+	}
+
+	return nil
 }
