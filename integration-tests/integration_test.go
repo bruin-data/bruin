@@ -478,6 +478,78 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-ddl-basic-duckdb",
+			task: e2e.Task{
+				Name:    "render-ddl-basic-duckdb",
+				Command: binary,
+				Args: []string{
+					"render-ddl",
+					filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-ddl/assets/schema.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"CREATE TABLE IF NOT EXISTS test.customers",
+						"customer_id INTEGER",
+						"name VARCHAR",
+						"email VARCHAR",
+						"created_at TIMESTAMP",
+						"PRIMARY KEY (customer_id)",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-ddl-with-dates",
+			task: e2e.Task{
+				Name:    "render-ddl-with-dates",
+				Command: binary,
+				Args: []string{
+					"render-ddl",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"CREATE TABLE IF NOT EXISTS date_capture",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-ddl-json-output",
+			task: e2e.Task{
+				Name:    "render-ddl-json-output",
+				Command: binary,
+				Args: []string{
+					"render-ddl",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-ddl/assets/schema.sql")},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"CREATE TABLE IF NOT EXISTS test.customers",
+						"customer_id INTEGER",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "python-happy-path-run",
 			task: e2e.Task{
 				Name:    "python-happy-path-run",
