@@ -506,7 +506,7 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "render-ddl-with-dates",
 			task: e2e.Task{
-				Name: "render-ddl-with-dates",
+				Name:    "render-ddl-with-dates",
 				Command: binary,
 				Args: []string{
 					"render-ddl",
@@ -529,7 +529,7 @@ func TestIndividualTasks(t *testing.T) {
 		{
 			name: "render-ddl-json-output",
 			task: e2e.Task{
-				Name: "render-ddl-json-output",
+				Name:    "render-ddl-json-output",
 				Command: binary,
 				Args: []string{
 					"render-ddl",
