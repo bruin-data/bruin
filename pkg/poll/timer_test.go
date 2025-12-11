@@ -1,4 +1,4 @@
-package emr_serverless //nolint
+package poll
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPollTimer(t *testing.T) {
+func TestTimer(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
@@ -41,7 +41,7 @@ func TestPollTimer(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		timer := &PollTimer{
+		timer := &Timer{
 			BaseDuration: time.Second,
 			MaxRetry:     maxRetry,
 		}

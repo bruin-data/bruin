@@ -733,6 +733,12 @@
           },
           "type": "array"
         },
+        "dataproc_serverless": {
+          "items": {
+            "$ref": "#/$defs/DataprocServerlessConnection"
+          },
+          "type": "array"
+        },
         "googleanalytics": {
           "items": {
             "$ref": "#/$defs/GoogleAnalyticsConnection"
@@ -1006,6 +1012,40 @@
         "port",
         "catalog",
         "schema"
+      ]
+    },
+    "DataprocServerlessConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "execution_role": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project_id",
+        "region",
+        "workspace",
+        "execution_role"
       ]
     },
     "DoceboConnection": {

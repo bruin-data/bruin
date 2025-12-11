@@ -415,7 +415,7 @@ func Test_GetAssetCountWithTasksPending(t *testing.T) {
 		pipeline         *pipeline.Pipeline
 		markAssets       []int // indices of assets to mark as Pending
 		want             int
-		checkInstanceIDs []string
+		checkInstanceIDs []CheckUniqueID
 	}{
 		{
 			name: "single asset with pending tasks",
@@ -445,7 +445,7 @@ func Test_GetAssetCountWithTasksPending(t *testing.T) {
 			},
 			markAssets:       []int{2},
 			want:             1,
-			checkInstanceIDs: []string{},
+			checkInstanceIDs: []CheckUniqueID{},
 		},
 		{
 			name: "2 asset with checks tasks",
@@ -483,7 +483,7 @@ func Test_GetAssetCountWithTasksPending(t *testing.T) {
 			},
 			markAssets:       []int{1, 2},
 			want:             2,
-			checkInstanceIDs: []string{},
+			checkInstanceIDs: []CheckUniqueID{},
 		},
 		{
 			name: "only checks of 1 asset",
@@ -521,10 +521,10 @@ func Test_GetAssetCountWithTasksPending(t *testing.T) {
 			},
 			markAssets:       []int{},
 			want:             1,
-			checkInstanceIDs: []string{"check1", "check2"},
+			checkInstanceIDs: []CheckUniqueID{{ID: "check1", Asset: &pipeline.Asset{ID: "task21"}}, {ID: "check2", Asset: &pipeline.Asset{ID: "task21"}}},
 		},
 		{
-			name: " checks of 2 asset",
+			name: "checks of 2 asset",
 			pipeline: &pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
 					{
@@ -557,9 +557,13 @@ func Test_GetAssetCountWithTasksPending(t *testing.T) {
 					},
 				},
 			},
-			markAssets:       []int{},
-			want:             2,
-			checkInstanceIDs: []string{"check1", "check2", "check3"},
+			markAssets: []int{},
+			want:       2,
+			checkInstanceIDs: []CheckUniqueID{
+				{ID: "check1", Asset: &pipeline.Asset{ID: "task21"}},
+				{ID: "check2", Asset: &pipeline.Asset{ID: "task21"}},
+				{ID: "check3", Asset: &pipeline.Asset{ID: "task12"}},
+			},
 		},
 		// Add more cases as needed
 	}
@@ -574,9 +578,9 @@ func Test_GetAssetCountWithTasksPending(t *testing.T) {
 			}
 
 			for _, id := range tt.checkInstanceIDs {
-				err := s.MarkCheckInstancesByID(id, Pending)
+				err := s.MarkCheckInstancesByID(id.ID, id.Asset, Pending)
 				if err != nil {
-					t.Errorf("failed to mark check instance %q as pending: %v", id, err)
+					t.Errorf("failed to mark check instance %q as pending: %v", id.ID, err)
 				}
 			}
 

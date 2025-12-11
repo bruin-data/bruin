@@ -25,6 +25,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/date"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
@@ -726,7 +727,10 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				ExcludeTag:        runConfig.ExcludeTag,
-				singleCheckID:     singleCheckID,
+				singleCheckID: scheduler.CheckUniqueID{
+					ID:    singleCheckID,
+					Asset: task,
+				},
 			}
 			var pipelineState *scheduler.PipelineState
 			if c.Bool("continue") {
@@ -935,9 +939,10 @@ func Run(isDebug *bool) *cli.Command {
 			exeCtx, cancel := signal.NotifyContext(timeoutCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 
-			// Check ADC credentials for all BigQuery connections before execution starts
+			// Check ADC credentials for BigQuery connections used by pending assets
 			// This ensures credentials are available before any tasks begin running
-			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, connectionManager); err != nil {
+			pendingAssets := getPendingAssets(s)
+			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, pendingAssets, connectionManager); err != nil {
 				errorPrinter.Printf("Failed to verify BigQuery ADC credentials: %v\n", err)
 				return cli.Exit("", 1)
 			}
@@ -960,9 +965,19 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			if len(errorsInTaskResults) > 0 {
-				printExecutionSummary(results, s, duration, len(results))
-				printErrorsInResults(errorsInTaskResults, s)
+				if singleCheckID != "" {
+					printSingleCheckError(errorsInTaskResults[0])
+				} else {
+					printExecutionSummary(results, s, duration, len(results))
+					printErrorsInResults(errorsInTaskResults, s)
+				}
 				return cli.Exit("", 1)
+			}
+
+			// Print single check success if running a single check
+			if singleCheckID != "" && len(results) > 0 {
+				printSingleCheckSuccess(results[0])
+				return nil
 			}
 
 			// Print execution summary (unless minimal-logs is enabled)
@@ -1162,6 +1177,43 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 	fmt.Println()
 	fmt.Println(tree.String())
+}
+
+func printSingleCheckError(result *scheduler.TaskExecutionResult) {
+	fmt.Println("\nCheck Failed")
+	fmt.Println(strings.Repeat("-", 12))
+
+	checkErr, ok := result.Error.(*ansisql.CheckError) //nolint:errorlint
+	if ok {
+		fmt.Printf("Error: %s\n\n", checkErr.Message)
+		fmt.Printf("Result: %d (expected: %d)\n\n", checkErr.Result, checkErr.Expected)
+		fmt.Println("Query:")
+		fmt.Println(checkErr.Query + "\n")
+	} else {
+		fmt.Printf("Error: %s\n", result.Error)
+	}
+}
+
+func printSingleCheckSuccess(result *scheduler.TaskExecutionResult) {
+	fmt.Println("\nCheck Passed")
+	fmt.Println(strings.Repeat("-", 12))
+
+	switch instance := result.Instance.(type) {
+	case *scheduler.ColumnCheckInstance:
+		fmt.Printf("Check: %s.%s\n", instance.Column.Name, instance.Check.Name)
+		fmt.Printf("Asset: %s\n\n", instance.GetAsset().Name)
+		if instance.ExecutedQuery != "" {
+			fmt.Println("Query:")
+			fmt.Println(instance.ExecutedQuery)
+		}
+	case *scheduler.CustomCheckInstance:
+		fmt.Printf("Check: %s (custom)\n", instance.Check.Name)
+		fmt.Printf("Asset: %s\n\n", instance.GetAsset().Name)
+		if instance.ExecutedQuery != "" {
+			fmt.Println("Query:")
+			fmt.Println(instance.ExecutedQuery)
+		}
+	}
 }
 
 //nolint:maintidx
@@ -1577,6 +1629,14 @@ func SetupExecutors(
 		}
 	}
 
+	if s.WillRunTaskOfType(pipeline.AssetTypeDataprocServerlessPyspark) {
+		dataprocServerlessOperator, err := dataprocserverless.NewBasicOperator(conn, jinjaVariables)
+		if err != nil {
+			return nil, err
+		}
+		mainExecutors[pipeline.AssetTypeDataprocServerlessPyspark][scheduler.TaskInstanceTypeMain] = dataprocServerlessOperator
+	}
+
 	if s.WillRunTaskOfType(pipeline.AssetTypeS3KeySensor) {
 		s3KeySensor := s3.NewKeySensor(conn, sensorMode)
 		mainExecutors[pipeline.AssetTypeS3KeySensor][scheduler.TaskInstanceTypeMain] = s3KeySensor
@@ -1729,15 +1789,15 @@ type Filter struct {
 	PushMetaData      bool
 	SingleTask        *pipeline.Asset
 	ExcludeTag        string
-	singleCheckID     string
+	singleCheckID     scheduler.CheckUniqueID // ID of the single check to run, if any
 }
 
 func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
-	if f.singleCheckID == "" {
+	if f.singleCheckID.ID == "" {
 		return nil
 	}
 	s.MarkAll(scheduler.Skipped)
-	err := s.MarkCheckInstancesByID(f.singleCheckID, scheduler.Pending)
+	err := s.MarkCheckInstancesByID(f.singleCheckID.ID, f.singleCheckID.Asset, scheduler.Pending)
 	if err != nil {
 		return err
 	}
@@ -1865,4 +1925,22 @@ func Validate(shouldvalidate bool, assetCounter assetCounter, lintChecker lintCh
 	}
 
 	return lintChecker(ctx, foundPipeline, pipelinePath, logger, true)
+}
+
+// getPendingAssets extracts unique assets from pending task instances in the scheduler.
+func getPendingAssets(s *scheduler.Scheduler) []*pipeline.Asset {
+	pendingInstances := s.GetTaskInstancesByStatus(scheduler.Pending)
+	seen := make(map[string]bool)
+	assets := make([]*pipeline.Asset, 0)
+
+	for _, instance := range pendingInstances {
+		asset := instance.GetAsset()
+		if seen[asset.Name] {
+			continue
+		}
+		seen[asset.Name] = true
+		assets = append(assets, asset)
+	}
+
+	return assets
 }

@@ -10,8 +10,8 @@ columns:
         - name: positive
 @bruin */
 
-SELECT 10
+SELECT 10 as amount
 union all
-SELECT 20
+SELECT 20 as amount
 union all
-SELECT 30
+SELECT 30 as amount

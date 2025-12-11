@@ -94,6 +94,27 @@
       },
       "schema_prefix": ""
     },
+    "env-adc-filter": {
+      "connections": {
+        "google_cloud_platform": [
+          {
+            "location": "",
+            "name": "google-cloud-platform-adc-check",
+            "project_id": "google-cloud-platform-adc-filter",
+            "service_account_file": "",
+            "service_account_json": "",
+            "use_application_default_credentials": "true"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-adc-filter",
+            "path": "duckdb-files/adc-filter.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-continue": {
       "connections": {
         "duckdb": [

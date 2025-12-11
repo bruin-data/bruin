@@ -63,6 +63,16 @@ environments:
         - name: KEY1
           value: value1
 
+  env-adc-filter:
+    connections:
+      duckdb:
+        - name: "duckdb-adc-filter"
+          path: "duckdb-files/adc-filter.db"
+      google_cloud_platform:
+        - name: "google-cloud-platform-adc-check"
+          project_id: "google-cloud-platform-adc-filter"
+          use_application_default_credentials: true
+
   env-run-with-downstream:
     connections:
       duckdb:

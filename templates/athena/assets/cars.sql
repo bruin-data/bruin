@@ -2,8 +2,7 @@
 name: cars
 materialization:
    type: table
-   strategy: delete+insert
-   incremental_key: id
+   strategy: create+replace
 columns:
   - name: id
     type: integer
@@ -20,9 +19,9 @@ columns:
         - name: unique
 @bruin */
 
-SELECT 1 as id,  'XWE12312' as name
+SELECT 1 as id,  'XWE12312' as plate
 union all
-SELECT 2 as id, 'TRE34535' as name
+SELECT 2 as id, 'TRE34535' as plate
 union all
-SELECT 3 as id, 'OIY54654' as name
+SELECT 3 as id, 'OIY54654' as plate
 

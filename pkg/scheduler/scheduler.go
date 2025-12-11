@@ -167,6 +167,11 @@ type AssetInstance struct {
 	downstream []TaskInstance
 }
 
+type CheckUniqueID struct {
+	ID    string
+	Asset *pipeline.Asset
+}
+
 func (t *AssetInstance) GetHumanID() string {
 	return t.HumanID
 }
@@ -222,9 +227,10 @@ func (t *AssetInstance) AddDownstream(task TaskInstance) {
 type ColumnCheckInstance struct {
 	*AssetInstance
 
-	parentID string
-	Column   *pipeline.Column
-	Check    *pipeline.ColumnCheck
+	parentID      string
+	Column        *pipeline.Column
+	Check         *pipeline.ColumnCheck
+	ExecutedQuery string
 }
 
 func (t *ColumnCheckInstance) GetType() TaskInstanceType {
@@ -242,7 +248,8 @@ func (t *ColumnCheckInstance) Blocking() bool {
 type CustomCheckInstance struct {
 	*AssetInstance
 
-	Check *pipeline.CustomCheck
+	Check         *pipeline.CustomCheck
+	ExecutedQuery string
 }
 
 func (t *CustomCheckInstance) GetType() TaskInstanceType {
@@ -366,11 +373,11 @@ func (s *Scheduler) MarkPendingInstancesByType(instanceType TaskInstanceType, st
 	}
 }
 
-func (s *Scheduler) MarkCheckInstancesByID(checkID string, status TaskInstanceStatus) error {
+func (s *Scheduler) MarkCheckInstancesByID(checkID string, asset *pipeline.Asset, status TaskInstanceStatus) error {
 	for _, instance := range s.taskInstances {
 		columnCheck, ok := instance.(*ColumnCheckInstance)
 		if ok {
-			if columnCheck.Check.ID == checkID {
+			if columnCheck.Check.ID == checkID && columnCheck.Asset.ID == asset.ID {
 				s.MarkTaskInstance(instance, status, false)
 				return nil
 			}
@@ -378,7 +385,7 @@ func (s *Scheduler) MarkCheckInstancesByID(checkID string, status TaskInstanceSt
 		customCheck, ok := instance.(*CustomCheckInstance)
 
 		if ok {
-			if customCheck.Check.ID == checkID {
+			if customCheck.Check.ID == checkID && customCheck.Asset.ID == asset.ID {
 				s.MarkTaskInstance(instance, status, false)
 				return nil
 			}

@@ -1,4 +1,4 @@
-package emr_serverless //nolint
+package dataprocserverless
 
 import (
 	"context"
@@ -7,16 +7,16 @@ import (
 	"log"
 	"time"
 
-	awsCfg "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	dataproc "cloud.google.com/go/dataproc/v2/apiv1"
+	"cloud.google.com/go/logging/logadmin"
+	"cloud.google.com/go/storage"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/poll"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/google/uuid"
 )
 
 type BasicOperator struct {
@@ -35,46 +35,54 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	}
 	conn, ok := op.connection.GetConnection(connID).(*Client)
 	if !ok {
-		return fmt.Errorf("'%s' either does not exist or is not a EMR Serverless connection", connID)
+		return fmt.Errorf("'%s' either does not exist or is not a Dataproc Serverless connection", connID)
 	}
 
-	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark && conn.Workspace == "" {
+	if asset.Type == pipeline.AssetTypeDataprocServerlessPyspark && conn.Workspace == "" {
 		return fmt.Errorf("connection %q is missing field: workspace", connID)
 	}
 
 	params := parseParams(conn, asset.Parameters)
-	cfg, err := awsCfg.LoadDefaultConfig(
-		ctx,
-		awsCfg.WithRegion(conn.Region),
-		awsCfg.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(
-				conn.AccessKey, conn.SecretKey, "",
-			),
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("error loading aws config: %w", err)
-	}
+	clientOptions := conn.getClientOptions()
 
-	env, err := env.SetupVariables(ctx, ti.GetPipeline(), asset, cloneEnv(op.env))
+	batchClient, err := dataproc.NewBatchControllerRESTClient(ctx, clientOptions...)
+	if err != nil {
+		return fmt.Errorf("error creating dataproc batch client: %w", err)
+	}
+	defer batchClient.Close()
+
+	storageClient, err := storage.NewClient(ctx, clientOptions...)
+	if err != nil {
+		return fmt.Errorf("error creating storage client: %w", err)
+	}
+	defer storageClient.Close()
+
+	logClient, err := logadmin.NewClient(ctx, conn.ProjectID, clientOptions...)
+	if err != nil {
+		return fmt.Errorf("error creating logging client: %w", err)
+	}
+	defer logClient.Close()
+
+	envVars, err := env.SetupVariables(ctx, ti.GetPipeline(), asset, cloneEnv(op.env))
 	if err != nil {
 		return fmt.Errorf("error setting up environment variables: %w", err)
 	}
 
 	job := Job{
-		logger:    logger,
-		s3Client:  s3.NewFromConfig(cfg),
-		emrClient: emrserverless.NewFromConfig(cfg),
-		params:    params,
-		asset:     asset,
-		pipeline:  ti.GetPipeline(),
+		logger:        logger,
+		batchClient:   batchClient,
+		storageClient: storageClient,
+		logClient:     logClient,
+		params:        params,
+		asset:         asset,
+		pipeline:      ti.GetPipeline(),
 		poll: &poll.Timer{
 			BaseDuration: time.Second,
-
 			// maximum backoff: 32 seconds
 			MaxRetry: 5,
 		},
-		env: env,
+		env: envVars,
+		id:  uuid.New().String(),
 	}
 
 	return job.Run(ctx)

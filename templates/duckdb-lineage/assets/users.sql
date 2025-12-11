@@ -24,4 +24,10 @@ columns:
     description: "Just a timestamp"
 @bruin */
 
-select *  from user_data;
+SELECT 1 as id, 'John' as name, 'Doe' as last_name, 'USA' as country, '2021-01-01' as created_at
+UNION ALL
+SELECT 2 as id, 'Jane' as name, 'Smith' as last_name, 'Canada' as country, '2021-01-02' as created_at
+UNION ALL
+SELECT 3 as id, 'Jim' as name, 'Beam' as last_name, 'UK' as country, '2021-01-03' as created_at
+UNION ALL
+SELECT 4 as id, 'Jill' as name, 'Johnson' as last_name, 'Australia' as country, '2021-01-04' as created_at

@@ -25,7 +25,7 @@ The pipeline includes the following SQL assets located in the `assets/` folder:
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-bruin --start-date 2024-01-01 run ./athena/pipeline.yml
+bruin run athena
 ```
 
 You can also run a single task:

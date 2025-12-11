@@ -1328,6 +1328,68 @@ func TestIndividualTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "run-single-non-bq-asset-no-adc-check",
+			task: e2e.Task{
+				Name:    "run-single-non-bq-asset-no-adc-check",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-adc-filter", filepath.Join(currentFolder, "test-pipelines/adc-filter-pipeline/assets/duckdb_asset.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"Finished: duckdb_products",
+						"bruin run completed",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-with-tag-excludes-bq-no-adc-check",
+			task: e2e.Task{
+				Name:    "run-with-tag-excludes-bq-no-adc-check",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-adc-filter", "--tag", "duckdb", filepath.Join(currentFolder, "test-pipelines/adc-filter-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"Finished: duckdb_products",
+						"Finished: duckdb_categories",
+						"bruin run completed",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-with-exclude-tag-bq-no-adc-check",
+			task: e2e.Task{
+				Name:    "run-with-exclude-tag-bq-no-adc-check",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-adc-filter", "--exclude-tag", "bigquery", filepath.Join(currentFolder, "test-pipelines/adc-filter-pipeline")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"Finished: duckdb_products",
+						"Finished: duckdb_categories",
+						"bruin run completed",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

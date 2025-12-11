@@ -17,6 +17,19 @@ type selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
+// CheckError is a custom error type that carries query and result information
+// for better error reporting when running single checks.
+type CheckError struct {
+	Query    string
+	Result   int64
+	Expected int64
+	Message  string
+}
+
+func (e *CheckError) Error() string {
+	return e.Message
+}
+
 type CountableQueryCheck struct {
 	conn                config.ConnectionGetter
 	expectedQueryResult int64
@@ -46,6 +59,7 @@ func (c *CountableQueryCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 		return errors.Wrap(err, "failed to add annotation comment")
 	}
 	c.queryInstance = annotatedQuery
+	ti.ExecutedQuery = c.queryInstance.Query
 
 	return c.check(ctx, conn)
 }
@@ -61,6 +75,7 @@ func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.Cus
 		return errors.Wrap(err, "failed to add annotation comment")
 	}
 	c.queryInstance = annotatedQuery
+	ti.ExecutedQuery = c.queryInstance.Query
 
 	return c.check(ctx, conn)
 }
@@ -87,7 +102,12 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 	}
 
 	if count != c.expectedQueryResult {
-		return c.customError(count)
+		return &CheckError{
+			Query:    c.queryInstance.Query,
+			Result:   count,
+			Expected: c.expectedQueryResult,
+			Message:  c.customError(count).Error(),
+		}
 	}
 
 	return nil

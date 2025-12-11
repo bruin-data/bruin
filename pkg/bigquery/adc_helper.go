@@ -111,27 +111,80 @@ func isGcloudAvailable() bool {
 	return err == nil
 }
 
-// CheckADCCredentialsForPipeline checks ADC credentials for all BigQuery connections
-// used in the pipeline before execution starts. This ensures credentials are available
-// before any tasks begin running, avoiding prompts during parallel execution.
-func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, connGetter config.ConnectionGetter) error {
-	// Collect unique BigQuery connection names from all assets
+// CheckADCCredentialsForPipeline checks ADC credentials for BigQuery connections
+// used by the given assets before execution starts.
+func CheckADCCredentialsForPipeline(ctx context.Context, p *pipeline.Pipeline, assets []*pipeline.Asset, connGetter config.ConnectionGetter) error {
+	// Collect unique BigQuery connection names from provided assets
 	bigQueryConnections := make(map[string]bool)
 
-	for _, asset := range p.Assets {
-		// Check if this is a BigQuery asset
-		if !isBigQueryAssetType(asset.Type) {
+	for _, asset := range assets {
+		// Check if this is a BigQuery SQL asset
+		if isBigQueryAssetType(asset.Type) {
+			// Get the connection name for this asset
+			connName, err := p.GetConnectionNameForAsset(asset)
+			if err == nil {
+				bigQueryConnections[connName] = true
+			}
 			continue
 		}
 
-		// Get the connection name for this asset
-		connName, err := p.GetConnectionNameForAsset(asset)
-		if err != nil {
-			// Skip assets where we can't determine the connection
+		// Check Python assets for BigQuery connections
+		if asset.Type == pipeline.AssetTypePython {
+			hasExplicitSecrets := false
+
+			// First: Check explicit secrets (preferred, most reliable)
+			for _, secret := range asset.Secrets {
+				hasExplicitSecrets = true
+				conn := connGetter.GetConnection(secret.SecretKey)
+				if conn == nil {
+					continue
+				}
+				// Check if this secret is a BigQuery connection
+				if _, ok := conn.(DB); ok {
+					bigQueryConnections[secret.SecretKey] = true
+				}
+			}
+
+			// Fallback: If no secrets declared, use majority inference
+			// This catches Python assets that might use BigQuery in BQ-majority pipelines
+			if !hasExplicitSecrets {
+				majorityType := p.GetMajorityAssetTypesFromSQLAssets(pipeline.AssetTypeBigqueryQuery)
+				if isBigQueryAssetType(majorityType) {
+					// Pipeline is BQ-majority, assume Python might use BQ
+					connName, err := p.GetConnectionNameForAsset(asset)
+					if err == nil {
+						bigQueryConnections[connName] = true
+					}
+				}
+			}
 			continue
 		}
 
-		bigQueryConnections[connName] = true
+		// Check ingestr assets for BigQuery source or destination
+		if asset.Type == pipeline.AssetTypeIngestr {
+			// Check if source connection is BigQuery
+			if sourceConn, ok := asset.Parameters["source_connection"]; ok {
+				if conn := connGetter.GetConnection(sourceConn); conn != nil {
+					if _, isBQ := conn.(DB); isBQ {
+						bigQueryConnections[sourceConn] = true
+					}
+				}
+			}
+
+			// Check if destination is BigQuery
+			if dest, ok := asset.Parameters["destination"]; ok && dest == "bigquery" {
+				// Get destination connection name
+				if destConn, ok := asset.Parameters["destination_connection"]; ok {
+					bigQueryConnections[destConn] = true
+				} else {
+					// Infer from pipeline defaults
+					connName, err := p.GetConnectionNameForAsset(asset)
+					if err == nil {
+						bigQueryConnections[connName] = true
+					}
+				}
+			}
+		}
 	}
 
 	// Check each unique BigQuery connection

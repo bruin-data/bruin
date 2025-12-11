@@ -83,7 +83,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s\n", tempTableName, query),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", QuoteIdentifier(task.Name), quotedIncrementalKey, quotedIncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", QuoteIdentifier(task.Name), tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -422,13 +422,16 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		case "_is_current", "_valid_from", "_valid_until":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
-		insertCols = append(insertCols, quotedColName)
-		insertValues = append(insertValues, "source."+quotedColName)
+		// For Postgres, use lowercase unquoted identifiers to match stored column names
+		lowerColName := strings.ToLower(col.Name)
+		insertCols = append(insertCols, lowerColName)
+		insertValues = append(insertValues, "source."+lowerColName)
 		if !col.PrimaryKey {
+			// For Postgres, use lowercase unquoted identifiers in WHERE/ON clauses to match stored column names
 			compareConds = append(compareConds,
-				fmt.Sprintf("target.%s != source.%s", quotedColName, quotedColName))
+				fmt.Sprintf("target.%s != source.%s", lowerColName, lowerColName))
 			compareCondsS1T1 = append(compareCondsS1T1,
-				fmt.Sprintf("t1.%s != s1.%s", quotedColName, quotedColName))
+				fmt.Sprintf("t1.%s != s1.%s", lowerColName, lowerColName))
 		}
 	}
 
@@ -438,12 +441,25 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(insertValues, "CURRENT_TIMESTAMP", "'9999-12-31 00:00:00'::TIMESTAMP", "TRUE")
-	pkList := strings.Join(primaryKeys, ", ")
+
+	// For Postgres USING clause, we need lowercase unquoted identifiers
+	// Postgres stores unquoted identifiers as lowercase, so USING needs to match that
+	pkListForUsing := make([]string, 0, len(primaryKeys))
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			pkListForUsing = append(pkListForUsing, strings.ToLower(col.Name))
+		}
+	}
+	pkListUsing := strings.Join(pkListForUsing, ", ")
 
 	// Build ON condition for MERGE
+	// For Postgres, use lowercase unquoted identifiers in ON clauses to match stored column names
 	onConditions := make([]string, 0, len(primaryKeys)+1)
-	for _, pk := range primaryKeys {
-		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			lowerPkName := strings.ToLower(col.Name)
+			onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", lowerPkName, lowerPkName))
+		}
 	}
 	onConditions = append(onConditions, "target._is_current AND source._is_current")
 	onCondition := strings.Join(onConditions, " AND ")
@@ -492,7 +508,7 @@ WHEN NOT MATCHED BY TARGET THEN
 		QuoteIdentifier(asset.Name),
 		strings.TrimSpace(query),
 		QuoteIdentifier(asset.Name),
-		pkList,
+		pkListUsing,
 		whereCondition,
 		onCondition,
 		matchedCondition,
@@ -547,7 +563,17 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 			asset.Materialization.Strategy,
 		)
 	}
-	pkList := strings.Join(primaryKeys, ", ")
+
+	// For Postgres USING clause, we need lowercase unquoted identifiers
+	// Postgres stores unquoted identifiers as lowercase, so USING needs to match that
+	pkListForUsing := make([]string, 0, len(primaryKeys))
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			pkListForUsing = append(pkListForUsing, strings.ToLower(col.Name))
+		}
+	}
+	pkListUsing := strings.Join(pkListForUsing, ", ")
+
 	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(insertValues,
@@ -597,7 +623,7 @@ WHEN NOT MATCHED BY TARGET THEN
 		QuoteIdentifier(tbl),
 		strings.TrimSpace(query),
 		QuoteIdentifier(tbl),
-		pkList,
+		pkListUsing,
 		quotedIncrementalKey,
 		onCondition,
 		quotedIncrementalKey,

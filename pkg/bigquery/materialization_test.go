@@ -163,7 +163,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
@@ -183,7 +183,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
@@ -203,7 +203,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
@@ -224,7 +224,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			query: "SELECT 1",
 			want: "^DECLARE distinct_keys.+ array<date>;\n" +
 				"BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
 				"SET distinct_keys_.+ = \\(SELECT array_agg\\(distinct somekey\\) FROM __bruin_tmp_.+\\);\n" +
 				"DELETE FROM my\\.asset WHERE somekey in unnest\\(distinct_keys.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
@@ -242,7 +242,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1\n -- This is a comment",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n -- This is a comment\n;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n -- This is a comment;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
