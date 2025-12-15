@@ -952,6 +952,37 @@ ORDER BY table_name;
 	return tables, nil
 }
 
+func (db *DB) GetTablesWithSchemas(ctx context.Context, databaseName string) (map[string][]string, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+
+	q := fmt.Sprintf(`
+SELECT table_schema, table_name
+FROM %s.INFORMATION_SCHEMA.TABLES
+WHERE table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY table_schema, table_name;
+`, databaseName)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tables in database '%s': %w", databaseName, err)
+	}
+
+	tables := make(map[string][]string)
+	for _, row := range result {
+		if len(row) >= 2 {
+			if schemaName, ok := row[0].(string); ok {
+				if tableName, ok := row[1].(string); ok {
+					tables[schemaName] = append(tables[schemaName], tableName)
+				}
+			}
+		}
+	}
+
+	return tables, nil
+}
+
 func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
 	if databaseName == "" {
 		return nil, errors.New("database name cannot be empty")
