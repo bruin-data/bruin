@@ -24,7 +24,7 @@ cd my-stripe-pipeline
 Run the entire pipeline:
 
 ```bash
-bruin run
+bruin run stripe-databricks
 ```
 
 Run a single asset:
