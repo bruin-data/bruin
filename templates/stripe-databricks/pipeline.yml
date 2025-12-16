@@ -1,0 +1,7 @@
+name: stripe-databricks-template
+default:
+  type: ingestr
+  parameters:
+    source_connection: stripe-default
+    destination: databricks-default
+

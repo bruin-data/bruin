@@ -1,0 +1,9 @@
+name: stripe_sandbox.charges_raw
+type: ingestr
+connection: databricks-default
+
+description: Ingests charge/payment data from Stripe into Databricks. Captures payment amounts, currency, and transaction details.
+
+parameters:
+  source_table: charge
+
