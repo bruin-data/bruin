@@ -30,7 +30,7 @@ bruin run stripe-databricks
 Run a single asset:
 
 ```bash
-bruin run assets/bronze_customer_data_raw.asset.yml
+bruin run stripe-databricks/assets/bronze_customer_data_raw.asset.yml
 ```
 
 ## Pipeline Flow
