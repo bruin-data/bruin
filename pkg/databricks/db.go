@@ -145,6 +145,10 @@ func (db *DB) Ping(ctx context.Context) error {
 	return nil
 }
 
+func (db *DB) GetIngestrURI() (string, error) {
+	return db.config.GetIngestrURI(), nil
+}
+
 func (db *DB) GetDatabases(ctx context.Context) ([]string, error) {
 	q := `SHOW DATABASES`
 
