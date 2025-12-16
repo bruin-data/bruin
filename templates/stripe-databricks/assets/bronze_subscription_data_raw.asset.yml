@@ -1,4 +1,4 @@
-name: stripe_sandbox.subscriptions_raw
+name: subscriptions_raw
 type: ingestr
 connection: databricks-default
 
