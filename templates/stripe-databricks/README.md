@@ -12,31 +12,6 @@ This pipeline demonstrates a complete bronze-to-silver ingestion workflow using 
 ### Silver Layer (Transformed)
 - `silver_customer_subscription_simple.sql` - Joins customers with their subscriptions and most recent charge, providing a clean, analysis-ready view of customer activity
 
-## Setup
-
-The pipeline includes a `.bruin.yml` file with placeholder connection values:
-
-```yaml
-default_environment: default
-environments:
-  default:
-    connections:
-      stripe:
-        - name: "stripe-default"
-          api_key: "sk_test_your_stripe_secret_key"
-
-      databricks:
-        - name: "databricks-default"
-          host: "your-workspace.cloud.databricks.com"
-          token: "your-databricks-token"
-          path: "/sql/1.0/warehouses/your-warehouse-id"
-          port: 443
-          catalog: "your_catalog"
-          schema: "stripe_sandbox"
-```
-
-Update the connections with your Stripe API key and Databricks credentials. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
-
 ## Running the Pipeline
 
 Initialize a new project from this template:
