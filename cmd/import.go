@@ -160,6 +160,11 @@ Example:
 	}
 }
 
+type importWarning struct {
+	tableName string
+	message   string
+}
+
 func runImport(ctx context.Context, pipelinePath, connectionName, schema string, fillColumns bool, environment, configFile string) error {
 	fs := afero.NewOsFs()
 
@@ -197,14 +202,21 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 	assetType := determineAssetTypeFromConnection(connectionName, conn)
 	totalTables := 0
 	mergedTableCount := 0
+	var warnings []importWarning
+
 	for _, schemaObj := range summary.Schemas {
 		if schema != "" && !strings.EqualFold(schemaObj.Name, schema) {
 			continue
 		}
 		for _, table := range schemaObj.Tables {
-			createdAsset, err := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns)
-			if err != nil {
-				return errors2.Wrapf(err, "failed to create asset for table %s.%s", schemaObj.Name, table.Name)
+			fullName := fmt.Sprintf("%s.%s", schemaObj.Name, table.Name)
+			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns)
+			if warning != "" {
+				warnings = append(warnings, importWarning{tableName: fullName, message: warning})
+			}
+
+			if createdAsset == nil {
+				continue
 			}
 
 			assetName := fmt.Sprintf("%s.%s", strings.ToLower(schemaObj.Name), strings.ToLower(table.Name))
@@ -247,6 +259,14 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 
 	fmt.Printf("Imported %d tables and Merged %d from data warehouse '%s'%s into pipeline '%s'\n",
 		totalTables, mergedTableCount, summary.Name, filterDesc, pipelinePath)
+
+	if len(warnings) > 0 {
+		fmt.Printf("\nWarnings encountered during import (%d tables affected):\n", len(warnings))
+		for _, w := range warnings {
+			warningPrinter.Printf("  - %s: %s\n", w.tableName, w.message)
+		}
+		fmt.Println()
+	}
 
 	return nil
 }
@@ -316,8 +336,7 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	return nil
 }
 
-func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool) (*pipeline.Asset, error) {
-	// Create schema subfolder
+func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool) (*pipeline.Asset, string) {
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 
 	fileName := strings.ToLower(tableName) + ".asset.yml"
@@ -334,14 +353,11 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	if fillColumns {
 		err := fillAssetColumnsFromDB(ctx, asset, conn, schemaName, tableName)
 		if err != nil {
-			warningPrinter.Printf("Warning: Could not fill columns for %s.%s: %v\n", schemaName, tableName, err)
-			if err != nil {
-				return nil, err
-			}
+			return asset, fmt.Sprintf("Could not fill columns: %v", err)
 		}
 	}
 
-	return asset, nil
+	return asset, ""
 }
 
 // maxInt returns the larger of two integers.
