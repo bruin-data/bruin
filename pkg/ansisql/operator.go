@@ -65,10 +65,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return errors.Errorf("'%s' does not exist", connName)
 	}
 
-	trimmedQuery := helpers.TrimToLength(qry[0].Query, 50)
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if printerExists {
-		fmt.Fprintln(printer, "Poking:", trimmedQuery)
+		fmt.Fprintln(printer, "Poking:", qry[0].Query)
 	}
 
 	timeout := time.After(24 * time.Hour)
