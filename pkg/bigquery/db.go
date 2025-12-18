@@ -1324,10 +1324,8 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 
 	// Only iterate over requested schemas (datasets)
 	for _, schemaName := range schemas {
-		schemaName := schemaName // capture for goroutine
-		ds := d.client.Dataset(schemaName)
-
 		p.Go(func() {
+			ds := d.client.Dataset(schemaName)
 			schema := &ansisql.DBSchema{
 				Name:   schemaName,
 				Tables: []*ansisql.DBTable{},

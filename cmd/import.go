@@ -185,19 +185,26 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 
 	var summary *ansisql.DBDatabase
 
-	// If --schemas flag is used, use the schema-filtered function (only supported for BigQuery)
-	if len(schemas) > 0 {
-		schemaSummarizer, ok := conn.(interface {
+	// Build schema list from --schema or --schemas flags
+	schemaList := schemas
+	if schema != "" {
+		schemaList = []string{schema}
+	}
+
+	// If schema(s) specified, try to use GetDatabaseSummaryForSchemas if available
+	if len(schemaList) > 0 {
+		if schemaSummarizer, ok := conn.(interface {
 			GetDatabaseSummaryForSchemas(ctx context.Context, schemas []string) (*ansisql.DBDatabase, error)
-		})
-		if !ok {
-			return fmt.Errorf("--schemas flag is only supported for BigQuery connections")
+		}); ok {
+			summary, err = schemaSummarizer.GetDatabaseSummaryForSchemas(ctx, schemaList)
+			if err != nil {
+				return errors2.Wrap(err, "failed to retrieve database summary for specified schemas")
+			}
 		}
-		summary, err = schemaSummarizer.GetDatabaseSummaryForSchemas(ctx, schemas)
-		if err != nil {
-			return errors2.Wrap(err, "failed to retrieve database summary for specified schemas")
-		}
-	} else {
+	}
+
+	// Fall back to GetDatabaseSummary if no schema specified or connection doesn't support filtered summary
+	if summary == nil {
 		summarizer, ok := conn.(interface {
 			GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
 		})
