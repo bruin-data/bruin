@@ -126,7 +126,7 @@ func TestCreateAsset(t *testing.T) {
 				conn.On("SelectWithSchema", mock.Anything, mock.Anything).Return((*query.QueryResult)(nil), errors.New("connection failed"))
 				return conn
 			},
-			wantWarning: "Could not fill columns: connection failed",
+			wantWarning: "Could not fill columns: failed to query columns for table public.orders: connection failed",
 		},
 		{
 			name:        "asset creation with special column names filtered out",
