@@ -1309,11 +1309,6 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 		return nil, err
 	}
 
-	// If no schemas specified, fall back to getting all
-	if len(schemas) == 0 {
-		return d.GetDatabaseSummary(ctx)
-	}
-
 	projectID := d.config.ProjectID
 
 	summary := &ansisql.DBDatabase{
