@@ -61,6 +61,10 @@ func ImportDatabase() *cli.Command {
 				Aliases: []string{"s"},
 				Usage:   "filter by specific schema name",
 			},
+			&cli.StringSliceFlag{
+				Name:  "schemas",
+				Usage: "filter by multiple schema names, only supported for BigQuery (e.g., --schemas public --schemas analytics)",
+			},
 			&cli.BoolFlag{
 				Name:    "no-columns",
 				Aliases: []string{"n"},
@@ -85,11 +89,17 @@ func ImportDatabase() *cli.Command {
 
 			connectionName := c.String("connection")
 			schema := c.String("schema")
+			schemas := c.StringSlice("schemas")
 			noColumns := c.Bool("no-columns")
 			environment := c.String("environment")
 			configFile := c.String("config-file")
 
-			return runImport(ctx, pipelinePath, connectionName, schema, !noColumns, environment, configFile)
+			// Validate that both --schema and --schemas are not used together
+			if schema != "" && len(schemas) > 0 {
+				return cli.Exit("cannot use both --schema and --schemas flags together", 1)
+			}
+
+			return runImport(ctx, pipelinePath, connectionName, schema, schemas, !noColumns, environment, configFile)
 		},
 	}
 }
@@ -165,7 +175,7 @@ type importWarning struct {
 	message   string
 }
 
-func runImport(ctx context.Context, pipelinePath, connectionName, schema string, fillColumns bool, environment, configFile string) error {
+func runImport(ctx context.Context, pipelinePath, connectionName, schema string, schemas []string, fillColumns bool, environment, configFile string) error {
 	fs := afero.NewOsFs()
 
 	conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
@@ -173,16 +183,32 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		return errors2.Wrap(err, "failed to get database connection")
 	}
 
-	summarizer, ok := conn.(interface {
-		GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
-	})
-	if !ok {
-		return fmt.Errorf("connection type '%s' does not support database summary", connectionName)
-	}
+	var summary *ansisql.DBDatabase
 
-	summary, err := summarizer.GetDatabaseSummary(ctx)
-	if err != nil {
-		return errors2.Wrap(err, "failed to retrieve database summary")
+	// If --schemas flag is used, use the schema-filtered function (only supported for BigQuery)
+	if len(schemas) > 0 {
+		schemaSummarizer, ok := conn.(interface {
+			GetDatabaseSummaryForSchemas(ctx context.Context, schemas []string) (*ansisql.DBDatabase, error)
+		})
+		if !ok {
+			return fmt.Errorf("--schemas flag is only supported for BigQuery connections")
+		}
+		summary, err = schemaSummarizer.GetDatabaseSummaryForSchemas(ctx, schemas)
+		if err != nil {
+			return errors2.Wrap(err, "failed to retrieve database summary for specified schemas")
+		}
+	} else {
+		summarizer, ok := conn.(interface {
+			GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
+		})
+		if !ok {
+			return fmt.Errorf("connection type '%s' does not support database summary", connectionName)
+		}
+
+		summary, err = summarizer.GetDatabaseSummary(ctx)
+		if err != nil {
+			return errors2.Wrap(err, "failed to retrieve database summary")
+		}
 	}
 
 	pathParts := strings.Split(pipelinePath, "/")
@@ -255,6 +281,8 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 	filterDesc := ""
 	if schema != "" {
 		filterDesc = fmt.Sprintf(" (schema: %s)", schema)
+	} else if len(schemas) > 0 {
+		filterDesc = fmt.Sprintf(" (schemas: %s)", strings.Join(schemas, ", "))
 	}
 
 	fmt.Printf("Imported %d tables and Merged %d from data warehouse '%s'%s into pipeline '%s'\n",
