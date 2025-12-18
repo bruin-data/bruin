@@ -64,7 +64,7 @@ func TestCreateAsset(t *testing.T) {
 		fillColumns bool
 		setupConn   func() *mockConnection
 		want        *pipeline.Asset
-		wantErr     string
+		wantWarning string
 	}{
 		{
 			name:        "successful asset creation without columns",
@@ -126,7 +126,7 @@ func TestCreateAsset(t *testing.T) {
 				conn.On("SelectWithSchema", mock.Anything, mock.Anything).Return((*query.QueryResult)(nil), errors.New("connection failed"))
 				return conn
 			},
-			wantErr: "connection failed",
+			wantWarning: "Could not fill columns: connection failed",
 		},
 		{
 			name:        "asset creation with special column names filtered out",
@@ -164,15 +164,14 @@ func TestCreateAsset(t *testing.T) {
 			ctx := t.Context()
 			conn := tt.setupConn()
 
-			got, err := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, conn, tt.fillColumns)
+			got, warning := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, conn, tt.fillColumns)
 
-			if tt.wantErr != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErr)
+			if tt.wantWarning != "" {
+				assert.Contains(t, warning, tt.wantWarning)
 				return
 			}
 
-			require.NoError(t, err)
+			assert.Equal(t, "", warning)
 			assert.Equal(t, tt.want, got)
 
 			if tt.fillColumns {
