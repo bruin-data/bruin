@@ -96,7 +96,7 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 		return errors.Wrapf(err, "failed '%s' check", c.checkName)
 	}
 
-	count, err := helpers.CastResultToInteger(res)
+	count, err := helpers.CastResultToInteger(res, false)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse '%s' check result", c.checkName)
 	}

@@ -46,13 +46,19 @@ func PrefixGenerator() string {
 	return string(b)
 }
 
-func CastResultToInteger(res [][]interface{}) (int64, error) {
+func CastResultToInteger(res [][]interface{}, tolerant bool) (int64, error) {
+	if len(res) == 0 && tolerant {
+		return 0, nil
+	}
 	if len(res) != 1 || len(res[0]) != 1 {
 		return 0, errors.Errorf("multiple results are returned from query, please make sure your query just expects one value - value: %v", res)
 	}
 
 	switch v := res[0][0].(type) {
 	case nil:
+		if tolerant {
+			return 0, nil
+		}
 		return 0, errors.Errorf("unexpected result from query, result is nil")
 	case float64:
 		return int64(v), nil

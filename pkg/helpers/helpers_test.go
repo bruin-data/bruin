@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"encoding/json"
+	"math"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -249,6 +250,241 @@ func TestParseJSONOutputs(t *testing.T) {
 			_, _, err := ParseJSONOutputs(tt.actual, tt.expected)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseJSONOutputs() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCastResultToInteger(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		res        [][]interface{}
+		tolerant   bool
+		expected   int64
+		expectErr  bool
+		errMessage string
+	}{
+		{
+			name:      "empty result tolerant",
+			res:       [][]interface{}{},
+			tolerant:  true,
+			expected:  0,
+			expectErr: false,
+		},
+		{
+			name:       "empty result not tolerant",
+			res:        [][]interface{}{},
+			tolerant:   false,
+			expectErr:  true,
+			errMessage: "multiple results are returned from query",
+		},
+		{
+			name:       "multiple rows",
+			res:        [][]interface{}{{1}, {2}},
+			tolerant:   false,
+			expectErr:  true,
+			errMessage: "multiple results are returned from query",
+		},
+		{
+			name:       "multiple columns",
+			res:        [][]interface{}{{1, 2}},
+			tolerant:   false,
+			expectErr:  true,
+			errMessage: "multiple results are returned from query",
+		},
+		{
+			name:      "nil value tolerant",
+			res:       [][]interface{}{{nil}},
+			tolerant:  true,
+			expected:  0,
+			expectErr: false,
+		},
+		{
+			name:       "nil value not tolerant",
+			res:        [][]interface{}{{nil}},
+			tolerant:   false,
+			expectErr:  true,
+			errMessage: "unexpected result from query, result is nil",
+		},
+		{
+			name:      "float64 value",
+			res:       [][]interface{}{{float64(42.7)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "float32 value",
+			res:       [][]interface{}{{float32(42.7)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "int8 value",
+			res:       [][]interface{}{{int8(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "int16 value",
+			res:       [][]interface{}{{int16(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "int32 value",
+			res:       [][]interface{}{{int32(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "int64 value",
+			res:       [][]interface{}{{int64(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "int value",
+			res:       [][]interface{}{{int(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "uint8 value",
+			res:       [][]interface{}{{uint8(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "uint16 value",
+			res:       [][]interface{}{{uint16(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "uint32 value",
+			res:       [][]interface{}{{uint32(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "uint64 value within range",
+			res:       [][]interface{}{{uint64(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:       "uint64 value overflow",
+			res:        [][]interface{}{{uint64(math.MaxInt64) + 1}},
+			tolerant:   false,
+			expectErr:  true,
+			errMessage: "uint64 value",
+		},
+		{
+			name:      "uint value within range",
+			res:       [][]interface{}{{uint(42)}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:       "uint value overflow",
+			res:        [][]interface{}{{uint(math.MaxInt64) + 1}},
+			tolerant:   false,
+			expectErr:  true,
+			errMessage: "uint value",
+		},
+		{
+			name:      "bool true",
+			res:       [][]interface{}{{true}},
+			tolerant:  false,
+			expected:  1,
+			expectErr: false,
+		},
+		{
+			name:      "bool false",
+			res:       [][]interface{}{{false}},
+			tolerant:  false,
+			expected:  0,
+			expectErr: false,
+		},
+		{
+			name:      "string integer",
+			res:       [][]interface{}{{"42"}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "string negative integer",
+			res:       [][]interface{}{{"-42"}},
+			tolerant:  false,
+			expected:  -42,
+			expectErr: false,
+		},
+		{
+			name:      "string float",
+			res:       [][]interface{}{{"42.7"}},
+			tolerant:  false,
+			expected:  42,
+			expectErr: false,
+		},
+		{
+			name:      "string bool true",
+			res:       [][]interface{}{{"true"}},
+			tolerant:  false,
+			expected:  1,
+			expectErr: false,
+		},
+		{
+			name:      "string bool false",
+			res:       [][]interface{}{{"false"}},
+			tolerant:  false,
+			expected:  0,
+			expectErr: false,
+		},
+		{
+			name:       "string invalid",
+			res:        [][]interface{}{{"invalid"}},
+			tolerant:   false,
+			expectErr:  true,
+			errMessage: "cannot cast result string to integer",
+		},
+		{
+			name:       "unsupported type",
+			res:        [][]interface{}{{[]int{1, 2, 3}}},
+			tolerant:   false,
+			expectErr:  true,
+			errMessage: "cannot cast result to integer",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := CastResultToInteger(tt.res, tt.tolerant)
+
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.errMessage != "" {
+					assert.Contains(t, err.Error(), tt.errMessage)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
 			}
 		})
 	}
