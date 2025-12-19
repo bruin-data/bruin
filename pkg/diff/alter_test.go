@@ -84,6 +84,45 @@ func TestGenerateAlterStatements_AddColumn(t *testing.T) {
 		assert.Contains(t, statements[0], "ADD COLUMN \"email\" VARCHAR(255) NOT NULL")
 	})
 
+	t.Run("adds missing column to schema-qualified table in PostgreSQL", func(t *testing.T) {
+		t.Parallel()
+		gen := NewAlterStatementGenerator(DialectPostgreSQL, false)
+		result := &SchemaComparisonResult{
+			HasSchemaDifferences: true,
+			Table1: &TableSummaryResult{
+				Table: &Table{Name: "edwh.stg_smartsheet_bruin.emp_learning_master_2025"},
+			},
+			Table2: &TableSummaryResult{
+				Table: &Table{Name: "dv.ss_emp_learning_master_2025"},
+			},
+			MissingColumns: []MissingColumn{
+				{
+					ColumnName:  "to_count",
+					Type:        "boolean",
+					Nullable:    true,
+					MissingFrom: "dv.ss_emp_learning_master_2025",
+					TableName:   "edwh.stg_smartsheet_bruin.emp_learning_master_2025",
+				},
+				{
+					ColumnName:  "cc_copy",
+					Type:        "character varying",
+					Nullable:    true,
+					MissingFrom: "dv.ss_emp_learning_master_2025",
+					TableName:   "edwh.stg_smartsheet_bruin.emp_learning_master_2025",
+				},
+			},
+		}
+
+		statements := gen.GenerateAlterStatements(result)
+		require.Len(t, statements, 1)
+		// Should quote schema and table name separately
+		assert.Contains(t, statements[0], "ALTER TABLE \"dv\".\"ss_emp_learning_master_2025\"")
+		assert.Contains(t, statements[0], "ADD COLUMN \"to_count\" boolean")
+		assert.Contains(t, statements[0], "ADD COLUMN \"cc_copy\" character varying")
+		// Should NOT contain the incorrectly quoted table name
+		assert.NotContains(t, statements[0], "\"dv.ss_emp_learning_master_2025\"")
+	})
+
 	t.Run("adds nullable column", func(t *testing.T) {
 		t.Parallel()
 		gen := NewAlterStatementGenerator(DialectDuckDB, false)
@@ -544,6 +583,8 @@ func TestQuoteIdentifier(t *testing.T) {
 	}{
 		{"PostgreSQL simple", DialectPostgreSQL, "users", `"users"`},
 		{"PostgreSQL already quoted", DialectPostgreSQL, `"users"`, `"users"`},
+		{"PostgreSQL schema-qualified", DialectPostgreSQL, "dv.ss_emp_learning_master_2025", `"dv"."ss_emp_learning_master_2025"`},
+		{"PostgreSQL multiple dots", DialectPostgreSQL, "catalog.schema.table", `"catalog"."schema"."table"`},
 		{"BigQuery simple", DialectBigQuery, "orders", "`orders`"},
 		{"BigQuery already quoted", DialectBigQuery, "`orders`", "`orders`"},
 		{"Snowflake simple", DialectSnowflake, "products", `"products"`},
