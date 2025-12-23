@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -20,10 +21,12 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
+	gosnowflake "github.com/snowflakedb/gosnowflake"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 )
@@ -94,6 +97,11 @@ func Query() *cli.Command {
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.StringFlag{
+				Name:    "agent-id",
+				Sources: cli.EnvVars("BRUIN_AGENT_ID"),
+				Usage:   "agent ID to include in query annotations for tracking purposes",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
@@ -149,6 +157,18 @@ func Query() *cli.Command {
 				defer timeoutCancel()
 
 				q := query.Query{Query: queryStr}
+				agentID := c.String("agent-id")
+
+				// Apply agent-id annotation based on connection type
+				_, isSnowflake := conn.(snowflake.SfClient)
+				if isSnowflake && agentID != "" {
+					// Snowflake: use query tag via context (Snowflake strips leading SQL comments)
+					timeoutCtx = gosnowflake.WithQueryTag(timeoutCtx, ansisql.BuildAgentIDQueryTag(agentID))
+				} else if agentID != "" {
+					// BigQuery and others: prepend comment to query
+					q = *ansisql.AddAgentIDAnnotationComment(&q, agentID)
+				}
+
 				result, err := querier.SelectWithSchema(timeoutCtx, &q)
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
