@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -70,22 +69,10 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 }
 
 func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, error) {
-	// Use the shared ansisql implementation and split the result into individual queries
-	result, err := ansisql.BuildTruncateInsertQuery(task, query)
-	if err != nil {
-		return nil, err
+	queries := []string{
+		"TRUNCATE TABLE " + task.Name,
+		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
 	}
-
-	// Split the combined query into individual statements for Databricks
-	// Remove the trailing semicolon and split by ";\n"
-	result = strings.TrimSuffix(result, ";")
-	queries := strings.Split(result, ";\n")
-
-	// Clean up each query
-	for i := range queries {
-		queries[i] = strings.TrimSpace(queries[i])
-	}
-
 	return queries, nil
 }
 
@@ -110,7 +97,10 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 
 	allColumnValues := strings.Join(columnNames, ", ")
 
-	whenMatchedThenQuery := ""
+	mergeLines := []string{
+		fmt.Sprintf("MERGE INTO %s target", asset.Name),
+		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+	}
 
 	if len(nonPrimaryKeys) > 0 {
 		matchedUpdateStatements := make([]string, 0, len(nonPrimaryKeys))
@@ -119,17 +109,15 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 		}
 
 		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
-		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
+		mergeLines = append(mergeLines, "WHEN MATCHED THEN UPDATE SET "+matchedUpdateQuery)
 	}
 
-	mergeLines := []string{
-		fmt.Sprintf("MERGE INTO %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
-		whenMatchedThenQuery,
-		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
-	}
+	mergeLines = append(mergeLines, fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues))
 
-	return mergeLines, nil
+	// Join all lines into a single MERGE statement
+	mergeQuery := strings.Join(mergeLines, "\n")
+
+	return []string{mergeQuery}, nil
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
