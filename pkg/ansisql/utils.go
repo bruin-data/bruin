@@ -138,7 +138,7 @@ func AddAgentIDAnnotationComment(q *query.Query, agentID string) *query.Query {
 		return q
 	}
 
-	comment := fmt.Sprintf("-- @bruin.config: %s", BuildAgentIDQueryTag(agentID))
+	comment := "-- @bruin.config: " + BuildAgentIDQueryTag(agentID)
 
 	return &query.Query{
 		Query: comment + "\n" + q.Query,
