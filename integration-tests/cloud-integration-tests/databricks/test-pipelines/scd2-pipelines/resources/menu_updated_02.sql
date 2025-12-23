@@ -26,3 +26,4 @@ columns:
 
 
 SELECT 1 AS ID, 'Cola' AS Name, 0.99 AS Price
+

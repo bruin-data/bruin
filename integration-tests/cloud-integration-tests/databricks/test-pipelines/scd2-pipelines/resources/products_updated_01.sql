@@ -1,5 +1,5 @@
 /* @bruin
-name: test.products
+name: test.products_scd2_time
 type: databricks.sql
 
 materialization:
@@ -46,3 +46,4 @@ SELECT
     'ps5' AS product_name,
     25 AS stock,
     DATE '2025-06-02' AS dt
+

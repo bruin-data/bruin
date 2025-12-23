@@ -29,3 +29,4 @@ SELECT 2 AS product_id, 'Smartphone' AS product_name, 69999 AS price, 50 AS stoc
 UNION ALL
 SELECT 3 AS product_id, 'Headphones' AS product_name, 19999 AS price, 100 AS stock
 
+

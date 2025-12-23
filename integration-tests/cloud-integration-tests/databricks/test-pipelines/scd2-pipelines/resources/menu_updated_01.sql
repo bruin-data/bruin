@@ -31,3 +31,4 @@ SELECT 2 AS ID, 'Tea' AS Name, 499 AS Price
 UNION ALL
 SELECT 4 AS ID, 'Fanta' AS Name, 1.99 AS Price
 
+

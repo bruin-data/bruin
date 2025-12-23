@@ -28,3 +28,4 @@ SELECT 5 AS product_id, 'Tablet' AS product_name, 49999 AS price, DATE '2024-01-
 UNION ALL
 SELECT 6 AS product_id, 'Mouse' AS product_name, 2999 AS price, DATE '2024-01-15' AS dt
 
+

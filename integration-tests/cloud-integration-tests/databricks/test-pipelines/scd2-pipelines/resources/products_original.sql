@@ -46,3 +46,4 @@ SELECT
     'Monitor' AS product_name,
     25 AS stock,
     DATE '2025-04-02' AS dt
+

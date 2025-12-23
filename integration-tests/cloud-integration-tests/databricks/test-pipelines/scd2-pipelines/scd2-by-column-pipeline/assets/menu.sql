@@ -32,3 +32,4 @@ SELECT 2 AS ID, 'Tea' AS Name, 499 AS Price
 UNION ALL
 SELECT 3 AS ID, 'Coffee' AS Name, 599 AS Price
 
+

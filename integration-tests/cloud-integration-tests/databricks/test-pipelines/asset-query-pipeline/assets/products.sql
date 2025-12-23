@@ -35,3 +35,4 @@ UNION ALL
 SELECT
     4 AS product_id, 'Monitor' AS product_name, 299.99 AS price, 25 AS stock
 
+

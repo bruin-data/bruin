@@ -35,3 +35,4 @@ SELECT 4 AS product_id, 'Monitor' AS product_name, 29999 AS price, DATE '2024-01
 UNION ALL
 SELECT 5 AS product_id, 'Keyboard' AS product_name, 8999 AS price, DATE '2024-01-05' AS dt
 
+

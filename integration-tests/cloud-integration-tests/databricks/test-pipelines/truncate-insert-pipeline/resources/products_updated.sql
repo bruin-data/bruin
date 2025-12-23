@@ -27,3 +27,4 @@ SELECT 4 AS product_id, 'Monitor' AS product_name, 29999 AS price, 25 AS stock
 UNION ALL
 SELECT 5 AS product_id, 'Keyboard' AS product_name, 8999 AS price, 75 AS stock
 
+

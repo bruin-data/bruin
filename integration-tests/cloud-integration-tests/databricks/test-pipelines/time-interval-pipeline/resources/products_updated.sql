@@ -31,3 +31,4 @@ SELECT 7 AS product_id, 'Mouse' AS product_name, 2999 AS price, DATE '2024-01-16
 UNION ALL
 SELECT 8 AS product_id, 'Webcam' AS product_name, 7999 AS price, DATE '2024-01-18' AS dt
 
+

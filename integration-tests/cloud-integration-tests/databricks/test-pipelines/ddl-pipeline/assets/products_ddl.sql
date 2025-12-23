@@ -13,7 +13,7 @@ columns:
     description: "Unique identifier for the product"
     primary_key: true
   - name: product_name
-    type: VARCHAR
+    type: VARCHAR(255)
     description: "Name of the product"
   - name: price
     type: INTEGER
@@ -22,8 +22,9 @@ columns:
     type: INTEGER
     description: "Number of units in stock"
   - name: category
-    type: VARCHAR
+    type: VARCHAR(255)
     description: "Product category"
 
 @bruin */
+
 
