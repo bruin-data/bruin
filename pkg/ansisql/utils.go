@@ -129,6 +129,39 @@ func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 	}, nil
 }
 
+// AddAgentIDAnnotationComment adds an agent ID annotation comment to the query.
+// This is used for adhoc queries to track which agent executed them.
+// The comment is prepended to the beginning of the query (works for BigQuery and others).
+// For Snowflake, use BuildAgentIDQueryTag with gosnowflake.WithQueryTag instead.
+func AddAgentIDAnnotationComment(q *query.Query, agentID string) *query.Query {
+	if agentID == "" {
+		return q
+	}
+
+	comment := fmt.Sprintf("-- @bruin.config: %s", BuildAgentIDQueryTag(agentID))
+
+	return &query.Query{
+		Query: comment + "\n" + q.Query,
+	}
+}
+
+// BuildAgentIDQueryTag builds the JSON query tag string for agent ID annotation.
+// This is used for Snowflake's QUERY_TAG via gosnowflake.WithQueryTag.
+func BuildAgentIDQueryTag(agentID string) string {
+	annotations := map[string]interface{}{
+		"agent_id": agentID,
+		"type":     "adhoc_query",
+	}
+
+	finalJSON, err := json.Marshal(annotations)
+	if err != nil {
+		// If marshaling fails, return just the agent ID
+		return agentID
+	}
+
+	return string(finalJSON)
+}
+
 // LogQueryIfVerbose logs the SQL query to the writer if verbose mode is enabled.
 // It checks for the verbose flag in the context and writes a formatted query preview
 // to the printer writer, truncating queries longer than QueryLogCharacterLimit.
