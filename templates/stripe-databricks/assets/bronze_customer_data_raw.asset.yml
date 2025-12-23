@@ -1,9 +1,0 @@
-name: customers_raw
-type: ingestr
-connection: databricks-default
-
-description: Ingests customer data from Stripe into Databricks. Captures customer information including name, email, and creation date.
-
-parameters:
-  source_table: customer
-
