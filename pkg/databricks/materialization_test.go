@@ -105,6 +105,21 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  []string{"INSERT INTO my.asset SELECT 1"},
 		},
 		{
+			name: "materialize to a table with truncate+insert",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyTruncateInsert,
+				},
+			},
+			query: "SELECT 1",
+			want: []string{
+				"TRUNCATE TABLE my.asset",
+				"INSERT INTO my.asset SELECT 1",
+			},
+		},
+		{
 			name: "incremental strategies require the incremental_key to be set",
 			task: &pipeline.Asset{
 				Name: "my.asset",
