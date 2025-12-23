@@ -1,0 +1,8 @@
+id,name,price,_is_current
+1,Cola,399,false
+1,Cola,799,false
+1,Cola,99,true
+2,Tea,499,false
+3,Coffee,599,false
+4,Fanta,199,false
+

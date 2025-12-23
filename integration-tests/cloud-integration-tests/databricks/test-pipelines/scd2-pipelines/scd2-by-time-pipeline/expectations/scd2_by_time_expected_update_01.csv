@@ -1,0 +1,9 @@
+product_id,product_name,stock,_is_current,_valid_from
+1,Laptop,100,true,2025-04-02 00:00:00 +0000 UTC
+2,Smartphone,150,true,2025-04-02 00:00:00 +0000 UTC
+3,Headphones,175,false,2025-04-02 00:00:00 +0000 UTC
+3,Headphones,900,true,2025-06-02 00:00:00 +0000 UTC
+4,Monitor,25,false,2025-04-02 00:00:00 +0000 UTC
+5,ps5,25,true,2025-06-02 00:00:00 +0000 UTC
+
+
