@@ -15,11 +15,11 @@ columns:
   - name: product_name
     type: VARCHAR
     description: "Name of the product"
-    update_on_merge: true
+    update_on_merge: false
   - name: price
     type: INTEGER
     description: "Price of the product in cents"
-    update_on_merge: false
+    update_on_merge: true
 
 @bruin */
 

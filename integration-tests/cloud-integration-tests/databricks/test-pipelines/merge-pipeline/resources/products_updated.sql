@@ -15,15 +15,15 @@ columns:
   - name: product_name
     type: VARCHAR
     description: "Name of the product"
-    update_on_merge: true
+    update_on_merge: false
   - name: price
     type: INTEGER
     description: "Price of the product in cents"
-    update_on_merge: false
+    update_on_merge: true
 
 @bruin */
 
-SELECT 1 AS product_id, 'Laptop' AS product_name, 129900 AS price
+SELECT 1 AS product_id, 'Laptop_new' AS product_name, 129900 AS price
 UNION ALL
 SELECT 2 AS product_id, 'Smartphone' AS product_name, 69900 AS price
 UNION ALL
