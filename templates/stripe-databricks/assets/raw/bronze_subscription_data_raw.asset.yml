@@ -1,0 +1,9 @@
+name: stripe_sandbox.bronze_subscription_data_raw
+type: ingestr
+connection: databricks-default
+
+description: Ingests subscription data from Stripe into Databricks. Captures subscription status, billing periods, and plan details.
+
+parameters:
+  source_table: subscription
+
