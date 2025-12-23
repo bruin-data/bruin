@@ -69,8 +69,6 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 }
 
 func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, error) {
-	// Databricks doesn't require transactions for truncate+insert
-	// Execute as separate statements (similar to BigQuery/ClickHouse)
 	queries := []string{
 		"TRUNCATE TABLE " + task.Name,
 		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
