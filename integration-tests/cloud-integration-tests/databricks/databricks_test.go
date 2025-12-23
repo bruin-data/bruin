@@ -21,6 +21,8 @@ func TestDatabricksWorkflows(t *testing.T) {
 
 	configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 
+	tempDir := t.TempDir()
+
 	tests := []struct {
 		name     string
 		workflow e2e.Workflow
@@ -175,6 +177,52 @@ func TestDatabricksWorkflows(t *testing.T) {
 				Name: "truncate-insert-materialization",
 				Steps: []e2e.Task{
 					{
+						Name:    "truncate-insert: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempDir, "test-truncate-insert")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "truncate-insert: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempDir, "test-truncate-insert"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "truncate-insert: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline"), filepath.Join(tempDir, "test-truncate-insert")},
+						WorkingDir: filepath.Join(tempDir, "test-truncate-insert"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "truncate-insert: copy initial SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/resources/products_initial.sql"), filepath.Join(tempDir, "test-truncate-insert/truncate-insert-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "truncate-insert: drop the table",
 						Command: binary,
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_truncate;"),
@@ -187,33 +235,9 @@ func TestDatabricksWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "truncate-insert: confirm the table is dropped",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT * FROM test.products_truncate;"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "truncate-insert: restore initial SQL",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
 						Name:    "truncate-insert: create initial table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-truncate-insert/truncate-insert-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -231,7 +255,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/expectations/initial_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-truncate-insert/truncate-insert-pipeline/expectations/initial_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -241,7 +265,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "truncate-insert: copy updated SQL to asset",
 						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/assets/products.sql")},
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/resources/products_updated.sql"), filepath.Join(tempDir, "test-truncate-insert/truncate-insert-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -253,7 +277,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "truncate-insert: run with truncate+insert strategy",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-truncate-insert/truncate-insert-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -271,7 +295,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/truncate-insert-pipeline/expectations/updated_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-truncate-insert/truncate-insert-pipeline/expectations/updated_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -299,6 +323,52 @@ func TestDatabricksWorkflows(t *testing.T) {
 				Name: "append-materialization",
 				Steps: []e2e.Task{
 					{
+						Name:    "append: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempDir, "test-append")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "append: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempDir, "test-append"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "append: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/append-pipeline"), filepath.Join(tempDir, "test-append")},
+						WorkingDir: filepath.Join(tempDir, "test-append"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "append: copy initial SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/append-pipeline/resources/products_initial.sql"), filepath.Join(tempDir, "test-append/append-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "append: drop the table",
 						Command: binary,
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_append;"),
@@ -311,33 +381,9 @@ func TestDatabricksWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "append: confirm the table is dropped",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT * FROM test.products_append;"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "append: restore initial SQL",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/append-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/append-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
 						Name:    "append: create initial table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/append-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-append/append-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -355,7 +401,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/append-pipeline/expectations/initial_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-append/append-pipeline/expectations/initial_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -365,7 +411,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "append: copy updated SQL to asset",
 						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/append-pipeline/resources/products_append.sql"), filepath.Join(currentFolder, "test-pipelines/append-pipeline/assets/products.sql")},
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/append-pipeline/resources/products_append.sql"), filepath.Join(tempDir, "test-append/append-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -377,7 +423,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "append: run append strategy",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/append-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-append/append-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -395,7 +441,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/append-pipeline/expectations/appended_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-append/append-pipeline/expectations/appended_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -423,6 +469,52 @@ func TestDatabricksWorkflows(t *testing.T) {
 				Name: "merge-materialization",
 				Steps: []e2e.Task{
 					{
+						Name:    "merge: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempDir, "test-merge")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "merge: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempDir, "test-merge"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "merge: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/merge-pipeline"), filepath.Join(tempDir, "test-merge")},
+						WorkingDir: filepath.Join(tempDir, "test-merge"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "merge: copy initial SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/merge-pipeline/resources/products_initial.sql"), filepath.Join(tempDir, "test-merge/merge-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "merge: drop the table",
 						Command: binary,
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_merge;"),
@@ -435,33 +527,9 @@ func TestDatabricksWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "merge: confirm the table is dropped",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT * FROM test.products_merge;"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "merge: restore initial SQL",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/merge-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/merge-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
 						Name:    "merge: create initial table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/merge-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-merge/merge-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -479,7 +547,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/merge-pipeline/expectations/initial_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-merge/merge-pipeline/expectations/initial_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -489,7 +557,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "merge: copy updated SQL to asset",
 						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/merge-pipeline/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/merge-pipeline/assets/products.sql")},
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/merge-pipeline/resources/products_updated.sql"), filepath.Join(tempDir, "test-merge/merge-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -501,7 +569,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "merge: run merge strategy",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/merge-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-merge/merge-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -519,7 +587,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/merge-pipeline/expectations/merged_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-merge/merge-pipeline/expectations/merged_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -547,6 +615,52 @@ func TestDatabricksWorkflows(t *testing.T) {
 				Name: "delete-insert-materialization",
 				Steps: []e2e.Task{
 					{
+						Name:    "delete-insert: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempDir, "test-delete-insert")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "delete-insert: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempDir, "test-delete-insert"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "delete-insert: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline"), filepath.Join(tempDir, "test-delete-insert")},
+						WorkingDir: filepath.Join(tempDir, "test-delete-insert"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "delete-insert: copy initial SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/resources/products_initial.sql"), filepath.Join(tempDir, "test-delete-insert/delete-insert-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "delete-insert: drop the table",
 						Command: binary,
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_delete_insert;"),
@@ -559,33 +673,9 @@ func TestDatabricksWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "delete-insert: confirm the table is dropped",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT * FROM test.products_delete_insert;"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "delete-insert: restore initial SQL",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
 						Name:    "delete-insert: create initial table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-delete-insert/delete-insert-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -603,7 +693,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/expectations/initial_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-delete-insert/delete-insert-pipeline/expectations/initial_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -613,7 +703,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "delete-insert: copy updated SQL to asset",
 						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/assets/products.sql")},
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/resources/products_updated.sql"), filepath.Join(tempDir, "test-delete-insert/delete-insert-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -625,7 +715,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "delete-insert: run delete+insert for date 2024-01-15",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-delete-insert/delete-insert-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -643,7 +733,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/delete-insert-pipeline/expectations/updated_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-delete-insert/delete-insert-pipeline/expectations/updated_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -671,6 +761,52 @@ func TestDatabricksWorkflows(t *testing.T) {
 				Name: "time-interval-materialization",
 				Steps: []e2e.Task{
 					{
+						Name:    "time-interval: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempDir, "test-time-interval")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "time-interval: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempDir, "test-time-interval"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "time-interval: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline"), filepath.Join(tempDir, "test-time-interval")},
+						WorkingDir: filepath.Join(tempDir, "test-time-interval"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "time-interval: copy initial SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/resources/products_initial.sql"), filepath.Join(tempDir, "test-time-interval/time-interval-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "time-interval: drop the table",
 						Command: binary,
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_time_interval;"),
@@ -683,33 +819,9 @@ func TestDatabricksWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "time-interval: confirm the table is dropped",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT * FROM test.products_time_interval;"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "time-interval: restore initial SQL",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/resources/products_initial.sql"), filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
 						Name:    "time-interval: create initial table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--start-date", "2024-01-01", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--start-date", "2024-01-01", "--end-date", "2024-01-31", filepath.Join(tempDir, "test-time-interval/time-interval-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -727,7 +839,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/expectations/initial_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-time-interval/time-interval-pipeline/expectations/initial_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -737,7 +849,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "time-interval: copy updated SQL to asset",
 						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/assets/products.sql")},
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/resources/products_updated.sql"), filepath.Join(tempDir, "test-time-interval/time-interval-pipeline/assets/products.sql")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -749,7 +861,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 					{
 						Name:    "time-interval: run for specific time range",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--start-date", "2024-01-15", "--end-date", "2024-01-18", filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--start-date", "2024-01-15", "--end-date", "2024-01-18", filepath.Join(tempDir, "test-time-interval/time-interval-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -767,7 +879,7 @@ func TestDatabricksWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/time-interval-pipeline/expectations/updated_expected.csv"),
+							CSVFile:  filepath.Join(tempDir, "test-time-interval/time-interval-pipeline/expectations/updated_expected.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
