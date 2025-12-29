@@ -264,7 +264,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to parse rerun_cooldown value '%s'", value)
 			}
-			task.RerunCooldown = rerunCooldown
+			task.RerunCooldown = &rerunCooldown
 
 			continue
 		case "secrets":

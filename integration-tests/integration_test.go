@@ -3156,6 +3156,23 @@ func TestMacros(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "rerun-cooldown-translation",
+			task: e2e.Task{
+				Name:    "rerun-cooldown-translation",
+				Command: binary,
+				Args:    []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "../test-rerun-cooldown")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`"rerun_cooldown":300`, `"retries_delay":300`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -783,8 +783,8 @@ type Asset struct { //nolint:recvcheck
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	Retries           int                `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
-	RerunCooldown     int                `json:"rerun_cooldown" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
-	RetriesDelay      int                `json:"retries_delay" yaml:"-" mapstructure:"-"`
+	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 
 	upstream   []*Asset
 	downstream []*Asset
@@ -1459,8 +1459,8 @@ type Pipeline struct {
 	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
-	RerunCooldown      int                    `json:"rerun_cooldown" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
-	RetriesDelay       int                    `json:"retries_delay" yaml:"-" mapstructure:"-"`
+	RerunCooldown      *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit" yaml:"commit,omitempty"`
@@ -2084,10 +2084,13 @@ func (b *Builder) translatePipelineRetryConfig(ctx context.Context, pipeline *Pi
 	}
 
 	// Translate pipeline-level rerun_cooldown to retries_delay
-	if pipeline.RerunCooldown > 0 {
-		pipeline.RetriesDelay = pipeline.RerunCooldown
-	} else if pipeline.RerunCooldown == -1 {
-		pipeline.RetriesDelay = 0
+	if pipeline.RerunCooldown != nil {
+		if *pipeline.RerunCooldown > 0 {
+			pipeline.RetriesDelay = pipeline.RerunCooldown
+		} else if *pipeline.RerunCooldown == -1 {
+			zero := 0
+			pipeline.RetriesDelay = &zero
+		}
 	}
 
 	return pipeline, nil
@@ -2147,11 +2150,14 @@ func (b *Builder) translateRetryConfig(ctx context.Context, asset *Asset, foundP
 	}
 
 	// Translate asset-level rerun_cooldown to retries_delay
-	if asset.RerunCooldown > 0 {
-		asset.RetriesDelay = asset.RerunCooldown
-	} else if asset.RerunCooldown == -1 {
-		asset.RetriesDelay = 0
-	} else if foundPipeline != nil && asset.RerunCooldown == 0 && foundPipeline.RerunCooldown > 0 {
+	if asset.RerunCooldown != nil {
+		if *asset.RerunCooldown > 0 {
+			asset.RetriesDelay = asset.RerunCooldown
+		} else if *asset.RerunCooldown == -1 {
+			zero := 0
+			asset.RetriesDelay = &zero
+		}
+	} else if foundPipeline != nil && foundPipeline.RerunCooldown != nil && *foundPipeline.RerunCooldown > 0 {
 		// Inherit from pipeline if asset has no specific retry config
 		asset.RetriesDelay = foundPipeline.RerunCooldown
 	}
