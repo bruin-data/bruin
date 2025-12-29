@@ -3165,7 +3165,36 @@ func TestMacros(t *testing.T) {
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{`"rerun_cooldown":300`, `"retries_delay":300`},
+					Contains: []string{
+						// Pipeline level
+						`"rerun_cooldown":300`, `"retries_delay":300`,
+						// Asset with explicit rerun_cooldown
+						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
+						// Asset that inherits from pipeline
+						`"name":"inherits_pipeline"`, `"retries_delay":300`,
+						// Asset with disabled retries
+						`"name":"no_delay"`, `"rerun_cooldown":-1`, `"retries_delay":0`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "rerun-cooldown-asset-parsing",
+			task: e2e.Task{
+				Name:    "rerun-cooldown-asset-parsing",
+				Command: binary,
+				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "../test-rerun-cooldown/assets/test_asset.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						// Asset with explicit rerun_cooldown should translate correctly
+						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
+					},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
