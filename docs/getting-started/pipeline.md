@@ -329,7 +329,7 @@ rerun_cooldown: 300  # Wait 5 minutes between retries
 
 ### Concurrency
 
-Limit how many runs you can take at the same time for this pipeline in Bruin Cloud. 
+Limit how many runs you can take at the same time for this pipeline in Bruin Cloud.
 Defaults to 1 for safety.
 
 Example:

@@ -1,6 +1,6 @@
 # Asset Definition
-Assets are defined in a YAML format in the same file as the asset code. 
-This enables the metadata to be right next to the code, reducing the friction when things change and encapsulating the relevant details in a single file. 
+Assets are defined in a YAML format in the same file as the asset code.
+This enables the metadata to be right next to the code, reducing the friction when things change and encapsulating the relevant details in a single file.
 The definition includes all the details around an asset from its name to the quality checks that will be executed.
 
 Here's an example asset definition:
@@ -23,7 +23,7 @@ rerun_cooldown: 300
 tags:
    - dashboard
    - team:xyz
-   
+
 columns:
   - name: one
     type: integer
@@ -61,22 +61,22 @@ We use `uri` (Universal Resource Identifier) as another way to identify assets. 
 
 ## `type`
 The type of the asset, determines how the execution will happen. Must be one of the types [here](https://github.com/bruin-data/bruin/blob/main/pkg/pipeline/pipeline.go#L33).
-- **Type:** `String` 
+- **Type:** `String`
 
 ## `owner`
-The owner of the asset, has no functional implications on Bruin CLI as of today, allows documenting the ownership information. On [Bruin Cloud](https://getbruin.com), it is used to analyze ownership information, used in governance reports and ownership lineage.  
-- **Type:** `String` 
+The owner of the asset, has no functional implications on Bruin CLI as of today, allows documenting the ownership information. On [Bruin Cloud](https://getbruin.com), it is used to analyze ownership information, used in governance reports and ownership lineage.
+- **Type:** `String`
 
 ## `tags`
 As the name states, tags that are applied to the asset. These tags can then be used while running assets, e.g.:
 ```bash
 bruin run --tags client1
 ```
-- **Type:** `String[]` 
+- **Type:** `String[]`
 
 ## `domains`
 Business domains that the asset belongs to. This is used for organizing and categorizing assets by business function or domain.
-- **Type:** `String[]` 
+- **Type:** `String[]`
 
 ## `meta`
 Additional metadata for the asset stored as key-value pairs. This can be used to store custom information about the asset that doesn't fit into other predefined fields.
@@ -149,13 +149,13 @@ This is a list of custom data quality checks that are applied to an asset. These
 ```yaml
 custom_checks:
   - name: Client X has 15 credits calculated for June 2024
-    description: This client had a problem previously, therefore we want to ensure the numbers make sense, see the ticket ACME-1234 for more details. 
+    description: This client had a problem previously, therefore we want to ensure the numbers make sense, see the ticket ACME-1234 for more details.
     value: 15
     query: |
       SELECT
         count(*)
       FROM `tier2.client_credits`
-      where client="client_x" 
+      where client="client_x"
         and date_trunc(StartDateDt, month) = "2024-06-01"
         and credits_spent = 1
 ```
