@@ -782,7 +782,6 @@ type Asset struct { //nolint:recvcheck
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
-	Retries           int                `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 
