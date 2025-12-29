@@ -784,7 +784,7 @@ type Asset struct { //nolint:recvcheck
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	Retries           int                `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RerunCooldown     int                `json:"rerun_cooldown" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
-	RetriesDelay      int                `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
+	RetriesDelay      int                `json:"retries_delay" yaml:"-" mapstructure:"-"`
 
 	upstream   []*Asset
 	downstream []*Asset
@@ -1460,7 +1460,7 @@ type Pipeline struct {
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RerunCooldown      int                    `json:"rerun_cooldown" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
-	RetriesDelay       int                    `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
+	RetriesDelay       int                    `json:"retries_delay" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit" yaml:"commit,omitempty"`

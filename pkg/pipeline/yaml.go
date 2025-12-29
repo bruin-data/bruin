@@ -341,6 +341,7 @@ type taskDefinition struct {
 	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
 	Domains           []string          `yaml:"domains"`
 	Meta              map[string]string `yaml:"meta"`
+	RerunCooldown     int               `yaml:"rerun_cooldown"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -517,6 +518,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		IntervalModifiers: definition.IntervalModifiers,
 		Domains:           definition.Domains,
 		Meta:              definition.Meta,
+		RerunCooldown:     definition.RerunCooldown,
 	}
 
 	for index, check := range definition.CustomChecks {
