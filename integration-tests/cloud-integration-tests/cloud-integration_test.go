@@ -21,11 +21,12 @@ type Environment struct {
 }
 
 var platformConnectionMap = map[string]string{
-	"bigquery":  "google_cloud_platform",
-	"snowflake": "snowflake",
-	"postgres":  "postgres",
-	"redshift":  "redshift",
-	"athena":    "athena",
+	"bigquery":   "google_cloud_platform",
+	"snowflake":  "snowflake",
+	"postgres":   "postgres",
+	"redshift":   "redshift",
+	"athena":     "athena",
+	"databricks": "databricks",
 }
 
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {
@@ -191,5 +192,24 @@ func TestCloudIntegration(t *testing.T) {
 		t.Logf("Athena platform is available - running integration tests")
 
 		runTestsInDirectory(t, athenaDir, "Athena")
+	})
+
+	t.Run("Databricks", func(t *testing.T) {
+		t.Parallel()
+
+		if !availablePlatforms["databricks"] {
+			t.Skip("Skipping Databricks tests - no connection configured")
+			return
+		}
+
+		databricksDir := filepath.Join(currentFolder, "databricks")
+		require.DirExists(t, databricksDir, "Databricks test directory should exist")
+
+		testFile := filepath.Join(databricksDir, "databricks_test.go")
+		require.FileExists(t, testFile, "Databricks test file should exist")
+
+		t.Logf("Databricks platform is available - running integration tests")
+
+		runTestsInDirectory(t, databricksDir, "Databricks")
 	})
 }

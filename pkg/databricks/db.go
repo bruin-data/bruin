@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/databricks/databricks-sql-go"
 	"github.com/jmoiron/sqlx"
@@ -14,8 +15,9 @@ import (
 )
 
 type DB struct {
-	conn   *sqlx.DB
-	config *Config
+	conn          *sqlx.DB
+	config        *Config
+	schemaCreator *ansisql.SchemaCreator
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -24,7 +26,11 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{conn: conn, config: c}, nil
+	return &DB{
+		conn:          conn,
+		config:        c,
+		schemaCreator: ansisql.NewSchemaCreator(),
+	}, nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -143,6 +149,10 @@ func (db *DB) Ping(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	return db.schemaCreator.CreateSchemaIfNotExist(ctx, db, asset)
 }
 
 func (db *DB) GetIngestrURI() (string, error) {

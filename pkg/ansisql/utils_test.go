@@ -86,3 +86,71 @@ func TestAddAnnotationComment(t *testing.T) {
 		})
 	}
 }
+
+func TestAddAgentIDAnnotationComment(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		agentID  string
+		query    string
+		expected string
+	}{
+		{
+			name:     "with agent ID",
+			agentID:  "my-agent-123",
+			query:    "SELECT * FROM table",
+			expected: `-- @bruin.config: {"agent_id":"my-agent-123","type":"adhoc_query"}` + "\n" + "SELECT * FROM table",
+		},
+		{
+			name:     "empty agent ID",
+			agentID:  "",
+			query:    "SELECT * FROM table",
+			expected: "SELECT * FROM table",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			q := &query.Query{Query: tt.query}
+			result := AddAgentIDAnnotationComment(q, tt.agentID)
+
+			assert.NotNil(t, result)
+			assert.Equal(t, tt.expected, result.Query)
+			// Original query should remain unchanged
+			assert.Equal(t, tt.query, q.Query)
+		})
+	}
+}
+
+func TestBuildAgentIDQueryTag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		agentID  string
+		expected string
+	}{
+		{
+			name:     "with agent ID",
+			agentID:  "my-agent-123",
+			expected: `{"agent_id":"my-agent-123","type":"adhoc_query"}`,
+		},
+		{
+			name:     "empty agent ID returns empty JSON",
+			agentID:  "",
+			expected: `{"agent_id":"","type":"adhoc_query"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := BuildAgentIDQueryTag(tt.agentID)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

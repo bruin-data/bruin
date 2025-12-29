@@ -22,6 +22,7 @@ type Client interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, query *query.Query) (*query.QueryResult, error)
 	Ping(ctx context.Context) error
+	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 }
 
 type BasicOperator struct {
@@ -85,6 +86,13 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	conn, ok := o.connection.GetConnection(connName).(Client)
 	if !ok {
 		return errors.Errorf("'%s' either does not exist or is not a Databricks connection", connName)
+	}
+
+	if t.Materialization.Type != pipeline.MaterializationTypeNone {
+		err = conn.CreateSchemaIfNotExist(ctx, t)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, queryString := range materializedQueries {
