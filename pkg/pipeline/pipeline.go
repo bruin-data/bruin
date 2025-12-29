@@ -782,6 +782,9 @@ type Asset struct { //nolint:recvcheck
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
+	Retries           int                `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	RerunCooldown     int                `json:"rerun_cooldown" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	RetriesDelay      int                `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 
 	upstream   []*Asset
 	downstream []*Asset
@@ -1456,6 +1459,8 @@ type Pipeline struct {
 	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	RerunCooldown      int                    `json:"rerun_cooldown" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	RetriesDelay       int                    `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit" yaml:"commit,omitempty"`
@@ -1808,7 +1813,12 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 	b.assetMutators = []AssetMutator{
 		b.fillGlossaryStuff,
 		b.SetupDefaultsFromPipeline,
+		b.translateRetryConfig,
 		b.SetNameFromPath,
+	}
+
+	b.pipelineMutators = []PipelineMutator{
+		b.translatePipelineRetryConfig,
 	}
 
 	return b
@@ -2068,6 +2078,21 @@ func (b *Builder) MutatePipeline(ctx context.Context, pipeline *Pipeline) (*Pipe
 	return pipeline, nil
 }
 
+func (b *Builder) translatePipelineRetryConfig(ctx context.Context, pipeline *Pipeline) (*Pipeline, error) {
+	if pipeline == nil {
+		return pipeline, nil
+	}
+
+	// Translate pipeline-level rerun_cooldown to retries_delay
+	if pipeline.RerunCooldown > 0 {
+		pipeline.RetriesDelay = pipeline.RerunCooldown
+	} else if pipeline.RerunCooldown == -1 {
+		pipeline.RetriesDelay = 0
+	}
+
+	return pipeline, nil
+}
+
 func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
 	if foundPipeline == nil {
 		return asset, nil
@@ -2111,6 +2136,24 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
 		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
+	}
+
+	return asset, nil
+}
+
+func (b *Builder) translateRetryConfig(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	if asset == nil {
+		return asset, nil
+	}
+
+	// Translate asset-level rerun_cooldown to retries_delay
+	if asset.RerunCooldown > 0 {
+		asset.RetriesDelay = asset.RerunCooldown
+	} else if asset.RerunCooldown == -1 {
+		asset.RetriesDelay = 0
+	} else if foundPipeline != nil && asset.RerunCooldown == 0 && foundPipeline.RerunCooldown > 0 {
+		// Inherit from pipeline if asset has no specific retry config
+		asset.RetriesDelay = foundPipeline.RerunCooldown
 	}
 
 	return asset, nil
