@@ -18,6 +18,8 @@ depends:
 materialization:
    type: table
 
+rerun_cooldown: 300
+
 tags:
    - dashboard
    - team:xyz
@@ -118,6 +120,21 @@ interval_modifiers:
 Supported time units: `ns` (nanoseconds), `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `M` (months).
 See [interval modifiers](./interval-modifiers) for more details.
 - **Type:** `Object`
+
+## `rerun_cooldown`
+Set a delay (in seconds) between retry attempts for failed assets. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. If not specified, the asset inherits the pipeline's `rerun_cooldown` setting.
+
+```yaml
+rerun_cooldown: 300  # Wait 5 minutes between retries
+```
+
+**Special values:**
+- `0`: No delay between retries (inherit from pipeline if not specified)
+- `> 0`: Wait the specified number of seconds before retrying
+- `-1`: Disable retry delays completely
+
+When deploying to Airflow, this is automatically translated to `retries_delay` for compatibility.
+- **Type:** `Integer`
 
 ## `materialization`
 This option determines how the asset will be materialized. Refer to the docs on [materialization](./materialization) for more details.
