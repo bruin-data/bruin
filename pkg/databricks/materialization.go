@@ -126,11 +126,11 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 	mat := task.Materialization
 
 	// Handle SCD2 strategies with full refresh
-	//nolint:exhaustive
-	switch mat.Strategy {
-	case pipeline.MaterializationStrategySCD2ByTime:
+	if mat.Strategy == pipeline.MaterializationStrategySCD2ByTime {
 		return buildSCD2ByTimefullRefresh(task, query)
-	case pipeline.MaterializationStrategySCD2ByColumn:
+	}
+
+	if mat.Strategy == pipeline.MaterializationStrategySCD2ByColumn {
 		return buildSCD2ByColumnfullRefresh(task, query)
 	}
 
@@ -283,19 +283,22 @@ FROM (
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	query = strings.TrimRight(query, ";")
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
+			asset.Materialization.Strategy)
+	}
+
 	var (
-		primaryKeys      = make([]string, 0, 4)
-		compareConds     = make([]string, 0, 12)
-		compareCondsS1T1 = make([]string, 0, 4)
-		insertCols       = make([]string, 0, 12)
-		insertValues     = make([]string, 0, 12)
+		compareConds     = make([]string, 0, len(asset.Columns)-len(primaryKeys))
+		compareCondsS1T1 = make([]string, 0, len(asset.Columns)-len(primaryKeys))
+		insertCols       = make([]string, 0, len(asset.Columns))
+		insertValues     = make([]string, 0, len(asset.Columns))
 	)
 
 	for _, col := range asset.Columns {
 		colName := col.Name
-		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, colName)
-		}
 		switch col.Name {
 		case "_is_current", "_valid_from", "_valid_until":
 			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
@@ -310,10 +313,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) ([]string, erro
 		}
 	}
 
-	if len(primaryKeys) == 0 {
-		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
-			asset.Materialization.Strategy)
-	}
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(insertValues, "CURRENT_TIMESTAMP()", "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
 
@@ -390,10 +389,17 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) ([]string, error)
 		return nil, errors.New("incremental_key is required for scd2_by_time strategy")
 	}
 
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return nil, fmt.Errorf(
+			"materialization strategy %s requires the primary_key field to be set on at least one column",
+			asset.Materialization.Strategy,
+		)
+	}
+
 	var (
-		primaryKeys  = make([]string, 0, 4)
-		insertCols   = make([]string, 0, 12)
-		insertValues = make([]string, 0, 12)
+		insertCols   = make([]string, 0, len(asset.Columns))
+		insertValues = make([]string, 0, len(asset.Columns))
 	)
 	for _, col := range asset.Columns {
 		colName := col.Name
@@ -409,17 +415,6 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) ([]string, error)
 		}
 		insertCols = append(insertCols, colName)
 		insertValues = append(insertValues, "source."+colName)
-
-		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, colName)
-		}
-	}
-
-	if len(primaryKeys) == 0 {
-		return nil, fmt.Errorf(
-			"materialization strategy %s requires the primary_key field to be set on at least one column",
-			asset.Materialization.Strategy,
-		)
 	}
 
 	// Build USING clause for join
