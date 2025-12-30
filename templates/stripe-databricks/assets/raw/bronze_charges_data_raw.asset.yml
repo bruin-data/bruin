@@ -6,4 +6,6 @@ description: Ingests charge/payment data from Stripe into Databricks. Captures p
 
 parameters:
   source_table: charge
+  incremental_strategy: replace
+  sql_limit: 1000
 
