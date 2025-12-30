@@ -1,6 +1,7 @@
 package databricks
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -400,6 +401,229 @@ func TestMaterializer_Render(t *testing.T) {
 					"\nPARTITIONED BY \\(timestamp, location\\)",
 			},
 		},
+		// SCD2 by column tests
+		{
+			name: "scd2_by_column without primary keys",
+			task: &pipeline.Asset{
+				Name: "test.menu",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT"},
+					{Name: "name", Type: "VARCHAR"},
+				},
+			},
+			query:   "SELECT 1 as id, 'test' as name",
+			wantErr: true,
+		},
+		{
+			name: "scd2_by_column with reserved column name",
+			task: &pipeline.Asset{
+				Name: "test.menu",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+					{Name: "_is_current", Type: "BOOLEAN"},
+				},
+			},
+			query:   "SELECT 1 as id, true as _is_current",
+			wantErr: true,
+		},
+		{
+			name: "scd2_by_column with primary keys",
+			task: &pipeline.Asset{
+				Name: "test.menu",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "ID", Type: "INT", PrimaryKey: true},
+					{Name: "Name", Type: "VARCHAR", PrimaryKey: true},
+					{Name: "Price", Type: "INT"},
+				},
+			},
+			query: "SELECT 1 AS ID, 'Cola' AS Name, 399 AS Price",
+			want: []string{
+				"MERGE INTO test\\.menu AS target",
+				"WITH s1 AS",
+				"SELECT \\*, TRUE AS _is_current",
+				"UNION ALL",
+				"JOIN   test\\.menu AS t1 USING \\(ID, Name\\)",
+				"ON  target\\.ID = source\\.ID AND target\\.Name = source\\.Name AND target\\._is_current AND source\\._is_current",
+				"WHEN MATCHED AND",
+				"target\\.Price != source\\.Price",
+				"UPDATE SET",
+				"_valid_until = CURRENT_TIMESTAMP\\(\\)",
+				"_is_current  = FALSE",
+				"WHEN NOT MATCHED THEN",
+				"WHEN NOT MATCHED BY SOURCE AND target\\._is_current = TRUE THEN",
+				"INSERT \\(ID, Name, Price, _valid_from, _valid_until, _is_current\\)",
+				"VALUES \\(source\\.ID, source\\.Name, source\\.Price, CURRENT_TIMESTAMP\\(\\), TIMESTAMP '9999-12-31 00:00:00', TRUE\\)",
+			},
+		},
+		{
+			name: "scd2_by_column full refresh",
+			task: &pipeline.Asset{
+				Name: "test.menu",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "ID", Type: "INT", PrimaryKey: true},
+					{Name: "Name", Type: "VARCHAR"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT 1 AS ID, 'Cola' AS Name",
+			want: []string{
+				"CREATE OR REPLACE TABLE test\\.menu AS",
+				"SELECT",
+				"CURRENT_TIMESTAMP\\(\\) AS _valid_from",
+				"src\\.\\*",
+				"TIMESTAMP '9999-12-31 00:00:00' AS _valid_until",
+				"TRUE AS _is_current",
+				"FROM \\(",
+			},
+		},
+		// SCD2 by time tests
+		{
+			name: "scd2_by_time without incremental_key",
+			task: &pipeline.Asset{
+				Name: "test.products",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+				},
+				Columns: []pipeline.Column{
+					{Name: "product_id", Type: "INT", PrimaryKey: true},
+					{Name: "product_name", Type: "VARCHAR"},
+				},
+			},
+			query:   "SELECT 1 as product_id, 'test' as product_name",
+			wantErr: true,
+		},
+		{
+			name: "scd2_by_time without primary keys",
+			task: &pipeline.Asset{
+				Name: "test.products",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "dt",
+				},
+				Columns: []pipeline.Column{
+					{Name: "product_id", Type: "INT"},
+					{Name: "dt", Type: "DATE"},
+				},
+			},
+			query:   "SELECT 1 as product_id, '2024-01-01' as dt",
+			wantErr: true,
+		},
+		{
+			name: "scd2_by_time with invalid incremental_key type",
+			task: &pipeline.Asset{
+				Name: "test.products",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "dt",
+				},
+				Columns: []pipeline.Column{
+					{Name: "product_id", Type: "INT", PrimaryKey: true},
+					{Name: "dt", Type: "STRING"},
+				},
+			},
+			query:   "SELECT 1 as product_id, '2024-01-01' as dt",
+			wantErr: true,
+		},
+		{
+			name: "scd2_by_time with reserved column name",
+			task: &pipeline.Asset{
+				Name: "test.products",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "dt",
+				},
+				Columns: []pipeline.Column{
+					{Name: "product_id", Type: "INT", PrimaryKey: true},
+					{Name: "dt", Type: "DATE"},
+					{Name: "_valid_from", Type: "TIMESTAMP"},
+				},
+			},
+			query:   "SELECT 1 as product_id, '2024-01-01' as dt, current_timestamp() as _valid_from",
+			wantErr: true,
+		},
+		{
+			name: "scd2_by_time with primary keys",
+			task: &pipeline.Asset{
+				Name: "test.products",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "dt",
+				},
+				Columns: []pipeline.Column{
+					{Name: "product_id", Type: "INT", PrimaryKey: true},
+					{Name: "product_name", Type: "VARCHAR", PrimaryKey: true},
+					{Name: "dt", Type: "DATE"},
+					{Name: "stock", Type: "INT"},
+				},
+			},
+			query: "SELECT 1 AS product_id, 'Laptop' AS product_name, DATE '2025-04-02' AS dt, 100 AS stock",
+			want: []string{
+				"MERGE INTO test\\.products AS target",
+				"WITH s1 AS",
+				"SELECT s1\\.\\*, TRUE AS _is_current",
+				"UNION ALL",
+				"JOIN   test\\.products AS t1 USING \\(product_id, product_name\\)",
+				"WHERE  t1\\._valid_from < s1\\.dt AND t1\\._is_current",
+				"ON  target\\.product_id = source\\.product_id AND target\\.product_name = source\\.product_name AND target\\._is_current AND source\\._is_current",
+				"WHEN MATCHED AND",
+				"target\\._valid_from < source\\.dt",
+				"UPDATE SET",
+				"_valid_until = source\\.dt",
+				"_is_current  = FALSE",
+				"WHEN NOT MATCHED THEN",
+				"WHEN NOT MATCHED BY SOURCE AND target\\._is_current = TRUE THEN",
+				"INSERT \\(product_id, product_name, dt, stock, _valid_from, _valid_until, _is_current\\)",
+				"VALUES \\(source\\.product_id, source\\.product_name, source\\.dt, source\\.stock, source\\.dt, TIMESTAMP '9999-12-31 00:00:00', TRUE\\)",
+			},
+		},
+		{
+			name: "scd2_by_time full refresh",
+			task: &pipeline.Asset{
+				Name: "test.products",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "dt",
+				},
+				Columns: []pipeline.Column{
+					{Name: "product_id", Type: "INT", PrimaryKey: true},
+					{Name: "product_name", Type: "VARCHAR"},
+					{Name: "dt", Type: "DATE"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT 1 AS product_id, 'Laptop' AS product_name, DATE '2025-04-02' AS dt",
+			want: []string{
+				"CREATE OR REPLACE TABLE test\\.products AS",
+				"SELECT",
+				"dt AS _valid_from",
+				"src\\.\\*",
+				"TIMESTAMP '9999-12-31 00:00:00' AS _valid_until",
+				"TRUE AS _is_current",
+				"FROM \\(",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -412,8 +636,10 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				for index, want := range tt.want {
-					require.Regexp(t, want, render[index])
+				// Join all rendered queries for pattern matching
+				fullOutput := strings.Join(render, "\n")
+				for _, want := range tt.want {
+					require.Regexp(t, want, fullOutput, "Pattern %q not found in output:\n%s", want, fullOutput)
 				}
 			}
 		})
