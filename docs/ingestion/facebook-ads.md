@@ -59,6 +59,17 @@ Facebook Ads source allows ingesting the following sources into separate tables:
 | `facebook_insights` | date_start | date_start | merge | Retrieves insights data (requires account_id in connection). See [Facebook Insights Custom Configuration](#facebook-insights-custom-configuration) below. |
 | `facebook_insights_with_account_ids:account_id1,account_id2` | date_start | date_start | merge | Retrieves insights data for multiple accounts. See [Facebook Insights with Multiple Accounts](#facebook-insights-with-multiple-accounts) below. |
 
+### Account ID Resolution
+
+The account ID is resolved in the following order of priority:
+
+1. **Table name** - If account ID(s) are specified in the table name (e.g., `campaigns:1234567890`), they are used
+2. **Connection** - If no account ID in the table name, the `account_id` from the connection configuration is used
+3. **Error** - If no account ID is found in either location, an error is raised
+
+> [!NOTE]
+> When account IDs are specified in the table name, the `account_id` parameter in the connection is ignored.
+
 ### Account ID in Table Name
 
 For `campaigns`, `ad_sets`, `ads`, `ad_creatives`, and `leads`, you can specify account ID(s) directly in the table name instead of the connection:
