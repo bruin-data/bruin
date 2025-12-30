@@ -49,7 +49,7 @@ table td:first-child {
 | `--exp-use-winget-for-uv` | bool | `false` | Use PowerShell to manage and install `uv` on Windows. Has no effect on non-Windows systems. |
 | `--debug-ingestr-src` | str | - | Use ingestr from the given path instead of the builtin version. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
-| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
+| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`, `infisical`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
 | `--no-validation` | bool | `false` | Skip validation for this run. |
 | `--no-timestamp` | bool | `false` | Skip logging timestamps for this run. |
 | `--no-color` | bool | `false` | Plain log output for this run. |
@@ -199,6 +199,7 @@ When pushing the metadata, Bruin will detect the right connection to use, same w
 
 ## Using Alternative Secrets Backends
 
+<<<<<<< HEAD
 By default, Bruin reads connection credentials from the `.bruin.yml` file. However, you can use alternative secrets management solutions like HashiCorp Vault or Doppler.
 
 ### Using Doppler
@@ -216,6 +217,22 @@ bruin run
 ```
 
 For more details on configuring Doppler, see the [Doppler secrets documentation](/secrets/doppler).
+
+### Using Infisical
+
+To use Infisical as your secrets backend:
+
+```bash
+bruin run --secrets-backend infisical
+```
+
+Or set via environment variable:
+```bash
+export BRUIN_SECRETS_BACKEND=infisical
+bruin run
+```
+
+For more details on configuring Infisical, see the [Infisical secrets documentation](/secrets/infisical).
 
 ### Using Vault
 
