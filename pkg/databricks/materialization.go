@@ -126,6 +126,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 	mat := task.Materialization
 
 	// Handle SCD2 strategies with full refresh
+	//nolint:exhaustive
 	switch mat.Strategy {
 	case pipeline.MaterializationStrategySCD2ByTime:
 		return buildSCD2ByTimefullRefresh(task, query)
