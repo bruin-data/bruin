@@ -46,12 +46,46 @@ Facebook Ads source allows ingesting the following sources into separate tables:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| campaigns | id | – | replace | Retrieves campaign data with fields: id, updated_time, created_time, name, status, effective_status, objective, start_time, stop_time, daily_budget, lifetime_budget |
-| ad_sets | id | – | replace | Retrieves ad set data with fields: id, updated_time, created_time, name, status, effective_status, campaign_id, start_time, end_time, daily_budget, lifetime_budget, optimization_goal, promoted_object, billing_event, bid_amount, bid_strategy, targeting |
-| ads | id | - | replace | Retrieves ad data with fields: id, updated_time, created_time, name, status, effective_status, adset_id, campaign_id, creative, targeting, tracking_specs, conversion_specs |
-| ad_creatives | id | - | replace | Retrieves ad creative data with fields: id, name, status, thumbnail_url, object_story_spec, effective_object_story_id, call_to_action_type, object_type, template_url, url_tags, instagram_actor_id, product_set_id |
-| leads | id | - | replace | Retrieves lead data with fields: id, created_time, ad_id, ad_name, adset_id, adset_name, campaign_id, campaign_name, form_id, field_data |
-| facebook_insights | date_start | date_start | merge | Retrieves insights data. Supports custom configuration for level, fields, breakdowns, and action breakdowns. See [Facebook Insights Custom Configuration](#facebook-insights-custom-configuration) below. |
+| `campaigns` | id | – | replace | Retrieves campaign data with fields: id, updated_time, created_time, name, status, effective_status, objective, start_time, stop_time, daily_budget, lifetime_budget |
+| `campaigns:account_id1,account_id2` | id | – | replace | Same as above but with account IDs specified in table name (supports multiple accounts) |
+| `ad_sets` | id | – | replace | Retrieves ad set data with fields: id, updated_time, created_time, name, status, effective_status, campaign_id, start_time, end_time, daily_budget, lifetime_budget, optimization_goal, promoted_object, billing_event, bid_amount, bid_strategy, targeting |
+| `ad_sets:account_id1,account_id2` | id | – | replace | Same as above but with account IDs specified in table name (supports multiple accounts) |
+| `ads` | id | - | replace | Retrieves ad data with fields: id, updated_time, created_time, name, status, effective_status, adset_id, campaign_id, creative, targeting, tracking_specs, conversion_specs |
+| `ads:account_id1,account_id2` | id | - | replace | Same as above but with account IDs specified in table name (supports multiple accounts) |
+| `ad_creatives` | id | - | replace | Retrieves ad creative data with fields: id, name, status, thumbnail_url, object_story_spec, effective_object_story_id, call_to_action_type, object_type, template_url, url_tags, instagram_actor_id, product_set_id |
+| `ad_creatives:account_id1,account_id2` | id | - | replace | Same as above but with account IDs specified in table name (supports multiple accounts) |
+| `leads` | id | - | replace | Retrieves lead data with fields: id, created_time, ad_id, ad_name, adset_id, adset_name, campaign_id, campaign_name, form_id, field_data |
+| `leads:account_id1,account_id2` | id | - | replace | Same as above but with account IDs specified in table name (supports multiple accounts) |
+| `facebook_insights` | date_start | date_start | merge | Retrieves insights data (requires account_id in connection). See [Facebook Insights Custom Configuration](#facebook-insights-custom-configuration) below. |
+| `facebook_insights_with_account_ids:account_id1,account_id2` | date_start | date_start | merge | Retrieves insights data for multiple accounts. See [Facebook Insights with Multiple Accounts](#facebook-insights-with-multiple-accounts) below. |
+
+### Account ID in Table Name
+
+For `campaigns`, `ad_sets`, `ads`, `ad_creatives`, and `leads`, you can specify account ID(s) directly in the table name instead of the connection:
+
+```yaml
+# Single account in table name
+name: public.facebook_campaigns
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my_facebookads
+  source_table: 'campaigns:1234567890'
+  destination: postgres
+```
+
+```yaml
+# Multiple accounts in table name
+name: public.facebook_campaigns_multi
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my_facebookads
+  source_table: 'campaigns:1234567890,9876543210'
+  destination: postgres
+```
 
 ---
 
@@ -253,8 +287,68 @@ parameters:
 
 ---
 
+## Facebook Insights with Multiple Accounts
+
+Use `facebook_insights_with_account_ids` to fetch insights from multiple accounts in a single request. The account IDs are specified in the table name.
+
+### Format
+
+```plaintext
+facebook_insights_with_account_ids:account_id1,account_id2
+facebook_insights_with_account_ids:account_id1,account_id2:level
+facebook_insights_with_account_ids:account_id1,account_id2:level:fields
+facebook_insights_with_account_ids:account_id1,account_id2:level:fields:breakdowns
+facebook_insights_with_account_ids:account_id1,account_id2:level:fields:breakdowns:action_breakdowns
+```
+
+### Examples
+
+#### Basic Insights from Multiple Accounts
+
+```yaml
+name: public.facebook_multi_account_insights
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my_facebookads
+  source_table: 'facebook_insights_with_account_ids:1234567890,9876543210'
+  destination: postgres
+```
+
+#### Multiple Accounts with Campaign Level
+
+```yaml
+name: public.facebook_multi_account_campaign_insights
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my_facebookads
+  source_table: 'facebook_insights_with_account_ids:1234567890,9876543210:campaign'
+  destination: postgres
+```
+
+#### Multiple Accounts with Custom Fields and Breakdowns
+
+```yaml
+name: public.facebook_multi_account_demographics
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my_facebookads
+  source_table: 'facebook_insights_with_account_ids:1234567890,9876543210:ad:impressions,clicks,spend:age,gender'
+  destination: postgres
+```
+
+> [!NOTE]
+> When using `facebook_insights_with_account_ids`, the `account_id` parameter in the connection is ignored. Account IDs must be provided in the table name.
+
+---
+
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+```
 bruin run assets/facebook_ads_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given Facebook Ads table into your Postgres database.
