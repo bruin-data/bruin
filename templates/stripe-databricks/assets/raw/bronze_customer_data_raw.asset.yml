@@ -6,4 +6,6 @@ description: Ingests customer data from Stripe into Databricks. Captures custome
 
 parameters:
   source_table: customer
+  incremental_strategy: replace
+  sql_limit: 1000
 

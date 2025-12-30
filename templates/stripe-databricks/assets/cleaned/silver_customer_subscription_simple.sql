@@ -3,10 +3,12 @@ name: stripe_sandbox.silver_customer_subscription_simple
 type: databricks.sql
 materialization:
   type: table
+  strategy: create+replace
+
 depends:
-  - customers_raw
-  - subscriptions_raw
-  - charges_raw
+  - stripe_sandbox.bronze_customer_data_raw
+  - stripe_sandbox.bronze_subscription_data_raw
+  - stripe_sandbox.bronze_charges_data_raw
 
 description: >
   Simplified view joining customers to their subscriptions and most recent charge.
