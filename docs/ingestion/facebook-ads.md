@@ -15,10 +15,10 @@ connections:
   facebookads:
     - name: "my_facebookads"
       access_token: "YOUR_FACEBOOK_ACCESS_TOKEN"
-      account_id: "YOUR_ACCOUNT_ID"
+      account_id: "YOUR_ACCOUNT_ID"  # optional
 ```
-- `access_token` is associated with Business Facebook App.
-- `account_id`  is associated with Ad manager.
+- `access_token` (required): Access token associated with Business Facebook App.
+- `account_id` (optional): Account ID associated with Ad manager. Can also be specified in the table name (e.g., `campaigns:1234567890`).
 
 ### Step 2: Create an asset file for data ingestion
 To ingest data from Facebook Ads, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., facebook_ads_ingestion.yml) inside the assets folder and add the following content:
