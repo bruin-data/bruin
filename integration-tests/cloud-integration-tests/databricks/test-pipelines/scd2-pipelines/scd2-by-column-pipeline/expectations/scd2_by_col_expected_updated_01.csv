@@ -1,7 +1,6 @@
-id,name,price,_is_current
-1,Cola,399,false
-1,Cola,799,true
-2,Tea,499,true
-3,Coffee,599,false
-4,Fanta,199,true
-
+ID,Name,Price,_is_current
+1,Cola,3.99,false
+1,Cola,7.99,true
+2,Tea,4.99,true
+3,Coffee,5.99,false
+4,Fanta,1.99,true
