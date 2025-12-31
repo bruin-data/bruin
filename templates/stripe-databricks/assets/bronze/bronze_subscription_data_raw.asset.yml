@@ -6,6 +6,4 @@ description: Ingests subscription data from Stripe into Databricks. Captures sub
 
 parameters:
   source_table: subscription
-  incremental_strategy: replace
-  sql_limit: 1000
 

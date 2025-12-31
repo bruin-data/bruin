@@ -1,0 +1,9 @@
+name: stripe_sandbox.bronze_charge_data_raw
+type: ingestr
+connection: databricks-default
+
+description: Ingests charge data from Stripe into Databricks. Charges link balance transactions to customers via the balance_transaction field.
+
+parameters:
+  source_table: charge
+

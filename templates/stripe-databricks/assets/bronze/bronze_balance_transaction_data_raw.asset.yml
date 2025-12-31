@@ -1,0 +1,9 @@
+name: stripe_sandbox.bronze_balance_transaction_data_raw
+type: ingestr
+connection: databricks-default
+
+description: Ingests balance transaction data from Stripe into Databricks. Captures transaction amounts, fees, net amounts, and availability dates.
+
+parameters:
+  source_table: balance_transaction
+
