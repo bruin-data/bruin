@@ -20,15 +20,13 @@ columns:
     checks:
       - name: not_null
   - name: Price
-    type: INTEGER
-    description: "Price of the Menu Item in cents"
+    type: FLOAT
+    description: "Price of the Menu Item"
 @bruin */
 
 
-SELECT 1 AS ID, 'Cola' AS Name, 799 AS Price
+SELECT 1 AS ID, 'Cola' AS Name, 7.99 AS Price
 UNION ALL
-SELECT 2 AS ID, 'Tea' AS Name, 499 AS Price
+SELECT 2 AS ID, 'Tea' AS Name, 4.99 AS Price
 UNION ALL
 SELECT 4 AS ID, 'Fanta' AS Name, 1.99 AS Price
-
-

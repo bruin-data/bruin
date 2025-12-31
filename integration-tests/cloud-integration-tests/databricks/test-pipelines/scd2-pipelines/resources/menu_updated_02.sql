@@ -20,10 +20,9 @@ columns:
     checks:
       - name: not_null
   - name: Price
-    type: INTEGER
-    description: "Price of the Menu Item in cents"
+    type: FLOAT
+    description: "Price of the Menu Item"
 @bruin */
 
 
 SELECT 1 AS ID, 'Cola' AS Name, 0.99 AS Price
-
