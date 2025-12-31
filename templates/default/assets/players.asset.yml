@@ -1,0 +1,7 @@
+name: dataset.players
+type: ingestr
+
+parameters:
+  destination: duckdb
+  source_connection: chess-default
+  source_table: profiles
