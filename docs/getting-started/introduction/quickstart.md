@@ -6,26 +6,27 @@ outline: deep
 Make sure you have [installed](./installation.md) Bruin CLI already in your device.
 
 > [!INFO]
-> The steps here assume you have DuckDB installed. You can replace to any reference to `duckdb.sql` with your data warehouse if you'd like to run the examples elsewhere.
+> The steps here assume you have [DuckDB](https://duckdb.org/install/) installed. You can replace to any reference to `duckdb.sql` with your data warehouse if you'd like to run the examples elsewhere.
 
 ## Create your first pipeline
 
-Bruin includes a handy command called `init`, you can simply run that command to create a new Bruin project.
+Bruin includes a handy command called `init`, you can simply run that command to create a new Bruin project. [learn more](../../commands/init.md)
       
 ```bash
-bruin init default my-pipeline   
+bruin init default my-pipeline  
+cd my-pipeline
 ```
 
 This command will:
 - Create a project named `my-pipeline`.
 - Generate a folder called `my-pipeline` containing the following:
-    - An `assets` folder
-    - `.bruin.yml` file (where you will add connection and credentials. There's other ways to provide credentials/secrets, see [Secrets](../../secrets/overview.md))
+    - `assets/` with a few sample assets (we will walk through them below)
+    - `.bruin.yml` with sample duckdb connections used in this guide (you can edit it or use a secrets manager, see [Secrets](../../secrets/overview.md))
     - `pipeline.yml` file to manage your pipeline.
 
 
 Once you have the project structure, you can run the whole pipeline:
-```
+```bash
 bruin run
 ```
 
@@ -65,7 +66,7 @@ That's it, this asset will load data from the `chess` source and load it into yo
 ### Setting up your `.bruin.yml` file
 To ensure the asset works correctly, configure your environments and connections by editing your ` .bruin.yml`  file. This file specifies environments and the connections your pipeline will use.
 
-Modify the `.bruin.yml` file as follows:
+Modify the `.bruin.yml` file as follows (if you used `bruin init default` this is already included):
 ```yaml
 default_environment: default
 environments:
