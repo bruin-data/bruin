@@ -106,7 +106,7 @@ depends:
 
 @bruin */
 
-SELECT name, count(*)
+SELECT name, count(*) AS player_count
 FROM dataset.players
 GROUP BY 1
 ```
@@ -213,10 +213,11 @@ custom_checks: # [!code ++]
   - name: row count is greater than zero # [!code ++]  
     description: this check ensures that the table is not empty # [!code ++]  
     query: SELECT count(*) > 1 FROM dataset.player_stats # [!code ++]  
+    value: 1 # [!code ++]
    
 @bruin */
 
-SELECT name, count(*)
+SELECT name, count(*) AS player_count
 FROM dataset.players
 GROUP BY 1
 ```
