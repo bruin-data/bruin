@@ -194,25 +194,25 @@ depends:
    - dataset.players
 
 # you can define column metadata and quality checks
-columns: // [!code ++]
-  - name: name // [!code ++]
-    type: string // [!code ++]
-    description: this column contains the player names // [!code ++]
-    checks: // [!code ++]
-      - name: not_null // [!code ++]
-      - name: unique // [!code ++]
-  - name: player_count // [!code ++]
-    type: int // [!code ++]
-    description: the number of players with the given name // [!code ++]
-    checks: // [!code ++]
-      - name: not_null // [!code ++]
-      - name: positive // [!code ++]
+columns: # [!code ++]
+  - name: name # [!code ++]
+    type: string # [!code ++]
+    description: this column contains the player names # [!code ++]
+    checks: # [!code ++]
+      - name: not_null # [!code ++]
+      - name: unique # [!code ++]
+  - name: player_count # [!code ++]
+    type: int # [!code ++]
+    description: the number of players with the given name # [!code ++]
+    checks: # [!code ++]
+      - name: not_null # [!code ++]
+      - name: positive # [!code ++]
 
 # you can also define custom checks 
-custom_checks:
-  - name: row count is greater than zero // [!code ++]  
-    description: this check ensures that the table is not empty // [!code ++]  
-    query: SELECT count(*) > 1 FROM dataset.player_stats // [!code ++]  
+custom_checks: # [!code ++]
+  - name: row count is greater than zero # [!code ++]  
+    description: this check ensures that the table is not empty # [!code ++]  
+    query: SELECT count(*) > 1 FROM dataset.player_stats # [!code ++]  
    
 @bruin */
 
