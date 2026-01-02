@@ -188,3 +188,67 @@ func TestVariables_UnmarshalJSON(t *testing.T) {
 		assert.Empty(t, vars)
 	})
 }
+
+func TestVariables_Merge(t *testing.T) {
+	t.Parallel()
+
+	t.Run("overrides existing defaults", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"foo": map[string]any{
+				"type":    "string",
+				"default": "old",
+			},
+			"bar": map[string]any{
+				"type":    "integer",
+				"default": 1,
+			},
+		}
+
+		err := vars.Merge(map[string]any{
+			"foo": "new",
+			"bar": 2,
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, "new", vars["foo"]["default"])
+		assert.Equal(t, 2, vars["bar"]["default"])
+	})
+
+	t.Run("returns error for unknown variables", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"foo": map[string]any{
+				"type":    "string",
+				"default": "old",
+			},
+		}
+
+		err := vars.Merge(map[string]any{
+			"missing": "value",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no such variable")
+	})
+
+	t.Run("preserves other fields", func(t *testing.T) {
+		t.Parallel()
+
+		vars := pipeline.Variables{
+			"foo": map[string]any{
+				"type":    "string",
+				"default": "old",
+			},
+		}
+
+		err := vars.Merge(map[string]any{
+			"foo": "new",
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, "string", vars["foo"]["type"])
+		assert.Equal(t, "new", vars["foo"]["default"])
+	})
+}
