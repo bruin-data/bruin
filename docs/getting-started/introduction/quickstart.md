@@ -14,7 +14,7 @@ Bruin includes a handy command called `init`, you can simply run that command to
       
 ```bash
 bruin init default my-pipeline  
-cd my-pipeline
+cd bruin/my-pipeline
 ```
 
 This command will:
