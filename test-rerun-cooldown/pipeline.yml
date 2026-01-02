@@ -1,2 +1,4 @@
 name: test-rerun-cooldown 
-rerun_cooldown: 300
+
+default:
+  rerun_cooldown: 300

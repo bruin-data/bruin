@@ -3166,8 +3166,8 @@ func TestMacros(t *testing.T) {
 				Expected: e2e.Output{
 					ExitCode: 0,
 					Contains: []string{
-						// Pipeline level
-						`"rerun_cooldown":300`, `"retries_delay":300`,
+						// Pipeline default rerun_cooldown
+						`"default":{"type":"","parameters":null,"secrets":null,"interval_modifiers":{"start":{"months":0,"days":0,"hours":0,"minutes":0,"seconds":0,"milliseconds":0,"nanoseconds":0,"cron_periods":0,"template":""},"end":{"months":0,"days":0,"hours":0,"minutes":0,"seconds":0,"milliseconds":0,"nanoseconds":0,"cron_periods":0,"template":""}},"rerun_cooldown":300}`, `"retries_delay":300`,
 						// Asset with explicit rerun_cooldown
 						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
 						// Asset that inherits from pipeline

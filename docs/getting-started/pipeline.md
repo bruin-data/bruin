@@ -50,10 +50,10 @@ metadata_push:
   bigquery: true
 
 retries: 2
-rerun_cooldown: 300
 concurrency: 4
 
 default:
+  rerun_cooldown: 300
   secrets:
     - key: MY_API_KEY
       inject_as: API_KEY
@@ -314,7 +314,8 @@ Set a delay (in seconds) between retry attempts for failed tasks. This helps pre
 Example:
 
 ```yaml
-rerun_cooldown: 300  # Wait 5 minutes between retries
+default:
+  rerun_cooldown: 300  # Wait 5 minutes between retries
 ```
 
 - **Type:** `Integer`
@@ -325,7 +326,7 @@ rerun_cooldown: 300  # Wait 5 minutes between retries
 - `> 0`: Wait the specified number of seconds before retrying
 - `-1`: Disable retry delays (same as `0`)
 
-**Inheritance:** Assets inherit the pipeline's `rerun_cooldown` unless they specify their own value.
+**Inheritance:** Assets inherit the pipeline's default `rerun_cooldown` unless they specify their own value.
 
 ### Concurrency
 
