@@ -2079,7 +2079,7 @@ func (b *Builder) MutatePipeline(ctx context.Context, pipeline *Pipeline) (*Pipe
 
 func (b *Builder) translatePipelineRetryConfig(ctx context.Context, pipeline *Pipeline) (*Pipeline, error) {
 	if pipeline == nil {
-		return pipeline, nil
+		return nil, nil
 	}
 
 	// Translate pipeline-level rerun_cooldown to retries_delay
