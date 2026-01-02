@@ -660,7 +660,13 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 	_, err := dataset.Metadata(ctx)
 	if err != nil {
 		var apiErr *googleapi.Error
-		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+		isAPIErr := errors.As(err, &apiErr)
+
+		if !isAPIErr {
+			return fmt.Errorf("failed to fetch metadata to create dataset for table '%s': %w", tableName, err)
+		}
+
+		if isAPIErr && apiErr.Code == 404 {
 			if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
 				var createApiErr *googleapi.Error //nolint:stylecheck
 				if errors.As(err, &createApiErr) && createApiErr.Code == 409 {
@@ -671,7 +677,7 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 			}
 			datasetNameCache.Store(cacheKey, true)
 		} else {
-			return fmt.Errorf("failed to fetch metadata to create dataset for table '%s': %w", tableName, err)
+			return errors.Errorf("google api returned error, http status: %d, headers: %v, body: %s", apiErr.Code, apiErr.Header, apiErr.Body)
 		}
 	}
 
