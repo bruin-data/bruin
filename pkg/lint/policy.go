@@ -206,15 +206,10 @@ func (spec *PolicySpecification) getValidators(name string, sqlParser sqlParser)
 	def, found := spec.compiledRules[name]
 	if !found {
 		validators, found := builtinRules[name]
-		if found && sqlParser != nil {
+		if found && name == "query-matches-columns" && sqlParser != nil {
 			// Special case: replace the noop validator with the actual implementation
 			if realParser, ok := sqlParser.(*sqlparser.SQLParser); ok {
-				switch name {
-				case "query-matches-columns":
-					validators.Asset = QueryColumnsMatchColumnsPolicy(realParser)
-				case "columns-matches-query":
-					validators.Asset = QueryHasAllMetadataColumnsPolicy(realParser)
-				}
+				validators.Asset = QueryColumnsMatchColumnsPolicy(realParser)
 			}
 		}
 		return validators, found

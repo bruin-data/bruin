@@ -259,12 +259,7 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
     <tr>
       <td><code>query-matches-columns</code></td>
       <td><code>asset</code></td>
-      <td>Columns found in the query must exist in asset metadata.</td>
-    </tr>
-    <tr>
-      <td><code>columns-matches-query</code></td>
-      <td><code>asset</code></td>
-      <td>Columns found in asset metadata must exist in the query.</td>
+      <td>Columns in the query must exactly match the columns defined in the asset metadata, and vice versa.</td>
     </tr>
   </tbody>
 </table>

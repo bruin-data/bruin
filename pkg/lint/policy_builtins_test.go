@@ -160,6 +160,121 @@ func TestQueryColumnsMatchColumnsPolicy(t *testing.T) { //nolint:paralleltest
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
+
+	t.Run("returns no issues when parser is nil", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(nil)
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("returns no issues for non-SQL assets", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "python",
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("returns no issues when asset type dialect conversion fails", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "invalid.sql",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT 1",
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("integration test - real parser with simple jinja", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "test.users",
+			Type: "bq.sql",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT id, {{ var.email_col }} as email FROM users WHERE active = {{ var.is_active }}",
+			},
+			Columns: []pipeline.Column{
+				{Name: "id"},
+				{Name: "email"},
+				// Extra phone metadata to trigger issue
+				{Name: "phone"},
+			},
+		}
+		pipeline := &pipeline.Pipeline{
+			Name: "test-pipeline",
+			Variables: pipeline.Variables{
+				"email_col": map[string]any{
+					"type":    "string",
+					"default": "user_email",
+				},
+				"is_active": map[string]any{
+					"type":    "boolean",
+					"default": true,
+				},
+			},
+		}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		// MUST find the extra phone metadata - if cloneForAsset is disabled, this will fail
+		require.Len(t, issues, 1, "Should detect extra phone metadata after Jinja variable resolution")
+		assert.Contains(t, issues[0].Description, "phone")
+	})
+
+	t.Run("integration test - this variable resolution MUST work", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "analytics.users",
+			Type: "bq.sql",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT id, name FROM {{ this }}",
+			},
+
+			Columns: []pipeline.Column{
+				{Name: "id"},
+				{Name: "name"},
+				// Extra extra_metadata to force detection
+				{Name: "extra_metadata"},
+			},
+		}
+		pipeline := &pipeline.Pipeline{
+			Name: "test-pipeline",
+		}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		// This MUST find the missing extra_metadata metadata if {{ this }} is properly resolved
+		require.Len(t, issues, 1, "Should detect extra extra_metadata column after {{ this }} resolution to 'analytics.users'")
+		assert.Contains(t, issues[0].Description, "extra_metadata")
+	})
 }
 
 func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolint:paralleltest
@@ -289,142 +404,9 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolin
 		// So we need a more sophisticated test...
 		assert.Empty(t, issues, "This test alone cannot distinguish between working and broken cloneForAsset")
 	})
-}
-
-
-
-func TestQueryHasAllMetadataColumnsPolicy(t *testing.T) { //nolint:paralleltest
-	// Set up context with required values for cloneForAsset
-	ctx := context.WithValue(context.Background(), pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)) //nolint:usetesting
-	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
-	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-123")
-	ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
-
-	t.Run("returns no issues when parser is nil", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryHasAllMetadataColumnsPolicy(nil)
-
-		asset := &pipeline.Asset{
-			Name: "test.table",
-			Type: "bq.sql",
-		}
-		pipeline := &pipeline.Pipeline{}
-
-		issues, err := validator(ctx, pipeline, asset)
-
-		require.NoError(t, err)
-		assert.Empty(t, issues)
-	})
-
-	t.Run("returns no issues for non-SQL assets", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryHasAllMetadataColumnsPolicy(sharedSQLParser)
-
-		asset := &pipeline.Asset{
-			Name: "test.table",
-			Type: "python",
-		}
-		pipeline := &pipeline.Pipeline{}
-
-		issues, err := validator(ctx, pipeline, asset)
-
-		require.NoError(t, err)
-		assert.Empty(t, issues)
-	})
-
-	t.Run("returns no issues when asset type dialect conversion fails", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryHasAllMetadataColumnsPolicy(sharedSQLParser)
-
-		asset := &pipeline.Asset{
-			Name: "test.table",
-			Type: "invalid.sql",
-			ExecutableFile: pipeline.ExecutableFile{
-				Content: "SELECT 1",
-			},
-		}
-		pipeline := &pipeline.Pipeline{}
-
-		issues, err := validator(ctx, pipeline, asset)
-
-		require.NoError(t, err)
-		assert.Empty(t, issues)
-	})
-    
-	t.Run("integration test - real parser with simple jinja", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryHasAllMetadataColumnsPolicy(sharedSQLParser)
-
-		asset := &pipeline.Asset{
-			Name: "test.users",
-			Type: "bq.sql",
-			ExecutableFile: pipeline.ExecutableFile{
-				Content: "SELECT id, {{ var.email_col }} as email FROM users WHERE active = {{ var.is_active }}",
-			},
-			Columns: []pipeline.Column{
-				{Name: "id"},
-				{Name: "email"},
-				// Extra phone metadata to trigger issue
-				{Name: "phone"},
-			},
-		}
-		pipeline := &pipeline.Pipeline{
-			Name: "test-pipeline",
-			Variables: pipeline.Variables{
-				"email_col": map[string]any{
-					"type":    "string",
-					"default": "user_email",
-				},
-				"is_active": map[string]any{
-					"type":    "boolean",
-					"default": true,
-				},
-			},
-		}
-
-		issues, err := validator(ctx, pipeline, asset)
-
-		require.NoError(t, err)
-		// MUST find the extra phone metadata - if cloneForAsset is disabled, this will fail
-		require.Len(t, issues, 1, "Should detect extra phone metadata after Jinja variable resolution")
-		assert.Contains(t, issues[0].Description, "phone")
-	})
-
-	t.Run("integration test - this variable resolution MUST work", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryHasAllMetadataColumnsPolicy(sharedSQLParser)
-
-		asset := &pipeline.Asset{
-			Name: "analytics.users",
-			Type: "bq.sql",
-			ExecutableFile: pipeline.ExecutableFile{
-				Content: "SELECT id, name FROM {{ this }}",
-			},
-			Columns: []pipeline.Column{
-				{Name: "id"},
-				{Name: "name"},
-				// Extra extra_metadata to force detection
-				{Name: "extra_metadata"},
-			},
-		}
-		pipeline := &pipeline.Pipeline{
-			Name: "test-pipeline",
-		}
-
-		issues, err := validator(ctx, pipeline, asset)
-
-		require.NoError(t, err)
-		// This MUST find the missing extra_metadata metadata if {{ this }} is properly resolved
-		require.Len(t, issues, 1, "Should detect extra extra_metadata column after {{ this }} resolution to 'analytics.users'")
-		assert.Contains(t, issues[0].Description, "extra_metadata")
-	})
-}
-
-
-func TestQueryHasAllMetadataColumnsPolicy_JinjaIntegration(t *testing.T) { //nolint:paralleltest
-	// Set up context with required values for cloneForAsset
-	ctx := context.WithValue(context.Background(), pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)) //nolint:usetesting
-	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
-	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-123")
-	ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
 
 	t.Run("complex jinja template with variables and this resolution MUST work", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryHasAllMetadataColumnsPolicy(sharedSQLParser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "analytics.user_metrics",
@@ -470,7 +452,7 @@ func TestQueryHasAllMetadataColumnsPolicy_JinjaIntegration(t *testing.T) { //nol
 	})
 
 	t.Run("jinja template with boolean and numeric variables MUST work", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryHasAllMetadataColumnsPolicy(sharedSQLParser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "analytics.active_users",
@@ -508,7 +490,7 @@ func TestQueryHasAllMetadataColumnsPolicy_JinjaIntegration(t *testing.T) { //nol
 	})
 
 	t.Run("test that FAILS without cloneForAsset - undefined jinja variables", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryHasAllMetadataColumnsPolicy(sharedSQLParser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "test.table",
@@ -546,8 +528,3 @@ func TestQueryHasAllMetadataColumnsPolicy_JinjaIntegration(t *testing.T) { //nol
 		assert.Empty(t, issues, "This test alone cannot distinguish between working and broken cloneForAsset")
 	})
 }
-
-
-
-
-
