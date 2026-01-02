@@ -1458,7 +1458,6 @@ type Pipeline struct {
 	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
-	RerunCooldown      *int                   `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
@@ -1507,6 +1506,7 @@ type DefaultValues struct {
 	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
 	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
 	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
+	RerunCooldown     *int              `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -2082,11 +2082,11 @@ func (b *Builder) translatePipelineRetryConfig(ctx context.Context, pipeline *Pi
 		return nil, nil
 	}
 
-	// Translate pipeline-level rerun_cooldown to retries_delay
-	if pipeline.RerunCooldown != nil {
-		if *pipeline.RerunCooldown > 0 {
-			pipeline.RetriesDelay = pipeline.RerunCooldown
-		} else if *pipeline.RerunCooldown == -1 {
+	// Translate pipeline default rerun_cooldown to retries_delay
+	if pipeline.DefaultValues != nil && pipeline.DefaultValues.RerunCooldown != nil {
+		if *pipeline.DefaultValues.RerunCooldown > 0 {
+			pipeline.RetriesDelay = pipeline.DefaultValues.RerunCooldown
+		} else if *pipeline.DefaultValues.RerunCooldown == -1 {
 			zero := 0
 			pipeline.RetriesDelay = &zero
 		}
@@ -2156,9 +2156,9 @@ func (b *Builder) translateRetryConfig(ctx context.Context, asset *Asset, foundP
 			zero := 0
 			asset.RetriesDelay = &zero
 		}
-	} else if foundPipeline != nil && foundPipeline.RerunCooldown != nil && *foundPipeline.RerunCooldown > 0 {
-		// Inherit from pipeline if asset has no specific retry config
-		asset.RetriesDelay = foundPipeline.RerunCooldown
+	} else if foundPipeline != nil && foundPipeline.DefaultValues != nil && foundPipeline.DefaultValues.RerunCooldown != nil && *foundPipeline.DefaultValues.RerunCooldown > 0 {
+		// Inherit from pipeline default if asset has no specific retry config
+		asset.RetriesDelay = foundPipeline.DefaultValues.RerunCooldown
 	}
 
 	return asset, nil
