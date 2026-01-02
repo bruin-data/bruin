@@ -9,7 +9,6 @@ The pipeline includes the following sample assets:
 - `dataset.players`: An ingestr asset that loads chess player data into DuckDB.
 - `dataset.player_stats`: A DuckDB SQL asset that builds a table from `dataset.players`.
 - `my_python_asset`: A Python asset that prints a message.
-- `my_r_asset`: An R asset that prints a message.
 
 ## Setup
 This template includes a `.bruin.yml` with sample DuckDB and chess connections. You can replace or extend with your connections and environments as needed.
@@ -48,33 +47,26 @@ bruin run .
 ```shell
 Starting the pipeline execution...
 
-[22:57:39] Running:  dataset.players
-[22:57:39] Running:  my_python_asset
-[22:57:39] Running:  my_r_asset
-[22:57:39] [my_r_asset] No renv.lock found, executing R script directly...
-[22:57:39] [my_python_asset] >> warning: `--no-sync` has no effect when used outside of a project
-[22:57:40] [my_python_asset] >> hello world
-[22:57:40] Finished: my_python_asset (78ms)
-[22:57:40] [my_r_asset] >> [1] "@bruin\nname: my_r_asset\ntype: r\n@bruin"
-[22:57:40] [my_r_asset] >> Hello from R!
-[22:57:40] [my_r_asset] >> 2 + 2 = 4
-[22:57:40] Finished: my_r_asset (144ms)
+[18:42:58] Running:  my_python_asset
+[18:42:58] Running:  dataset.players
+[18:42:58] [my_python_asset] >> warning: `--no-sync` has no effect when used outside of a project
+[18:42:58] [my_python_asset] >> hello world
+[18:42:58] Finished: my_python_asset (191ms)
 ⋮
-[22:57:42] Finished: dataset.player_stats:player_count:positive (18ms)
-[22:57:42] Finished: dataset.player_stats:custom-check:row_count_is_greater_than_zero (26ms)
-[22:57:42] Finished: dataset.player_stats:name:unique (32ms)
+[18:43:04] Finished: dataset.player_stats:player_count:not_null (24ms)
+[18:43:04] Finished: dataset.player_stats:player_count:positive (33ms)
+[18:43:04] Finished: dataset.player_stats:name:unique (42ms)
 
 ==================================================
 
 PASS my_python_asset 
-PASS my_r_asset 
 PASS dataset.players 
 PASS dataset.player_stats .....
 
 
-bruin run completed successfully in 3.024s
+bruin run completed successfully in 5.439s
 
- ✓ Assets executed      4 succeeded
+ ✓ Assets executed      3 succeeded
  ✓ Quality checks       5 succeeded
 ```
 
