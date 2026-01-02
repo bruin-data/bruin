@@ -3174,6 +3174,10 @@ func TestMacros(t *testing.T) {
 						`"name":"inherits_pipeline"`, `"retries_delay":300`,
 						// Asset with disabled retries
 						`"name":"no_delay"`, `"rerun_cooldown":-1`, `"retries_delay":0`,
+						// Python asset with rerun_cooldown
+						`"name":"python_test"`, `"rerun_cooldown":900`, `"retries_delay":900`,
+						// Ingestr asset with rerun_cooldown
+						`"name":"ingestr_test"`, `"rerun_cooldown":450`, `"retries_delay":450`,
 					},
 				},
 				Asserts: []func(*e2e.Task) error{
