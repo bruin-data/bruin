@@ -121,7 +121,7 @@ Bruin will take the result of the given query, and will create a `dataset.player
 materialization type instead of `table` to create a view instead.
 
 > [!INFO]
-> Bruin supports many asset types, including BigQuery, Snowflake, Python, R, Redshift, Databricks, and more.
+> Bruin supports many [asset](/assets/definition-schema.html) types, including BigQuery, Snowflake, Python, R, Redshift, Databricks, and more.
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
 ```bash
