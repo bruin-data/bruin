@@ -20,7 +20,7 @@ cd bruin/my-pipeline
 This command will:
 - Create a project named `my-pipeline`.
 - Generate a folder called `my-pipeline` containing the following:
-    - `assets/` with four sample assets: ingestr, Python, R, and SQL (we will walk through them below)
+    - `assets/` with three sample assets: ingestr, Python, and SQL (we will walk through them below)
     - `.bruin.yml` with sample duckdb connections used in this guide (you can edit it or use a secrets manager, see [Secrets](../../secrets/overview.md))
     - `pipeline.yml` file to manage your pipeline.
 
@@ -34,7 +34,7 @@ bruin run
 
 In a nutshell, an asset is anything that generates value with data. In practice, an asset can be a table in your data warehouse, a Python script, or a file in S3. Bruin represents assets in code, put under the `assets` folder.
 
-The `default` template already includes a 4 sample assets under `assets/`. In the next sections, we will walk through each one. You can use the same patterns to add new assets by creating new files under `assets/`.
+The `default` template already includes 3 sample assets under `assets/`. In the next sections, we will walk through each one. You can use the same patterns to add new assets by creating new files under `assets/`.
 
 ### Creating a `ingestr` asset
 Let's start by ingesting some data from an external source.
@@ -149,31 +149,6 @@ You can run this asset either via the Bruin VS Code extension, or in the termina
 bruin run assets/my_python_asset.py
 ```
 
-### Creating an R asset
-Similar to SQL and Python, Bruin supports running R natively as well.
-
-The template includes an R asset in `assets/my_r_asset.r`:
-
-```r
-"@bruin
-name: my_r_asset
-type: r
-@bruin"
-
-cat("Hello from R!\n")
-result <- 2 + 2
-cat(sprintf("2 + 2 = %d\n", result))
-```
-
-- The sections between `"@bruin` and `@bruin"` contain YAML configuration for the asset using R's multiline string syntax.
-- You can use either double quotes `"` or single quotes `'` - just make sure they match.
-- The rest of the file is a regular R script.
-
-You can run this asset either via the Bruin VS Code extension, or in the terminal:
-```bash
-bruin run assets/my_r_asset.r
-```
-
 At this point, you can also run the whole pipeline:
 ```bash
 bruin run
@@ -239,6 +214,32 @@ bruin run assets/player_stats.sql
 If you'd like to run only the checks, you can run:
 ```bash
 bruin run --only checks assets/player_stats.sql
+```
+
+## Optional: Adding an R asset
+If you'd like to try R, you can add an R asset manually. Create `assets/my_r_asset.r` with:
+
+> [!INFO]
+> R is not bundled with Bruin. Make sure R is installed locally before running R assets.
+
+```r
+"@bruin
+name: my_r_asset
+type: r
+@bruin"
+
+cat("Hello from R!\n")
+result <- 2 + 2
+cat(sprintf("2 + 2 = %d\n", result))
+```
+
+- The sections between `"@bruin` and `@bruin"` contain YAML configuration for the asset using R's multiline string syntax.
+- You can use either double quotes `"` or single quotes `'` - just make sure they match.
+- The rest of the file is a regular R script.
+
+You can run this asset either via the Bruin VS Code extension, or in the terminal:
+```bash
+bruin run assets/my_r_asset.r
 ```
 
 ## Next steps
