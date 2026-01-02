@@ -3156,6 +3156,56 @@ func TestMacros(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "rerun-cooldown-translation",
+			task: e2e.Task{
+				Name:    "rerun-cooldown-translation",
+				Command: binary,
+				Args:    []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "../test-rerun-cooldown")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						// Pipeline default rerun_cooldown
+						`"default":{"type":"","parameters":null,"secrets":null,"interval_modifiers":null,"rerun_cooldown":300}`, `"retries_delay":300`,
+						// Asset with explicit rerun_cooldown
+						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
+						// Asset that inherits from pipeline
+						`"name":"inherits_pipeline"`, `"retries_delay":300`,
+						// Asset with disabled retries
+						`"name":"no_delay"`, `"rerun_cooldown":-1`, `"retries_delay":0`,
+						// Python asset with rerun_cooldown
+						`"name":"python_test"`, `"rerun_cooldown":900`, `"retries_delay":900`,
+						// Ingestr asset with rerun_cooldown
+						`"name":"ingestr_test"`, `"rerun_cooldown":450`, `"retries_delay":450`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "rerun-cooldown-asset-parsing",
+			task: e2e.Task{
+				Name:    "rerun-cooldown-asset-parsing",
+				Command: binary,
+				Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "../test-rerun-cooldown/assets/test_asset.sql")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						// Asset with explicit rerun_cooldown should translate correctly
+						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

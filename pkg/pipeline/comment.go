@@ -259,6 +259,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			task.StartDate = value
 
 			continue
+		case "rerun_cooldown":
+			rerunCooldown, err := strconv.Atoi(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse rerun_cooldown value '%s'", value)
+			}
+			task.RerunCooldown = &rerunCooldown
+
+			continue
 		case "secrets":
 			values := strings.Split(value, ",")
 			for _, v := range values {
