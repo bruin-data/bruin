@@ -53,6 +53,7 @@ retries: 2
 concurrency: 4
 
 default:
+  rerun_cooldown: 300
   secrets:
     - key: MY_API_KEY
       inject_as: API_KEY
@@ -114,6 +115,7 @@ variables:
 - [Catchup](#catchup)
 - [Metadata push](#metadata-push)
 - [Retries](#retries)
+- [Rerun Cooldown](#rerun-cooldown)
 - [Concurrency](#concurrency)
 - [Default (pipeline-level defaults)](#default-pipeline-level-defaults)
 - [Variables](#variables)
@@ -305,9 +307,30 @@ retries: 2
 - **Type:** `Integer`
 - **Default:** `2`
 
+### Rerun Cooldown
+
+Set a delay (in seconds) between retry attempts for failed tasks. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. When deploying to Airflow, this is automatically translated to `retries_delay` for compatibility.
+
+Example:
+
+```yaml
+default:
+  rerun_cooldown: 300  # Wait 5 minutes between retries
+```
+
+- **Type:** `Integer`
+- **Default:** `0` (no delay)
+
+**Special values:**
+- `0`: No delay between retries (default behavior)
+- `> 0`: Wait the specified number of seconds before retrying
+- `-1`: Disable retry delays (same as `0`)
+
+**Inheritance:** Assets inherit the pipeline's default `rerun_cooldown` unless they specify their own value.
+
 ### Concurrency
 
-Limit how many runs you can take at the same time for this pipeline in Bruin Cloud. 
+Limit how many runs you can take at the same time for this pipeline in Bruin Cloud.
 Defaults to 1 for safety.
 
 Example:
