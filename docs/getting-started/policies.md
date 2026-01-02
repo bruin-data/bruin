@@ -256,6 +256,11 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td><code>pipeline</code></td>
       <td>Pipeline must push it's metadata</td>
     </tr>
+    <tr>
+      <td><code>query-matches-columns</code></td>
+      <td><code>asset</code></td>
+      <td>Columns in the query must exactly match the columns defined in the asset metadata, and vice versa.</td>
+    </tr>
   </tbody>
 </table>
 
