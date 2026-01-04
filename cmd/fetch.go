@@ -602,7 +602,7 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	if err != nil {
 		return "", err
 	}
-	resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05"))
+	resultName := fmt.Sprintf("query_result_%d.csv", time.Now().UnixMilli())
 	resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
 	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
 	if err != nil {
@@ -714,7 +714,7 @@ func handleSuccess(output string, message string) error {
 	return nil
 }
 
-// QueryLog represents the structure of a query log entry
+// QueryLog represents the structure of a query log entry.
 type QueryLog struct {
 	Query       string          `json:"query"`
 	Timestamp   time.Time       `json:"timestamp"`
@@ -729,7 +729,7 @@ type QueryLog struct {
 	Timeout     int             `json:"timeout,omitempty"`
 }
 
-// QueryLogOptions contains optional parameters for query logging
+// QueryLogOptions contains optional parameters for query logging.
 type QueryLogOptions struct {
 	Asset       string
 	Environment string
@@ -760,7 +760,7 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 	}
 
 	timestamp := time.Now()
-	logFileName := fmt.Sprintf("query_%s.json", timestamp.Format("2006-01-02_15-04-05"))
+	logFileName := fmt.Sprintf("query_%d.json", timestamp.UnixMilli())
 	logPath := filepath.Join(logDir, logFileName)
 
 	logEntry := QueryLog{
@@ -786,7 +786,7 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 		return errors.Wrap(err, "failed to marshal query log to JSON")
 	}
 
-	err = os.WriteFile(logPath, jsonData, 0o644)
+	err = os.WriteFile(logPath, jsonData, 0o600)
 	if err != nil {
 		return errors.Wrap(err, "failed to write query log file")
 	}
