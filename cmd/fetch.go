@@ -169,12 +169,26 @@ func Query() *cli.Command {
 					q = *ansisql.AddAgentIDAnnotationComment(&q, agentID)
 				}
 
-				result, err := querier.SelectWithSchema(timeoutCtx, &q)
-				if err != nil {
-					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
-				}
-				// Output result based on format specified
+				result, queryErr := querier.SelectWithSchema(timeoutCtx, &q)
+
+				// Save query log (for both success and error cases)
 				inputPath := c.String("asset")
+				logOpts := QueryLogOptions{
+					Asset:       inputPath,
+					Environment: c.String("environment"),
+					Limit:       c.Int64("limit"),
+					Timeout:     c.Int("timeout"),
+				}
+				if err := saveQueryLog(queryStr, connName, result, queryErr, logOpts); err != nil {
+					// Log the error but don't fail the command
+					fmt.Fprintf(os.Stderr, "Warning: failed to save query log: %v\n", err)
+				}
+
+				if queryErr != nil {
+					return handleError(c.String("output"), errors.Wrap(queryErr, "query execution failed"))
+				}
+
+				// Output result based on format specified
 				var resultsPath string
 				if c.Bool("export") {
 					resultsPath, err = exportResultsToCSV(result, inputPath)
@@ -588,7 +602,7 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	if err != nil {
 		return "", err
 	}
-	resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05"))
+	resultName := fmt.Sprintf("query_result_%d.csv", time.Now().UnixMilli())
 	resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
 	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
 	if err != nil {
@@ -697,5 +711,85 @@ func handleSuccess(output string, message string) error {
 	} else {
 		successPrinter.Printf("%s\n", message)
 	}
+	return nil
+}
+
+// QueryLog represents the structure of a query log entry.
+type QueryLog struct {
+	Query       string          `json:"query"`
+	Timestamp   time.Time       `json:"timestamp"`
+	Connection  string          `json:"connection"`
+	Success     bool            `json:"success"`
+	Columns     []string        `json:"columns,omitempty"`
+	Rows        [][]interface{} `json:"rows,omitempty"`
+	Error       string          `json:"error,omitempty"`
+	Asset       string          `json:"asset,omitempty"`
+	Environment string          `json:"environment,omitempty"`
+	Limit       int64           `json:"limit,omitempty"`
+	Timeout     int             `json:"timeout,omitempty"`
+}
+
+// QueryLogOptions contains optional parameters for query logging.
+type QueryLogOptions struct {
+	Asset       string
+	Environment string
+	Limit       int64
+	Timeout     int
+}
+
+func saveQueryLog(queryStr string, connName string, result *query.QueryResult, queryErr error, opts QueryLogOptions) error {
+	basePath := opts.Asset
+	if basePath == "" {
+		basePath = "."
+	}
+	repoRoot, err := git.FindRepoFromPath(basePath)
+	if err != nil {
+		return errors.Wrap(err, "failed to find repo root")
+	}
+
+	logDir := filepath.Join(repoRoot.Path, "logs/queries")
+
+	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/queries")
+	if err != nil {
+		return errors.Wrap(err, "failed to add logs/queries to .gitignore")
+	}
+
+	err = os.MkdirAll(logDir, 0o755)
+	if err != nil {
+		return errors.Wrap(err, "failed to create logs/queries directory")
+	}
+
+	timestamp := time.Now()
+	logFileName := fmt.Sprintf("query_%d.json", timestamp.UnixMilli())
+	logPath := filepath.Join(logDir, logFileName)
+
+	logEntry := QueryLog{
+		Query:       queryStr,
+		Timestamp:   timestamp,
+		Connection:  connName,
+		Success:     queryErr == nil,
+		Asset:       opts.Asset,
+		Environment: opts.Environment,
+		Limit:       opts.Limit,
+		Timeout:     opts.Timeout,
+	}
+
+	if queryErr != nil {
+		logEntry.Error = queryErr.Error()
+	} else if result != nil {
+		logEntry.Columns = result.Columns
+		logEntry.Rows = result.Rows
+	}
+
+	jsonData, err := json.MarshalIndent(logEntry, "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal query log to JSON")
+	}
+
+	err = os.WriteFile(logPath, jsonData, 0o600)
+	if err != nil {
+		return errors.Wrap(err, "failed to write query log file")
+	}
+
 	return nil
 }
