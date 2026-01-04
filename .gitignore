@@ -158,3 +158,4 @@ __debug_bin*
 .claude
 test-glossary.yml
 .venv
+logs/queries
