@@ -27,13 +27,18 @@ Initialize a new project from this template:
 
 ```bash
 bruin init stripe-databricks my-stripe-pipeline
-cd my-stripe-pipeline
 ```
 
-Run the entire pipeline:
+Run the pipeline for the first time using the `full-refresh` flag. The pipeline will start processing data, starting from the `start_date` specified in `pipeline.yml`:
 
 ```bash
-bruin run .
+bruin run --full-refresh my-stripe-pipeline
+```
+
+Alternatively, specify the date range in the `run` command by using the `start-date` and `end-date` flags:
+
+```bash
+bruin run --start-date 2025-01-01 --end-date 2025-01-30 my-stripe-pipeline
 ```
 
 Run a single asset:
