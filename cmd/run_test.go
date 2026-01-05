@@ -1828,3 +1828,85 @@ func TestApplyIntervalModifiersWithFullRefresh(t *testing.T) {
 		})
 	}
 }
+
+func TestAnalyzeResults(t *testing.T) {
+	t.Parallel()
+
+	newAsset := func() *pipeline.Asset {
+		return &pipeline.Asset{
+			Name: "Asset1",
+			Type: pipeline.AssetTypeBigqueryQuery,
+			Columns: []pipeline.Column{
+				{
+					Name:   "col1",
+					Type:   "STRING",
+					Checks: []pipeline.ColumnCheck{{Name: "not_null"}},
+				},
+			},
+			CustomChecks: []pipeline.CustomCheck{{Name: "row_count"}},
+		}
+	}
+
+	type expectedSummary struct {
+		assetsTotal     int
+		assetsSucceeded int
+		assetsFailed    int
+		columnTotal     int
+		columnSucceeded int
+		customTotal     int
+		customSucceeded int
+	}
+
+	tests := []struct {
+		name     string
+		filter   *Filter
+		expected expectedSummary
+	}{
+		{
+			name:   "ChecksOnlySkipsAssets",
+			filter: &Filter{OnlyTaskTypes: []string{"checks"}},
+			expected: expectedSummary{
+				assetsTotal:     0,
+				assetsSucceeded: 0,
+				assetsFailed:    0,
+				columnTotal:     1,
+				columnSucceeded: 1,
+				customTotal:     1,
+				customSucceeded: 1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt 	// This line avoids a common Go gotcha with t.Parallel() in range loops. 
+					// Rebind range var so each subtest captures its own case when running in parallel (not the same last value)
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{
+				Name:   "TestPipeline",
+				Assets: []*pipeline.Asset{newAsset()},
+			}
+			s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+			err := ApplyAllFilters(context.Background(), tt.filter, s, p)
+			require.NoError(t, err)
+
+			results := make([]*scheduler.TaskExecutionResult, 0)
+			for _, instance := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+				results = append(results, &scheduler.TaskExecutionResult{
+					Instance: instance,
+					Error:    nil,
+				})
+			}
+
+			summary := analyzeResults(results, s)
+			require.Equal(t, tt.expected.assetsTotal, summary.Assets.Total)
+			require.Equal(t, tt.expected.assetsSucceeded, summary.Assets.Succeeded)
+			require.Equal(t, tt.expected.assetsFailed, summary.Assets.Failed)
+			require.Equal(t, tt.expected.columnTotal, summary.ColumnChecks.Total)
+			require.Equal(t, tt.expected.columnSucceeded, summary.ColumnChecks.Succeeded)
+			require.Equal(t, tt.expected.customTotal, summary.CustomChecks.Total)
+			require.Equal(t, tt.expected.customSucceeded, summary.CustomChecks.Succeeded)
+		})
+	}
+}
