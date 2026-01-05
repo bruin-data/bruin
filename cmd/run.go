@@ -63,6 +63,11 @@ import (
 
 const LogsFolder = "logs"
 
+var pythonCacheGitignorePatterns = []string{
+	"__pycache__/",
+	"*.py[cod]",
+}
+
 type PipelineInfo struct {
 	Pipeline           *pipeline.Pipeline
 	RunningForAnAsset  bool
@@ -853,6 +858,12 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
 					return cli.Exit("", 1)
 				}
+			}
+			
+			err = ensurePythonCacheGitignore(afero.NewOsFs(), repoRoot.Path)
+			if err != nil {
+				errorPrinter.Printf("Failed to add Python cache patterns to .gitignore: %v\n", err)
+				return cli.Exit("", 1)
 			}
 
 			if filter.PushMetaData {
@@ -1958,4 +1969,13 @@ func getPendingAssets(s *scheduler.Scheduler) []*pipeline.Asset {
 	}
 
 	return assets
+}
+
+func ensurePythonCacheGitignore(fs afero.Fs, repoRoot string) error {
+	for _, pattern := range pythonCacheGitignorePatterns {
+		if err := git.EnsureGivenPatternIsInGitignore(fs, repoRoot, pattern); err != nil {
+			return fmt.Errorf("failed to add %s: %w", pattern, err)
+		}
+	}
+	return nil
 }
