@@ -51,6 +51,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hostaway"
 	"github.com/bruin-data/bruin/pkg/hubspot"
+	"github.com/bruin-data/bruin/pkg/indeed"
 	"github.com/bruin-data/bruin/pkg/influxdb"
 	"github.com/bruin-data/bruin/pkg/intercom"
 	"github.com/bruin-data/bruin/pkg/isocpulse"
@@ -173,6 +174,7 @@ type Manager struct {
 	PlusVibeAI           map[string]*plusvibeai.Client
 	BruinCloud           map[string]*bruincloud.Client
 	Primer               map[string]*primer.Client
+	Indeed               map[string]*indeed.Client
 	EMRSeverless         map[string]*emr_serverless.Client
 	DataprocServerless   map[string]*dataprocserverless.Client
 	GoogleAnalytics      map[string]*googleanalytics.Client
@@ -2387,6 +2389,27 @@ func (m *Manager) AddPrimerConnectionFromConfig(connection *config.PrimerConnect
 	return nil
 }
 
+func (m *Manager) AddIndeedConnectionFromConfig(connection *config.IndeedConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Indeed == nil {
+		m.Indeed = make(map[string]*indeed.Client)
+	}
+
+	client, err := indeed.NewClient(indeed.Config{
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		EmployerID:   connection.EmployerID,
+	})
+	if err != nil {
+		return err
+	}
+	m.Indeed[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2648,6 +2671,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.PlusVibeAI, connectionManager.AddPlusVibeAIConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.BruinCloud, connectionManager.AddBruinCloudConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Primer, connectionManager.AddPrimerConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Indeed, connectionManager.AddIndeedConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)

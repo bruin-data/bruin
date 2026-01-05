@@ -445,6 +445,11 @@ environments:
       primer:
         - name: "primer-1"
           api_key: "test-api-key"
+      indeed:
+        - name: "indeed-1"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
+          employer_id: "test-employer-id"
 
   prod:
     connections:
