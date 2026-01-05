@@ -965,7 +965,6 @@ func (a *Asset) PrefixUpstreams(prefix string) {
 func (a *Asset) removeRedundanciesBeforePersisting() {
 	a.clearDuplicateUpstreams()
 	a.removeExtraSpacesAtLineEndingsInTextContent()
-	a.removeNameIfItCanBeInferredFromPath()
 
 	// python assets don't require a type anymore
 	if a.Type == AssetTypePython && strings.HasSuffix(a.ExecutableFile.Path, ".py") {
@@ -1031,17 +1030,6 @@ func (a *Asset) removeExtraSpacesAtLineEndingsInTextContent() {
 	for i := range a.CustomChecks {
 		a.CustomChecks[i].Description = ClearSpacesAtLineEndings(a.CustomChecks[i].Description)
 		a.CustomChecks[i].Query = ClearSpacesAtLineEndings(a.CustomChecks[i].Query)
-	}
-}
-
-func (a *Asset) removeNameIfItCanBeInferredFromPath() {
-	potentialName, err := a.GetNameIfItWasSetFromItsPath(nil)
-	if err != nil {
-		return
-	}
-
-	if potentialName == a.Name {
-		a.Name = ""
 	}
 }
 
