@@ -391,8 +391,12 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 
 	// Analyze asset-level results
 	for assetName := range assetNames {
+		mainSucceeded, mainSeen := assetMainStatus[assetName]
+		if !mainSeen {
+			continue
+		}
+
 		summary.Assets.Total++
-		mainSucceeded := assetMainStatus[assetName]
 		hasCheckFailures := assetHasCheckFailures[assetName]
 
 		if mainSucceeded && !hasCheckFailures { // nolint:gocritic
