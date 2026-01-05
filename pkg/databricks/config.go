@@ -35,3 +35,29 @@ func (c *Config) ToDBConnectionURI() string {
 
 	return strings.TrimPrefix(dsn.String(), "//")
 }
+
+// GetIngestrURI returns the connection URI for ingestr.
+// Format: databricks://token:<access_token>@<server_hostname>?http_path=<http_path>&catalog=<catalog>&schema=<schema>
+// See: https://bruin-data.github.io/ingestr/supported-sources/databricks.html
+func (c *Config) GetIngestrURI() string {
+	query := url.Values{}
+
+	if c.Path != "" {
+		query.Add("http_path", c.Path)
+	}
+	if c.Catalog != "" {
+		query.Add("catalog", c.Catalog)
+	}
+	if c.Schema != "" {
+		query.Add("schema", c.Schema)
+	}
+
+	u := &url.URL{
+		Scheme:   "databricks",
+		User:     url.UserPassword("token", c.Token),
+		Host:     c.Host,
+		RawQuery: query.Encode(),
+	}
+
+	return u.String()
+}

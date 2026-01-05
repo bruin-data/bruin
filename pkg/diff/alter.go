@@ -260,7 +260,17 @@ func (g *AlterStatementGenerator) quoteIdentifier(identifier string) string {
 	switch g.dialect {
 	case DialectBigQuery:
 		return fmt.Sprintf("`%s`", identifier)
-	case DialectPostgreSQL, DialectSnowflake, DialectDuckDB:
+	case DialectPostgreSQL:
+		if strings.Contains(identifier, ".") {
+			parts := strings.Split(identifier, ".")
+			quotedParts := make([]string, len(parts))
+			for i, part := range parts {
+				quotedParts[i] = fmt.Sprintf("\"%s\"", part)
+			}
+			return strings.Join(quotedParts, ".")
+		}
+		return fmt.Sprintf("\"%s\"", identifier)
+	case DialectSnowflake, DialectDuckDB:
 		return fmt.Sprintf("\"%s\"", identifier)
 	case DialectGeneric:
 		return fmt.Sprintf("\"%s\"", identifier)

@@ -758,6 +758,8 @@ default_args = {
 }
 ```
 
+> **Bruin Configuration Mapping**: When using `bruin internal parse-pipeline` or `bruin internal parse-asset`, Bruin automatically translates your `rerun_cooldown` setting to `retries_delay` in the JSON output for Airflow compatibility.
+
 ### 4. Use Task Dependencies
 
 Define clear dependencies between tasks:

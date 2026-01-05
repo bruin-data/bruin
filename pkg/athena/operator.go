@@ -167,7 +167,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			return err
 		}
 
-		intRes, err := helpers.CastResultToInteger(res)
+		intRes, err := helpers.CastResultToInteger(res, true)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse query sensor result")
 		}

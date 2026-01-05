@@ -660,7 +660,13 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 	_, err := dataset.Metadata(ctx)
 	if err != nil {
 		var apiErr *googleapi.Error
-		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+		isAPIErr := errors.As(err, &apiErr)
+
+		if !isAPIErr {
+			return fmt.Errorf("failed to fetch metadata to create dataset for table '%s': %w", tableName, err)
+		}
+
+		if isAPIErr && apiErr.Code == 404 {
 			if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
 				var createApiErr *googleapi.Error //nolint:stylecheck
 				if errors.As(err, &createApiErr) && createApiErr.Code == 409 {
@@ -671,7 +677,7 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 			}
 			datasetNameCache.Store(cacheKey, true)
 		} else {
-			return fmt.Errorf("failed to fetch metadata to create dataset for table '%s': %w", tableName, err)
+			return errors.Errorf("google api returned error, http status: %d, headers: %v, body: %s", apiErr.Code, apiErr.Header, apiErr.Body)
 		}
 	}
 
@@ -1275,6 +1281,79 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 				if err != nil {
 					mu.Lock()
 					errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", ds.DatasetID, t.TableID, err))
+					mu.Unlock()
+					return
+				}
+
+				schema.Tables = append(schema.Tables, &ansisql.DBTable{
+					Name:    t.TableID,
+					Columns: columns,
+				})
+			}
+
+			sort.Slice(schema.Tables, func(i, j int) bool { return schema.Tables[i].Name < schema.Tables[j].Name })
+
+			mu.Lock()
+			summary.Schemas = append(summary.Schemas, schema)
+			mu.Unlock()
+		})
+	}
+
+	p.Wait()
+
+	if len(errs) > 0 {
+		return nil, errs[0]
+	}
+
+	sort.Slice(summary.Schemas, func(i, j int) bool { return summary.Schemas[i].Name < summary.Schemas[j].Name })
+
+	return summary, nil
+}
+
+func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []string) (*ansisql.DBDatabase, error) {
+	if err := d.ensureClientInitialized(ctx); err != nil {
+		return nil, err
+	}
+
+	projectID := d.config.ProjectID
+
+	summary := &ansisql.DBDatabase{
+		Name:    projectID,
+		Schemas: []*ansisql.DBSchema{},
+	}
+
+	mu := sync.Mutex{}
+	var errs []error
+
+	workers := max(runtime.NumCPU(), 8)
+	p := pool.New().WithMaxGoroutines(workers)
+
+	// Only iterate over requested schemas (datasets)
+	for _, schemaName := range schemas {
+		p.Go(func() {
+			ds := d.client.Dataset(schemaName)
+			schema := &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+
+			tables := ds.Tables(ctx)
+			for {
+				t, err := tables.Next()
+				if errors.Is(err, iterator.Done) {
+					break
+				}
+				if err != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Errorf("failed to list tables in dataset %s: %w", schemaName, err))
+					mu.Unlock()
+					return
+				}
+
+				columns, err := d.getTableColumns(ctx, schemaName, t.TableID)
+				if err != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", schemaName, t.TableID, err))
 					mu.Unlock()
 					return
 				}

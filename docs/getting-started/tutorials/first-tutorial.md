@@ -71,8 +71,8 @@ Just like in Step 3, the pipeline.yml file also comes pre-configured for our tas
 ```yaml
 name: chess_duckdb
 default_connections:
-    duckdb: "duckdb_default"  
-    chess: "chess_connection"
+    duckdb: "duckdb-default"
+    chess: "chess-default"
 ```
 > [!INFO]
 > **What is a Pipeline?**  

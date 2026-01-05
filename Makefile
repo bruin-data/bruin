@@ -99,10 +99,10 @@ format: lint-python
 
 lint-python:
 	pip install sqlglot ruff
-	@echo "$(OK_COLOR)==> Running Python formatting with black...$(NO_COLOR)"
+	@echo "$(OK_COLOR)==> Running Python formatting with ruff...$(NO_COLOR)"
 	@ruff format ./pythonsrc
 
-	@echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
+	@echo "$(OK_COLOR)==> Running Python linting with ruff...$(NO_COLOR)"
 	@ruff check --fix ./pythonsrc
 
 refresh-integration-expectations: build
@@ -138,4 +138,3 @@ duck-db-static-lib:
 	@mkdir vendor/github.com/marcboeker/go-duckdb/deps || true
 	@mkdir vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH) || true
 	@cp $$(go env GOPATH)/pkg/mod/github.com/marcboeker/go-duckdb@v1.8.2/deps/$(OS_ARCH)/libduckdb.a vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH)/libduckdb.a
-

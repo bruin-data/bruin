@@ -44,6 +44,7 @@ type FormattingOptions struct {
 	DoNotLogTimestamp bool
 	DoNotLogTaskName  bool
 	NoColor           bool
+	MinimalLogs       bool
 }
 
 type Concurrent struct {
@@ -107,10 +108,12 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		if !w.formatOpts.NoColor {
 			runningPrinter = color.New(color.Faint)
 		}
-		if w.formatOpts.DoNotLogTimestamp {
-			fmt.Printf("%s\n", runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
-		} else {
-			fmt.Printf("%s %s\n", timestampStr, runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+		if !w.formatOpts.MinimalLogs {
+			if w.formatOpts.DoNotLogTimestamp {
+				fmt.Printf("%s\n", runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+			} else {
+				fmt.Printf("%s %s\n", timestampStr, runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+			}
 		}
 		w.printLock.Unlock()
 
@@ -146,11 +149,13 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 			res = "Failed"
 		}
 
-		if w.formatOpts.DoNotLogTimestamp {
-			fmt.Printf("%s\n", printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
-		} else {
-			timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
-			fmt.Printf("%s %s\n", timestampStr, printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+		if !w.formatOpts.MinimalLogs {
+			if w.formatOpts.DoNotLogTimestamp {
+				fmt.Printf("%s\n", printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+			} else {
+				timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
+				fmt.Printf("%s %s\n", timestampStr, printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+			}
 		}
 		w.printLock.Unlock()
 		results <- &scheduler.TaskExecutionResult{

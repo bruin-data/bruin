@@ -716,6 +716,14 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "test-api-key",
 				},
 			},
+			Indeed: []IndeedConnection{
+				{
+					Name:         "indeed-1",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					EmployerID:   "test-employer-id",
+				},
+			},
 		},
 	}
 

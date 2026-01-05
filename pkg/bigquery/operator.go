@@ -285,10 +285,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
-	trimmedQuery := helpers.TrimToLength(qry[0].Query, 50)
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if printerExists {
-		fmt.Fprintln(printer, "Poking:", trimmedQuery)
+		fmt.Fprintln(printer, "Poking:", qry[0].Query)
 	}
 
 	timeout := time.After(24 * time.Hour)
@@ -301,7 +300,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			if err != nil {
 				return err
 			}
-			intRes, err := helpers.CastResultToInteger(res)
+			intRes, err := helpers.CastResultToInteger(res, true)
 			if err != nil {
 				return errors.Wrap(err, "failed to parse query sensor result")
 			}
@@ -383,7 +382,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			if err != nil {
 				return err
 			}
-			intRes, err := helpers.CastResultToInteger(res)
+			intRes, err := helpers.CastResultToInteger(res, true)
 			if err != nil {
 				return errors.Wrap(err, "failed to parse query sensor result")
 			}

@@ -782,6 +782,8 @@ type Asset struct { //nolint:recvcheck
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
+	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 
 	upstream   []*Asset
 	downstream []*Asset
@@ -1456,6 +1458,7 @@ type Pipeline struct {
 	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit" yaml:"commit,omitempty"`
@@ -1503,6 +1506,7 @@ type DefaultValues struct {
 	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
 	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
 	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
+	RerunCooldown     *int              `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -1808,7 +1812,12 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 	b.assetMutators = []AssetMutator{
 		b.fillGlossaryStuff,
 		b.SetupDefaultsFromPipeline,
+		b.translateRetryConfig,
 		b.SetNameFromPath,
+	}
+
+	b.pipelineMutators = []PipelineMutator{
+		b.translatePipelineRetryConfig,
 	}
 
 	return b
@@ -2068,6 +2077,24 @@ func (b *Builder) MutatePipeline(ctx context.Context, pipeline *Pipeline) (*Pipe
 	return pipeline, nil
 }
 
+func (b *Builder) translatePipelineRetryConfig(ctx context.Context, pipeline *Pipeline) (*Pipeline, error) {
+	if pipeline == nil {
+		return nil, nil
+	}
+
+	// Translate pipeline default rerun_cooldown to retries_delay
+	if pipeline.DefaultValues != nil && pipeline.DefaultValues.RerunCooldown != nil {
+		if *pipeline.DefaultValues.RerunCooldown > 0 {
+			pipeline.RetriesDelay = pipeline.DefaultValues.RerunCooldown
+		} else if *pipeline.DefaultValues.RerunCooldown == -1 {
+			zero := 0
+			pipeline.RetriesDelay = &zero
+		}
+	}
+
+	return pipeline, nil
+}
+
 func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
 	if foundPipeline == nil {
 		return asset, nil
@@ -2111,6 +2138,27 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
 		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
+	}
+
+	return asset, nil
+}
+
+func (b *Builder) translateRetryConfig(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	if asset == nil {
+		return asset, nil
+	}
+
+	// Translate asset-level rerun_cooldown to retries_delay
+	if asset.RerunCooldown != nil {
+		if *asset.RerunCooldown > 0 {
+			asset.RetriesDelay = asset.RerunCooldown
+		} else if *asset.RerunCooldown == -1 {
+			zero := 0
+			asset.RetriesDelay = &zero
+		}
+	} else if foundPipeline != nil && foundPipeline.DefaultValues != nil && foundPipeline.DefaultValues.RerunCooldown != nil && *foundPipeline.DefaultValues.RerunCooldown > 0 {
+		// Inherit from pipeline default if asset has no specific retry config
+		asset.RetriesDelay = foundPipeline.DefaultValues.RerunCooldown
 	}
 
 	return asset, nil
