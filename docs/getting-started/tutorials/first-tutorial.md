@@ -50,8 +50,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "erik"
-            - "vadimer2"
+            - "albertojgomez"
+            - "awryaw"
 
 ```
 ## Step 3: Take a look at your assets
@@ -96,8 +96,8 @@ After executing the query, you will see the following results displayed in your 
 ```plaintext
 | USERNAME      | AID                                            | TOTAL_GAMES | WHITE_WINS | BLACK_WINS | WHITE_GAMES | BLACK_GAMES | WHITE_WIN_RATE | BLACK_WIN_RATE |
 |---------------|------------------------------------------------|-------------|------------|------------|-------------|-------------|----------------|----------------|
-| vadimer2        | https://api.chess.com/pub/player/vadimer2        | 59573       | 24243      | 22731      | 30029       | 29544       | 80.73          | 76.94          |
-| erik | https://api.chess.com/pub/player/erik | 6298        | 2267       | 2027       | 3169        | 3129        | 71.54          | 64.78          |
+| awryaw        | https://api.chess.com/pub/player/awryaw        | 59573       | 24243      | 22731      | 30029       | 29544       | 80.73          | 76.94          |
+| albertojgomez | https://api.chess.com/pub/player/albertojgomez | 6298        | 2267       | 2027       | 3169        | 3129        | 71.54          | 64.78          |
 
 ```
 🎉Congratulations!

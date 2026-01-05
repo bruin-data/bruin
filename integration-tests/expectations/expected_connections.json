@@ -39,8 +39,8 @@
         {
           "name": "chess-default",
           "players": [
-            "erik",
-            "vadimer2"
+            "albertojgomez",
+            "awryaw"
           ]
         }
       ]
@@ -86,8 +86,8 @@
           {
             "name": "chess-default",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]
@@ -182,8 +182,8 @@
           {
             "name": "chess-ingestr",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]
@@ -267,8 +267,8 @@
           {
             "name": "chess-run-default-option",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]
@@ -293,8 +293,8 @@
           {
             "name": "chess-run-main-with-downstream",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]
@@ -319,8 +319,8 @@
           {
             "name": "chess-run-main-with-filters",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]
@@ -345,8 +345,8 @@
           {
             "name": "chess-run-malformed-sql",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]
@@ -415,8 +415,8 @@
           {
             "name": "chess-run-with-downstream",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]
@@ -441,8 +441,8 @@
           {
             "name": "chess-run-with-filters",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]
@@ -467,8 +467,8 @@
           {
             "name": "chess-run-with-tags",
             "players": [
-              "erik",
-              "vadimer2"
+              "albertojgomez",
+              "awryaw"
             ]
           }
         ]

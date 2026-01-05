@@ -27,8 +27,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "erik"
-            - "vadimer2"
+            - "albertojgomez"
+            - "awryaw"
 
   production:
     connections:
@@ -85,8 +85,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "erik"
-            - "vadimer2"
+            - "albertojgomez"
+            - "awryaw"
 
   production:
     connections:
