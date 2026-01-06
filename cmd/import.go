@@ -406,7 +406,7 @@ func maxInt(a, b int) int {
 func determineAssetTypeFromConnection(connectionName string, conn interface{}) pipeline.AssetType {
 	// First, try to determine from the actual connection type
 	if _, ok := conn.(interface {
-		GetDatabaseSummary(ctx context.Context) ([]string, error)
+		GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
 	}); ok {
 		connType := fmt.Sprintf("%T", conn)
 		if strings.Contains(connType, "snowflake") {

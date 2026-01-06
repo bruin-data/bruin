@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -192,7 +194,19 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 	}{
 		// Test connection type detection
 		{
-			name:           "snowflake connection type (mock - undefined connection)",
+			name:           "mssql connection type overrides name",
+			connectionName: "prod",
+			conn:           &mssql.DB{},
+			want:           pipeline.AssetTypeMsSQLSource,
+		},
+		{
+			name:           "postgres connection type overrides name",
+			connectionName: "prod",
+			conn:           &postgres.Client{},
+			want:           pipeline.AssetTypePostgresSource,
+		},
+		{
+			name:           "connection type not detected (embedded mock)",
 			connectionName: "test-conn",
 			conn:           &struct{ mockConnection }{},
 			want:           pipeline.AssetTypeEmpty,
