@@ -136,6 +136,7 @@ func (c *DopplerClient) GetConnection(name string) any {
 
 	manager, err := c.getDopplerManager(name)
 	if err != nil {
+		c.logger.Errorf("%v", err)
 		return nil
 	}
 
@@ -153,6 +154,7 @@ func (c *DopplerClient) GetConnectionDetails(name string) any {
 
 	manager, err := c.getDopplerManager(name)
 	if err != nil {
+		c.logger.Errorf("%v", err)
 		return nil
 	}
 
@@ -168,21 +170,18 @@ func (c *DopplerClient) getDopplerManager(name string) (config.ConnectionAndDeta
 
 	secretData, err := c.client.GetSecret(ctx, name)
 	if err != nil {
-		c.logger.Error("failed to read secret from Doppler", "error", err)
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to read secret '%s' from Doppler", name)
 	}
 
 	detailsRaw, okDetails := secretData["details"]
 	secretType, okType := secretData["type"].(string)
 	if !okDetails && !okType {
-		c.logger.Error("failed to read secret from Doppler", "error", "no details or type found")
-		return nil, errors.New("no details or type found")
+		return nil, errors.Errorf("secret '%s' is missing required 'details' or 'type' fields", name)
 	}
 
 	details, ok := detailsRaw.(map[string]any)
 	if !ok {
-		c.logger.Error("failed to read secret from Doppler", "error", "details is not a map", "details:", detailsRaw)
-		return nil, errors.New("details is not a map")
+		return nil, errors.Errorf("secret '%s' has invalid 'details' field: expected a map", name)
 	}
 
 	details["name"] = name
@@ -197,15 +196,13 @@ func (c *DopplerClient) getDopplerManager(name string) (config.ConnectionAndDeta
 
 	serialized, err := json.Marshal(connectionsMap)
 	if err != nil {
-		c.logger.Error("failed to marshal connections map", "error", err)
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to process secret '%s'", name)
 	}
 
 	var connections config.Connections
 
 	if err := json.Unmarshal(serialized, &connections); err != nil {
-		c.logger.Error("failed to unmarshal connections map", "error", err)
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to parse secret '%s' configuration", name)
 	}
 
 	environment := config.Environment{
@@ -223,8 +220,7 @@ func (c *DopplerClient) getDopplerManager(name string) (config.ConnectionAndDeta
 
 	manager, errs := connection.NewManagerFromConfig(&cfg)
 	if len(errs) > 0 {
-		c.logger.Error("failed to create manager from config", "error", errs)
-		return nil, errors.Wrap(errs[0], "failed to create manager from config")
+		return nil, errors.Wrapf(errs[0], "failed to configure connection '%s'", name)
 	}
 
 	return manager, nil

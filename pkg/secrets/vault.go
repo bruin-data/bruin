@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -134,6 +135,7 @@ func (c *Client) GetConnection(name string) any {
 
 	manager, err := c.getVaultManager(name)
 	if err != nil {
+		c.logger.Errorf("%v", err)
 		return nil
 	}
 
@@ -150,6 +152,7 @@ func (c *Client) GetConnectionDetails(name string) any {
 
 	manager, err := c.getVaultManager(name)
 	if err != nil {
+		c.logger.Errorf("%v", err)
 		return nil
 	}
 
@@ -166,21 +169,22 @@ func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter
 	secretPath := fmt.Sprintf("%s/%s", c.path, name)
 	res, err := c.client.KvV2Read(ctx, secretPath, vault.WithMountPath(c.mountPath))
 	if err != nil {
-		c.logger.Error("failed to read secret from Vault", "error", err)
-		return nil, err
+		var respErr *vault.ResponseError
+		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
+			return nil, errors.Errorf("secret '%s' not found in Vault", name)
+		}
+		return nil, errors.Wrapf(err, "failed to read secret '%s' from Vault", name)
 	}
 
 	detailsRaw, okDetails := res.Data.Data["details"]
 	secretType, okType := res.Data.Data["type"].(string)
 	if !okDetails && !okType {
-		c.logger.Error("failed to read secret from Vault", "error", "no details or type found")
-		return nil, errors.New("no details or type found")
+		return nil, errors.Errorf("secret '%s' is missing required 'details' or 'type' fields", name)
 	}
 
 	details, ok := detailsRaw.(map[string]any)
 	if !ok {
-		c.logger.Error("failed to read secret from Vault", "error", "details is not a map", "details:", detailsRaw)
-		return nil, errors.New("details is not a map")
+		return nil, errors.Errorf("secret '%s' has invalid 'details' field: expected a map", name)
 	}
 
 	details["name"] = name
@@ -195,15 +199,13 @@ func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter
 
 	serialized, err := json.Marshal(connectionsMap)
 	if err != nil {
-		c.logger.Error("failed to marshal connections map", "error", err)
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to process secret '%s'", name)
 	}
 
 	var connections config.Connections
 
 	if err := json.Unmarshal(serialized, &connections); err != nil {
-		c.logger.Error("failed to unmarshal connections map", "error", err)
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to parse secret '%s' configuration", name)
 	}
 
 	environment := config.Environment{
@@ -221,8 +223,7 @@ func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter
 
 	manager, errs := connection.NewManagerFromConfig(&config)
 	if len(errs) > 0 {
-		c.logger.Error("failed to create manager from config", "error", errs)
-		return nil, errors.Wrap(errs[0], "failed to create manager from config")
+		return nil, errors.Wrapf(errs[0], "failed to configure connection '%s'", name)
 	}
 
 	return manager, nil

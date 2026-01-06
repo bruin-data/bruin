@@ -15,6 +15,7 @@ import (
 type mockLogger struct{}
 
 func (m *mockLogger) Error(args ...any)                       {}
+func (m *mockLogger) Errorf(format string, args ...any)       {}
 func (m *mockLogger) Info(args ...any)                        {}
 func (m *mockLogger) Debug(args ...any)                       {}
 func (m *mockLogger) Warn(args ...any)                        {}
@@ -125,6 +126,23 @@ func TestClient_GetConnection_ReturnsGenericConnection(t *testing.T) {
 	conn := c.GetConnection("test-connection")
 	require.NotNil(t, conn)
 	require.Equal(t, "somevalue", conn.(*config.GenericConnection).Value)
+}
+
+func TestClient_GetConnection_Returns404Error(t *testing.T) {
+	t.Parallel()
+	c := &Client{
+		client: &mockVaultClient{
+			response: nil,
+			err:      &vault.ResponseError{StatusCode: 404, Errors: []string{}},
+		},
+		mountPath:        "mount",
+		path:             "path",
+		logger:           &mockLogger{},
+		cacheConnections: make(map[string]any),
+	}
+
+	conn := c.GetConnection("missing-secret")
+	require.Nil(t, conn)
 }
 
 // Additional tests for newVaultClientWithToken and newVaultClientWithKubernetesAuth would require
