@@ -950,7 +950,7 @@ func getColumnValue(col *diff.Column, exists bool, property string) string {
 	}
 }
 
-// JSON output types for --output json flag
+// JSON output types for --output json flag.
 type JSONDiffOutput struct {
 	Summary          JSONSummary       `json:"summary"`
 	SchemaDiffs      []JSONColumnDiff  `json:"schemaDiffs"`
@@ -1037,7 +1037,7 @@ func buildJSONOutput(schemaComparison diff.SchemaComparisonResult, table1Name, t
 		allColumnNames[col.Name] = true
 	}
 
-	var schemaDiffs []JSONColumnDiff
+	schemaDiffs := make([]JSONColumnDiff, 0, len(allColumnNames))
 	for colName := range allColumnNames {
 		t1Col := t1Columns[colName]
 		t2Col := t2Columns[colName]
@@ -1062,13 +1062,14 @@ func buildJSONOutput(schemaComparison diff.SchemaComparisonResult, table1Name, t
 		}
 
 		// Determine status
-		if t1Col == nil && t2Col != nil {
+		switch {
+		case t1Col == nil && t2Col != nil:
 			colDiff.Status = "added"
-		} else if t1Col != nil && t2Col == nil {
+		case t1Col != nil && t2Col == nil:
 			colDiff.Status = "removed"
-		} else if colDiff.Type.IsDifferent || colDiff.Nullable.IsDifferent || colDiff.Constraints.IsDifferent {
+		case colDiff.Type.IsDifferent || colDiff.Nullable.IsDifferent || colDiff.Constraints.IsDifferent:
 			colDiff.Status = "modified"
-		} else {
+		default:
 			colDiff.Status = "unchanged"
 		}
 
@@ -1079,7 +1080,7 @@ func buildJSONOutput(schemaComparison diff.SchemaComparisonResult, table1Name, t
 	var columnStats []JSONColumnStats
 	for _, t1Col := range t1Schema.Columns {
 		if t2Col, ok := t2Columns[t1Col.Name]; ok && t1Col.Stats != nil && t2Col.Stats != nil {
-			stats := buildColumnStatistics(t1Col, t2Col, table1Name, table2Name, tolerance)
+			stats := buildColumnStatistics(t1Col, t2Col, tolerance)
 			columnStats = append(columnStats, stats)
 		}
 	}
@@ -1090,7 +1091,18 @@ func buildJSONOutput(schemaComparison diff.SchemaComparisonResult, table1Name, t
 		alterStatementsStr = strings.Join(alterStatements, "\n\n")
 	}
 
-	hasDifferences := schemaComparison.HasSchemaDifferences || schemaComparison.HasRowCountDifference
+	// Check for data differences in column statistics (same logic as plain text output)
+	hasDataDiffs := false
+	for _, t1Col := range t1Schema.Columns {
+		if t2Col, ok := t2Columns[t1Col.Name]; ok && t1Col.Stats != nil && t2Col.Stats != nil {
+			if hasDataDifferences(t1Col.Stats, t2Col.Stats, tolerance) {
+				hasDataDiffs = true
+				break
+			}
+		}
+	}
+
+	hasDifferences := schemaComparison.HasSchemaDifferences || schemaComparison.HasRowCountDifference || hasDataDiffs
 
 	return JSONDiffOutput{
 		Summary:          summary,
@@ -1103,7 +1115,7 @@ func buildJSONOutput(schemaComparison diff.SchemaComparisonResult, table1Name, t
 	}
 }
 
-func buildColumnStatistics(t1Col, t2Col *diff.Column, table1Name, table2Name string, tolerance float64) JSONColumnStats {
+func buildColumnStatistics(t1Col, t2Col *diff.Column, tolerance float64) JSONColumnStats {
 	stats := JSONColumnStats{
 		ColumnName: t1Col.Name,
 		DataType:   t1Col.Type,
@@ -1209,8 +1221,8 @@ func buildStatRow(name string, val1, val2 int64, tolerance float64) JSONStatisti
 
 	return JSONStatistic{
 		Name:        name,
-		Source:      fmt.Sprintf("%d", val1),
-		Target:      fmt.Sprintf("%d", val2),
+		Source:      strconv.FormatInt(val1, 10),
+		Target:      strconv.FormatInt(val2, 10),
 		Diff:        diffStr,
 		DiffPercent: diffPercent,
 	}
