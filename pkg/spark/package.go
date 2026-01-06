@@ -1,4 +1,6 @@
-package dataprocserverless
+// Package spark provides shared utilities for Spark-based execution environments
+// such as EMR Serverless and Dataproc Serverless.
+package spark
 
 import (
 	"archive/zip"
@@ -10,27 +12,30 @@ import (
 	"slices"
 )
 
-var bruinExcludes = []string{
+// BruinExcludes contains files that should be excluded from Spark context packages.
+var BruinExcludes = []string{
 	"README.md",
 	".bruin.yml",
 	"pipeline.yml",
 	"pipeline.yaml",
 }
 
-var dirExcludes = []*regexp.Regexp{
+// DirExcludes contains regex patterns for directories that should be excluded from Spark context packages.
+var DirExcludes = []*regexp.Regexp{
 	regexp.MustCompile(`(^|[/\\])\.venv([/\\]|$)`),
 	regexp.MustCompile(`(^|[/\\])venv([/\\]|$)`),
 	regexp.MustCompile(`^logs([/\\]|$)`),
 	regexp.MustCompile(`^\.git([/\\]|$)`),
 }
 
-func exclude(path string) bool {
+// Exclude returns true if the given path should be excluded from packaging.
+func Exclude(path string) bool {
 	fileName := filepath.Base(path)
-	if slices.Contains(bruinExcludes, fileName) {
+	if slices.Contains(BruinExcludes, fileName) {
 		return true
 	}
 
-	for _, re := range dirExcludes {
+	for _, re := range DirExcludes {
 		if re.MatchString(path) {
 			return true
 		}
@@ -38,14 +43,18 @@ func exclude(path string) bool {
 	return false
 }
 
-// zip.AddFS() modified with support for filesystem prefix
-// and some spark specific adjustments.
-func packageContextWithPrefix(zw *zip.Writer, context fs.FS) error {
+// PackageContext creates a zip archive from the given filesystem, suitable for Spark execution.
+// It's a modified version of zip.AddFS() with:
+//   - Exclusion of Bruin configuration files and virtual environments
+//   - Automatic creation of __init__.py files in directories for Python package support
+//
+// Spark requires directories to contain __init__.py to be treated as packages.
+func PackageContext(zw *zip.Writer, context fs.FS) error {
 	return fs.WalkDir(context, ".", func(name string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if exclude(name) {
+		if Exclude(name) {
 			if d.IsDir() {
 				return fs.SkipDir
 			}
