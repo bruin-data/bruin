@@ -18,10 +18,10 @@ var bruinExcludes = []string{
 }
 
 var dirExcludes = []*regexp.Regexp{
-	regexp.MustCompile(`[/\\].venv[/\\]`),
-	regexp.MustCompile(`[/\\]venv[/\\]`),
-	regexp.MustCompile(`^logs/.*$`),
-	regexp.MustCompile(`^\.git/.*$`),
+	regexp.MustCompile(`(^|[/\\])\.venv([/\\]|$)`),
+	regexp.MustCompile(`(^|[/\\])venv([/\\]|$)`),
+	regexp.MustCompile(`^logs([/\\]|$)`),
+	regexp.MustCompile(`^\.git([/\\]|$)`),
 }
 
 func exclude(path string) bool {
@@ -46,6 +46,9 @@ func packageContextWithPrefix(zw *zip.Writer, context fs.FS) error {
 			return err
 		}
 		if exclude(name) {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
 			return nil
 		}
 		if d.IsDir() {
