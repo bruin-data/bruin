@@ -122,26 +122,26 @@ bruin import database --connection snowflake-prod --environment production ./my-
 Each imported table creates a YAML **source** asset file with the following structure:
 
 ```yaml
-type: postgres  # or snowflake, bigquery, etc.
-name: schema.table
+type: pg.source  # or sf.source, bq.source, ms.source, etc.
 description: "Imported table schema.table"
 ```
 
 These are metadata-only source assets. SQL transformation assets live in `.sql` files, and `import database` does not generate SQL templates.
 
 The asset file includes:
-- **File Name**: `{schema}.{table}.asset.yml` (lowercase)
-- **Asset Name**: `{schema}.{table}` (lowercase)
+- **File Name**: `assets/<schema>/<table>.asset.yml` (lowercase)
 - **Description**: `"Imported table {schema}.{table}"`
 - **Asset Type**: Automatically determined from connection type
+
+> [!INFO]
+> **Asset Name** is derived from the file path, e.g. `assets/schema/table.asset.yml` -> `schema.table` (lowercase)
 
 #### With Column Metadata (Default)
 
 By default, the asset will include column metadata:
 
 ```yaml
-type: postgres
-name: schema.table
+type: pg.source
 description: "Imported table schema.table"
 columns:
   - name: column_name
