@@ -488,43 +488,4 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolin
 		require.Len(t, issues, 1, "Should detect extra score metadata after boolean/numeric variable resolution")
 		assert.Contains(t, issues[0].Description, "score")
 	})
-
-	t.Run("test that FAILS without cloneForAsset - undefined jinja variables", func(t *testing.T) { //nolint:paralleltest
-		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
-
-		asset := &pipeline.Asset{
-			Name: "test.table",
-			Type: "bq.sql",
-			ExecutableFile: pipeline.ExecutableFile{
-				// This template uses undefined variables that only cloneForAsset would provide
-				Content: "SELECT id, name FROM {{ this }} WHERE status = '{{ var.user_status }}'",
-			},
-			Columns: []pipeline.Column{
-				{Name: "id"},
-				{Name: "name"},
-			},
-		}
-		pipeline := &pipeline.Pipeline{
-			Name: "test-pipeline",
-			Variables: pipeline.Variables{
-				"user_status": map[string]any{
-					"type":    "string",
-					"default": "active",
-				},
-			},
-		}
-
-		issues, err := validator(ctx, pipeline, asset)
-
-		require.NoError(t, err)
-		// Without cloneForAsset, the template "SELECT id, name FROM {{ this }}" will fail to render
-		// because 'this' and 'var' are undefined, so the function returns no issues
-		// With cloneForAsset, it should render to "SELECT id, name FROM test.table WHERE status = 'active'"
-		// and correctly find all columns match, so no issues
-
-		// If cloneForAsset is working, we expect no issues (all columns match)
-		// If cloneForAsset is disabled, we also get no issues (due to graceful Jinja failure handling)
-		// So we need a more sophisticated test...
-		assert.Empty(t, issues, "This test alone cannot distinguish between working and broken cloneForAsset")
-	})
 }
