@@ -493,24 +493,48 @@ func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx contex
 			return issues, nil
 		}
 
-		yamlColumns := make(map[string]bool)
-		for _, col := range asset.Columns {
-			yamlColumns[col.Name] = true
-		}
+		{
+			yamlColumns := make(map[string]bool)
+			for _, col := range asset.Columns {
+				yamlColumns[col.Name] = true
+			}
 
-		missingColumns := make([]string, 0)
-		for _, queryCol := range lineage.Columns {
-			if !yamlColumns[queryCol.Name] {
-				missingColumns = append(missingColumns, queryCol.Name)
+			missingColumns := make([]string, 0)
+			for _, queryCol := range lineage.Columns {
+				if !yamlColumns[queryCol.Name] {
+					missingColumns = append(missingColumns, queryCol.Name)
+				}
+			}
+
+			if len(missingColumns) > 0 {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Columns found in query but missing from columns metadata: " + strings.Join(missingColumns, ", "),
+					Context:     missingColumns,
+				})
 			}
 		}
 
-		if len(missingColumns) > 0 {
-			issues = append(issues, &Issue{
-				Task:        asset,
-				Description: "Columns found in query but missing from columns metadata: " + strings.Join(missingColumns, ", "),
-				Context:     missingColumns,
-			})
+		{
+			queryColumns := make(map[string]bool)
+			for _, col := range lineage.Columns {
+				queryColumns[col.Name] = true
+			}
+
+			missingColumns := make([]string, 0)
+			for _, metadataCol := range asset.Columns {
+				if !queryColumns[metadataCol.Name] {
+					missingColumns = append(missingColumns, metadataCol.Name)
+				}
+			}
+
+			if len(missingColumns) > 0 {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Columns found in columns metadata but missing from query: " + strings.Join(missingColumns, ", "),
+					Context:     missingColumns,
+				})
+			}
 		}
 
 		return issues, nil

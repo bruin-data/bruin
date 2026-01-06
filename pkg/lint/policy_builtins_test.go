@@ -160,6 +160,121 @@ func TestQueryColumnsMatchColumnsPolicy(t *testing.T) { //nolint:paralleltest
 		require.NoError(t, err)
 		assert.Empty(t, issues)
 	})
+
+	t.Run("returns no issues when parser is nil", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(nil)
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "bq.sql",
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("returns no issues for non-SQL assets", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "python",
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("returns no issues when asset type dialect conversion fails", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "test.table",
+			Type: "invalid.sql",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT 1",
+			},
+		}
+		pipeline := &pipeline.Pipeline{}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("integration test - real parser with simple jinja", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "test.users",
+			Type: "bq.sql",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT id, {{ var.email_col }} as email FROM users WHERE active = {{ var.is_active }}",
+			},
+			Columns: []pipeline.Column{
+				{Name: "id"},
+				{Name: "email"},
+				// Extra phone metadata to trigger issue
+				{Name: "phone"},
+			},
+		}
+		pipeline := &pipeline.Pipeline{
+			Name: "test-pipeline",
+			Variables: pipeline.Variables{
+				"email_col": map[string]any{
+					"type":    "string",
+					"default": "user_email",
+				},
+				"is_active": map[string]any{
+					"type":    "boolean",
+					"default": true,
+				},
+			},
+		}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		// MUST find the extra phone metadata - if cloneForAsset is disabled, this will fail
+		require.Len(t, issues, 1, "Should detect extra phone metadata after Jinja variable resolution")
+		assert.Contains(t, issues[0].Description, "phone")
+	})
+
+	t.Run("integration test - this variable resolution MUST work", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "analytics.users",
+			Type: "bq.sql",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT id, name FROM {{ this }}",
+			},
+
+			Columns: []pipeline.Column{
+				{Name: "id"},
+				{Name: "name"},
+				// Extra extra_metadata to force detection
+				{Name: "extra_metadata"},
+			},
+		}
+		pipeline := &pipeline.Pipeline{
+			Name: "test-pipeline",
+		}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		// This MUST find the missing extra_metadata metadata if {{ this }} is properly resolved
+		require.Len(t, issues, 1, "Should detect extra extra_metadata column after {{ this }} resolution to 'analytics.users'")
+		assert.Contains(t, issues[0].Description, "extra_metadata")
+	})
 }
 
 func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolint:paralleltest
@@ -288,5 +403,89 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolin
 		// If cloneForAsset is disabled, we also get no issues (due to graceful Jinja failure handling)
 		// So we need a more sophisticated test...
 		assert.Empty(t, issues, "This test alone cannot distinguish between working and broken cloneForAsset")
+	})
+
+	t.Run("complex jinja template with variables and this resolution MUST work", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "analytics.user_metrics",
+			Type: "bq.sql",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT {{ var.id_col }}, {{ var.email_col }} FROM {{ var.source_table }} WHERE created_at >= '{{ var.cutoff_date }}' AND {{ var.id_col }} NOT IN (SELECT {{ var.id_col }} FROM {{ this }})",
+			},
+			Columns: []pipeline.Column{
+				{Name: "user_id"},
+				{Name: "email"},
+				// Intentionally extra 'score' metadata to test detection
+				{Name: "score"},
+			},
+		}
+		pipeline := &pipeline.Pipeline{
+			Name: "analytics-pipeline",
+			Variables: pipeline.Variables{
+				"id_col": map[string]any{
+					"type":    "string",
+					"default": "user_id",
+				},
+				"email_col": map[string]any{
+					"type":    "string",
+					"default": "email",
+				},
+				"source_table": map[string]any{
+					"type":    "string",
+					"default": "raw.users",
+				},
+				"cutoff_date": map[string]any{
+					"type":    "string",
+					"default": "2023-01-01",
+				},
+			},
+		}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		// MUST detect extra score metadata after all Jinja variables are resolved
+		require.Len(t, issues, 1, "Should detect extra score metadata after complex Jinja variable resolution")
+		assert.Contains(t, issues[0].Description, "score")
+	})
+
+	t.Run("jinja template with boolean and numeric variables MUST work", func(t *testing.T) { //nolint:paralleltest
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
+
+		asset := &pipeline.Asset{
+			Name: "analytics.active_users",
+			Type: "bq.sql",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT id, name FROM users WHERE active = {{ var.is_active }} AND score >= {{ var.min_score }}",
+			},
+			Columns: []pipeline.Column{
+				{Name: "id"},
+				{Name: "name"},
+				// Intentionally extra 'score' metadata to test detection
+				{Name: "score"},
+			},
+		}
+		pipeline := &pipeline.Pipeline{
+			Name: "scoring-pipeline",
+			Variables: pipeline.Variables{
+				"is_active": map[string]any{
+					"type":    "boolean",
+					"default": true,
+				},
+				"min_score": map[string]any{
+					"type":    "integer",
+					"default": 85,
+				},
+			},
+		}
+
+		issues, err := validator(ctx, pipeline, asset)
+
+		require.NoError(t, err)
+		// MUST detect extra score metadata after boolean/numeric variable resolution
+		require.Len(t, issues, 1, "Should detect extra score metadata after boolean/numeric variable resolution")
+		assert.Contains(t, issues[0].Description, "score")
 	})
 }
