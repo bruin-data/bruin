@@ -1878,8 +1878,8 @@ func TestAnalyzeResults(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt 	// This line avoids a common Go gotcha with t.Parallel() in range loops. 
-					// Rebind range var so each subtest captures its own case when running in parallel (not the same last value)
+		tt := tt // This line avoids a common Go gotcha with t.Parallel() in range loops.
+		// Rebind range var so each subtest captures its own case when running in parallel (not the same last value)
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1888,7 +1888,7 @@ func TestAnalyzeResults(t *testing.T) {
 				Assets: []*pipeline.Asset{newAsset()},
 			}
 			s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
-			err := ApplyAllFilters(context.Background(), tt.filter, s, p)
+			err := ApplyAllFilters(t.Context(), tt.filter, s, p)
 			require.NoError(t, err)
 
 			results := make([]*scheduler.TaskExecutionResult, 0)
