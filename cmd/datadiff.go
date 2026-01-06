@@ -1129,6 +1129,11 @@ func buildColumnStatistics(t1Col, t2Col *diff.Column, tolerance float64) JSONCol
 	stats1 := t1Col.Stats
 	stats2 := t2Col.Stats
 
+	// Check if statistics types are compatible
+	if stats1.Type() != stats2.Type() {
+		return stats
+	}
+
 	switch stats1.Type() {
 	case "numerical":
 		numStats1 := stats1.(*diff.NumericalStatistics)
