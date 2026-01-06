@@ -192,16 +192,16 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 	}{
 		// Test connection type detection
 		{
-			name:           "snowflake connection type",
+			name:           "snowflake connection type (mock - undefined connection)",
 			connectionName: "test-conn",
 			conn:           &struct{ mockConnection }{},
-			want:           pipeline.AssetTypeSnowflakeSource,
+			want:           pipeline.AssetTypeEmpty,
 		},
 		{
-			name:           "duckdb connection type",
+			name:           "duckdb connection type (mock - undefined connection)",
 			connectionName: "test-conn",
 			conn:           &mockConnection{},
-			want:           pipeline.AssetTypeSnowflakeSource, // Default fallback
+			want:           pipeline.AssetTypeEmpty, // Default fallback
 		},
 
 		// Test connection name detection
@@ -296,10 +296,10 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
-			name:           "unknown connection defaults to snowflake",
+			name:           "unknown connection defaults to empty",
 			connectionName: "unknown-db",
 			conn:           &mockConnection{},
-			want:           pipeline.AssetTypeSnowflakeSource,
+			want:           pipeline.AssetTypeEmpty,
 		},
 	}
 

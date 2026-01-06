@@ -478,8 +478,8 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		return pipeline.AssetTypeOracleSource
 	}
 
-	// Default to Snowflake if we can't determine the type
-	return pipeline.AssetTypeSnowflakeSource
+	// Default to empty if we can't determine the type
+	return pipeline.AssetTypeEmpty
 }
 
 func GetPipelinefromPath(ctx context.Context, inputPath string) (*pipeline.Pipeline, error) {
