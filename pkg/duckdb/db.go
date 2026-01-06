@@ -340,13 +340,17 @@ func convertDecimal128(v decimal128.Num, colType *sql.ColumnType) float64 {
 		}
 	}
 	floatVal := v.ToFloat64(int32(scale))
-	// Round to avoid float precision issues
-	// Use math.Round for symmetric rounding (works correctly for both positive and negative numbers)
+	return roundToScale(floatVal, scale)
+}
+
+// roundToScale rounds a float64 value to the specified decimal scale.
+// Uses math.Round for symmetric rounding which correctly handles both positive and negative numbers.
+func roundToScale(value float64, scale int64) float64 {
 	if scale > 0 {
 		multiplier := math.Pow(10, float64(scale))
-		return math.Round(floatVal*multiplier) / multiplier
+		return math.Round(value*multiplier) / multiplier
 	}
-	return floatVal
+	return value
 }
 
 // tryConvertDecimal attempts to convert a value to float64 if it's a decimal struct.
