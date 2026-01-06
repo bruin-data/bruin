@@ -1878,8 +1878,6 @@ func TestAnalyzeResults(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // This line avoids a common Go gotcha with t.Parallel() in range loops.
-		// Rebind range var so each subtest captures its own case when running in parallel (not the same last value)
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
