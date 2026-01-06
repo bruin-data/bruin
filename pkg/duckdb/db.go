@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -340,12 +341,10 @@ func convertDecimal128(v decimal128.Num, colType *sql.ColumnType) float64 {
 	}
 	floatVal := v.ToFloat64(int32(scale))
 	// Round to avoid float precision issues
+	// Use math.Round for symmetric rounding (works correctly for both positive and negative numbers)
 	if scale > 0 {
-		multiplier := 1.0
-		for range scale {
-			multiplier *= 10
-		}
-		floatVal = float64(int64(floatVal*multiplier+0.5)) / multiplier
+		multiplier := math.Pow(10, float64(scale))
+		return math.Round(floatVal*multiplier) / multiplier
 	}
 	return floatVal
 }
