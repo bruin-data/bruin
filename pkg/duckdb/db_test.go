@@ -291,3 +291,175 @@ ORDER BY table_schema, table_name;`).
 		})
 	}
 }
+
+func TestRoundToScale(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		value    float64
+		scale    int64
+		expected float64
+	}{
+		{
+			name:     "positive value with scale 2",
+			value:    123.45,
+			scale:    2,
+			expected: 123.45,
+		},
+		{
+			name:     "negative value with scale 2",
+			value:    -123.45,
+			scale:    2,
+			expected: -123.45,
+		},
+		{
+			name:     "positive value with scale 3",
+			value:    1.235,
+			scale:    3,
+			expected: 1.235,
+		},
+		{
+			name:     "negative value with scale 3",
+			value:    -1.235,
+			scale:    3,
+			expected: -1.235,
+		},
+		{
+			name:     "zero value",
+			value:    0.0,
+			scale:    2,
+			expected: 0.0,
+		},
+		{
+			name:     "positive value with scale 0",
+			value:    12345.0,
+			scale:    0,
+			expected: 12345.0,
+		},
+		{
+			name:     "negative value with scale 0",
+			value:    -12345.0,
+			scale:    0,
+			expected: -12345.0,
+		},
+		{
+			name:     "small positive value with high scale",
+			value:    1.23456789,
+			scale:    8,
+			expected: 1.23456789,
+		},
+		{
+			name:     "small negative value with high scale",
+			value:    -1.23456789,
+			scale:    8,
+			expected: -1.23456789,
+		},
+		{
+			name:     "value at rounding boundary positive",
+			value:    1.25,
+			scale:    2,
+			expected: 1.25,
+		},
+		{
+			name:     "value at rounding boundary negative",
+			value:    -1.25,
+			scale:    2,
+			expected: -1.25,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := roundToScale(tt.value, tt.scale)
+
+			assert.InDelta(t, tt.expected, result, 0.0000001, "expected %v but got %v", tt.expected, result)
+		})
+	}
+}
+
+func TestRoundToScale_SymmetricRounding(t *testing.T) {
+	t.Parallel()
+
+	// This test specifically verifies that negative numbers are rounded symmetrically
+	// (away from zero), not toward zero as the bug previously caused.
+	//
+	// The original bug was:
+	// floatVal = float64(int64(floatVal*multiplier+0.5)) / multiplier
+	//
+	// Example with scale 2 (multiplier 100):
+	// Positive: 1.235 -> 123.5 + 0.5 = 124.0 -> int64(124.0) = 124 -> 1.24 (correct)
+	// Negative: -1.235 -> -123.5 + 0.5 = -123.0 -> int64(-123.0) = -123 -> -1.23 (wrong!)
+	//
+	// The fix uses math.Round which handles both positive and negative correctly:
+	// Positive: 1.235 -> 123.5 -> round(123.5) = 124 -> 1.24 (correct)
+	// Negative: -1.235 -> -123.5 -> round(-123.5) = -124 -> -1.24 (correct)
+
+	tests := []struct {
+		name     string
+		value    float64
+		scale    int64
+		expected float64
+	}{
+		{
+			name:     "positive rounds up at 0.5",
+			value:    1.235,
+			scale:    2,
+			expected: 1.24,
+		},
+		{
+			name:     "negative rounds away from zero at 0.5 (symmetric)",
+			value:    -1.235,
+			scale:    2,
+			expected: -1.24,
+		},
+		{
+			name:     "positive rounds down below 0.5",
+			value:    1.234,
+			scale:    2,
+			expected: 1.23,
+		},
+		{
+			name:     "negative rounds toward zero below 0.5 (symmetric)",
+			value:    -1.234,
+			scale:    2,
+			expected: -1.23,
+		},
+		{
+			name:     "large positive value with rounding",
+			value:    99999999.995,
+			scale:    2,
+			expected: 100000000.0,
+		},
+		{
+			name:     "large negative value with rounding",
+			value:    -99999999.995,
+			scale:    2,
+			expected: -100000000.0,
+		},
+		{
+			name:     "positive value rounding with scale 1",
+			value:    1.55,
+			scale:    1,
+			expected: 1.6,
+		},
+		{
+			name:     "negative value rounding with scale 1",
+			value:    -1.55,
+			scale:    1,
+			expected: -1.6,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := roundToScale(tt.value, tt.scale)
+
+			assert.InDelta(t, tt.expected, result, 0.0000001, "expected %v but got %v", tt.expected, result)
+		})
+	}
+}
