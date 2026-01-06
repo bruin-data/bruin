@@ -6,4 +6,5 @@ type Logger interface {
 	Warnf(template string, args ...interface{})
 	Debugw(msg string, keysAndValues ...interface{})
 	Error(args ...interface{})
+	Errorf(template string, args ...interface{})
 }
