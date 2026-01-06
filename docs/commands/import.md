@@ -71,8 +71,8 @@ table td:first-child {
 1. **Connection Setup**: Uses your existing connection configuration from `.bruin.yml` (or any other [secrets backend](../secrets/overview.md))
 2. **Database Scanning**: Retrieves database summary including schemas and tables
 3. **Filtering**: Applies database and schema filters if specified
-4. **Asset Creation**: Creates YAML asset files with naming pattern `{schema}.{table}.asset.yml`
-5. **Directory Structure**: Places assets in `{pipeline_path}/assets/` directory
+4. **Asset Creation**: Creates YAML source asset files named `<table>.asset.yml` under `assets/<schema>/`
+5. **Directory Structure**: Places assets in `{pipeline_path}/assets/<schema>/<table>.asset.yml` (lowercase)
 6. **Column Metadata**: Optionally queries table schema to populate column information
 
 ### Examples
@@ -119,13 +119,15 @@ bruin import database --connection snowflake-prod --environment production ./my-
 
 ### Generated Asset Structure
 
-Each imported table creates a YAML asset file with the following structure:
+Each imported table creates a YAML **source** asset file with the following structure:
 
 ```yaml
 type: postgres  # or snowflake, bigquery, etc.
 name: schema.table
 description: "Imported table schema.table"
 ```
+
+These are metadata-only source assets. SQL transformation assets live in `.sql` files, and `import database` does not generate SQL templates.
 
 The asset file includes:
 - **File Name**: `{schema}.{table}.asset.yml` (lowercase)
