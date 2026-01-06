@@ -859,7 +859,7 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 			}
-			
+
 			err = ensurePythonCacheGitignore(afero.NewOsFs(), repoRoot.Path)
 			if err != nil {
 				errorPrinter.Printf("Failed to add Python cache patterns to .gitignore: %v\n", err)
