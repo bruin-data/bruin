@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -169,7 +170,7 @@ func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter
 	res, err := c.client.KvV2Read(ctx, secretPath, vault.WithMountPath(c.mountPath))
 	if err != nil {
 		var respErr *vault.ResponseError
-		if errors.As(err, &respErr) && respErr.StatusCode == 404 {
+		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
 			return nil, errors.Errorf("secret '%s' not found in Vault", name)
 		}
 		return nil, errors.Wrapf(err, "failed to read secret '%s' from Vault", name)
