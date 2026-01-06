@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -92,6 +93,7 @@ func DataDiffCmd() *cli.Command {
 	var failIfDiff bool
 	var targetDialect string
 	var reverse bool
+	var outputFormat string
 
 	return &cli.Command{
 		Name:    "data-diff",
@@ -137,6 +139,13 @@ func DataDiffCmd() *cli.Command {
 				Name:        "reverse",
 				Usage:       "Reverse the direction of ALTER statements (transform Table1 to match Table2 instead of Table2 to match Table1)",
 				Destination: &reverse,
+			},
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				Usage:       "Output format: 'plain' (default) for human-readable tables, 'json' for machine-readable JSON",
+				Destination: &outputFormat,
+				Value:       "plain",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -232,21 +241,49 @@ func DataDiffCmd() *cli.Command {
 
 			schemaComparison, err := compareTables(ctx, s1, s2, table1Name, table2Name, schemaOnly)
 			if err != nil {
-				errorPrinter.Printf("error comparing tables '%s' and '%s':\n\n%v", table1Identifier, table2Identifier, err)
+				if outputFormat == "json" {
+					jsonErr := map[string]string{"error": fmt.Sprintf("error comparing tables '%s' and '%s': %v", table1Identifier, table2Identifier, err)}
+					jsonBytes, marshalErr := json.Marshal(jsonErr)
+					if marshalErr != nil {
+						return fmt.Errorf("failed to marshal JSON error output: %w", marshalErr)
+					}
+					fmt.Fprintln(c.Writer, string(jsonBytes))
+				} else {
+					errorPrinter.Printf("error comparing tables '%s' and '%s':\n\n%v", table1Identifier, table2Identifier, err)
+				}
 				return cli.Exit("", 1)
 			}
 
 			if schemaComparison != nil {
+				// Generate ALTER TABLE statements
+				var alterStatements []string
+				if schemaComparison.HasSchemaDifferences {
+					alterStatements = generateAlterStatements(*schemaComparison, conn1Name, conn2Name, targetDialect, reverse)
+				}
+
+				// Handle JSON output
+				if outputFormat == "json" {
+					jsonOutput := buildJSONOutput(*schemaComparison, table1Identifier, table2Identifier, alterStatements, tolerance)
+					jsonBytes, err := json.Marshal(jsonOutput)
+					if err != nil {
+						return fmt.Errorf("failed to marshal JSON output: %w", err)
+					}
+					fmt.Fprintln(c.Writer, string(jsonBytes))
+
+					if jsonOutput.HasDifferences && failIfDiff {
+						return cli.Exit("", 1)
+					}
+					return nil
+				}
+
+				// Plain text output (original behavior)
 				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.ErrWriter)
 
-				// Generate ALTER TABLE statements if there are schema differences
-				if schemaComparison.HasSchemaDifferences {
-					alterStatements := generateAlterStatements(*schemaComparison, conn1Name, conn2Name, targetDialect, reverse)
-					if len(alterStatements) > 0 {
-						fmt.Fprintf(c.Writer, "\n-- ALTER TABLE statements to synchronize schemas:\n")
-						for _, stmt := range alterStatements {
-							fmt.Fprintf(c.Writer, "%s\n\n", stmt)
-						}
+				// Print ALTER TABLE statements
+				if len(alterStatements) > 0 {
+					fmt.Fprintf(c.Writer, "\n-- ALTER TABLE statements to synchronize schemas:\n")
+					for _, stmt := range alterStatements {
+						fmt.Fprintf(c.Writer, "%s\n\n", stmt)
 					}
 				}
 
@@ -254,7 +291,16 @@ func DataDiffCmd() *cli.Command {
 					return cli.Exit("", 1) // Exit with code 1 when differences are found and flag is set
 				}
 			} else {
-				fmt.Fprintf(c.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
+				if outputFormat == "json" {
+					jsonErr := map[string]string{"error": "failed to compare table summaries due to missing data"}
+					jsonBytes, marshalErr := json.Marshal(jsonErr)
+					if marshalErr != nil {
+						return fmt.Errorf("failed to marshal JSON error output: %w", marshalErr)
+					}
+					fmt.Fprintln(c.Writer, string(jsonBytes))
+				} else {
+					fmt.Fprintf(c.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
+				}
 				return errors.New("failed to compare table summaries due to missing data")
 			}
 
@@ -901,5 +947,294 @@ func getColumnValue(col *diff.Column, exists bool, property string) string {
 		return strings.Join(constraints, ", ")
 	default:
 		return "-"
+	}
+}
+
+// JSON output types for --output json flag
+type JSONDiffOutput struct {
+	Summary          JSONSummary       `json:"summary"`
+	SchemaDiffs      []JSONColumnDiff  `json:"schemaDiffs"`
+	ColumnStatistics []JSONColumnStats `json:"columnStatistics"`
+	SourceTable      string            `json:"sourceTable"`
+	TargetTable      string            `json:"targetTable"`
+	HasDifferences   bool              `json:"hasDifferences"`
+	AlterStatements  string            `json:"alterStatements"`
+}
+
+type JSONSummary struct {
+	RowCount    JSONCountDiff `json:"rowCount"`
+	ColumnCount JSONCountDiff `json:"columnCount"`
+}
+
+type JSONCountDiff struct {
+	Source int64 `json:"source"`
+	Target int64 `json:"target"`
+	Diff   int64 `json:"diff"`
+}
+
+type JSONColumnDiff struct {
+	Name        string       `json:"name"`
+	Type        JSONPropDiff `json:"type"`
+	Nullable    JSONPropDiff `json:"nullable"`
+	Constraints JSONPropDiff `json:"constraints"`
+	Status      string       `json:"status"` // "added", "removed", "modified", "unchanged"
+}
+
+type JSONPropDiff struct {
+	Source      string `json:"source"`
+	Target      string `json:"target"`
+	IsDifferent bool   `json:"isDifferent"`
+}
+
+type JSONColumnStats struct {
+	ColumnName string          `json:"columnName"`
+	DataType   string          `json:"dataType"`
+	Statistics []JSONStatistic `json:"statistics"`
+}
+
+type JSONStatistic struct {
+	Name        string `json:"name"`
+	Source      string `json:"source"`
+	Target      string `json:"target"`
+	Diff        string `json:"diff"`
+	DiffPercent string `json:"diffPercent,omitempty"`
+}
+
+func buildJSONOutput(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string, alterStatements []string, tolerance float64) JSONDiffOutput {
+	t1Schema := schemaComparison.Table1.Table
+	t2Schema := schemaComparison.Table2.Table
+
+	// Build summary
+	summary := JSONSummary{
+		RowCount: JSONCountDiff{
+			Source: schemaComparison.Table1.RowCount,
+			Target: schemaComparison.Table2.RowCount,
+			Diff:   schemaComparison.Table1.RowCount - schemaComparison.Table2.RowCount,
+		},
+		ColumnCount: JSONCountDiff{
+			Source: int64(len(t1Schema.Columns)),
+			Target: int64(len(t2Schema.Columns)),
+			Diff:   int64(len(t1Schema.Columns) - len(t2Schema.Columns)),
+		},
+	}
+
+	// Build schema diffs
+	t1Columns := make(map[string]*diff.Column)
+	for _, col := range t1Schema.Columns {
+		t1Columns[col.Name] = col
+	}
+	t2Columns := make(map[string]*diff.Column)
+	for _, col := range t2Schema.Columns {
+		t2Columns[col.Name] = col
+	}
+
+	// Collect all column names
+	allColumnNames := make(map[string]bool)
+	for _, col := range t1Schema.Columns {
+		allColumnNames[col.Name] = true
+	}
+	for _, col := range t2Schema.Columns {
+		allColumnNames[col.Name] = true
+	}
+
+	var schemaDiffs []JSONColumnDiff
+	for colName := range allColumnNames {
+		t1Col := t1Columns[colName]
+		t2Col := t2Columns[colName]
+
+		colDiff := JSONColumnDiff{
+			Name: colName,
+			Type: JSONPropDiff{
+				Source:      getColumnValue(t1Col, t1Col != nil, "type"),
+				Target:      getColumnValue(t2Col, t2Col != nil, "type"),
+				IsDifferent: getColumnValue(t1Col, t1Col != nil, "type") != getColumnValue(t2Col, t2Col != nil, "type"),
+			},
+			Nullable: JSONPropDiff{
+				Source:      getColumnValue(t1Col, t1Col != nil, "nullable"),
+				Target:      getColumnValue(t2Col, t2Col != nil, "nullable"),
+				IsDifferent: getColumnValue(t1Col, t1Col != nil, "nullable") != getColumnValue(t2Col, t2Col != nil, "nullable"),
+			},
+			Constraints: JSONPropDiff{
+				Source:      getColumnValue(t1Col, t1Col != nil, "constraints"),
+				Target:      getColumnValue(t2Col, t2Col != nil, "constraints"),
+				IsDifferent: getColumnValue(t1Col, t1Col != nil, "constraints") != getColumnValue(t2Col, t2Col != nil, "constraints"),
+			},
+		}
+
+		// Determine status
+		if t1Col == nil && t2Col != nil {
+			colDiff.Status = "added"
+		} else if t1Col != nil && t2Col == nil {
+			colDiff.Status = "removed"
+		} else if colDiff.Type.IsDifferent || colDiff.Nullable.IsDifferent || colDiff.Constraints.IsDifferent {
+			colDiff.Status = "modified"
+		} else {
+			colDiff.Status = "unchanged"
+		}
+
+		schemaDiffs = append(schemaDiffs, colDiff)
+	}
+
+	// Build column statistics for columns that exist in both tables
+	var columnStats []JSONColumnStats
+	for _, t1Col := range t1Schema.Columns {
+		if t2Col, ok := t2Columns[t1Col.Name]; ok && t1Col.Stats != nil && t2Col.Stats != nil {
+			stats := buildColumnStatistics(t1Col, t2Col, table1Name, table2Name, tolerance)
+			columnStats = append(columnStats, stats)
+		}
+	}
+
+	// Combine alter statements
+	alterStatementsStr := ""
+	if len(alterStatements) > 0 {
+		alterStatementsStr = strings.Join(alterStatements, "\n\n")
+	}
+
+	hasDifferences := schemaComparison.HasSchemaDifferences || schemaComparison.HasRowCountDifference
+
+	return JSONDiffOutput{
+		Summary:          summary,
+		SchemaDiffs:      schemaDiffs,
+		ColumnStatistics: columnStats,
+		SourceTable:      table1Name,
+		TargetTable:      table2Name,
+		HasDifferences:   hasDifferences,
+		AlterStatements:  alterStatementsStr,
+	}
+}
+
+func buildColumnStatistics(t1Col, t2Col *diff.Column, table1Name, table2Name string, tolerance float64) JSONColumnStats {
+	stats := JSONColumnStats{
+		ColumnName: t1Col.Name,
+		DataType:   t1Col.Type,
+		Statistics: []JSONStatistic{},
+	}
+
+	if t1Col.Stats == nil || t2Col.Stats == nil {
+		return stats
+	}
+
+	stats1 := t1Col.Stats
+	stats2 := t2Col.Stats
+
+	switch stats1.Type() {
+	case "numerical":
+		numStats1 := stats1.(*diff.NumericalStatistics)
+		numStats2 := stats2.(*diff.NumericalStatistics)
+
+		stats.Statistics = append(stats.Statistics, buildStatRow("Count", numStats1.Count, numStats2.Count, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRow("Null Count", numStats1.NullCount, numStats2.NullCount, tolerance))
+
+		fillRate1 := float64(numStats1.Count-numStats1.NullCount) / float64(numStats1.Count) * 100
+		fillRate2 := float64(numStats2.Count-numStats2.NullCount) / float64(numStats2.Count) * 100
+		stats.Statistics = append(stats.Statistics, buildStatRowFloat("Fill Rate", fillRate1, fillRate2, tolerance, "%"))
+
+		if numStats1.Avg != nil && numStats2.Avg != nil {
+			stats.Statistics = append(stats.Statistics, buildStatRowFloat("Avg", *numStats1.Avg, *numStats2.Avg, tolerance, ""))
+		}
+		if numStats1.StdDev != nil && numStats2.StdDev != nil {
+			stats.Statistics = append(stats.Statistics, buildStatRowFloat("StdDev", *numStats1.StdDev, *numStats2.StdDev, tolerance, ""))
+		}
+		if numStats1.Min != nil && numStats2.Min != nil {
+			stats.Statistics = append(stats.Statistics, buildStatRowFloat("Min", *numStats1.Min, *numStats2.Min, tolerance, ""))
+		}
+		if numStats1.Max != nil && numStats2.Max != nil {
+			stats.Statistics = append(stats.Statistics, buildStatRowFloat("Max", *numStats1.Max, *numStats2.Max, tolerance, ""))
+		}
+		if numStats1.Sum != nil && numStats2.Sum != nil {
+			stats.Statistics = append(stats.Statistics, buildStatRowFloat("Sum", *numStats1.Sum, *numStats2.Sum, tolerance, ""))
+		}
+
+	case "string":
+		strStats1 := stats1.(*diff.StringStatistics)
+		strStats2 := stats2.(*diff.StringStatistics)
+
+		stats.Statistics = append(stats.Statistics, buildStatRow("Count", strStats1.Count, strStats2.Count, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRow("Null Count", strStats1.NullCount, strStats2.NullCount, tolerance))
+
+		fillRate1 := float64(strStats1.Count-strStats1.NullCount) / float64(strStats1.Count) * 100
+		fillRate2 := float64(strStats2.Count-strStats2.NullCount) / float64(strStats2.Count) * 100
+		stats.Statistics = append(stats.Statistics, buildStatRowFloat("Fill Rate", fillRate1, fillRate2, tolerance, "%"))
+
+		stats.Statistics = append(stats.Statistics, buildStatRow("Distinct Count", strStats1.DistinctCount, strStats2.DistinctCount, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRow("Empty Count", strStats1.EmptyCount, strStats2.EmptyCount, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRowInt("Min Length", int64(strStats1.MinLength), int64(strStats2.MinLength), tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRowInt("Max Length", int64(strStats1.MaxLength), int64(strStats2.MaxLength), tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRowFloat("Avg Length", strStats1.AvgLength, strStats2.AvgLength, tolerance, ""))
+
+	case "boolean":
+		boolStats1 := stats1.(*diff.BooleanStatistics)
+		boolStats2 := stats2.(*diff.BooleanStatistics)
+
+		stats.Statistics = append(stats.Statistics, buildStatRow("Count", boolStats1.Count, boolStats2.Count, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRow("Null Count", boolStats1.NullCount, boolStats2.NullCount, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRow("True Count", boolStats1.TrueCount, boolStats2.TrueCount, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRow("False Count", boolStats1.FalseCount, boolStats2.FalseCount, tolerance))
+
+	case "datetime":
+		dtStats1 := stats1.(*diff.DateTimeStatistics)
+		dtStats2 := stats2.(*diff.DateTimeStatistics)
+
+		stats.Statistics = append(stats.Statistics, buildStatRow("Count", dtStats1.Count, dtStats2.Count, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRow("Null Count", dtStats1.NullCount, dtStats2.NullCount, tolerance))
+		stats.Statistics = append(stats.Statistics, buildStatRow("Distinct Count", dtStats1.UniqueCount, dtStats2.UniqueCount, tolerance))
+
+		if dtStats1.EarliestDate != nil && dtStats2.EarliestDate != nil {
+			stats.Statistics = append(stats.Statistics, JSONStatistic{
+				Name:        "Earliest Date",
+				Source:      dtStats1.EarliestDate.Format("2006-01-02 15:04:05"),
+				Target:      dtStats2.EarliestDate.Format("2006-01-02 15:04:05"),
+				Diff:        "-",
+				DiffPercent: "-",
+			})
+		}
+		if dtStats1.LatestDate != nil && dtStats2.LatestDate != nil {
+			stats.Statistics = append(stats.Statistics, JSONStatistic{
+				Name:        "Latest Date",
+				Source:      dtStats1.LatestDate.Format("2006-01-02 15:04:05"),
+				Target:      dtStats2.LatestDate.Format("2006-01-02 15:04:05"),
+				Diff:        "-",
+				DiffPercent: "-",
+			})
+		}
+	}
+
+	return stats
+}
+
+func buildStatRow(name string, val1, val2 int64, tolerance float64) JSONStatistic {
+	diff := val1 - val2
+	diffPercent := calculatePercentageDiffInt(val1, val2, tolerance)
+	diffStr := formatDiffValue(float64(diff), diffPercent)
+
+	return JSONStatistic{
+		Name:        name,
+		Source:      fmt.Sprintf("%d", val1),
+		Target:      fmt.Sprintf("%d", val2),
+		Diff:        diffStr,
+		DiffPercent: diffPercent,
+	}
+}
+
+func buildStatRowInt(name string, val1, val2 int64, tolerance float64) JSONStatistic {
+	return buildStatRow(name, val1, val2, tolerance)
+}
+
+func buildStatRowFloat(name string, val1, val2 float64, tolerance float64, suffix string) JSONStatistic {
+	diff := val1 - val2
+	diffPercent := calculatePercentageDiff(val1, val2, tolerance)
+	diffStr := formatDiffValue(diff, diffPercent)
+
+	format := "%.4g"
+	if suffix == "%" {
+		format = "%.6g%%"
+	}
+
+	return JSONStatistic{
+		Name:        name,
+		Source:      fmt.Sprintf(format, val1),
+		Target:      fmt.Sprintf(format, val2),
+		Diff:        diffStr,
+		DiffPercent: diffPercent,
 	}
 }
