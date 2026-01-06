@@ -18,8 +18,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       generic:
         - name: KEY1
           value: value1
@@ -31,8 +31,8 @@ environments:
       chess:
         - name: "chess-run-with-filters"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       generic:
         - name: KEY1
           value: value1
@@ -44,8 +44,8 @@ environments:
       chess:
         - name: "chess-run-with-tags"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       generic:
         - name: KEY1
           value: value1
@@ -57,8 +57,8 @@ environments:
       chess:
         - name: "chess-run-main-with-filters"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       generic:
         - name: KEY1
           value: value1
@@ -81,8 +81,8 @@ environments:
       chess:
         - name: "chess-run-with-downstream"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       generic:
         - name: KEY1
           value: value1
@@ -94,8 +94,8 @@ environments:
       chess:
         - name: "chess-run-main-with-downstream"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       generic:
         - name: KEY1
           value: value1
@@ -112,8 +112,8 @@ environments:
       chess:
         - name: "chess-run-default-option"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       generic:
         - name: KEY1
           value: value1
@@ -127,8 +127,8 @@ environments:
       chess:
         - name: "chess-run-malformed-sql"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       generic:
         - name: KEY1
           value: value1
@@ -150,8 +150,8 @@ environments:
       chess:
         - name: "chess-ingestr"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
   env-run-python-materialization:
     connections:
       duckdb:
