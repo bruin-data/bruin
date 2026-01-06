@@ -50,7 +50,6 @@ linters:
     - depguard
     - tagalign
     - gocyclo
-    - exportloopref
     - godox
     - nonamedreturns
     - maintidx
