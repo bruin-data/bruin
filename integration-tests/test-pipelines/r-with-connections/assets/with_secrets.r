@@ -30,7 +30,7 @@ cat(sprintf("INJECTED1: %s (correct!)\n", injected1))
 
 # Check for CHESS_DEFAULT connection (injected with underscore instead of hyphen)
 chess_default <- Sys.getenv("CHESS_DEFAULT")
-expected_chess <- '{"name":"chess-default","players":["albertojgomez","awryaw"]}'
+expected_chess <- '{"name":"chess-default","players":["MagnusCarlsen","Hikaru"]}'
 if (nchar(chess_default) == 0) {
   stop("CHESS_DEFAULT environment variable not set")
 }

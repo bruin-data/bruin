@@ -39,8 +39,8 @@
         {
           "name": "chess-default",
           "players": [
-            "albertojgomez",
-            "awryaw"
+            "MagnusCarlsen",
+            "Hikaru"
           ]
         }
       ]
@@ -86,8 +86,8 @@
           {
             "name": "chess-default",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]
@@ -182,8 +182,8 @@
           {
             "name": "chess-ingestr",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]
@@ -267,8 +267,8 @@
           {
             "name": "chess-run-default-option",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]
@@ -293,8 +293,8 @@
           {
             "name": "chess-run-main-with-downstream",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]
@@ -319,8 +319,8 @@
           {
             "name": "chess-run-main-with-filters",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]
@@ -345,8 +345,8 @@
           {
             "name": "chess-run-malformed-sql",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]
@@ -415,8 +415,8 @@
           {
             "name": "chess-run-with-downstream",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]
@@ -441,8 +441,8 @@
           {
             "name": "chess-run-with-filters",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]
@@ -467,8 +467,8 @@
           {
             "name": "chess-run-with-tags",
             "players": [
-              "albertojgomez",
-              "awryaw"
+              "MagnusCarlsen",
+              "Hikaru"
             ]
           }
         ]

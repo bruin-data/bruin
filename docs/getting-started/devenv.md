@@ -27,8 +27,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
 
   production:
     connections:
@@ -85,8 +85,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
 
   production:
     connections:

@@ -272,8 +272,8 @@
           },
           "type": "array",
         "default": [
-          "albertojgomez",
-          "awryaw"
+          "MagnusCarlsen",
+          "Hikaru"
         ]
         }
       },

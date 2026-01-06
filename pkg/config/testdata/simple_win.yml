@@ -174,8 +174,8 @@ environments:
       chess:
         - name: conn24
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
       airtable:
         - name: conn23
           base_id: "123"

@@ -23,8 +23,8 @@ environments:
             chess:
                 - name: "chess-connection"
                   players:
-                      - "albertojgomez"
-                      - "awryaw"
+                      - "MagnusCarlsen"
+                      - "Hikaru"
 ```
 
 You can simply switch the environment using the `--environment` flag, e.g.:

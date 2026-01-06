@@ -77,8 +77,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "albertojgomez"
-            - "awryaw"
+            - "MagnusCarlsen"
+            - "Hikaru"
 
 ```
 
