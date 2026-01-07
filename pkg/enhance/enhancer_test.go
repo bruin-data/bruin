@@ -231,3 +231,49 @@ func TestEnhancer_IsClaudeCLIInstalled(t *testing.T) {
 		assert.True(t, enhancer.IsClaudeCLIInstalled())
 	})
 }
+
+func TestEnhancer_BuildMCPConfig(t *testing.T) {
+	fs := afero.NewMemMapFs()
+
+	t.Run("builds valid MCP config JSON", func(t *testing.T) {
+		enhancer := &Enhancer{
+			fs:        fs,
+			model:     defaultModel,
+			bruinPath: "/usr/local/bin/bruin",
+			useMCP:    true,
+		}
+
+		config := enhancer.buildMCPConfig()
+
+		assert.Contains(t, config, "mcpServers")
+		assert.Contains(t, config, "bruin")
+		assert.Contains(t, config, "/usr/local/bin/bruin")
+		assert.Contains(t, config, "mcp")
+	})
+}
+
+func TestEnhancer_UseMCP(t *testing.T) {
+	fs := afero.NewMemMapFs()
+
+	t.Run("enables MCP when bruin path is set", func(t *testing.T) {
+		enhancer := &Enhancer{
+			fs:        fs,
+			model:     defaultModel,
+			bruinPath: "/usr/local/bin/bruin",
+			useMCP:    true,
+		}
+
+		assert.True(t, enhancer.useMCP)
+	})
+
+	t.Run("disables MCP when bruin path is empty", func(t *testing.T) {
+		enhancer := &Enhancer{
+			fs:        fs,
+			model:     defaultModel,
+			bruinPath: "",
+			useMCP:    false,
+		}
+
+		assert.False(t, enhancer.useMCP)
+	})
+}

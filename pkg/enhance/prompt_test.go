@@ -92,11 +92,26 @@ func TestBuildEnhancePrompt(t *testing.T) {
 }
 
 func TestGetSystemPrompt(t *testing.T) {
-	prompt := GetSystemPrompt()
+	t.Run("without MCP", func(t *testing.T) {
+		prompt := GetSystemPrompt(false)
 
-	assert.NotEmpty(t, prompt)
-	assert.Contains(t, prompt, "data quality expert")
-	assert.Contains(t, prompt, "JSON")
+		assert.NotEmpty(t, prompt)
+		assert.Contains(t, prompt, "data quality expert")
+		assert.Contains(t, prompt, "JSON")
+		assert.NotContains(t, prompt, "MCP")
+	})
+
+	t.Run("with MCP", func(t *testing.T) {
+		prompt := GetSystemPrompt(true)
+
+		assert.NotEmpty(t, prompt)
+		assert.Contains(t, prompt, "data quality expert")
+		assert.Contains(t, prompt, "JSON")
+		assert.Contains(t, prompt, "MCP")
+		assert.Contains(t, prompt, "bruin_get_overview")
+		assert.Contains(t, prompt, "bruin_get_docs_tree")
+		assert.Contains(t, prompt, "bruin_get_doc_content")
+	})
 }
 
 func TestBuildAssetSummary(t *testing.T) {
