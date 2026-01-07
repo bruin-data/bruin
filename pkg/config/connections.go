@@ -1198,3 +1198,14 @@ type PrimerConnection struct {
 func (c PrimerConnection) GetName() string {
 	return c.Name
 }
+
+type IndeedConnection struct {
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	EmployerID   string `yaml:"employer_id,omitempty" json:"employer_id" mapstructure:"employer_id"`
+}
+
+func (c IndeedConnection) GetName() string {
+	return c.Name
+}

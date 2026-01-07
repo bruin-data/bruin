@@ -250,6 +250,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hostaway", link: "/ingestion/hostaway"},
                             {text: "Hubspot", link: "/ingestion/hubspot"},
+                            {text: "Indeed", link: "/ingestion/indeed"},
                             {text: "Intercom", link: "/ingestion/intercom"},
                             {text: "InfluxDB", link: "/ingestion/influxdb"},
                             {text: "Internet Society Pulse", link: "/ingestion/isoc_pulse"},
