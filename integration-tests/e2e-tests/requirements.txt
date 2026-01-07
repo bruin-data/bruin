@@ -1,0 +1,4 @@
+# E2E Testing Dependencies for User & Team Management Tests
+pytest>=8.0.0
+playwright>=1.40.0
+pytest-playwright>=0.4.4
