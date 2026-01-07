@@ -335,3 +335,32 @@ func TestUpstreams(t *testing.T) {
 	// Compare the expected and actual results
 	require.Equal(t, expected, got)
 }
+
+func TestConvertYamlToTask_Hooks(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(strings.TrimSpace(`
+name: dataset.player_stats
+type: duckdb.sql
+hooks:
+  pre:
+    - query: "insert into logs (name, ts) values ('exec', now())"
+    - query: "select 2"
+  post:
+    - query: "select 3"
+    - query: "select 4"
+`))
+
+	task, err := pipeline.ConvertYamlToTask(content)
+	require.NoError(t, err)
+
+	require.NotNil(t, task.Hooks)
+	require.Equal(t, []pipeline.Hook{
+		{Query: "insert into logs (name, ts) values ('exec', now())"},
+		{Query: "select 2"},
+	}, task.Hooks.Pre)
+	require.Equal(t, []pipeline.Hook{
+		{Query: "select 3"},
+		{Query: "select 4"},
+	}, task.Hooks.Post)
+}
