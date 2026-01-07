@@ -71,8 +71,8 @@ table td:first-child {
 1. **Connection Setup**: Uses your existing connection configuration from `.bruin.yml` (or any other [secrets backend](../secrets/overview.md))
 2. **Database Scanning**: Retrieves database summary including schemas and tables
 3. **Filtering**: Applies database and schema filters if specified
-4. **Asset Creation**: Creates YAML asset files with naming pattern `{schema}.{table}.asset.yml`
-5. **Directory Structure**: Places assets in `{pipeline_path}/assets/` directory
+4. **Asset Creation**: Creates YAML source asset files named `<table>.asset.yml` under `assets/<schema>/`
+5. **Directory Structure**: Places assets in `{pipeline_path}/assets/<schema>/<table>.asset.yml` (lowercase)
 6. **Column Metadata**: Optionally queries table schema to populate column information
 
 ### Examples
@@ -119,27 +119,29 @@ bruin import database --connection snowflake-prod --environment production ./my-
 
 ### Generated Asset Structure
 
-Each imported table creates a YAML asset file with the following structure:
+Each imported table creates a YAML **source** asset file with the following structure:
 
 ```yaml
-type: postgres  # or snowflake, bigquery, etc.
-name: schema.table
+type: pg.source  # or sf.source, bq.source, ms.source, etc.
 description: "Imported table schema.table"
 ```
 
+These are metadata-only source assets. SQL transformation assets live in `.sql` files, and `import database` does not generate SQL templates.
+
 The asset file includes:
-- **File Name**: `{schema}.{table}.asset.yml` (lowercase)
-- **Asset Name**: `{schema}.{table}` (lowercase)
+- **File Name**: `assets/<schema>/<table>.asset.yml` (lowercase)
 - **Description**: `"Imported table {schema}.{table}"`
 - **Asset Type**: Automatically determined from connection type
+
+> [!INFO]
+> **Asset Name** is derived from the file path, e.g. `assets/schema/table.asset.yml` -> `schema.table` (lowercase)
 
 #### With Column Metadata (Default)
 
 By default, the asset will include column metadata:
 
 ```yaml
-type: postgres
-name: schema.table
+type: pg.source
 description: "Imported table schema.table"
 columns:
   - name: column_name

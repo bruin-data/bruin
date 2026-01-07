@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -192,16 +194,28 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 	}{
 		// Test connection type detection
 		{
-			name:           "snowflake connection type",
-			connectionName: "test-conn",
-			conn:           &struct{ mockConnection }{},
-			want:           pipeline.AssetTypeSnowflakeSource,
+			name:           "mssql connection type overrides name",
+			connectionName: "prod",
+			conn:           &mssql.DB{},
+			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
-			name:           "duckdb connection type",
+			name:           "postgres connection type overrides name",
+			connectionName: "prod",
+			conn:           &postgres.Client{},
+			want:           pipeline.AssetTypePostgresSource,
+		},
+		{
+			name:           "connection type not detected (embedded mock)",
+			connectionName: "test-conn",
+			conn:           &struct{ mockConnection }{},
+			want:           pipeline.AssetTypeEmpty,
+		},
+		{
+			name:           "duckdb connection type (mock - undefined connection)",
 			connectionName: "test-conn",
 			conn:           &mockConnection{},
-			want:           pipeline.AssetTypeSnowflakeSource, // Default fallback
+			want:           pipeline.AssetTypeEmpty, // Default fallback
 		},
 
 		// Test connection name detection
@@ -296,10 +310,10 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 			want:           pipeline.AssetTypeMsSQLSource,
 		},
 		{
-			name:           "unknown connection defaults to snowflake",
+			name:           "unknown connection defaults to empty",
 			connectionName: "unknown-db",
 			conn:           &mockConnection{},
-			want:           pipeline.AssetTypeSnowflakeSource,
+			want:           pipeline.AssetTypeEmpty,
 		},
 	}
 
