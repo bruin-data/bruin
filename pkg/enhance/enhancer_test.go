@@ -250,6 +250,56 @@ func TestEnhancer_BuildMCPConfig(t *testing.T) {
 		assert.Contains(t, config, "/usr/local/bin/bruin")
 		assert.Contains(t, config, "mcp")
 	})
+
+	t.Run("includes environment variables when set", func(t *testing.T) {
+		enhancer := &Enhancer{
+			fs:          fs,
+			model:       defaultModel,
+			bruinPath:   "/usr/local/bin/bruin",
+			useMCP:      true,
+			repoRoot:    "/path/to/repo",
+			environment: "production",
+		}
+
+		config := enhancer.buildMCPConfig()
+
+		assert.Contains(t, config, "BRUIN_REPO_ROOT")
+		assert.Contains(t, config, "/path/to/repo")
+		assert.Contains(t, config, "BRUIN_ENVIRONMENT")
+		assert.Contains(t, config, "production")
+	})
+
+	t.Run("omits env when not set", func(t *testing.T) {
+		enhancer := &Enhancer{
+			fs:        fs,
+			model:     defaultModel,
+			bruinPath: "/usr/local/bin/bruin",
+			useMCP:    true,
+		}
+
+		config := enhancer.buildMCPConfig()
+
+		assert.NotContains(t, config, "BRUIN_REPO_ROOT")
+		assert.NotContains(t, config, "BRUIN_ENVIRONMENT")
+	})
+}
+
+func TestEnhancer_SetRepoRoot(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	enhancer := NewEnhancer(fs, "")
+
+	enhancer.SetRepoRoot("/path/to/repo")
+
+	assert.Equal(t, "/path/to/repo", enhancer.repoRoot)
+}
+
+func TestEnhancer_SetEnvironment(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	enhancer := NewEnhancer(fs, "")
+
+	enhancer.SetEnvironment("production")
+
+	assert.Equal(t, "production", enhancer.environment)
 }
 
 func TestEnhancer_UseMCP(t *testing.T) {

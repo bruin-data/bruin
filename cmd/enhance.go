@@ -143,6 +143,21 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		enhancer.SetAPIKey(apiKey)
 	}
 
+	// Set repo root and environment for MCP database tools
+	repoRoot, err := git.FindRepoFromPath(assetPath)
+	if err == nil {
+		enhancer.SetRepoRoot(repoRoot.Path)
+		if output != "json" {
+			infoPrinter.Printf("  MCP database tools enabled (repo: %s)\n", repoRoot.Path)
+		}
+	}
+	if env := c.String("environment"); env != "" {
+		enhancer.SetEnvironment(env)
+		if output != "json" {
+			infoPrinter.Printf("  Using environment: %s\n", env)
+		}
+	}
+
 	// Check if Claude CLI is available
 	if err := enhancer.EnsureClaudeCLI(); err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "Claude CLI not available"))
@@ -302,6 +317,21 @@ func enhancePipeline(ctx context.Context, c *cli.Command, pipelinePath string, f
 	// Try to get API key from config
 	if apiKey := getAnthropicAPIKey(fs, pipelinePath); apiKey != "" {
 		enhancer.SetAPIKey(apiKey)
+	}
+
+	// Set repo root and environment for MCP database tools
+	pipelineRepoRoot, repoErr := git.FindRepoFromPath(pipelinePath)
+	if repoErr == nil {
+		enhancer.SetRepoRoot(pipelineRepoRoot.Path)
+		if output != "json" {
+			infoPrinter.Printf("  MCP database tools enabled (repo: %s)\n", pipelineRepoRoot.Path)
+		}
+	}
+	if env := c.String("environment"); env != "" {
+		enhancer.SetEnvironment(env)
+		if output != "json" {
+			infoPrinter.Printf("  Using environment: %s\n", env)
+		}
 	}
 
 	if err := enhancer.EnsureClaudeCLI(); err != nil {

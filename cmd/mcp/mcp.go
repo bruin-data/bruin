@@ -142,42 +142,47 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 			Result:  nil,
 		}
 	case "tools/list":
+		// Combine documentation tools with database tools
+		tools := []map[string]interface{}{
+			{
+				"name":        "bruin_get_overview",
+				"description": "Get information about Bruin's features and capabilities",
+				"inputSchema": map[string]interface{}{
+					"type":       "object",
+					"properties": map[string]interface{}{},
+				},
+			},
+			{
+				"name":        "bruin_get_docs_tree",
+				"description": "Get tree view of documentation files for Bruin, including all the supported platforms, data sources and destinations.",
+				"inputSchema": map[string]interface{}{
+					"type":       "object",
+					"properties": map[string]interface{}{},
+				},
+			},
+			{
+				"name":        "bruin_get_doc_content",
+				"description": "Get the contents of a specific documentation from Bruin CLI docs.",
+				"inputSchema": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"filename": map[string]interface{}{
+							"type":        "string",
+							"description": "Name of the markdown file to fetch (with or without .md extension)",
+						},
+					},
+					"required": []string{"filename"},
+				},
+			},
+		}
+		// Add database tools
+		tools = append(tools, GetDBToolDefinitions()...)
+
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result: map[string]interface{}{
-				"tools": []map[string]interface{}{
-					{
-						"name":        "bruin_get_overview",
-						"description": "Get information about Bruin's features and capabilities",
-						"inputSchema": map[string]interface{}{
-							"type":       "object",
-							"properties": map[string]interface{}{},
-						},
-					},
-					{
-						"name":        "bruin_get_docs_tree",
-						"description": "Get tree view of documentation files for Bruin, including all the supported platforms, data sources and destinations.",
-						"inputSchema": map[string]interface{}{
-							"type":       "object",
-							"properties": map[string]interface{}{},
-						},
-					},
-					{
-						"name":        "bruin_get_doc_content",
-						"description": "Get the contents of a specific documentation from Bruin CLI docs.",
-						"inputSchema": map[string]interface{}{
-							"type": "object",
-							"properties": map[string]interface{}{
-								"filename": map[string]interface{}{
-									"type":        "string",
-									"description": "Name of the markdown file to fetch (with or without .md extension)",
-								},
-							},
-							"required": []string{"filename"},
-						},
-					},
-				},
+				"tools": tools,
 			},
 		}
 	case "tools/call":
@@ -303,6 +308,37 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 		}
 
 	default:
+		// Check if it's a database tool
+		if IsDBTool(toolName) {
+			args, _ := params["arguments"].(map[string]interface{})
+			telemetry.SendEvent("mcp_tool_call", analytics.Properties{
+				"tool_name": toolName,
+			})
+			result, err := HandleDBToolCall(toolName, args, debug)
+			if err != nil {
+				return JSONRPCResponse{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error: &JSONRPCError{
+						Code:    -32603,
+						Message: err.Error(),
+					},
+				}
+			}
+			return JSONRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Result: map[string]interface{}{
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": result,
+						},
+					},
+				},
+			}
+		}
+
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
