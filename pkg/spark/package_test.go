@@ -12,6 +12,8 @@ import (
 )
 
 func TestExclude(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		path     string
@@ -33,6 +35,8 @@ func TestExclude(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := Exclude(tt.path)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -40,15 +44,17 @@ func TestExclude(t *testing.T) {
 }
 
 func TestPackageContext(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock filesystem
 	mockFS := fstest.MapFS{
-		"main.py":           &fstest.MapFile{Data: []byte("print('hello')")},
-		"utils/helper.py":   &fstest.MapFile{Data: []byte("def help(): pass")},
-		"README.md":         &fstest.MapFile{Data: []byte("# Readme")},
-		".bruin.yml":        &fstest.MapFile{Data: []byte("config: true")},
-		".venv/lib/pkg.py":  &fstest.MapFile{Data: []byte("# should be excluded")},
-		".git/config":       &fstest.MapFile{Data: []byte("# should be excluded")},
-		"logs/output.log":   &fstest.MapFile{Data: []byte("# should be excluded")},
+		"main.py":          &fstest.MapFile{Data: []byte("print('hello')")},
+		"utils/helper.py":  &fstest.MapFile{Data: []byte("def help(): pass")},
+		"README.md":        &fstest.MapFile{Data: []byte("# Readme")},
+		".bruin.yml":       &fstest.MapFile{Data: []byte("config: true")},
+		".venv/lib/pkg.py": &fstest.MapFile{Data: []byte("# should be excluded")},
+		".git/config":      &fstest.MapFile{Data: []byte("# should be excluded")},
+		"logs/output.log":  &fstest.MapFile{Data: []byte("# should be excluded")},
 	}
 
 	var buf bytes.Buffer
@@ -85,6 +91,8 @@ func TestPackageContext(t *testing.T) {
 }
 
 func TestPackageContextWithEmptyFS(t *testing.T) {
+	t.Parallel()
+
 	mockFS := fstest.MapFS{}
 
 	var buf bytes.Buffer
@@ -98,6 +106,8 @@ func TestPackageContextWithEmptyFS(t *testing.T) {
 }
 
 func TestPackageContextWalkError(t *testing.T) {
+	t.Parallel()
+
 	// Create a filesystem that returns an error
 	errFS := &errorFS{err: fs.ErrPermission}
 
