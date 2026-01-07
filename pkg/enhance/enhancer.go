@@ -25,6 +25,8 @@ type Enhancer struct {
 	model      string
 	claudePath string
 	apiKey     string
+	bruinPath  string // path to bruin binary for MCP server
+	useMCP     bool   // whether to use bruin MCP server
 }
 
 // NewEnhancer creates a new Enhancer instance.
@@ -33,10 +35,13 @@ func NewEnhancer(fs afero.Fs, model string) *Enhancer {
 		model = defaultModel
 	}
 	claudePath, _ := exec.LookPath("claude")
+	bruinPath, _ := exec.LookPath("bruin")
 	return &Enhancer{
 		fs:         fs,
 		model:      model,
 		claudePath: claudePath,
+		bruinPath:  bruinPath,
+		useMCP:     bruinPath != "", // Enable MCP if bruin is available
 	}
 }
 
@@ -74,7 +79,7 @@ func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipe
 
 	// Build the prompt
 	prompt := BuildEnhancePrompt(asset, pipelineName)
-	systemPrompt := GetSystemPrompt()
+	systemPrompt := GetSystemPrompt(e.useMCP)
 
 	// Call Claude CLI
 	response, err := e.callClaude(ctx, prompt, systemPrompt)
@@ -101,6 +106,12 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 		"--output-format", "text",
 		"--model", e.model,
 		"--dangerously-skip-permissions",
+	}
+
+	// Add MCP server configuration if bruin is available
+	if e.useMCP && e.bruinPath != "" {
+		mcpConfig := e.buildMCPConfig()
+		args = append(args, "--mcp-config", mcpConfig)
 	}
 
 	if systemPrompt != "" {
@@ -130,6 +141,20 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 	}
 
 	return stdout.String(), nil
+}
+
+// buildMCPConfig creates the MCP server configuration JSON for bruin.
+func (e *Enhancer) buildMCPConfig() string {
+	config := map[string]interface{}{
+		"mcpServers": map[string]interface{}{
+			"bruin": map[string]interface{}{
+				"command": e.bruinPath,
+				"args":    []string{"mcp"},
+			},
+		},
+	}
+	jsonBytes, _ := json.Marshal(config)
+	return string(jsonBytes)
 }
 
 // ClaudeResponse represents the JSON response when using json output format.

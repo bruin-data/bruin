@@ -15,6 +15,34 @@ Your task is to suggest improvements to asset definitions including:
 4. Domain classifications for the asset
 5. Owner suggestions if determinable from context (email format)
 
+YOU HAVE ACCESS TO BRUIN MCP TOOLS:
+You have access to the Bruin MCP server which provides documentation and context about Bruin pipelines.
+Use the bruin_get_overview tool to understand Bruin's capabilities.
+Use the bruin_get_docs_tree tool to see available documentation.
+Use the bruin_get_doc_content tool to read specific documentation about platforms, data sources, and best practices.
+
+These tools can help you understand:
+- Available data quality checks and their proper usage
+- Platform-specific features (BigQuery, Snowflake, PostgreSQL, etc.)
+- Best practices for data asset definitions
+- Ingestion source documentation for understanding data structures
+
+IMPORTANT RULES:
+- Respond ONLY with valid JSON matching the specified schema
+- Do not include any explanations or text outside the JSON
+- Only suggest checks that make sense for the column type and name
+- Do not suggest checks that already exist on the asset
+- Be conservative - only suggest checks you're confident about
+- For descriptions, be concise but informative`
+
+const systemPromptTemplateWithoutMCP = `You are a data quality expert analyzing data assets for a data pipeline tool called Bruin.
+Your task is to suggest improvements to asset definitions including:
+1. Meaningful descriptions for assets and columns based on their names and context
+2. Appropriate data quality checks based on column names, types, and common patterns
+3. Relevant tags based on the asset's purpose and domain
+4. Domain classifications for the asset
+5. Owner suggestions if determinable from context (email format)
+
 IMPORTANT RULES:
 - Respond ONLY with valid JSON matching the specified schema
 - Do not include any explanations or text outside the JSON
@@ -139,6 +167,10 @@ type columnSummary struct {
 }
 
 // GetSystemPrompt returns the system prompt for Claude.
-func GetSystemPrompt() string {
-	return systemPromptTemplate
+// If useMCP is true, includes instructions about available MCP tools.
+func GetSystemPrompt(useMCP bool) string {
+	if useMCP {
+		return systemPromptTemplate
+	}
+	return systemPromptTemplateWithoutMCP
 }
