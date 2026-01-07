@@ -108,9 +108,15 @@ func TestGetSystemPrompt(t *testing.T) {
 		assert.Contains(t, prompt, "data quality expert")
 		assert.Contains(t, prompt, "JSON")
 		assert.Contains(t, prompt, "MCP")
+		// Documentation tools
 		assert.Contains(t, prompt, "bruin_get_overview")
 		assert.Contains(t, prompt, "bruin_get_docs_tree")
 		assert.Contains(t, prompt, "bruin_get_doc_content")
+		// Database tools
+		assert.Contains(t, prompt, "bruin_list_connections")
+		assert.Contains(t, prompt, "bruin_get_table_schema")
+		assert.Contains(t, prompt, "bruin_get_column_stats")
+		assert.Contains(t, prompt, "bruin_sample_column_values")
 	})
 }
 

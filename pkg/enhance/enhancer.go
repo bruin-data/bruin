@@ -21,12 +21,14 @@ const (
 
 // Enhancer coordinates the AI enhancement process for assets.
 type Enhancer struct {
-	fs         afero.Fs
-	model      string
-	claudePath string
-	apiKey     string
-	bruinPath  string // path to bruin binary for MCP server
-	useMCP     bool   // whether to use bruin MCP server
+	fs          afero.Fs
+	model       string
+	claudePath  string
+	apiKey      string
+	bruinPath   string // path to bruin binary for MCP server
+	useMCP      bool   // whether to use bruin MCP server
+	repoRoot    string // path to the Bruin repository root
+	environment string // environment name for database connections
 }
 
 // NewEnhancer creates a new Enhancer instance.
@@ -145,16 +147,40 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 
 // buildMCPConfig creates the MCP server configuration JSON for bruin.
 func (e *Enhancer) buildMCPConfig() string {
+	bruinConfig := map[string]interface{}{
+		"command": e.bruinPath,
+		"args":    []string{"mcp"},
+	}
+
+	// Add environment variables for database connectivity
+	env := make(map[string]string)
+	if e.repoRoot != "" {
+		env["BRUIN_REPO_ROOT"] = e.repoRoot
+	}
+	if e.environment != "" {
+		env["BRUIN_ENVIRONMENT"] = e.environment
+	}
+	if len(env) > 0 {
+		bruinConfig["env"] = env
+	}
+
 	config := map[string]interface{}{
 		"mcpServers": map[string]interface{}{
-			"bruin": map[string]interface{}{
-				"command": e.bruinPath,
-				"args":    []string{"mcp"},
-			},
+			"bruin": bruinConfig,
 		},
 	}
 	jsonBytes, _ := json.Marshal(config)
 	return string(jsonBytes)
+}
+
+// SetRepoRoot sets the Bruin repository root path for MCP database tools.
+func (e *Enhancer) SetRepoRoot(repoRoot string) {
+	e.repoRoot = repoRoot
+}
+
+// SetEnvironment sets the environment name for MCP database tools.
+func (e *Enhancer) SetEnvironment(environment string) {
+	e.environment = environment
 }
 
 // ClaudeResponse represents the JSON response when using json output format.
