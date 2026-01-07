@@ -364,3 +364,87 @@ hooks:
 		{Query: "select 4"},
 	}, task.Hooks.Post)
 }
+
+func TestConvertYamlToTask_HooksPreOnly(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(strings.TrimSpace(`
+name: dataset.player_stats
+type: duckdb.sql
+hooks:
+  pre:
+    - query: "select 1"
+`))
+
+	task, err := pipeline.ConvertYamlToTask(content)
+	require.NoError(t, err)
+
+	require.NotNil(t, task.Hooks)
+	require.Equal(t, []pipeline.Hook{
+		{Query: "select 1"},
+	}, task.Hooks.Pre)
+	require.Empty(t, task.Hooks.Post)
+}
+
+func TestConvertYamlToTask_HooksPostOnly(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(strings.TrimSpace(`
+name: dataset.player_stats
+type: duckdb.sql
+hooks:
+  post:
+    - query: "select 2"
+`))
+
+	task, err := pipeline.ConvertYamlToTask(content)
+	require.NoError(t, err)
+
+	require.NotNil(t, task.Hooks)
+	require.Empty(t, task.Hooks.Pre)
+	require.Equal(t, []pipeline.Hook{
+		{Query: "select 2"},
+	}, task.Hooks.Post)
+}
+
+func TestConvertYamlToTask_NoHooks(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(strings.TrimSpace(`
+name: dataset.player_stats
+type: duckdb.sql
+`))
+
+	task, err := pipeline.ConvertYamlToTask(content)
+	require.NoError(t, err)
+	require.Nil(t, task.Hooks)
+}
+
+func TestConvertYamlToTask_HooksInvalidShape(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(strings.TrimSpace(`
+name: dataset.player_stats
+type: duckdb.sql
+hooks:
+  - query: "select 1"
+`))
+
+	_, err := pipeline.ConvertYamlToTask(content)
+	require.Error(t, err)
+}
+
+func TestConvertYamlToTask_HooksInvalidEntryType(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(strings.TrimSpace(`
+name: dataset.player_stats
+type: duckdb.sql
+hooks:
+  pre:
+    - "select 1"
+`))
+
+	_, err := pipeline.ConvertYamlToTask(content)
+	require.Error(t, err)
+}
