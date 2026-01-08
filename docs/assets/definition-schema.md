@@ -60,7 +60,7 @@ We use `uri` (Universal Resource Identifier) as another way to identify assets. 
 - **Type:** `String`
 
 ## `type`
-The type of the asset, determines how the execution will happen. Must be one of the types [here](https://github.com/bruin-data/bruin/blob/main/pkg/pipeline/pipeline.go#L33).
+The type of the asset determines how execution will happen. Must be one of the types listed in <a href="https://github.com/bruin-data/bruin/blob/main/pkg/pipeline/pipeline.go#L31">pkg/pipeline/pipeline.go</a>.
 - **Type:** `String`
 
 ## `owner`
