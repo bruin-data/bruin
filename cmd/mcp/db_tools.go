@@ -162,6 +162,7 @@ func getTableSchema(ctx context.Context, connectionName, tableName string) *Tabl
 }
 
 // getColumnStats retrieves statistics for a column.
+// Uses a sample of 1000 rows for performance on large tables.
 func getColumnStats(ctx context.Context, connectionName, tableName, columnName string) *ColumnStats {
 	manager, err := getConnectionManager(ctx)
 	if err != nil {
@@ -178,7 +179,8 @@ func getColumnStats(ctx context.Context, connectionName, tableName, columnName s
 		return &ColumnStats{TableName: tableName, ColumnName: columnName, Error: fmt.Sprintf("connection '%s' does not support queries", connectionName)}
 	}
 
-	// Build stats query
+	// Build stats query with LIMIT 1000 for performance on large tables
+	// Uses a subquery to limit the rows scanned
 	statsQuery := fmt.Sprintf(`
 		SELECT
 			COUNT(*) as total_rows,
@@ -186,8 +188,8 @@ func getColumnStats(ctx context.Context, connectionName, tableName, columnName s
 			COUNT(DISTINCT %s) as distinct_count,
 			MIN(%s) as min_value,
 			MAX(%s) as max_value
-		FROM %s
-	`, columnName, columnName, columnName, columnName, tableName)
+		FROM (SELECT %s FROM %s LIMIT 1000) as sample
+	`, columnName, columnName, columnName, columnName, columnName, tableName)
 
 	q := &query.Query{Query: statsQuery}
 	result, err := selector.Select(ctx, q)
@@ -219,9 +221,13 @@ func getColumnStats(ctx context.Context, connectionName, tableName, columnName s
 }
 
 // getSampleColumnValues retrieves sample distinct values for a column.
+// Limit is capped at 1000 for performance on large tables.
 func getSampleColumnValues(ctx context.Context, connectionName, tableName, columnName string, limit int) *SampleValues {
 	if limit <= 0 {
 		limit = 20
+	}
+	if limit > 1000 {
+		limit = 1000
 	}
 
 	manager, err := getConnectionManager(ctx)
@@ -386,7 +392,7 @@ func GetDBToolDefinitions() []map[string]interface{} {
 		},
 		{
 			"name":        "bruin_get_column_stats",
-			"description": "Get statistics for a specific column including total rows, null count, distinct count, min/max values. Use this to determine appropriate data quality checks (e.g., not_null if null_count is 0, unique if distinct_count equals total_rows).",
+			"description": "Get statistics for a specific column including total rows, null count, distinct count, min/max values. Uses a sample of 1000 rows for performance. Use this to determine appropriate data quality checks (e.g., not_null if null_count is 0, unique if distinct_count equals total_rows).",
 			"inputSchema": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -408,7 +414,7 @@ func GetDBToolDefinitions() []map[string]interface{} {
 		},
 		{
 			"name":        "bruin_sample_column_values",
-			"description": "Get sample distinct values for a column. Use this to suggest accepted_values checks for enum-like columns (e.g., status, type, category columns).",
+			"description": "Get sample distinct values for a column (max 1000 values). Use this to suggest accepted_values checks for enum-like columns (e.g., status, type, category columns).",
 			"inputSchema": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{

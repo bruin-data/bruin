@@ -41,8 +41,8 @@ func Enhance(isDebug *bool) *cli.Command {
 				Usage:   "Target environment name as defined in .bruin.yml",
 			},
 			&cli.BoolFlag{
-				Name:  "auto-apply",
-				Usage: "Automatically apply all suggestions without confirmation",
+				Name:  "manual",
+				Usage: "Manually confirm each suggestion before applying",
 				Value: false,
 			},
 			&cli.BoolFlag{
@@ -200,21 +200,16 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return nil
 	}
 
-	// Interactive confirmation or auto-apply
+	// Auto-apply by default, or interactive confirmation with --manual flag
 	var approved *enhance.EnhancementSuggestions
-	if c.Bool("auto-apply") {
-		approved = suggestions
-	} else {
-		if output == "json" {
-			// In JSON mode, auto-apply since we can't do interactive
-			approved = suggestions
-		} else {
-			confirmer := enhance.NewInteractiveConfirmer(os.Stdin, os.Stdout)
-			approved, err = confirmer.ConfirmSuggestions(suggestions, pp.Asset.Name)
-			if err != nil {
-				return printEnhanceError(output, errors.Wrap(err, "confirmation failed"))
-			}
+	if c.Bool("manual") && output != "json" {
+		confirmer := enhance.NewInteractiveConfirmer(os.Stdin, os.Stdout)
+		approved, err = confirmer.ConfirmSuggestions(suggestions, pp.Asset.Name)
+		if err != nil {
+			return printEnhanceError(output, errors.Wrap(err, "confirmation failed"))
 		}
+	} else {
+		approved = suggestions
 	}
 
 	// Apply and persist
@@ -377,14 +372,13 @@ func enhancePipeline(ctx context.Context, c *cli.Command, pipelinePath string, f
 			continue
 		}
 
-		// In pipeline mode with auto-apply or JSON output, apply automatically
-		// Otherwise, this would be too tedious to confirm each
+		// Auto-apply by default, or interactive confirmation with --manual flag
 		var approved *enhance.EnhancementSuggestions
-		if c.Bool("auto-apply") || output == "json" || c.Bool("dry-run") {
-			approved = suggestions
-		} else {
+		if c.Bool("manual") && output != "json" && !c.Bool("dry-run") {
 			confirmer := enhance.NewInteractiveConfirmer(os.Stdin, os.Stdout)
 			approved, _ = confirmer.ConfirmSuggestions(suggestions, asset.Name)
+		} else {
+			approved = suggestions
 		}
 
 		if c.Bool("dry-run") {
