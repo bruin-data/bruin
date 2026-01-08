@@ -50,11 +50,234 @@ func Test_uvPythonRunner_ingestrLoaderFileFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := ConsolidatedParameters(t.Context(), tt.asset, tt.cmdArgs)
+			result, err := ConsolidatedParameters(t.Context(), tt.asset, tt.cmdArgs, nil)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestColumnHints(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		columns        []pipeline.Column
+		normalizeNames bool
+		expected       string
+	}{
+		{
+			name: "basic column hints without normalization",
+			columns: []pipeline.Column{
+				{Name: "id", Type: "integer"},
+				{Name: "name", Type: "varchar"},
+				{Name: "created_at", Type: "timestamp"},
+			},
+			normalizeNames: false,
+			expected:       "id:bigint,name:text,created_at:timestamp",
+		},
+		{
+			name: "column hints with name normalization",
+			columns: []pipeline.Column{
+				{Name: "DateOfBirth", Type: "date"},
+				{Name: "User Name", Type: "string"},
+			},
+			normalizeNames: true,
+			expected:       "date_of_birth:date,user_name:text",
+		},
+		{
+			name:           "empty columns",
+			columns:        []pipeline.Column{},
+			normalizeNames: false,
+			expected:       "",
+		},
+		{
+			name: "unknown type is skipped",
+			columns: []pipeline.Column{
+				{Name: "id", Type: "integer"},
+				{Name: "unknown_col", Type: "unknown_type"},
+				{Name: "name", Type: "string"},
+			},
+			normalizeNames: false,
+			expected:       "id:bigint,name:text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := ColumnHints(tt.columns, tt.normalizeNames)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		asset      *pipeline.Asset
+		columnOpts *ColumnHintOptions
+		wantColumn bool
+	}{
+		{
+			name: "enforce_schema=true adds columns",
+			asset: &pipeline.Asset{
+				Parameters: map[string]string{
+					"enforce_schema": "true",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "integer"},
+				},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames:   false,
+				EnforceSchemaByDefault: false,
+			},
+			wantColumn: true,
+		},
+		{
+			name: "enforce_schema=false does not add columns",
+			asset: &pipeline.Asset{
+				Parameters: map[string]string{
+					"enforce_schema": "false",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "integer"},
+				},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames:   false,
+				EnforceSchemaByDefault: true,
+			},
+			wantColumn: false,
+		},
+		{
+			name: "default enforces when EnforceSchemaByDefault=true",
+			asset: &pipeline.Asset{
+				Parameters: map[string]string{},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "integer"},
+				},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames:   false,
+				EnforceSchemaByDefault: true,
+			},
+			wantColumn: true,
+		},
+		{
+			name: "default does not enforce when EnforceSchemaByDefault=false",
+			asset: &pipeline.Asset{
+				Parameters: map[string]string{},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "integer"},
+				},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames:   false,
+				EnforceSchemaByDefault: false,
+			},
+			wantColumn: false,
+		},
+		{
+			name: "nil columnOpts does not add columns",
+			asset: &pipeline.Asset{
+				Parameters: map[string]string{
+					"enforce_schema": "true",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "integer"},
+				},
+			},
+			columnOpts: nil,
+			wantColumn: false,
+		},
+		{
+			name: "normalizes column names when NormalizeColumnNames=true",
+			asset: &pipeline.Asset{
+				Parameters: map[string]string{
+					"enforce_schema": "true",
+				},
+				Columns: []pipeline.Column{
+					{Name: "DateOfBirth", Type: "date"},
+				},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames:   true,
+				EnforceSchemaByDefault: false,
+			},
+			wantColumn: true,
+		},
+		{
+			name: "seed asset with path parameter can disable enforce_schema",
+			asset: &pipeline.Asset{
+				Parameters: map[string]string{
+					"path":           "./seed.csv",
+					"enforce_schema": "false",
+				},
+				Columns: []pipeline.Column{
+					{Name: "name", Type: "varchar"},
+					{Name: "contact_date", Type: "varchar"},
+				},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames:   true,
+				EnforceSchemaByDefault: true,
+			},
+			wantColumn: false,
+		},
+		{
+			name: "seed asset without enforce_schema uses default (true)",
+			asset: &pipeline.Asset{
+				Parameters: map[string]string{
+					"path": "./seed.csv",
+				},
+				Columns: []pipeline.Column{
+					{Name: "name", Type: "varchar"},
+				},
+			},
+			columnOpts: &ColumnHintOptions{
+				NormalizeColumnNames:   true,
+				EnforceSchemaByDefault: true,
+			},
+			wantColumn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := ConsolidatedParameters(t.Context(), tt.asset, []string{"--existing"}, tt.columnOpts)
+			require.NoError(t, err)
+
+			hasColumns := false
+			for _, arg := range result {
+				if arg == "--columns" {
+					hasColumns = true
+					break
+				}
+			}
+			assert.Equal(t, tt.wantColumn, hasColumns, "expected columns presence to be %v", tt.wantColumn)
+		})
+	}
+}
+
+func TestColumnHints_Normalization(t *testing.T) {
+	t.Parallel()
+
+	columns := []pipeline.Column{
+		{Name: "DateOfBirth", Type: "date"},
+	}
+
+	// Without normalization
+	result := ColumnHints(columns, false)
+	assert.Equal(t, "DateOfBirth:date", result)
+
+	// With normalization
+	result = ColumnHints(columns, true)
+	assert.Equal(t, "date_of_birth:date", result)
 }
 
 func TestAddExtraPackages(t *testing.T) {

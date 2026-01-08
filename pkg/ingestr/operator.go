@@ -144,16 +144,12 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--yes",
 		"--progress",
 		"log",
+	}, &python.ColumnHintOptions{
+		NormalizeColumnNames:   false,
+		EnforceSchemaByDefault: false,
 	})
 	if err != nil {
 		return err
-	}
-
-	if asset.Parameters["enforce_schema"] == "true" {
-		columns := columnHints(asset.Columns, false)
-		if columns != "" {
-			cmdArgs = append(cmdArgs, "--columns", columns)
-		}
 	}
 
 	path := asset.ExecutableFile.Path
@@ -254,14 +250,12 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"--yes",
 		"--progress",
 		"log",
+	}, &python.ColumnHintOptions{
+		NormalizeColumnNames:   true,
+		EnforceSchemaByDefault: true,
 	})
 	if err != nil {
 		return err
-	}
-
-	columns := columnHints(asset.Columns, true)
-	if columns != "" {
-		cmdArgs = append(cmdArgs, "--columns", columns)
 	}
 
 	path := asset.ExecutableFile.Path
