@@ -18,17 +18,17 @@ SELECT
     c.id AS customer_id,
     c.name AS customer_name,
     c.email,
-    c.created AS customer_created_at,
+    TIMESTAMP(c.created) AS customer_created_at,
     s.id AS subscription_id,
     s.status AS subscription_status,
-    s.current_period_start,
-    s.current_period_end,
+    TIMESTAMP(s.current_period_start) AS current_period_start,
+    TIMESTAMP(s.current_period_end) AS current_period_end,
     bt.id AS last_transaction_id,
     bt.amount / 100.0 AS last_transaction_amount,
     bt.fee / 100.0 AS last_transaction_fee,
     bt.net / 100.0 AS last_transaction_net,
     bt.currency AS last_transaction_currency,
-    bt.created AS last_transaction_created_at
+    TIMESTAMP(bt.created) AS last_transaction_created_at
 FROM stripe_sandbox.bronze_customer_data_raw c
 LEFT JOIN stripe_sandbox.bronze_subscription_data_raw s 
     ON c.id = s.customer

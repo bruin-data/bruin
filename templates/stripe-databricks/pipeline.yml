@@ -6,3 +6,5 @@ default:
     source_connection: stripe-default
     destination: databricks-default
 
+default_connections:
+  databricks: databricks-default
