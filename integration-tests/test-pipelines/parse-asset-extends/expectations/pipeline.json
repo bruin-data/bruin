@@ -126,6 +126,7 @@
         }
       ],
       "custom_checks": [],
+      "hooks": {},
       "metadata": {},
       "snowflake": null,
       "athena": null,

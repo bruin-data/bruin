@@ -335,6 +335,7 @@ type taskDefinition struct {
 	Extends           []string          `yaml:"extends"`
 	Columns           []column          `yaml:"columns"`
 	CustomChecks      []customCheck     `yaml:"custom_checks"`
+	Hooks             Hooks             `yaml:"hooks"`
 	Tags              []string          `yaml:"tags"`
 	Snowflake         snowflake         `yaml:"snowflake"`
 	Athena            athena            `yaml:"athena"`
@@ -513,6 +514,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Extends:           definition.Extends,
 		Columns:           columns,
 		CustomChecks:      make([]CustomCheck, len(definition.CustomChecks)),
+		Hooks:             definition.Hooks,
 		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
 		IntervalModifiers: definition.IntervalModifiers,

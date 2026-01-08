@@ -75,6 +75,10 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					PartitionBy:    "dt",
 					IncrementalKey: "dt",
 				},
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Post: []pipeline.Hook{{Query: "select 2"}},
+				},
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 				Columns: []pipeline.Column{
 					{
@@ -334,4 +338,87 @@ func TestUpstreams(t *testing.T) {
 
 	// Compare the expected and actual results
 	require.Equal(t, expected, got)
+}
+
+func TestConvertYamlToTask_Hooks(t *testing.T) {
+	t.Parallel()
+
+	type expectation struct {
+		pre  []pipeline.Hook
+		post []pipeline.Hook
+	}
+
+	tests := []struct {
+		name    string
+		content string
+		want    expectation
+		wantErr bool
+	}{
+		{
+			name: "pre hooks only",
+			content: `
+hooks:
+  pre:
+    - query: "select 1"
+`,
+			want: expectation{
+				pre: []pipeline.Hook{{Query: "select 1"}},
+			},
+		},
+		{
+			name: "post hooks only",
+			content: `
+hooks:
+  post:
+    - query: "select 2"
+`,
+			want: expectation{
+				post: []pipeline.Hook{{Query: "select 2"}},
+			},
+		},
+		{
+			name:    "no hooks",
+			content: ``,
+			want:    expectation{},
+		},
+		{
+			name: "invalid hooks shape",
+			content: `
+hooks:
+  - query: "select 1"
+`,
+			wantErr: true,
+		},
+		{
+			name: "invalid hook entry type",
+			content: `
+hooks:
+  pre:
+    - "select 1"
+`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			body := strings.TrimSpace(tt.content)
+			if body != "" {
+				body = "\n" + body
+			}
+			content := []byte(strings.TrimSpace("name: dataset.player_stats\ntype: duckdb.sql" + body))
+
+			task, err := pipeline.ConvertYamlToTask(content)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want.pre, task.Hooks.Pre)
+			require.Equal(t, tt.want.post, task.Hooks.Post)
+		})
+	}
 }

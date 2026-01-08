@@ -14,6 +14,12 @@ parameters:
     param2: second-parameter
     param3: third-parameter
 
+hooks:
+    pre:
+        - query: "select 1"
+    post:
+        - query: "select 2"
+
 secrets:
     - key: secret1
       inject_as: INJECTED_SECRET1

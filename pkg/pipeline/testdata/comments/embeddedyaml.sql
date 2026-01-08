@@ -27,6 +27,11 @@ custom_checks:
   - name: check1
     value: 16
     query: select * from table1
+hooks:
+  pre:
+    - query: "select 1"
+  post:
+    - query: "select 2"
 
 @bruin */
 
