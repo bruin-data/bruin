@@ -18,7 +18,7 @@
     "executable_file": {
       "name": "chess_games.asset.yml",
       "path": "test-pipelines/parse-happy-path/assets/chess_games.asset.yml",
-      "content": "name: chess_playground.games\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: games\n  destination: duckdb"
+      "content": "name: chess_playground.games\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: games\n  destination: duckdb\n\nhooks:\n  pre:\n    - query: \"select 1\"\n  post:\n    - query: \"select 2\"\n"
     },
     "definition_file": {
       "name": "chess_games.asset.yml",
@@ -34,7 +34,18 @@
     "extends": null,
     "columns": [],
     "custom_checks": [],
-    "hooks": {},
+    "hooks": {
+      "pre": [
+        {
+          "query": "select 1"
+        }
+      ],
+      "post": [
+        {
+          "query": "select 2"
+        }
+      ]
+    },
     "metadata": {},
     "snowflake": null,
     "athena": null,

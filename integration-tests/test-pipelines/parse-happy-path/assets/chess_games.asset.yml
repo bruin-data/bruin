@@ -4,3 +4,9 @@ parameters:
   source_connection: chess-default
   source_table: games
   destination: duckdb
+
+hooks:
+  pre:
+    - query: "select 1"
+  post:
+    - query: "select 2"

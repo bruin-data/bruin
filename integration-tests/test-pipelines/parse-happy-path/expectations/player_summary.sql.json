@@ -75,7 +75,21 @@
       }
     ],
     "custom_checks": [],
-    "hooks": {},
+    "hooks": {
+      "pre": [
+        {
+          "query": "select 1"
+        },
+        {
+          "query": "select 2"
+        }
+      ],
+      "post": [
+        {
+          "query": "select 3"
+        }
+      ]
+    },
     "metadata": {},
     "snowflake": null,
     "athena": null,
