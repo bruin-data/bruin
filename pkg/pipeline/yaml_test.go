@@ -339,9 +339,21 @@ func TestUpstreams(t *testing.T) {
 func TestConvertYamlToTask_Hooks(t *testing.T) {
 	t.Parallel()
 
-	content := []byte(strings.TrimSpace(`
-name: dataset.player_stats
-type: duckdb.sql
+	type expectation struct {
+		hooksNil bool
+		pre      []pipeline.Hook
+		post     []pipeline.Hook
+	}
+
+	tests := []struct {
+		name    string
+		content string
+		want    expectation
+		wantErr bool
+	}{
+		{
+			name: "pre and post hooks",
+			content: `
 hooks:
   pre:
     - query: "insert into logs (name, ts) values ('exec', now())"
@@ -349,102 +361,91 @@ hooks:
   post:
     - query: "select 3"
     - query: "select 4"
-`))
-
-	task, err := pipeline.ConvertYamlToTask(content)
-	require.NoError(t, err)
-
-	require.NotNil(t, task.Hooks)
-	require.Equal(t, []pipeline.Hook{
-		{Query: "insert into logs (name, ts) values ('exec', now())"},
-		{Query: "select 2"},
-	}, task.Hooks.Pre)
-	require.Equal(t, []pipeline.Hook{
-		{Query: "select 3"},
-		{Query: "select 4"},
-	}, task.Hooks.Post)
-}
-
-func TestConvertYamlToTask_HooksPreOnly(t *testing.T) {
-	t.Parallel()
-
-	content := []byte(strings.TrimSpace(`
-name: dataset.player_stats
-type: duckdb.sql
+`,
+			want: expectation{
+				pre: []pipeline.Hook{
+					{Query: "insert into logs (name, ts) values ('exec', now())"},
+					{Query: "select 2"},
+				},
+				post: []pipeline.Hook{
+					{Query: "select 3"},
+					{Query: "select 4"},
+				},
+			},
+		},
+		{
+			name: "pre hooks only",
+			content: `
 hooks:
   pre:
     - query: "select 1"
-`))
-
-	task, err := pipeline.ConvertYamlToTask(content)
-	require.NoError(t, err)
-
-	require.NotNil(t, task.Hooks)
-	require.Equal(t, []pipeline.Hook{
-		{Query: "select 1"},
-	}, task.Hooks.Pre)
-	require.Empty(t, task.Hooks.Post)
-}
-
-func TestConvertYamlToTask_HooksPostOnly(t *testing.T) {
-	t.Parallel()
-
-	content := []byte(strings.TrimSpace(`
-name: dataset.player_stats
-type: duckdb.sql
+`,
+			want: expectation{
+				pre: []pipeline.Hook{{Query: "select 1"}},
+			},
+		},
+		{
+			name: "post hooks only",
+			content: `
 hooks:
   post:
     - query: "select 2"
-`))
-
-	task, err := pipeline.ConvertYamlToTask(content)
-	require.NoError(t, err)
-
-	require.NotNil(t, task.Hooks)
-	require.Empty(t, task.Hooks.Pre)
-	require.Equal(t, []pipeline.Hook{
-		{Query: "select 2"},
-	}, task.Hooks.Post)
-}
-
-func TestConvertYamlToTask_NoHooks(t *testing.T) {
-	t.Parallel()
-
-	content := []byte(strings.TrimSpace(`
-name: dataset.player_stats
-type: duckdb.sql
-`))
-
-	task, err := pipeline.ConvertYamlToTask(content)
-	require.NoError(t, err)
-	require.Nil(t, task.Hooks)
-}
-
-func TestConvertYamlToTask_HooksInvalidShape(t *testing.T) {
-	t.Parallel()
-
-	content := []byte(strings.TrimSpace(`
-name: dataset.player_stats
-type: duckdb.sql
+`,
+			want: expectation{
+				post: []pipeline.Hook{{Query: "select 2"}},
+			},
+		},
+		{
+			name:    "no hooks",
+			content: ``,
+			want: expectation{
+				hooksNil: true,
+			},
+		},
+		{
+			name: "invalid hooks shape",
+			content: `
 hooks:
   - query: "select 1"
-`))
-
-	_, err := pipeline.ConvertYamlToTask(content)
-	require.Error(t, err)
-}
-
-func TestConvertYamlToTask_HooksInvalidEntryType(t *testing.T) {
-	t.Parallel()
-
-	content := []byte(strings.TrimSpace(`
-name: dataset.player_stats
-type: duckdb.sql
+`,
+			wantErr: true,
+		},
+		{
+			name: "invalid hook entry type",
+			content: `
 hooks:
   pre:
     - "select 1"
-`))
+`,
+			wantErr: true,
+		},
+	}
 
-	_, err := pipeline.ConvertYamlToTask(content)
-	require.Error(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			body := strings.TrimSpace(tt.content)
+			if body != "" {
+				body = "\n" + body
+			}
+			content := []byte(strings.TrimSpace("name: dataset.player_stats\ntype: duckdb.sql" + body))
+
+			task, err := pipeline.ConvertYamlToTask(content)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			if tt.want.hooksNil {
+				require.Nil(t, task.Hooks)
+				return
+			}
+
+			require.NotNil(t, task.Hooks)
+			require.Equal(t, tt.want.pre, task.Hooks.Pre)
+			require.Equal(t, tt.want.post, task.Hooks.Post)
+		})
+	}
 }
