@@ -511,6 +511,11 @@ func enhancePipeline(ctx context.Context, c *cli.Command, pipelinePath string, f
 		if failedCount > 0 {
 			errorPrinter.Printf("  Failed: %d\n", failedCount)
 		}
+
+		// Show git diff for the pipeline directory if any assets were updated
+		if updatedCount > 0 {
+			showGitDiff(pipelinePath)
+		}
 	}
 
 	return nil
