@@ -2,15 +2,6 @@
 
 name: dashboard.hello_bq
 type: bq.sql
-description: A simple dashboard table that demonstrates basic BigQuery SQL materialization, containing a single integer column for testing and demonstration purposes
-tags:
-  - demo
-  - dashboard
-  - bigquery
-  - example
-domains:
-  - analytics
-  - dashboard
 
 materialization:
   type: table

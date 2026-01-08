@@ -159,4 +159,3 @@ __debug_bin*
 test-glossary.yml
 .venv
 logs/queries
-.bruin.yml
