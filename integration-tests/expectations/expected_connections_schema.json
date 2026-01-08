@@ -271,11 +271,10 @@
             "type": "string"
           },
           "type": "array",
-          "default": [
-            "erik",
-            "vadimer2Nakamura",
-            "ArjunErigaisi"
-          ]
+        "default": [
+          "MagnusCarlsen",
+          "Hikaru"
+        ]
         }
       },
       "additionalProperties": false,
