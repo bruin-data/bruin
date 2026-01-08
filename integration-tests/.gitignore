@@ -3,3 +3,7 @@ logs/*.log
 .bruin.cloud.yml
 logs/runs
 logs/exports
+
+__pycache__/
+*.py[cod]
+logs/queries
