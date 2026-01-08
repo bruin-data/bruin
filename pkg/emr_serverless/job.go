@@ -19,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/poll"
+	"github.com/bruin-data/bruin/pkg/spark"
 	"github.com/google/uuid"
 )
 
@@ -182,7 +183,7 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 		return nil, fmt.Errorf("error finding project root: %w", err)
 	}
 
-	err = packageContextWithPrefix(
+	err = spark.PackageContext(
 		zipper,
 		os.DirFS(repo.Path),
 	)
