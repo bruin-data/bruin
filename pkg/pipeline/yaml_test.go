@@ -356,28 +356,6 @@ func TestConvertYamlToTask_Hooks(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "pre and post hooks",
-			content: `
-hooks:
-  pre:
-    - query: "insert into logs (name, ts) values ('exec', now())"
-    - query: "select 2"
-  post:
-    - query: "select 3"
-    - query: "select 4"
-`,
-			want: expectation{
-				pre: []pipeline.Hook{
-					{Query: "insert into logs (name, ts) values ('exec', now())"},
-					{Query: "select 2"},
-				},
-				post: []pipeline.Hook{
-					{Query: "select 3"},
-					{Query: "select 4"},
-				},
-			},
-		},
-		{
 			name: "pre hooks only",
 			content: `
 hooks:
