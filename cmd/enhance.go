@@ -14,7 +14,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/enhance"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
@@ -24,7 +23,6 @@ import (
 
 const (
 	enhanceStatusUpdated = "updated"
-	enhanceStatusSkipped = "skipped"
 	enhanceStatusFailed  = "failed"
 )
 
@@ -47,11 +45,6 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 				Usage:   "Target environment name as defined in .bruin.yml",
 			},
 			&cli.BoolFlag{
-				Name:  "manual",
-				Usage: "Manually confirm each suggestion before applying",
-				Value: false,
-			},
-			&cli.BoolFlag{
 				Name:  "skip-format",
 				Usage: "Skip the initial formatting step",
 				Value: false,
@@ -65,11 +58,6 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 				Name:  "model",
 				Usage: "Claude model to use for AI suggestions",
 				Value: "claude-sonnet-4-20250514",
-			},
-			&cli.BoolFlag{
-				Name:  "dry-run",
-				Usage: "Show suggestions without applying any changes",
-				Value: false,
 			},
 			&cli.BoolFlag{
 				Name:  "debug",
@@ -93,17 +81,15 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 
 	inputPath := c.Args().Get(0)
 	if inputPath == "" {
-		inputPath = "."
+		return printEnhanceError(output, errors.New("please provide a path to an asset file"))
 	}
 
-	// Check if it's a single asset or pipeline
-	isSingleAsset := isPathReferencingAsset(inputPath)
-
-	if isSingleAsset {
-		return enhanceSingleAsset(ctx, c, inputPath, fs, output, logger, isDebug)
+	// Only single asset enhancement is supported
+	if !isPathReferencingAsset(inputPath) {
+		return printEnhanceError(output, errors.New("please provide a path to a single asset file (e.g., assets/my_asset.sql or assets/my_asset.asset.yml)"))
 	}
 
-	return enhancePipeline(ctx, c, inputPath, fs, output, logger, isDebug)
+	return enhanceSingleAsset(ctx, c, inputPath, fs, output, logger, isDebug)
 }
 
 func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, logger interface{}, isDebug *bool) error {
@@ -190,339 +176,26 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		tableSummaryJSON = preFetchTableSummary(ctx, fs, assetPath, pp.Asset, env, output)
 	}
 
-	suggestions, err := enhancer.EnhanceAssetWithStats(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
+	_, err = enhancer.EnhanceAssetWithStats(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
 
-	// If suggestions is nil, Claude directly edited the file via MCP
-	if suggestions == nil {
-		if output == "json" {
-			result := map[string]interface{}{
-				"status": "success",
-				"asset":  pp.Asset.Name,
-			}
-			jsonBytes, _ := json.Marshal(result)
-			fmt.Println(string(jsonBytes))
-		} else {
-			successPrinter.Printf("\n✓ Enhanced '%s'\n", pp.Asset.Name)
-			// Show git diff to display what changed
-			showGitDiff(absAssetPath)
-		}
-		return nil
-	}
-
-	// Fallback mode: Claude returned JSON suggestions
-	if suggestions.IsEmpty() {
-		if output == "json" {
-			result := map[string]interface{}{
-				"status":  "no_suggestions",
-				"message": "No enhancements suggested for this asset",
-				"asset":   pp.Asset.Name,
-			}
-			jsonBytes, _ := json.Marshal(result)
-			fmt.Println(string(jsonBytes))
-		} else {
-			infoPrinter.Printf("No enhancements suggested for asset '%s'.\n", pp.Asset.Name)
-		}
-		return nil
-	}
-
-	// Handle dry-run mode
-	if c.Bool("dry-run") {
-		if output == "json" {
-			result := map[string]interface{}{
-				"status":      "dry_run",
-				"asset":       pp.Asset.Name,
-				"suggestions": suggestions,
-			}
-			jsonBytes, _ := json.Marshal(result)
-			fmt.Println(string(jsonBytes))
-		} else {
-			enhance.DisplaySuggestions(os.Stdout, suggestions, pp.Asset.Name)
-			fmt.Println("\nDry run complete. No changes applied.")
-		}
-		return nil
-	}
-
-	// Auto-apply by default, or interactive confirmation with --manual flag
-	var approved *enhance.EnhancementSuggestions
-	if c.Bool("manual") && output != "json" {
-		confirmer := enhance.NewInteractiveConfirmer(os.Stdin, os.Stdout)
-		approved, err = confirmer.ConfirmSuggestions(suggestions, pp.Asset.Name)
-		if err != nil {
-			return printEnhanceError(output, errors.Wrap(err, "confirmation failed"))
-		}
-	} else {
-		approved = suggestions
-	}
-
-	// Apply and persist
-	if !approved.IsEmpty() {
-		enhance.ApplySuggestions(pp.Asset, approved)
-		if err := pp.Asset.Persist(fs); err != nil {
-			return printEnhanceError(output, errors.Wrap(err, "failed to save asset"))
-		}
-
-		if output == "json" {
-			result := map[string]interface{}{
-				"status":  "success",
-				"asset":   pp.Asset.Name,
-				"applied": approved,
-			}
-			jsonBytes, _ := json.Marshal(result)
-			fmt.Println(string(jsonBytes))
-		} else {
-			enhance.DisplayAppliedChanges(os.Stdout, approved, pp.Asset.Name)
-		}
-	} else {
-		if output == "json" {
-			result := map[string]interface{}{
-				"status":  "skipped",
-				"asset":   pp.Asset.Name,
-				"message": "No suggestions were approved",
-			}
-			jsonBytes, _ := json.Marshal(result)
-			fmt.Println(string(jsonBytes))
-		} else {
-			infoPrinter.Println("No suggestions were approved.")
-		}
-	}
-
-	return nil
-}
-
-func enhancePipeline(ctx context.Context, c *cli.Command, pipelinePath string, fs afero.Fs, output string, logger interface{}, isDebug *bool) error {
-	// Step 1: Format all assets (unless skipped)
-	if !c.Bool("skip-format") {
-		if output != "json" {
-			infoPrinter.Println("Step 1/3: Formatting assets...")
-		}
-		// Use the format command logic for the entire pipeline
-		assetPaths := path.GetAllPossibleAssetPaths(pipelinePath, assetsDirectoryNames, pipeline.SupportedFileSuffixes)
-		formattedCount := 0
-		for _, assetPath := range assetPaths {
-			if _, err := formatAsset(assetPath); err == nil {
-				formattedCount++
-			}
-		}
-		if output != "json" && formattedCount > 0 {
-			infoPrinter.Printf("  Formatted %d assets.\n", formattedCount)
-		}
-	}
-
-	// Load the pipeline
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
-	if err != nil {
-		return printEnhanceError(output, errors.Wrapf(err, "failed to build pipeline at '%s'", pipelinePath))
-	}
-
-	// Step 2: Fill columns from DB for all assets (unless skipped)
-	if !c.Bool("skip-fill-columns") {
-		if output != "json" {
-			infoPrinter.Println("Step 2/3: Filling columns from database...")
-		}
-		// Load config
-		repoRoot, err := git.FindRepoFromPath(pipelinePath)
-		if err == nil {
-			cm, err := config.LoadOrCreate(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
-			if err == nil {
-				env := c.String("environment")
-				if env != "" {
-					_ = cm.SelectEnvironment(env)
-				}
-
-				filledCount := 0
-				for _, asset := range foundPipeline.Assets {
-					pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-					status, _ := fillColumnsFromDB(pp, fs, env, nil)
-					if status == fillStatusUpdated {
-						filledCount++
-					}
-				}
-				if output != "json" && filledCount > 0 {
-					infoPrinter.Printf("  Updated columns for %d assets.\n", filledCount)
-				}
-			}
-		}
-	}
-
-	// Step 3: AI Enhancement for each asset
-	if output != "json" {
-		infoPrinter.Println("Step 3/3: Enhancing assets with AI...")
-	}
-
-	enhancer := enhance.NewEnhancer(fs, c.String("model"))
-
-	// Enable debug mode if --debug flag is set
-	isDebugMode := isDebug != nil && *isDebug
-	enhancer.SetDebug(isDebugMode)
-
-	// Try to get API key from config
-	if apiKey := getAnthropicAPIKey(fs, pipelinePath); apiKey != "" {
-		enhancer.SetAPIKey(apiKey)
-	}
-
-	// Set repo root and environment for MCP file tools
-	pipelineRepoRoot, repoErr := git.FindRepoFromPath(pipelinePath)
-	if repoErr == nil {
-		enhancer.SetRepoRoot(pipelineRepoRoot.Path)
-		if output != "json" {
-			infoPrinter.Printf("  AI agent enabled with file editing tools\n")
-		}
-	}
-	if env := c.String("environment"); env != "" {
-		enhancer.SetEnvironment(env)
-		if output != "json" {
-			infoPrinter.Printf("  Using environment: %s\n", env)
-		}
-	}
-
-	if err := enhancer.EnsureClaudeCLI(); err != nil {
-		return printEnhanceError(output, errors.Wrap(err, "Claude CLI not available"))
-	}
-
-	// Re-load pipeline to get updated assets
-	foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
-	if err != nil {
-		return printEnhanceError(output, errors.Wrapf(err, "failed to reload pipeline at '%s'", pipelinePath))
-	}
-
-	results := make([]map[string]interface{}, 0)
-	updatedCount := 0
-	skippedCount := 0
-	failedCount := 0
-
-	env := c.String("environment")
-	for _, asset := range foundPipeline.Assets {
-		if output != "json" {
-			infoPrinter.Printf("  Processing '%s'...\n", asset.Name)
-		}
-
-		// Pre-fetch table statistics to minimize tool calls during enhancement
-		var tableSummaryJSON string
-		if asset.Materialization.Type != "" && asset.Name != "" {
-			tableSummaryJSON = preFetchTableSummary(ctx, fs, asset.DefinitionFile.Path, asset, env, output)
-		}
-
-		suggestions, err := enhancer.EnhanceAssetWithStats(ctx, asset, foundPipeline.Name, tableSummaryJSON)
-		if err != nil {
-			failedCount++
-			if output != "json" {
-				warningPrinter.Printf("    Failed to enhance: %v\n", err)
-			}
-			results = append(results, map[string]interface{}{
-				"asset":  asset.Name,
-				"status": enhanceStatusFailed,
-				"error":  err.Error(),
-			})
-			continue
-		}
-
-		// If suggestions is nil, Claude directly edited the file via MCP
-		if suggestions == nil {
-			updatedCount++
-			if output != "json" {
-				successPrinter.Printf("    ✓ Enhanced\n")
-			}
-			results = append(results, map[string]interface{}{
-				"asset":  asset.Name,
-				"status": enhanceStatusUpdated,
-			})
-			continue
-		}
-
-		// Fallback mode: Claude returned JSON suggestions
-		if suggestions.IsEmpty() {
-			skippedCount++
-			results = append(results, map[string]interface{}{
-				"asset":  asset.Name,
-				"status": enhanceStatusSkipped,
-			})
-			continue
-		}
-
-		// Auto-apply by default, or interactive confirmation with --manual flag
-		var approved *enhance.EnhancementSuggestions
-		if c.Bool("manual") && output != "json" && !c.Bool("dry-run") {
-			confirmer := enhance.NewInteractiveConfirmer(os.Stdin, os.Stdout)
-			approved, _ = confirmer.ConfirmSuggestions(suggestions, asset.Name)
-		} else {
-			approved = suggestions
-		}
-
-		if c.Bool("dry-run") {
-			results = append(results, map[string]interface{}{
-				"asset":       asset.Name,
-				"status":      "dry_run",
-				"suggestions": suggestions,
-			})
-			continue
-		}
-
-		if !approved.IsEmpty() {
-			enhance.ApplySuggestions(asset, approved)
-			if err := asset.Persist(fs); err != nil {
-				failedCount++
-				results = append(results, map[string]interface{}{
-					"asset":  asset.Name,
-					"status": enhanceStatusFailed,
-					"error":  err.Error(),
-				})
-				continue
-			}
-			updatedCount++
-			if output != "json" {
-				enhance.DisplayAppliedChanges(os.Stdout, approved, asset.Name)
-			}
-			results = append(results, map[string]interface{}{
-				"asset":   asset.Name,
-				"status":  enhanceStatusUpdated,
-				"applied": approved,
-			})
-		} else {
-			skippedCount++
-			results = append(results, map[string]interface{}{
-				"asset":  asset.Name,
-				"status": enhanceStatusSkipped,
-			})
-		}
-	}
-
-	// Print summary
+	// Claude directly edited the file via MCP
 	if output == "json" {
-		summary := map[string]interface{}{
-			"status":   "completed",
-			"pipeline": foundPipeline.Name,
-			"summary": map[string]int{
-				"updated": updatedCount,
-				"skipped": skippedCount,
-				"failed":  failedCount,
-				"total":   len(foundPipeline.Assets),
-			},
-			"results": results,
+		result := map[string]interface{}{
+			"status": "success",
+			"asset":  pp.Asset.Name,
 		}
-		jsonBytes, _ := json.Marshal(summary)
+		jsonBytes, _ := json.Marshal(result)
 		fmt.Println(string(jsonBytes))
 	} else {
-		fmt.Println()
-		infoPrinter.Printf("Enhancement Summary for pipeline '%s':\n", foundPipeline.Name)
-		fmt.Printf("  Total assets: %d\n", len(foundPipeline.Assets))
-		successPrinter.Printf("  Updated: %d\n", updatedCount)
-		fmt.Printf("  Skipped (no suggestions): %d\n", skippedCount)
-		if failedCount > 0 {
-			errorPrinter.Printf("  Failed: %d\n", failedCount)
-		}
-
-		// Show git diff for the pipeline directory if any assets were updated
-		if updatedCount > 0 {
-			showGitDiff(pipelinePath)
-		}
+		successPrinter.Printf("\n✓ Enhanced '%s'\n", pp.Asset.Name)
+		// Show git diff to display what changed
+		showGitDiff(absAssetPath)
 	}
-
 	return nil
 }
-
 func printEnhanceError(output string, err error) error {
 	printErrorForOutput(output, err)
 	return cli.Exit("", 1)
