@@ -345,7 +345,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 		}
 
 		qq.Query = wrapHooks(qq.Query, task.Hooks)
-		
+
 		if r.output != "json" {
 			qq.Query = highlightCode(qq.Query, "sql")
 		}
@@ -394,11 +394,7 @@ func highlightCode(code string, language string) string {
 	return b.String()
 }
 
-func wrapHooks(query string, hooks *pipeline.Hooks) string {
-	if hooks == nil {
-		return query
-	}
-
+func wrapHooks(query string, hooks pipeline.Hooks) string {
 	preParts := formatHookQueries(hooks.Pre)
 	postParts := formatHookQueries(hooks.Post)
 	if len(preParts) == 0 && len(postParts) == 0 {

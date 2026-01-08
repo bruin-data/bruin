@@ -127,7 +127,7 @@ func TestRenderDDLCommand_Run(t *testing.T) {
 					ExecutableFile: pipeline.ExecutableFile{
 						Path: "/path/to/executable",
 					},
-					Hooks: &pipeline.Hooks{
+					Hooks: pipeline.Hooks{
 						Pre:  []pipeline.Hook{{Query: "select 1"}},
 						Post: []pipeline.Hook{{Query: "select 2"}},
 					},
