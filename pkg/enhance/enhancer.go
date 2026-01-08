@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
@@ -76,27 +75,23 @@ func (e *Enhancer) EnsureClaudeCLI() error {
 }
 
 // EnhanceAsset runs AI enhancement on a single asset.
-// When MCP is enabled, Claude directly edits the file and returns nil suggestions.
-// When MCP is disabled, Claude returns suggestions that need to be applied manually.
+// Claude directly edits the file using MCP tools and returns nil suggestions.
 func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName string) (*EnhancementSuggestions, error) {
 	return e.EnhanceAssetWithStats(ctx, asset, pipelineName, "")
 }
 
 // EnhanceAssetWithStats runs AI enhancement with pre-fetched table statistics.
 // The tableSummaryJSON parameter contains pre-fetched statistics to avoid Claude making database tool calls.
-// When tableSummaryJSON is provided, Claude won't need to call bruin_get_table_summary.
 func (e *Enhancer) EnhanceAssetWithStats(ctx context.Context, asset *pipeline.Asset, pipelineName string, tableSummaryJSON string) (*EnhancementSuggestions, error) {
 	if err := e.EnsureClaudeCLI(); err != nil {
 		return nil, errors.Wrap(err, "claude CLI not available")
 	}
 
-	// If MCP is enabled, use the agentic file-editing approach
-	if e.useMCP && asset.DefinitionFile.Path != "" {
-		return e.enhanceAssetWithMCP(ctx, asset, pipelineName, tableSummaryJSON)
+	if asset.DefinitionFile.Path == "" {
+		return nil, errors.New("asset definition file path is required")
 	}
 
-	// Fallback to JSON response mode
-	return e.enhanceAssetWithJSON(ctx, asset, pipelineName)
+	return e.enhanceAssetWithMCP(ctx, asset, pipelineName, tableSummaryJSON)
 }
 
 // enhanceAssetWithMCP uses Claude to directly edit the asset file.
@@ -114,30 +109,6 @@ func (e *Enhancer) enhanceAssetWithMCP(ctx context.Context, asset *pipeline.Asse
 	// Return nil suggestions since Claude edited the file directly
 	// The caller should reload the asset to see the changes
 	return nil, nil
-}
-
-// enhanceAssetWithJSON uses Claude to return JSON suggestions (fallback mode).
-func (e *Enhancer) enhanceAssetWithJSON(ctx context.Context, asset *pipeline.Asset, pipelineName string) (*EnhancementSuggestions, error) {
-	// Build the prompt
-	prompt := BuildEnhancePrompt(asset, pipelineName)
-	systemPrompt := GetSystemPrompt(false)
-
-	// Call Claude CLI
-	response, err := e.callClaude(ctx, prompt, systemPrompt)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get AI suggestions")
-	}
-
-	// Parse response
-	suggestions, err := ParseClaudeResponse(response)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse AI suggestions")
-	}
-
-	// Filter out suggestions for columns/checks that already exist
-	suggestions = e.filterExistingSuggestions(suggestions, asset)
-
-	return suggestions, nil
 }
 
 // callClaude executes the Claude CLI with the given prompt.
@@ -270,86 +241,6 @@ func (e *Enhancer) SetEnvironment(environment string) {
 // When debug is true, Claude CLI output is streamed directly to stdout/stderr.
 func (e *Enhancer) SetDebug(debug bool) {
 	e.debug = debug
-}
-
-// filterExistingSuggestions removes suggestions for things that already exist.
-func (e *Enhancer) filterExistingSuggestions(suggestions *EnhancementSuggestions, asset *pipeline.Asset) *EnhancementSuggestions {
-	if suggestions == nil {
-		return nil
-	}
-
-	filtered := &EnhancementSuggestions{
-		ColumnDescriptions: make(map[string]string),
-		ColumnChecks:       make(map[string][]CheckSuggestion),
-	}
-
-	// Only include description if asset doesn't have one
-	if asset.Description == "" && suggestions.AssetDescription != "" {
-		filtered.AssetDescription = suggestions.AssetDescription
-	}
-
-	// Filter column descriptions - only for columns without descriptions
-	for colName, desc := range suggestions.ColumnDescriptions {
-		col := getColumnByName(asset, colName)
-		if col != nil && col.Description == "" {
-			filtered.ColumnDescriptions[colName] = desc
-		}
-	}
-
-	// Filter column checks - only for checks that don't exist
-	for colName, checks := range suggestions.ColumnChecks {
-		col := getColumnByName(asset, colName)
-		if col == nil {
-			continue
-		}
-
-		var validChecks []CheckSuggestion
-		for _, check := range checks {
-			if !hasCheck(col.Checks, check.Name) {
-				validChecks = append(validChecks, check)
-			}
-		}
-		if len(validChecks) > 0 {
-			filtered.ColumnChecks[colName] = validChecks
-		}
-	}
-
-	// Filter tags - only tags that don't exist
-	for _, tag := range suggestions.SuggestedTags {
-		if !containsString(asset.Tags, tag) {
-			filtered.SuggestedTags = append(filtered.SuggestedTags, tag)
-		}
-	}
-
-	// Filter domains
-	for _, domain := range suggestions.SuggestedDomains {
-		if !containsString(asset.Domains, domain) {
-			filtered.SuggestedDomains = append(filtered.SuggestedDomains, domain)
-		}
-	}
-
-	// Only include owner if not set
-	if asset.Owner == "" && suggestions.SuggestedOwner != "" {
-		filtered.SuggestedOwner = suggestions.SuggestedOwner
-	}
-
-	// Filter custom checks
-	for _, customCheck := range suggestions.CustomChecks {
-		if !hasCustomCheck(asset.CustomChecks, customCheck.Name) {
-			filtered.CustomChecks = append(filtered.CustomChecks, customCheck)
-		}
-	}
-
-	return filtered
-}
-
-func getColumnByName(asset *pipeline.Asset, name string) *pipeline.Column {
-	for i := range asset.Columns {
-		if strings.EqualFold(asset.Columns[i].Name, name) {
-			return &asset.Columns[i]
-		}
-	}
-	return nil
 }
 
 // installClaudeCLI installs the Claude CLI using the official installation script.
