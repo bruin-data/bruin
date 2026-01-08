@@ -7,14 +7,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
-	"github.com/bruin-data/bruin/cmd/mcp"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/enhance"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -161,12 +163,12 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		enhancer.SetAPIKey(apiKey)
 	}
 
-	// Set repo root and environment for MCP database tools
+	// Set repo root and environment for MCP file tools
 	repoRoot, err := git.FindRepoFromPath(assetPath)
 	if err == nil {
 		enhancer.SetRepoRoot(repoRoot.Path)
 		if output != "json" {
-			infoPrinter.Printf("  AI agent enabled with file editing and database tools\n")
+			infoPrinter.Printf("  AI agent enabled with file editing tools\n")
 		}
 	}
 	env := c.String("environment")
@@ -361,12 +363,12 @@ func enhancePipeline(ctx context.Context, c *cli.Command, pipelinePath string, f
 		enhancer.SetAPIKey(apiKey)
 	}
 
-	// Set repo root and environment for MCP database tools
+	// Set repo root and environment for MCP file tools
 	pipelineRepoRoot, repoErr := git.FindRepoFromPath(pipelinePath)
 	if repoErr == nil {
 		enhancer.SetRepoRoot(pipelineRepoRoot.Path)
 		if output != "json" {
-			infoPrinter.Printf("  AI agent enabled with file editing and database tools\n")
+			infoPrinter.Printf("  AI agent enabled with file editing tools\n")
 		}
 	}
 	if env := c.String("environment"); env != "" {
@@ -604,8 +606,8 @@ func preFetchTableSummary(ctx context.Context, fs afero.Fs, assetPath string, as
 		infoPrinter.Printf("  Pre-fetching table statistics for '%s'...\n", tableName)
 	}
 
-	// Fetch table summary using the MCP function
-	summary := mcp.GetTableSummaryWithManager(ctx, manager, connectionName, tableName)
+	// Fetch table summary with sample values for enum-like columns
+	summary := getTableSummaryWithManager(ctx, manager, connectionName, tableName)
 	if summary.Error != "" {
 		if output != "json" {
 			warningPrinter.Printf("  Warning: could not fetch table statistics: %s\n", summary.Error)
@@ -620,7 +622,11 @@ func preFetchTableSummary(ctx context.Context, fs afero.Fs, assetPath string, as
 	}
 
 	if output != "json" {
-		infoPrinter.Printf("  Pre-fetched statistics for %d columns\n", len(summary.Columns))
+		infoPrinter.Printf("  Pre-fetched statistics for %d columns", len(summary.Columns))
+		if len(summary.SampleValues) > 0 {
+			infoPrinter.Printf(" (including sample values for %d enum-like columns)", len(summary.SampleValues))
+		}
+		infoPrinter.Println()
 	}
 
 	return string(jsonBytes)
@@ -639,5 +645,231 @@ func getAssetConnectionName(asset *pipeline.Asset) string {
 	}
 
 	return ""
+}
+
+// TableSummary represents comprehensive statistics for an entire table.
+type TableSummary struct {
+	TableName    string                   `json:"table_name"`
+	Connection   string                   `json:"connection"`
+	RowCount     int64                    `json:"row_count"`
+	Columns      []ColumnSummary          `json:"columns"`
+	SampleValues map[string][]interface{} `json:"sample_values,omitempty"`
+	Error        string                   `json:"error,omitempty"`
+}
+
+// ColumnSummary represents statistics for a single column within a table summary.
+type ColumnSummary struct {
+	Name           string      `json:"name"`
+	Type           string      `json:"type"`
+	NormalizedType string      `json:"normalized_type"`
+	Nullable       bool        `json:"nullable"`
+	PrimaryKey     bool        `json:"primary_key"`
+	Unique         bool        `json:"unique"`
+	Stats          interface{} `json:"stats,omitempty"`
+}
+
+// Selector interface for querying databases.
+type Selector interface {
+	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+}
+
+// getTableSummaryWithManager retrieves comprehensive statistics using a provided connection manager.
+func getTableSummaryWithManager(ctx context.Context, manager config.ConnectionAndDetailsGetter, connectionName, tableName string) *TableSummary {
+	if manager == nil {
+		return &TableSummary{TableName: tableName, Error: "connection manager is nil"}
+	}
+
+	conn := manager.GetConnection(connectionName)
+	if conn == nil {
+		return &TableSummary{TableName: tableName, Error: fmt.Sprintf("connection '%s' not found", connectionName)}
+	}
+
+	summarizer, ok := conn.(diff.TableSummarizer)
+	if !ok {
+		return &TableSummary{TableName: tableName, Error: fmt.Sprintf("connection '%s' does not support table summary", connectionName)}
+	}
+
+	result, err := summarizer.GetTableSummary(ctx, tableName, false)
+	if err != nil {
+		return &TableSummary{TableName: tableName, Connection: connectionName, Error: fmt.Sprintf("failed to get table summary: %v", err)}
+	}
+
+	summary := &TableSummary{
+		TableName:    tableName,
+		Connection:   connectionName,
+		RowCount:     result.RowCount,
+		Columns:      make([]ColumnSummary, 0, len(result.Table.Columns)),
+		SampleValues: make(map[string][]interface{}),
+	}
+
+	for _, col := range result.Table.Columns {
+		colSummary := ColumnSummary{
+			Name:           col.Name,
+			Type:           col.Type,
+			NormalizedType: string(col.NormalizedType),
+			Nullable:       col.Nullable,
+			PrimaryKey:     col.PrimaryKey,
+			Unique:         col.Unique,
+		}
+
+		// Convert statistics to a map for JSON serialization
+		if col.Stats != nil {
+			colSummary.Stats = convertStatsToMap(col.Stats)
+		}
+
+		summary.Columns = append(summary.Columns, colSummary)
+
+		// Pre-fetch sample values for enum-like columns
+		if isEnumLikeColumn(col.Name, string(col.NormalizedType)) {
+			values := getSampleColumnValues(ctx, conn, tableName, col.Name, 20)
+			if len(values) > 0 {
+				summary.SampleValues[col.Name] = values
+			}
+		}
+	}
+
+	return summary
+}
+
+// convertStatsToMap converts diff.ColumnStatistics to a map for JSON serialization.
+func convertStatsToMap(stats diff.ColumnStatistics) map[string]interface{} {
+	result := make(map[string]interface{})
+	result["type"] = stats.Type()
+
+	switch s := stats.(type) {
+	case *diff.NumericalStatistics:
+		if s.Min != nil {
+			result["min"] = *s.Min
+		}
+		if s.Max != nil {
+			result["max"] = *s.Max
+		}
+		if s.Avg != nil {
+			result["avg"] = *s.Avg
+		}
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+		if s.StdDev != nil {
+			result["stddev"] = *s.StdDev
+		}
+	case *diff.StringStatistics:
+		result["distinct_count"] = s.DistinctCount
+		result["min_length"] = s.MinLength
+		result["max_length"] = s.MaxLength
+		result["avg_length"] = s.AvgLength
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+		result["empty_count"] = s.EmptyCount
+	case *diff.BooleanStatistics:
+		result["true_count"] = s.TrueCount
+		result["false_count"] = s.FalseCount
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+	case *diff.DateTimeStatistics:
+		if !s.EarliestDate.IsZero() {
+			result["earliest_date"] = s.EarliestDate.String()
+		}
+		if !s.LatestDate.IsZero() {
+			result["latest_date"] = s.LatestDate.String()
+		}
+		result["unique_count"] = s.UniqueCount
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+	case *diff.JSONStatistics:
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+	}
+
+	return result
+}
+
+// isEnumLikeColumn checks if a column name suggests it contains enum-like values.
+func isEnumLikeColumn(name string, normalizedType string) bool {
+	// Only check string columns
+	if normalizedType != string(diff.CommonTypeString) {
+		return false
+	}
+
+	lowerName := strings.ToLower(name)
+
+	// Common enum-like column name patterns
+	enumPatterns := []string{
+		"status",
+		"state",
+		"type",
+		"category",
+		"kind",
+		"level",
+		"priority",
+		"severity",
+		"role",
+		"gender",
+		"country",
+		"region",
+		"currency",
+		"language",
+		"tier",
+		"plan",
+		"source",
+		"channel",
+		"platform",
+		"device",
+		"browser",
+		"os",
+		"method",
+		"action",
+		"event_type",
+		"payment_method",
+		"payment_status",
+		"order_status",
+		"subscription_status",
+	}
+
+	for _, pattern := range enumPatterns {
+		if strings.Contains(lowerName, pattern) {
+			return true
+		}
+	}
+
+	// Check for suffix patterns
+	suffixPatterns := []string{"_type", "_status", "_state", "_kind", "_category", "_level"}
+	for _, suffix := range suffixPatterns {
+		if strings.HasSuffix(lowerName, suffix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getSampleColumnValues retrieves sample distinct values for a column.
+func getSampleColumnValues(ctx context.Context, conn interface{}, tableName, columnName string, limit int) []interface{} {
+	selector, ok := conn.(Selector)
+	if !ok {
+		return nil
+	}
+
+	// Query for distinct values
+	sampleQuery := fmt.Sprintf(`
+		SELECT DISTINCT %s
+		FROM %s
+		WHERE %s IS NOT NULL
+		LIMIT %d
+	`, columnName, tableName, columnName, limit)
+
+	q := &query.Query{Query: sampleQuery}
+	result, err := selector.Select(ctx, q)
+	if err != nil {
+		return nil
+	}
+
+	values := make([]interface{}, 0, len(result))
+	for _, row := range result {
+		if len(row) > 0 {
+			values = append(values, row[0])
+		}
+	}
+
+	return values
 }
 
