@@ -344,8 +344,8 @@ func TestConvertYamlToTask_Hooks(t *testing.T) {
 	t.Parallel()
 
 	type expectation struct {
-		pre      []pipeline.Hook
-		post     []pipeline.Hook
+		pre  []pipeline.Hook
+		post []pipeline.Hook
 	}
 
 	tests := []struct {
@@ -379,7 +379,7 @@ hooks:
 		{
 			name:    "no hooks",
 			content: ``,
-			want: expectation{},
+			want:    expectation{},
 		},
 		{
 			name: "invalid hooks shape",
