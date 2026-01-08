@@ -8,7 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string) ([]string, error) {
+func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string, columnOpts *ColumnHintOptions) ([]string, error) {
 	if value, exists := asset.Parameters["incremental_key"]; exists && value != "" {
 		cmdArgs = append(cmdArgs, "--incremental-key", value)
 
@@ -114,6 +114,22 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	if fullRefresh != nil && fullRefresh.(bool) {
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
+
+	// Handle column hints based on enforce_schema parameter
+	if columnOpts != nil && len(asset.Columns) > 0 {
+		shouldEnforce := columnOpts.EnforceSchemaByDefault
+		if value, exists := asset.Parameters["enforce_schema"]; exists {
+			shouldEnforce = value == "true"
+		}
+
+		if shouldEnforce {
+			columns := ColumnHints(asset.Columns, columnOpts.NormalizeColumnNames)
+			if columns != "" {
+				cmdArgs = append(cmdArgs, "--columns", columns)
+			}
+		}
+	}
+
 	return cmdArgs, nil
 }
 

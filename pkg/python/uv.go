@@ -228,6 +228,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		"--yes",
 		"--progress",
 		"log",
+	}, &ColumnHintOptions{
+		NormalizeColumnNames:   false,
+		EnforceSchemaByDefault: false,
 	})
 	if err != nil {
 		return err

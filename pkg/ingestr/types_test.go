@@ -1,6 +1,10 @@
 package ingestr
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/bruin-data/bruin/pkg/python"
+)
 
 func TestNormaliseColumnName(t *testing.T) {
 	t.Parallel()
@@ -14,9 +18,9 @@ func TestNormaliseColumnName(t *testing.T) {
 	}
 
 	for in, out := range testCases {
-		result := normalizeColumnName(in)
+		result := python.NormalizeColumnName(in)
 		if result != out {
-			t.Errorf("expected normaliseColumnName(%q) = %q, was %q", in, out, result)
+			t.Errorf("expected NormalizeColumnName(%q) = %q, was %q", in, out, result)
 		}
 	}
 }
