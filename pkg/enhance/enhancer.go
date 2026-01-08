@@ -79,13 +79,20 @@ func (e *Enhancer) EnsureClaudeCLI() error {
 // When MCP is enabled, Claude directly edits the file and returns nil suggestions.
 // When MCP is disabled, Claude returns suggestions that need to be applied manually.
 func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName string) (*EnhancementSuggestions, error) {
+	return e.EnhanceAssetWithStats(ctx, asset, pipelineName, "")
+}
+
+// EnhanceAssetWithStats runs AI enhancement with pre-fetched table statistics.
+// The tableSummaryJSON parameter contains pre-fetched statistics to avoid Claude making database tool calls.
+// When tableSummaryJSON is provided, Claude won't need to call bruin_get_table_summary.
+func (e *Enhancer) EnhanceAssetWithStats(ctx context.Context, asset *pipeline.Asset, pipelineName string, tableSummaryJSON string) (*EnhancementSuggestions, error) {
 	if err := e.EnsureClaudeCLI(); err != nil {
 		return nil, errors.Wrap(err, "claude CLI not available")
 	}
 
 	// If MCP is enabled, use the agentic file-editing approach
 	if e.useMCP && asset.DefinitionFile.Path != "" {
-		return e.enhanceAssetWithMCP(ctx, asset, pipelineName)
+		return e.enhanceAssetWithMCP(ctx, asset, pipelineName, tableSummaryJSON)
 	}
 
 	// Fallback to JSON response mode
@@ -93,10 +100,10 @@ func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipe
 }
 
 // enhanceAssetWithMCP uses Claude to directly edit the asset file.
-func (e *Enhancer) enhanceAssetWithMCP(ctx context.Context, asset *pipeline.Asset, pipelineName string) (*EnhancementSuggestions, error) {
-	// Build prompt with file path
-	prompt := BuildEnhancePromptWithFilePath(asset.DefinitionFile.Path, asset.Name, pipelineName)
-	systemPrompt := GetSystemPrompt(true)
+func (e *Enhancer) enhanceAssetWithMCP(ctx context.Context, asset *pipeline.Asset, pipelineName string, tableSummaryJSON string) (*EnhancementSuggestions, error) {
+	// Build prompt with file path and optional pre-fetched stats
+	prompt := BuildEnhancePromptWithFilePath(asset.DefinitionFile.Path, asset.Name, pipelineName, tableSummaryJSON)
+	systemPrompt := GetSystemPrompt(true, tableSummaryJSON != "")
 
 	// Call Claude CLI - Claude will use MCP tools to edit the file directly
 	_, err := e.callClaude(ctx, prompt, systemPrompt)
@@ -263,47 +270,6 @@ func (e *Enhancer) SetEnvironment(environment string) {
 // When debug is true, Claude CLI output is streamed directly to stdout/stderr.
 func (e *Enhancer) SetDebug(debug bool) {
 	e.debug = debug
-}
-
-// ClaudeResponse represents the JSON response when using json output format.
-type ClaudeResponse struct {
-	Content string `json:"content"`
-	Error   string `json:"error,omitempty"`
-}
-
-// callClaudeJSON executes Claude CLI and expects JSON response.
-func (e *Enhancer) callClaudeJSON(ctx context.Context, prompt, systemPrompt string) (string, error) {
-	args := []string{
-		"-p", // print mode (non-interactive)
-		"--output-format", "json",
-		"--model", e.model,
-		"--dangerously-skip-permissions",
-	}
-
-	if systemPrompt != "" {
-		args = append(args, "--append-system-prompt", systemPrompt)
-	}
-
-	args = append(args, prompt)
-
-	cmd := exec.CommandContext(ctx, e.claudePath, args...)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", errors.Wrapf(err, "claude CLI failed: %s", string(output))
-	}
-
-	var response ClaudeResponse
-	if err := json.Unmarshal(output, &response); err != nil {
-		// If JSON parsing fails, return raw output
-		return string(output), nil
-	}
-
-	if response.Error != "" {
-		return "", errors.New("Claude returned error: " + response.Error)
-	}
-
-	return response.Content, nil
 }
 
 // filterExistingSuggestions removes suggestions for things that already exist.

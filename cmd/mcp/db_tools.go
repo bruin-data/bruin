@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/spf13/afero"
@@ -91,17 +92,6 @@ type ColumnInfo struct {
 	Nullable bool   `json:"nullable,omitempty"`
 }
 
-// ColumnStats represents statistics for a column.
-type ColumnStats struct {
-	ColumnName    string      `json:"column_name"`
-	TableName     string      `json:"table_name"`
-	TotalRows     int64       `json:"total_rows"`
-	NullCount     int64       `json:"null_count"`
-	DistinctCount int64       `json:"distinct_count"`
-	MinValue      interface{} `json:"min_value,omitempty"`
-	MaxValue      interface{} `json:"max_value,omitempty"`
-	Error         string      `json:"error,omitempty"`
-}
 
 // SampleValues represents sample distinct values for a column.
 type SampleValues struct {
@@ -111,10 +101,143 @@ type SampleValues struct {
 	Error      string        `json:"error,omitempty"`
 }
 
+// TableSummary represents comprehensive statistics for an entire table.
+type TableSummary struct {
+	TableName  string                  `json:"table_name"`
+	Connection string                  `json:"connection"`
+	RowCount   int64                   `json:"row_count"`
+	Columns    []ColumnSummary         `json:"columns"`
+	Error      string                  `json:"error,omitempty"`
+}
+
+// ColumnSummary represents statistics for a single column within a table summary.
+type ColumnSummary struct {
+	Name           string      `json:"name"`
+	Type           string      `json:"type"`
+	NormalizedType string      `json:"normalized_type"`
+	Nullable       bool        `json:"nullable"`
+	PrimaryKey     bool        `json:"primary_key"`
+	Unique         bool        `json:"unique"`
+	Stats          interface{} `json:"stats,omitempty"`
+}
+
 // Selector interface for querying databases.
 type Selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
+}
+
+// GetTableSummaryWithStats retrieves comprehensive statistics for all columns in a table.
+// This uses the TableSummarizer interface which is implemented by most database clients.
+// Exported for use by the enhance command to pre-fetch stats before calling Claude.
+func GetTableSummaryWithStats(ctx context.Context, connectionName, tableName string) *TableSummary {
+	manager, err := getConnectionManager(ctx)
+	if err != nil {
+		return &TableSummary{TableName: tableName, Error: err.Error()}
+	}
+	return GetTableSummaryWithManager(ctx, manager, connectionName, tableName)
+}
+
+// GetTableSummaryWithManager retrieves comprehensive statistics using a provided connection manager.
+// This is useful when the caller already has a connection manager (e.g., the enhance command).
+func GetTableSummaryWithManager(ctx context.Context, manager config.ConnectionAndDetailsGetter, connectionName, tableName string) *TableSummary {
+	if manager == nil {
+		return &TableSummary{TableName: tableName, Error: "connection manager is nil"}
+	}
+
+	conn := manager.GetConnection(connectionName)
+	if conn == nil {
+		return &TableSummary{TableName: tableName, Error: fmt.Sprintf("connection '%s' not found", connectionName)}
+	}
+
+	summarizer, ok := conn.(diff.TableSummarizer)
+	if !ok {
+		return &TableSummary{TableName: tableName, Error: fmt.Sprintf("connection '%s' does not support table summary (try using bruin_get_column_stats instead)", connectionName)}
+	}
+
+	result, err := summarizer.GetTableSummary(ctx, tableName, false)
+	if err != nil {
+		return &TableSummary{TableName: tableName, Connection: connectionName, Error: fmt.Sprintf("failed to get table summary: %v", err)}
+	}
+
+	summary := &TableSummary{
+		TableName:  tableName,
+		Connection: connectionName,
+		RowCount:   result.RowCount,
+		Columns:    make([]ColumnSummary, 0, len(result.Table.Columns)),
+	}
+
+	for _, col := range result.Table.Columns {
+		colSummary := ColumnSummary{
+			Name:           col.Name,
+			Type:           col.Type,
+			NormalizedType: string(col.NormalizedType),
+			Nullable:       col.Nullable,
+			PrimaryKey:     col.PrimaryKey,
+			Unique:         col.Unique,
+		}
+
+		// Convert statistics to a map for JSON serialization
+		if col.Stats != nil {
+			colSummary.Stats = convertStatsToMap(col.Stats)
+		}
+
+		summary.Columns = append(summary.Columns, colSummary)
+	}
+
+	return summary
+}
+
+// convertStatsToMap converts diff.ColumnStatistics to a map for JSON serialization.
+func convertStatsToMap(stats diff.ColumnStatistics) map[string]interface{} {
+	result := make(map[string]interface{})
+	result["type"] = stats.Type()
+
+	switch s := stats.(type) {
+	case *diff.NumericalStatistics:
+		if s.Min != nil {
+			result["min"] = *s.Min
+		}
+		if s.Max != nil {
+			result["max"] = *s.Max
+		}
+		if s.Avg != nil {
+			result["avg"] = *s.Avg
+		}
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+		if s.StdDev != nil {
+			result["stddev"] = *s.StdDev
+		}
+	case *diff.StringStatistics:
+		result["distinct_count"] = s.DistinctCount
+		result["min_length"] = s.MinLength
+		result["max_length"] = s.MaxLength
+		result["avg_length"] = s.AvgLength
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+		result["empty_count"] = s.EmptyCount
+	case *diff.BooleanStatistics:
+		result["true_count"] = s.TrueCount
+		result["false_count"] = s.FalseCount
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+	case *diff.DateTimeStatistics:
+		if !s.EarliestDate.IsZero() {
+			result["earliest_date"] = s.EarliestDate.String()
+		}
+		if !s.LatestDate.IsZero() {
+			result["latest_date"] = s.LatestDate.String()
+		}
+		result["unique_count"] = s.UniqueCount
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+	case *diff.JSONStatistics:
+		result["count"] = s.Count
+		result["null_count"] = s.NullCount
+	}
+
+	return result
 }
 
 // getTableSchema retrieves the schema for a given table.
@@ -159,65 +282,6 @@ func getTableSchema(ctx context.Context, connectionName, tableName string) *Tabl
 	}
 
 	return schema
-}
-
-// getColumnStats retrieves statistics for a column.
-// Uses a sample of 1000 rows for performance on large tables.
-func getColumnStats(ctx context.Context, connectionName, tableName, columnName string) *ColumnStats {
-	manager, err := getConnectionManager(ctx)
-	if err != nil {
-		return &ColumnStats{TableName: tableName, ColumnName: columnName, Error: err.Error()}
-	}
-
-	conn := manager.GetConnection(connectionName)
-	if conn == nil {
-		return &ColumnStats{TableName: tableName, ColumnName: columnName, Error: fmt.Sprintf("connection '%s' not found", connectionName)}
-	}
-
-	selector, ok := conn.(Selector)
-	if !ok {
-		return &ColumnStats{TableName: tableName, ColumnName: columnName, Error: fmt.Sprintf("connection '%s' does not support queries", connectionName)}
-	}
-
-	// Build stats query with LIMIT 1000 for performance on large tables
-	// Uses a subquery to limit the rows scanned
-	statsQuery := fmt.Sprintf(`
-		SELECT
-			COUNT(*) as total_rows,
-			COUNT(*) - COUNT(%s) as null_count,
-			COUNT(DISTINCT %s) as distinct_count,
-			MIN(%s) as min_value,
-			MAX(%s) as max_value
-		FROM (SELECT %s FROM %s LIMIT 1000) as sample
-	`, columnName, columnName, columnName, columnName, columnName, tableName)
-
-	q := &query.Query{Query: statsQuery}
-	result, err := selector.Select(ctx, q)
-	if err != nil {
-		return &ColumnStats{TableName: tableName, ColumnName: columnName, Error: fmt.Sprintf("failed to query stats: %v", err)}
-	}
-
-	stats := &ColumnStats{
-		TableName:  tableName,
-		ColumnName: columnName,
-	}
-
-	if len(result) > 0 && len(result[0]) >= 5 {
-		row := result[0]
-		if v, ok := row[0].(int64); ok {
-			stats.TotalRows = v
-		}
-		if v, ok := row[1].(int64); ok {
-			stats.NullCount = v
-		}
-		if v, ok := row[2].(int64); ok {
-			stats.DistinctCount = v
-		}
-		stats.MinValue = row[3]
-		stats.MaxValue = row[4]
-	}
-
-	return stats
 }
 
 // getSampleColumnValues retrieves sample distinct values for a column.
@@ -321,15 +385,14 @@ func HandleDBToolCall(toolName string, args map[string]interface{}, debug bool) 
 		jsonBytes, _ := json.MarshalIndent(schema, "", "  ")
 		return string(jsonBytes), nil
 
-	case "bruin_get_column_stats":
+	case "bruin_get_table_summary":
 		connectionName, _ := args["connection"].(string)
 		tableName, _ := args["table"].(string)
-		columnName, _ := args["column"].(string)
-		if connectionName == "" || tableName == "" || columnName == "" {
-			return formatDBError("get_column_stats", fmt.Errorf("connection, table, and column parameters are required")), nil
+		if connectionName == "" || tableName == "" {
+			return formatDBError("get_table_summary", fmt.Errorf("connection and table parameters are required")), nil
 		}
-		stats := getColumnStats(ctx, connectionName, tableName, columnName)
-		jsonBytes, _ := json.MarshalIndent(stats, "", "  ")
+		summary := GetTableSummaryWithStats(ctx, connectionName, tableName)
+		jsonBytes, _ := json.MarshalIndent(summary, "", "  ")
 		return string(jsonBytes), nil
 
 	case "bruin_sample_column_values":
@@ -391,25 +454,21 @@ func GetDBToolDefinitions() []map[string]interface{} {
 			},
 		},
 		{
-			"name":        "bruin_get_column_stats",
-			"description": "Get statistics for a specific column including total rows, null count, distinct count, min/max values. Uses a sample of 1000 rows for performance. Use this to determine appropriate data quality checks (e.g., not_null if null_count is 0, unique if distinct_count equals total_rows).",
+			"name":        "bruin_get_table_summary",
+			"description": "Get comprehensive statistics for ALL columns in a table in a single query. Returns row count, column types, and statistics (null_count, distinct_count, min/max, etc.) for each column. Use this to determine appropriate data quality checks for the entire table at once.",
 			"inputSchema": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
 					"connection": map[string]interface{}{
 						"type":        "string",
-						"description": "Name of the database connection",
+						"description": "Name of the database connection (from bruin_list_connections)",
 					},
 					"table": map[string]interface{}{
 						"type":        "string",
-						"description": "Fully qualified table name",
-					},
-					"column": map[string]interface{}{
-						"type":        "string",
-						"description": "Column name to analyze",
+						"description": "Fully qualified table name (e.g., 'schema.table' or 'project.dataset.table')",
 					},
 				},
-				"required": []string{"connection", "table", "column"},
+				"required": []string{"connection", "table"},
 			},
 		},
 		{
@@ -444,9 +503,9 @@ func GetDBToolDefinitions() []map[string]interface{} {
 // IsDBTool checks if a tool name is a database tool.
 func IsDBTool(toolName string) bool {
 	dbTools := map[string]bool{
-		"bruin_list_connections":    true,
-		"bruin_get_table_schema":    true,
-		"bruin_get_column_stats":    true,
+		"bruin_list_connections":     true,
+		"bruin_get_table_schema":     true,
+		"bruin_get_table_summary":    true,
 		"bruin_sample_column_values": true,
 	}
 	return dbTools[toolName]
