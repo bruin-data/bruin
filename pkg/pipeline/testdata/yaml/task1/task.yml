@@ -16,6 +16,11 @@ materialization:
   cluster_by:
     - key1
     - key2
+hooks:
+  pre:
+    - query: "select 1"
+  post:
+    - query: "select 2"
 
 columns:
   - name: col1

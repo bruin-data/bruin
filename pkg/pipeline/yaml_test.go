@@ -75,6 +75,10 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					PartitionBy:    "dt",
 					IncrementalKey: "dt",
 				},
+				Hooks: &pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Post: []pipeline.Hook{{Query: "select 2"}},
+				},
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 				Columns: []pipeline.Column{
 					{
