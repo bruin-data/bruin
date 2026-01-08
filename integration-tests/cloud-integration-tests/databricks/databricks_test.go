@@ -1268,6 +1268,656 @@ func TestDatabricksWorkflows(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "view-materialization",
+			workflow: e2e.Workflow{
+				Name: "view-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "view: drop the view if exists",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP VIEW IF EXISTS test.products_view;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "view: create the view",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/view-pipeline/assets/products_view.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products_view"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "view: query the view",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT product_id, product_name, price FROM test.products_view ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/view-pipeline/expectations/expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "view: run again to verify idempotency",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/view-pipeline/assets/products_view.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products_view"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "view: query again to verify same results",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT product_id, product_name, price FROM test.products_view ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/view-pipeline/expectations/expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "view: drop the view",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP VIEW IF EXISTS test.products_view;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "partition-materialization",
+			workflow: e2e.Workflow{
+				Name: "partition-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "partition: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_partitioned;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "partition: create partitioned table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/partition-pipeline/assets/products_partitioned.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products_partitioned"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "partition: query the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT product_id, product_name, price, category FROM test.products_partitioned ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/partition-pipeline/expectations/expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "partition: verify partitioning exists",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DESCRIBE DETAIL test.products_partitioned;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"category"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "partition: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_partitioned;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "time-interval-timestamp-materialization",
+			workflow: e2e.Workflow{
+				Name: "time-interval-timestamp-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "time-interval-ts: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempDir, "test-time-interval-ts")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "time-interval-ts: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempDir, "test-time-interval-ts"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "time-interval-ts: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/time-interval-timestamp-pipeline"), filepath.Join(tempDir, "test-time-interval-ts")},
+						WorkingDir: filepath.Join(tempDir, "test-time-interval-ts"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "time-interval-ts: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.events_time_interval;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "time-interval-ts: create initial table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--start-date", "2024-01-01T00:00:00", "--end-date", "2024-01-02T23:59:59", filepath.Join(tempDir, "test-time-interval-ts/time-interval-timestamp-pipeline")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.events_time_interval"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "time-interval-ts: query initial table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT event_id, event_name, user_id, event_timestamp FROM test.events_time_interval ORDER BY event_timestamp, event_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(tempDir, "test-time-interval-ts/time-interval-timestamp-pipeline/expectations/initial_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "time-interval-ts: copy updated SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/time-interval-timestamp-pipeline/resources/events_updated.sql"), filepath.Join(tempDir, "test-time-interval-ts/time-interval-timestamp-pipeline/assets/events.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "time-interval-ts: run for specific time range (Jan 2nd)",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--start-date", "2024-01-02T00:00:00", "--end-date", "2024-01-02T23:59:59", filepath.Join(tempDir, "test-time-interval-ts/time-interval-timestamp-pipeline")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.events_time_interval"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "time-interval-ts: query updated table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT event_id, event_name, user_id, event_timestamp FROM test.events_time_interval ORDER BY event_timestamp, event_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(tempDir, "test-time-interval-ts/time-interval-timestamp-pipeline/expectations/updated_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "time-interval-ts: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.events_time_interval;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "create-replace-materialization",
+			workflow: e2e.Workflow{
+				Name: "create-replace-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "create-replace: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempDir, "test-create-replace")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "create-replace: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempDir, "test-create-replace"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "create-replace: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/create-replace-pipeline"), filepath.Join(tempDir, "test-create-replace")},
+						WorkingDir: filepath.Join(tempDir, "test-create-replace"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "create-replace: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_create_replace;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "create-replace: create initial table",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-create-replace/create-replace-pipeline")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products_create_replace"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "create-replace: query initial table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT product_id, product_name, price FROM test.products_create_replace ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(tempDir, "test-create-replace/create-replace-pipeline/expectations/initial_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "create-replace: copy updated SQL to asset",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/create-replace-pipeline/resources/products_updated.sql"), filepath.Join(tempDir, "test-create-replace/create-replace-pipeline/assets/products.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "create-replace: run with create+replace strategy (should fully replace)",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-create-replace/create-replace-pipeline")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products_create_replace"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "create-replace: query replaced table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT product_id, product_name, price FROM test.products_create_replace ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(tempDir, "test-create-replace/create-replace-pipeline/expectations/replaced_expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "create-replace: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_create_replace;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "idempotency-merge-materialization",
+			workflow: e2e.Workflow{
+				Name: "idempotency-merge-materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "idempotency: drop the table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_idempotency;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "idempotency: create initial table with merge",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/idempotency-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products_idempotency"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "idempotency: query initial table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT product_id, product_name, price, stock FROM test.products_idempotency ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/idempotency-pipeline/expectations/expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "idempotency: run merge again (same data)",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/idempotency-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products_idempotency"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "idempotency: verify same results after second run",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT product_id, product_name, price, stock FROM test.products_idempotency ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/idempotency-pipeline/expectations/expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "idempotency: run merge third time",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/idempotency-pipeline/assets/products.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: test.products_idempotency"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "idempotency: verify same results after third run",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT product_id, product_name, price, stock FROM test.products_idempotency ORDER BY product_id;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/idempotency-pipeline/expectations/expected.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "idempotency: verify row count is still 3",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "SELECT COUNT(*) as count FROM test.products_idempotency;", "--output", "csv"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"count", "3"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "idempotency: drop table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "databricks-default", "--query", "DROP TABLE IF EXISTS test.products_idempotency;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "error-merge-no-primary-key",
+			workflow: e2e.Workflow{
+				Name: "error-merge-no-primary-key",
+				Steps: []e2e.Task{
+					{
+						Name:    "error-merge: run merge without primary key should fail",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/error-tests/assets/merge_no_primary_key.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"primary"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "error-delete-insert-no-incremental-key",
+			workflow: e2e.Workflow{
+				Name: "error-delete-insert-no-incremental-key",
+				Steps: []e2e.Task{
+					{
+						Name:    "error-delete-insert: run without incremental key should fail",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/error-tests/assets/delete_insert_no_incremental_key.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"incremental"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "error-scd2-no-primary-key",
+			workflow: e2e.Workflow{
+				Name: "error-scd2-no-primary-key",
+				Steps: []e2e.Task{
+					{
+						Name:    "error-scd2: run scd2 without primary key should fail",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/error-tests/assets/scd2_no_primary_key.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"primary"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "error-time-interval-no-incremental-key",
+			workflow: e2e.Workflow{
+				Name: "error-time-interval-no-incremental-key",
+				Steps: []e2e.Task{
+					{
+						Name:    "error-time-interval: run without incremental key should fail",
+						Command: binary,
+						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/error-tests/assets/time_interval_no_incremental_key.sql")),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"incremental"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

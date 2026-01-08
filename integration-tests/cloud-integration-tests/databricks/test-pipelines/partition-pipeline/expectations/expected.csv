@@ -1,0 +1,7 @@
+product_id,product_name,price,category
+1,Laptop,999.99,Electronics
+2,Smartphone,699.99,Electronics
+3,Desk,299.99,Furniture
+4,Chair,199.99,Furniture
+5,Notebook,9.99,Stationery
+
