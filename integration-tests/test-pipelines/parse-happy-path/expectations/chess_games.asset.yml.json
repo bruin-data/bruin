@@ -34,6 +34,7 @@
     "extends": null,
     "columns": [],
     "custom_checks": [],
+    "hooks": {},
     "metadata": {},
     "snowflake": null,
     "athena": null,
