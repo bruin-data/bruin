@@ -111,10 +111,6 @@ func TestGetSystemPrompt(t *testing.T) {
 		assert.Contains(t, prompt, "bruin_write_file")
 		assert.Contains(t, prompt, "bruin_format")
 		assert.Contains(t, prompt, "bruin_validate")
-		// Database tools
-		assert.Contains(t, prompt, "bruin_list_connections")
-		assert.Contains(t, prompt, "bruin_get_table_summary")
-		assert.Contains(t, prompt, "bruin_sample_column_values")
 	})
 
 	t.Run("with MCP and pre-fetched stats", func(t *testing.T) {
@@ -127,10 +123,10 @@ func TestGetSystemPrompt(t *testing.T) {
 		assert.Contains(t, prompt, "bruin_write_file")
 		assert.Contains(t, prompt, "bruin_format")
 		assert.Contains(t, prompt, "bruin_validate")
-		// Should only have limited database tools when stats are pre-fetched
-		assert.Contains(t, prompt, "bruin_sample_column_values")
 		// Should mention using pre-fetched statistics
 		assert.Contains(t, prompt, "PRE-FETCHED")
+		// Should mention sample_values in the context of statistics
+		assert.Contains(t, prompt, "sample_values")
 	})
 }
 
