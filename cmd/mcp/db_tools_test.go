@@ -23,7 +23,7 @@ func TestGetDBToolDefinitions(t *testing.T) {
 
 	assert.Contains(t, toolNames, "bruin_list_connections")
 	assert.Contains(t, toolNames, "bruin_get_table_schema")
-	assert.Contains(t, toolNames, "bruin_get_column_stats")
+	assert.Contains(t, toolNames, "bruin_get_table_summary")
 	assert.Contains(t, toolNames, "bruin_sample_column_values")
 }
 
@@ -44,14 +44,19 @@ func TestIsDBTool(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "bruin_get_column_stats is a DB tool",
-			toolName: "bruin_get_column_stats",
+			name:     "bruin_get_table_summary is a DB tool",
+			toolName: "bruin_get_table_summary",
 			expected: true,
 		},
 		{
 			name:     "bruin_sample_column_values is a DB tool",
 			toolName: "bruin_sample_column_values",
 			expected: true,
+		},
+		{
+			name:     "bruin_get_column_stats is not a DB tool (removed)",
+			toolName: "bruin_get_column_stats",
+			expected: false,
 		},
 		{
 			name:     "bruin_get_overview is not a DB tool",
@@ -98,22 +103,16 @@ func TestHandleDBToolCall_MissingParameters(t *testing.T) {
 			errField: "connection and table parameters are required",
 		},
 		{
-			name:     "get_column_stats missing connection",
-			toolName: "bruin_get_column_stats",
-			args:     map[string]interface{}{"table": "users", "column": "id"},
-			errField: "connection, table, and column parameters are required",
+			name:     "get_table_summary missing connection",
+			toolName: "bruin_get_table_summary",
+			args:     map[string]interface{}{"table": "users"},
+			errField: "connection and table parameters are required",
 		},
 		{
-			name:     "get_column_stats missing table",
-			toolName: "bruin_get_column_stats",
-			args:     map[string]interface{}{"connection": "mydb", "column": "id"},
-			errField: "connection, table, and column parameters are required",
-		},
-		{
-			name:     "get_column_stats missing column",
-			toolName: "bruin_get_column_stats",
-			args:     map[string]interface{}{"connection": "mydb", "table": "users"},
-			errField: "connection, table, and column parameters are required",
+			name:     "get_table_summary missing table",
+			toolName: "bruin_get_table_summary",
+			args:     map[string]interface{}{"connection": "mydb"},
+			errField: "connection and table parameters are required",
 		},
 		{
 			name:     "sample_column_values missing connection",
@@ -186,31 +185,6 @@ func TestTableSchemaJSON(t *testing.T) {
 	assert.Equal(t, "integer", parsed.Columns[0].Type)
 }
 
-func TestColumnStatsJSON(t *testing.T) {
-	stats := &ColumnStats{
-		ColumnName:    "status",
-		TableName:     "orders",
-		TotalRows:     1000,
-		NullCount:     10,
-		DistinctCount: 5,
-		MinValue:      "active",
-		MaxValue:      "pending",
-	}
-
-	jsonBytes, err := json.Marshal(stats)
-	require.NoError(t, err)
-
-	var parsed ColumnStats
-	err = json.Unmarshal(jsonBytes, &parsed)
-	require.NoError(t, err)
-
-	assert.Equal(t, "status", parsed.ColumnName)
-	assert.Equal(t, "orders", parsed.TableName)
-	assert.Equal(t, int64(1000), parsed.TotalRows)
-	assert.Equal(t, int64(10), parsed.NullCount)
-	assert.Equal(t, int64(5), parsed.DistinctCount)
-}
-
 func TestSampleValuesJSON(t *testing.T) {
 	sample := &SampleValues{
 		ColumnName: "status",
@@ -228,6 +202,62 @@ func TestSampleValuesJSON(t *testing.T) {
 	assert.Equal(t, "status", parsed.ColumnName)
 	assert.Equal(t, "orders", parsed.TableName)
 	assert.Len(t, parsed.Values, 3)
+}
+
+func TestTableSummaryJSON(t *testing.T) {
+	summary := &TableSummary{
+		TableName:  "users",
+		Connection: "mydb",
+		RowCount:   1000,
+		Columns: []ColumnSummary{
+			{
+				Name:           "id",
+				Type:           "integer",
+				NormalizedType: "numeric",
+				Nullable:       false,
+				PrimaryKey:     true,
+				Unique:         true,
+				Stats: map[string]interface{}{
+					"type":       "numerical",
+					"min":        1.0,
+					"max":        1000.0,
+					"null_count": int64(0),
+					"count":      int64(1000),
+				},
+			},
+			{
+				Name:           "email",
+				Type:           "varchar",
+				NormalizedType: "string",
+				Nullable:       true,
+				PrimaryKey:     false,
+				Unique:         false,
+				Stats: map[string]interface{}{
+					"type":           "string",
+					"distinct_count": int64(950),
+					"null_count":     int64(50),
+					"count":          int64(1000),
+				},
+			},
+		},
+	}
+
+	jsonBytes, err := json.Marshal(summary)
+	require.NoError(t, err)
+
+	var parsed TableSummary
+	err = json.Unmarshal(jsonBytes, &parsed)
+	require.NoError(t, err)
+
+	assert.Equal(t, "users", parsed.TableName)
+	assert.Equal(t, "mydb", parsed.Connection)
+	assert.Equal(t, int64(1000), parsed.RowCount)
+	assert.Len(t, parsed.Columns, 2)
+	assert.Equal(t, "id", parsed.Columns[0].Name)
+	assert.Equal(t, "integer", parsed.Columns[0].Type)
+	assert.True(t, parsed.Columns[0].PrimaryKey)
+	assert.Equal(t, "email", parsed.Columns[1].Name)
+	assert.True(t, parsed.Columns[1].Nullable)
 }
 
 func TestDBToolDefinitionsHaveRequiredFields(t *testing.T) {
@@ -273,13 +303,12 @@ func TestDBToolDefinitionsRequiredParams(t *testing.T) {
 	assert.Contains(t, required, "connection")
 	assert.Contains(t, required, "table")
 
-	// bruin_get_column_stats requires connection, table, and column
-	columnStatsTool := toolMap["bruin_get_column_stats"]
-	inputSchema = columnStatsTool["inputSchema"].(map[string]interface{})
+	// bruin_get_table_summary requires connection and table
+	tableSummaryTool := toolMap["bruin_get_table_summary"]
+	inputSchema = tableSummaryTool["inputSchema"].(map[string]interface{})
 	required = inputSchema["required"].([]string)
 	assert.Contains(t, required, "connection")
 	assert.Contains(t, required, "table")
-	assert.Contains(t, required, "column")
 
 	// bruin_sample_column_values requires connection, table, and column
 	sampleValuesTool := toolMap["bruin_sample_column_values"]

@@ -8,7 +8,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/bruin-data/bruin/cmd/mcp"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/enhance"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -167,7 +169,8 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 			infoPrinter.Printf("  AI agent enabled with file editing and database tools\n")
 		}
 	}
-	if env := c.String("environment"); env != "" {
+	env := c.String("environment")
+	if env != "" {
 		enhancer.SetEnvironment(env)
 		if output != "json" {
 			infoPrinter.Printf("  Using environment: %s\n", env)
@@ -179,7 +182,13 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return printEnhanceError(output, errors.Wrap(err, "Claude CLI not available"))
 	}
 
-	suggestions, err := enhancer.EnhanceAsset(ctx, pp.Asset, pp.Pipeline.Name)
+	// Pre-fetch table statistics to minimize tool calls during enhancement
+	var tableSummaryJSON string
+	if pp.Asset.Materialization.Type != "" && pp.Asset.Name != "" {
+		tableSummaryJSON = preFetchTableSummary(ctx, fs, assetPath, pp.Asset, env, output)
+	}
+
+	suggestions, err := enhancer.EnhanceAssetWithStats(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
@@ -382,12 +391,19 @@ func enhancePipeline(ctx context.Context, c *cli.Command, pipelinePath string, f
 	skippedCount := 0
 	failedCount := 0
 
+	env := c.String("environment")
 	for _, asset := range foundPipeline.Assets {
 		if output != "json" {
 			infoPrinter.Printf("  Processing '%s'...\n", asset.Name)
 		}
 
-		suggestions, err := enhancer.EnhanceAsset(ctx, asset, foundPipeline.Name)
+		// Pre-fetch table statistics to minimize tool calls during enhancement
+		var tableSummaryJSON string
+		if asset.Materialization.Type != "" && asset.Name != "" {
+			tableSummaryJSON = preFetchTableSummary(ctx, fs, asset.DefinitionFile.Path, asset, env, output)
+		}
+
+		suggestions, err := enhancer.EnhanceAssetWithStats(ctx, asset, foundPipeline.Name, tableSummaryJSON)
 		if err != nil {
 			failedCount++
 			if output != "json" {
@@ -540,5 +556,83 @@ func showGitDiff(filePath string) {
 
 	fmt.Println("\nChanges:")
 	_ = cmd.Run()
+}
+
+// preFetchTableSummary fetches table statistics before calling Claude to minimize tool calls.
+// Returns JSON-serialized table summary or empty string if fetching fails.
+func preFetchTableSummary(ctx context.Context, fs afero.Fs, assetPath string, asset *pipeline.Asset, environment, output string) string {
+	// Get connection name from asset's upstream connection or materialization
+	connectionName := getAssetConnectionName(asset)
+	if connectionName == "" {
+		return ""
+	}
+
+	// Get table name from asset
+	tableName := asset.Name
+	if tableName == "" {
+		return ""
+	}
+
+	// Load connection manager
+	repoRoot, err := git.FindRepoFromPath(assetPath)
+	if err != nil {
+		return ""
+	}
+
+	cm, err := config.LoadOrCreate(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
+	if err != nil {
+		return ""
+	}
+
+	if environment != "" {
+		if err := cm.SelectEnvironment(environment); err != nil {
+			return ""
+		}
+	}
+
+	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+	if len(errs) > 0 {
+		return ""
+	}
+
+	if output != "json" {
+		infoPrinter.Printf("  Pre-fetching table statistics for '%s'...\n", tableName)
+	}
+
+	// Fetch table summary using the MCP function
+	summary := mcp.GetTableSummaryWithManager(ctx, manager, connectionName, tableName)
+	if summary.Error != "" {
+		if output != "json" {
+			warningPrinter.Printf("  Warning: could not fetch table statistics: %s\n", summary.Error)
+		}
+		return ""
+	}
+
+	// Serialize to JSON
+	jsonBytes, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		return ""
+	}
+
+	if output != "json" {
+		infoPrinter.Printf("  Pre-fetched statistics for %d columns\n", len(summary.Columns))
+	}
+
+	return string(jsonBytes)
+}
+
+// getAssetConnectionName extracts the connection name from an asset.
+func getAssetConnectionName(asset *pipeline.Asset) string {
+	// Check asset connection field first
+	if asset.Connection != "" {
+		return asset.Connection
+	}
+
+	// Check if there's a connection in parameters
+	if conn, ok := asset.Parameters["connection"]; ok && conn != "" {
+		return conn
+	}
+
+	return ""
 }
 
