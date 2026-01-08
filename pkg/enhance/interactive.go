@@ -157,6 +157,61 @@ func formatCheckValue(check CheckSuggestion) string {
 	return ""
 }
 
+// DisplayAppliedChanges prints a summary of what changes were applied.
+func DisplayAppliedChanges(stdout io.Writer, suggestions *EnhancementSuggestions, assetName string) {
+	fmt.Fprintf(stdout, "\n%s\n", green(fmt.Sprintf("✓ Enhanced '%s'", assetName)))
+
+	if suggestions.AssetDescription != "" {
+		fmt.Fprintf(stdout, "  • Added asset description\n")
+	}
+
+	if len(suggestions.ColumnDescriptions) > 0 {
+		fmt.Fprintf(stdout, "  • Added %d column description(s): %s\n",
+			len(suggestions.ColumnDescriptions), joinKeys(suggestions.ColumnDescriptions))
+	}
+
+	if len(suggestions.ColumnChecks) > 0 {
+		totalChecks := 0
+		checkDetails := []string{}
+		for col, checks := range suggestions.ColumnChecks {
+			totalChecks += len(checks)
+			for _, check := range checks {
+				checkDetails = append(checkDetails, fmt.Sprintf("%s.%s", col, check.Name))
+			}
+		}
+		fmt.Fprintf(stdout, "  • Added %d column check(s): %s\n", totalChecks, strings.Join(checkDetails, ", "))
+	}
+
+	if len(suggestions.SuggestedTags) > 0 {
+		fmt.Fprintf(stdout, "  • Added tags: %v\n", suggestions.SuggestedTags)
+	}
+
+	if len(suggestions.SuggestedDomains) > 0 {
+		fmt.Fprintf(stdout, "  • Added domains: %v\n", suggestions.SuggestedDomains)
+	}
+
+	if suggestions.SuggestedOwner != "" {
+		fmt.Fprintf(stdout, "  • Set owner: %s\n", suggestions.SuggestedOwner)
+	}
+
+	if len(suggestions.CustomChecks) > 0 {
+		checkNames := make([]string, len(suggestions.CustomChecks))
+		for i, check := range suggestions.CustomChecks {
+			checkNames[i] = check.Name
+		}
+		fmt.Fprintf(stdout, "  • Added %d custom check(s): %s\n", len(suggestions.CustomChecks), strings.Join(checkNames, ", "))
+	}
+}
+
+// joinKeys returns a comma-separated list of map keys.
+func joinKeys(m map[string]string) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return strings.Join(keys, ", ")
+}
+
 // DisplaySuggestions prints suggestions without confirmation prompts (for dry-run).
 func DisplaySuggestions(stdout io.Writer, suggestions *EnhancementSuggestions, assetName string) {
 	fmt.Fprintf(stdout, "\n%s\n", bold(fmt.Sprintf("Suggestions for '%s' (dry-run):", assetName)))

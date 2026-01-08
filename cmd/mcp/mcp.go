@@ -142,7 +142,7 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 			Result:  nil,
 		}
 	case "tools/list":
-		// Combine documentation tools with database tools
+		// Documentation tools
 		tools := []map[string]interface{}{
 			{
 				"name":        "bruin_get_overview",
@@ -175,8 +175,12 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 				},
 			},
 		}
-		// Add database tools
+
+		// Add database tools (for enhance command database introspection)
 		tools = append(tools, GetDBToolDefinitions()...)
+
+		// Add file tools (for enhance command file editing)
+		tools = append(tools, GetFileToolDefinitions()...)
 
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
@@ -308,19 +312,44 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 		}
 
 	default:
-		// Check if it's a database tool
+		// Check if this is a database tool (internal use for enhance command)
 		if IsDBTool(toolName) {
 			args, _ := params["arguments"].(map[string]interface{})
-			telemetry.SendEvent("mcp_tool_call", analytics.Properties{
-				"tool_name": toolName,
-			})
 			result, err := HandleDBToolCall(toolName, args, debug)
 			if err != nil {
 				return JSONRPCResponse{
 					JSONRPC: "2.0",
 					ID:      req.ID,
 					Error: &JSONRPCError{
-						Code:    -32603,
+						Code:    -32000,
+						Message: err.Error(),
+					},
+				}
+			}
+			return JSONRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Result: map[string]interface{}{
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": result,
+						},
+					},
+				},
+			}
+		}
+
+		// Check if this is a file tool (internal use for enhance command)
+		if IsFileTool(toolName) {
+			args, _ := params["arguments"].(map[string]interface{})
+			result, err := HandleFileToolCall(toolName, args, debug)
+			if err != nil {
+				return JSONRPCResponse{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error: &JSONRPCError{
+						Code:    -32000,
 						Message: err.Error(),
 					},
 				}
