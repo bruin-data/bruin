@@ -152,7 +152,7 @@ func GetTableSummaryWithManager(ctx context.Context, manager config.ConnectionAn
 
 	summarizer, ok := conn.(diff.TableSummarizer)
 	if !ok {
-		return &TableSummary{TableName: tableName, Error: fmt.Sprintf("connection '%s' does not support table summary (try using bruin_get_column_stats instead)", connectionName)}
+		return &TableSummary{TableName: tableName, Error: fmt.Sprintf("connection '%s' does not support table summary", connectionName)}
 	}
 
 	result, err := summarizer.GetTableSummary(ctx, tableName, false)
