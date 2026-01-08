@@ -21,7 +21,7 @@ type Config struct {
 	ClientSecret string
 }
 
-// UseOAuthM2M returns true if OAuth M2M authentication should be used
+// UseOAuthM2M returns true if OAuth M2M authentication should be used.
 func (c *Config) UseOAuthM2M() bool {
 	return c.ClientID != "" && c.ClientSecret != ""
 }
