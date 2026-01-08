@@ -335,7 +335,7 @@ type taskDefinition struct {
 	Extends           []string          `yaml:"extends"`
 	Columns           []column          `yaml:"columns"`
 	CustomChecks      []customCheck     `yaml:"custom_checks"`
-	Hooks             *Hooks            `yaml:"hooks"`
+	Hooks             Hooks             `yaml:"hooks"`
 	Tags              []string          `yaml:"tags"`
 	Snowflake         snowflake         `yaml:"snowflake"`
 	Athena            athena            `yaml:"athena"`

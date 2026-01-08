@@ -151,7 +151,7 @@ func Test_createTaskFromFile(t *testing.T) {
 						Value: 16,
 					},
 				},
-				Hooks: &pipeline.Hooks{
+				Hooks: pipeline.Hooks{
 					Pre:  []pipeline.Hook{{Query: "select 1"}},
 					Post: []pipeline.Hook{{Query: "select 2"}},
 				},
@@ -321,7 +321,7 @@ func Test_createTaskFromFile(t *testing.T) {
 						Value: 16,
 					},
 				},
-				Hooks: &pipeline.Hooks{
+				Hooks: pipeline.Hooks{
 					Pre:  []pipeline.Hook{{Query: "select 1"}},
 					Post: []pipeline.Hook{{Query: "select 2"}},
 				},
@@ -366,7 +366,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				},
 				Columns:      make([]pipeline.Column, 0),
 				CustomChecks: make([]pipeline.CustomCheck, 0),
-				Hooks: &pipeline.Hooks{
+				Hooks: pipeline.Hooks{
 					Pre:  []pipeline.Hook{{Query: "select 1"}},
 					Post: []pipeline.Hook{{Query: "select 2"}},
 				},

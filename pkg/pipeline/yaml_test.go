@@ -75,7 +75,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					PartitionBy:    "dt",
 					IncrementalKey: "dt",
 				},
-				Hooks: &pipeline.Hooks{
+				Hooks: pipeline.Hooks{
 					Pre:  []pipeline.Hook{{Query: "select 1"}},
 					Post: []pipeline.Hook{{Query: "select 2"}},
 				},
@@ -344,7 +344,6 @@ func TestConvertYamlToTask_Hooks(t *testing.T) {
 	t.Parallel()
 
 	type expectation struct {
-		hooksNil bool
 		pre      []pipeline.Hook
 		post     []pipeline.Hook
 	}
@@ -380,9 +379,7 @@ hooks:
 		{
 			name:    "no hooks",
 			content: ``,
-			want: expectation{
-				hooksNil: true,
-			},
+			want: expectation{},
 		},
 		{
 			name: "invalid hooks shape",
@@ -420,12 +417,6 @@ hooks:
 			}
 
 			require.NoError(t, err)
-			if tt.want.hooksNil {
-				require.Nil(t, task.Hooks)
-				return
-			}
-
-			require.NotNil(t, task.Hooks)
 			require.Equal(t, tt.want.pre, task.Hooks.Pre)
 			require.Equal(t, tt.want.post, task.Hooks.Post)
 		})

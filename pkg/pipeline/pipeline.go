@@ -778,7 +778,7 @@ type Asset struct { //nolint:recvcheck
 	Extends           []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
 	Columns           []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
 	CustomChecks      []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
-	Hooks             *Hooks             `json:"hooks,omitempty" yaml:"hooks,omitempty" mapstructure:"hooks"`
+	Hooks             Hooks              `json:"hooks,omitempty" yaml:"hooks,omitempty" mapstructure:"hooks"`
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
@@ -797,6 +797,10 @@ type Hook struct {
 type Hooks struct {
 	Pre  []Hook `json:"pre,omitempty" yaml:"pre,omitempty" mapstructure:"pre"`
 	Post []Hook `json:"post,omitempty" yaml:"post,omitempty" mapstructure:"post"`
+}
+
+func (h Hooks) IsZero() bool {
+	return len(h.Pre) == 0 && len(h.Post) == 0
 }
 
 //nolint:recvcheck
@@ -1041,13 +1045,11 @@ func (a *Asset) removeExtraSpacesAtLineEndingsInTextContent() {
 		a.CustomChecks[i].Description = ClearSpacesAtLineEndings(a.CustomChecks[i].Description)
 		a.CustomChecks[i].Query = ClearSpacesAtLineEndings(a.CustomChecks[i].Query)
 	}
-	if a.Hooks != nil {
-		for i := range a.Hooks.Pre {
-			a.Hooks.Pre[i].Query = ClearSpacesAtLineEndings(a.Hooks.Pre[i].Query)
-		}
-		for i := range a.Hooks.Post {
-			a.Hooks.Post[i].Query = ClearSpacesAtLineEndings(a.Hooks.Post[i].Query)
-		}
+	for i := range a.Hooks.Pre {
+		a.Hooks.Pre[i].Query = ClearSpacesAtLineEndings(a.Hooks.Pre[i].Query)
+	}
+	for i := range a.Hooks.Post {
+		a.Hooks.Post[i].Query = ClearSpacesAtLineEndings(a.Hooks.Post[i].Query)
 	}
 }
 
