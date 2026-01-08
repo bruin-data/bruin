@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,7 @@ type Enhancer struct {
 	useMCP      bool   // whether to use bruin MCP server
 	repoRoot    string // path to the Bruin repository root
 	environment string // environment name for database connections
+	debug       bool   // whether to print debug information
 }
 
 // NewEnhancer creates a new Enhancer instance.
@@ -73,15 +75,45 @@ func (e *Enhancer) EnsureClaudeCLI() error {
 	return nil
 }
 
-// EnhanceAsset runs AI enhancement on a single asset and returns suggestions.
+// EnhanceAsset runs AI enhancement on a single asset.
+// When MCP is enabled, Claude directly edits the file and returns nil suggestions.
+// When MCP is disabled, Claude returns suggestions that need to be applied manually.
 func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName string) (*EnhancementSuggestions, error) {
 	if err := e.EnsureClaudeCLI(); err != nil {
 		return nil, errors.Wrap(err, "claude CLI not available")
 	}
 
+	// If MCP is enabled, use the agentic file-editing approach
+	if e.useMCP && asset.DefinitionFile.Path != "" {
+		return e.enhanceAssetWithMCP(ctx, asset, pipelineName)
+	}
+
+	// Fallback to JSON response mode
+	return e.enhanceAssetWithJSON(ctx, asset, pipelineName)
+}
+
+// enhanceAssetWithMCP uses Claude to directly edit the asset file.
+func (e *Enhancer) enhanceAssetWithMCP(ctx context.Context, asset *pipeline.Asset, pipelineName string) (*EnhancementSuggestions, error) {
+	// Build prompt with file path
+	prompt := BuildEnhancePromptWithFilePath(asset.DefinitionFile.Path, asset.Name, pipelineName)
+	systemPrompt := GetSystemPrompt(true)
+
+	// Call Claude CLI - Claude will use MCP tools to edit the file directly
+	_, err := e.callClaude(ctx, prompt, systemPrompt)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to enhance asset")
+	}
+
+	// Return nil suggestions since Claude edited the file directly
+	// The caller should reload the asset to see the changes
+	return nil, nil
+}
+
+// enhanceAssetWithJSON uses Claude to return JSON suggestions (fallback mode).
+func (e *Enhancer) enhanceAssetWithJSON(ctx context.Context, asset *pipeline.Asset, pipelineName string) (*EnhancementSuggestions, error) {
 	// Build the prompt
 	prompt := BuildEnhancePrompt(asset, pipelineName)
-	systemPrompt := GetSystemPrompt(e.useMCP)
+	systemPrompt := GetSystemPrompt(false)
 
 	// Call Claude CLI
 	response, err := e.callClaude(ctx, prompt, systemPrompt)
@@ -130,6 +162,12 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 		cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY="+e.apiKey)
 	}
 
+	// In debug mode, stream Claude CLI output in real-time using pipes
+	if e.debug {
+		return e.runClaudeWithStreaming(cmd)
+	}
+
+	// Non-debug mode: capture output
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -143,6 +181,44 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 	}
 
 	return stdout.String(), nil
+}
+
+// runClaudeWithStreaming runs the Claude CLI and streams output in real-time.
+func (e *Enhancer) runClaudeWithStreaming(cmd *exec.Cmd) (string, error) {
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create stdout pipe")
+	}
+
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create stderr pipe")
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", errors.Wrap(err, "failed to start claude CLI")
+	}
+
+	// Stream stdout and stderr concurrently
+	done := make(chan error, 2)
+	go func() {
+		_, copyErr := io.Copy(os.Stdout, stdoutPipe)
+		done <- copyErr
+	}()
+	go func() {
+		_, copyErr := io.Copy(os.Stderr, stderrPipe)
+		done <- copyErr
+	}()
+
+	// Wait for both streams to complete
+	<-done
+	<-done
+
+	if err := cmd.Wait(); err != nil {
+		return "", errors.Wrap(err, "claude CLI failed")
+	}
+
+	return "", nil
 }
 
 // buildMCPConfig creates the MCP server configuration JSON for bruin.
@@ -181,6 +257,12 @@ func (e *Enhancer) SetRepoRoot(repoRoot string) {
 // SetEnvironment sets the environment name for MCP database tools.
 func (e *Enhancer) SetEnvironment(environment string) {
 	e.environment = environment
+}
+
+// SetDebug enables or disables debug output.
+// When debug is true, Claude CLI output is streamed directly to stdout/stderr.
+func (e *Enhancer) SetDebug(debug bool) {
+	e.debug = debug
 }
 
 // ClaudeResponse represents the JSON response when using json output format.

@@ -66,7 +66,7 @@ func main() {
 			cmd.Lineage(),
 			cmd.CleanCmd(),
 			cmd.Format(&isDebug),
-			cmd.Enhance(&isDebug),
+			cmd.AI(&isDebug),
 			cmd.Docs(),
 			cmd.Init(),
 			cmd.Internal(),
