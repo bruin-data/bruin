@@ -271,10 +271,10 @@
             "type": "string"
           },
           "type": "array",
-        "default": [
-          "MagnusCarlsen",
-          "Hikaru"
-        ]
+          "default": [
+            "MagnusCarlsen",
+            "Hikaru"
+          ]
         }
       },
       "additionalProperties": false,
@@ -1005,6 +1005,12 @@
         },
         "schema": {
           "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -1016,7 +1022,9 @@
         "host",
         "port",
         "catalog",
-        "schema"
+        "schema",
+        "client_id",
+        "client_secret"
       ]
     },
     "DataprocServerlessConnection": {
@@ -1568,6 +1576,30 @@
       "required": [
         "name",
         "token"
+      ]
+    },
+    "IndeedConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "employer_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "client_id",
+        "client_secret",
+        "employer_id"
       ]
     },
     "InfluxDBConnection": {
@@ -2206,30 +2238,6 @@
       "required": [
         "name",
         "api_key"
-      ]
-    },
-    "IndeedConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "client_id": {
-          "type": "string"
-        },
-        "client_secret": {
-          "type": "string"
-        },
-        "employer_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "client_id",
-        "client_secret",
-        "employer_id"
       ]
     },
     "QuickBooksConnection": {

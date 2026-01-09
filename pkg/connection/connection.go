@@ -567,12 +567,14 @@ func (m *Manager) AddDatabricksConnectionFromConfig(connection *config.Databrick
 	m.mutex.Unlock()
 
 	client, err := databricks.NewDB(&databricks.Config{
-		Token:   connection.Token,
-		Host:    connection.Host,
-		Path:    connection.Path,
-		Port:    connection.Port,
-		Catalog: connection.Catalog,
-		Schema:  connection.Schema,
+		Token:        connection.Token,
+		Host:         connection.Host,
+		Path:         connection.Path,
+		Port:         connection.Port,
+		Catalog:      connection.Catalog,
+		Schema:       connection.Schema,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
 	})
 	if err != nil {
 		return err
