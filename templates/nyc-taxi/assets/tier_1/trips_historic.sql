@@ -12,8 +12,6 @@ description: |
   - Truncate interval dates to month level to match ingestion logic (ingestion loads full months)
   - The time_interval materialization strategy already handles deleting data in the interval range
 
-owner: data-engineering
-
 depends:
   - tier_1.ingest_trips
 

@@ -17,8 +17,6 @@ description: |
     - Seed files are a convenient way to load static data into a database
     - Seed asset automatically materializes into a table on each run
 
-owner: data-engineering
-
 columns:
   - name: payment_type_id
     type: INTEGER

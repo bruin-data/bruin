@@ -18,13 +18,6 @@ description: |
   - Column normalization (vendor_id -> vendorid, etc.) is handled in tier_1 transformation layer
   - Returns DataFrame for Bruin to materialize into DuckDB table
 
-owner: data-engineering
-tags:
-  - ingestion
-  - nyc-taxi
-  - raw-data
-  - python-ingestion
-
 materialization:
   type: table
   strategy: create+replace

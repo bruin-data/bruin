@@ -24,12 +24,6 @@ description: |
   - Materialization:
     - No specified strategy, so it will be replaced every time the pipeline runs
 
-owner: data-engineering
-tags:
-  - ingestion
-  - nyc-taxi
-  - lookup-table
-
 materialization:
   type: table
 

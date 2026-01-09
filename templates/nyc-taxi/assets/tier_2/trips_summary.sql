@@ -26,12 +26,6 @@ description: |
   LIMIT 10
   ```
 
-owner: data-engineering
-tags:
-  - tier-2
-  - nyc-taxi
-  - cleaned-data
-
 depends:
   - tier_1.taxi_zone_lookup
   - tier_1.trips_historic

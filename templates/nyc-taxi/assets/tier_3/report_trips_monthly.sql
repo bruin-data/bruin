@@ -24,13 +24,6 @@ description: |
   ORDER BY month_date DESC
   ```
 
-owner: data-engineering
-tags:
-  - tier-3
-  - nyc-taxi
-  - reports
-  - monthly-aggregation
-
 depends:
   - tier_2.trips_summary
 
