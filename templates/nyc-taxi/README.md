@@ -39,7 +39,6 @@ This project serves as a **template and learning resource** for developers who w
 5. **Metadata Management**
    - Comprehensive column descriptions and documentation
    - Primary key definitions and nullable constraints
-   - Asset-level tags and ownership
 
 6. **Data Quality Checks**
    - Custom quality checks using SQL queries to validate business rules and data integrity
@@ -430,14 +429,14 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
 - [ ] Create `nyc-taxi/pipeline.yml` with correct configuration and variables
 - [ ] Create `requirements.txt` in pipeline root with Python dependencies
 - [ ] Create `.bruin.yml` for local environment configuration
-- [ ] Create `tier_1.ingest_trips.py` with date-to-month conversion logic
+- [ ] Create `tier_1.ingest_trips.py` to ingest data from source website and materialize as a table (using Bruin Python Materialization)
 - [ ] Create `tier_1.taxi_zone_lookup.sql` with HTTP CSV ingestion
-- [ ] Create `tier_1.payment_lookup.asset.yml` with seed file configuration
 - [ ] Create `tier_1.payment_lookup.csv` with payment type mapping data
+- [ ] Create `tier_1.payment_lookup.asset.yml` with seed file configuration
 - [ ] Create `tier_1.trips_historic.sql` with time_interval strategy and column normalization
 - [ ] Create `tier_2.trips_summary.sql` with deduplication and enrichment
 - [ ] Create `tier_3.report_trips_monthly.sql` with monthly aggregations
-- [ ] Add all required Bruin metadata (name, uri, description, owner, tags, columns)
+- [ ] Add all required Bruin metadata (name, uri, description, owner, tags, columns) to all assets
 - [ ] Set primary keys and nullable constraints correctly
 - [ ] Add timestamp tracking columns (extracted_at, loaded_at, updated_at)
 - [ ] Test individual assets
