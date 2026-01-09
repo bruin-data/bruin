@@ -75,40 +75,33 @@ func (e *Enhancer) EnsureClaudeCLI() error {
 }
 
 // EnhanceAsset runs AI enhancement on a single asset.
-// Claude directly edits the file using MCP tools and returns nil suggestions.
-func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName string) (*EnhancementSuggestions, error) {
+// Claude directly edits the file using MCP tools.
+func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName string) error {
 	return e.EnhanceAssetWithStats(ctx, asset, pipelineName, "")
 }
 
 // EnhanceAssetWithStats runs AI enhancement with pre-fetched table statistics.
 // The tableSummaryJSON parameter contains pre-fetched statistics to avoid Claude making database tool calls.
-func (e *Enhancer) EnhanceAssetWithStats(ctx context.Context, asset *pipeline.Asset, pipelineName string, tableSummaryJSON string) (*EnhancementSuggestions, error) {
+func (e *Enhancer) EnhanceAssetWithStats(ctx context.Context, asset *pipeline.Asset, pipelineName string, tableSummaryJSON string) error {
 	if err := e.EnsureClaudeCLI(); err != nil {
-		return nil, errors.Wrap(err, "claude CLI not available")
+		return errors.Wrap(err, "claude CLI not available")
 	}
 
 	if asset.DefinitionFile.Path == "" {
-		return nil, errors.New("asset definition file path is required")
+		return errors.New("asset definition file path is required")
 	}
 
-	return e.enhanceAssetWithMCP(ctx, asset, pipelineName, tableSummaryJSON)
-}
-
-// enhanceAssetWithMCP uses Claude to directly edit the asset file.
-func (e *Enhancer) enhanceAssetWithMCP(ctx context.Context, asset *pipeline.Asset, pipelineName string, tableSummaryJSON string) (*EnhancementSuggestions, error) {
 	// Build prompt with file path and optional pre-fetched stats
-	prompt := BuildEnhancePromptWithFilePath(asset.DefinitionFile.Path, asset.Name, pipelineName, tableSummaryJSON)
-	systemPrompt := GetSystemPrompt(true, tableSummaryJSON != "")
+	prompt := BuildEnhancePrompt(asset.DefinitionFile.Path, asset.Name, pipelineName, tableSummaryJSON)
+	systemPrompt := GetSystemPrompt(tableSummaryJSON != "")
 
 	// Call Claude CLI - Claude will use MCP tools to edit the file directly
 	_, err := e.callClaude(ctx, prompt, systemPrompt)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to enhance asset")
+		return errors.Wrap(err, "failed to enhance asset")
 	}
 
-	// Return nil suggestions since Claude edited the file directly
-	// The caller should reload the asset to see the changes
-	return nil, nil
+	return nil
 }
 
 // callClaude executes the Claude CLI with the given prompt.
