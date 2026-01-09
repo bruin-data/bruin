@@ -1,6 +1,6 @@
 /* @bruin
-name: ingestion.taxi_zone_lookup
-uri: neptune.ingestion.taxi_zone_lookup
+name: tier_1.taxi_zone_lookup
+uri: neptune.tier_1.taxi_zone_lookup
 type: duckdb.sql
 description: |
   Loads the NYC taxi zone lookup table from HTTP CSV source.

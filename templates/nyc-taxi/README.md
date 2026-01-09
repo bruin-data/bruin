@@ -206,7 +206,7 @@ In this pipeline, the `taxi_types` variable allows you to configure which taxi t
 
 ### 1. Ingestion Layer
 
-#### `ingestion.ingest_trips_python`
+#### `tier_1.ingest_trips`
 - **Type**: `python`
 - **Strategy**: `create+replace`
 - **Connection**: `duckdb-default`
@@ -227,7 +227,7 @@ The `materialize()` function is required and must return a Pandas DataFrame. Bru
 - Adds `extracted_at` timestamp column
 - Uses `create+replace` strategy to fully refresh the table on each run
 
-#### `ingestion.taxi_zone_lookup`
+#### `tier_1.taxi_zone_lookup`
 - **Type**: `duckdb.sql`
 - **Strategy**: `truncate+insert`
 - **Purpose**: Load taxi zone lookup table from HTTP CSV
@@ -254,7 +254,7 @@ The `time_interval` strategy is designed for incremental processing based on tim
 Why we chose it: This strategy is ideal for time-series data where we want to reprocess specific date ranges (e.g., to handle late-arriving data or corrections) without affecting other time periods.
 
 **Bruin Configuration**:
-- Reads from `ingestion.ingest_trips_python`
+- Reads from `tier_1.ingest_trips`
 - Normalizes column names (e.g., `tpep_pickup_datetime` → `pickup_time`)
 - Adds `loaded_at` timestamp column
 - Preserves `extracted_at` timestamp from ingestion layer
@@ -274,7 +274,7 @@ Same as tier_1 - processes data incrementally based on the pickup_time date rang
 
 **Bruin Configuration**:
 - Reads from `tier_1.trips_historic`
-- Enriches with location data from `ingestion.taxi_zone_lookup`
+- Enriches with location data from `tier_1.taxi_zone_lookup`
 - Adds `updated_at` timestamp column
 - Preserves `extracted_at` timestamp from tier_1
 - All primary key columns are non-nullable
@@ -358,7 +358,7 @@ bruin run ./nyc/pipeline.yml --start-date 2024-12-01 --end-date 2025-01-31
 ### 5. Verify Data
 ```bash
 # Check row counts
-bruin query --asset ingestion.ingest_trips_python --query "SELECT COUNT(*) FROM ingestion.ingest_trips_python"
+bruin query --asset tier_1.ingest_trips --query "SELECT COUNT(*) FROM tier_1.ingest_trips"
 
 # Check monthly report (should show 14 months for 2021-01 to 2022-02)
 bruin query --asset tier_3.report_trips_monthly --query "SELECT COUNT(*) as month_count FROM tier_3.report_trips_monthly WHERE month_date >= '2021-01-01' AND month_date <= '2022-02-28'"
@@ -379,8 +379,8 @@ bruin query --asset tier_3.report_trips_monthly --query "SELECT * FROM tier_3.re
 ## Implementation Checklist
 
 - [ ] Create `nyc/pipeline.yml` with correct configuration and variables
-- [ ] Create `ingestion.ingest_trips_python.py` with date-to-month conversion logic
-- [ ] Create `ingestion.taxi_zone_lookup.sql` with CSV ingestion
+- [ ] Create `tier_1.ingest_trips.py` with date-to-month conversion logic
+- [ ] Create `tier_1.taxi_zone_lookup.sql` with CSV ingestion
 - [ ] Create `tier_1.trips_historic.sql` with time_interval strategy and column normalization
 - [ ] Create `tier_2.trips_summary.sql` with deduplication and enrichment
 - [ ] Create `tier_3.report_trips_monthly.sql` with monthly aggregations

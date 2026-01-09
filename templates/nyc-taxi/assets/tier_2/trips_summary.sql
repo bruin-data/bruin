@@ -33,7 +33,7 @@ tags:
   - cleaned-data
 
 depends:
-  - ingestion.taxi_zone_lookup
+  - tier_1.taxi_zone_lookup
   - tier_1.trips_historic
   - tier_1.payment_lookup
 
@@ -182,7 +182,7 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     pickup_lookup.borough AS pickup_borough,
     pickup_lookup.zone AS pickup_zone,
   FROM cleaned_trips AS ct
-  LEFT JOIN ingestion.taxi_zone_lookup AS pickup_lookup
+  LEFT JOIN tier_1.taxi_zone_lookup AS pickup_lookup
     ON ct.pickup_location_id = pickup_lookup.location_id
 )
 
@@ -207,7 +207,7 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     payment_lookup.payment_description,
     twl.extracted_at,
   FROM trips_with_lookup AS twl
-  LEFT JOIN ingestion.taxi_zone_lookup AS dropoff_lookup
+  LEFT JOIN tier_1.taxi_zone_lookup AS dropoff_lookup
     ON twl.dropoff_location_id = dropoff_lookup.location_id
   LEFT JOIN tier_1.payment_lookup AS payment_lookup
     ON CAST(twl.payment_type AS INTEGER) = payment_lookup.payment_type_id

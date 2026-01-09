@@ -4,7 +4,7 @@ uri: neptune.tier_1.trips_historic
 type: duckdb.sql
 description: |
   Stores raw ingested taxi trip data from the Python ingestion table.
-  Reads all columns from ingestion.ingest_trips_python and normalizes column names to match tier_1 schema.
+  Reads all columns from tier_1.ingest_trips and normalizes column names to match tier_1 schema.
   This is the first persistent storage layer for raw trip data.
   Standardizes columns names.
   Filter by date range using month-level truncation
@@ -15,7 +15,7 @@ description: |
 owner: data-engineering
 
 depends:
-  - ingestion.ingest_trips_python
+  - tier_1.ingest_trips
 
 materialization:
   type: table
@@ -114,7 +114,7 @@ SELECT
   taxi_type,
   extracted_at,
   CURRENT_TIMESTAMP AS loaded_at,
-FROM ingestion.ingest_trips_python
+FROM tier_1.ingest_trips
 WHERE 1=1
   AND DATE_TRUNC('month', CAST(COALESCE(tpep_pickup_datetime, lpep_pickup_datetime) AS TIMESTAMP)) BETWEEN DATE_TRUNC('month', CAST('{{ start_datetime }}' AS TIMESTAMP)) AND DATE_TRUNC('month', CAST('{{ end_datetime }}' AS TIMESTAMP))
   AND COALESCE(tpep_pickup_datetime, lpep_pickup_datetime) IS NOT NULL
