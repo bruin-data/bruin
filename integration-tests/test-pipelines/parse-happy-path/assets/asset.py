@@ -5,6 +5,12 @@ image: python:3.11
 depends:
     - chess_playground.player_summary
 
+hooks:
+    pre:
+        - query: "select 1"
+    post:
+        - query: "select 2"
+
 secrets:
     - key: KEY1
       inject_as: INJECTED1

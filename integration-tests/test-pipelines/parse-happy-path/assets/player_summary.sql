@@ -9,6 +9,13 @@ depends:
    - chess_playground.games
    - chess_playground.profiles
 
+hooks:
+  pre:
+    - query: "select 1"
+    - query: "select 2"
+  post:
+    - query: "select 3"
+
 columns:
   - name: total_games
     type: integer
