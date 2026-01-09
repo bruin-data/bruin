@@ -8,15 +8,18 @@ import (
 )
 
 func TestNewEnhancer(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 
 	t.Run("uses default model when empty", func(t *testing.T) {
+		t.Parallel()
 		enhancer := NewEnhancer(fs, "")
 
 		assert.Equal(t, defaultModel, enhancer.GetModel())
 	})
 
 	t.Run("uses provided model", func(t *testing.T) {
+		t.Parallel()
 		enhancer := NewEnhancer(fs, "claude-opus-4-20250514")
 
 		assert.Equal(t, "claude-opus-4-20250514", enhancer.GetModel())
@@ -24,6 +27,7 @@ func TestNewEnhancer(t *testing.T) {
 }
 
 func TestNewEnhancerWithAPIKey(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 
 	enhancer := NewEnhancerWithAPIKey(fs, "claude-sonnet-4-20250514", "sk-test-key")
@@ -33,6 +37,7 @@ func TestNewEnhancerWithAPIKey(t *testing.T) {
 }
 
 func TestEnhancer_SetAPIKey(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	enhancer := NewEnhancer(fs, "")
 
@@ -42,15 +47,18 @@ func TestEnhancer_SetAPIKey(t *testing.T) {
 }
 
 func TestEnhancer_IsClaudeCLIInstalled(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 
 	t.Run("returns false when path is empty", func(t *testing.T) {
+		t.Parallel()
 		enhancer := &Enhancer{fs: fs, model: defaultModel, claudePath: ""}
 
 		assert.False(t, enhancer.IsClaudeCLIInstalled())
 	})
 
 	t.Run("returns true when path is set", func(t *testing.T) {
+		t.Parallel()
 		enhancer := &Enhancer{fs: fs, model: defaultModel, claudePath: "/usr/local/bin/claude"}
 
 		assert.True(t, enhancer.IsClaudeCLIInstalled())
@@ -58,9 +66,11 @@ func TestEnhancer_IsClaudeCLIInstalled(t *testing.T) {
 }
 
 func TestEnhancer_BuildMCPConfig(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 
 	t.Run("builds valid MCP config JSON", func(t *testing.T) {
+		t.Parallel()
 		enhancer := &Enhancer{
 			fs:        fs,
 			model:     defaultModel,
@@ -77,6 +87,7 @@ func TestEnhancer_BuildMCPConfig(t *testing.T) {
 	})
 
 	t.Run("includes environment variables when set", func(t *testing.T) {
+		t.Parallel()
 		enhancer := &Enhancer{
 			fs:          fs,
 			model:       defaultModel,
@@ -95,6 +106,7 @@ func TestEnhancer_BuildMCPConfig(t *testing.T) {
 	})
 
 	t.Run("omits env when not set", func(t *testing.T) {
+		t.Parallel()
 		enhancer := &Enhancer{
 			fs:        fs,
 			model:     defaultModel,
@@ -110,6 +122,7 @@ func TestEnhancer_BuildMCPConfig(t *testing.T) {
 }
 
 func TestEnhancer_SetRepoRoot(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	enhancer := NewEnhancer(fs, "")
 
@@ -119,6 +132,7 @@ func TestEnhancer_SetRepoRoot(t *testing.T) {
 }
 
 func TestEnhancer_SetEnvironment(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 	enhancer := NewEnhancer(fs, "")
 
@@ -128,9 +142,11 @@ func TestEnhancer_SetEnvironment(t *testing.T) {
 }
 
 func TestEnhancer_UseMCP(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewMemMapFs()
 
 	t.Run("enables MCP when bruin path is set", func(t *testing.T) {
+		t.Parallel()
 		enhancer := &Enhancer{
 			fs:        fs,
 			model:     defaultModel,
@@ -142,6 +158,7 @@ func TestEnhancer_UseMCP(t *testing.T) {
 	})
 
 	t.Run("disables MCP when bruin path is empty", func(t *testing.T) {
+		t.Parallel()
 		enhancer := &Enhancer{
 			fs:        fs,
 			model:     defaultModel,

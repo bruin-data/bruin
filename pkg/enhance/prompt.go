@@ -337,14 +337,14 @@ Start by reading the file.`,
 // buildAssetSummary creates a readable summary of the asset for the prompt.
 func buildAssetSummary(asset *pipeline.Asset) string {
 	summary := struct {
-		Name           string            `json:"name"`
-		Type           string            `json:"type"`
-		Description    string            `json:"description,omitempty"`
-		Owner          string            `json:"owner,omitempty"`
-		Tags           []string          `json:"tags,omitempty"`
-		Domains        []string          `json:"domains,omitempty"`
-		Columns        []columnSummary   `json:"columns,omitempty"`
-		ExistingChecks []string          `json:"existing_custom_checks,omitempty"`
+		Name           string          `json:"name"`
+		Type           string          `json:"type"`
+		Description    string          `json:"description,omitempty"`
+		Owner          string          `json:"owner,omitempty"`
+		Tags           []string        `json:"tags,omitempty"`
+		Domains        []string        `json:"domains,omitempty"`
+		Columns        []columnSummary `json:"columns,omitempty"`
+		ExistingChecks []string        `json:"existing_custom_checks,omitempty"`
 	}{
 		Name:        asset.Name,
 		Type:        string(asset.Type),

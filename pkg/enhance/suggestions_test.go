@@ -8,6 +8,7 @@ import (
 )
 
 func TestEnhancementSuggestions_IsEmpty(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		suggestions *EnhancementSuggestions
@@ -78,6 +79,7 @@ func TestEnhancementSuggestions_IsEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := tt.suggestions.IsEmpty()
 			assert.Equal(t, tt.want, got)
 		})
@@ -85,7 +87,9 @@ func TestEnhancementSuggestions_IsEmpty(t *testing.T) {
 }
 
 func TestApplySuggestions(t *testing.T) {
+	t.Parallel()
 	t.Run("applies asset description when empty", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{Name: "test_asset"}
 		suggestions := &EnhancementSuggestions{
 			AssetDescription: "New description",
@@ -97,6 +101,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("does not overwrite existing description", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name:        "test_asset",
 			Description: "Existing description",
@@ -111,6 +116,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("applies column descriptions", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "test_asset",
 			Columns: []pipeline.Column{
@@ -132,6 +138,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("applies column checks", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "test_asset",
 			Columns: []pipeline.Column{
@@ -155,6 +162,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("does not duplicate existing checks", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "test_asset",
 			Columns: []pipeline.Column{
@@ -183,6 +191,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("applies tags without duplicates", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "test_asset",
 			Tags: []string{"existing_tag"},
@@ -199,6 +208,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("applies owner when empty", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{Name: "test_asset"}
 		suggestions := &EnhancementSuggestions{
 			SuggestedOwner: "owner@example.com",
@@ -210,6 +220,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("does not overwrite existing owner", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name:  "test_asset",
 			Owner: "existing@example.com",
@@ -224,6 +235,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("handles nil asset", func(t *testing.T) {
+		t.Parallel()
 		suggestions := &EnhancementSuggestions{
 			AssetDescription: "test",
 		}
@@ -233,6 +245,7 @@ func TestApplySuggestions(t *testing.T) {
 	})
 
 	t.Run("handles nil suggestions", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{Name: "test_asset"}
 
 		// Should not panic
@@ -241,7 +254,9 @@ func TestApplySuggestions(t *testing.T) {
 }
 
 func TestCreateColumnCheck(t *testing.T) {
+	t.Parallel()
 	t.Run("creates check without value", func(t *testing.T) {
+		t.Parallel()
 		suggestion := CheckSuggestion{
 			Name: "not_null",
 		}
@@ -252,6 +267,7 @@ func TestCreateColumnCheck(t *testing.T) {
 	})
 
 	t.Run("creates check with int value", func(t *testing.T) {
+		t.Parallel()
 		suggestion := CheckSuggestion{
 			Name:  "min",
 			Value: float64(10), // JSON unmarshals numbers as float64
@@ -265,6 +281,7 @@ func TestCreateColumnCheck(t *testing.T) {
 	})
 
 	t.Run("creates check with string value", func(t *testing.T) {
+		t.Parallel()
 		suggestion := CheckSuggestion{
 			Name:  "pattern",
 			Value: "^[a-z]+$",
@@ -278,6 +295,7 @@ func TestCreateColumnCheck(t *testing.T) {
 	})
 
 	t.Run("creates check with string array value", func(t *testing.T) {
+		t.Parallel()
 		suggestion := CheckSuggestion{
 			Name:  "accepted_values",
 			Value: []interface{}{"active", "inactive", "pending"},
@@ -292,6 +310,7 @@ func TestCreateColumnCheck(t *testing.T) {
 }
 
 func TestContainsString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		slice []string
@@ -326,6 +345,7 @@ func TestContainsString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := containsString(tt.slice, tt.s)
 			assert.Equal(t, tt.want, got)
 		})
@@ -333,6 +353,7 @@ func TestContainsString(t *testing.T) {
 }
 
 func TestHasCheck(t *testing.T) {
+	t.Parallel()
 	checks := []pipeline.ColumnCheck{
 		{Name: "not_null"},
 		{Name: "unique"},
