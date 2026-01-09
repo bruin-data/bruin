@@ -899,14 +899,15 @@ func (c EMRServerlessConnection) GetName() string {
 }
 
 type DataprocServerlessConnection struct {
-	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
-	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
-	Region             string `yaml:"region" json:"region" mapstructure:"region"`
-	Workspace          string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
-	ExecutionRole      string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
-	SubnetworkURI      string `yaml:"subnetwork_uri,omitempty" json:"subnetwork_uri,omitempty" mapstructure:"subnetwork_uri"`
+	Name                             string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountJSON               string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile               string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	UseApplicationDefaultCredentials bool   `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" mapstructure:"use_application_default_credentials"`
+	ProjectID                        string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	Region                           string `yaml:"region" json:"region" mapstructure:"region"`
+	Workspace                        string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+	ExecutionRole                    string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
+	SubnetworkURI                    string `yaml:"subnetwork_uri,omitempty" json:"subnetwork_uri,omitempty" mapstructure:"subnetwork_uri"`
 }
 
 func (c DataprocServerlessConnection) GetName() string {
