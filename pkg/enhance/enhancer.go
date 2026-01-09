@@ -199,31 +199,46 @@ func (e *Enhancer) runClaudeWithStreaming(cmd *exec.Cmd) (string, error) {
 	return "", nil
 }
 
+// mcpServerConfig represents the configuration for an MCP server.
+type mcpServerConfig struct {
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     map[string]string `json:"env,omitempty"`
+}
+
+// mcpConfig represents the full MCP configuration.
+type mcpConfig struct {
+	MCPServers map[string]mcpServerConfig `json:"mcpServers"`
+}
+
 // buildMCPConfig creates the MCP server configuration JSON for bruin.
 func (e *Enhancer) buildMCPConfig() string {
-	bruinConfig := map[string]interface{}{
-		"command": e.bruinPath,
-		"args":    []string{"mcp"},
+	bruinConfig := mcpServerConfig{
+		Command: e.bruinPath,
+		Args:    []string{"mcp"},
 	}
 
 	// Add environment variables for database connectivity
-	env := make(map[string]string)
-	if e.repoRoot != "" {
-		env["BRUIN_REPO_ROOT"] = e.repoRoot
-	}
-	if e.environment != "" {
-		env["BRUIN_ENVIRONMENT"] = e.environment
-	}
-	if len(env) > 0 {
-		bruinConfig["env"] = env
+	if e.repoRoot != "" || e.environment != "" {
+		bruinConfig.Env = make(map[string]string)
+		if e.repoRoot != "" {
+			bruinConfig.Env["BRUIN_REPO_ROOT"] = e.repoRoot
+		}
+		if e.environment != "" {
+			bruinConfig.Env["BRUIN_ENVIRONMENT"] = e.environment
+		}
 	}
 
-	config := map[string]interface{}{
-		"mcpServers": map[string]interface{}{
+	config := mcpConfig{
+		MCPServers: map[string]mcpServerConfig{
 			"bruin": bruinConfig,
 		},
 	}
-	jsonBytes, _ := json.Marshal(config)
+	jsonBytes, err := json.Marshal(config)
+	if err != nil {
+		// Fallback to empty config on error (should never happen with these types)
+		return `{"mcpServers":{}}`
+	}
 	return string(jsonBytes)
 }
 

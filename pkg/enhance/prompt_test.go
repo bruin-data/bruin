@@ -9,7 +9,9 @@ import (
 )
 
 func TestBuildEnhancePrompt(t *testing.T) {
+	t.Parallel()
 	t.Run("includes asset name and pipeline", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "test_asset",
 			Type: "duckdb.sql",
@@ -23,6 +25,7 @@ func TestBuildEnhancePrompt(t *testing.T) {
 	})
 
 	t.Run("includes column information", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "users",
 			Type: "pg.sql",
@@ -41,6 +44,7 @@ func TestBuildEnhancePrompt(t *testing.T) {
 	})
 
 	t.Run("includes existing checks in summary", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "users",
 			Type: "pg.sql",
@@ -61,6 +65,7 @@ func TestBuildEnhancePrompt(t *testing.T) {
 	})
 
 	t.Run("includes check type guidelines", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "test",
 			Type: "sql",
@@ -77,6 +82,7 @@ func TestBuildEnhancePrompt(t *testing.T) {
 	})
 
 	t.Run("includes JSON schema format", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "test",
 			Type: "sql",
@@ -92,7 +98,9 @@ func TestBuildEnhancePrompt(t *testing.T) {
 }
 
 func TestGetSystemPrompt(t *testing.T) {
+	t.Parallel()
 	t.Run("without MCP", func(t *testing.T) {
+		t.Parallel()
 		prompt := GetSystemPrompt(false)
 
 		assert.NotEmpty(t, prompt)
@@ -102,6 +110,7 @@ func TestGetSystemPrompt(t *testing.T) {
 	})
 
 	t.Run("with MCP", func(t *testing.T) {
+		t.Parallel()
 		prompt := GetSystemPrompt(true)
 
 		assert.NotEmpty(t, prompt)
@@ -114,6 +123,7 @@ func TestGetSystemPrompt(t *testing.T) {
 	})
 
 	t.Run("with MCP and pre-fetched stats", func(t *testing.T) {
+		t.Parallel()
 		prompt := GetSystemPrompt(true, true)
 
 		assert.NotEmpty(t, prompt)
@@ -131,7 +141,9 @@ func TestGetSystemPrompt(t *testing.T) {
 }
 
 func TestBuildAssetSummary(t *testing.T) {
+	t.Parallel()
 	t.Run("includes basic asset info", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name:        "orders",
 			Type:        "bq.sql",
@@ -151,6 +163,7 @@ func TestBuildAssetSummary(t *testing.T) {
 	})
 
 	t.Run("returns valid JSON", func(t *testing.T) {
+		t.Parallel()
 		asset := &pipeline.Asset{
 			Name: "test",
 			Type: "sql",

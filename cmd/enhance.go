@@ -21,11 +21,6 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const (
-	enhanceStatusUpdated = "updated"
-	enhanceStatusFailed  = "failed"
-)
-
 // enhanceCommand returns the enhance subcommand for the ai parent command.
 func enhanceCommand(isDebug *bool) *cli.Command {
 	return &cli.Command{
@@ -75,7 +70,6 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 }
 
 func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
-	logger := makeLogger(*isDebug)
 	fs := afero.NewOsFs()
 	output := c.String("output")
 
@@ -89,10 +83,10 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 		return printEnhanceError(output, errors.New("please provide a path to a single asset file (e.g., assets/my_asset.sql or assets/my_asset.asset.yml)"))
 	}
 
-	return enhanceSingleAsset(ctx, c, inputPath, fs, output, logger, isDebug)
+	return enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug)
 }
 
-func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, logger interface{}, isDebug *bool) error {
+func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, isDebug *bool) error {
 	absAssetPath, _ := filepath.Abs(assetPath)
 
 	// Step 1: Format (unless skipped)
@@ -183,11 +177,17 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 
 	// Claude directly edited the file via MCP
 	if output == "json" {
-		result := map[string]interface{}{
-			"status": "success",
-			"asset":  pp.Asset.Name,
+		result := struct {
+			Status string `json:"status"`
+			Asset  string `json:"asset"`
+		}{
+			Status: "success",
+			Asset:  pp.Asset.Name,
 		}
-		jsonBytes, _ := json.Marshal(result)
+		jsonBytes, err := json.Marshal(result)
+		if err != nil {
+			return printEnhanceError(output, errors.Wrap(err, "failed to marshal result"))
+		}
 		fmt.Println(string(jsonBytes))
 	} else {
 		successPrinter.Printf("\n✓ Enhanced '%s'\n", pp.Asset.Name)
@@ -545,4 +545,3 @@ func getSampleColumnValues(ctx context.Context, conn interface{}, tableName, col
 
 	return values
 }
-

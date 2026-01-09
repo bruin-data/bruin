@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +16,14 @@ import (
 // FileToolsConfig holds configuration for file tools.
 type FileToolsConfig struct {
 	RepoRoot string
+}
+
+// formatToolResult represents the result of a format or validate tool call.
+type formatToolResult struct {
+	Success bool   `json:"success"`
+	Path    string `json:"path"`
+	Output  string `json:"output"`
+	Error   string `json:"error,omitempty"`
 }
 
 // Global file tools config.
@@ -47,7 +56,7 @@ func validatePath(path string) (string, error) {
 	initFileToolsConfig()
 
 	if fileToolsConfig.RepoRoot == "" {
-		return "", fmt.Errorf("no Bruin repository found. Set BRUIN_REPO_ROOT environment variable")
+		return "", errors.New("no Bruin repository found. Set BRUIN_REPO_ROOT environment variable")
 	}
 
 	// Resolve absolute path
@@ -96,7 +105,7 @@ func writeFile(path, content string) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	if err := os.WriteFile(absPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(absPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -112,7 +121,7 @@ func runBruinFormat(ctx context.Context, path string) (string, error) {
 
 	bruinPath, err := exec.LookPath("bruin")
 	if err != nil {
-		return "", fmt.Errorf("bruin CLI not found in PATH")
+		return "", errors.New("bruin CLI not found in PATH")
 	}
 
 	cmd := exec.CommandContext(ctx, bruinPath, "format", absPath)
@@ -133,7 +142,7 @@ func runBruinValidate(ctx context.Context, path string) (string, error) {
 
 	bruinPath, err := exec.LookPath("bruin")
 	if err != nil {
-		return "", fmt.Errorf("bruin CLI not found in PATH")
+		return "", errors.New("bruin CLI not found in PATH")
 	}
 
 	cmd := exec.CommandContext(ctx, bruinPath, "validate", absPath)
@@ -154,7 +163,7 @@ func HandleFileToolCall(toolName string, args map[string]interface{}, debug bool
 	case "bruin_read_file":
 		path, _ := args["path"].(string)
 		if path == "" {
-			return formatFileError("read_file", fmt.Errorf("path parameter is required")), nil
+			return formatFileError("read_file", errors.New("path parameter is required")), nil
 		}
 		content, err := readFile(path)
 		if err != nil {
@@ -166,51 +175,60 @@ func HandleFileToolCall(toolName string, args map[string]interface{}, debug bool
 		path, _ := args["path"].(string)
 		content, _ := args["content"].(string)
 		if path == "" {
-			return formatFileError("write_file", fmt.Errorf("path parameter is required")), nil
+			return formatFileError("write_file", errors.New("path parameter is required")), nil
 		}
 		if err := writeFile(path, content); err != nil {
 			return formatFileError("write_file", err), nil
 		}
-		result := map[string]interface{}{
-			"success": true,
+		result := map[string]string{
+			"success": "true",
 			"path":    path,
 			"message": "File written successfully",
 		}
-		jsonBytes, _ := json.MarshalIndent(result, "", "  ")
+		jsonBytes, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal result: %w", err)
+		}
 		return string(jsonBytes), nil
 
 	case "bruin_format":
 		path, _ := args["path"].(string)
 		if path == "" {
-			return formatFileError("format", fmt.Errorf("path parameter is required")), nil
+			return formatFileError("format", errors.New("path parameter is required")), nil
 		}
-		output, err := runBruinFormat(ctx, path)
-		result := map[string]interface{}{
-			"success": err == nil,
-			"path":    path,
-			"output":  output,
+		output, fmtErr := runBruinFormat(ctx, path)
+		result := formatToolResult{
+			Success: fmtErr == nil,
+			Path:    path,
+			Output:  output,
 		}
+		if fmtErr != nil {
+			result.Error = fmtErr.Error()
+		}
+		jsonBytes, err := json.MarshalIndent(result, "", "  ")
 		if err != nil {
-			result["error"] = err.Error()
+			return "", fmt.Errorf("failed to marshal result: %w", err)
 		}
-		jsonBytes, _ := json.MarshalIndent(result, "", "  ")
 		return string(jsonBytes), nil
 
 	case "bruin_validate":
 		path, _ := args["path"].(string)
 		if path == "" {
-			return formatFileError("validate", fmt.Errorf("path parameter is required")), nil
+			return formatFileError("validate", errors.New("path parameter is required")), nil
 		}
-		output, err := runBruinValidate(ctx, path)
-		result := map[string]interface{}{
-			"success": err == nil,
-			"path":    path,
-			"output":  output,
+		output, valErr := runBruinValidate(ctx, path)
+		result := formatToolResult{
+			Success: valErr == nil,
+			Path:    path,
+			Output:  output,
 		}
+		if valErr != nil {
+			result.Error = valErr.Error()
+		}
+		jsonBytes, err := json.MarshalIndent(result, "", "  ")
 		if err != nil {
-			result["error"] = err.Error()
+			return "", fmt.Errorf("failed to marshal result: %w", err)
 		}
-		jsonBytes, _ := json.MarshalIndent(result, "", "  ")
 		return string(jsonBytes), nil
 
 	default:
@@ -218,12 +236,21 @@ func HandleFileToolCall(toolName string, args map[string]interface{}, debug bool
 	}
 }
 
+// fileErrorResult represents an error result from a file tool.
+type fileErrorResult struct {
+	Error     string `json:"error"`
+	Operation string `json:"operation"`
+}
+
 func formatFileError(operation string, err error) string {
-	result := map[string]string{
-		"error":     err.Error(),
-		"operation": operation,
+	result := fileErrorResult{
+		Error:     err.Error(),
+		Operation: operation,
 	}
-	jsonBytes, _ := json.MarshalIndent(result, "", "  ")
+	jsonBytes, marshalErr := json.MarshalIndent(result, "", "  ")
+	if marshalErr != nil {
+		return fmt.Sprintf(`{"error": "%s", "operation": "%s"}`, err.Error(), operation)
+	}
 	return string(jsonBytes)
 }
 
