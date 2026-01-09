@@ -6,7 +6,11 @@ Bruin supports Databricks as a data platform.
 
 ## Connection
 
-In order to work with Databricks you can add as a configuration item to `connections` in the `.bruin.yml` file complying with the following schema:
+Bruin supports two authentication methods for Databricks:
+- **Personal Access Token (PAT)**: Simple token-based authentication
+- **OAuth M2M (Machine-to-Machine)**: Service principal authentication using OAuth 2.0
+
+### Option 1: Personal Access Token (PAT)
 
 ```yaml
     connections:
@@ -15,7 +19,7 @@ In order to work with Databricks you can add as a configuration item to `connect
           token: "your-databricks-token"
           path: "your-databricks-endpoint-path"
           host: "your-databricks-host"
-          port: "your-databricks-port"
+          port: 443
           catalog: "your-databricks-catalog"
           schema: "your-databricks-schema"
 ```
@@ -51,6 +55,39 @@ The Databricks configuration in `.bruin.yml` should like something like this:
           catalog: default
           schema: example_schema
 ```
+
+### Option 2: OAuth M2M (Service Principal)
+
+OAuth M2M authentication is recommended for automated workflows and service accounts. It uses a service principal with a client ID and secret instead of a personal access token.
+
+#### Step 1: Create a Service Principal
+
+In your Databricks account console, add a new service principal. Go to the Configuration tab and select the entitlements it should have for your workspace.
+
+#### Step 2: Create an OAuth Secret
+
+On the service principal's details page, open the Secrets tab. Under OAuth secrets, click "Generate secret." Set the secret's lifetime (up to 730 days). Copy the displayed secret and client ID - the secret is only shown once.
+
+#### Step 3: Grant Access to SQL Warehouse
+
+Ensure the service principal has `CAN USE` permission on the SQL warehouse you want to use.
+
+#### Step 4: Configure the Connection
+
+```yaml
+    connections:
+      databricks:
+        - name: databricks-default
+          host: dbc-example-host.cloud.databricks.com
+          path: /sql/1.0/warehouses/3748325bf498i274
+          port: 443
+          catalog: default
+          schema: example_schema
+          client_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+          client_secret: dosexxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+For more details on OAuth M2M authentication, see the [Databricks documentation](https://docs.databricks.com/en/dev-tools/auth/oauth-m2m.html).
 
 ## Databricks Assets
 
