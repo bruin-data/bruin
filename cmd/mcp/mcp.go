@@ -51,13 +51,13 @@ func MCPCmd() *cli.Command {
 				Value: false,
 			},
 		},
-		Action: func(_ context.Context, c *cli.Command) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			debug := c.Bool("debug")
 
 			if debug {
 				fmt.Fprintf(os.Stderr, "Starting Bruin MCP server...\n")
 			}
-			return runMCPServer(debug) //nolint:contextcheck
+			return runMCPServer(debug)
 		},
 	}
 }
@@ -142,45 +142,42 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 			Result:  nil,
 		}
 	case "tools/list":
-		// Documentation tools
-		tools := []map[string]interface{}{
-			{
-				"name":        "bruin_get_overview",
-				"description": "Get information about Bruin's features and capabilities",
-				"inputSchema": map[string]interface{}{
-					"type":       "object",
-					"properties": map[string]interface{}{},
-				},
-			},
-			{
-				"name":        "bruin_get_docs_tree",
-				"description": "Get tree view of documentation files for Bruin, including all the supported platforms, data sources and destinations.",
-				"inputSchema": map[string]interface{}{
-					"type":       "object",
-					"properties": map[string]interface{}{},
-				},
-			},
-			{
-				"name":        "bruin_get_doc_content",
-				"description": "Get the contents of a specific documentation from Bruin CLI docs.",
-				"inputSchema": map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"filename": map[string]interface{}{
-							"type":        "string",
-							"description": "Name of the markdown file to fetch (with or without .md extension)",
-						},
-					},
-					"required": []string{"filename"},
-				},
-			},
-		}
-
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result: map[string]interface{}{
-				"tools": tools,
+				"tools": []map[string]interface{}{
+					{
+						"name":        "bruin_get_overview",
+						"description": "Get information about Bruin's features and capabilities",
+						"inputSchema": map[string]interface{}{
+							"type":       "object",
+							"properties": map[string]interface{}{},
+						},
+					},
+					{
+						"name":        "bruin_get_docs_tree",
+						"description": "Get tree view of documentation files for Bruin, including all the supported platforms, data sources and destinations.",
+						"inputSchema": map[string]interface{}{
+							"type":       "object",
+							"properties": map[string]interface{}{},
+						},
+					},
+					{
+						"name":        "bruin_get_doc_content",
+						"description": "Get the contents of a specific documentation from Bruin CLI docs.",
+						"inputSchema": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"filename": map[string]interface{}{
+									"type":        "string",
+									"description": "Name of the markdown file to fetch (with or without .md extension)",
+								},
+							},
+							"required": []string{"filename"},
+						},
+					},
+				},
 			},
 		}
 	case "tools/call":
