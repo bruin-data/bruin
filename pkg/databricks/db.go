@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -18,19 +19,31 @@ type DB struct {
 	conn          *sqlx.DB
 	config        *Config
 	schemaCreator *ansisql.SchemaCreator
+	mu            sync.Mutex
 }
 
 func NewDB(c *Config) (*DB, error) {
-	conn, err := sqlx.Open("databricks", c.ToDBConnectionURI())
-	if err != nil {
-		return nil, err
-	}
-
 	return &DB{
-		conn:          conn,
 		config:        c,
 		schemaCreator: ansisql.NewSchemaCreator(),
 	}, nil
+}
+
+func (db *DB) ensureConnection() error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if db.conn != nil {
+		return nil
+	}
+
+	conn, err := sqlx.Open("databricks", db.config.ToDBConnectionURI())
+	if err != nil {
+		return err
+	}
+
+	db.conn = conn
+	return nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -39,6 +52,10 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) err
 }
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	if err := db.ensureConnection(); err != nil {
+		return nil, err
+	}
+
 	queryString := query.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	if err == nil {
@@ -84,6 +101,10 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 }
 
 func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	if err := db.ensureConnection(); err != nil {
+		return nil, err
+	}
+
 	queryString := queryObj.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	if err != nil {

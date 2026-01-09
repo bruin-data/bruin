@@ -11,6 +11,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewDB_LazyConnection(t *testing.T) {
+	t.Parallel()
+
+	config := &Config{
+		Host:    "test-host",
+		Port:    443,
+		Token:   "test-token",
+		Path:    "/sql/1.0/warehouses/test",
+		Catalog: "test_catalog",
+		Schema:  "test_schema",
+	}
+
+	db, err := NewDB(config)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	// Step 1: Connection should NOT be opened yet after NewDB
+	require.Nil(t, db.conn, "connection should be nil after NewDB (lazy initialization)")
+	require.NotNil(t, db.config, "config should be set")
+	require.NotNil(t, db.schemaCreator, "schemaCreator should be set")
+
+	// Step 2: Call ensureConnection directly to trigger lazy initialization
+	err = db.ensureConnection()
+	require.NoError(t, err, "ensureConnection should succeed (sqlx.Open doesn't actually connect)")
+
+	// Step 3: Now conn should be set
+	require.NotNil(t, db.conn, "connection should be initialized after ensureConnection")
+}
+
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
 
