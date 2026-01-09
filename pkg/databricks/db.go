@@ -16,11 +16,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func init() {
-	// Disable zerolog global logger used by the driver's OAuth module
+// disableDriverLogs ensures the Databricks driver's noisy logs are disabled.
+// Uses sync.Once to ensure this only happens once across all DB instances.
+var disableDriverLogs = sync.OnceFunc(func() {
 	zerolog.SetGlobalLevel(zerolog.Disabled)
-}
-
+})
 
 type DB struct {
 	conn          *sqlx.DB
@@ -43,6 +43,8 @@ func (db *DB) ensureConnection() error {
 	if db.conn != nil {
 		return nil
 	}
+
+	disableDriverLogs()
 
 	conn, err := sqlx.Open("databricks", db.config.ToDBConnectionURI())
 	if err != nil {
