@@ -143,20 +143,9 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		enhancer.SetAPIKey(apiKey)
 	}
 
-	// Set repo root and environment for MCP file tools
-	repoRoot, err := git.FindRepoFromPath(assetPath)
-	if err == nil {
-		enhancer.SetRepoRoot(repoRoot.Path)
-		if output != "json" {
-			infoPrinter.Printf("  AI agent enabled with file editing tools\n")
-		}
-	}
 	env := c.String("environment")
-	if env != "" {
-		enhancer.SetEnvironment(env)
-		if output != "json" {
-			infoPrinter.Printf("  Using environment: %s\n", env)
-		}
+	if env != "" && output != "json" {
+		infoPrinter.Printf("  Using environment: %s\n", env)
 	}
 
 	// Check if Claude CLI is available

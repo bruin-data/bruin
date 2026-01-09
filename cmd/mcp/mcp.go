@@ -176,9 +176,6 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 			},
 		}
 
-		// Add file tools (for enhance command file editing)
-		tools = append(tools, GetFileToolDefinitions()...)
-
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -309,34 +306,6 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 		}
 
 	default:
-		// Check if this is a file tool (for enhance command file editing)
-		if IsFileTool(toolName) {
-			args, _ := params["arguments"].(map[string]interface{})
-			result, err := HandleFileToolCall(toolName, args, debug)
-			if err != nil {
-				return JSONRPCResponse{
-					JSONRPC: "2.0",
-					ID:      req.ID,
-					Error: &JSONRPCError{
-						Code:    -32000,
-						Message: err.Error(),
-					},
-				}
-			}
-			return JSONRPCResponse{
-				JSONRPC: "2.0",
-				ID:      req.ID,
-				Result: map[string]interface{}{
-					"content": []map[string]interface{}{
-						{
-							"type": "text",
-							"text": result,
-						},
-					},
-				},
-			}
-		}
-
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,

@@ -26,8 +26,6 @@ func TestBuildEnhancePrompt(t *testing.T) {
 		assert.Contains(t, prompt, "unique")
 		assert.Contains(t, prompt, "non_negative")
 		assert.Contains(t, prompt, "accepted_values")
-		assert.Contains(t, prompt, "bruin_read_file")
-		assert.Contains(t, prompt, "bruin_write_file")
 	})
 
 	t.Run("includes pre-fetched stats when provided", func(t *testing.T) {
@@ -48,11 +46,7 @@ func TestGetSystemPrompt(t *testing.T) {
 
 		assert.NotEmpty(t, prompt)
 		assert.Contains(t, prompt, "data quality expert")
-		// File tools
-		assert.Contains(t, prompt, "bruin_read_file")
-		assert.Contains(t, prompt, "bruin_write_file")
-		assert.Contains(t, prompt, "bruin_format")
-		assert.Contains(t, prompt, "bruin_validate")
+		assert.Contains(t, prompt, "DIRECTLY EDIT")
 	})
 
 	t.Run("with pre-fetched stats", func(t *testing.T) {
@@ -61,11 +55,7 @@ func TestGetSystemPrompt(t *testing.T) {
 
 		assert.NotEmpty(t, prompt)
 		assert.Contains(t, prompt, "data quality expert")
-		// File tools
-		assert.Contains(t, prompt, "bruin_read_file")
-		assert.Contains(t, prompt, "bruin_write_file")
-		assert.Contains(t, prompt, "bruin_format")
-		assert.Contains(t, prompt, "bruin_validate")
+		assert.Contains(t, prompt, "DIRECTLY EDIT")
 		// Should mention using pre-fetched statistics
 		assert.Contains(t, prompt, "PRE-FETCHED")
 		// Should mention sample_values in the context of statistics

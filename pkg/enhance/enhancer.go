@@ -3,7 +3,6 @@ package enhance
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
@@ -21,15 +20,12 @@ const (
 
 // Enhancer coordinates the AI enhancement process for assets.
 type Enhancer struct {
-	fs          afero.Fs
-	model       string
-	claudePath  string
-	apiKey      string
-	bruinPath   string // path to bruin binary for MCP server
-	useMCP      bool   // whether to use bruin MCP server
-	repoRoot    string // path to the Bruin repository root
-	environment string // environment name for database connections
-	debug       bool   // whether to print debug information
+	fs         afero.Fs
+	model      string
+	claudePath string
+	apiKey     string
+	bruinPath  string // path to bruin binary for format/validate
+	debug      bool   // whether to print debug information
 }
 
 // NewEnhancer creates a new Enhancer instance.
@@ -44,7 +40,6 @@ func NewEnhancer(fs afero.Fs, model string) *Enhancer {
 		model:      model,
 		claudePath: claudePath,
 		bruinPath:  bruinPath,
-		useMCP:     bruinPath != "", // Enable MCP if bruin is available
 	}
 }
 
@@ -75,7 +70,7 @@ func (e *Enhancer) EnsureClaudeCLI() error {
 }
 
 // EnhanceAsset runs AI enhancement on a single asset.
-// Claude directly edits the file using MCP tools.
+// Claude directly edits the file, then we run format and validate.
 func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName string) error {
 	return e.EnhanceAssetWithStats(ctx, asset, pipelineName, "")
 }
@@ -95,10 +90,20 @@ func (e *Enhancer) EnhanceAssetWithStats(ctx context.Context, asset *pipeline.As
 	prompt := BuildEnhancePrompt(asset.DefinitionFile.Path, asset.Name, pipelineName, tableSummaryJSON)
 	systemPrompt := GetSystemPrompt(tableSummaryJSON != "")
 
-	// Call Claude CLI - Claude will use MCP tools to edit the file directly
+	// Call Claude CLI - Claude will edit the file directly
 	_, err := e.callClaude(ctx, prompt, systemPrompt)
 	if err != nil {
 		return errors.Wrap(err, "failed to enhance asset")
+	}
+
+	// Run bruin format on the file
+	if err := e.runBruinFormat(ctx, asset.DefinitionFile.Path); err != nil {
+		return errors.Wrap(err, "failed to format asset")
+	}
+
+	// Run bruin validate on the file
+	if err := e.runBruinValidate(ctx, asset.DefinitionFile.Path); err != nil {
+		return errors.Wrap(err, "failed to validate asset")
 	}
 
 	return nil
@@ -111,12 +116,6 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 		"--output-format", "text",
 		"--model", e.model,
 		"--dangerously-skip-permissions",
-	}
-
-	// Add MCP server configuration if bruin is available
-	if e.useMCP && e.bruinPath != "" {
-		mcpConfig := e.buildMCPConfig()
-		args = append(args, "--mcp-config", mcpConfig)
 	}
 
 	if systemPrompt != "" {
@@ -192,57 +191,32 @@ func (e *Enhancer) runClaudeWithStreaming(cmd *exec.Cmd) (string, error) {
 	return "", nil
 }
 
-// mcpServerConfig represents the configuration for an MCP server.
-type mcpServerConfig struct {
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	Env     map[string]string `json:"env,omitempty"`
-}
-
-// mcpConfig represents the full MCP configuration.
-type mcpConfig struct {
-	MCPServers map[string]mcpServerConfig `json:"mcpServers"`
-}
-
-// buildMCPConfig creates the MCP server configuration JSON for bruin.
-func (e *Enhancer) buildMCPConfig() string {
-	bruinConfig := mcpServerConfig{
-		Command: e.bruinPath,
-		Args:    []string{"mcp"},
+// runBruinFormat runs bruin format on the asset file.
+func (e *Enhancer) runBruinFormat(ctx context.Context, filePath string) error {
+	if e.bruinPath == "" {
+		return errors.New("bruin CLI not found")
 	}
 
-	// Add environment variables for database connectivity
-	if e.repoRoot != "" || e.environment != "" {
-		bruinConfig.Env = make(map[string]string)
-		if e.repoRoot != "" {
-			bruinConfig.Env["BRUIN_REPO_ROOT"] = e.repoRoot
-		}
-		if e.environment != "" {
-			bruinConfig.Env["BRUIN_ENVIRONMENT"] = e.environment
-		}
-	}
-
-	config := mcpConfig{
-		MCPServers: map[string]mcpServerConfig{
-			"bruin": bruinConfig,
-		},
-	}
-	jsonBytes, err := json.Marshal(config)
+	cmd := exec.CommandContext(ctx, e.bruinPath, "format", filePath)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Fallback to empty config on error (should never happen with these types)
-		return `{"mcpServers":{}}`
+		return errors.Wrapf(err, "bruin format failed: %s", string(output))
 	}
-	return string(jsonBytes)
+	return nil
 }
 
-// SetRepoRoot sets the Bruin repository root path for MCP database tools.
-func (e *Enhancer) SetRepoRoot(repoRoot string) {
-	e.repoRoot = repoRoot
-}
+// runBruinValidate runs bruin validate on the asset file.
+func (e *Enhancer) runBruinValidate(ctx context.Context, filePath string) error {
+	if e.bruinPath == "" {
+		return errors.New("bruin CLI not found")
+	}
 
-// SetEnvironment sets the environment name for MCP database tools.
-func (e *Enhancer) SetEnvironment(environment string) {
-	e.environment = environment
+	cmd := exec.CommandContext(ctx, e.bruinPath, "validate", filePath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "bruin validate failed: %s", string(output))
+	}
+	return nil
 }
 
 // SetDebug enables or disables debug output.
