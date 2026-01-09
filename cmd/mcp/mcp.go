@@ -51,13 +51,13 @@ func MCPCmd() *cli.Command {
 				Value: false,
 			},
 		},
-		Action: func(ctx context.Context, c *cli.Command) error {
+		Action: func(_ context.Context, c *cli.Command) error {
 			debug := c.Bool("debug")
 
 			if debug {
 				fmt.Fprintf(os.Stderr, "Starting Bruin MCP server...\n")
 			}
-			return runMCPServer(debug)
+			return runMCPServer(debug) //nolint:contextcheck
 		},
 	}
 }

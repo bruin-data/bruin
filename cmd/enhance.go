@@ -110,7 +110,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		}
 		pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
 		if err == nil {
-			status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil)
+			status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil) //nolint:contextcheck
 			if fillErr != nil && output != "json" {
 				warningPrinter.Printf("Warning: fill columns failed: %v\n", fillErr)
 			} else if status == fillStatusUpdated && output != "json" {
