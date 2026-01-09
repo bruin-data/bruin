@@ -11,7 +11,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 )
 
 const (
@@ -20,39 +19,35 @@ const (
 
 // Enhancer coordinates the AI enhancement process for assets.
 type Enhancer struct {
-	fs         afero.Fs
 	model      string
 	claudePath string
 	apiKey     string
-	bruinPath  string // path to bruin binary for format/validate
-	debug      bool   // whether to print debug information
+	bruinPath  string
+	debug      bool
 }
 
 // NewEnhancer creates a new Enhancer instance.
-func NewEnhancer(fs afero.Fs, model string) *Enhancer {
+func NewEnhancer(model string) *Enhancer {
 	if model == "" {
 		model = defaultModel
 	}
 	claudePath, _ := exec.LookPath("claude")
 	bruinPath, _ := exec.LookPath("bruin")
 	return &Enhancer{
-		fs:         fs,
 		model:      model,
 		claudePath: claudePath,
 		bruinPath:  bruinPath,
 	}
 }
 
-// NewEnhancerWithAPIKey creates a new Enhancer instance with an API key.
-func NewEnhancerWithAPIKey(fs afero.Fs, model, apiKey string) *Enhancer {
-	e := NewEnhancer(fs, model)
-	e.apiKey = apiKey
-	return e
-}
-
 // SetAPIKey sets the Anthropic API key to use for Claude CLI.
 func (e *Enhancer) SetAPIKey(apiKey string) {
 	e.apiKey = apiKey
+}
+
+// SetDebug enables or disables debug output.
+func (e *Enhancer) SetDebug(debug bool) {
+	e.debug = debug
 }
 
 // EnsureClaudeCLI checks if Claude CLI is installed and installs it if not.
@@ -70,14 +65,7 @@ func (e *Enhancer) EnsureClaudeCLI() error {
 }
 
 // EnhanceAsset runs AI enhancement on a single asset.
-// Claude directly edits the file, then we run format and validate.
-func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName string) error {
-	return e.EnhanceAssetWithStats(ctx, asset, pipelineName, "")
-}
-
-// EnhanceAssetWithStats runs AI enhancement with pre-fetched table statistics.
-// The tableSummaryJSON parameter contains pre-fetched statistics to avoid Claude making database tool calls.
-func (e *Enhancer) EnhanceAssetWithStats(ctx context.Context, asset *pipeline.Asset, pipelineName string, tableSummaryJSON string) error {
+func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName, tableSummaryJSON string) error {
 	if err := e.EnsureClaudeCLI(); err != nil {
 		return errors.Wrap(err, "claude CLI not available")
 	}
@@ -91,8 +79,7 @@ func (e *Enhancer) EnhanceAssetWithStats(ctx context.Context, asset *pipeline.As
 	systemPrompt := GetSystemPrompt(tableSummaryJSON != "")
 
 	// Call Claude CLI - Claude will edit the file directly
-	_, err := e.callClaude(ctx, prompt, systemPrompt)
-	if err != nil {
+	if err := e.callClaude(ctx, prompt, systemPrompt); err != nil {
 		return errors.Wrap(err, "failed to enhance asset")
 	}
 
@@ -110,9 +97,9 @@ func (e *Enhancer) EnhanceAssetWithStats(ctx context.Context, asset *pipeline.As
 }
 
 // callClaude executes the Claude CLI with the given prompt.
-func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) (string, error) {
+func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) error {
 	args := []string{
-		"-p", // print mode (non-interactive)
+		"-p",
 		"--output-format", "text",
 		"--model", e.model,
 		"--dangerously-skip-permissions",
@@ -122,22 +109,18 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 		args = append(args, "--append-system-prompt", systemPrompt)
 	}
 
-	// Add the prompt as the last argument
 	args = append(args, prompt)
 
-	cmd := exec.CommandContext(ctx, e.claudePath, args...) //nolint:gosec // claudePath is intentionally user-controlled to run Claude CLI
+	cmd := exec.CommandContext(ctx, e.claudePath, args...) //nolint:gosec
 
-	// Set API key as environment variable if provided
 	if e.apiKey != "" {
 		cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY="+e.apiKey)
 	}
 
-	// In debug mode, stream Claude CLI output in real-time using pipes
 	if e.debug {
 		return e.runClaudeWithStreaming(cmd)
 	}
 
-	// Non-debug mode: capture output
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -147,29 +130,28 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 		if errMsg == "" {
 			errMsg = stdout.String()
 		}
-		return "", errors.Wrapf(err, "claude CLI failed: %s", errMsg)
+		return errors.Wrapf(err, "claude CLI failed: %s", errMsg)
 	}
 
-	return stdout.String(), nil
+	return nil
 }
 
 // runClaudeWithStreaming runs the Claude CLI and streams output in real-time.
-func (e *Enhancer) runClaudeWithStreaming(cmd *exec.Cmd) (string, error) {
+func (e *Enhancer) runClaudeWithStreaming(cmd *exec.Cmd) error {
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create stdout pipe")
+		return errors.Wrap(err, "failed to create stdout pipe")
 	}
 
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create stderr pipe")
+		return errors.Wrap(err, "failed to create stderr pipe")
 	}
 
 	if err := cmd.Start(); err != nil {
-		return "", errors.Wrap(err, "failed to start claude CLI")
+		return errors.Wrap(err, "failed to start claude CLI")
 	}
 
-	// Stream stdout and stderr concurrently
 	done := make(chan error, 2)
 	go func() {
 		_, copyErr := io.Copy(os.Stdout, stdoutPipe)
@@ -180,15 +162,14 @@ func (e *Enhancer) runClaudeWithStreaming(cmd *exec.Cmd) (string, error) {
 		done <- copyErr
 	}()
 
-	// Wait for both streams to complete
 	<-done
 	<-done
 
 	if err := cmd.Wait(); err != nil {
-		return "", errors.Wrap(err, "claude CLI failed")
+		return errors.Wrap(err, "claude CLI failed")
 	}
 
-	return "", nil
+	return nil
 }
 
 // runBruinFormat runs bruin format on the asset file.
@@ -219,19 +200,12 @@ func (e *Enhancer) runBruinValidate(ctx context.Context, filePath string) error 
 	return nil
 }
 
-// SetDebug enables or disables debug output.
-// When debug is true, Claude CLI output is streamed directly to stdout/stderr.
-func (e *Enhancer) SetDebug(debug bool) {
-	e.debug = debug
-}
-
 // installClaudeCLI installs the Claude CLI using the official installation script.
 func (e *Enhancer) installClaudeCLI() (string, error) {
 	if runtime.GOOS == "windows" {
 		return "", errors.New("automatic Claude CLI installation is not supported on Windows; please install manually or use WSL")
 	}
 
-	// Run the official installation script
 	installCmd := exec.Command("bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash")
 
 	var stdout, stderr bytes.Buffer
@@ -242,10 +216,8 @@ func (e *Enhancer) installClaudeCLI() (string, error) {
 		return "", errors.Wrapf(err, "failed to install Claude CLI: %s", stderr.String())
 	}
 
-	// After installation, try to find claude in common locations
 	claudePath, err := exec.LookPath("claude")
 	if err != nil {
-		// Check common installation paths
 		commonPaths := []string{
 			filepath.Join(os.Getenv("HOME"), ".local", "bin", "claude"),
 			"/usr/local/bin/claude",
@@ -260,14 +232,4 @@ func (e *Enhancer) installClaudeCLI() (string, error) {
 	}
 
 	return claudePath, nil
-}
-
-// IsClaudeCLIInstalled checks if Claude CLI is available.
-func (e *Enhancer) IsClaudeCLIInstalled() bool {
-	return e.claudePath != ""
-}
-
-// GetModel returns the model being used.
-func (e *Enhancer) GetModel() string {
-	return e.model
 }

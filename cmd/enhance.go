@@ -132,7 +132,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return printEnhanceError(output, errors.Wrap(err, "failed to load asset"))
 	}
 
-	enhancer := enhance.NewEnhancer(fs, c.String("model"))
+	enhancer := enhance.NewEnhancer(c.String("model"))
 
 	// Enable debug mode if --debug flag is set
 	isDebugMode := isDebug != nil && *isDebug
@@ -159,7 +159,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		tableSummaryJSON = preFetchTableSummary(ctx, fs, assetPath, pp.Asset, env, output)
 	}
 
-	err = enhancer.EnhanceAssetWithStats(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
+	err = enhancer.EnhanceAsset(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
