@@ -38,6 +38,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/fireflies"
 	"github.com/bruin-data/bruin/pkg/fluxx"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/freshdesk"
@@ -169,6 +170,7 @@ type Manager struct {
 	Fluxx                map[string]*fluxx.Client
 	Freshdesk            map[string]*freshdesk.Client
 	FundraiseUp          map[string]*fundraiseup.Client
+	Fireflies            map[string]*fireflies.Client
 	Jira                 map[string]*jira.Client
 	Monday               map[string]*monday.Client
 	PlusVibeAI           map[string]*plusvibeai.Client
@@ -2291,6 +2293,27 @@ func (m *Manager) AddFundraiseUpConnectionFromConfig(connection *config.Fundrais
 	return nil
 }
 
+func (m *Manager) AddFirefliesConnectionFromConfig(connection *config.FirefliesConnection) error {
+	m.mutex.Lock()
+	if m.Fireflies == nil {
+		m.Fireflies = make(map[string]*fireflies.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := fireflies.NewClient(fireflies.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Fireflies[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddJiraConnectionFromConfig(connection *config.JiraConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2666,6 +2689,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Fluxx, connectionManager.AddFluxxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Freshdesk, connectionManager.AddFreshdeskConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FundraiseUp, connectionManager.AddFundraiseUpConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Fireflies, connectionManager.AddFirefliesConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Jira, connectionManager.AddJiraConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Monday, connectionManager.AddMondayConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.PlusVibeAI, connectionManager.AddPlusVibeAIConnectionFromConfig, &wg, &errList, &mu)

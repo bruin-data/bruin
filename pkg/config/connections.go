@@ -1151,6 +1151,15 @@ func (c FundraiseUpConnection) GetName() string {
 	return c.Name
 }
 
+type FirefliesConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c FirefliesConnection) GetName() string {
+	return c.Name
+}
+
 type JiraConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Domain   string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
