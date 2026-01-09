@@ -2366,6 +2366,50 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "duckdb_hooks_workflow",
+			workflow: e2e.Workflow{
+				Name: "duckdb_hooks_workflow",
+				Steps: []e2e.Task{
+					{
+						Name:    "hooks: run pipeline",
+						Command: binary,
+						Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/duckdb-hooks-pipeline")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: hooks_test.main_table"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "hooks: query hook log",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--connection",
+							"duckdb-default",
+							"--query",
+							"SELECT step FROM hooks_test.hook_log ORDER BY step;",
+							"--output",
+							"csv",
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-hooks-pipeline/expectations/hook_log.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "duckdb_create_replace_materialization",
 			workflow: e2e.Workflow{
 				Name: "duckdb_create_replace_materialization",
