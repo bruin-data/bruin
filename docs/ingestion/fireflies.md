@@ -65,8 +65,8 @@ You can customize the chunk size for analytics by appending a granularity suffix
 | Table Name | Chunk Size | Use Case |
 | ---------- | ---------- | -------- |
 | `analytics` | 30 days (default) | Monthly reports |
-| `analytics:DAY` | 1 day | Daily metrics |
 | `analytics:HOUR` | 1 hour | Detailed hourly analysis |
+| `analytics:DAY` | 1 day | Daily metrics |
 | `analytics:MONTH` | Month boundaries | Calendar month alignment |
 
 ## Step 3: [Run](/commands/run) asset to ingest data
