@@ -1030,6 +1030,9 @@
         "service_account_file": {
           "type": "string"
         },
+        "use_application_default_credentials": {
+          "type": "boolean"
+        },
         "project_id": {
           "type": "string"
         },

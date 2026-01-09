@@ -2441,13 +2441,14 @@ func (m *Manager) AddDataprocServerlessConnectionFromConfig(connection *config.D
 		m.DataprocServerless = make(map[string]*dataprocserverless.Client)
 	}
 	client, err := dataprocserverless.NewClient(dataprocserverless.Config{
-		ServiceAccountJSON: connection.ServiceAccountJSON,
-		ServiceAccountFile: connection.ServiceAccountFile,
-		ProjectID:          connection.ProjectID,
-		Workspace:          connection.Workspace,
-		Region:             connection.Region,
-		ExecutionRole:      connection.ExecutionRole,
-		SubnetworkURI:      connection.SubnetworkURI,
+		ServiceAccountJSON:               connection.ServiceAccountJSON,
+		ServiceAccountFile:               connection.ServiceAccountFile,
+		UseApplicationDefaultCredentials: connection.UseApplicationDefaultCredentials,
+		ProjectID:                        connection.ProjectID,
+		Workspace:                        connection.Workspace,
+		Region:                           connection.Region,
+		ExecutionRole:                    connection.ExecutionRole,
+		SubnetworkURI:                    connection.SubnetworkURI,
 	})
 	if err != nil {
 		return err

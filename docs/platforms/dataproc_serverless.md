@@ -34,23 +34,27 @@ environments:
         subnetwork_uri: projects/my-host-project/regions/us-central1/subnetworks/my-subnetwork
 
         # Authentication (one of the following):
-        # Option 1: Inline service account JSON
+        # Option 1: Use Application Default Credentials (ADC)
+        use_application_default_credentials: true
+
+        # Option 2: Inline service account JSON
         service_account_json: |
           {
             "type": "service_account",
             ...
           }
 
-        # Option 2: Path to service account JSON file
+        # Option 3: Path to service account JSON file
         service_account_file: /path/to/service-account.json
 ```
 
 ### Authentication
 
-Dataproc Serverless supports two authentication methods:
+Dataproc Serverless supports three authentication methods:
 
-1. **Service Account JSON** (`service_account_json`): Inline JSON credentials for the service account.
-2. **Service Account File** (`service_account_file`): Path to a JSON file containing the service account credentials.
+1. **Application Default Credentials** (`use_application_default_credentials`): Uses the default credentials from the environment. This is the recommended approach when running on GCP or when you have configured `gcloud auth application-default login`.
+2. **Service Account JSON** (`service_account_json`): Inline JSON credentials for the service account.
+3. **Service Account File** (`service_account_file`): Path to a JSON file containing the service account credentials.
 
 At least one of these must be provided for authentication.
 
@@ -215,10 +219,11 @@ parameters:
 | `workspace` | Yes | GCS path for temporary job files (e.g., `gs://bucket/prefix/`) |
 | `execution_role` | No | Service account email for job execution |
 | `subnetwork_uri` | No | Subnetwork URI for VPC connectivity (e.g., `projects/host-project/regions/region/subnetworks/subnet`) |
+| `use_application_default_credentials` | No* | Set to `true` to use Application Default Credentials |
 | `service_account_json` | No* | Inline service account JSON credentials |
 | `service_account_file` | No* | Path to service account JSON file |
 
-\* At least one of `service_account_json` or `service_account_file` must be provided.
+\* At least one of `use_application_default_credentials`, `service_account_json`, or `service_account_file` must be provided.
 
 ## IAM Permissions
 

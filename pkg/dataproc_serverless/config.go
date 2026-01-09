@@ -16,13 +16,14 @@ func (e *MissingFieldsError) Error() string {
 }
 
 type Config struct {
-	ServiceAccountJSON string `yaml:"service_account_json,omitempty"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty"`
-	ProjectID          string `yaml:"project_id,omitempty"`
-	Region             string `yaml:"region" json:"region"`
-	Workspace          string `yaml:"workspace"`
-	ExecutionRole      string `yaml:"execution_role"`
-	SubnetworkURI      string `yaml:"subnetwork_uri,omitempty"`
+	ServiceAccountJSON               string `yaml:"service_account_json,omitempty"`
+	ServiceAccountFile               string `yaml:"service_account_file,omitempty"`
+	UseApplicationDefaultCredentials bool   `yaml:"use_application_default_credentials,omitempty"`
+	ProjectID                        string `yaml:"project_id,omitempty"`
+	Region                           string `yaml:"region" json:"region"`
+	Workspace                        string `yaml:"workspace"`
+	ExecutionRole                    string `yaml:"execution_role"`
+	SubnetworkURI                    string `yaml:"subnetwork_uri,omitempty"`
 }
 
 func (c *Config) validate() error {
@@ -38,7 +39,7 @@ func (c *Config) validate() error {
 		missing = append(missing, "workspace")
 	}
 
-	hasCredentials := c.ServiceAccountJSON != "" || c.ServiceAccountFile != ""
+	hasCredentials := c.ServiceAccountJSON != "" || c.ServiceAccountFile != "" || c.UseApplicationDefaultCredentials
 	if !hasCredentials {
 		missing = append(missing, "service_account_json, service_account_file, or use_application_default_credentials")
 	}
