@@ -13,7 +13,14 @@ import (
 	_ "github.com/databricks/databricks-sql-go"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
+
+func init() {
+	// Disable zerolog global logger used by the driver's OAuth module
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+}
+
 
 type DB struct {
 	conn          *sqlx.DB
