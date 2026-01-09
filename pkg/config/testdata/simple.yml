@@ -427,6 +427,9 @@ environments:
       fundraiseup:
         - name: "fundraiseup-1"
           api_key: "test-api-key"
+      fireflies:
+        - name: "fireflies-1"
+          api_key: "test-api-key"
       jira:
         - name: "jira-1"
           domain: "company.atlassian.net"

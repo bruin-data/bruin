@@ -683,6 +683,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "test-api-key",
 				},
 			},
+			Fireflies: []FirefliesConnection{
+				{
+					Name:   "fireflies-1",
+					APIKey: "test-api-key",
+				},
+			},
 			Jira: []JiraConnection{
 				{
 					Name:     "jira-1",
@@ -1173,6 +1179,16 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Fireflies connection",
+			envName:  "default",
+			connType: "fireflies",
+			connName: "fireflies-conn",
+			creds: map[string]interface{}{
+				"api_key": "test-api-key",
+			},
+			expectedErr: false,
+		},
+		{
 			name:        "Add Invalid connection",
 			envName:     "default",
 			connType:    "invalid",
@@ -1248,6 +1264,10 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.FundraiseUp, 1)
 					assert.Equal(t, tt.connName, env.Connections.FundraiseUp[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.FundraiseUp[0].APIKey)
+				case "fireflies":
+					assert.Len(t, env.Connections.Fireflies, 1)
+					assert.Equal(t, tt.connName, env.Connections.Fireflies[0].Name)
+					assert.Equal(t, tt.creds["api_key"], env.Connections.Fireflies[0].APIKey)
 				}
 			}
 		})

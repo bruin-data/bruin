@@ -858,6 +858,12 @@
           },
           "type": "array"
         },
+        "fireflies": {
+          "items": {
+            "$ref": "#/$defs/FirefliesConnection"
+          },
+          "type": "array"
+        },
         "fundraiseup": {
           "items": {
             "$ref": "#/$defs/FundraiseUpConnection"
@@ -1283,6 +1289,22 @@
       "required": [
         "name",
         "domain",
+        "api_key"
+      ]
+    },
+    "FirefliesConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
         "api_key"
       ]
     },

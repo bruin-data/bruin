@@ -110,6 +110,7 @@ type Connections struct {
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
+	Fireflies           []FirefliesConnection           `yaml:"fireflies,omitempty" json:"fireflies,omitempty" mapstructure:"fireflies"`
 	Jira                []JiraConnection                `yaml:"jira,omitempty" json:"jira,omitempty" mapstructure:"jira"`
 	Monday              []MondayConnection              `yaml:"monday,omitempty" json:"monday,omitempty" mapstructure:"monday"`
 	PlusVibeAI          []PlusVibeAIConnection          `yaml:"plusvibeai,omitempty" json:"plusvibeai,omitempty" mapstructure:"plusvibeai"`
@@ -1054,6 +1055,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.FundraiseUp = append(env.Connections.FundraiseUp, conn)
+	case "fireflies":
+		var conn FirefliesConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Fireflies = append(env.Connections.Fireflies, conn)
 	case "plusvibeai":
 		var conn PlusVibeAIConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1281,6 +1289,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Fluxx = removeConnection(env.Connections.Fluxx, connectionName)
 	case "fundraiseup":
 		env.Connections.FundraiseUp = removeConnection(env.Connections.FundraiseUp, connectionName)
+	case "fireflies":
+		env.Connections.Fireflies = removeConnection(env.Connections.Fireflies, connectionName)
 	case "plusvibeai":
 		env.Connections.PlusVibeAI = removeConnection(env.Connections.PlusVibeAI, connectionName)
 	case "bruin":
@@ -1407,6 +1417,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Tableau, source.Tableau)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
+	mergeConnectionList(&c.Fireflies, source.Fireflies)
 	mergeConnectionList(&c.BruinCloud, source.BruinCloud)
 	mergeConnectionList(&c.Primer, source.Primer)
 	mergeConnectionList(&c.Indeed, source.Indeed)
