@@ -75,3 +75,55 @@ func (m *Materializer) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) 
 
 	return nil
 }
+
+
+// HookWrapperMaterializer decorates a string-based materializer by wrapping the rendered SQL
+// with asset hooks, while forwarding optional behaviors when the base materializer supports them.
+type HookWrapperMaterializer struct {
+	Mat interface {
+		Render(asset *Asset, query string) (string, error)
+	}
+}
+
+func (m HookWrapperMaterializer) Render(asset *Asset, query string) (string, error) {
+	if m.Mat == nil {
+		return "", errors.New("hook wrapper materializer requires a base materializer")
+	}
+
+	materialized, err := m.Mat.Render(asset, query)
+	if err != nil {
+		return "", err
+	}
+
+	return WrapHooks(materialized, asset.Hooks), nil
+}
+
+func (m HookWrapperMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {
+	if m.Mat == nil {
+		return errors.New("hook wrapper materializer requires a base materializer")
+	}
+
+	logger, ok := m.Mat.(interface {
+		LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error
+	})
+	if !ok {
+		return nil
+	}
+
+	return logger.LogIfFullRefreshAndDDL(writer, asset)
+}
+
+func (m HookWrapperMaterializer) IsFullRefresh() bool {
+	if m.Mat == nil {
+		return false
+	}
+
+	fullRefresh, ok := m.Mat.(interface {
+		IsFullRefresh() bool
+	})
+	if !ok {
+		return false
+	}
+
+	return fullRefresh.IsFullRefresh()
+}
