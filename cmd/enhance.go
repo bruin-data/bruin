@@ -170,7 +170,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		tableSummaryJSON = preFetchTableSummary(ctx, fs, assetPath, pp.Asset, env, output)
 	}
 
-	_, err = enhancer.EnhanceAssetWithStats(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
+	err = enhancer.EnhanceAssetWithStats(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
