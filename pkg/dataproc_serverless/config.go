@@ -22,6 +22,7 @@ type Config struct {
 	Region             string `yaml:"region" json:"region"`
 	Workspace          string `yaml:"workspace"`
 	ExecutionRole      string `yaml:"execution_role"`
+	SubnetworkURI      string `yaml:"subnetwork_uri,omitempty"`
 }
 
 func (c *Config) validate() error {
