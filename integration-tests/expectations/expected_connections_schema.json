@@ -1041,6 +1041,9 @@
         },
         "execution_role": {
           "type": "string"
+        },
+        "subnetwork_uri": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

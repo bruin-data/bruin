@@ -50,6 +50,7 @@ type JobRunParams struct {
 	Timeout        time.Duration
 	Workspace      string
 	ExecutionRole  string
+	SubnetworkURI  string
 }
 
 func parseParams(cfg *Client, params map[string]string) *JobRunParams {
@@ -60,6 +61,7 @@ func parseParams(cfg *Client, params map[string]string) *JobRunParams {
 		Config:         params["config"],
 		Workspace:      cfg.Workspace,
 		ExecutionRole:  cfg.ExecutionRole,
+		SubnetworkURI:  cfg.SubnetworkURI,
 	}
 
 	// default runtime version
@@ -242,7 +244,7 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 			Version:    job.params.RuntimeVersion,
 			Properties: sparkProperties,
 		},
-		EnvironmentConfig: batchEnvironmentConfig(job.params.ExecutionRole, job.params.Timeout),
+		EnvironmentConfig: batchEnvironmentConfig(job.params.ExecutionRole, job.params.Timeout, job.params.SubnetworkURI),
 	}
 
 	return &dataprocpb.CreateBatchRequest{
@@ -357,7 +359,7 @@ func (job Job) buildLogConsumer(ctx context.Context, batchID string) LogConsumer
 	}
 }
 
-func batchEnvironmentConfig(role string, timeout time.Duration) *dataprocpb.EnvironmentConfig {
+func batchEnvironmentConfig(role string, timeout time.Duration, subnetworkURI string) *dataprocpb.EnvironmentConfig {
 	cfg := &dataprocpb.EnvironmentConfig{
 		ExecutionConfig: &dataprocpb.ExecutionConfig{},
 	}
@@ -366,6 +368,11 @@ func batchEnvironmentConfig(role string, timeout time.Duration) *dataprocpb.Envi
 	}
 	if timeout != 0 {
 		cfg.ExecutionConfig.Ttl = durationpb.New(timeout)
+	}
+	if strings.TrimSpace(subnetworkURI) != "" {
+		cfg.ExecutionConfig.Network = &dataprocpb.ExecutionConfig_SubnetworkUri{
+			SubnetworkUri: subnetworkURI,
+		}
 	}
 	return cfg
 }
