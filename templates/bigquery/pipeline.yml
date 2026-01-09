@@ -1,0 +1,8 @@
+name: bruin-bigquery
+schedule: daily
+start_date: "2024-01-01"
+catchup: false
+default_connections:
+    google_cloud_platform: "gcp-default"
+default:
+    type: bq.sql
