@@ -1,9 +1,18 @@
 package fireflies
 
+import "net/url"
+
 type Config struct {
 	APIKey string
 }
 
 func (c *Config) GetIngestrURI() string {
-	return "fireflies://?api_key=" + c.APIKey
+	params := url.Values{}
+	params.Set("api_key", c.APIKey)
+
+	uri := url.URL{
+		Scheme:   "fireflies",
+		RawQuery: params.Encode(),
+	}
+	return uri.String()
 }
