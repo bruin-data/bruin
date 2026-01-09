@@ -1,7 +1,6 @@
 package dataprocserverless
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -132,7 +131,7 @@ func TestConfig_Validate(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				var missingErr *MissingFieldsError
-				require.True(t, errors.As(err, &missingErr), "expected MissingFieldsError, got %T", err)
+				require.ErrorAs(t, err, &missingErr, "expected MissingFieldsError, got %T", err)
 				assert.Equal(t, tt.errFields, missingErr.Fields)
 			} else {
 				require.NoError(t, err)
