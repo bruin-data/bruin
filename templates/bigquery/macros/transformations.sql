@@ -33,5 +33,5 @@ TO_HEX(MD5(CONCAT(
 {%- endmacro %}
 
 {% macro safe_divide(numerator, denominator, default=0) -%}
-SAFE_DIVIDE({{ numerator }}, {{ denominator }})
+IFNULL(SAFE_DIVIDE({{ numerator }}, {{ denominator }}), {{ default }})
 {%- endmacro %}

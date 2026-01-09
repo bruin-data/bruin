@@ -2,10 +2,13 @@
 
 materialization:
   type: table
+  partition_by: country
+  cluster_by:
+    - id
 
 columns:
   - name: id
-    type: int64
+    type: integer
     description: Just a number
     primary_key: true
     checks:
@@ -21,10 +24,9 @@ columns:
   - name: name
     type: string
     description: Just a name
-    update_on_merge: true
+    nullable: true
     checks:
       - name: unique
-      - name: not_null
 
 @bruin */
 

@@ -5,7 +5,7 @@ SELECT
     {{ column }},
     COUNT(*) as count
 FROM {{ table }}
-GROUP BY {{ column }}
+GROUP BY ALL
 ORDER BY {{ order_by }} DESC
 {%- endmacro %}
 
@@ -14,7 +14,7 @@ SELECT
     {{ group_column }},
     SUM({{ sum_column }}) as total
 FROM {{ table }}
-GROUP BY {{ group_column }}
+GROUP BY ALL
 ORDER BY total DESC
 {%- endmacro %}
 

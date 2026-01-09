@@ -15,8 +15,14 @@ columns:
     type: string
     description: Country name
   - name: count
-    type: int64
+    type: integer
     description: Number of people per country
+
+custom_checks:
+  - name: at_least_one_country
+    query: SELECT COUNT(*) > 0 FROM macro_example
+  - name: count_is_positive
+    query: SELECT COUNT(*) = 0 FROM macro_example WHERE count <= 0
 
 @bruin */
 
