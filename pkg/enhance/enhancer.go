@@ -133,7 +133,7 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 	// Add the prompt as the last argument
 	args = append(args, prompt)
 
-	cmd := exec.CommandContext(ctx, e.claudePath, args...)
+	cmd := exec.CommandContext(ctx, e.claudePath, args...) //nolint:gosec // claudePath is intentionally user-controlled to run Claude CLI
 
 	// Set API key as environment variable if provided
 	if e.apiKey != "" {
