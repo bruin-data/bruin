@@ -906,6 +906,7 @@ type DataprocServerlessConnection struct {
 	Region             string `yaml:"region" json:"region" mapstructure:"region"`
 	Workspace          string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
 	ExecutionRole      string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
+	SubnetworkURI      string `yaml:"subnetwork_uri,omitempty" json:"subnetwork_uri,omitempty" mapstructure:"subnetwork_uri"`
 }
 
 func (c DataprocServerlessConnection) GetName() string {

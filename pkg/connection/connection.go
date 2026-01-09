@@ -2447,6 +2447,7 @@ func (m *Manager) AddDataprocServerlessConnectionFromConfig(connection *config.D
 		Workspace:          connection.Workspace,
 		Region:             connection.Region,
 		ExecutionRole:      connection.ExecutionRole,
+		SubnetworkURI:      connection.SubnetworkURI,
 	})
 	if err != nil {
 		return err

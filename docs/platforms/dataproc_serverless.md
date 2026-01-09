@@ -29,6 +29,10 @@ environments:
         # (Optional) service account email for job execution
         execution_role: my-service-account@my-project.iam.gserviceaccount.com
 
+        # (Optional) Subnetwork URI for VPC connectivity
+        # Use this when your Dataproc batches need to connect to resources in a specific VPC
+        subnetwork_uri: projects/my-host-project/regions/us-central1/subnetworks/my-subnetwork
+
         # Authentication (one of the following):
         # Option 1: Inline service account JSON
         service_account_json: |
@@ -210,6 +214,7 @@ parameters:
 | `region` | Yes | Google Cloud region (e.g., `us-central1`, `europe-west1`) |
 | `workspace` | Yes | GCS path for temporary job files (e.g., `gs://bucket/prefix/`) |
 | `execution_role` | No | Service account email for job execution |
+| `subnetwork_uri` | No | Subnetwork URI for VPC connectivity (e.g., `projects/host-project/regions/region/subnetworks/subnet`) |
 | `service_account_json` | No* | Inline service account JSON credentials |
 | `service_account_file` | No* | Path to service account JSON file |
 
