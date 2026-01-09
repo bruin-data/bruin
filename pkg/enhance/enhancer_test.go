@@ -65,107 +65,12 @@ func TestEnhancer_IsClaudeCLIInstalled(t *testing.T) {
 	})
 }
 
-func TestEnhancer_BuildMCPConfig(t *testing.T) {
-	t.Parallel()
-	fs := afero.NewMemMapFs()
-
-	t.Run("builds valid MCP config JSON", func(t *testing.T) {
-		t.Parallel()
-		enhancer := &Enhancer{
-			fs:        fs,
-			model:     defaultModel,
-			bruinPath: "/usr/local/bin/bruin",
-			useMCP:    true,
-		}
-
-		config := enhancer.buildMCPConfig()
-
-		assert.Contains(t, config, "mcpServers")
-		assert.Contains(t, config, "bruin")
-		assert.Contains(t, config, "/usr/local/bin/bruin")
-		assert.Contains(t, config, "mcp")
-	})
-
-	t.Run("includes environment variables when set", func(t *testing.T) {
-		t.Parallel()
-		enhancer := &Enhancer{
-			fs:          fs,
-			model:       defaultModel,
-			bruinPath:   "/usr/local/bin/bruin",
-			useMCP:      true,
-			repoRoot:    "/path/to/repo",
-			environment: "production",
-		}
-
-		config := enhancer.buildMCPConfig()
-
-		assert.Contains(t, config, "BRUIN_REPO_ROOT")
-		assert.Contains(t, config, "/path/to/repo")
-		assert.Contains(t, config, "BRUIN_ENVIRONMENT")
-		assert.Contains(t, config, "production")
-	})
-
-	t.Run("omits env when not set", func(t *testing.T) {
-		t.Parallel()
-		enhancer := &Enhancer{
-			fs:        fs,
-			model:     defaultModel,
-			bruinPath: "/usr/local/bin/bruin",
-			useMCP:    true,
-		}
-
-		config := enhancer.buildMCPConfig()
-
-		assert.NotContains(t, config, "BRUIN_REPO_ROOT")
-		assert.NotContains(t, config, "BRUIN_ENVIRONMENT")
-	})
-}
-
-func TestEnhancer_SetRepoRoot(t *testing.T) {
+func TestEnhancer_SetDebug(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
 	enhancer := NewEnhancer(fs, "")
 
-	enhancer.SetRepoRoot("/path/to/repo")
+	enhancer.SetDebug(true)
 
-	assert.Equal(t, "/path/to/repo", enhancer.repoRoot)
-}
-
-func TestEnhancer_SetEnvironment(t *testing.T) {
-	t.Parallel()
-	fs := afero.NewMemMapFs()
-	enhancer := NewEnhancer(fs, "")
-
-	enhancer.SetEnvironment("production")
-
-	assert.Equal(t, "production", enhancer.environment)
-}
-
-func TestEnhancer_UseMCP(t *testing.T) {
-	t.Parallel()
-	fs := afero.NewMemMapFs()
-
-	t.Run("enables MCP when bruin path is set", func(t *testing.T) {
-		t.Parallel()
-		enhancer := &Enhancer{
-			fs:        fs,
-			model:     defaultModel,
-			bruinPath: "/usr/local/bin/bruin",
-			useMCP:    true,
-		}
-
-		assert.True(t, enhancer.useMCP)
-	})
-
-	t.Run("disables MCP when bruin path is empty", func(t *testing.T) {
-		t.Parallel()
-		enhancer := &Enhancer{
-			fs:        fs,
-			model:     defaultModel,
-			bruinPath: "",
-			useMCP:    false,
-		}
-
-		assert.False(t, enhancer.useMCP)
-	})
+	assert.True(t, enhancer.debug)
 }

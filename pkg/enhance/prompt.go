@@ -11,26 +11,17 @@ Your task is to DIRECTLY MODIFY asset YAML files to add improvements including:
 3. Relevant tags based on the asset's purpose and domain
 4. Domain classifications for the asset
 
-YOU MUST USE THE FILE TOOLS TO DIRECTLY EDIT THE ASSET FILE.
-
-AVAILABLE TOOLS:
-- bruin_read_file: Read the contents of an asset file
-- bruin_write_file: Write the modified content back to the file
-- bruin_format: Format the asset file after writing (ALWAYS run this after writing)
-- bruin_validate: Validate the asset file (ALWAYS run this after formatting)
+YOU MUST DIRECTLY EDIT THE ASSET FILE.
 
 REQUIRED WORKFLOW:
-1. First, use bruin_read_file to read the current asset file
+1. First, read the current asset file
 2. Use the PRE-FETCHED TABLE STATISTICS provided in the prompt to make data-driven decisions
 3. Modify the YAML content to add enhancements:
    - Add description field if missing
    - Add column descriptions where missing
    - Add appropriate column checks based on the provided statistics
    - Add relevant tags
-4. Use bruin_write_file to save the modified content
-5. Use bruin_format to format the file properly
-6. Use bruin_validate to check for errors
-7. If validation fails, read the file again, fix the issues, and repeat steps 4-6
+4. Edit the file to save the modified content
 
 YAML STRUCTURE FOR BRUIN ASSETS:
 ` + "```yaml" + `
@@ -72,16 +63,7 @@ IMPORTANT RULES:
 - Do NOT modify columns that already have descriptions
 - Do NOT create custom checks - only use the standard column checks listed above
 - Be conservative - only add checks you're confident about
-- Preserve existing content - only ADD, don't remove existing fields
-
-MANDATORY FINAL STEPS (YOU MUST ALWAYS DO THESE):
-After writing ANY changes to the file, you MUST ALWAYS run these two commands in order:
-1. bruin_format - Format the file (REQUIRED, never skip)
-2. bruin_validate - Validate the file (REQUIRED, never skip)
-
-If validation fails, fix the issues and repeat the write -> format -> validate cycle.
-Even if you made no changes, still run bruin_format and bruin_validate to ensure file integrity.
-DO NOT finish without running both bruin_format and bruin_validate.`
+- Preserve existing content - only ADD, don't remove existing fields`
 
 // systemPromptTemplateWithStats is used when table statistics are pre-fetched.
 // This reduces tool calls since Claude doesn't need to query the database.
@@ -92,16 +74,10 @@ Your task is to DIRECTLY MODIFY asset YAML files to add improvements including:
 3. Relevant tags based on the asset's purpose and domain
 4. Domain classifications for the asset
 
-YOU MUST USE THE FILE TOOLS TO DIRECTLY EDIT THE ASSET FILE.
-
-AVAILABLE TOOLS:
-- bruin_read_file: Read the contents of an asset file
-- bruin_write_file: Write the modified content back to the file
-- bruin_format: Format the asset file after writing (ALWAYS run this after writing)
-- bruin_validate: Validate the asset file (ALWAYS run this after formatting)
+YOU MUST DIRECTLY EDIT THE ASSET FILE.
 
 REQUIRED WORKFLOW:
-1. First, use bruin_read_file to read the current asset file
+1. First, read the current asset file
 2. Use the PRE-FETCHED TABLE STATISTICS provided in the prompt (includes sample values for enum-like columns)
 3. Modify the YAML content to add enhancements:
    - Add description field if missing
@@ -109,10 +85,7 @@ REQUIRED WORKFLOW:
    - Add appropriate column checks based on the provided statistics
    - Use the provided sample_values for accepted_values checks on enum-like columns
    - Add relevant tags
-4. Use bruin_write_file to save the modified content
-5. Use bruin_format to format the file properly
-6. Use bruin_validate to check for errors
-7. If validation fails, read the file again, fix the issues, and repeat steps 4-6
+4. Edit the file to save the modified content
 
 YAML STRUCTURE FOR BRUIN ASSETS:
 ` + "```yaml" + `
@@ -155,19 +128,10 @@ IMPORTANT RULES:
 - Do NOT modify columns that already have descriptions
 - Do NOT create custom checks - only use the standard column checks listed above
 - Be conservative - only add checks you're confident about
-- Preserve existing content - only ADD, don't remove existing fields
+- Preserve existing content - only ADD, don't remove existing fields`
 
-MANDATORY FINAL STEPS (YOU MUST ALWAYS DO THESE):
-After writing ANY changes to the file, you MUST ALWAYS run these two commands in order:
-1. bruin_format - Format the file (REQUIRED, never skip)
-2. bruin_validate - Validate the file (REQUIRED, never skip)
-
-If validation fails, fix the issues and repeat the write -> format -> validate cycle.
-Even if you made no changes, still run bruin_format and bruin_validate to ensure file integrity.
-DO NOT finish without running both bruin_format and bruin_validate.`
-
-// BuildEnhancePrompt constructs the prompt for Claude when using MCP tools.
-// Claude will directly edit the file using the file tools.
+// BuildEnhancePrompt constructs the prompt for Claude.
+// Claude will directly edit the file using its native tools.
 // If tableSummaryJSON is provided, it will be included in the prompt.
 func BuildEnhancePrompt(assetPath, assetName, pipelineName, tableSummaryJSON string) string {
 	if tableSummaryJSON != "" {
@@ -182,13 +146,10 @@ PRE-FETCHED TABLE STATISTICS (includes sample values for enum-like columns):
 %s
 
 YOUR TASK:
-1. Read the asset file using bruin_read_file
+1. Read the asset file
 2. Use the PRE-FETCHED TABLE STATISTICS above to make data-driven decisions
 3. Add meaningful descriptions, quality checks, and tags based on the statistics
-4. Write the enhanced file using bruin_write_file
-5. ALWAYS run bruin_format (MANDATORY - never skip)
-6. ALWAYS run bruin_validate (MANDATORY - never skip)
-7. If validation fails, fix issues and repeat steps 4-6
+4. Edit the file with your enhancements
 
 Use statistics to determine checks:
 - null_count = 0 → add not_null check
@@ -207,8 +168,6 @@ Column naming patterns to consider when adding checks:
 Be conservative - only add checks you're confident about based on column names or actual data analysis.
 Do NOT remove any existing fields or checks, only ADD new ones.
 
-IMPORTANT: You MUST run bruin_format and bruin_validate at the end, even if you made no changes.
-
 Start by reading the file.`,
 			assetPath,
 			assetName,
@@ -225,12 +184,9 @@ Asset Name: %s
 Pipeline: %s
 
 YOUR TASK:
-1. Read the asset file using bruin_read_file
+1. Read the asset file
 2. Add meaningful descriptions, quality checks, and tags based on column names and types
-3. Write the enhanced file using bruin_write_file
-4. ALWAYS run bruin_format (MANDATORY - never skip)
-5. ALWAYS run bruin_validate (MANDATORY - never skip)
-6. If validation fails, fix issues and repeat steps 3-5
+3. Edit the file with your enhancements
 
 Column naming patterns to consider when adding checks:
 - *_id, *Id columns: usually need not_null + unique
@@ -243,8 +199,6 @@ Column naming patterns to consider when adding checks:
 
 Be conservative - only add checks you're confident about based on column names.
 Do NOT remove any existing fields or checks, only ADD new ones.
-
-IMPORTANT: You MUST run bruin_format and bruin_validate at the end, even if you made no changes.
 
 Start by reading the file.`,
 		assetPath,
