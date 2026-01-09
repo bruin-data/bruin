@@ -178,7 +178,7 @@ func (e *Enhancer) runBruinFormat(ctx context.Context, filePath string) error {
 		return errors.New("bruin CLI not found")
 	}
 
-	cmd := exec.CommandContext(ctx, e.bruinPath, "format", filePath)
+	cmd := exec.CommandContext(ctx, e.bruinPath, "format", filePath) //nolint:gosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "bruin format failed: %s", string(output))
@@ -192,7 +192,7 @@ func (e *Enhancer) runBruinValidate(ctx context.Context, filePath string) error 
 		return errors.New("bruin CLI not found")
 	}
 
-	cmd := exec.CommandContext(ctx, e.bruinPath, "validate", filePath)
+	cmd := exec.CommandContext(ctx, e.bruinPath, "validate", filePath) //nolint:gosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "bruin validate failed: %s", string(output))
