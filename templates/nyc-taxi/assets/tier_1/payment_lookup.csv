@@ -1,0 +1,8 @@
+payment_type_id,payment_description
+0,flex_fare
+1,credit_card
+2,cash
+3,no_charge
+4,dispute
+5,unknown
+6,voided_trip

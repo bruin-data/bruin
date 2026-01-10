@@ -159,3 +159,4 @@ __debug_bin*
 test-glossary.yml
 .venv
 logs/queries
+*.py[cod]
