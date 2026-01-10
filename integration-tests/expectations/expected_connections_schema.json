@@ -1073,6 +1073,21 @@
         },
         "subnetwork_uri": {
           "type": "string"
+        },
+        "network_tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kms_key": {
+          "type": "string"
+        },
+        "staging_bucket": {
+          "type": "string"
+        },
+        "metastore_service": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

@@ -16,14 +16,18 @@ func (e *MissingFieldsError) Error() string {
 }
 
 type Config struct {
-	ServiceAccountJSON               string `yaml:"service_account_json,omitempty"`
-	ServiceAccountFile               string `yaml:"service_account_file,omitempty"`
-	UseApplicationDefaultCredentials bool   `yaml:"use_application_default_credentials,omitempty"`
-	ProjectID                        string `yaml:"project_id,omitempty"`
-	Region                           string `yaml:"region" json:"region"`
-	Workspace                        string `yaml:"workspace"`
-	ExecutionRole                    string `yaml:"execution_role"`
-	SubnetworkURI                    string `yaml:"subnetwork_uri,omitempty"`
+	ServiceAccountJSON               string   `yaml:"service_account_json,omitempty"`
+	ServiceAccountFile               string   `yaml:"service_account_file,omitempty"`
+	UseApplicationDefaultCredentials bool     `yaml:"use_application_default_credentials,omitempty"`
+	ProjectID                        string   `yaml:"project_id,omitempty"`
+	Region                           string   `yaml:"region" json:"region"`
+	Workspace                        string   `yaml:"workspace"`
+	ExecutionRole                    string   `yaml:"execution_role"`
+	SubnetworkURI                    string   `yaml:"subnetwork_uri,omitempty"`
+	NetworkTags                      []string `yaml:"network_tags,omitempty"`
+	KmsKey                           string   `yaml:"kms_key,omitempty"`
+	StagingBucket                    string   `yaml:"staging_bucket,omitempty"`
+	MetastoreService                 string   `yaml:"metastore_service,omitempty"`
 }
 
 func (c *Config) validate() error {
