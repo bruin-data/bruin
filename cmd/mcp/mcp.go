@@ -325,32 +325,44 @@ func getTreeList() string {
 	result.WriteString("```\n")
 	result.WriteString("Bruin Documentation\n")
 
-	dirs := []string{
-		"getting-started",
-		"commands",
-		"quality",
-		"secrets",
-		"deployment",
-		"cicd",
-		"cloud",
-		"vscode-extension",
-		"ingestion",
-		"platforms",
+	entries, err := fs.ReadDir(DocsFS, ".")
+	if err != nil {
+		return fmt.Sprintf("Error reading docs: %v", err)
 	}
 
-	for i, dir := range dirs {
-		isLast := i == len(dirs)-1
+	var dirs []string
+	var files []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirs = append(dirs, entry.Name())
+		} else if strings.HasSuffix(entry.Name(), ".md") {
+			files = append(files, entry.Name())
+		}
+	}
+	sort.Strings(dirs)
+	sort.Strings(files)
+
+	// Combine: directories first, then files
+	allEntries := make([]string, 0, len(dirs)+len(files))
+	allEntries = append(allEntries, dirs...)
+	allEntries = append(allEntries, files...)
+
+	for i, name := range allEntries {
+		isLast := i == len(allEntries)-1
 		prefix := "├── "
 		if isLast {
 			prefix = "└── "
 		}
-		result.WriteString(prefix + dir + "\n")
+		result.WriteString(prefix + name + "\n")
 
-		childPrefix := "│   "
-		if isLast {
-			childPrefix = "    "
+		isDir := i < len(dirs)
+		if isDir {
+			childPrefix := "│   "
+			if isLast {
+				childPrefix = "    "
+			}
+			result.WriteString(buildDocsSubTree(name, childPrefix))
 		}
-		result.WriteString(buildDocsSubTree(dir, childPrefix))
 	}
 
 	result.WriteString("```\n")
@@ -363,18 +375,29 @@ func getDocContent(filename string) string {
 		filename += ".md"
 	}
 
-	validPrefixes := []string{"getting-started/", "commands/", "quality/", "secrets/", "deployment/", "cicd/", "cloud/", "vscode-extension/", "ingestion/", "platforms/"}
-	for _, prefix := range validPrefixes {
-		if strings.HasPrefix(filename, prefix) {
-			content, err := DocsFS.ReadFile(filename)
-			if err == nil {
-				return string(content)
-			}
-			return fmt.Sprintf("Error: File '%s' not found in %s documentation", filename, strings.TrimSuffix(prefix, "/"))
+	// Try to read the file directly (handles both root-level and nested files)
+	content, err := DocsFS.ReadFile(filename)
+	if err == nil {
+		return string(content)
+	}
+
+	// File not found - provide helpful error message
+	entries, err := fs.ReadDir(DocsFS, ".")
+	if err != nil {
+		return fmt.Sprintf("Error reading docs: %v", err)
+	}
+
+	var validDirs []string
+	var rootFiles []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			validDirs = append(validDirs, entry.Name()+"/")
+		} else if strings.HasSuffix(entry.Name(), ".md") {
+			rootFiles = append(rootFiles, entry.Name())
 		}
 	}
 
-	return fmt.Sprintf("Error: File '%s' not found. Valid prefixes are: getting-started/, commands/, quality/, secrets/, deployment/, cicd/, cloud/, vscode-extension/, ingestion/, platforms/. Use bruin_get_docs_tree to see all available files.", filename)
+	return fmt.Sprintf("Error: File '%s' not found. Valid paths are: %s or root files like %s. Use bruin_get_docs_tree to see all available files.", filename, strings.Join(validDirs, ", "), strings.Join(rootFiles, ", "))
 }
 
 func buildDocsSubTree(dir string, parentPrefix string) string {
@@ -384,7 +407,6 @@ func buildDocsSubTree(dir string, parentPrefix string) string {
 	if err != nil {
 		return fmt.Sprintf("Error reading directory %s: %v\n", dir, err)
 	}
-
 
 	var filtered []fs.DirEntry
 	for _, entry := range entries {
