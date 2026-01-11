@@ -448,4 +448,3 @@ func sortEmbeddedEntries(entries []fs.DirEntry) []fs.DirEntry {
 	})
 	return entries
 }
-
