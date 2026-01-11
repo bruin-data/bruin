@@ -165,13 +165,13 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 					},
 					{
 						"name":        "bruin_get_doc_content",
-						"description": "Get the contents of a specific documentation from Bruin CLI docs.",
+						"description": "Get the contents of a specific documentation file from Bruin CLI docs. Files are organized in three directories: MCP (general docs), Ingestion (data sources like shopify, stripe, github), and Platforms (destinations like bigquery, snowflake, postgres). Use the appropriate prefix to specify the directory, e.g., 'Platforms/bigquery' for BigQuery platform docs or 'Ingestion/shopify' for Shopify source docs. If unsure about the exact path, use bruin_get_docs_tree first to see all available files.",
 						"inputSchema": map[string]interface{}{
 							"type": "object",
 							"properties": map[string]interface{}{
 								"filename": map[string]interface{}{
 									"type":        "string",
-									"description": "Name of the markdown file to fetch (with or without .md extension)",
+									"description": "Path to the markdown file. Use format 'Directory/filename' (e.g., 'Platforms/bigquery', 'Ingestion/stripe'). The .md extension is optional.",
 								},
 							},
 							"required": []string{"filename"},
@@ -351,6 +351,24 @@ func getDocContent(filename string) string {
 		filename += ".md"
 	}
 
+	if strings.HasPrefix(filename, "Ingestion/") {
+		baseName := strings.TrimPrefix(filename, "Ingestion/")
+		content, err := ingestion.DocsFS.ReadFile(baseName)
+		if err == nil {
+			return string(content)
+		}
+		return fmt.Sprintf("Error: File '%s' not found in ingestion documentation", baseName)
+	}
+
+	if strings.HasPrefix(filename, "Platforms/") {
+		baseName := strings.TrimPrefix(filename, "Platforms/")
+		content, err := platforms.DocsFS.ReadFile(baseName)
+		if err == nil {
+			return string(content)
+		}
+		return fmt.Sprintf("Error: File '%s' not found in platforms documentation", baseName)
+	}
+
 	// Try to find in MCP docs first
 	filePath, err := findEmbeddedFile("docs", filename)
 	if err == nil {
@@ -360,17 +378,6 @@ func getDocContent(filename string) string {
 		}
 	}
 
-	// Try to find in ingestion docs
-	content, err := ingestion.DocsFS.ReadFile(filename)
-	if err == nil {
-		return string(content)
-	}
-
-	// Try to find in platforms docs
-	content, err = platforms.DocsFS.ReadFile(filename)
-	if err == nil {
-		return string(content)
-	}
 
 	return fmt.Sprintf("Error: File '%s' not found in any documentation directory", filename)
 }
