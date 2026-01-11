@@ -163,13 +163,13 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 					},
 					{
 						"name":        "bruin_get_doc_content",
-						"description": "Get the contents of a specific documentation file from Bruin CLI docs. Files are organized in three directories: MCP (general docs), Ingestion (data sources like shopify, stripe, github), and Platforms (destinations like bigquery, snowflake, postgres). Use the appropriate prefix to specify the directory, e.g., 'Platforms/bigquery' for BigQuery platform docs or 'Ingestion/shopify' for Shopify source docs. If unsure about the exact path, use bruin_get_docs_tree first to see all available files.",
+						"description": "Get the contents of a specific documentation file from Bruin CLI docs. Use bruin_get_docs_tree first to see all available directories and files. You can access files in subdirectories (e.g., 'ingestion/shopify', 'platforms/bigquery', 'commands/run') or root-level files (e.g., 'overview', 'index'). The .md extension is optional.",
 						"inputSchema": map[string]interface{}{
 							"type": "object",
 							"properties": map[string]interface{}{
 								"filename": map[string]interface{}{
 									"type":        "string",
-									"description": "Path to the markdown file. Use format 'Directory/filename' (e.g., 'Platforms/bigquery', 'Ingestion/stripe'). The .md extension is optional.",
+									"description": "Path to the markdown file (e.g., 'ingestion/shopify', 'platforms/bigquery', 'overview'). The .md extension is optional.",
 								},
 							},
 							"required": []string{"filename"},
