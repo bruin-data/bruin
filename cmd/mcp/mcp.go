@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bruin-data/bruin/docs/ingestion"
-	"github.com/bruin-data/bruin/docs/platforms"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v3"
@@ -165,13 +163,13 @@ func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 					},
 					{
 						"name":        "bruin_get_doc_content",
-						"description": "Get the contents of a specific documentation from Bruin CLI docs.",
+						"description": "Get the contents of a specific documentation file from Bruin CLI docs. Files are organized in three directories: MCP (general docs), Ingestion (data sources like shopify, stripe, github), and Platforms (destinations like bigquery, snowflake, postgres). Use the appropriate prefix to specify the directory, e.g., 'Platforms/bigquery' for BigQuery platform docs or 'Ingestion/shopify' for Shopify source docs. If unsure about the exact path, use bruin_get_docs_tree first to see all available files.",
 						"inputSchema": map[string]interface{}{
 							"type": "object",
 							"properties": map[string]interface{}{
 								"filename": map[string]interface{}{
 									"type":        "string",
-									"description": "Name of the markdown file to fetch (with or without .md extension)",
+									"description": "Path to the markdown file. Use format 'Directory/filename' (e.g., 'Platforms/bigquery', 'Ingestion/stripe'). The .md extension is optional.",
 								},
 							},
 							"required": []string{"filename"},
@@ -315,7 +313,7 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 }
 
 func getBruinInfo() string {
-	content, err := DocsFS.ReadFile("docs/overview.md")
+	content, err := DocsFS.ReadFile("overview.md")
 	if err != nil {
 		return fmt.Sprintf("Error: Could not read overview.md: %v", err)
 	}
@@ -326,17 +324,45 @@ func getTreeList() string {
 	var result strings.Builder
 	result.WriteString("Bruin Documentation\n")
 
-	// MCP docs (existing)
-	result.WriteString("    MCP\n")
-	result.WriteString(buildEmbeddedTree("docs", 1))
+	// Getting Started
+	result.WriteString("    getting-started\n")
+	result.WriteString(buildDocsSubTree("getting-started", 1))
+
+	// Commands
+	result.WriteString("    commands\n")
+	result.WriteString(buildDocsSubTree("commands", 1))
+
+	// Quality
+	result.WriteString("    quality\n")
+	result.WriteString(buildDocsSubTree("quality", 1))
+
+	// Secrets
+	result.WriteString("    secrets\n")
+	result.WriteString(buildDocsSubTree("secrets", 1))
+
+	// Deployment
+	result.WriteString("    deployment\n")
+	result.WriteString(buildDocsSubTree("deployment", 1))
+
+	// CI/CD
+	result.WriteString("    cicd\n")
+	result.WriteString(buildDocsSubTree("cicd", 1))
+
+	// Cloud
+	result.WriteString("    cloud\n")
+	result.WriteString(buildDocsSubTree("cloud", 1))
+
+	// VSCode Extension
+	result.WriteString("    vscode-extension\n")
+	result.WriteString(buildDocsSubTree("vscode-extension", 1))
 
 	// Ingestion docs
-	result.WriteString("    Ingestion\n")
-	result.WriteString(buildIngestionTree(1))
+	result.WriteString("    ingestion\n")
+	result.WriteString(buildDocsSubTree("ingestion", 1))
 
 	// Platforms docs
-	result.WriteString("    Platforms\n")
-	result.WriteString(buildPlatformsTree(1))
+	result.WriteString("    platforms\n")
+	result.WriteString(buildDocsSubTree("platforms", 1))
 
 	return result.String()
 }
@@ -351,36 +377,26 @@ func getDocContent(filename string) string {
 		filename += ".md"
 	}
 
-	// Try to find in MCP docs first
-	filePath, err := findEmbeddedFile("docs", filename)
-	if err == nil {
-		content, err := DocsFS.ReadFile(filePath)
-		if err == nil {
-			return string(content)
+	validPrefixes := []string{"getting-started/", "commands/", "quality/", "secrets/", "deployment/", "cicd/", "cloud/", "vscode-extension/", "ingestion/", "platforms/"}
+	for _, prefix := range validPrefixes {
+		if strings.HasPrefix(filename, prefix) {
+			content, err := DocsFS.ReadFile(filename)
+			if err == nil {
+				return string(content)
+			}
+			return fmt.Sprintf("Error: File '%s' not found in %s documentation", filename, strings.TrimSuffix(prefix, "/"))
 		}
 	}
 
-	// Try to find in ingestion docs
-	content, err := ingestion.DocsFS.ReadFile(filename)
-	if err == nil {
-		return string(content)
-	}
-
-	// Try to find in platforms docs
-	content, err = platforms.DocsFS.ReadFile(filename)
-	if err == nil {
-		return string(content)
-	}
-
-	return fmt.Sprintf("Error: File '%s' not found in any documentation directory", filename)
+	return fmt.Sprintf("Error: File '%s' not found. Valid prefixes are: getting-started/, commands/, quality/, secrets/, deployment/, cicd/, cloud/, vscode-extension/, ingestion/, platforms/. Use bruin_get_docs_tree to see all available files.", filename)
 }
 
-func buildEmbeddedTree(rootPath string, depth int) string {
+func buildDocsSubTree(dir string, depth int) string {
 	var result strings.Builder
 
-	entries, err := fs.ReadDir(DocsFS, rootPath)
+	entries, err := fs.ReadDir(DocsFS, dir)
 	if err != nil {
-		return fmt.Sprintf("Error reading directory %s: %v\n", rootPath, err)
+		return fmt.Sprintf("Error reading directory %s: %v\n", dir, err)
 	}
 
 	sortedEntries := sortEmbeddedEntries(entries)
@@ -389,52 +405,11 @@ func buildEmbeddedTree(rootPath string, depth int) string {
 		indent := strings.Repeat("    ", depth+1)
 		name := formatEntryName(entry.Name())
 
-		result.WriteString(indent + name + "\n")
-
 		if entry.IsDir() {
-			subPath := filepath.Join(rootPath, entry.Name())
-			result.WriteString(buildEmbeddedTree(subPath, depth+1))
-		}
-	}
-
-	return result.String()
-}
-
-func buildIngestionTree(depth int) string {
-	var result strings.Builder
-
-	entries, err := fs.ReadDir(ingestion.DocsFS, ".")
-	if err != nil {
-		return fmt.Sprintf("Error reading ingestion directory: %v\n", err)
-	}
-
-	sortedEntries := sortEmbeddedEntries(entries)
-
-	for _, entry := range sortedEntries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
-			indent := strings.Repeat("    ", depth+1)
-			name := formatEntryName(entry.Name())
 			result.WriteString(indent + name + "\n")
-		}
-	}
-
-	return result.String()
-}
-
-func buildPlatformsTree(depth int) string {
-	var result strings.Builder
-
-	entries, err := fs.ReadDir(platforms.DocsFS, ".")
-	if err != nil {
-		return fmt.Sprintf("Error reading platforms directory: %v\n", err)
-	}
-
-	sortedEntries := sortEmbeddedEntries(entries)
-
-	for _, entry := range sortedEntries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
-			indent := strings.Repeat("    ", depth+1)
-			name := formatEntryName(entry.Name())
+			subPath := filepath.Join(dir, entry.Name())
+			result.WriteString(buildDocsSubTree(subPath, depth+1))
+		} else if strings.HasSuffix(entry.Name(), ".md") {
 			result.WriteString(indent + name + "\n")
 		}
 	}
@@ -450,31 +425,4 @@ func sortEmbeddedEntries(entries []fs.DirEntry) []fs.DirEntry {
 		return entries[i].Name() < entries[j].Name()
 	})
 	return entries
-}
-
-func findEmbeddedFile(rootPath, filename string) (string, error) {
-	var foundPath string
-
-	// Walk through all directories to find the file
-	err := fs.WalkDir(DocsFS, rootPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !d.IsDir() && d.Name() == filename {
-			foundPath = path
-			return fs.SkipAll // Stop walking after finding the file
-		}
-
-		return nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("error searching for file: %w", err)
-	}
-
-	if foundPath == "" {
-		return "", fmt.Errorf("file '%s' not found in docs directory", filename)
-	}
-
-	return foundPath, nil
 }
