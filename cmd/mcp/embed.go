@@ -1,8 +1,7 @@
 package mcp
 
 import (
-	"embed"
+	"github.com/bruin-data/bruin/docs"
 )
 
-//go:embed docs/*
-var DocsFS embed.FS
+var DocsFS = docs.DocsFS
