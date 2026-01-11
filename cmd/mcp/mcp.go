@@ -369,16 +369,7 @@ func getDocContent(filename string) string {
 		return fmt.Sprintf("Error: File '%s' not found in platforms documentation", baseName)
 	}
 
-	// Try to find in MCP docs first
-	filePath, err := findEmbeddedFile("docs", filename)
-	if err == nil {
-		content, err := DocsFS.ReadFile(filePath)
-		if err == nil {
-			return string(content)
-		}
-	}
-
-	return fmt.Sprintf("Error: File '%s' not found in any documentation directory", filename)
+	return fmt.Sprintf("Error: File '%s' not found. You must use 'Ingestion/<source>' prefix for data sources (e.g., 'Ingestion/shopify') or 'Platforms/<destination>' prefix for destinations (e.g., 'Platforms/bigquery'). Use bruin_get_docs_tree to see all available files.", filename)
 }
 
 func buildEmbeddedTree(rootPath string, depth int) string {
@@ -458,29 +449,3 @@ func sortEmbeddedEntries(entries []fs.DirEntry) []fs.DirEntry {
 	return entries
 }
 
-func findEmbeddedFile(rootPath, filename string) (string, error) {
-	var foundPath string
-
-	// Walk through all directories to find the file
-	err := fs.WalkDir(DocsFS, rootPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !d.IsDir() && d.Name() == filename {
-			foundPath = path
-			return fs.SkipAll // Stop walking after finding the file
-		}
-
-		return nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("error searching for file: %w", err)
-	}
-
-	if foundPath == "" {
-		return "", fmt.Errorf("file '%s' not found in docs directory", filename)
-	}
-
-	return foundPath, nil
-}
