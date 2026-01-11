@@ -322,53 +322,39 @@ func getBruinInfo() string {
 
 func getTreeList() string {
 	var result strings.Builder
+	result.WriteString("```\n")
 	result.WriteString("Bruin Documentation\n")
 
-	// Getting Started
-	result.WriteString("    getting-started\n")
-	result.WriteString(buildDocsSubTree("getting-started", 1))
+	dirs := []string{
+		"getting-started",
+		"commands",
+		"quality",
+		"secrets",
+		"deployment",
+		"cicd",
+		"cloud",
+		"vscode-extension",
+		"ingestion",
+		"platforms",
+	}
 
-	// Commands
-	result.WriteString("    commands\n")
-	result.WriteString(buildDocsSubTree("commands", 1))
+	for i, dir := range dirs {
+		isLast := i == len(dirs)-1
+		prefix := "├── "
+		if isLast {
+			prefix = "└── "
+		}
+		result.WriteString(prefix + dir + "\n")
 
-	// Quality
-	result.WriteString("    quality\n")
-	result.WriteString(buildDocsSubTree("quality", 1))
+		childPrefix := "│   "
+		if isLast {
+			childPrefix = "    "
+		}
+		result.WriteString(buildDocsSubTree(dir, childPrefix))
+	}
 
-	// Secrets
-	result.WriteString("    secrets\n")
-	result.WriteString(buildDocsSubTree("secrets", 1))
-
-	// Deployment
-	result.WriteString("    deployment\n")
-	result.WriteString(buildDocsSubTree("deployment", 1))
-
-	// CI/CD
-	result.WriteString("    cicd\n")
-	result.WriteString(buildDocsSubTree("cicd", 1))
-
-	// Cloud
-	result.WriteString("    cloud\n")
-	result.WriteString(buildDocsSubTree("cloud", 1))
-
-	// VSCode Extension
-	result.WriteString("    vscode-extension\n")
-	result.WriteString(buildDocsSubTree("vscode-extension", 1))
-
-	// Ingestion docs
-	result.WriteString("    ingestion\n")
-	result.WriteString(buildDocsSubTree("ingestion", 1))
-
-	// Platforms docs
-	result.WriteString("    platforms\n")
-	result.WriteString(buildDocsSubTree("platforms", 1))
-
+	result.WriteString("```\n")
 	return result.String()
-}
-
-func formatEntryName(name string) string {
-	return name
 }
 
 func getDocContent(filename string) string {
@@ -391,7 +377,7 @@ func getDocContent(filename string) string {
 	return fmt.Sprintf("Error: File '%s' not found. Valid prefixes are: getting-started/, commands/, quality/, secrets/, deployment/, cicd/, cloud/, vscode-extension/, ingestion/, platforms/. Use bruin_get_docs_tree to see all available files.", filename)
 }
 
-func buildDocsSubTree(dir string, depth int) string {
+func buildDocsSubTree(dir string, parentPrefix string) string {
 	var result strings.Builder
 
 	entries, err := fs.ReadDir(DocsFS, dir)
@@ -399,18 +385,32 @@ func buildDocsSubTree(dir string, depth int) string {
 		return fmt.Sprintf("Error reading directory %s: %v\n", dir, err)
 	}
 
-	sortedEntries := sortEmbeddedEntries(entries)
 
-	for _, entry := range sortedEntries {
-		indent := strings.Repeat("    ", depth+1)
-		name := formatEntryName(entry.Name())
+	var filtered []fs.DirEntry
+	for _, entry := range entries {
+		if entry.IsDir() || strings.HasSuffix(entry.Name(), ".md") {
+			filtered = append(filtered, entry)
+		}
+	}
+
+	sortedEntries := sortEmbeddedEntries(filtered)
+
+	for i, entry := range sortedEntries {
+		isLast := i == len(sortedEntries)-1
+		prefix := "├── "
+		if isLast {
+			prefix = "└── "
+		}
+
+		result.WriteString(parentPrefix + prefix + entry.Name() + "\n")
 
 		if entry.IsDir() {
-			result.WriteString(indent + name + "\n")
+			childPrefix := parentPrefix + "│   "
+			if isLast {
+				childPrefix = parentPrefix + "    "
+			}
 			subPath := filepath.Join(dir, entry.Name())
-			result.WriteString(buildDocsSubTree(subPath, depth+1))
-		} else if strings.HasSuffix(entry.Name(), ".md") {
-			result.WriteString(indent + name + "\n")
+			result.WriteString(buildDocsSubTree(subPath, childPrefix))
 		}
 	}
 
