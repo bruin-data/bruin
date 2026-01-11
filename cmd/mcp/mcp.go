@@ -378,7 +378,6 @@ func getDocContent(filename string) string {
 		}
 	}
 
-
 	return fmt.Sprintf("Error: File '%s' not found in any documentation directory", filename)
 }
 
