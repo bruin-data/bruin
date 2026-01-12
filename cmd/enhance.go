@@ -459,7 +459,7 @@ func isEnumLikeColumn(name string, normalizedType string) bool {
 		"status",
 		"state",
 		"type",
-		"category",
+		"cateimage.pngry",
 		"kind",
 		"level",
 		"priority",

@@ -17,6 +17,14 @@ const (
 	defaultModel = "claude-sonnet-4-20250514"
 )
 
+// EnhancerInterface defines the interface for asset enhancement.
+type EnhancerInterface interface {
+	SetAPIKey(apiKey string)
+	SetDebug(debug bool)
+	EnsureClaudeCLI() error
+	EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName, tableSummaryJSON string) error
+}
+
 // Enhancer coordinates the AI enhancement process for assets.
 type Enhancer struct {
 	model      string
