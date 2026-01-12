@@ -60,6 +60,7 @@ var TypeHintMapping = map[string]string{
 	"dec":        "decimal", // Alias for decimal
 	"money":      "decimal", // SQL Server/PostgreSQL
 	"smallmoney": "decimal", // SQL Server
+	"bigdecimal": "bigdecimal", // High precision decimal (76,76) for BigQuery
 
 	// Binary types
 	"binary":      "binary",
