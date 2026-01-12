@@ -624,4 +624,3 @@ func getSampleColumnValues(ctx context.Context, conn interface{}, tableName, col
 
 	return values
 }
-
