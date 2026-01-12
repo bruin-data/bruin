@@ -120,6 +120,32 @@ func TestRenderDDLCommand_Run(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "should include hooks around DDL output",
+			args: args{
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Hooks: pipeline.Hooks{
+						Pre:  []pipeline.Hook{{Query: "select 1"}},
+						Post: []pipeline.Hook{{Query: "select 2"}},
+					},
+					Name: "asset1",
+				},
+			},
+			setup: func(f *fields) {
+				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
+					Return([]*query.Query{{Query: "extracted query"}}, nil)
+				f.bqMaterializer.On("Render", mock.Anything, "extracted query").
+					Return("CREATE TABLE asset1 AS (extracted query)", nil)
+
+				f.writer.On("Write", []byte("select 1;\nCREATE TABLE asset1 AS (extracted query);\nselect 2;\n")).
+					Return(0, nil)
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "should render DDL for Snowflake asset",
 			args: args{
 				task: &pipeline.Asset{
