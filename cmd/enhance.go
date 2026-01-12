@@ -51,8 +51,23 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:  "model",
-				Usage: "Claude model to use for AI suggestions",
+				Usage: "AI model to use for suggestions",
 				Value: "claude-sonnet-4-20250514",
+			},
+			&cli.BoolFlag{
+				Name:  "claude",
+				Usage: "Use Claude CLI for AI enhancement",
+				Value: false,
+			},
+			&cli.BoolFlag{
+				Name:  "opencode",
+				Usage: "Use OpenCode CLI for AI enhancement",
+				Value: false,
+			},
+			&cli.BoolFlag{
+				Name:  "codex",
+				Usage: "Use Codex CLI for AI enhancement",
+				Value: false,
 			},
 			&cli.BoolFlag{
 				Name:  "debug",
@@ -132,7 +147,29 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return printEnhanceError(output, errors.Wrap(err, "failed to load asset"))
 	}
 
-	enhancer := enhance.NewEnhancer(c.String("model"))
+	// Determine provider from flags
+	providerType := enhance.ProviderClaude // default
+
+	// Check for mutually exclusive flags
+	flagCount := 0
+	if c.Bool("claude") {
+		flagCount++
+		providerType = enhance.ProviderClaude
+	}
+	if c.Bool("opencode") {
+		flagCount++
+		providerType = enhance.ProviderOpenCode
+	}
+	if c.Bool("codex") {
+		flagCount++
+		providerType = enhance.ProviderCodex
+	}
+
+	if flagCount > 1 {
+		return printEnhanceError(output, errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex)"))
+	}
+
+	enhancer := enhance.NewEnhancer(providerType, c.String("model"))
 
 	// Enable debug mode if --debug flag is set
 	isDebugMode := isDebug != nil && *isDebug
@@ -148,9 +185,9 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		infoPrinter.Printf("  Using environment: %s\n", env)
 	}
 
-	// Check if Claude CLI is available
-	if err := enhancer.EnsureClaudeCLI(); err != nil {
-		return printEnhanceError(output, errors.Wrap(err, "Claude CLI not available"))
+	// Check if the selected provider's CLI is available
+	if err := enhancer.EnsureCLI(); err != nil {
+		return printEnhanceError(output, err)
 	}
 
 	// Pre-fetch table statistics to minimize tool calls during enhancement
@@ -164,7 +201,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
 
-	// Claude directly edited the file via MCP
+	// Provider directly edited the file
 	if output == "json" {
 		result := struct {
 			Status string `json:"status"`
