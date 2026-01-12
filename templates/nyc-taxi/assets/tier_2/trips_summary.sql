@@ -5,17 +5,8 @@ description: |
   Transforms and cleans raw trip data from tier_1.
   Deduplicates trips, selects necessary columns, and joins with the taxi zone lookup table
   to enrich data with borough and zone names.
-  
-  Query Operations:
-  - Step 1: Selects necessary columns from tier_1 and applies data quality filters. Ensures all primary key columns (pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, taxi_type) are NOT NULL, which is required for the merge strategy. Filters by date range using month-level truncation to match tier_1 logic (ingestion loads full months).
-  - Step 2: Deduplicates trips using ROW_NUMBER() window function with composite key (pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, taxi_type). If duplicate trips exist, keeps the most recent record (ordered by pickup_time DESC) to handle data quality issues where trip records may have been updated/corrected.
-  - Step 3: Filters to keep only deduplicated records (rn=1) and calculates trip duration in seconds using EXTRACT(EPOCH FROM (dropoff_time - pickup_time)). Trip duration is a derived metric calculated once here to avoid recalculating in downstream queries.
-  - Step 4: Enriches trips with pickup location information using LEFT JOIN with taxi_zone_lookup table. LEFT JOIN ensures all trips are preserved even if location ID doesn't exist in lookup table, preserving data integrity.
-  - Step 5: Enriches trips with dropoff location information using LEFT JOIN with taxi_zone_lookup table. Adds Borough and Zone names for both pickup and dropoff locations to make data more accessible for analysis and reporting.
-  - Step 6: Enriches trips with payment type information using LEFT JOIN with payment_lookup table. Adds payment_description to make payment information human-readable for analysis and reporting.
-  
   Aggregation Level: Individual trip records with location enrichment and deduplication applied.
-  
+
   Sample query:
   ```sql
   SELECT *
