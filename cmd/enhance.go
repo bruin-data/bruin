@@ -276,20 +276,32 @@ func printUnifiedDiff(original, modified string) {
 	originalLines := strings.Split(original, "\n")
 	modifiedLines := strings.Split(modified, "\n")
 
-	// Use diffmatchpatch to get line-level diffs
-	dmp := diffmatchpatch.New()
-
-	// Convert lines to chars for line-by-line diff
-	text1, text2, lineArray := dmp.DiffLinesToChars(original, modified)
-	diffs := dmp.DiffMain(text1, text2, false)
-	diffs = dmp.DiffCharsToLines(diffs, lineArray)
-	diffs = dmp.DiffCleanupSemantic(diffs)
-
+	// Use a simple line-by-line diff algorithm
 	added := 0
 	removed := 0
 
+	// Create maps to track which lines exist in each version
+	type lineInfo struct {
+		text  string
+		index int
+	}
+
+	// Use LCS-based approach for better line matching
+	dmp := diffmatchpatch.New()
+	text1, text2, lineArray := dmp.DiffLinesToChars(original, modified)
+	diffs := dmp.DiffMain(text1, text2, false)
+	diffs = dmp.DiffCharsToLines(diffs, lineArray)
+
 	for _, d := range diffs {
-		lines := strings.Split(strings.TrimSuffix(d.Text, "\n"), "\n")
+		// Split the text into lines, preserving the structure
+		text := d.Text
+		if len(text) == 0 {
+			continue
+		}
+
+		// Remove trailing newline for processing
+		lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
+
 		for _, line := range lines {
 			switch d.Type {
 			case diffmatchpatch.DiffInsert:
@@ -299,7 +311,6 @@ func printUnifiedDiff(original, modified string) {
 				fmt.Printf("\033[31m- %s\033[0m\n", line)
 				removed++
 			case diffmatchpatch.DiffEqual:
-				// Show context lines (unchanged)
 				fmt.Printf("  %s\n", line)
 			}
 		}
