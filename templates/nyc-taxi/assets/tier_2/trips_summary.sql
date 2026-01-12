@@ -7,15 +7,6 @@ description: |
   to enrich data with borough and zone names.
   Aggregation Level: Individual trip records with location enrichment and deduplication applied.
 
-  Sample query:
-  ```sql
-  SELECT *
-  FROM tier_2.trips_summary
-  WHERE 1=1
-    AND pickup_borough = 'Manhattan'
-  LIMIT 10
-  ```
-
 depends:
   - tier_1.taxi_zone_lookup
   - tier_1.trips_historic
@@ -152,76 +143,45 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
   ) = 1
 )
 
-, trips_with_lookup AS ( -- Step 3: Enriches trips with pickup location information using LEFT JOIN with taxi_zone_lookup table
+, enriched_trips AS ( -- Step 3: Enrich trips with location and payment information using LEFT JOINs
   SELECT
-    ct.*,
+    ct.pickup_time,
+    ct.dropoff_time,
+    ct.pickup_location_id,
+    ct.dropoff_location_id,
+    ct.taxi_type,
+    ct.trip_distance,
+    ct.passenger_count,
+    ct.fare_amount,
+    ct.tip_amount,
+    ct.total_amount,
     pickup_lookup.borough AS pickup_borough,
     pickup_lookup.zone AS pickup_zone,
+    dropoff_lookup.borough AS dropoff_borough,
+    dropoff_lookup.zone AS dropoff_zone,
+    ct.trip_duration_seconds,
+    ct.payment_type,
+    payment_lookup.payment_description,
+    ct.extracted_at,
+    CURRENT_TIMESTAMP AS updated_at,
   FROM cleaned_trips AS ct
   LEFT JOIN tier_1.taxi_zone_lookup AS pickup_lookup
     ON ct.pickup_location_id = pickup_lookup.location_id
-)
-
-, trips_with_payment AS ( -- Step 4: Enriches trips with payment type information using LEFT JOIN with payment_lookup table
-  SELECT
-    twl.pickup_time,
-    twl.dropoff_time,
-    twl.pickup_location_id,
-    twl.dropoff_location_id,
-    twl.taxi_type,
-    twl.trip_distance,
-    twl.passenger_count,
-    twl.fare_amount,
-    twl.tip_amount,
-    twl.total_amount,
-    twl.pickup_borough,
-    twl.pickup_zone,
-    dropoff_lookup.borough AS dropoff_borough,
-    dropoff_lookup.zone AS dropoff_zone,
-    twl.trip_duration_seconds,
-    twl.payment_type,
-    payment_lookup.payment_description,
-    twl.extracted_at,
-  FROM trips_with_lookup AS twl
   LEFT JOIN tier_1.taxi_zone_lookup AS dropoff_lookup
-    ON twl.dropoff_location_id = dropoff_lookup.location_id
+    ON ct.dropoff_location_id = dropoff_lookup.location_id
   LEFT JOIN tier_1.payment_lookup AS payment_lookup
-    ON CAST(twl.payment_type AS INTEGER) = payment_lookup.payment_type_id
+    ON CAST(ct.payment_type AS INTEGER) = payment_lookup.payment_type_id
   WHERE 1=1
     -- filter out zero durations (trip cannot end at the same time it starts or before it starts)
-    AND trip_duration_seconds > 0
+    AND ct.trip_duration_seconds > 0
     -- filter out outlier durations that are too long, 8 hours (28800 seconds)
-    AND trip_duration_seconds < 28800
+    AND ct.trip_duration_seconds < 28800
     -- filter out negative total amounts
-    AND total_amount >= 0
+    AND ct.total_amount >= 0
     -- Only include trips that were actually charged
     AND payment_lookup.payment_description IN ('flex_fare', 'credit_card', 'cash')
     -- filter out negative trip distances as they are data quality issues (trip distance cannot be negative)
-    AND trip_distance >= 0
-)
-
-, final AS ( -- Step 5: Final select with all required columns
-  SELECT
-    pickup_time,
-    dropoff_time,
-    pickup_location_id,
-    dropoff_location_id,
-    taxi_type,
-    trip_distance,
-    passenger_count,
-    fare_amount,
-    tip_amount,
-    total_amount,
-    pickup_borough,
-    pickup_zone,
-    dropoff_borough,
-    dropoff_zone,
-    trip_duration_seconds,
-    payment_type,
-    payment_description,
-    extracted_at,
-    CURRENT_TIMESTAMP AS updated_at,
-  FROM trips_with_payment
+    AND ct.trip_distance >= 0
 )
 
 SELECT
@@ -244,4 +204,4 @@ SELECT
   payment_description,
   extracted_at,
   updated_at,
-FROM final
+FROM enriched_trips
