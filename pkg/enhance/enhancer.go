@@ -107,7 +107,6 @@ func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipe
 	return nil
 }
 
-
 // validateAsset runs basic validation rules on the asset.
 func (e *Enhancer) validateAsset(ctx context.Context, asset *pipeline.Asset) error {
 	// Create a minimal pipeline containing just this asset for validation

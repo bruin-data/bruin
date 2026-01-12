@@ -17,10 +17,10 @@ type CLIProviderConfig struct {
 	Name              string
 	BinaryName        string
 	DefaultModel      string
-	UseAPIKeyEnv      bool        // Whether to inject API key via environment variable
-	APIKeyEnvVar      string      // Environment variable name for API key (e.g., "ANTHROPIC_API_KEY")
+	UseAPIKeyEnv      bool        // Whether to inject API key via environment variable.
+	APIKeyEnvVar      string      // Environment variable name for API key (e.g., "ANTHROPIC_API_KEY").
 	BuildArgs         func(model, prompt, systemPrompt string) []string
-	CommonSearchPaths []string    // Additional search paths beyond standard ones
+	CommonSearchPaths []string    // Additional search paths beyond standard ones.
 }
 
 // CLIProvider implements the Provider interface for any CLI-based AI tool.
@@ -36,7 +36,7 @@ type CLIProvider struct {
 // NewCLIProvider creates a new generic CLI provider.
 func NewCLIProvider(config CLIProviderConfig, model string, fs afero.Fs) *CLIProvider {
 	// Use default model if none specified
-	if model == "" || model == defaultModel {
+	if model == "" {
 		model = config.DefaultModel
 	}
 
@@ -105,7 +105,9 @@ func (p *CLIProvider) Enhance(ctx context.Context, prompt, systemPrompt string) 
 	cmd := exec.CommandContext(ctx, p.cliPath, args...) //nolint:gosec
 
 	// Set working directory to current directory
-	cmd.Dir, _ = os.Getwd()
+	if wd, err := os.Getwd(); err == nil {
+		cmd.Dir = wd
+	}
 
 	// Inject API key via environment variable if configured
 	if p.config.UseAPIKeyEnv && p.apiKey != "" {

@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-// ProviderType represents the AI provider type
+// ProviderType represents the AI provider type.
 type ProviderType string
 
 const (

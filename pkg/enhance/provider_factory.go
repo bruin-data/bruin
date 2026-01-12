@@ -20,7 +20,7 @@ func NewClaudeProvider(model string, fs afero.Fs) Provider {
 				"--dangerously-skip-permissions",
 			}
 			if systemPrompt != "" {
-				args = append(args, "--system", systemPrompt)
+				args = append(args, "--append-system-prompt", systemPrompt)
 			}
 			args = append(args, prompt)
 			return args
