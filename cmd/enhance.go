@@ -189,12 +189,16 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		// Continue even if formatting fails
 	}
 
-	// Step 4: Validate
+	// Step 4: Validate using the existing bruin validate command
 	if output != "json" {
 		infoPrinter.Println("Step 4/4: Validating asset...")
 	}
-	err = ValidateAsset(ctx, assetPath, fs, c.String("environment"))
-	if err != nil {
+	validateCmd := Lint(isDebug)
+	args := []string{"validate", absAssetPath}
+	if env := c.String("environment"); env != "" {
+		args = append(args, "--environment", env)
+	}
+	if err := validateCmd.Run(ctx, args); err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "validation failed"))
 	}
 
@@ -270,33 +274,20 @@ func showDiff(originalContent []byte, filePath string) {
 
 // printUnifiedDiff prints a unified diff format with colors.
 func printUnifiedDiff(original, modified string) {
-	originalLines := strings.Split(original, "\n")
-	modifiedLines := strings.Split(modified, "\n")
-
-	// Use a simple line-by-line diff algorithm
 	added := 0
 	removed := 0
 
-	// Create maps to track which lines exist in each version
-	type lineInfo struct {
-		text  string
-		index int
-	}
-
-	// Use LCS-based approach for better line matching
 	dmp := diffmatchpatch.New()
 	text1, text2, lineArray := dmp.DiffLinesToChars(original, modified)
 	diffs := dmp.DiffMain(text1, text2, false)
 	diffs = dmp.DiffCharsToLines(diffs, lineArray)
 
 	for _, d := range diffs {
-		// Split the text into lines, preserving the structure
 		text := d.Text
 		if len(text) == 0 {
 			continue
 		}
 
-		// Remove trailing newline for processing
 		lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
 
 		for _, line := range lines {
@@ -313,8 +304,6 @@ func printUnifiedDiff(original, modified string) {
 		}
 	}
 
-	_ = originalLines
-	_ = modifiedLines
 	fmt.Printf("\n\033[32m+%d additions\033[0m, \033[31m-%d deletions\033[0m\n", added, removed)
 }
 
