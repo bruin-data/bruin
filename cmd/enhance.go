@@ -91,10 +91,16 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 }
 
 func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, isDebug *bool) error {
-	absAssetPath, _ := filepath.Abs(assetPath)
+	absAssetPath, err := filepath.Abs(assetPath)
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "failed to get absolute path"))
+	}
 
 	// Read original file content before any modifications (for diff display)
-	originalContent, _ := afero.ReadFile(fs, absAssetPath)
+	originalContent, err := afero.ReadFile(fs, absAssetPath)
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "failed to read original file content"))
+	}
 
 	// Step 1: Fill columns from DB
 	if output != "json" {
@@ -199,7 +205,11 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		args = append(args, "--environment", env)
 	}
 	if err := validateCmd.Run(ctx, args); err != nil {
-		return printEnhanceError(output, errors.Wrap(err, "validation failed"))
+		// Rollback: restore original content
+		if writeErr := afero.WriteFile(fs, absAssetPath, originalContent, 0644); writeErr != nil {
+			return printEnhanceError(output, errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err)))
+		}
+		return printEnhanceError(output, errors.Wrap(err, "validation failed, original file restored"))
 	}
 
 	// Provider directly edited the file
@@ -256,9 +266,9 @@ func getAnthropicAPIKey(fs afero.Fs, inputPath string) string {
 
 // showDiff displays a colored diff between the original content and the current file content.
 func showDiff(originalContent []byte, filePath string) {
-	// Read the new content
 	newContent, err := os.ReadFile(filePath)
 	if err != nil {
+		warningPrinter.Printf("Warning: could not read file to display diff: %v\n", err)
 		return
 	}
 
