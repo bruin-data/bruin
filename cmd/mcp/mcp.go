@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bruin-data/bruin/docs"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v3"
@@ -313,7 +314,7 @@ func handleToolCall(req JSONRPCRequest, debug bool) JSONRPCResponse {
 }
 
 func getBruinInfo() string {
-	content, err := DocsFS.ReadFile("overview.md")
+	content, err := docs.DocsFS.ReadFile("overview.md")
 	if err != nil {
 		return fmt.Sprintf("Error: Could not read overview.md: %v", err)
 	}
@@ -325,7 +326,7 @@ func getTreeList() string {
 	result.WriteString("```\n")
 	result.WriteString("Bruin Documentation\n")
 
-	entries, err := fs.ReadDir(DocsFS, ".")
+	entries, err := fs.ReadDir(docs.DocsFS, ".")
 	if err != nil {
 		return fmt.Sprintf("Error reading docs: %v", err)
 	}
@@ -376,13 +377,13 @@ func getDocContent(filename string) string {
 	}
 
 	// Try to read the file directly (handles both root-level and nested files)
-	content, err := DocsFS.ReadFile(filename)
+	content, err := docs.DocsFS.ReadFile(filename)
 	if err == nil {
 		return string(content)
 	}
 
 	// File not found - provide helpful error message
-	entries, err := fs.ReadDir(DocsFS, ".")
+	entries, err := fs.ReadDir(docs.DocsFS, ".")
 	if err != nil {
 		return fmt.Sprintf("Error reading docs: %v", err)
 	}
@@ -403,7 +404,7 @@ func getDocContent(filename string) string {
 func buildDocsSubTree(dir string, parentPrefix string) string {
 	var result strings.Builder
 
-	entries, err := fs.ReadDir(DocsFS, dir)
+	entries, err := fs.ReadDir(docs.DocsFS, dir)
 	if err != nil {
 		return fmt.Sprintf("Error reading directory %s: %v\n", dir, err)
 	}
