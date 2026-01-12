@@ -1,6 +1,5 @@
 /* @bruin
 name: tier_3.report_trips_monthly
-uri: neptune.tier_3.report_trips_monthly
 type: duckdb.sql
 description: |
   Monthly summary report of NYC taxi trips aggregated by taxi type and month.

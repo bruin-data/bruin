@@ -1,6 +1,5 @@
 /* @bruin
 name: tier_2.trips_summary
-uri: neptune.tier_2.trips_summary
 type: duckdb.sql
 description: |
   Transforms and cleans raw trip data from tier_1.

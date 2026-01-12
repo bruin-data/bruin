@@ -1,6 +1,5 @@
 /* @bruin
 name: tier_1.trips_historic
-uri: neptune.tier_1.trips_historic
 type: duckdb.sql
 description: |
   Stores raw ingested taxi trip data from the Python ingestion table.
