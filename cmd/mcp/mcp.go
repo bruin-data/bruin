@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v3"
+	"github.com/xlab/treeprint"
 )
 
 type JSONRPCRequest struct {
@@ -322,52 +322,42 @@ func getBruinInfo() string {
 }
 
 func getTreeList() string {
-	var result strings.Builder
-	result.WriteString("```\n")
-	result.WriteString("Bruin Documentation\n")
+	tree := treeprint.NewWithRoot("Bruin Documentation")
+	buildDocTree(tree, ".")
+	return "```\n" + tree.String() + "```\n"
+}
 
-	entries, err := fs.ReadDir(docs.DocsFS, ".")
+func buildDocTree(branch treeprint.Tree, dir string) {
+	entries, err := fs.ReadDir(docs.DocsFS, dir)
 	if err != nil {
-		return fmt.Sprintf("Error reading docs: %v", err)
+		return
 	}
 
-	var dirs []string
-	var files []string
+	var dirs []fs.DirEntry
+	var files []fs.DirEntry
 	for _, entry := range entries {
 		if entry.IsDir() {
-			dirs = append(dirs, entry.Name())
+			dirs = append(dirs, entry)
 		} else if strings.HasSuffix(entry.Name(), ".md") {
-			files = append(files, entry.Name())
-		}
-	}
-	sort.Strings(dirs)
-	sort.Strings(files)
-
-	// Combine: directories first, then files
-	allEntries := make([]string, 0, len(dirs)+len(files))
-	allEntries = append(allEntries, dirs...)
-	allEntries = append(allEntries, files...)
-
-	for i, name := range allEntries {
-		isLast := i == len(allEntries)-1
-		prefix := "├── "
-		if isLast {
-			prefix = "└── "
-		}
-		result.WriteString(prefix + name + "\n")
-
-		isDir := i < len(dirs)
-		if isDir {
-			childPrefix := "│   "
-			if isLast {
-				childPrefix = "    "
-			}
-			result.WriteString(buildDocsSubTree(name, childPrefix))
+			files = append(files, entry)
 		}
 	}
 
-	result.WriteString("```\n")
-	return result.String()
+	sort.Slice(dirs, func(i, j int) bool { return dirs[i].Name() < dirs[j].Name() })
+	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
+
+	for _, entry := range dirs {
+		childPath := dir + "/" + entry.Name()
+		if dir == "." {
+			childPath = entry.Name()
+		}
+		childBranch := branch.AddBranch(entry.Name())
+		buildDocTree(childBranch, childPath)
+	}
+
+	for _, entry := range files {
+		branch.AddNode(entry.Name())
+	}
 }
 
 func getDocContent(filename string) string {
@@ -400,51 +390,3 @@ func getDocContent(filename string) string {
 	return fmt.Sprintf("Error: File '%s' not found. Valid paths are: %s or root files like %s. Use bruin_get_docs_tree to see all available files.", filename, strings.Join(validDirs, ", "), strings.Join(rootFiles, ", "))
 }
 
-func buildDocsSubTree(dir string, parentPrefix string) string {
-	var result strings.Builder
-
-	entries, err := fs.ReadDir(docs.DocsFS, dir)
-	if err != nil {
-		return fmt.Sprintf("Error reading directory %s: %v\n", dir, err)
-	}
-
-	var filtered []fs.DirEntry
-	for _, entry := range entries {
-		if entry.IsDir() || strings.HasSuffix(entry.Name(), ".md") {
-			filtered = append(filtered, entry)
-		}
-	}
-
-	sortedEntries := sortEmbeddedEntries(filtered)
-
-	for i, entry := range sortedEntries {
-		isLast := i == len(sortedEntries)-1
-		prefix := "├── "
-		if isLast {
-			prefix = "└── "
-		}
-
-		result.WriteString(parentPrefix + prefix + entry.Name() + "\n")
-
-		if entry.IsDir() {
-			childPrefix := parentPrefix + "│   "
-			if isLast {
-				childPrefix = parentPrefix + "    "
-			}
-			subPath := filepath.Join(dir, entry.Name())
-			result.WriteString(buildDocsSubTree(subPath, childPrefix))
-		}
-	}
-
-	return result.String()
-}
-
-func sortEmbeddedEntries(entries []fs.DirEntry) []fs.DirEntry {
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].IsDir() != entries[j].IsDir() {
-			return entries[i].IsDir()
-		}
-		return entries[i].Name() < entries[j].Name()
-	})
-	return entries
-}
