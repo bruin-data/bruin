@@ -9,35 +9,59 @@ import (
 func TestNewEnhancer(t *testing.T) {
 	t.Parallel()
 
-	t.Run("uses default model when empty", func(t *testing.T) {
+	t.Run("creates Claude provider by default", func(t *testing.T) {
 		t.Parallel()
-		enhancer := NewEnhancer("")
+		enhancer := NewEnhancer(ProviderClaude, "")
 
-		assert.Equal(t, defaultModel, enhancer.model)
+		assert.NotNil(t, enhancer)
+		assert.NotNil(t, enhancer.provider)
+		assert.Equal(t, "claude", enhancer.provider.Name())
 	})
 
-	t.Run("uses provided model", func(t *testing.T) {
+	t.Run("creates OpenCode provider when specified", func(t *testing.T) {
 		t.Parallel()
-		enhancer := NewEnhancer("claude-opus-4-20250514")
+		enhancer := NewEnhancer(ProviderOpenCode, "")
 
-		assert.Equal(t, "claude-opus-4-20250514", enhancer.model)
+		assert.NotNil(t, enhancer)
+		assert.NotNil(t, enhancer.provider)
+		assert.Equal(t, "opencode", enhancer.provider.Name())
+	})
+
+	t.Run("creates Codex provider when specified", func(t *testing.T) {
+		t.Parallel()
+		enhancer := NewEnhancer(ProviderCodex, "")
+
+		assert.NotNil(t, enhancer)
+		assert.NotNil(t, enhancer.provider)
+		assert.Equal(t, "codex", enhancer.provider.Name())
+	})
+
+	t.Run("defaults to Claude when invalid provider type", func(t *testing.T) {
+		t.Parallel()
+		enhancer := NewEnhancer(ProviderType("invalid"), "")
+
+		assert.NotNil(t, enhancer)
+		assert.NotNil(t, enhancer.provider)
+		assert.Equal(t, "claude", enhancer.provider.Name())
 	})
 }
 
 func TestEnhancer_SetAPIKey(t *testing.T) {
 	t.Parallel()
-	enhancer := NewEnhancer("")
+	enhancer := NewEnhancer(ProviderClaude, "")
 
-	enhancer.SetAPIKey("sk-new-key")
-
-	assert.Equal(t, "sk-new-key", enhancer.apiKey)
+	// SetAPIKey should not panic
+	assert.NotPanics(t, func() {
+		enhancer.SetAPIKey("sk-new-key")
+	})
 }
 
 func TestEnhancer_SetDebug(t *testing.T) {
 	t.Parallel()
-	enhancer := NewEnhancer("")
+	enhancer := NewEnhancer(ProviderClaude, "")
 
-	enhancer.SetDebug(true)
-
-	assert.True(t, enhancer.debug)
+	// SetDebug should not panic
+	assert.NotPanics(t, func() {
+		enhancer.SetDebug(true)
+	})
 }

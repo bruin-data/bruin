@@ -1,12 +1,7 @@
 package enhance
 
 import (
-	"bytes"
 	"context"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -14,71 +9,62 @@ import (
 	"github.com/spf13/afero"
 )
 
-const (
-	defaultModel = "claude-sonnet-4-20250514"
-)
-
 // EnhancerInterface defines the interface for asset enhancement.
 type EnhancerInterface interface {
 	SetAPIKey(apiKey string)
 	SetDebug(debug bool)
-	EnsureClaudeCLI() error
+	EnsureCLI() error
 	EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName, tableSummaryJSON string) error
 }
 
 // Enhancer coordinates the AI enhancement process for assets.
 type Enhancer struct {
-	model           string
-	claudePath      string
-	apiKey          string
-	debug           bool
+	provider        Provider
 	pipelineBuilder *pipeline.Builder
 	fs              afero.Fs
 }
 
 // NewEnhancer creates a new Enhancer instance.
-func NewEnhancer(model string) *Enhancer {
-	if model == "" {
-		model = defaultModel
-	}
-	claudePath, _ := exec.LookPath("claude")
+func NewEnhancer(providerType ProviderType, model string) *Enhancer {
 	fs := afero.NewOsFs()
+	var provider Provider
+	switch providerType {
+	case ProviderCodex:
+		provider = NewCodexProvider(model, fs)
+	case ProviderOpenCode:
+		provider = NewOpenCodeProvider(model, fs)
+	case ProviderClaude:
+		provider = NewClaudeProvider(model, fs)
+	default:
+		// Default to Claude
+		provider = NewClaudeProvider(model, fs)
+	}
 	return &Enhancer{
-		model:           model,
-		claudePath:      claudePath,
+		provider:        provider,
 		pipelineBuilder: pipeline.NewBuilder(pipeline.BuilderConfig{}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil),
 		fs:              fs,
 	}
 }
 
-// SetAPIKey sets the Anthropic API key to use for Claude CLI.
+// SetAPIKey sets the API key for the provider.
 func (e *Enhancer) SetAPIKey(apiKey string) {
-	e.apiKey = apiKey
+	e.provider.SetAPIKey(apiKey)
 }
 
 // SetDebug enables or disables debug output.
 func (e *Enhancer) SetDebug(debug bool) {
-	e.debug = debug
+	e.provider.SetDebug(debug)
 }
 
-// EnsureClaudeCLI checks if Claude CLI is installed and installs it if not.
-func (e *Enhancer) EnsureClaudeCLI() error {
-	if e.claudePath != "" {
-		return nil
-	}
-
-	claudePath, err := e.installClaudeCLI()
-	if err != nil {
-		return err
-	}
-	e.claudePath = claudePath
-	return nil
+// EnsureCLI checks if the provider's CLI is available.
+func (e *Enhancer) EnsureCLI() error {
+	return e.provider.EnsureCLI()
 }
 
 // EnhanceAsset runs AI enhancement on a single asset.
 func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName, tableSummaryJSON string) error {
-	if err := e.EnsureClaudeCLI(); err != nil {
-		return errors.Wrap(err, "claude CLI not available")
+	if err := e.EnsureCLI(); err != nil {
+		return errors.Wrapf(err, "%s CLI not available", e.provider.Name())
 	}
 
 	if asset.DefinitionFile.Path == "" {
@@ -89,12 +75,12 @@ func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipe
 	prompt := BuildEnhancePrompt(asset.DefinitionFile.Path, asset.Name, pipelineName, tableSummaryJSON)
 	systemPrompt := GetSystemPrompt(tableSummaryJSON != "")
 
-	// Call Claude CLI - Claude will edit the file directly
-	if err := e.callClaude(ctx, prompt, systemPrompt); err != nil {
+	// Call the provider CLI to enhance the asset
+	if err := e.provider.Enhance(ctx, prompt, systemPrompt); err != nil {
 		return errors.Wrap(err, "failed to enhance asset")
 	}
 
-	// Reload the asset from file after Claude edited it
+	// Reload the asset from file after it was edited
 	updatedAsset, err := e.pipelineBuilder.CreateAssetFromFile(asset.DefinitionFile.Path, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to reload asset after enhancement")
@@ -112,40 +98,6 @@ func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipe
 	// Validate the asset using lint rules
 	if err := e.validateAsset(ctx, updatedAsset); err != nil {
 		return errors.Wrap(err, "asset validation failed")
-	}
-
-	return nil
-}
-
-// callClaude executes the Claude CLI with the given prompt.
-func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) error {
-	args := []string{
-		"-p",
-		"--output-format", "text",
-		"--model", e.model,
-		"--dangerously-skip-permissions",
-	}
-
-	if systemPrompt != "" {
-		args = append(args, "--append-system-prompt", systemPrompt)
-	}
-
-	args = append(args, prompt)
-
-	cmd := exec.CommandContext(ctx, e.claudePath, args...) //nolint:gosec
-
-	if e.apiKey != "" {
-		cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY="+e.apiKey)
-	}
-
-	// In debug mode, stream output to stdout/stderr for visibility
-	if e.debug {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
-
-	if err := cmd.Run(); err != nil {
-		return errors.Wrap(err, "claude CLI failed")
 	}
 
 	return nil
@@ -190,38 +142,4 @@ func (e *Enhancer) validateAsset(ctx context.Context, asset *pipeline.Asset) err
 	}
 
 	return nil
-}
-
-// installClaudeCLI installs the Claude CLI using the official installation script.
-func (e *Enhancer) installClaudeCLI() (string, error) {
-	if runtime.GOOS == "windows" {
-		return "", errors.New("automatic Claude CLI installation is not supported on Windows; please install manually or use WSL")
-	}
-
-	installCmd := exec.Command("bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash")
-
-	var stdout, stderr bytes.Buffer
-	installCmd.Stdout = &stdout
-	installCmd.Stderr = &stderr
-
-	if err := installCmd.Run(); err != nil {
-		return "", errors.Wrapf(err, "failed to install Claude CLI: %s", stderr.String())
-	}
-
-	claudePath, err := exec.LookPath("claude")
-	if err != nil {
-		commonPaths := []string{
-			filepath.Join(os.Getenv("HOME"), ".local", "bin", "claude"),
-			"/usr/local/bin/claude",
-			"/usr/bin/claude",
-		}
-		for _, p := range commonPaths {
-			if _, statErr := os.Stat(p); statErr == nil {
-				return p, nil
-			}
-		}
-		return "", errors.New("Claude CLI installation appeared to succeed but 'claude' not found in PATH")
-	}
-
-	return claudePath, nil
 }
