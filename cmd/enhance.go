@@ -201,7 +201,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
 
-	// Claude directly edited the file via MCP
+	// Provider directly edited the file
 	if output == "json" {
 		result := struct {
 			Status string `json:"status"`
