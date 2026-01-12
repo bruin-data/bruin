@@ -190,6 +190,17 @@ In this pipeline, the `taxi_types` variable allows you to configure which taxi t
 
 ## Asset Specifications
 
+### Asset Naming
+
+The `name` parameter in Bruin asset configurations (e.g., `name: tier_1.ingest_trips`) is **optional**. If not provided, Bruin automatically infers the asset name from the file path:
+- The parent folder name becomes the schema/dataset name (e.g., `tier_1`)
+- The file name (without extension) becomes the asset name (e.g., `trips_historic.sql` → `trips_historic`)
+- Combined, this creates the full asset name: `tier_1.trips_historic`
+
+**Example**: A file at `assets/tier_1/trips_historic.sql` will automatically be named `tier_1.trips_historic` even without an explicit `name` parameter in the asset configuration.
+
+You can still explicitly specify the `name` parameter if you want to override this default behavior or if your file structure doesn't match your desired naming convention.
+
 ### 1. Tier 1: Ingestion & Raw Data Storage
 
 #### `tier_1.ingest_trips`
@@ -436,7 +447,7 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
 - [ ] Create `tier_1.trips_historic.sql` with time_interval strategy and column normalization
 - [ ] Create `tier_2.trips_summary.sql` with deduplication and enrichment
 - [ ] Create `tier_3.report_trips_monthly.sql` with monthly aggregations
-- [ ] Add all required Bruin metadata (name, uri, description, owner, tags, columns) to all assets
+- [ ] Add all required Bruin metadata (description, columns, etc.) to all assets (note: `name` is optional and will be inferred from file path if not provided)
 - [ ] Set primary keys and nullable constraints correctly
 - [ ] Add timestamp tracking columns (extracted_at, loaded_at, updated_at)
 - [ ] Test individual assets
