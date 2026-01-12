@@ -9,10 +9,6 @@ import (
 	"github.com/spf13/afero"
 )
 
-const (
-	defaultModel = "claude-sonnet-4-20250514"
-)
-
 // EnhancerInterface defines the interface for asset enhancement.
 type EnhancerInterface interface {
 	SetAPIKey(apiKey string)
