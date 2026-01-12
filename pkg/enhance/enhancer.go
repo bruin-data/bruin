@@ -143,4 +143,3 @@ func (e *Enhancer) validateAsset(ctx context.Context, asset *pipeline.Asset) err
 
 	return nil
 }
-
