@@ -389,4 +389,3 @@ func getDocContent(filename string) string {
 
 	return fmt.Sprintf("Error: File '%s' not found. Valid paths are: %s or root files like %s. Use bruin_get_docs_tree to see all available files.", filename, strings.Join(validDirs, ", "), strings.Join(rootFiles, ", "))
 }
-
