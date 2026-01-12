@@ -5,7 +5,7 @@ A simple Databricks pipeline template that demonstrates querying data from one c
 ## Project Structure
 
 ```
-databricks-pipeline/
+databricks/
 ├── pipeline.yml                    # Pipeline configuration
 ├── README.md                      # This file
 └── assets/                        # Asset definitions
@@ -17,7 +17,7 @@ databricks-pipeline/
 ### 1. Initialize the Project
 
 ```bash
-bruin init databricks-pipeline my-databricks-project
+bruin init databricks my-databricks-project
 ```
 
 ### 2. Set Up Databricks
@@ -141,4 +141,4 @@ The asset uses fully qualified table names to read from the `samples` catalog wh
 ## Resources
 
 - [Databricks Documentation](https://docs.bruin.dev/platforms/databricks)
-- [Bruin CLI Documentation](https://docs.bruin.dev)
+- [Bruin CLI Documentation](https://getbruin.com/docs/bruin/)
