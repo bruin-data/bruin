@@ -56,10 +56,11 @@ var TypeHintMapping = map[string]string{
 	// Decimal/Numeric types (with precision and scale)
 	"decimal":    "decimal",
 	"numeric":    "decimal",
-	"number":     "decimal", // Oracle/Snowflake
-	"dec":        "decimal", // Alias for decimal
-	"money":      "decimal", // SQL Server/PostgreSQL
-	"smallmoney": "decimal", // SQL Server
+	"number":     "decimal",    // Oracle/Snowflake
+	"dec":        "decimal",    // Alias for decimal
+	"money":      "decimal",    // SQL Server/PostgreSQL
+	"smallmoney": "decimal",    // SQL Server
+	"bigdecimal": "bigdecimal", // High precision decimal (76,76) for BigQuery
 
 	// Binary types
 	"binary":      "binary",
