@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	path2 "path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -385,6 +386,73 @@ func flattenErrors(err error) []string {
 	foundErrors = append(foundErrors, err.Error())
 
 	return foundErrors
+}
+
+// ValidateAsset validates a single asset file and returns an error if validation fails.
+// This is a reusable function that can be called from other commands like enhance.
+func ValidateAsset(ctx context.Context, assetPath string, fs afero.Fs, environment string) error {
+	// Get pipeline root from asset path
+	pipelineRoot, err := path.GetPipelineRootFromTask(assetPath, PipelineDefinitionFiles)
+	if err != nil {
+		return errors.Wrap(err, "failed to find pipeline root")
+	}
+
+	// Find repo root for config
+	repoRoot, err := git.FindRepoFromPath(pipelineRoot)
+	if err != nil {
+		return errors.Wrap(err, "failed to find repository root")
+	}
+
+	// Load config
+	cm, err := config.LoadOrCreate(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
+	if err != nil {
+		return errors.Wrap(err, "failed to load config")
+	}
+
+	// Switch environment if specified
+	if environment != "" {
+		if err := cm.SelectEnvironment(environment); err != nil {
+			return errors.Wrap(err, "failed to select environment")
+		}
+	}
+
+	// Initialize SQL parser
+	parser, err := sqlparser.NewSQLParser(false)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize SQL parser")
+	}
+	defer parser.Close()
+
+	// Get validation rules
+	rules, err := lint.GetRules(fs, &git.RepoFinder{}, false, parser, true)
+	if err != nil {
+		return errors.Wrap(err, "failed to get validation rules")
+	}
+
+	// Filter to asset-level rules only (fast validation)
+	rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
+	rules = lint.FilterRulesBySpeed(rules, true)
+
+	// Create linter
+	pipelineFinder := func(root string, pipelineDefinitionFile []string) ([]string, error) {
+		return path.GetPipelinePaths(root, pipelineDefinitionFile)
+	}
+	linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, makeLogger(false), parser)
+
+	// Run validation on the asset
+	result, err := linter.LintAsset(ctx, pipelineRoot, PipelineDefinitionFiles, assetPath, nil)
+	if err != nil {
+		return errors.Wrap(err, "validation failed")
+	}
+
+	// Check for errors
+	if result != nil && result.ErrorCount() > 0 {
+		printer := lint.Printer{RootCheckPath: pipelineRoot}
+		printer.PrintIssues(result)
+		return errors.Errorf("validation found %d error(s)", result.ErrorCount())
+	}
+
+	return nil
 }
 
 func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager config.ConnectionGetter, fullRefresh bool) []lint.Rule {
