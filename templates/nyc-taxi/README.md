@@ -469,7 +469,7 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
      - `do_location_id` → `dropoff_location_id`
    - This separation allows the ingestion layer to process data as-is, while tier_1 standardizes the schema for downstream consumption
 3. **Taxi Types**: Configured via pipeline variables (default: `["yellow", "green"]`), accessible in Python assets via `BRUIN_VARS` environment variable
-4. **Deduplication**: Use `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)` and filter `rn = 1` to keep most recent record for each unique trip
+4. **Deduplication**: Use `ROW_NUMBER()` with `QUALIFY` to keep most recent record for each unique trip
 5. **Lookup Joins**: Use `LEFT JOIN` to retain all trips even if location_id or payment_type_id not found in lookup tables (taxi_zone_lookup and payment_lookup)
 6. **Timestamp Tracking**: 
    - `extracted_at`: Set in ingestion layer when data is downloaded

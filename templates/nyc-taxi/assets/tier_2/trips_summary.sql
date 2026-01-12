@@ -130,17 +130,7 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     AND taxi_type IS NOT NULL
 )
 
-, deduplicated_trips AS ( -- Step 2: Deduplicate trips using ROW_NUMBER() window function
-  SELECT
-    *,
-    ROW_NUMBER() OVER (
-      PARTITION BY pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, taxi_type
-      ORDER BY pickup_time DESC
-    ) AS rn,
-  FROM raw_trips
-)
-
-, cleaned_trips AS ( -- Step 3: Filters to keep only deduplicated records (rn=1) and calculates trip duration in seconds
+, cleaned_trips AS ( -- Step 2: Deduplicate trips using QUALIFY and calculate trip duration in seconds
   SELECT
     pickup_time,
     dropoff_time,
@@ -155,12 +145,14 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     payment_type,
     extracted_at,
     EXTRACT(EPOCH FROM (dropoff_time - pickup_time)) AS trip_duration_seconds,
-  FROM deduplicated_trips
-  WHERE 1=1
-    AND rn = 1
+  FROM raw_trips
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, taxi_type
+    ORDER BY pickup_time DESC
+  ) = 1
 )
 
-, trips_with_lookup AS ( -- Step 4: Enriches trips with pickup location information using LEFT JOIN with taxi_zone_lookup table
+, trips_with_lookup AS ( -- Step 3: Enriches trips with pickup location information using LEFT JOIN with taxi_zone_lookup table
   SELECT
     ct.*,
     pickup_lookup.borough AS pickup_borough,
@@ -170,7 +162,7 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     ON ct.pickup_location_id = pickup_lookup.location_id
 )
 
-, trips_with_payment AS ( -- Step 6: Enriches trips with payment type information using LEFT JOIN with payment_lookup table
+, trips_with_payment AS ( -- Step 4: Enriches trips with payment type information using LEFT JOIN with payment_lookup table
   SELECT
     twl.pickup_time,
     twl.dropoff_time,
@@ -208,7 +200,7 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     AND trip_distance >= 0
 )
 
-, final AS ( -- Step 7: Final select with all required columns
+, final AS ( -- Step 5: Final select with all required columns
   SELECT
     pickup_time,
     dropoff_time,
