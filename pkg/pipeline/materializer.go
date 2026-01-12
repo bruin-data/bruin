@@ -76,7 +76,6 @@ func (m *Materializer) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) 
 	return nil
 }
 
-
 // HookWrapperMaterializer decorates a string-based materializer by wrapping the rendered SQL
 // with asset hooks, while forwarding optional behaviors when the base materializer supports them.
 type HookWrapperMaterializer struct {

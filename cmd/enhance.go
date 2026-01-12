@@ -233,6 +233,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	}
 	return nil
 }
+
 func printEnhanceError(output string, err error) error {
 	printErrorForOutput(output, err)
 	return cli.Exit("", 1)
