@@ -17,7 +17,6 @@ const (
 type EnhancerInterface interface {
 	SetAPIKey(apiKey string)
 	SetDebug(debug bool)
-	EnsureClaudeCLI() error // Deprecated: Use EnsureCLI instead
 	EnsureCLI() error
 	EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipelineName, tableSummaryJSON string) error
 }
@@ -59,12 +58,6 @@ func (e *Enhancer) SetAPIKey(apiKey string) {
 // SetDebug enables or disables debug output.
 func (e *Enhancer) SetDebug(debug bool) {
 	e.provider.SetDebug(debug)
-}
-
-// EnsureClaudeCLI checks if Claude CLI is installed.
-// Deprecated: Use EnsureCLI instead.
-func (e *Enhancer) EnsureClaudeCLI() error {
-	return e.provider.EnsureCLI()
 }
 
 // EnsureCLI checks if the provider's CLI is available.
