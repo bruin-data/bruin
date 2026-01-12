@@ -3,14 +3,15 @@ package enhance
 import (
 	"bytes"
 	"context"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 
+	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 )
 
 const (
@@ -27,11 +28,12 @@ type EnhancerInterface interface {
 
 // Enhancer coordinates the AI enhancement process for assets.
 type Enhancer struct {
-	model      string
-	claudePath string
-	apiKey     string
-	bruinPath  string
-	debug      bool
+	model           string
+	claudePath      string
+	apiKey          string
+	debug           bool
+	pipelineBuilder *pipeline.Builder
+	fs              afero.Fs
 }
 
 // NewEnhancer creates a new Enhancer instance.
@@ -40,11 +42,12 @@ func NewEnhancer(model string) *Enhancer {
 		model = defaultModel
 	}
 	claudePath, _ := exec.LookPath("claude")
-	bruinPath, _ := exec.LookPath("bruin")
+	fs := afero.NewOsFs()
 	return &Enhancer{
-		model:      model,
-		claudePath: claudePath,
-		bruinPath:  bruinPath,
+		model:           model,
+		claudePath:      claudePath,
+		pipelineBuilder: pipeline.NewBuilder(pipeline.BuilderConfig{}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil),
+		fs:              fs,
 	}
 }
 
@@ -91,14 +94,24 @@ func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipe
 		return errors.Wrap(err, "failed to enhance asset")
 	}
 
-	// Run bruin format on the file
-	if err := e.runBruinFormat(ctx, asset.DefinitionFile.Path); err != nil {
+	// Reload the asset from file after Claude edited it
+	updatedAsset, err := e.pipelineBuilder.CreateAssetFromFile(asset.DefinitionFile.Path, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to reload asset after enhancement")
+	}
+
+	if updatedAsset == nil {
+		return errors.New("no valid asset found after enhancement")
+	}
+
+	// Format the asset by persisting it (this formats and writes it back)
+	if err := updatedAsset.Persist(e.fs); err != nil {
 		return errors.Wrap(err, "failed to format asset")
 	}
 
-	// Run bruin validate on the file
-	if err := e.runBruinValidate(ctx, asset.DefinitionFile.Path); err != nil {
-		return errors.Wrap(err, "failed to validate asset")
+	// Validate the asset using lint rules
+	if err := e.validateAsset(ctx, updatedAsset); err != nil {
+		return errors.Wrap(err, "asset validation failed")
 	}
 
 	return nil
@@ -125,86 +138,57 @@ func (e *Enhancer) callClaude(ctx context.Context, prompt, systemPrompt string) 
 		cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY="+e.apiKey)
 	}
 
+	// In debug mode, stream output to stdout/stderr for visibility
 	if e.debug {
-		return e.runClaudeWithStreaming(cmd)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 	}
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		errMsg := stderr.String()
-		if errMsg == "" {
-			errMsg = stdout.String()
-		}
-		return errors.Wrapf(err, "claude CLI failed: %s", errMsg)
-	}
-
-	return nil
-}
-
-// runClaudeWithStreaming runs the Claude CLI and streams output in real-time.
-func (e *Enhancer) runClaudeWithStreaming(cmd *exec.Cmd) error {
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return errors.Wrap(err, "failed to create stdout pipe")
-	}
-
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return errors.Wrap(err, "failed to create stderr pipe")
-	}
-
-	if err := cmd.Start(); err != nil {
-		return errors.Wrap(err, "failed to start claude CLI")
-	}
-
-	done := make(chan error, 2)
-	go func() {
-		_, copyErr := io.Copy(os.Stdout, stdoutPipe)
-		done <- copyErr
-	}()
-	go func() {
-		_, copyErr := io.Copy(os.Stderr, stderrPipe)
-		done <- copyErr
-	}()
-
-	<-done
-	<-done
-
-	if err := cmd.Wait(); err != nil {
 		return errors.Wrap(err, "claude CLI failed")
 	}
 
 	return nil
 }
 
-// runBruinFormat runs bruin format on the asset file.
-func (e *Enhancer) runBruinFormat(ctx context.Context, filePath string) error {
-	if e.bruinPath == "" {
-		return errors.New("bruin CLI not found")
+// validateAsset runs basic validation rules on the asset.
+func (e *Enhancer) validateAsset(ctx context.Context, asset *pipeline.Asset) error {
+	// Create a minimal pipeline containing just this asset for validation
+	p := &pipeline.Pipeline{
+		Name:   "validation",
+		Assets: []*pipeline.Asset{asset},
 	}
 
-	cmd := exec.CommandContext(ctx, e.bruinPath, "format", filePath) //nolint:gosec
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "bruin format failed: %s", string(output))
+	// Run basic fast lint rules that don't require external dependencies
+	rules := []lint.Rule{
+		&lint.SimpleRule{
+			Identifier:       "task-name-valid",
+			Fast:             true,
+			Severity:         lint.ValidatorSeverityCritical,
+			AssetValidator:   lint.EnsureTaskNameIsValidForASingleAsset,
+			ApplicableLevels: []lint.Level{lint.LevelAsset},
+		},
+		&lint.SimpleRule{
+			Identifier:       "task-type-correct",
+			Fast:             true,
+			Severity:         lint.ValidatorSeverityCritical,
+			AssetValidator:   lint.EnsureTypeIsCorrectForASingleAsset,
+			ApplicableLevels: []lint.Level{lint.LevelAsset},
+		},
 	}
-	return nil
-}
 
-// runBruinValidate runs bruin validate on the asset file.
-func (e *Enhancer) runBruinValidate(ctx context.Context, filePath string) error {
-	if e.bruinPath == "" {
-		return errors.New("bruin CLI not found")
+	for _, rule := range rules {
+		issues, err := rule.ValidateAsset(ctx, p, asset)
+		if err != nil {
+			return errors.Wrapf(err, "validation rule '%s' failed", rule.Name())
+		}
+
+		if len(issues) > 0 {
+			// Return the first issue as an error
+			return errors.Errorf("validation failed: %s", issues[0].Description)
+		}
 	}
 
-	cmd := exec.CommandContext(ctx, e.bruinPath, "validate", filePath) //nolint:gosec
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "bruin validate failed: %s", string(output))
-	}
 	return nil
 }
 
