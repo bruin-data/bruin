@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 )
@@ -95,6 +95,9 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 
 func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, isDebug *bool) error {
 	absAssetPath, _ := filepath.Abs(assetPath)
+
+	// Read original file content before any modifications (for diff display)
+	originalContent, _ := afero.ReadFile(fs, absAssetPath)
 
 	// Step 1: Fill columns from DB
 	if output != "json" {
@@ -214,8 +217,8 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		fmt.Println(string(jsonBytes))
 	} else {
 		successPrinter.Printf("\n✓ Enhanced '%s'\n", pp.Asset.Name)
-		// Show git diff to display what changed
-		showGitDiff(absAssetPath)
+		// Show diff to display what changed
+		showDiff(originalContent, absAssetPath)
 	}
 	return nil
 }
@@ -250,15 +253,61 @@ func getAnthropicAPIKey(fs afero.Fs, inputPath string) string {
 	return ""
 }
 
-// showGitDiff displays git diff output for the given file.
-func showGitDiff(filePath string) {
-	// Run git diff with --no-pager to print directly without interactive pager
-	cmd := exec.Command("git", "--no-pager", "diff", "--color=always", filePath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+// showDiff displays a colored diff between the original content and the current file content.
+func showDiff(originalContent []byte, filePath string) {
+	// Read the new content
+	newContent, err := os.ReadFile(filePath)
+	if err != nil {
+		return
+	}
+
+	// If no changes, don't show anything
+	if string(originalContent) == string(newContent) {
+		fmt.Println("\nNo changes made.")
+		return
+	}
 
 	fmt.Println("\nChanges:")
-	_ = cmd.Run()
+	printUnifiedDiff(string(originalContent), string(newContent))
+}
+
+// printUnifiedDiff prints a unified diff format with colors.
+func printUnifiedDiff(original, modified string) {
+	originalLines := strings.Split(original, "\n")
+	modifiedLines := strings.Split(modified, "\n")
+
+	// Use diffmatchpatch to get line-level diffs
+	dmp := diffmatchpatch.New()
+
+	// Convert lines to chars for line-by-line diff
+	text1, text2, lineArray := dmp.DiffLinesToChars(original, modified)
+	diffs := dmp.DiffMain(text1, text2, false)
+	diffs = dmp.DiffCharsToLines(diffs, lineArray)
+	diffs = dmp.DiffCleanupSemantic(diffs)
+
+	added := 0
+	removed := 0
+
+	for _, d := range diffs {
+		lines := strings.Split(strings.TrimSuffix(d.Text, "\n"), "\n")
+		for _, line := range lines {
+			switch d.Type {
+			case diffmatchpatch.DiffInsert:
+				fmt.Printf("\033[32m+ %s\033[0m\n", line)
+				added++
+			case diffmatchpatch.DiffDelete:
+				fmt.Printf("\033[31m- %s\033[0m\n", line)
+				removed++
+			case diffmatchpatch.DiffEqual:
+				// Show context lines (unchanged)
+				fmt.Printf("  %s\n", line)
+			}
+		}
+	}
+
+	_ = originalLines
+	_ = modifiedLines
+	fmt.Printf("\n\033[32m+%d additions\033[0m, \033[31m-%d deletions\033[0m\n", added, removed)
 }
 
 // preFetchTableSummary fetches table statistics before calling Claude to minimize tool calls.
