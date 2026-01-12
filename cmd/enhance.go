@@ -14,8 +14,11 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/enhance"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/lint"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -39,20 +42,9 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 				Aliases: []string{"env"},
 				Usage:   "Target environment name as defined in .bruin.yml",
 			},
-			&cli.BoolFlag{
-				Name:  "skip-format",
-				Usage: "Skip the initial formatting step",
-				Value: false,
-			},
-			&cli.BoolFlag{
-				Name:  "skip-fill-columns",
-				Usage: "Skip filling columns from database",
-				Value: false,
-			},
 			&cli.StringFlag{
 				Name:  "model",
 				Usage: "AI model to use for suggestions",
-				Value: "claude-sonnet-4-20250514",
 			},
 			&cli.BoolFlag{
 				Name:  "claude",
@@ -104,45 +96,29 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, isDebug *bool) error {
 	absAssetPath, _ := filepath.Abs(assetPath)
 
-	// Step 1: Format (unless skipped)
-	if !c.Bool("skip-format") {
-		if output != "json" {
-			infoPrinter.Println("Step 1/3: Formatting asset...")
-		}
-		_, err := formatAsset(assetPath)
-		if err != nil {
-			if output != "json" {
-				warningPrinter.Printf("Warning: formatting failed: %v\n", err)
-			}
-			// Continue even if formatting fails
-		}
-	}
-
-	// Step 2: Fill columns from DB (unless skipped)
-	if !c.Bool("skip-fill-columns") {
-		if output != "json" {
-			infoPrinter.Println("Step 2/3: Filling columns from database...")
-		}
-		pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
-		if err == nil {
-			status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil) //nolint:contextcheck
-			if fillErr != nil && output != "json" {
-				warningPrinter.Printf("Warning: fill columns failed: %v\n", fillErr)
-			} else if status == fillStatusUpdated && output != "json" {
-				infoPrinter.Println("  Columns updated from database schema.")
-			}
-		} else if output != "json" {
-			warningPrinter.Printf("Warning: could not load asset for column filling: %v\n", err)
-		}
-	}
-
-	// Step 3: AI Enhancement
+	// Step 1: Fill columns from DB
 	if output != "json" {
-		infoPrinter.Println("Step 3/3: Enhancing asset with AI...")
+		infoPrinter.Println("Step 1/4: Filling columns from database...")
+	}
+	pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
+	if err == nil {
+		status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil) //nolint:contextcheck
+		if fillErr != nil && output != "json" {
+			warningPrinter.Printf("Warning: fill columns failed: %v\n", fillErr)
+		} else if status == fillStatusUpdated && output != "json" {
+			infoPrinter.Println("  Columns updated from database schema.")
+		}
+	} else if output != "json" {
+		warningPrinter.Printf("Warning: could not load asset for column filling: %v\n", err)
 	}
 
-	// Reload asset after previous steps may have modified it
-	pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
+	// Step 2: AI Enhancement
+	if output != "json" {
+		infoPrinter.Println("Step 2/4: Enhancing asset with AI...")
+	}
+
+	// Reload asset after previous step may have modified it
+	pp, err = GetPipelineAndAsset(ctx, assetPath, fs, "")
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to load asset"))
 	}
@@ -199,6 +175,27 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	err = enhancer.EnhanceAsset(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
+	}
+
+	// Step 3: Format
+	if output != "json" {
+		infoPrinter.Println("Step 3/4: Formatting asset...")
+	}
+	_, err = formatAsset(assetPath)
+	if err != nil {
+		if output != "json" {
+			warningPrinter.Printf("Warning: formatting failed: %v\n", err)
+		}
+		// Continue even if formatting fails
+	}
+
+	// Step 4: Validate
+	if output != "json" {
+		infoPrinter.Println("Step 4/4: Validating asset...")
+	}
+	err = validateEnhancedAsset(ctx, assetPath, fs, c.String("environment"))
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "validation failed"))
 	}
 
 	// Provider directly edited the file
@@ -570,4 +567,79 @@ func getSampleColumnValues(ctx context.Context, conn interface{}, tableName, col
 	}
 
 	return values
+}
+
+// validateEnhancedAsset runs validation on a single asset after enhancement.
+func validateEnhancedAsset(ctx context.Context, assetPath string, fs afero.Fs, environment string) error {
+	// Get pipeline root from asset path
+	pipelineRoot, err := path.GetPipelineRootFromTask(assetPath, PipelineDefinitionFiles)
+	if err != nil {
+		return errors.Wrap(err, "failed to find pipeline root")
+	}
+
+	// Find repo root for config
+	repoRoot, err := git.FindRepoFromPath(pipelineRoot)
+	if err != nil {
+		return errors.Wrap(err, "failed to find repository root")
+	}
+
+	// Load config
+	cm, err := config.LoadOrCreate(fs, filepath.Join(repoRoot.Path, ".bruin.yml"))
+	if err != nil {
+		return errors.Wrap(err, "failed to load config")
+	}
+
+	// Switch environment if specified
+	if environment != "" {
+		if err := cm.SelectEnvironment(environment); err != nil {
+			return errors.Wrap(err, "failed to select environment")
+		}
+	}
+
+	// Create connection manager
+	connectionManager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
+	if len(errs) > 0 {
+		return errors.Wrap(errs[0], "failed to create connection manager")
+	}
+
+	// Initialize SQL parser
+	parser, err := sqlparser.NewSQLParser(false)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize SQL parser")
+	}
+	defer parser.Close()
+
+	// Get validation rules
+	rules, err := lint.GetRules(fs, &git.RepoFinder{}, false, parser, true)
+	if err != nil {
+		return errors.Wrap(err, "failed to get validation rules")
+	}
+
+	// Filter to asset-level rules only (fast validation)
+	rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
+	rules = lint.FilterRulesBySpeed(rules, true)
+
+	// Create linter
+	pipelineFinder := func(root string, pipelineDefinitionFile []string) ([]string, error) {
+		return path.GetPipelinePaths(root, pipelineDefinitionFile)
+	}
+	linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, rules, makeLogger(false), parser)
+
+	// Run validation on the asset
+	result, err := linter.LintAsset(ctx, pipelineRoot, PipelineDefinitionFiles, assetPath, nil)
+	if err != nil {
+		return errors.Wrap(err, "validation failed")
+	}
+
+	// Check for errors
+	if result != nil && result.ErrorCount() > 0 {
+		// Print issues for visibility
+		printer := lint.Printer{RootCheckPath: pipelineRoot}
+		printer.PrintIssues(result)
+		return errors.Errorf("validation found %d error(s)", result.ErrorCount())
+	}
+
+	_ = connectionManager // silence unused variable if not needed
+
+	return nil
 }
