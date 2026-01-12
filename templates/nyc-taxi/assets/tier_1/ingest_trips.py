@@ -32,15 +32,19 @@ import os
 import json
 
 
-def generate_month_range() -> list[tuple[int, int]]:
+def generate_month_range(start_date: str, end_date: str) -> list[tuple[int, int]]:
     """
     Generate list of (year, month) tuples for all months between start and end dates (inclusive).
+
+    Args:
+        start_date: Start date in 'YYYY-MM-DD' format
+        end_date: End date in 'YYYY-MM-DD' format
 
     Returns:
         List of (year, month) tuples
     """
-    start_month = datetime.strptime(os.environ.get('BRUIN_START_DATE'), '%Y-%m-%d').replace(day=1)
-    end_month = datetime.strptime(os.environ.get('BRUIN_END_DATE'), '%Y-%m-%d').replace(day=1)
+    start_month = datetime.strptime(start_date, '%Y-%m-%d').replace(day=1)
+    end_month = datetime.strptime(end_date, '%Y-%m-%d').replace(day=1)
 
     print(f"Generating months between {start_month} and {end_month}")
     months = []
@@ -60,13 +64,17 @@ def materialize():
     Bruin will automatically insert this DataFrame into DuckDB based on materialization strategy.
     """
 
+    # Get start and end dates from environment variables
+    start_date = os.environ.get('BRUIN_START_DATE')
+    end_date = os.environ.get('BRUIN_END_DATE')
+
     # Get taxi_type
     bruin_vars = json.loads(os.environ["BRUIN_VARS"])
     taxi_types = bruin_vars.get('taxi_types')
     print(f"Taxi types: {taxi_types}")
 
     # Generate list of months to process
-    months = generate_month_range()
+    months = generate_month_range(start_date, end_date)
 
     # Download and combine parquet files
     all_dataframes = []
