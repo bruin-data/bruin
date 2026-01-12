@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -87,6 +88,7 @@ func TestRenderCommand_Run(t *testing.T) {
 		name    string
 		setup   func(*fields)
 		args    args
+		output  string
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
@@ -156,6 +158,100 @@ func TestRenderCommand_Run(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "should include hooks around materialized query",
+			args: args{
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Hooks: pipeline.Hooks{
+						Pre:  []pipeline.Hook{{Query: "select 1"}},
+						Post: []pipeline.Hook{{Query: "select 2"}},
+					},
+					Name: "asset1",
+				},
+			},
+			setup: func(f *fields) {
+				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
+					Return([]*query.Query{{Query: "extracted query"}}, nil)
+				f.bqMaterializer.On("Render", mock.Anything, "extracted query").
+					Return("materialized query", nil)
+
+				f.writer.On("Write", []byte("select 1;\nmaterialized query;\nselect 2;\n")).
+					Return(0, nil)
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "should wrap hooks for json output",
+			args: args{
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Hooks: pipeline.Hooks{
+						Pre:  []pipeline.Hook{{Query: "select 1;"}},
+						Post: []pipeline.Hook{{Query: "select 2"}},
+					},
+					Name: "asset1",
+				},
+			},
+			output: "json",
+			setup: func(f *fields) {
+				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
+					Return([]*query.Query{{Query: "extracted query"}}, nil)
+				f.bqMaterializer.On("Render", mock.Anything, "extracted query").
+					Return("materialized query", nil)
+
+				expected, err := json.Marshal(map[string]string{
+					"query": "select 1;\nmaterialized query;\nselect 2;",
+				})
+				require.NoError(t, err)
+				f.writer.On("Write", expected).
+					Return(0, nil)
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "should wrap hooks once after time_interval re-extract",
+			args: args{
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "/path/to/executable",
+						Content: "select * from src",
+					},
+					Materialization: pipeline.Materialization{
+						Strategy: pipeline.MaterializationStrategyTimeInterval,
+					},
+					Hooks: pipeline.Hooks{
+						Pre:  []pipeline.Hook{{Query: "select 1"}},
+						Post: []pipeline.Hook{{Query: "select 2"}},
+					},
+					Name: "asset1",
+				},
+			},
+			output: "json",
+			setup: func(f *fields) {
+				f.extractor.On("ExtractQueriesFromString", "select * from src").
+					Return([]*query.Query{{Query: "base query"}}, nil)
+				f.bqMaterializer.On("Render", mock.Anything, "base query").
+					Return("materialized query", nil)
+				f.extractor.On("ExtractQueriesFromString", "materialized query").
+					Return([]*query.Query{{Query: "re-extracted query"}}, nil)
+
+				expected, err := json.Marshal(map[string]string{
+					"query": "select 1;\nre-extracted query;\nselect 2;",
+				})
+				require.NoError(t, err)
+				f.writer.On("Write", expected).
+					Return(0, nil)
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "should skip materialization if asset is a not bigquery query",
 			args: args{
 				task: &pipeline.Asset{
@@ -198,6 +294,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 				builder: f.builder,
 				writer:  f.writer,
+				output:  tt.output,
 			}
 
 			// Create an instance of ExecutionParameters
@@ -223,6 +320,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 		name    string
 		task    *pipeline.Asset
 		setup   func(*mockExtractor, *mockMaterializer, *mockWriter)
+		output  string
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
@@ -244,6 +342,38 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 				materializer.On("Render", mock.Anything, "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'").
 					Return("SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'", nil)
 				writer.On("Write", []byte("SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'\n")).
+					Return(0, nil)
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "should wrap hooks for query sensors",
+			task: &pipeline.Asset{
+				Name: "bq-sensor",
+				Type: pipeline.AssetTypeBigqueryQuerySensor,
+				Parameters: map[string]string{
+					"query": "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '{{ start_date }}'",
+				},
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Post: []pipeline.Hook{{Query: "select 2"}},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Path:    "/path/to/sensor.task.yml",
+					Content: "sensor:\ntype: bq.sensor.query\nparameters:\n  query: SELECT...",
+				},
+			},
+			output: "json",
+			setup: func(extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
+				extractor.On("ExtractQueriesFromString", "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '{{ start_date }}'").
+					Return([]*query.Query{{Query: "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'"}}, nil)
+				materializer.On("Render", mock.Anything, "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'").
+					Return("SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'", nil)
+				expected, err := json.Marshal(map[string]string{
+					"query": "select 1;\nSELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01';\nselect 2;",
+				})
+				require.NoError(t, err)
+				writer.On("Write", expected).
 					Return(0, nil)
 			},
 			wantErr: assert.NoError,
@@ -331,6 +461,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 					pipeline.AssetTypeSnowflakeQuerySensor: materializer,
 				},
 				writer: writer,
+				output: tt.output,
 			}
 
 			params := ModifierInfo{
@@ -414,6 +545,17 @@ func TestIsQuerySensorAsset(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
+	t.Parallel()
+
+	result := wrapHooks("  select 9  ", pipeline.Hooks{
+		Pre:  []pipeline.Hook{{Query: ""}, {Query: "select 1;"}},
+		Post: []pipeline.Hook{{Query: "  select 2  "}},
+	})
+
+	assert.Equal(t, "select 1;\nselect 9;\nselect 2;", result)
 }
 
 func TestModifyExtractor(t *testing.T) {
