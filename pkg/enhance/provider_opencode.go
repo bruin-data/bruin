@@ -73,7 +73,7 @@ func (p *OpenCodeProvider) EnsureCLI() error {
 		}
 	}
 
-	return errors.New("OpenCode CLI not found. Install it from: https://opencode.ai/docs/cli/")
+	return errors.New("OpenCode CLI not found. Please install it before using the enhance command")
 }
 
 // Enhance executes the OpenCode CLI with the given prompt.

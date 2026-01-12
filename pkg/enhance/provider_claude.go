@@ -73,7 +73,7 @@ func (p *ClaudeProvider) EnsureCLI() error {
 		}
 	}
 
-	return errors.New("Claude CLI not found. Install it from: https://claude.ai/download")
+	return errors.New("Claude CLI not found. Please install it before using the enhance command")
 }
 
 // Enhance executes the Claude CLI with the given prompt.

@@ -65,6 +65,11 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 				Value: false,
 			},
 			&cli.BoolFlag{
+				Name:  "codex",
+				Usage: "Use Codex CLI for AI enhancement",
+				Value: false,
+			},
+			&cli.BoolFlag{
 				Name:  "debug",
 				Usage: "Show debug information during enhancement",
 				Value: false,
@@ -144,11 +149,24 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 
 	// Determine provider from flags
 	providerType := enhance.ProviderClaude // default
+
+	// Check for mutually exclusive flags
+	flagCount := 0
+	if c.Bool("claude") {
+		flagCount++
+		providerType = enhance.ProviderClaude
+	}
 	if c.Bool("opencode") {
-		if c.Bool("claude") {
-			return printEnhanceError(output, errors.New("cannot specify both --claude and --opencode flags"))
-		}
+		flagCount++
 		providerType = enhance.ProviderOpenCode
+	}
+	if c.Bool("codex") {
+		flagCount++
+		providerType = enhance.ProviderCodex
+	}
+
+	if flagCount > 1 {
+		return printEnhanceError(output, errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex)"))
 	}
 
 	enhancer := enhance.NewEnhancer(providerType, c.String("model"))

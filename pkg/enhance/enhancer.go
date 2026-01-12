@@ -34,6 +34,8 @@ func NewEnhancer(providerType ProviderType, model string) *Enhancer {
 	fs := afero.NewOsFs()
 	var provider Provider
 	switch providerType {
+	case ProviderCodex:
+		provider = NewCodexProvider(model, fs)
 	case ProviderOpenCode:
 		provider = NewOpenCodeProvider(model, fs)
 	case ProviderClaude:
