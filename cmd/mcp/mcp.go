@@ -382,7 +382,6 @@ func getDocContent(filename string) string {
 		return string(content)
 	}
 
-	// File not found - provide helpful error message
 	entries, err := fs.ReadDir(docs.DocsFS, ".")
 	if err != nil {
 		return fmt.Sprintf("Error reading docs: %v", err)
