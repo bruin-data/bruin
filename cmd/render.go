@@ -428,7 +428,7 @@ func formatHookQueries(hooks []pipeline.Hook) []string {
 		}
 	}
 	return formatted
-} 
+}
 
 func formatStatement(query string) string {
 	trimmed := strings.TrimSpace(query)
