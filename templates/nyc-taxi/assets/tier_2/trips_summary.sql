@@ -133,7 +133,7 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     fare_amount,
     tip_amount,
     total_amount,
-    payment_type,
+    CAST(ct.payment_type AS INTEGER) AS payment_type,
     extracted_at,
     EXTRACT(EPOCH FROM (dropoff_time - pickup_time)) AS trip_duration_seconds,
   FROM raw_trips
@@ -170,7 +170,7 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
   LEFT JOIN tier_1.taxi_zone_lookup AS dropoff_lookup
     ON ct.dropoff_location_id = dropoff_lookup.location_id
   LEFT JOIN tier_1.payment_lookup AS payment_lookup
-    ON CAST(ct.payment_type AS INTEGER) = payment_lookup.payment_type_id
+    ON ct.payment_type = payment_lookup.payment_type_id
   WHERE 1=1
     -- filter out zero durations (trip cannot end at the same time it starts or before it starts)
     AND ct.trip_duration_seconds > 0
