@@ -78,8 +78,10 @@ def materialize():
 
   # Download and combine parquet files
   all_dataframes = []
+  errors = []
   base_url = 'https://d37ci6vzurychx.cloudfront.net/trip-data'
   extracted_at = datetime.now()
+  
   for taxi_type in taxi_types:
     for year, month in months:
       print(f"Downloading {year}-{month:02d}: {taxi_type}")
@@ -102,15 +104,20 @@ def materialize():
         print(f"Successfully downloaded {year}-{month:02d}: {len(df)} rows")
 
       except requests.exceptions.RequestException as e:
-        print(f"Error downloading {year}-{month:02d}: {e}")
-        continue
+        error_msg = f"Error downloading {taxi_type} {year}-{month:02d}: {e}"
+        print(error_msg)
+        errors.append(error_msg)
       except Exception as e:
-        print(f"Error processing {year}-{month:02d}: {e}")
-        continue
+        error_msg = f"Error processing {taxi_type} {year}-{month:02d}: {e}"
+        print(error_msg)
+        errors.append(error_msg)
 
   if not all_dataframes:
-    print("No dataframes to combine")
-    raise ValueError("No dataframes to combine")
+    error_summary = "\n".join(errors) if errors else "No errors recorded"
+    raise ValueError(f"No dataframes to combine. Failed to download all files.\nErrors:\n{error_summary}")
+  
+  if errors:
+    print(f"\nWarning: {len(errors)} file(s) failed to download, but continuing with {len(all_dataframes)} successful download(s)")
 
   combined_df = pd.concat(all_dataframes, ignore_index=True)
   print(f"Total rows combined: {len(combined_df)}")
