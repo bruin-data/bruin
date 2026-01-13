@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 )
@@ -39,20 +39,9 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 				Aliases: []string{"env"},
 				Usage:   "Target environment name as defined in .bruin.yml",
 			},
-			&cli.BoolFlag{
-				Name:  "skip-format",
-				Usage: "Skip the initial formatting step",
-				Value: false,
-			},
-			&cli.BoolFlag{
-				Name:  "skip-fill-columns",
-				Usage: "Skip filling columns from database",
-				Value: false,
-			},
 			&cli.StringFlag{
 				Name:  "model",
 				Usage: "AI model to use for suggestions",
-				Value: "claude-sonnet-4-20250514",
 			},
 			&cli.BoolFlag{
 				Name:  "claude",
@@ -102,47 +91,40 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 }
 
 func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, isDebug *bool) error {
-	absAssetPath, _ := filepath.Abs(assetPath)
-
-	// Step 1: Format (unless skipped)
-	if !c.Bool("skip-format") {
-		if output != "json" {
-			infoPrinter.Println("Step 1/3: Formatting asset...")
-		}
-		_, err := formatAsset(assetPath)
-		if err != nil {
-			if output != "json" {
-				warningPrinter.Printf("Warning: formatting failed: %v\n", err)
-			}
-			// Continue even if formatting fails
-		}
+	absAssetPath, err := filepath.Abs(assetPath)
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "failed to get absolute path"))
 	}
 
-	// Step 2: Fill columns from DB (unless skipped)
-	if !c.Bool("skip-fill-columns") {
-		if output != "json" {
-			infoPrinter.Println("Step 2/3: Filling columns from database...")
-		}
-		pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
-		if err == nil {
-			status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil) //nolint:contextcheck
-			if fillErr != nil && output != "json" {
-				warningPrinter.Printf("Warning: fill columns failed: %v\n", fillErr)
-			} else if status == fillStatusUpdated && output != "json" {
-				infoPrinter.Println("  Columns updated from database schema.")
-			}
-		} else if output != "json" {
-			warningPrinter.Printf("Warning: could not load asset for column filling: %v\n", err)
-		}
+	// Read original file content before any modifications (for diff display)
+	originalContent, err := afero.ReadFile(fs, absAssetPath)
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "failed to read original file content"))
 	}
 
-	// Step 3: AI Enhancement
+	// Step 1: Fill columns from DB
 	if output != "json" {
-		infoPrinter.Println("Step 3/3: Enhancing asset with AI...")
+		infoPrinter.Println("Step 1/4: Filling columns from database...")
+	}
+	pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
+	if err == nil {
+		status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil) //nolint:contextcheck
+		if fillErr != nil && output != "json" {
+			warningPrinter.Printf("Warning: fill columns failed: %v\n", fillErr)
+		} else if status == fillStatusUpdated && output != "json" {
+			infoPrinter.Println("  Columns updated from database schema.")
+		}
+	} else if output != "json" {
+		warningPrinter.Printf("Warning: could not load asset for column filling: %v\n", err)
 	}
 
-	// Reload asset after previous steps may have modified it
-	pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
+	// Step 2: AI Enhancement
+	if output != "json" {
+		infoPrinter.Println("Step 2/4: Enhancing asset with AI...")
+	}
+
+	// Reload asset after previous step may have modified it
+	pp, err = GetPipelineAndAsset(ctx, assetPath, fs, "")
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to load asset"))
 	}
@@ -201,6 +183,35 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
 
+	// Step 3: Format
+	if output != "json" {
+		infoPrinter.Println("Step 3/4: Formatting asset...")
+	}
+	_, err = formatAsset(assetPath)
+	if err != nil {
+		if output != "json" {
+			warningPrinter.Printf("Warning: formatting failed: %v\n", err)
+		}
+		// Continue even if formatting fails
+	}
+
+	// Step 4: Validate using the existing bruin validate command
+	if output != "json" {
+		infoPrinter.Println("Step 4/4: Validating asset...")
+	}
+	validateCmd := Lint(isDebug)
+	args := []string{"validate", absAssetPath}
+	if env := c.String("environment"); env != "" {
+		args = append(args, "--environment", env)
+	}
+	if err := validateCmd.Run(ctx, args); err != nil {
+		// Rollback: restore original content
+		if writeErr := afero.WriteFile(fs, absAssetPath, originalContent, 0644); writeErr != nil {
+			return printEnhanceError(output, errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err)))
+		}
+		return printEnhanceError(output, errors.Wrap(err, "validation failed, original file restored"))
+	}
+
 	// Provider directly edited the file
 	if output == "json" {
 		result := struct {
@@ -217,8 +228,8 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		fmt.Println(string(jsonBytes))
 	} else {
 		successPrinter.Printf("\n✓ Enhanced '%s'\n", pp.Asset.Name)
-		// Show git diff to display what changed
-		showGitDiff(absAssetPath)
+		// Show diff to display what changed
+		showDiff(originalContent, absAssetPath)
 	}
 	return nil
 }
@@ -253,15 +264,57 @@ func getAnthropicAPIKey(fs afero.Fs, inputPath string) string {
 	return ""
 }
 
-// showGitDiff displays git diff output for the given file.
-func showGitDiff(filePath string) {
-	// Run git diff with --no-pager to print directly without interactive pager
-	cmd := exec.Command("git", "--no-pager", "diff", "--color=always", filePath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+// showDiff displays a colored diff between the original content and the current file content.
+func showDiff(originalContent []byte, filePath string) {
+	newContent, err := os.ReadFile(filePath)
+	if err != nil {
+		warningPrinter.Printf("Warning: could not read file to display diff: %v\n", err)
+		return
+	}
+
+	// If no changes, don't show anything
+	if string(originalContent) == string(newContent) {
+		fmt.Println("\nNo changes made.")
+		return
+	}
 
 	fmt.Println("\nChanges:")
-	_ = cmd.Run()
+	printUnifiedDiff(string(originalContent), string(newContent))
+}
+
+// printUnifiedDiff prints a unified diff format with colors.
+func printUnifiedDiff(original, modified string) {
+	added := 0
+	removed := 0
+
+	dmp := diffmatchpatch.New()
+	text1, text2, lineArray := dmp.DiffLinesToChars(original, modified)
+	diffs := dmp.DiffMain(text1, text2, false)
+	diffs = dmp.DiffCharsToLines(diffs, lineArray)
+
+	for _, d := range diffs {
+		text := d.Text
+		if len(text) == 0 {
+			continue
+		}
+
+		lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
+
+		for _, line := range lines {
+			switch d.Type {
+			case diffmatchpatch.DiffInsert:
+				fmt.Printf("\033[32m+ %s\033[0m\n", line)
+				added++
+			case diffmatchpatch.DiffDelete:
+				fmt.Printf("\033[31m- %s\033[0m\n", line)
+				removed++
+			case diffmatchpatch.DiffEqual:
+				fmt.Printf("  %s\n", line)
+			}
+		}
+	}
+
+	fmt.Printf("\n\033[32m+%d additions\033[0m, \033[31m-%d deletions\033[0m\n", added, removed)
 }
 
 // preFetchTableSummary fetches table statistics before calling Claude to minimize tool calls.
