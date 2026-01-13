@@ -214,7 +214,8 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	var sourceURI string
-	if strings.HasPrefix(sourceConnectionPath, "http://") || strings.HasPrefix(sourceConnectionPath, "https://") {
+	lowerPath := strings.ToLower(sourceConnectionPath)
+	if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
 		sourceURI = sourceConnectionPath
 	} else {
 		sourceURI = "csv://" + filepath.Join(filepath.Dir(asset.ExecutableFile.Path), sourceConnectionPath)

@@ -529,7 +529,8 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
-		if strings.HasPrefix(seedPath, "http://") || strings.HasPrefix(seedPath, "https://") {
+		lowerPath := strings.ToLower(seedPath)
+		if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
 			// URL seeds are validated at runtime by ingestr, skip local file checks
 			return issues, nil
 		}

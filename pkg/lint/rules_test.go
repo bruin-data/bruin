@@ -3290,6 +3290,34 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 			want: []*Issue{},
 		},
 		{
+			name: "uppercase HTTPS URL - should skip local file validation",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "HTTPS://example.com/data.csv",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{},
+		},
+		{
+			name: "mixed case HTTP URL - should skip local file validation",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "Http://example.com/data.csv",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{},
+		},
+		{
 			name: "empty path - should still error",
 			asset: &pipeline.Asset{
 				Name: "test_seed",
