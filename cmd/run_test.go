@@ -1908,3 +1908,172 @@ func TestAnalyzeResults(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateDateRange(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		startDate     time.Time
+		endDate       time.Time
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name:          "start date after end date should error",
+			startDate:     time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC),
+			endDate:       time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedError: true,
+			errorContains: "start date",
+		},
+		{
+			name:          "start date equal to end date should succeed",
+			startDate:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			endDate:       time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedError: false,
+		},
+		{
+			name:          "start date before end date should succeed",
+			startDate:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			endDate:       time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC),
+			expectedError: false,
+		},
+		{
+			name:          "start date before end date with time should succeed",
+			startDate:     time.Date(2024, 1, 1, 10, 30, 0, 0, time.UTC),
+			endDate:       time.Date(2024, 1, 1, 15, 45, 0, 0, time.UTC),
+			expectedError: false,
+		},
+		{
+			name:          "start date after end date with time should error",
+			startDate:     time.Date(2024, 1, 1, 15, 45, 0, 0, time.UTC),
+			endDate:       time.Date(2024, 1, 1, 10, 30, 0, 0, time.UTC),
+			expectedError: true,
+			errorContains: "start date",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateDateRange(tt.startDate, tt.endDate)
+
+			if tt.expectedError {
+				require.Error(t, err, "Expected error for invalid date range")
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains, "Error message should contain expected text")
+				}
+			} else {
+				require.NoError(t, err, "Should not error for valid date range")
+			}
+		})
+	}
+}
+
+func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
+	t.Parallel()
+
+	logger := zaptest.NewLogger(t).Sugar()
+	now := time.Now()
+	futureDate := now.AddDate(0, 0, 1) // Tomorrow
+	futureDateStr := futureDate.Format("2006-01-02 15:04:05.000000")
+
+	tests := []struct {
+		name          string
+		cliStartDate  string
+		pipeline      *pipeline.Pipeline
+		fullRefresh   bool
+		expectedError bool
+	}{
+		{
+			name:         "future CLI start date with full refresh false should succeed",
+			cliStartDate: futureDateStr,
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: "",
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   false,
+			expectedError: false,
+		},
+		{
+			name:          "future CLI start date with nil pipeline should succeed",
+			cliStartDate:  futureDateStr,
+			pipeline:      nil,
+			fullRefresh:   true,
+			expectedError: false,
+		},
+		{
+			name:         "future CLI start date with empty pipeline start date should succeed",
+			cliStartDate: futureDateStr,
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: "",
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   true,
+			expectedError: false,
+		},
+		{
+			name:         "future pipeline start date should succeed",
+			cliStartDate: "",
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: futureDate.Format("2006-01-02"),
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   true,
+			expectedError: false,
+		},
+		{
+			name:         "past CLI start date should succeed",
+			cliStartDate: now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05.000000"),
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: "",
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   false,
+			expectedError: false,
+		},
+		{
+			name:         "past pipeline start date should succeed",
+			cliStartDate: "",
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: now.AddDate(0, 0, -1).Format("2006-01-02"),
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   true,
+			expectedError: false,
+		},
+		{
+			name:         "current date (date only) should succeed",
+			cliStartDate: now.Format("2006-01-02"),
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: "",
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   false,
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			startDate, err := DetermineStartDate(tt.cliStartDate, tt.pipeline, tt.fullRefresh, logger)
+
+			if tt.expectedError {
+				require.Error(t, err, "Expected error")
+				assert.True(t, startDate.IsZero(), "Start date should be zero time on error")
+			} else {
+				require.NoError(t, err, "Should not error for any valid date (past, present, or future)")
+				assert.False(t, startDate.IsZero(), "Start date should not be zero time on success")
+			}
+		})
+	}
+}
