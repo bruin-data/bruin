@@ -18,27 +18,34 @@ description: |
   - Uses merge strategy to handle incremental updates - updates existing records and inserts new ones
   - Returns DataFrame for Bruin to materialize into DuckDB table
 
+  Primary Key Design:
+  According to NYC TLC documentation, there is no single unique trip identifier. The composite primary key
+  includes: vendorid (TPEP provider code), pickup_datetime (coalesced from tpep_*/lpep_* fields to avoid NULLs),
+  dropoff_datetime (coalesced), pulocationid, dolocationid, and taxi_type. This ensures no NULL values in
+  the primary key, which is required for merge strategy to work correctly. The coalesced datetime columns
+  handle the fact that yellow taxis use tpep_* fields (with NULL lpep_* values) while green taxis use
+  lpep_* fields (with NULL tpep_* values).
+
 materialization:
   type: table
   strategy: merge
 
 columns:
-  - name: tpep_pickup_datetime
-    type: TIMESTAMP
-    description: The date and time when the meter was engaged (yellow taxis only)
+  - name: vendorid
+    type: DOUBLE
+    description: A code indicating the TPEP provider that provided the record
     primary_key: true
-  - name: lpep_pickup_datetime
+    nullable: false
+  - name: pickup_datetime
     type: TIMESTAMP
-    description: The date and time when the meter was engaged (green taxis only)
+    description: The date and time when the meter was engaged (coalesced from tpep_pickup_datetime or lpep_pickup_datetime)
     primary_key: true
-  - name: tpep_dropoff_datetime
+    nullable: false
+  - name: dropoff_datetime
     type: TIMESTAMP
-    description: The date and time when the meter was disengaged (yellow taxis only)
+    description: The date and time when the meter was disengaged (coalesced from tpep_dropoff_datetime or lpep_dropoff_datetime)
     primary_key: true
-  - name: lpep_dropoff_datetime
-    type: TIMESTAMP
-    description: The date and time when the meter was disengaged (green taxis only)
-    primary_key: true
+    nullable: false
   - name: pulocationid
     type: INTEGER
     description: TLC Taxi Zone in which the taximeter was engaged
@@ -54,13 +61,21 @@ columns:
     description: Type of taxi (yellow or green)
     primary_key: true
     nullable: false
+  - name: tpep_pickup_datetime
+    type: TIMESTAMP
+    description: The date and time when the meter was engaged (yellow taxis only)
+  - name: lpep_pickup_datetime
+    type: TIMESTAMP
+    description: The date and time when the meter was engaged (green taxis only)
+  - name: tpep_dropoff_datetime
+    type: TIMESTAMP
+    description: The date and time when the meter was disengaged (yellow taxis only)
+  - name: lpep_dropoff_datetime
+    type: TIMESTAMP
+    description: The date and time when the meter was disengaged (green taxis only)
   - name: extracted_at
     type: TIMESTAMP
     description: Timestamp when the data was extracted from the source
-    update_on_merge: true
-  - name: vendorid
-    type: DOUBLE
-    description: A code indicating the TPEP provider that provided the record
     update_on_merge: true
   - name: passenger_count
     type: DOUBLE
@@ -193,6 +208,10 @@ def materialize():
 
         df['taxi_type'] = taxi_type
         df['extracted_at'] = extracted_at
+        
+        # Create coalesced datetime columns for primary key (handles both yellow and green taxis)
+        df['pickup_datetime'] = df['tpep_pickup_datetime'].fillna(df['lpep_pickup_datetime'])
+        df['dropoff_datetime'] = df['tpep_dropoff_datetime'].fillna(df['lpep_dropoff_datetime'])
 
         all_dataframes.append(df)
         print(f"Successfully downloaded {year}-{month:02d}: {len(df)} rows")

@@ -444,8 +444,12 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
    - Read dates from `BRUIN_START_DATE` and `BRUIN_END_DATE` environment variables (YYYY-MM-DD format)
    - Use `generate_month_range()` function to convert date range to list of (year, month) tuples
    - Handles cross-year ranges correctly (e.g., 2021-12-01 to 2022-01-01 → Dec 2021, Jan 2022)
-2. **Column Normalization**: 
-   - **Ingestion Layer (raw.trips_raw)**: Preserves original column names from parquet files as-is (e.g., `vendorid`, `tpep_pickup_datetime` for yellow taxis, `lpep_pickup_datetime` for green taxis, `pulocationid`). Only adds `taxi_type` and `extracted_at` columns. No data manipulation or transformation.
+2. **Primary Key Design for Merge Strategy**: 
+   - According to [NYC TLC documentation](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page), there is no single unique trip identifier. The composite primary key includes: `vendorid` (TPEP provider code), `pickup_datetime` (coalesced from `tpep_pickup_datetime` or `lpep_pickup_datetime`), `dropoff_datetime` (coalesced), `pulocationid`, `dolocationid`, and `taxi_type`.
+   - The coalesced datetime columns are created in Python to avoid NULL values in the primary key (yellow taxis have NULL `lpep_*` values, green taxis have NULL `tpep_*` values). This ensures merge strategy works correctly since primary keys cannot contain NULLs.
+   - This composite key uniquely identifies each trip and allows merge strategy to update existing records or insert new ones during incremental runs.
+3. **Column Normalization**: 
+   - **Ingestion Layer (raw.trips_raw)**: Preserves original column names from parquet files as-is (e.g., `vendorid`, `tpep_pickup_datetime` for yellow taxis, `lpep_pickup_datetime` for green taxis, `pulocationid`). Adds `taxi_type`, `extracted_at`, and coalesced datetime columns (`pickup_datetime`, `dropoff_datetime`) for the primary key.
    - **Staging Layer (staging.trips_summary)**: Transforms column names to more human-readable, consistent formats:
      - Uses `COALESCE(tpep_pickup_datetime, lpep_pickup_datetime)` → `pickup_time` (cast to TIMESTAMP) to handle both taxi types
      - Uses `COALESCE(tpep_dropoff_datetime, lpep_dropoff_datetime)` → `dropoff_time` (cast to TIMESTAMP)
@@ -453,9 +457,9 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
      - `dolocationid` → `dropoff_location_id`
      - `payment_type` → cast to INTEGER
    - This separation allows the ingestion layer to process data as-is, while staging standardizes the schema for downstream consumption
-3. **Taxi Types**: Configured via pipeline variables (default: `["yellow", "green"]`), accessible in Python assets via `BRUIN_VARS` environment variable
-4. **Deduplication**: Use `ROW_NUMBER()` with `QUALIFY` in the `normalized_trips` CTE to keep the most recent record for each unique trip (based on pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, and taxi_type)
-5. **Lookup Joins**: Use `LEFT JOIN` to retain all trips even if location_id or payment_type_id not found in lookup tables (taxi_zone_lookup and payment_lookup)
-6. **Timestamp Tracking**: 
+4. **Taxi Types**: Configured via pipeline variables (default: `["yellow", "green"]`), accessible in Python assets via `BRUIN_VARS` environment variable
+5. **Deduplication**: Use `ROW_NUMBER()` with `QUALIFY` in the `normalized_trips` CTE to keep the most recent record for each unique trip (based on pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, and taxi_type)
+6. **Lookup Joins**: Use `LEFT JOIN` to retain all trips even if location_id or payment_type_id not found in lookup tables (taxi_zone_lookup and payment_lookup)
+7. **Timestamp Tracking**: 
    - `extracted_at`: Set in ingestion layer when data is downloaded
    - `updated_at`: Set in staging and reports when data is updated/refreshed
