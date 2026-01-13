@@ -11,7 +11,7 @@ This project serves as a **template and learning resource** for developers who w
 - **End-to-end ELT workflows**: From raw data ingestion to analytical reporting
 - **Multi-tier data architecture**: Implementing a layered approach (ingestion → raw → cleaned → aggregated)
 - **Incremental data processing**: Using time-based incremental strategies for efficient data updates
-- **Data quality and transformation**: Deduplication, enrichment, and data quality checks
+- **Data quality and transformation**: Cleaning, enrichment, and data quality checks
 - **Python and SQL integration**: Combining Python-based ingestion with SQL transformations
 
 ## What Tools and Features of Bruin This Project Showcases
@@ -55,7 +55,7 @@ This project serves as a **template and learning resource** for developers who w
 
 1. Start with `trips_raw.py` to understand Python asset materialization with merge strategy
 2. Review `taxi_zone_lookup.sql` and `payment_lookup.asset.yml` to see different lookup table patterns
-3. Study `trips_summary.sql` for column normalization, deduplication, and enrichment patterns
+3. Review `trips_summary.sql` for column normalization and enrichment patterns
 4. Examine `report_trips_monthly.sql` for aggregation techniques
 5. Explore `pipeline.yml` to understand configuration and variables
 
@@ -253,7 +253,7 @@ The `materialize()` function is required and must return a Pandas DataFrame. Bru
 - **Incremental Key**: `pickup_time`
 - **Time Granularity**: `timestamp`
 - **Primary Key**: Composite (`pickup_time`, `dropoff_time`, `pickup_location_id`, `dropoff_location_id`, `taxi_type`)
-- **Purpose**: Normalize column names, clean, deduplicate, and enrich trip data
+- **Purpose**: Normalize column names, clean, and enrich trip data
 
 **Time-Interval Strategy**:
 The `time_interval` strategy is designed for incremental processing based on time-based keys. How it works:
@@ -272,7 +272,6 @@ Why we chose it: This strategy is ideal for time-series data where we want to re
   - `pulocationid` → `pickup_location_id`
   - `dolocationid` → `dropoff_location_id`
   - `payment_type` → cast to INTEGER
-- Deduplicates trips using `QUALIFY ROW_NUMBER()` to keep the most recent record for each unique trip
 - Calculates `trip_duration_seconds` from pickup and dropoff times
 - Enriches with location data from `raw.taxi_zone_lookup`
 - Enriches with payment type descriptions from `raw.payment_lookup`
@@ -429,7 +428,7 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
 - [ ] Create `raw.taxi_zone_lookup.sql` with HTTP CSV ingestion
 - [ ] Create `raw.payment_lookup.csv` with payment type mapping data
 - [ ] Create `raw.payment_lookup.asset.yml` with seed file configuration
-- [ ] Create `staging.trips_summary.sql` with column normalization, deduplication and enrichment
+- [ ] Create `staging.trips_summary.sql` with column normalization and enrichment
 - [ ] Create `reports.report_trips_monthly.sql` with monthly aggregations
 - [ ] Add all required Bruin metadata (description, columns, etc.) to all assets (note: `name` is optional and will be inferred from file path if not provided)
 - [ ] Set primary keys and nullable constraints correctly
@@ -458,8 +457,7 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
      - `payment_type` → cast to INTEGER
    - This separation allows the ingestion layer to process data as-is, while staging standardizes the schema for downstream consumption
 4. **Taxi Types**: Configured via pipeline variables (default: `["yellow", "green"]`), accessible in Python assets via `BRUIN_VARS` environment variable
-5. **Deduplication**: Use `ROW_NUMBER()` with `QUALIFY` in the `normalized_trips` CTE to keep the most recent record for each unique trip (based on pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, and taxi_type)
-6. **Lookup Joins**: Use `LEFT JOIN` to retain all trips even if location_id or payment_type_id not found in lookup tables (taxi_zone_lookup and payment_lookup)
-7. **Timestamp Tracking**: 
+5. **Lookup Joins**: Use `LEFT JOIN` to retain all trips even if location_id or payment_type_id not found in lookup tables (taxi_zone_lookup and payment_lookup)
+6. **Timestamp Tracking**: 
    - `extracted_at`: Set in ingestion layer when data is downloaded
    - `updated_at`: Set in staging and reports when data is updated/refreshed
