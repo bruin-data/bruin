@@ -3238,6 +3238,149 @@ func TestValidateAssetSeedValidation_CaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []*Issue
+	}{
+		{
+			name: "valid HTTPS URL - should skip local file validation",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "https://example.com/data.csv",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{},
+		},
+		{
+			name: "valid HTTP URL - should skip local file validation",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "http://example.com/data.csv",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{},
+		},
+		{
+			name: "URL with query parameters - should skip local file validation",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{},
+		},
+		{
+			name: "uppercase HTTPS URL - should skip local file validation",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "HTTPS://example.com/data.csv",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{},
+		},
+		{
+			name: "mixed case HTTP URL - should skip local file validation",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "Http://example.com/data.csv",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{},
+		},
+		{
+			name: "empty path - should still error",
+			asset: &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": "",
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "test_seed",
+						Type: "duckdb.seed",
+						Parameters: map[string]string{
+							"path": "",
+						},
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "/test/assets/test.asset.yml",
+						},
+					},
+					Description: "Seed file path is required",
+				},
+			},
+		},
+		{
+			name: "missing path parameter - should still error",
+			asset: &pipeline.Asset{
+				Name:       "test_seed",
+				Type:       "duckdb.seed",
+				Parameters: map[string]string{},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "/test/assets/test.asset.yml",
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name:       "test_seed",
+						Type:       "duckdb.seed",
+						Parameters: map[string]string{},
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "/test/assets/test.asset.yml",
+						},
+					},
+					Description: "Seed file path is required",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := ValidateAssetSeedValidation(ctx, &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestValidateTableSensorTableParameter(t *testing.T) {
 	t.Parallel()
 
