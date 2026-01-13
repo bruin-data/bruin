@@ -2,6 +2,8 @@
 
 A comprehensive ELT pipeline built with Bruin that demonstrates best practices for building data pipelines. This project processes NYC taxi trip data from public HTTP sources, transforms it through multiple tiers, and generates analytical reports.
 
+The pipeline extracts NYC taxi trip data from HTTP parquet files, cleans and transforms it, and generates monthly summary reports. It uses DuckDB for local processing and follows a three-tier architecture: tier_1 (ingestion & raw) → tier_2 (cleaned) → tier_3 (reports).
+
 ## What This Project Aims to Achieve
 
 This project serves as a **template and learning resource** for developers who want to understand Bruin's capabilities and how to build production-ready data pipelines. It demonstrates:
@@ -44,23 +46,6 @@ This project serves as a **template and learning resource** for developers who w
    - Custom quality checks using SQL queries to validate business rules and data integrity
    - Column-level checks using built-in check types (non_negative, positive, min, max)
 
-### Data Processing Patterns
-
-- **Column Normalization**: Transforming source column names to more readable formats in tier_1
-- **Deduplication**: Using window functions to handle duplicate records
-- **Data Enrichment**: Joining with lookup tables to convert location IDs to human-readable borough and zone names, and payment type codes to descriptions, adding dimensional information to trip records
-- **Aggregation**: Monthly summaries with multiple metrics (averages and totals)
-- **Error Handling**: Graceful handling of missing data and failed downloads
-
-
-## Target Audience
-
-This project is designed for:
-- **Developers** learning Bruin for the first time
-- **Data Engineers** looking for a reference implementation
-- **Teams** evaluating Bruin's capabilities
-- **Anyone** wanting to understand modern ELT pipeline patterns
-
 ## Learning Path
 
 1. Start with `ingest_trips.py` to understand Python asset materialization
@@ -81,11 +66,8 @@ This project uses publicly available NYC taxi trip data from the [NYC TLC Trip R
 
 # Implementation Instructions
 
-This document provides complete instructions to create and test a Bruin pipeline for NYC taxi trip data processing.
-
-## Pipeline Overview
-
-The pipeline extracts NYC taxi trip data from HTTP parquet files, cleans and transforms it, and generates monthly summary reports. It uses DuckDB for local processing and follows a three-tier architecture: ingestion → tier_1 (raw) → tier_2 (cleaned) → tier_3 (reports).
+These instructions are especially useful as a prompt to an AI agent - this would work best when the Bruin MCP is configured. Please follow the instructions in the link below to set up Bruin MCP:
+https://getbruin.com/docs/bruin/getting-started/bruin-mcp.html
 
 ## Data Sources
 
@@ -108,15 +90,15 @@ The pipeline extracts NYC taxi trip data from HTTP parquet files, cleans and tra
 ### Directory Layout
 ```
 nyc-taxi/
+├── .bruin.yml
 ├── pipeline.yml
 ├── requirements.txt
-├── .bruin.yml
 └── assets/
     ├── tier_1/
     │   ├── ingest_trips.py
-    │   ├── taxi_zone_lookup.sql
     │   ├── payment_lookup.asset.yml
     │   ├── payment_lookup.csv
+    │   ├── taxi_zone_lookup.sql
     │   └── trips_historic.sql
     ├── tier_2/
     │   └── trips_summary.sql
@@ -124,13 +106,13 @@ nyc-taxi/
         └── report_trips_monthly.sql
 ```
 
-## Local Configuration (`.bruin.yml`)
+## Connection Configurations (`.bruin.yml`)
 
-Before running the pipeline, you need to create a `.bruin.yml` file in the project root directory to configure your local DuckDB connection.
+Before running the pipeline, you need to create a `.bruin.yml` file in the project root directory to [configure your local DuckDB connection](https://getbruin.com/docs/bruin/platforms/duckdb.html). This file is where you configure any database connection, as well as [custom secrets](https://getbruin.com/docs/bruin/secrets/bruinyml.html#bruin-yml-schema).
 
-### Setup Instructions
+The `.bruin.yml` file configures your local development environment and tells Bruin where to create and store the DuckDB database file. If the duckdb database file does not already exist, it will automatically be created when you first run the pipeline.
 
-1. **Create `.bruin.yml` file** in the project root:
+**Create `.bruin.yml` file** in the project root:
    ```yaml
    default_environment: default
    environments:
@@ -141,17 +123,11 @@ Before running the pipeline, you need to create a `.bruin.yml` file in the proje
                      path: duckdb.db
    ```
 
-2. **Add to `.gitignore`**: It's best practice to add `.bruin.yml` to your `.gitignore` file because:
+Note that it is best practice to add `.bruin.yml` to your `.gitignore` file because:
    - It may contain sensitive connection information and authentication credentials
    - Different developers may have different local database paths
    - Environment-specific configurations should not be committed to version control
 
-   Add this line to your `.gitignore`:
-   ```
-   .bruin.yml
-   ```
-
-The `.bruin.yml` file configures your local development environment and tells Bruin where to create and store the DuckDB database file.
 
 ## Pipeline Configuration (`pipeline.yml`)
 
@@ -225,22 +201,25 @@ The `materialize()` function is required and must return a Pandas DataFrame. Bru
 - Uses `create+replace` strategy to fully refresh the table on each run
 - Python dependencies are defined in `requirements.txt` at the pipeline root
 
+**Design Choice - Why Python with create+replace?**:
+- **Python for Complex Ingestion**: Python is ideal for this use case because it allows us to dynamically loop through date ranges and taxi types using Bruin variables (`BRUIN_START_DATE`, `BRUIN_END_DATE`, and `BRUIN_VARS`). This enables flexible ingestion logic that can handle multiple sources and date ranges without hardcoding values.
+- **create+replace Strategy**: This table uses `create+replace` to ensure it only contains the latest ingested data for the current run. The table is completely replaced on each run, which simplifies the ingestion logic and ensures data freshness. The actual incremental processing happens downstream in `tier_1.trips_historic`, which uses the `time_interval` strategy to insert/replace data based on date ranges. This separation of concerns allows the ingestion layer to focus on downloading and combining data, while the persistent storage layer handles incremental updates.
+- **Bruin Python Materialization**: Utilizing Bruin's Python materialization feature eliminates the need for manual database operations. We simply return a Pandas DataFrame, and Bruin handles all the database connection management, schema inference, and table creation/insertion automatically. This keeps the code focused on data extraction and transformation logic.
+
 #### `tier_1.taxi_zone_lookup`
 - **Type**: `duckdb.sql`
-- **Strategy**: `truncate+insert` (implicit - no strategy specified, table is replaced on each run)
+- **Strategy**: `create+replace` (implicit - no strategy specified, table is replaced on each run)
 - **Purpose**: Load taxi zone lookup table from HTTP CSV source
 
 **Bruin Configuration**:
 - Primary key: `location_id` (non-nullable)
-- Reads from HTTP CSV: `https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv`
-- Uses DuckDB's `read_csv()` function with `header=true` and `auto_detect=true`
+- Uses DuckDB's `read_csv()` function with `header=true` and `auto_detect=true` and pass the HTTP URL that contains the csv file
 - Filters out NULL location IDs to ensure data quality
 - Strategy: Table is replaced on each run to ensure we have the latest zone information
 
-**Design Choice - Why HTTP CSV?**:
-- The lookup table may be updated by NYC TLC (new zones, renamed zones, etc.)
-- Refreshing ensures we always have the latest zone information
-- HTTP source is reliable and publicly available
+**Design Choice**:
+- DuckDB has built-in ingestion features; when a URL is provided with the `read_csv` function, it essentially downloads the csv file and creates a table
+- The lookup table may be updated by NYC TLC (new zones, renamed zones, etc.) - create/replace ensures we always have the latest zone information
 
 #### `tier_1.payment_lookup`
 - **Type**: `duckdb.seed`
@@ -248,7 +227,7 @@ The `materialize()` function is required and must return a Pandas DataFrame. Bru
 
 **Bruin Configuration**:
 - Primary key: `payment_type_id` (non-nullable)
-- Reads from local CSV file: `./payment_lookup.csv`
+- Reads from local CSV file: `payment_lookup.csv`
 - Maps payment type codes (0-6) to human-readable descriptions
 
 **Design Choice - Why DuckDB Seed Asset?**:
@@ -425,15 +404,6 @@ duckdb duckdb.db -ui
 ```
 
 The `-ui` flag opens a web-based interface in your browser where you can run queries, explore tables, and visualize data interactively.
-
-## Known Issues & Workarounds
-
-### Date Type Casting in DATE_TRUNC
-- **Issue**: DATE_TRUNC requires explicit type casting when using template variables
-- **Solution**: 
-  - Cast template variables to TIMESTAMP: `CAST('{{ start_datetime }}' AS TIMESTAMP)`
-  - Cast source datetime columns to TIMESTAMP: `CAST(tpep_pickup_datetime AS TIMESTAMP)`
-  - This ensures proper type resolution in DuckDB
 
 ## Implementation Checklist
 
