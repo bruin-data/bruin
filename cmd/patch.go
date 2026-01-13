@@ -141,7 +141,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager conf
 			})
 		}
 		pp.Asset.Columns = columns
-		err = pp.Asset.Persist(fs)
+		err = pp.Asset.Persist(fs, pp.Pipeline)
 		if err != nil {
 			return fillStatusFailed, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
 		}
@@ -180,7 +180,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager conf
 		return fillStatusSkipped, nil
 	}
 
-	err = pp.Asset.Persist(fs)
+	err = pp.Asset.Persist(fs, pp.Pipeline)
 	if err != nil {
 		return fillStatusFailed, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
 	}

@@ -1218,9 +1218,35 @@ func (a *Asset) GetNameIfItWasSetFromItsPath(foundPipeline *Pipeline) (string, e
 	return name, nil
 }
 
-func (a Asset) Persist(fs afero.Fs) error {
+func (a Asset) Persist(fs afero.Fs, pipeline ...*Pipeline) error {
+	// Save original values
+	originalParams := a.Parameters
+
+	// Remove parameters that match pipeline defaults
+	// pipeline is optional - if provided and has defaults, filter them out
+	if len(pipeline) > 0 && pipeline[0] != nil && pipeline[0].DefaultValues != nil && len(pipeline[0].DefaultValues.Parameters) > 0 {
+		filteredParams := EmptyStringMap{}
+		for key, value := range a.Parameters {
+			// Only keep parameters that are NOT in defaults or have different values
+			if defaultValue, existsInDefaults := pipeline[0].DefaultValues.Parameters[key]; !existsInDefaults || defaultValue != value {
+				filteredParams[key] = value
+			}
+		}
+
+		// If no parameters remain, set to nil instead of empty map
+		if len(filteredParams) == 0 {
+			a.Parameters = nil
+		} else {
+			a.Parameters = filteredParams
+		}
+	}
+
 	// Reuse the logic from PersistWithoutWriting
 	content, err := a.FormatContent()
+
+	// Restore original values (even if formatting failed)
+	a.Parameters = originalParams
+
 	if err != nil {
 		return errors.Wrap(err, "failed to generate content for persistence")
 	}
