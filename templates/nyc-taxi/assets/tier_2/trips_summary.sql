@@ -3,13 +3,13 @@ name: tier_2.trips_summary
 type: duckdb.sql
 description: |
   Transforms and cleans raw trip data from tier_1.
-  Deduplicates trips, selects necessary columns, and joins with the taxi zone lookup table
-  to enrich data with borough and zone names.
+  Normalizes column names (cast, coalesce, rename), deduplicates trips, selects necessary columns,
+  and joins with the taxi zone lookup table to enrich data with borough and zone names.
   Aggregation Level: Individual trip records with location enrichment and deduplication applied.
 
 depends:
   - tier_1.taxi_zone_lookup
-  - tier_1.trips_historic
+  - tier_1.trips_raw
   - tier_1.payment_lookup
 
 materialization:
@@ -97,56 +97,47 @@ columns:
 
 WITH
 
-raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data quality filters
+normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, rename) and deduplicate
   SELECT
-    pickup_time,
-    dropoff_time,
-    pickup_location_id,
-    dropoff_location_id,
-    taxi_type,
-    trip_distance,
+    vendorid,
+    CAST(COALESCE(tpep_pickup_datetime, lpep_pickup_datetime) AS TIMESTAMP) AS pickup_time,
+    CAST(COALESCE(tpep_dropoff_datetime, lpep_dropoff_datetime) AS TIMESTAMP) AS dropoff_time,
     passenger_count,
+    trip_distance,
+    store_and_fwd_flag,
+    pulocationid AS pickup_location_id,
+    dolocationid AS dropoff_location_id,
+    CAST(payment_type AS INTEGER) AS payment_type,
     fare_amount,
+    extra,
+    mta_tax,
     tip_amount,
+    tolls_amount,
+    improvement_surcharge,
     total_amount,
-    payment_type,
+    congestion_surcharge,
+    airport_fee,
+    taxi_type,
     extracted_at,
-  FROM tier_1.trips_historic
+  FROM tier_1.trips_raw
   WHERE 1=1
-    AND DATE_TRUNC('month', pickup_time) BETWEEN DATE_TRUNC('month', CAST('{{ start_datetime }}' AS TIMESTAMP)) AND DATE_TRUNC('month', CAST('{{ end_datetime }}' AS TIMESTAMP))
-    AND pickup_time IS NOT NULL
-    AND dropoff_time IS NOT NULL
-    AND pickup_location_id IS NOT NULL
-    AND dropoff_location_id IS NOT NULL
+    AND DATE_TRUNC('month', CAST(COALESCE(tpep_pickup_datetime, lpep_pickup_datetime) AS TIMESTAMP)) BETWEEN DATE_TRUNC('month', CAST('{{ start_datetime }}' AS TIMESTAMP)) AND DATE_TRUNC('month', CAST('{{ end_datetime }}' AS TIMESTAMP))
+    AND COALESCE(tpep_pickup_datetime, lpep_pickup_datetime) IS NOT NULL
+    AND COALESCE(tpep_dropoff_datetime, lpep_dropoff_datetime) IS NOT NULL
+    AND pulocationid IS NOT NULL
+    AND dolocationid IS NOT NULL
     AND taxi_type IS NOT NULL
-)
-
-, cleaned_trips AS ( -- Step 2: Deduplicate trips using QUALIFY and calculate trip duration in seconds
-  SELECT
-    pickup_time,
-    dropoff_time,
-    pickup_location_id,
-    dropoff_location_id,
-    taxi_type,
-    trip_distance,
-    passenger_count,
-    fare_amount,
-    tip_amount,
-    total_amount,
-    CAST(ct.payment_type AS INTEGER) AS payment_type,
-    extracted_at,
-    EXTRACT(EPOCH FROM (dropoff_time - pickup_time)) AS trip_duration_seconds,
-  FROM raw_trips
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, taxi_type
     ORDER BY pickup_time DESC
   ) = 1
 )
 
-, enriched_trips AS ( -- Step 3: Enrich trips with location and payment information using LEFT JOINs
+, enriched_trips AS ( -- Enrich trips with location and payment information using LEFT JOINs
   SELECT
     ct.pickup_time,
     ct.dropoff_time,
+    EXTRACT(EPOCH FROM (ct.dropoff_time - ct.pickup_time)) AS trip_duration_seconds,
     ct.pickup_location_id,
     ct.dropoff_location_id,
     ct.taxi_type,
@@ -159,12 +150,11 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     pickup_lookup.zone AS pickup_zone,
     dropoff_lookup.borough AS dropoff_borough,
     dropoff_lookup.zone AS dropoff_zone,
-    ct.trip_duration_seconds,
     ct.payment_type,
     payment_lookup.payment_description,
     ct.extracted_at,
     CURRENT_TIMESTAMP AS updated_at,
-  FROM cleaned_trips AS ct
+  FROM normalized_trips AS ct
   LEFT JOIN tier_1.taxi_zone_lookup AS pickup_lookup
     ON ct.pickup_location_id = pickup_lookup.location_id
   LEFT JOIN tier_1.taxi_zone_lookup AS dropoff_lookup
@@ -173,9 +163,9 @@ raw_trips AS ( -- Step 1: Select necessary columns from tier_1 and apply data qu
     ON ct.payment_type = payment_lookup.payment_type_id
   WHERE 1=1
     -- filter out zero durations (trip cannot end at the same time it starts or before it starts)
-    AND ct.trip_duration_seconds > 0
+    AND EXTRACT(EPOCH FROM (ct.dropoff_time - ct.pickup_time)) > 0
     -- filter out outlier durations that are too long, 8 hours (28800 seconds)
-    AND ct.trip_duration_seconds < 28800
+    AND EXTRACT(EPOCH FROM (ct.dropoff_time - ct.pickup_time)) < 28800
     -- filter out negative total amounts
     AND ct.total_amount >= 0
     -- Only include trips that were actually charged
