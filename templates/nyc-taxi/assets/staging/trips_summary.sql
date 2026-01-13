@@ -3,9 +3,9 @@ name: staging.trips_summary
 type: duckdb.sql
 description: |
   Transforms and cleans raw trip data from raw.
-  Normalizes column names (cast, coalesce, rename), deduplicates trips, selects necessary columns,
+  Normalizes column names (cast, coalesce, rename), selects necessary columns,
   and joins with the taxi zone lookup table to enrich data with borough and zone names.
-  Aggregation Level: Individual trip records with location enrichment and deduplication applied.
+  Aggregation Level: Individual trip records with location enrichment.
 
 depends:
   - raw.taxi_zone_lookup
@@ -97,7 +97,7 @@ columns:
 
 WITH
 
-normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, rename) and deduplicate
+normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, rename)
   SELECT
     vendorid,
     CAST(COALESCE(tpep_pickup_datetime, lpep_pickup_datetime) AS TIMESTAMP) AS pickup_time,
