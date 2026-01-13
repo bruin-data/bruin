@@ -127,10 +127,6 @@ normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, r
     AND pulocationid IS NOT NULL
     AND dolocationid IS NOT NULL
     AND taxi_type IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, taxi_type
-    ORDER BY pickup_time DESC
-  ) = 1
 )
 
 , enriched_trips AS ( -- Enrich trips with location and payment information using LEFT JOINs
