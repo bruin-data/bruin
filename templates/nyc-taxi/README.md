@@ -320,6 +320,24 @@ bruin run ./nyc-taxi/assets/tier_1/trips_raw.py \
   --environment default
 ```
 
+You can also test with a single taxi type by overriding the `taxi_types` variable:
+
+```bash
+# Test with only yellow taxis
+bruin run ./nyc-taxi/assets/tier_1/trips_raw.py \
+  --start-date 2021-01-01 \
+  --end-date 2021-01-31 \
+  --environment default \
+  --var 'taxi_types=["yellow"]'
+
+# Test with only green taxis
+bruin run ./nyc-taxi/assets/tier_1/trips_raw.py \
+  --start-date 2021-01-01 \
+  --end-date 2021-01-31 \
+  --environment default \
+  --var 'taxi_types=["green"]'
+```
+
 When running a single asset, only that asset is executed. To also run all downstream assets (assets that depend on the one you're running), add the `--downstream` flag:
 
 ```bash
