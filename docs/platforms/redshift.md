@@ -145,7 +145,10 @@ parameters:
 ```
 
 **Parameters**:
-- `path`:  The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file.
+- `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
+
+> [!WARNING]
+> When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
 
 ####  Examples: Load csv into a Redshift database
