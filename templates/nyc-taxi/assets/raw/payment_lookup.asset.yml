@@ -1,0 +1,27 @@
+name: raw.payment_lookup
+type: duckdb.seed
+parameters:
+  path: payment_lookup.csv
+description: |
+  Loads the payment type lookup table from local CSV file.
+  This table contains payment type information including payment_type_id and payment_description.
+  The lookup table is a static reference table that maps payment type codes to human-readable descriptions.
+
+  Design Choices:
+  - Why read from local CSV:
+    - Payment type codes are standardized and do not change frequently
+    - Local seed file provides version control and reproducibility
+
+  - Why seed file:
+    - Seed files are a convenient way to load static data into a database
+    - Seed asset automatically materializes into a table on each run
+
+columns:
+  - name: payment_type_id
+    type: INTEGER
+    description: Numeric code signifying how the passenger paid for the trip
+    primary_key: true
+    nullable: false
+  - name: payment_description
+    type: VARCHAR
+    description: Human-readable description of the payment type
