@@ -85,11 +85,12 @@ func TestRenderCommand_Run(t *testing.T) {
 		task *pipeline.Asset
 	}
 	tests := []struct {
-		name    string
-		setup   func(*fields)
-		args    args
-		output  string
-		wantErr assert.ErrorAssertionFunc
+		name              string
+		setup             func(*fields)
+		args              args
+		output            string
+		noMaterialization bool
+		wantErr           assert.ErrorAssertionFunc
 	}{
 		{
 			name: "should return error if task path is empty",
@@ -271,6 +272,26 @@ func TestRenderCommand_Run(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "should return raw query without materialization when noMaterialization is true",
+			args: args{
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Name: "asset1",
+				},
+			},
+			noMaterialization: true,
+			setup: func(f *fields) {
+				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
+					Return([]*query.Query{{Query: "SELECT * FROM my_table"}}, nil)
+				f.writer.On("Write", []byte("SELECT * FROM my_table\n")).
+					Return(0, nil)
+			},
+			wantErr: assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -292,9 +313,10 @@ func TestRenderCommand_Run(t *testing.T) {
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeBigqueryQuery: f.bqMaterializer,
 				},
-				builder: f.builder,
-				writer:  f.writer,
-				output:  tt.output,
+				builder:           f.builder,
+				writer:            f.writer,
+				output:            tt.output,
+				noMaterialization: tt.noMaterialization,
 			}
 
 			// Create an instance of ExecutionParameters
@@ -317,11 +339,12 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		task    *pipeline.Asset
-		setup   func(*mockExtractor, *mockMaterializer, *mockWriter)
-		output  string
-		wantErr assert.ErrorAssertionFunc
+		name              string
+		task              *pipeline.Asset
+		setup             func(*mockExtractor, *mockMaterializer, *mockWriter)
+		output            string
+		noMaterialization bool
+		wantErr           assert.ErrorAssertionFunc
 	}{
 		{
 			name: "should extract query from parameters for BigQuery query sensor",
@@ -460,8 +483,9 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 					pipeline.AssetTypeBigqueryQuerySensor:  materializer,
 					pipeline.AssetTypeSnowflakeQuerySensor: materializer,
 				},
-				writer: writer,
-				output: tt.output,
+				writer:            writer,
+				output:            tt.output,
+				noMaterialization: tt.noMaterialization,
 			}
 
 			params := ModifierInfo{

@@ -17,13 +17,14 @@ bruin render [path to asset definition] [flags]
 
 ### Flags
 
-| Flag               | Alias | Description                                                           |
-|--------------------|-------|-----------------------------------------------------------------------|
-| `--full-refresh`   | `-r`  | Truncate the table before running the query. Also sets the `full_refresh` jinja variable to `True`. |
-| `--start-date`     |       | Specify the start date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format.|
-| `--end-date`       |       | Specify the end date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format. |
-| `--output [format]`| `-o`  | Specify the output format (e.g., `json`). Defaults to console output.  |
-| `--config-file`    |       | The path to the `.bruin.yml` file. |
+| Flag                  | Alias | Description                                                           |
+|-----------------------|-------|-----------------------------------------------------------------------|
+| `--no-materialization`|       | Output only the raw query without materialization logic. |
+| `--full-refresh`      | `-r`  | Truncate the table before running the query. Also sets the `full_refresh` jinja variable to `True`. |
+| `--start-date`        |       | Specify the start date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format.|
+| `--end-date`          |       | Specify the end date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format. |
+| `--output [format]`   | `-o`  | Specify the output format (e.g., `json`). Defaults to console output.  |
+| `--config-file`       |       | The path to the `.bruin.yml` file. |
 
 
 ### Examples
