@@ -1133,13 +1133,6 @@ func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRe
 		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
 	}
 
-	// Validate that start date is not in the future
-	now := time.Now()
-	if startDate.After(now) {
-		errorPrinter.Printf("Start date cannot be in the future. Given start date: %s, current time: %s\n", startDate.Format("2006-01-02 15:04:05"), now.Format("2006-01-02 15:04:05"))
-		return time.Time{}, fmt.Errorf("start date %s is in the future", startDate.Format("2006-01-02 15:04:05"))
-	}
-
 	return startDate, nil
 }
 
