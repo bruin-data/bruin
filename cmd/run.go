@@ -1154,11 +1154,6 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 		return time.Now(), time.Now(), "", err
 	}
 
-	// Validate date range
-	if err := ValidateDateRange(startDate, endDate); err != nil {
-		return time.Now(), time.Now(), "", err
-	}
-
 	return startDate, endDate, inputPath, nil
 }
 
