@@ -1,16 +1,16 @@
 /* @bruin
-name: tier_2.trips_summary
+name: staging.trips_summary
 type: duckdb.sql
 description: |
-  Transforms and cleans raw trip data from tier_1.
+  Transforms and cleans raw trip data from raw.
   Normalizes column names (cast, coalesce, rename), deduplicates trips, selects necessary columns,
   and joins with the taxi zone lookup table to enrich data with borough and zone names.
   Aggregation Level: Individual trip records with location enrichment and deduplication applied.
 
 depends:
-  - tier_1.taxi_zone_lookup
-  - tier_1.trips_raw
-  - tier_1.payment_lookup
+  - raw.taxi_zone_lookup
+  - raw.trips_raw
+  - raw.payment_lookup
 
 materialization:
   type: table
@@ -91,7 +91,7 @@ columns:
     description: Timestamp when the data was extracted from the source
   - name: updated_at
     type: TIMESTAMP
-    description: Timestamp when the data was last updated in tier_2
+    description: Timestamp when the data was last updated in staging
 
 @bruin */
 
@@ -119,7 +119,7 @@ normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, r
     airport_fee,
     taxi_type,
     extracted_at,
-  FROM tier_1.trips_raw
+  FROM raw.trips_raw
   WHERE 1=1
     AND DATE_TRUNC('month', CAST(COALESCE(tpep_pickup_datetime, lpep_pickup_datetime) AS TIMESTAMP)) BETWEEN DATE_TRUNC('month', CAST('{{ start_datetime }}' AS TIMESTAMP)) AND DATE_TRUNC('month', CAST('{{ end_datetime }}' AS TIMESTAMP))
     AND COALESCE(tpep_pickup_datetime, lpep_pickup_datetime) IS NOT NULL
@@ -151,11 +151,11 @@ normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, r
     ct.extracted_at,
     CURRENT_TIMESTAMP AS updated_at,
   FROM normalized_trips AS ct
-  LEFT JOIN tier_1.taxi_zone_lookup AS pickup_lookup
+  LEFT JOIN raw.taxi_zone_lookup AS pickup_lookup
     ON ct.pickup_location_id = pickup_lookup.location_id
-  LEFT JOIN tier_1.taxi_zone_lookup AS dropoff_lookup
+  LEFT JOIN raw.taxi_zone_lookup AS dropoff_lookup
     ON ct.dropoff_location_id = dropoff_lookup.location_id
-  LEFT JOIN tier_1.payment_lookup AS payment_lookup
+  LEFT JOIN raw.payment_lookup AS payment_lookup
     ON ct.payment_type = payment_lookup.payment_type_id
   WHERE 1=1
     -- filter out zero durations (trip cannot end at the same time it starts or before it starts)

@@ -1,4 +1,4 @@
-name: tier_1.payment_lookup
+name: raw.payment_lookup
 type: duckdb.seed
 parameters:
   path: payment_lookup.csv

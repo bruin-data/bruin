@@ -1,5 +1,5 @@
 """@bruin
-name: tier_1.trips_raw
+name: raw.trips_raw
 type: python
 image: python:3.11
 connection: duckdb-default
@@ -14,7 +14,7 @@ description: |
   - Combines data from multiple months into a single DataFrame
   - Adds taxi_type column to track which taxi type each record represents
   - Keeps data as raw as possible - preserves original column names from parquet files
-  - Column normalization (tpep_pickup_datetime -> pickup_time, etc.) is handled in tier_2 transformation layer
+  - Column normalization (tpep_pickup_datetime -> pickup_time, etc.) is handled in staging transformation layer
   - Uses merge strategy to handle incremental updates - updates existing records and inserts new ones
   - Returns DataFrame for Bruin to materialize into DuckDB table
 

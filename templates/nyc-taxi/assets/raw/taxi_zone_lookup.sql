@@ -1,5 +1,5 @@
 /* @bruin
-name: tier_1.taxi_zone_lookup
+name: raw.taxi_zone_lookup
 type: duckdb.sql
 description: |
   Loads the NYC taxi zone lookup table from HTTP CSV source.

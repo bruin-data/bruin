@@ -1,5 +1,5 @@
 /* @bruin
-name: tier_3.report_trips_monthly
+name: reports.report_trips_monthly
 type: duckdb.sql
 description: |
   Monthly summary report of NYC taxi trips aggregated by taxi type and month.
@@ -10,7 +10,7 @@ description: |
   Sample query:
   ```sql
   SELECT *
-  FROM tier_3.report_trips_monthly
+  FROM reports.report_trips_monthly
   WHERE 1=1
     AND taxi_type = 'yellow'
     AND month_date >= '2022-01-01'
@@ -18,7 +18,7 @@ description: |
   ```
 
 depends:
-  - tier_2.trips_summary
+  - staging.trips_summary
 
 materialization:
   type: table
@@ -67,16 +67,16 @@ columns:
     description: Maximum timestamp when the source data was extracted (latest extraction time for the month)
   - name: updated_at
     type: TIMESTAMP
-    description: Timestamp when the data was last updated in tier_3
+    description: Timestamp when the data was last updated in reports
 
 custom_checks:
   - name: positive_trip_count
     description: Validates total_trips count is positive for each month
-    query: SELECT COUNT(*) FROM tier_3.report_trips_monthly WHERE total_trips <= 0
+    query: SELECT COUNT(*) FROM reports.report_trips_monthly WHERE total_trips <= 0
     value: 0
   - name: non_negative_revenue
     description: Ensures aggregated total_amount_total is non-negative
-    query: SELECT COUNT(*) FROM tier_3.report_trips_monthly WHERE total_amount_total < 0
+    query: SELECT COUNT(*) FROM reports.report_trips_monthly WHERE total_amount_total < 0
     value: 0
 
 @bruin */
@@ -91,7 +91,7 @@ trips_by_month AS ( -- Step 1: Extract month from pickup_time and prepare data f
     total_amount,
     tip_amount,
     extracted_at,
-  FROM tier_2.trips_summary
+  FROM staging.trips_summary
   WHERE 1=1
     AND DATE_TRUNC('month', pickup_time) BETWEEN DATE_TRUNC('month', CAST('{{ start_datetime }}' AS TIMESTAMP)) AND DATE_TRUNC('month', CAST('{{ end_datetime }}' AS TIMESTAMP))
     AND trip_duration_seconds IS NOT NULL
