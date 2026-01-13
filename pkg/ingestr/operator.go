@@ -213,7 +213,12 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("source connection not configured")
 	}
 
-	sourceURI := "csv://" + filepath.Join(filepath.Dir(asset.ExecutableFile.Path), sourceConnectionPath)
+	var sourceURI string
+	if strings.HasPrefix(sourceConnectionPath, "http://") || strings.HasPrefix(sourceConnectionPath, "https://") {
+		sourceURI = sourceConnectionPath
+	} else {
+		sourceURI = "csv://" + filepath.Join(filepath.Dir(asset.ExecutableFile.Path), sourceConnectionPath)
+	}
 
 	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
 	if err != nil {
