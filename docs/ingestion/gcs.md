@@ -59,6 +59,33 @@ bruin run assets/gcs_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given gcs bucket into your Postgres database.
 
+### File type hints
+Bruin can read 3 types of files from GCS:
+* CSV
+* JSONL
+* Parquet
+
+Bruin will check the file extension to determine the right decoder to use. If you file names are missing the correct extension, then you can explicitly tell Bruin to use a specific decoder using `file_type` parameter.
+
+
+For example:
+```yaml
+name: public.fees
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-gcs
+  source_table: 'my-bucket/records/fees.log'
+  file_type: csv # [!code ++]
+  destination: postgres
+```
+
+This asset will load the contents `fees.log`, treating it as if it were a CSV File.
+
+### Working with compressed files.
+Bruin automatically detects and handles gzipped files in your GCS bucket. You can load data from compressed files with the `.gz` extension without any additional configuration.
+
 ## Writing to a GCS
 
 Follow the steps below to correctly set up GCS as a destination and run ingestion.
