@@ -858,15 +858,15 @@
           },
           "type": "array"
         },
-        "fireflies": {
-          "items": {
-            "$ref": "#/$defs/FirefliesConnection"
-          },
-          "type": "array"
-        },
         "fundraiseup": {
           "items": {
             "$ref": "#/$defs/FundraiseUpConnection"
+          },
+          "type": "array"
+        },
+        "fireflies": {
+          "items": {
+            "$ref": "#/$defs/FirefliesConnection"
           },
           "type": "array"
         },
@@ -989,6 +989,21 @@
       ]
     },
     "DatabricksConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "token"
+          ],
+          "title": "token"
+        },
+        {
+          "required": [
+            "client_id",
+            "client_secret"
+          ],
+          "title": "oauth"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -1023,14 +1038,11 @@
       "type": "object",
       "required": [
         "name",
-        "token",
         "path",
         "host",
         "port",
         "catalog",
-        "schema",
-        "client_id",
-        "client_secret"
+        "schema"
       ]
     },
     "DataprocServerlessConnection": {
@@ -1236,6 +1248,22 @@
         "account_id"
       ]
     },
+    "FirefliesConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "FluxxConnection": {
       "properties": {
         "name": {
@@ -1289,22 +1317,6 @@
       "required": [
         "name",
         "domain",
-        "api_key"
-      ]
-    },
-    "FirefliesConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
         "api_key"
       ]
     },
