@@ -206,7 +206,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	}
 	if err := validateCmd.Run(ctx, args); err != nil {
 		// Rollback: restore original content
-		if writeErr := afero.WriteFile(fs, absAssetPath, originalContent, 0644); writeErr != nil {
+		if writeErr := afero.WriteFile(fs, absAssetPath, originalContent, 0o644); writeErr != nil {
 			return printEnhanceError(output, errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err)))
 		}
 		return printEnhanceError(output, errors.Wrap(err, "validation failed, original file restored"))
