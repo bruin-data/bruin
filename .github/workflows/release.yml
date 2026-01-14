@@ -48,6 +48,53 @@ jobs:
           [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
           make ${{ matrix.suite }}
 
+  cloud-integration-tests:
+    name: Cloud Integration Tests (BigQuery)
+    runs-on: depot-ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Build Bruin
+        run: make build
+
+      - name: Create cloud config file
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_LOCATION: ${{ secrets.GCP_LOCATION || 'US' }}
+        run: |
+          cat > integration-tests/cloud-integration-tests/.bruin.cloud.yml << EOF
+          default_environment: default
+          environments:
+            default:
+              connections:
+                google_cloud_platform:
+                  - name: gcp-default
+                    project_id: "${GCP_PROJECT_ID}"
+                    service_account_json: '${GCP_SERVICE_ACCOUNT_JSON}'
+                    location: "${GCP_LOCATION}"
+          EOF
+
+      - name: Test BigQuery connection (fail fast)
+        run: |
+          ./bin/bruin connections test \
+            --config-file integration-tests/cloud-integration-tests/.bruin.cloud.yml \
+            --env default \
+            --name gcp-default
+
+      - name: Run BigQuery Integration Tests
+        run: |
+          cd integration-tests/cloud-integration-tests/bigquery
+          go test -v -timeout 30m ./...
+
   prepare-darwin:
     runs-on: depot-ubuntu-latest
     steps:
@@ -108,7 +155,7 @@ jobs:
 
   release-unix:
     runs-on: depot-ubuntu-latest
-    needs: [prepare-linux,  prepare-darwin, integration-tests]
+    needs: [prepare-linux, prepare-darwin, integration-tests, cloud-integration-tests]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -141,7 +188,7 @@ jobs:
 
   release-windows:
     runs-on: depot-windows-latest
-    needs: [prepare-linux, prepare-darwin, integration-tests]
+    needs: [prepare-linux, prepare-darwin, integration-tests, cloud-integration-tests]
     defaults:
       run:
         shell: msys2 {0}
