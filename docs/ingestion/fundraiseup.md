@@ -34,13 +34,13 @@ connections:
 
 FundraiseUp assets will be ingested to your data warehouse as defined in the `destination` table.
 
-| Asset                | Table Name        | Incremental Key | Description                                                                                                                                        |
-|----------------------|-------------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| Donations            | `donations`       | replace         | All donation records including amounts, supporters, and payment details                                                                           |
-| Events               | `events`          | replace         | Audit log events for tracking changes and activities                                                                                              |
-| Fundraisers          | `fundraisers`     | replace         | Fundraiser campaigns (requires appropriate API permissions)                                                                                        |
-| Recurring Plans      | `recurring_plans` | replace         | Recurring donation plans and subscription details                                                                                                  |
-| Supporters           | `supporters`      | replace         | Donor/supporter information including contact details                                                                                              |
+| Asset | Table Name | Incremental Key | Description |
+|-------|------------|-----------------|-------------|
+| Donations | `donations` | replace | All donation records including amounts, supporters, and payment details |
+| Events | `events` | replace | Audit log events for tracking changes and activities |
+| Fundraisers | `fundraisers` | replace | Fundraiser campaigns (requires appropriate API permissions) |
+| Recurring Plans | `recurring_plans` | replace | Recurring donation plans and subscription details |
+| Supporters | `supporters` | replace | Donor/supporter information including contact details |
 
 ## Asset-Specific Configuration
 

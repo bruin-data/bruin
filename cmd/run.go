@@ -786,6 +786,11 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
+			// Validate date range
+			if err := ValidateDateRange(startDate, endDate); err != nil {
+				return err
+			}
+
 			// Update renderer with the finalized start/end dates
 			renderer = jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pipelineInfo.Pipeline.Name, runID, nil, macroContent)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
@@ -1129,6 +1134,14 @@ func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRe
 	}
 
 	return startDate, nil
+}
+
+func ValidateDateRange(startDate, endDate time.Time) error {
+	if startDate.After(endDate) {
+		errorPrinter.Printf("Start date cannot be after end date. Given start date: %s, end date: %s\n", startDate.Format("2006-01-02 15:04:05"), endDate.Format("2006-01-02 15:04:05"))
+		return fmt.Errorf("start date %s is after end date %s", startDate.Format("2006-01-02 15:04:05"), endDate.Format("2006-01-02 15:04:05"))
+	}
+	return nil
 }
 
 func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger logger.Logger) (time.Time, time.Time, string, error) {

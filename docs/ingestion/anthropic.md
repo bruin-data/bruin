@@ -40,17 +40,17 @@ connections:
 
 Anthropic assets will be ingested to your data warehouse as defined in the `destination` table.
 
-| Asset                  | Table Name             | Incremental Key | Description                                                                                       |
-|------------------------|------------------------|-----------------|---------------------------------------------------------------------------------------------------|
-| Claude Code Usage      | `claude_code_usage`    | date            | Daily aggregated usage metrics for Claude Code users in your organization                        |
-| Usage Report           | `usage_report`         | replace         | Detailed token usage metrics from the Messages API, aggregated by time bucket                   |
-| Cost Report            | `cost_report`          | replace         | Aggregated cost data broken down by workspace and cost description                               |
-| Organization           | `organization`         | replace         | Information about your Anthropic organization                                                     |
-| Workspaces             | `workspaces`           | replace         | All workspaces in your organization                                                               |
-| API Keys               | `api_keys`             | replace         | All API keys in your organization                                                                 |
-| Invites                | `invites`              | replace         | All pending organization invites                                                                  |
-| Users                  | `users`                | replace         | All users in your organization                                                                    |
-| Workspace Members      | `workspace_members`    | replace         | Workspace membership information                                                                  |
+| Asset | Table Name | Incremental Key | Description |
+|-------|------------|-----------------|-------------|
+| Claude Code Usage | `claude_code_usage` | date | Daily aggregated usage metrics for Claude Code users in your organization |
+| Usage Report | `usage_report` | replace | Detailed token usage metrics from the Messages API, aggregated by time bucket |
+| Cost Report | `cost_report` | replace | Aggregated cost data broken down by workspace and cost description |
+| Organization | `organization` | replace | Information about your Anthropic organization |
+| Workspaces | `workspaces` | replace | All workspaces in your organization |
+| API Keys | `api_keys` | replace | All API keys in your organization |
+| Invites | `invites` | replace | All pending organization invites |
+| Users | `users` | replace | All users in your organization |
+| Workspace Members | `workspace_members` | replace | Workspace membership information |
 
 ## Asset-Specific Configuration
 

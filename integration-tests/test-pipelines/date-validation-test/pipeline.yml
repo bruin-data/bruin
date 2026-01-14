@@ -1,0 +1,4 @@
+name: date-validation-test
+
+default_connections:
+  duckdb: duckdb-date-validation

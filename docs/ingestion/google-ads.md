@@ -65,20 +65,20 @@ Google Ads source allows ingesting the following sources into separate tables:
 
 | Table | Description |
 |-------|-------------|
-| account_report_daily | Provides daily metrics aggregated at the account level |
-| campaign_report_daily | Provides daily metrics aggregated at the campaign level |
-| ad_group_report_daily | Provides daily metrics aggregated at the ad group level |
-| ad_report_daily | Provides daily metrics aggregated at the ad level |
-| audience_report_daily | Provides daily metrics aggregated at the audience level |
-| keyword_report_daily | Provides daily metrics aggregated at the keyword level |
-| click_report_daily | Provides daily metrics on clicks |
-| landing_page_report_daily | Provides daily metrics on landing page performance |
-| search_keyword_report_daily | Provides daily metrics on search keywords |
-| search_term_report_daily | Provides daily metrics on search terms |
-| lead_form_submission_data_report_daily | Provides daily metrics on lead form submissions |
-| local_services_lead_report_daily | Provides daily metrics on local services leads |
-| local_services_lead_conversations_report_daily | Provides daily metrics on local services lead conversations |
-| daily:{resource_name}:{dimensions}:{metrics} | Custom reports with specified resource, dimensions, and metrics |
+| `account_report_daily` | Provides daily metrics aggregated at the account level |
+| `campaign_report_daily` | Provides daily metrics aggregated at the campaign level |
+| `ad_group_report_daily` | Provides daily metrics aggregated at the ad group level |
+| `ad_report_daily` | Provides daily metrics aggregated at the ad level |
+| `audience_report_daily` | Provides daily metrics aggregated at the audience level |
+| `keyword_report_daily` | Provides daily metrics aggregated at the keyword level |
+| `click_report_daily` | Provides daily metrics on clicks |
+| `landing_page_report_daily` | Provides daily metrics on landing page performance |
+| `search_keyword_report_daily` | Provides daily metrics on search keywords |
+| `search_term_report_daily` | Provides daily metrics on search terms |
+| `lead_form_submission_data_report_daily` | Provides daily metrics on lead form submissions |
+| `local_services_lead_report_daily` | Provides daily metrics on local services leads |
+| `local_services_lead_conversations_report_daily` | Provides daily metrics on local services lead conversations |
+| `daily:{resource_name}:{dimensions}:{metrics}` | Custom reports with specified resource, dimensions, and metrics |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

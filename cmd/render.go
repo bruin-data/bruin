@@ -72,6 +72,10 @@ func Render() *cli.Command {
 				Name:  "var",
 				Usage: "override pipeline variables with custom values",
 			},
+			&cli.BoolFlag{
+				Name:  "raw-query",
+				Usage: "output only the raw query",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fullRefresh := c.Bool("full-refresh")
@@ -260,9 +264,10 @@ func Render() *cli.Command {
 					pipeline.AssetTypeClickHouse:            clickhouse.NewRenderer(fullRefresh),
 					pipeline.AssetTypeClickHouseQuerySensor: clickhouse.NewRenderer(fullRefresh),
 				},
-				builder: DefaultPipelineBuilder,
-				writer:  os.Stdout,
-				output:  c.String("output"),
+				builder:  DefaultPipelineBuilder,
+				writer:   os.Stdout,
+				output:   c.String("output"),
+				rawQuery: c.Bool("raw-query"),
 			}
 			modifierInfo := ModifierInfo{
 				StartDate:      startDate,
@@ -292,8 +297,9 @@ type RenderCommand struct {
 	materializers map[pipeline.AssetType]queryMaterializer
 	builder       taskCreator
 
-	output string
-	writer io.Writer
+	output   string
+	writer   io.Writer
+	rawQuery bool
 }
 
 func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifierInfo ModifierInfo) error {
@@ -325,30 +331,31 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 
 	qq := queries[0]
 
-	if materializer, ok := r.materializers[task.Type]; ok {
-		materialized, err := materializer.Render(task, qq.Query)
-		if err != nil {
-			r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
-			return cli.Exit("", 1)
-		}
-
-		qq.Query = materialized
-		if task.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-			var rextractedQueries []*query.Query
-
-			rextractedQueries, err = extractor.ExtractQueriesFromString(materialized)
+	if !r.rawQuery {
+		if materializer, ok := r.materializers[task.Type]; ok {
+			materialized, err := materializer.Render(task, qq.Query)
 			if err != nil {
-				r.printErrorOrJSON(err.Error())
+				r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
 				return cli.Exit("", 1)
 			}
-			qq.Query = rextractedQueries[0].Query
-		}
 
-		qq.Query = pipeline.WrapHooks(qq.Query, task.Hooks)
+			qq.Query = materialized
+			if task.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
+				var rextractedQueries []*query.Query
 
-		if r.output != "json" {
-			qq.Query = highlightCode(qq.Query, "sql")
+				rextractedQueries, err = extractor.ExtractQueriesFromString(materialized)
+				if err != nil {
+					r.printErrorOrJSON(err.Error())
+					return cli.Exit("", 1)
+				}
+				qq.Query = rextractedQueries[0].Query
+			}
+			qq.Query = pipeline.WrapHooks(qq.Query, task.Hooks)
 		}
+	}
+
+	if r.output != "json" {
+		qq.Query = highlightCode(qq.Query, "sql")
 	}
 
 	if r.output == "json" {
