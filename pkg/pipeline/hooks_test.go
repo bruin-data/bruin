@@ -73,3 +73,46 @@ func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
 		})
 	}
 }
+
+func TestWrapHookQueriesList(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		queries []string
+		hooks   Hooks
+		want    []string
+	}{
+		{
+			name:    "no hooks returns original list",
+			queries: []string{"select 1"},
+			hooks:   Hooks{},
+			want:    []string{"select 1"},
+		},
+		{
+			name:    "wraps pre and post hooks",
+			queries: []string{"select 2"},
+			hooks: Hooks{
+				Pre:  []Hook{{Query: "select 1"}},
+				Post: []Hook{{Query: "select 3"}},
+			},
+			want: []string{"select 1;", "select 2", "select 3;"},
+		},
+		{
+			name:    "skips empty hooks",
+			queries: []string{"select 2"},
+			hooks: Hooks{
+				Pre:  []Hook{{Query: " "}},
+				Post: []Hook{{Query: ""}},
+			},
+			want: []string{"select 2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, wrapHookQueriesList(tt.queries, tt.hooks))
+		})
+	}
+}
