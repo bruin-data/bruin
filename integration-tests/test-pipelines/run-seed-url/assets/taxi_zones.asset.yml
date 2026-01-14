@@ -1,0 +1,7 @@
+name: taxi_zones.raw
+type: duckdb.seed
+
+description: This asset loads a CSV file from a URL into a DuckDB database.
+
+parameters:
+  path: https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv

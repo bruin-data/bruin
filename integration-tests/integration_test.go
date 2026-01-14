@@ -1329,6 +1329,59 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "run-start-date-after-end-date-validation",
+			task: e2e.Task{
+				Name:    "run-start-date-after-end-date-validation",
+				Command: binary,
+				Args:    []string{"run", "--start-date", "2024-01-31", "--end-date", "2024-01-15", filepath.Join(currentFolder, "test-pipelines/happy-path")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"Start date cannot be after end date",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-start-date-after-end-date-validation-with-time",
+			task: e2e.Task{
+				Name:    "run-start-date-after-end-date-validation-with-time",
+				Command: binary,
+				Args:    []string{"run", "--start-date", "2024-01-15 15:00:00", "--end-date", "2024-01-15 10:00:00", filepath.Join(currentFolder, "test-pipelines/happy-path")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{
+						"Start date cannot be after end date",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-start-date-equal-to-end-date-should-succeed",
+			task: e2e.Task{
+				Name:    "run-start-date-equal-to-end-date-should-succeed",
+				Command: binary,
+				Args:    []string{"run", "--start-date", "2024-01-15", "--end-date", "2024-01-15", filepath.Join(currentFolder, "test-pipelines/happy-path")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+		},
+		{
 			name: "run-single-non-bq-asset-no-adc-check",
 			task: e2e.Task{
 				Name:    "run-single-non-bq-asset-no-adc-check",

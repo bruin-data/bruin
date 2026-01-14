@@ -182,14 +182,14 @@ func (c SynapseConnection) GetName() string {
 
 type DatabricksConnection struct {
 	Name         string `yaml:"name,omitempty"  json:"name" mapstructure:"name"`
-	Token        string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Token        string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" jsonschema:"oneof_required=token"`
 	Path         string `yaml:"path,omitempty"  json:"path" mapstructure:"path"`
 	Host         string `yaml:"host,omitempty"  json:"host" mapstructure:"host"`
 	Port         int    `yaml:"port,omitempty"  json:"port" mapstructure:"port" jsonschema:"default=443"`
 	Catalog      string `yaml:"catalog,omitempty"  json:"catalog" mapstructure:"catalog"`
 	Schema       string `yaml:"schema,omitempty"  json:"schema" mapstructure:"schema"`
-	ClientID     string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
-	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id" jsonschema:"oneof_required=oauth"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret" jsonschema:"oneof_required=oauth"`
 }
 
 func (c DatabricksConnection) GetName() string {

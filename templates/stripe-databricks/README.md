@@ -21,6 +21,45 @@ Balance transactions in Stripe don't have a direct `customer` field. To link the
 customer ← charge (via charge.customer) → balance_transaction (via charge.balance_transaction)
 ```
 
+## Configuration
+
+### Stripe API Key Setup
+
+Before running the pipeline, you need to configure your Stripe API credentials. **Important: You must use a Secret API key, not a Publishable API key.** Using a publishable key will result in errors like:
+
+```
+PermissionError: This API call cannot be made with a publishable API key. Please use a secret API key.
+```
+
+#### Getting Your Stripe Secret API Key
+
+1. Log in to your [Stripe Dashboard](https://dashboard.stripe.com/)
+2. Click ⚙️ **Settings** in the top-right corner
+3. Navigate to **Developers** from the top menu
+4. Click **"Manage API Keys"**
+5. In the **"Standard Keys"** section, click **"Reveal test key"** (for test mode) or **"Reveal live key"** (for production) beside the **Secret Key**
+6. Copy the secret API key (it starts with `sk_test_` for test mode or `sk_live_` for production)
+
+> **Note:** The Stripe UI may change over time. For the most up-to-date instructions, refer to the [dlt Stripe documentation](https://dlthub.com/docs/dlt-ecosystem/verified-sources/stripe#grab-credentials). Since Bruin uses dlt's Stripe ingestion under the hood, the credential setup process is the same.
+
+#### Configuring the Connection in Bruin
+
+Add your Stripe connection to the `.bruin.yml` file in your project root:
+
+```yaml
+default_environment: default
+environments:
+  default:
+    connections:
+      stripe:
+        - name: 'stripe-default'
+          api_key: 'sk_test_YOUR_SECRET_KEY_HERE'  # Use your secret API key
+```
+
+The connection name `stripe-default` matches the `source_connection` specified in `pipeline.yml`. If you use a different connection name, make sure to update `pipeline.yml` accordingly.
+
+For more information on managing connections in Bruin, see the [Bruin connections documentation](https://getbruin.com/docs/bruin/commands/connections) and [Stripe credentials guide](https://getbruin.com/docs/bruin/ingestion/stripe.html#step-1-add-a-connection-to-bruin-yml-file).
+
 ## Running the Pipeline
 
 Initialize a new project from this template:
@@ -44,7 +83,7 @@ bruin run --start-date 2025-01-01 --end-date 2025-01-30 my-stripe-pipeline
 Run a single asset:
 
 ```bash
-bruin run assets/raw/bronze_customer_data_raw.asset.yml
+bruin run assets/bronze/bronze_customer_data_raw.asset.yml
 ```
 
 ## Pipeline Flow

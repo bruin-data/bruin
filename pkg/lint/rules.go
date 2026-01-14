@@ -520,7 +520,8 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 				Description: "Materialization is not allowed on a seed asset",
 			})
 		}
-		if asset.Parameters["path"] == "" {
+		seedPath := asset.Parameters["path"]
+		if seedPath == "" {
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: "Seed file path is required",
@@ -528,7 +529,13 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
-		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), asset.Parameters["path"])
+		lowerPath := strings.ToLower(seedPath)
+		if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
+			// URL seeds are validated at runtime by ingestr, skip local file checks
+			return issues, nil
+		}
+
+		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), seedPath)
 		_, err := os.Stat(seedFilePath)
 		if os.IsNotExist(err) {
 			issues = append(issues, &Issue{
