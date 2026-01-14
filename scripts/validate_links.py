@@ -106,6 +106,9 @@ def check_url(url, timeout=10):
             else:
                 return False, f"Status {status_code}"
     except urllib.error.HTTPError as e:
+        # Treat 403 (Forbidden) as skipped - many sites block automated checkers
+        if e.code == 403:
+            return True, "skipped (403 Forbidden - likely blocks automated checkers)"
         if e.code in OK_STATUS_CODES:
             return True, f"OK ({e.code})"
         return False, f"HTTP {e.code}: {e.reason}"
@@ -141,8 +144,13 @@ def validate_links_in_repo(root_dir='.'):
                     skipped_count += 1
                     continue
                 
-                checked_count += 1
                 is_valid, message = check_url(url)
+                # If the URL was skipped (e.g., 403), count it as skipped
+                if message.startswith("skipped"):
+                    skipped_count += 1
+                    continue
+                
+                checked_count += 1
                 if not is_valid:
                     broken_links.append((md_file, url, message))
                     print(f"  ✗ {url} - {message}")
