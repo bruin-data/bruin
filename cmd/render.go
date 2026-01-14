@@ -74,7 +74,7 @@ func Render() *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:  "raw-query",
-				Usage: "output only the raw SELECT query",
+				Usage: "output only the raw query",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
