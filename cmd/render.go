@@ -330,9 +330,10 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	}
 
 	qq := queries[0]
+	materializer, hasMaterializer := r.materializers[task.Type]
 
 	if !r.rawQuery {
-		if materializer, ok := r.materializers[task.Type]; ok {
+		if hasMaterializer {
 			materialized, err := materializer.Render(task, qq.Query)
 			if err != nil {
 				r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
@@ -354,7 +355,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 		}
 	}
 
-	if r.output != "json" {
+	if hasMaterializer && r.output != "json" {
 		qq.Query = highlightCode(qq.Query, "sql")
 	}
 
