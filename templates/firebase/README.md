@@ -13,7 +13,7 @@ The pipeline includes several sample assets:
 For a more detailed description of each asset, refer to the **description** section within each sql asset. Each file provides specific details and instructions relevant to its functionality.
 
 ## Setup
-The pipeline includes a `.bruin.yml` file where you need to configure your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
+The pipeline includes a `.bruin.yml` file where you need to configure your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` configuration:
 

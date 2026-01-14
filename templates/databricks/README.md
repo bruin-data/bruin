@@ -140,5 +140,5 @@ The asset uses fully qualified table names to read from the `samples` catalog wh
 
 ## Resources
 
-- [Databricks Documentation](https://docs.bruin.dev/platforms/databricks)
+- [Databricks Documentation](https://getbruin.com/docs/bruin/platforms/databricks)
 - [Bruin CLI Documentation](https://getbruin.com/docs/bruin/)

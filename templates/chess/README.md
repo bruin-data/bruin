@@ -8,7 +8,7 @@ The pipeline includes three sample assets already:
 - `player_summary.sql`:Creates a summary table of chess player stats, including games, wins, and win rates as white/black.
 
 ## Setup
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
+The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
 

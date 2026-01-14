@@ -11,7 +11,7 @@ The pipeline includes the following example assets:
 - `fx_insights/currency_performance.sql`: An SQL-asset which shows the latest exchange rates as well as each currency's performance over the past 30 days from `frankfurter/daily_rates.sql` and matches each currency code to the currencies full name from `frankfurter/currency_names.sql`.
 
 ## Setup
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
+The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
 
