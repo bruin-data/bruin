@@ -15,6 +15,8 @@ environments:
           path: "duckdb-files/start-date-flags.db"
         - name: "duckdb-mat-test"
           path: "duckdb-files/materialization-test.db"
+        - name: "duckdb-date-validation"
+          path: "duckdb-files/date-validation.db"
       chess:
         - name: "chess-default"
           players:
