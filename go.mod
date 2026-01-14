@@ -53,6 +53,7 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/rudderlabs/analytics-go/v4 v4.2.1
 	github.com/samber/lo v1.51.0
+	github.com/sergi/go-diff v1.4.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/snowflakedb/gosnowflake v1.17.1
 	github.com/sourcegraph/conc v0.3.0
@@ -325,7 +326,6 @@ require (
 	github.com/securego/gosec/v2 v2.22.2 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/segmentio/backo-go v1.1.0 // indirect
-	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sivchari/containedctx v1.0.3 // indirect
