@@ -2474,6 +2474,10 @@ func (m *Manager) AddDataprocServerlessConnectionFromConfig(connection *config.D
 		Region:                           connection.Region,
 		ExecutionRole:                    connection.ExecutionRole,
 		SubnetworkURI:                    connection.SubnetworkURI,
+		NetworkTags:                      connection.NetworkTags,
+		KmsKey:                           connection.KmsKey,
+		StagingBucket:                    connection.StagingBucket,
+		MetastoreService:                 connection.MetastoreService,
 	})
 	if err != nil {
 		return err

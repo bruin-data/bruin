@@ -38,13 +38,16 @@ parameters:
 - type: Specifies the type of the asset. It will be always ingestr type for Slack.
 - connection: This is the destination connection.
 - source_connection: The name of the Slack connection defined in .bruin.yml.
-- source_table: The name of the data table in Slack you want to ingest. Available tables:
+- source_table: The name of the data table in Slack you want to ingest.
 
-Table    PK    Inc Key    Inc Strategy    Details
-channels    id    -    replace    Retrieves information about all the channels
-users    id    -    replace    Retrieves all the users
-messages:chan1,chan2    ts    ts    append/merge    Retrieves messages from specified channels (e.g., general, memes). Multiple channels can be listed separated by commas
-access_logs    user_id    -    append    Retrieves access logs
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| `channels` | id | - | replace | Retrieves information about all the channels |
+| `users` | id | - | replace | Retrieves all the users |
+| `messages:chan1,chan2` | ts | ts | append/merge | Retrieves messages from specified channels (e.g., general, memes). Multiple channels can be listed separated by commas |
+| `access_logs` | user_id | - | append | Retrieves access logs |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

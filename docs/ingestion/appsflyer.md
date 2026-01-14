@@ -44,9 +44,11 @@ parameters:
 
 ## Available Source Tables
 
-- `campaigns`: Retrieves data for campaigns, detailing the app's costs, loyal users, total installs, and revenue over multiple days.
-- `creatives`: Retrieves data for a creative asset, including revenue and cost.
-- `custom:<dimensions>:<metrics>`: Retrieves data for custom tables, which can be specified by the user.
+| Table | Description |
+|-------|-------------|
+| `campaigns` | Retrieves data for campaigns, detailing the app's costs, loyal users, total installs, and revenue over multiple days. |
+| `creatives` | Retrieves data for a creative asset, including revenue and cost. |
+| `custom:<dimensions>:<metrics>` | Retrieves data for custom tables, which can be specified by the user. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

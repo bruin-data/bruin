@@ -33,6 +33,20 @@ environments:
         # Use this when your Dataproc batches need to connect to resources in a specific VPC
         subnetwork_uri: projects/my-host-project/regions/us-central1/subnetworks/my-subnetwork
 
+        # (Optional) Network tags for firewall rules
+        network_tags:
+          - dataproc
+          - spark
+
+        # (Optional) Cloud KMS key for encryption
+        kms_key: projects/my-project/locations/us-central1/keyRings/my-ring/cryptoKeys/my-key
+
+        # (Optional) GCS bucket for staging files (bucket name only, not gs:// URI)
+        staging_bucket: my-staging-bucket
+
+        # (Optional) Dataproc Metastore service for Hive/Spark SQL tables
+        metastore_service: projects/my-project/locations/us-central1/services/my-metastore
+
         # Authentication (one of the following):
         # Option 1: Use Application Default Credentials (ADC)
         use_application_default_credentials: true
@@ -219,6 +233,10 @@ parameters:
 | `workspace` | Yes | GCS path for temporary job files (e.g., `gs://bucket/prefix/`) |
 | `execution_role` | No | Service account email for job execution |
 | `subnetwork_uri` | No | Subnetwork URI for VPC connectivity (e.g., `projects/host-project/regions/region/subnetworks/subnet`) |
+| `network_tags` | No | List of network tags for firewall rules |
+| `kms_key` | No | Cloud KMS key resource name for encryption |
+| `staging_bucket` | No | GCS bucket name (not URI) for staging files |
+| `metastore_service` | No | Dataproc Metastore service resource name for Hive/Spark SQL tables |
 | `use_application_default_credentials` | No* | Set to `true` to use Application Default Credentials |
 | `service_account_json` | No* | Inline service account JSON credentials |
 | `service_account_file` | No* | Path to service account JSON file |
@@ -232,6 +250,11 @@ The service account used for authentication requires the following IAM roles:
 - **Dataproc Editor** (`roles/dataproc.editor`): To create and manage batch jobs
 - **Storage Object Admin** (`roles/storage.objectAdmin`): To upload files to the workspace bucket
 - **Logs Viewer** (`roles/logging.viewer`): To stream job logs
+
+Additional roles may be required depending on optional features:
+
+- If using `kms_key`: **Cloud KMS CryptoKey Encrypter/Decrypter** (`roles/cloudkms.cryptoKeyEncrypterDecrypter`)
+- If using `metastore_service`: **Dataproc Metastore Editor** (`roles/metastore.editor`)
 
 If using `execution_role`, that service account needs appropriate permissions to access data sources and destinations used by your Spark jobs.
 

@@ -42,26 +42,34 @@ func (e batchError) Error() string {
 }
 
 type JobRunParams struct {
-	Project        string
-	Region         string
-	RuntimeVersion string
-	Config         string
-	Args           []string
-	Timeout        time.Duration
-	Workspace      string
-	ExecutionRole  string
-	SubnetworkURI  string
+	Project          string
+	Region           string
+	RuntimeVersion   string
+	Config           string
+	Args             []string
+	Timeout          time.Duration
+	Workspace        string
+	ExecutionRole    string
+	SubnetworkURI    string
+	NetworkTags      []string
+	KmsKey           string
+	StagingBucket    string
+	MetastoreService string
 }
 
 func parseParams(cfg *Client, params map[string]string) *JobRunParams {
 	jobParams := JobRunParams{
-		Project:        cfg.ProjectID,
-		Region:         cfg.Region,
-		RuntimeVersion: params["runtime_version"],
-		Config:         params["config"],
-		Workspace:      cfg.Workspace,
-		ExecutionRole:  cfg.ExecutionRole,
-		SubnetworkURI:  cfg.SubnetworkURI,
+		Project:          cfg.ProjectID,
+		Region:           cfg.Region,
+		RuntimeVersion:   params["runtime_version"],
+		Config:           params["config"],
+		Workspace:        cfg.Workspace,
+		ExecutionRole:    cfg.ExecutionRole,
+		SubnetworkURI:    cfg.SubnetworkURI,
+		NetworkTags:      cfg.NetworkTags,
+		KmsKey:           cfg.KmsKey,
+		StagingBucket:    cfg.StagingBucket,
+		MetastoreService: cfg.MetastoreService,
 	}
 
 	// default runtime version
@@ -244,7 +252,7 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 			Version:    job.params.RuntimeVersion,
 			Properties: sparkProperties,
 		},
-		EnvironmentConfig: batchEnvironmentConfig(job.params.ExecutionRole, job.params.Timeout, job.params.SubnetworkURI),
+		EnvironmentConfig: batchEnvironmentConfig(job.params),
 	}
 
 	return &dataprocpb.CreateBatchRequest{
@@ -359,20 +367,41 @@ func (job Job) buildLogConsumer(ctx context.Context, batchID string) LogConsumer
 	}
 }
 
-func batchEnvironmentConfig(role string, timeout time.Duration, subnetworkURI string) *dataprocpb.EnvironmentConfig {
+func batchEnvironmentConfig(params *JobRunParams) *dataprocpb.EnvironmentConfig {
 	cfg := &dataprocpb.EnvironmentConfig{
 		ExecutionConfig: &dataprocpb.ExecutionConfig{},
 	}
-	if strings.TrimSpace(role) != "" {
-		cfg.ExecutionConfig.ServiceAccount = role
+
+	// Execution config
+	if strings.TrimSpace(params.ExecutionRole) != "" {
+		cfg.ExecutionConfig.ServiceAccount = params.ExecutionRole
 	}
-	if timeout != 0 {
-		cfg.ExecutionConfig.Ttl = durationpb.New(timeout)
+	if params.Timeout != 0 {
+		cfg.ExecutionConfig.Ttl = durationpb.New(params.Timeout)
 	}
-	if strings.TrimSpace(subnetworkURI) != "" {
+	if strings.TrimSpace(params.SubnetworkURI) != "" {
 		cfg.ExecutionConfig.Network = &dataprocpb.ExecutionConfig_SubnetworkUri{
-			SubnetworkUri: subnetworkURI,
+			SubnetworkUri: params.SubnetworkURI,
 		}
 	}
+	if len(params.NetworkTags) > 0 {
+		cfg.ExecutionConfig.NetworkTags = params.NetworkTags
+	}
+	if strings.TrimSpace(params.KmsKey) != "" {
+		cfg.ExecutionConfig.KmsKey = params.KmsKey
+	}
+	if strings.TrimSpace(params.StagingBucket) != "" {
+		bucket := strings.TrimPrefix(strings.TrimSpace(params.StagingBucket), "gs://")
+		bucket = strings.TrimSuffix(bucket, "/")
+		cfg.ExecutionConfig.StagingBucket = bucket
+	}
+
+	// Peripherals config (metastore)
+	if strings.TrimSpace(params.MetastoreService) != "" {
+		cfg.PeripheralsConfig = &dataprocpb.PeripheralsConfig{
+			MetastoreService: params.MetastoreService,
+		}
+	}
+
 	return cfg
 }
