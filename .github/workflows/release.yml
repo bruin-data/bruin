@@ -83,6 +83,13 @@ jobs:
                     location: "${GCP_LOCATION}"
           EOF
 
+      - name: Test BigQuery connection (fail fast)
+        run: |
+          ./bin/bruin connections test \
+            --config-file integration-tests/cloud-integration-tests/.bruin.cloud.yml \
+            --env default \
+            --name gcp-default
+
       - name: Run BigQuery Integration Tests
         run: |
           cd integration-tests/cloud-integration-tests/bigquery
