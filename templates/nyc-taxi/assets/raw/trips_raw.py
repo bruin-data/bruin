@@ -208,10 +208,17 @@ def materialize():
 
         df['taxi_type'] = taxi_type
         df['extracted_at'] = extracted_at
-        
+
         # Create coalesced datetime columns for primary key (handles both yellow and green taxis)
-        df['pickup_datetime'] = df['tpep_pickup_datetime'].fillna(df['lpep_pickup_datetime'])
-        df['dropoff_datetime'] = df['tpep_dropoff_datetime'].fillna(df['lpep_dropoff_datetime'])
+        # Yellow taxis use tpep_* columns, green taxis use lpep_* columns
+        # Check for column existence before accessing to avoid KeyError
+        tpep_pickup = df['tpep_pickup_datetime'] if 'tpep_pickup_datetime' in df.columns else pd.Series(dtype='datetime64[ns]', index=df.index)
+        lpep_pickup = df['lpep_pickup_datetime'] if 'lpep_pickup_datetime' in df.columns else pd.Series(dtype='datetime64[ns]', index=df.index)
+        tpep_dropoff = df['tpep_dropoff_datetime'] if 'tpep_dropoff_datetime' in df.columns else pd.Series(dtype='datetime64[ns]', index=df.index)
+        lpep_dropoff = df['lpep_dropoff_datetime'] if 'lpep_dropoff_datetime' in df.columns else pd.Series(dtype='datetime64[ns]', index=df.index)
+        
+        df['pickup_datetime'] = tpep_pickup.fillna(lpep_pickup)
+        df['dropoff_datetime'] = tpep_dropoff.fillna(lpep_dropoff)
 
         all_dataframes.append(df)
         print(f"Successfully downloaded {year}-{month:02d}: {len(df)} rows")
