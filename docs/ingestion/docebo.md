@@ -60,7 +60,7 @@ parameters:
 ## Available Source Tables
 
 | Table | Inc Strategy | Details |
-| ----- | ------------ | ------- |
+|-------|--------------|---------|
 | `branches` | replace | Organization branches and departments structure. |
 | `categories` | replace | Course categories for organizing learning content. |
 | `certifications` | replace | Certification records and achievement data. |

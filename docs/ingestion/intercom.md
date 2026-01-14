@@ -37,18 +37,18 @@ connections:
 
 Intercom assets will be ingested to your data warehouse as defined in the `destination` table.
 
-| Asset            | Table Name       | Incremental Key | Description                                                                  |
-|------------------|------------------|-----------------|------------------------------------------------------------------------------|
-| Contacts         | `contacts`       | updated_at      | Customer contacts with their attributes, tags, and company associations     |
-| Companies        | `companies`      | updated_at      | Company information including custom attributes and tags                     |
-| Conversations    | `conversations`  | updated_at      | Customer conversations with messages, state, and metadata                   |
-| Tickets          | `tickets`        | updated_at      | Customer support tickets with attributes and resolution details             |
-| Articles         | `articles`       | updated_at      | Help center articles and knowledge base content                             |
-| Tags             | `tags`           | replace         | All available tags in your Intercom workspace                              |
-| Segments         | `segments`       | replace         | Customer segments and their definitions                                     |
-| Teams            | `teams`          | replace         | Support and sales teams configuration                                       |
-| Admins           | `admins`         | replace         | Admin users and their permissions                                           |
-| Data Attributes  | `data_attributes`| replace         | Custom data attributes definitions for contacts and companies               |
+| Asset | Table Name | Incremental Key | Description |
+|-------|------------|-----------------|-------------|
+| Contacts | `contacts` | updated_at | Customer contacts with their attributes, tags, and company associations |
+| Companies | `companies` | updated_at | Company information including custom attributes and tags |
+| Conversations | `conversations` | updated_at | Customer conversations with messages, state, and metadata |
+| Tickets | `tickets` | updated_at | Customer support tickets with attributes and resolution details |
+| Articles | `articles` | updated_at | Help center articles and knowledge base content |
+| Tags | `tags` | replace | All available tags in your Intercom workspace |
+| Segments | `segments` | replace | Customer segments and their definitions |
+| Teams | `teams` | replace | Support and sales teams configuration |
+| Admins | `admins` | replace | Admin users and their permissions |
+| Data Attributes | `data_attributes` | replace | Custom data attributes definitions for contacts and companies |
 
 ## Asset-Specific Configuration
 
