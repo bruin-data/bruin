@@ -25,7 +25,7 @@ parameters:
 
 The interesting part is in the `parameters` list:
 - `source_connection`: the [connection](../getting-started/concepts.md#connection) that defines the source platform
-- `source_table`: the table name for that source on [ingestr](https://bruin-data.github.io/ingestr/supported-sources/shopify.html)
+- `source_table`: the table name for that source on [ingestr](https://getbruin.com/docs/ingestr/supported-sources/shopify.html)
 - `destination`: the destination you'd like to load the data on
 
 Effectively, this asset will run `ingestr` in the background and load the data to your data warehouse.

@@ -3,7 +3,7 @@
 
 Bruin supports Appsflyer as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Appsflyer into your data warehouse.
 
-In order to set up an Appsflyer connection, you need to add a configuration item to `connections` in the `.bruin.yml` file and in `asset` file. You need the `api_key`. For more information on how to get these credentials check the Appsflyer section in [Ingestr documentation](https://bruin-data.github.io/ingestr/getting-started/quickstart.html)
+In order to set up an Appsflyer connection, you need to add a configuration item to `connections` in the `.bruin.yml` file and in `asset` file. You need the `api_key`. For more information on how to get these credentials check the Appsflyer section in [Ingestr documentation](https://getbruin.com/docs/ingestr/getting-started/quickstart.html)
 
 Follow the steps below to correctly set up Appsflyer as a data source and run ingestion.
 

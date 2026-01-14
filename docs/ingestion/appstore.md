@@ -32,7 +32,7 @@ To connect to AppStore, you need to add a configuration item to the connections 
 * `key_path`: Path to the private key.
 * `key`: encoded contents of the private key. Be sure to use `|` yaml scalar when specifying the key inline.
 
-For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/appstore.html#setting-up-appstore-integration).
+For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/appstore.html#setting-up-appstore-integration).
 
 ### Step 2: Create an asset file for data ingestion
 

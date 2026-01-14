@@ -22,7 +22,7 @@ To connect to Monday.com, you need to add a configuration item to the connection
 
 * `api_token`: is your Monday.com API token for authentication.
 
-For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/monday.html#setting-up-a-mondaycom-integration).
+For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/monday.html#setting-up-a-mondaycom-integration).
 
 ### Step 2: Create an asset file for data ingestion
 

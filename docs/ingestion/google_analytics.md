@@ -39,7 +39,7 @@ parameters:
 - `source_connection`: The name of the Google Analytics connection defined in .bruin.yml.
 - `source_table`: The name of the data table in Google Analytics to ingest data from.
 Currently, only one table is supported: custom, which refers to Custom Reports. These allow you to retrieve data based on specific dimensions and metrics.
-For more information, please visit [here](https://bruin-data.github.io/ingestr/supported-sources/google_analytics.html).
+For more information, please visit [here](https://getbruin.com/docs/ingestr/supported-sources/google_analytics.html).
 - `destination`: The name of the destination connection.
 
 ### Step 3: [Run](/commands/run) asset to ingest data

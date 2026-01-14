@@ -25,7 +25,7 @@ to your data warehouses:
 * Postgres 
 
 > [!INFO]
-> You can read more about the capabilities of ingestr [in its documentation](https://bruin-data.github.io/ingestr/).
+> You can read more about the capabilities of ingestr [in its documentation](https://getbruin.com/docs/ingestr/).
 
 
 

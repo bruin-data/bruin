@@ -26,7 +26,7 @@ To connect to Jira, you need to add a configuration item to the connections sect
 * `email`: is the email address used for authentication with the Jira API.
 * `api_token`: is the API token for authentication (required for Jira Cloud).
 
-For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/jira.html#authentication).
+For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/jira.html#authentication).
 
 ### Step 2: Create an asset file for data ingestion
 

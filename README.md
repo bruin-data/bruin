@@ -8,21 +8,21 @@ Bruin is a data pipeline tool that brings together data ingestion, data transfor
 
 Bruin is packed with features:
 - 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
-- ✨ run SQL, Python & R transformations on [many platforms](https://bruin-data.github.io/bruin/#supported-platforms)
-- 📐 table/view [materializations](https://bruin-data.github.io/bruin/assets/materialization.html), incremental tables
+- ✨ run SQL, Python & R transformations on [many platforms](https://getbruin.com/docs/bruin/#supported-platforms)
+- 📐 table/view [materializations](https://getbruin.com/docs/bruin/assets/materialization.html), incremental tables
 - 🐍 run Python in isolated environments using [uv](https://github.com/astral-sh/uv)
 - 💅 built-in data quality checks
 - 🚀 Jinja templating to avoid repetition
 - ✅ validate pipelines end-to-end via dry-run
-- 👷 run on your local machine, an EC2 instance, or [GitHub Actions](https://bruin-data.github.io/bruin/cicd/github-action.html)
+- 👷 run on your local machine, an EC2 instance, or [GitHub Actions](https://getbruin.com/docs/bruin/cicd/github-action.html)
 - 🔒 secrets injection via environment variables
-- [VS Code extension](https://bruin-data.github.io/bruin/vscode-extension/overview.html) for a better developer experience
+- [VS Code extension](https://getbruin.com/docs/bruin/vscode-extension/overview.html) for a better developer experience
 - ⚡ written in Golang
-- 📦 [easy to install](https://bruin-data.github.io/bruin/getting-started/introduction/installation.html) and use
+- 📦 [easy to install](https://getbruin.com/docs/bruin/getting-started/introduction/installation.html) and use
 
 ## Installation
 
-Please see the installation instructions [here](https://bruin-data.github.io/bruin/getting-started/introduction/installation.html).
+Please see the installation instructions [here](https://getbruin.com/docs/bruin/getting-started/introduction/installation.html).
 
 ## Community
 
@@ -38,5 +38,5 @@ Join our Slack community [here](https://join.slack.com/t/bruindatacommunity/shar
 
 ## Quickstart
 
-Take a look at our quickstart guide [here](https://bruin-data.github.io/bruin/getting-started/introduction/quickstart.html).
+Take a look at our quickstart guide [here](https://getbruin.com/docs/bruin/getting-started/introduction/quickstart.html).
 

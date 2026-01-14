@@ -24,7 +24,7 @@ To connect to Asana, you need to add a configuration item to the connections sec
 * `workspace`: is the `gid` of your workspace.
 * `access_token`: is a personal access token.
 
-For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/asana.html#uri-format).
+For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/asana.html#uri-format).
 
 ### Step 2: Create an asset file for data ingestion
 

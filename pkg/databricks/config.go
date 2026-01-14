@@ -66,7 +66,7 @@ func (c *Config) ToDBConnectionURI() string {
 // GetIngestrURI returns the connection URI for ingestr.
 // For PAT: databricks://token:<access_token>@<server_hostname>?http_path=<http_path>&catalog=<catalog>&schema=<schema>
 // For OAuth M2M: databricks://<server_hostname>?http_path=<http_path>&catalog=<catalog>&schema=<schema>&client_id=<id>&client_secret=<secret>
-// See: https://bruin-data.github.io/ingestr/supported-sources/databricks.html
+// See: https://getbruin.com/docs/ingestr/supported-sources/databricks.html
 func (c *Config) GetIngestrURI() string {
 	query := url.Values{}
 

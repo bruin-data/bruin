@@ -26,7 +26,7 @@ To connect to DynamoDB, you need to add a configuration item to the connections 
 * `secret_access_key`: Password for the IAM account.
 * `region`: AWS region in which your DynamoDB table exists.
 
-For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/dynamodb.html#setting-up-a-dynamodb-integration).
+For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/dynamodb.html#setting-up-a-dynamodb-integration).
 
 ### Step 2: Create an asset file for data ingestion
 
