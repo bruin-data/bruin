@@ -330,9 +330,10 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	}
 
 	qq := queries[0]
+	materializer, hasMaterializer := r.materializers[task.Type]
 
 	if !r.rawQuery {
-		if materializer, ok := r.materializers[task.Type]; ok {
+		if hasMaterializer {
 			materialized, err := materializer.Render(task, qq.Query)
 			if err != nil {
 				r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
@@ -350,12 +351,11 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 				}
 				qq.Query = rextractedQueries[0].Query
 			}
-
-			qq.Query = wrapHooks(qq.Query, task.Hooks)
+			qq.Query = pipeline.WrapHooks(qq.Query, task.Hooks)
 		}
 	}
 
-	if r.output != "json" {
+	if hasMaterializer && r.output != "json" {
 		qq.Query = highlightCode(qq.Query, "sql")
 	}
 
@@ -400,45 +400,6 @@ func highlightCode(code string, language string) string {
 	}
 
 	return b.String()
-}
-
-func wrapHooks(query string, hooks pipeline.Hooks) string {
-	preParts := formatHookQueries(hooks.Pre)
-	postParts := formatHookQueries(hooks.Post)
-	if len(preParts) == 0 && len(postParts) == 0 {
-		return query
-	}
-
-	parts := make([]string, 0, len(preParts)+1+len(postParts))
-	parts = append(parts, preParts...)
-
-	if main := formatStatement(query); main != "" {
-		parts = append(parts, main)
-	}
-
-	parts = append(parts, postParts...)
-	return strings.Join(parts, "\n")
-}
-
-func formatHookQueries(hooks []pipeline.Hook) []string {
-	formatted := make([]string, 0, len(hooks))
-	for _, hook := range hooks {
-		if formattedQuery := formatStatement(hook.Query); formattedQuery != "" {
-			formatted = append(formatted, formattedQuery)
-		}
-	}
-	return formatted
-}
-
-func formatStatement(query string) string {
-	trimmed := strings.TrimSpace(query)
-	if trimmed == "" {
-		return ""
-	}
-	if strings.HasSuffix(trimmed, ";") {
-		return trimmed
-	}
-	return trimmed + ";"
 }
 
 func (r *RenderCommand) printErrorOrJSON(msg string) {

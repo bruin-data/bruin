@@ -68,3 +68,88 @@ func TestMaterializer_Render(t *testing.T) {
 		})
 	}
 }
+
+type stringMaterializer struct {
+	out string
+}
+
+func (m stringMaterializer) Render(_ *Asset, _ string) (string, error) {
+	return m.out, nil
+}
+
+type listMaterializer struct {
+	out []string
+}
+
+func (m listMaterializer) Render(_ *Asset, _ string) ([]string, error) {
+	return m.out, nil
+}
+
+type listWithLocationMaterializer struct {
+	out         []string
+	gotLocation string
+}
+
+func (m *listWithLocationMaterializer) Render(_ *Asset, _ string, location string) ([]string, error) {
+	m.gotLocation = location
+	return m.out, nil
+}
+
+func TestHookWrapperMaterializer_Render(t *testing.T) {
+	t.Parallel()
+
+	asset := &Asset{
+		Hooks: Hooks{
+			Pre:  []Hook{{Query: "select 1"}},
+			Post: []Hook{{Query: "select 2"}},
+		},
+	}
+
+	wrapper := HookWrapperMaterializer{
+		Mat: stringMaterializer{out: "select 3"},
+	}
+
+	got, err := wrapper.Render(asset, "ignored")
+	require.NoError(t, err)
+	assert.Equal(t, "select 1;\nselect 3;\nselect 2;", got)
+}
+
+func TestHookWrapperMaterializerList_Render(t *testing.T) {
+	t.Parallel()
+
+	asset := &Asset{
+		Hooks: Hooks{
+			Pre:  []Hook{{Query: "select 1"}},
+			Post: []Hook{{Query: "select 2"}},
+		},
+	}
+
+	wrapper := HookWrapperMaterializerList{
+		Mat: listMaterializer{out: []string{"select 3"}},
+	}
+
+	got, err := wrapper.Render(asset, "ignored")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"select 1;", "select 3", "select 2;"}, got)
+}
+
+func TestHookWrapperMaterializerListWithLocation_Render(t *testing.T) {
+	t.Parallel()
+
+	asset := &Asset{
+		Hooks: Hooks{
+			Pre:  []Hook{{Query: "select 1"}},
+			Post: []Hook{{Query: "select 2"}},
+		},
+	}
+	base := &listWithLocationMaterializer{out: []string{"select 3"}}
+
+	wrapper := HookWrapperMaterializerListWithLocation{
+		Mat: base,
+	}
+
+	got, err := wrapper.Render(asset, "ignored", "s3://bucket")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"select 1;", "select 3", "select 2;"}, got)
+	assert.Equal(t, "s3://bucket", base.gotLocation)
+}

@@ -571,17 +571,6 @@ func TestIsQuerySensorAsset(t *testing.T) {
 	}
 }
 
-func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
-	t.Parallel()
-
-	result := wrapHooks("  select 9  ", pipeline.Hooks{
-		Pre:  []pipeline.Hook{{Query: ""}, {Query: "select 1;"}},
-		Post: []pipeline.Hook{{Query: "  select 2  "}},
-	})
-
-	assert.Equal(t, "select 1;\nselect 9;\nselect 2;", result)
-}
-
 func TestModifyExtractor(t *testing.T) {
 	t.Parallel()
 	type args struct {
