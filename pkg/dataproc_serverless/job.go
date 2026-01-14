@@ -391,7 +391,9 @@ func batchEnvironmentConfig(params *JobRunParams) *dataprocpb.EnvironmentConfig 
 		cfg.ExecutionConfig.KmsKey = params.KmsKey
 	}
 	if strings.TrimSpace(params.StagingBucket) != "" {
-		cfg.ExecutionConfig.StagingBucket = params.StagingBucket
+		bucket := strings.TrimPrefix(strings.TrimSpace(params.StagingBucket), "gs://")
+		bucket = strings.TrimSuffix(bucket, "/")
+		cfg.ExecutionConfig.StagingBucket = bucket
 	}
 
 	// Peripherals config (metastore)
