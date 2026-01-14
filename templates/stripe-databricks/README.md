@@ -83,7 +83,7 @@ bruin run --start-date 2025-01-01 --end-date 2025-01-30 my-stripe-pipeline
 Run a single asset:
 
 ```bash
-bruin run assets/raw/bronze_customer_data_raw.asset.yml
+bruin run assets/bronze/bronze_customer_data_raw.asset.yml
 ```
 
 ## Pipeline Flow
