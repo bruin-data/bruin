@@ -1333,7 +1333,7 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "run-start-date-after-end-date-validation",
 				Command: binary,
-				Args:    []string{"run", "--start-date", "2024-01-31", "--end-date", "2024-01-15", filepath.Join(currentFolder, "test-pipelines/happy-path")},
+				Args:    []string{"run", "--start-date", "2024-01-31", "--end-date", "2024-01-15", filepath.Join(currentFolder, "test-pipelines/date-validation-test")},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 1,
@@ -1352,7 +1352,7 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "run-start-date-after-end-date-validation-with-time",
 				Command: binary,
-				Args:    []string{"run", "--start-date", "2024-01-15 15:00:00", "--end-date", "2024-01-15 10:00:00", filepath.Join(currentFolder, "test-pipelines/happy-path")},
+				Args:    []string{"run", "--start-date", "2024-01-15 15:00:00", "--end-date", "2024-01-15 10:00:00", filepath.Join(currentFolder, "test-pipelines/date-validation-test")},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 1,
@@ -1371,7 +1371,7 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "run-start-date-equal-to-end-date-should-succeed",
 				Command: binary,
-				Args:    []string{"run", "--start-date", "2024-01-15", "--end-date", "2024-01-15", filepath.Join(currentFolder, "test-pipelines/happy-path")},
+				Args:    []string{"run", "--start-date", "2024-01-15", "--end-date", "2024-01-15", filepath.Join(currentFolder, "test-pipelines/date-validation-test")},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
