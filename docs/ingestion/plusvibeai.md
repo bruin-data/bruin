@@ -37,15 +37,15 @@ connections:
 
 Plus Vibe AI assets will be ingested to your data warehouse as defined in the `destination` table.
 
-| Asset                | Table Name        | Incremental Key | Description                                                                                                                                        |
-|----------------------|-------------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| Campaigns            | `campaigns`       | `modified_at`   | Campaign information including configuration, schedules, sequences, and performance metrics                                                       |
-| Leads                | `leads`           | `modified_at`   | Lead information including contact details, campaign association, engagement metrics, and professional information                                 |
-| Email Accounts       | `email_accounts`  | `timestamp_updated` | Email account configurations including SMTP/IMAP settings, warmup configurations, and analytics data                                              |
-| Emails               | `emails`          | `timestamp_created` | Email data including message content, headers, thread information, and recipient details                                                          |
-| Blocklist            | `blocklist`       | `created_at`    | Blocklist entries for email addresses or domains that should be excluded from campaigns                                                           |
-| Webhooks             | `webhooks`        | `modified_at`   | Webhook configurations for receiving real-time notifications about campaign events and lead interactions                                          |
-| Tags                 | `tags`            | `modified_at`   | Tag information used for organizing and categorizing campaigns, leads, and other resources                                                        |
+| Asset | Table Name | Incremental Key | Description |
+|-------|------------|-----------------|-------------|
+| Campaigns | `campaigns` | `modified_at` | Campaign information including configuration, schedules, sequences, and performance metrics |
+| Leads | `leads` | `modified_at` | Lead information including contact details, campaign association, engagement metrics, and professional information |
+| Email Accounts | `email_accounts` | `timestamp_updated` | Email account configurations including SMTP/IMAP settings, warmup configurations, and analytics data |
+| Emails | `emails` | `timestamp_created` | Email data including message content, headers, thread information, and recipient details |
+| Blocklist | `blocklist` | `created_at` | Blocklist entries for email addresses or domains that should be excluded from campaigns |
+| Webhooks | `webhooks` | `modified_at` | Webhook configurations for receiving real-time notifications about campaign events and lead interactions |
+| Tags | `tags` | `modified_at` | Tag information used for organizing and categorizing campaigns, leads, and other resources |
 
 ## Asset-Specific Configuration
 

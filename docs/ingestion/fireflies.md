@@ -48,15 +48,15 @@ parameters:
 Fireflies source allows ingesting the following sources into separate tables:
 
 | Table | Inc Key | Inc Strategy | Details |
-| ----- | ------- | ------------ | ------- |
-| active_meetings | - | replace | Currently active/ongoing meetings in your Fireflies account |
-| analytics | end_time | merge | Meeting analytics including duration, speaker stats, and sentiment |
-| channels | - | replace | Channels (workspaces) configured in your Fireflies account |
-| users | - | replace | Users in your Fireflies team/organization |
-| user_groups | - | replace | User groups configured in your organization |
-| transcripts | date | merge | Meeting transcripts with full conversation details and metadata |
-| bites | - | replace | Short audio/video clips (bites) extracted from meetings |
-| contacts | - | replace | Contacts associated with your Fireflies account |
+|-------|---------|--------------|---------|
+| `active_meetings` | - | replace | Currently active/ongoing meetings in your Fireflies account |
+| `analytics` | end_time | merge | Meeting analytics including duration, speaker stats, and sentiment |
+| `channels` | - | replace | Channels (workspaces) configured in your Fireflies account |
+| `users` | - | replace | Users in your Fireflies team/organization |
+| `user_groups` | - | replace | User groups configured in your organization |
+| `transcripts` | date | merge | Meeting transcripts with full conversation details and metadata |
+| `bites` | - | replace | Short audio/video clips (bites) extracted from meetings |
+| `contacts` | - | replace | Contacts associated with your Fireflies account |
 
 ## Analytics Granularity
 
