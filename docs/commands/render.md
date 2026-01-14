@@ -19,7 +19,7 @@ bruin render [path to asset definition] [flags]
 
 | Flag                  | Alias | Description                                                           |
 |-----------------------|-------|-----------------------------------------------------------------------|
-| `--no-materialization`|       | Output only the raw query without materialization logic. |
+| `--raw-query`         |       | Output only the raw SELECT query. |
 | `--full-refresh`      | `-r`  | Truncate the table before running the query. Also sets the `full_refresh` jinja variable to `True`. |
 | `--start-date`        |       | Specify the start date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format.|
 | `--end-date`          |       | Specify the end date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format. |

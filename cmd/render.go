@@ -73,8 +73,8 @@ func Render() *cli.Command {
 				Usage: "override pipeline variables with custom values",
 			},
 			&cli.BoolFlag{
-				Name:  "no-materialization",
-				Usage: "output only the raw query without materialization logic",
+				Name:  "raw-query",
+				Usage: "output only the raw SELECT query",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -264,10 +264,10 @@ func Render() *cli.Command {
 					pipeline.AssetTypeClickHouse:            clickhouse.NewRenderer(fullRefresh),
 					pipeline.AssetTypeClickHouseQuerySensor: clickhouse.NewRenderer(fullRefresh),
 				},
-				builder:           DefaultPipelineBuilder,
-				writer:            os.Stdout,
-				output:            c.String("output"),
-				noMaterialization: c.Bool("no-materialization"),
+				builder:  DefaultPipelineBuilder,
+				writer:   os.Stdout,
+				output:   c.String("output"),
+				rawQuery: c.Bool("raw-query"),
 			}
 			modifierInfo := ModifierInfo{
 				StartDate:      startDate,
@@ -297,9 +297,9 @@ type RenderCommand struct {
 	materializers map[pipeline.AssetType]queryMaterializer
 	builder       taskCreator
 
-	output            string
-	writer            io.Writer
-	noMaterialization bool
+	output   string
+	writer   io.Writer
+	rawQuery bool
 }
 
 func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifierInfo ModifierInfo) error {
@@ -331,7 +331,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 
 	qq := queries[0]
 
-	if !r.noMaterialization {
+	if !r.rawQuery {
 		if materializer, ok := r.materializers[task.Type]; ok {
 			materialized, err := materializer.Render(task, qq.Query)
 			if err != nil {
@@ -428,7 +428,7 @@ func formatHookQueries(hooks []pipeline.Hook) []string {
 		}
 	}
 	return formatted
-} 
+}
 
 func formatStatement(query string) string {
 	trimmed := strings.TrimSpace(query)
