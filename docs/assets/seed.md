@@ -10,15 +10,18 @@ parameters:
     path: seed.csv
 ```
 
-The `type` key in the configuration defines what platform to run the query against. 
+The `type` key in the configuration defines what platform to run the query against.
 
 You can see the "Data Platforms" on the left sidebar to see supported types.
 
 ## Parameters
 
-The `parameters` key in the configuration defines the parameters for the seed asset. The `path` parameter is the path to the CSV file that will be loaded into the data platform. The path can be:
-- **A relative file path**: relative to the asset definition file (e.g., `./seed.csv`)
-- **A URL**: an HTTP or HTTPS URL pointing to a publicly accessible CSV file (e.g., `https://example.com/data.csv`)
+The `parameters` key in the configuration defines the parameters for the seed asset.
+
+| Parameter | Required | Default | Description |
+| --- | --- | --- | --- |
+| `path` | Yes | - | Path to the CSV file to load. Can be a relative path (relative to the asset definition file) or a URL pointing to a publicly accessible CSV file. |
+| `enforce_schema` | No | `true` | When `true`, enforces column types defined in the `columns` section. Set to `false` to let ingestr infer types from the CSV. |
 
 ::: warning Column validation skipped for URLs
 When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime when `bruin run` fetches the data.
@@ -81,3 +84,46 @@ parameters:
 ```
 
 This will download the CSV from the URL and load it into the database at runtime.
+
+### Enforcing column types
+By default, seed assets enforce the column types defined in the `columns` section. This ensures your destination table has the correct schema.
+
+```yaml
+name: dashboard.contacts
+type: bigquery.seed
+
+parameters:
+    path: contacts.csv
+
+columns:
+  - name: id
+    type: integer
+    primary_key: true
+  - name: name
+    type: string
+  - name: email
+    type: string
+  - name: created_at
+    type: timestamp
+```
+
+When columns are defined, Bruin passes type hints to ingestr, ensuring the destination table uses the specified types rather than inferring them from the CSV content.
+
+### Disabling schema enforcement
+If you prefer to let ingestr infer column types from the CSV content, you can disable schema enforcement:
+
+```yaml
+name: dashboard.raw_data
+type: duckdb.seed
+
+parameters:
+    path: data.csv
+    enforce_schema: false
+
+columns:
+  - name: id
+    checks:
+      - name: not_null
+```
+
+With `enforce_schema: false`, the column types will be inferred from the CSV data. You can still define columns for quality checks and documentation without enforcing specific types.
