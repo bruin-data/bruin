@@ -139,6 +139,21 @@ When deploying to Airflow, this is automatically translated to `retries_delay` f
 ## `materialization`
 This option determines how the asset will be materialized. Refer to the docs on [materialization](./materialization) for more details.
 
+## `hooks`
+Hooks let you run SQL snippets before and/or after the main asset query. This is useful for setup or cleanup (loading extensions, attaching databases, or writing run logs, etc.). 
+
+```yaml
+hooks:
+  pre:
+    - query: "INSTALL httpfs"
+    - query: "LOAD httpfs"
+  post:
+    - query: "SET s3_region=''"
+```
+Hooks are currently supported for SQL assets. Each hook entry supports a single `query` field and is executed in order. 
+
+- **Type:** `Object`
+
 ## `columns`
 
 This is a list that contains all the columns defined with the asset, along with their quality checks and other metadata. Refer to the [columns](./columns.md) documentation for more details.
