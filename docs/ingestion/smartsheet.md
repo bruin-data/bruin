@@ -5,7 +5,7 @@ ingestr supports Smartsheet as a source.
 
 Bruin supports Smartsheet as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Smartsheet into your data warehouse.
 
-In order to set up Smartsheet connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `access_token` . For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/smartsheets.html#setting-up-a-smartsheet-integration).
+In order to set up Smartsheet connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `access_token` . For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/smartsheets.html#setting-up-a-smartsheet-integration).
 
 Follow the steps below to correctly set up Smartsheet as a data source and run ingestion.
 

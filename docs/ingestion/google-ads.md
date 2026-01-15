@@ -36,7 +36,7 @@ To connect to Google Ads, you need to add a configuration item to the connection
 - `service_account_json`: The service account JSON content itself
 
 
-For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/google-ads.html#setting-up-a-google-ads-integration).
+For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/google-ads.html#setting-up-a-google-ads-integration).
 
 ### Step 2: Create an asset file for data ingestion
 

@@ -61,7 +61,7 @@ This command will ingest data from the specified Internet Society Pulse metric i
 | tls | TLS protocol metrics | No | None | date | date | merge |
 | tls13 | TLS 1.3 protocol metrics | No | None | date | date | merge |
 
-Refer to the [Pulse documentation](https://bruin-data.github.io/ingestr/supported-sources/isoc-pulse.html#tables) for the full list and parameter syntax.
+Refer to the [Pulse documentation](https://getbruin.com/docs/ingestr/supported-sources/isoc-pulse.html#tables) for the full list and parameter syntax.
 
 ## Example: Internet Shutdowns in US
 

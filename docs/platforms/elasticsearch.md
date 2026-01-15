@@ -117,5 +117,5 @@ The `destination_table` parameter specifies the Elasticsearch index name where d
 ## Additional Resources
 
 - [Elasticsearch Official Documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html)
-- [Ingestr Elasticsearch Documentation](https://bruin-data.github.io/ingestr/supported-sources/elasticsearch.html)
+- [Ingestr Elasticsearch Documentation](https://getbruin.com/docs/ingestr/supported-sources/elasticsearch.html)
 - [Bruin Ingestr Assets](../assets/ingestr.md)

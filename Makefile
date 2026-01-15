@@ -20,7 +20,7 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud
+.PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud validate-links
 all: clean deps test build
 
 deps: 
@@ -132,6 +132,14 @@ refresh-integration-expectations: build
 	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expectations/expected_connections_schema.json
 	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expectations/expected_connections.json
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
+
+validate-links:
+	@echo "$(OK_COLOR)==> Validating web links in repository...$(NO_COLOR)"
+	@if ! command -v python3 > /dev/null 2>&1; then \
+		echo "$(ERROR_COLOR)Python 3 not found. Please install Python 3 to validate links.$(NO_COLOR)"; \
+		exit 1; \
+	fi
+	@python3 scripts/validate_links.py . || (echo "$(ERROR_COLOR)Link validation found broken links. Please fix them.$(NO_COLOR)" && exit 1)
 
 # sometimes vendoring doesn't move the precompiled library
 duck-db-static-lib:

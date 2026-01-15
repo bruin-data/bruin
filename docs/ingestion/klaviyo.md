@@ -3,7 +3,7 @@
 
 Bruin supports Klaviyo as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Klaviyo into your data warehouse.
 
-To set up a Klaviyo connection, you need to have Klaviyo API key and source table. For more information, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/klaviyo.html)
+To set up a Klaviyo connection, you need to have Klaviyo API key and source table. For more information, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/klaviyo.html)
 
 Follow the steps below to correctly set up Klaviyo as a data source and run ingestion:
 

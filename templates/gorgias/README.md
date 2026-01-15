@@ -10,7 +10,7 @@ This pipeline is a simple example of a Bruin pipeline that copies data from Gorg
 > Gorgias has very strict rate limits as of the time of building this pipeline, 2 req/s. This means that we cannot extract data from Gorgias in parallel, therefore all of these steps here are built to run sequentially. This is not a problem for small datasets, but it can be a bottleneck for larger datasets.
 
 ## Setup
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/gorgias.html).
+The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/ingestion/gorgias).
 
 Here's a sample `.bruin.yml` file:
 

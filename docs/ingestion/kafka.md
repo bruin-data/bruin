@@ -3,7 +3,7 @@
 
 Bruin supports Kafka as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Kafka into your data warehouse.
 
-In order to set up a Kafka connection, you need to add a configuration item to connections in the .bruin.yml file, following the schema below. The required fields include `bootstrap_servers` and `group_id`. The SASL-related fields (`security_protocol`, `sasl_mechanisms`, `sasl_username`, `sasl_password`) as well as `batch_size` and `batch_timeout` are optional, depending on your Kafka setup. For more information on Kafka, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/kafka.html)
+In order to set up a Kafka connection, you need to add a configuration item to connections in the .bruin.yml file, following the schema below. The required fields include `bootstrap_servers` and `group_id`. The SASL-related fields (`security_protocol`, `sasl_mechanisms`, `sasl_username`, `sasl_password`) as well as `batch_size` and `batch_timeout` are optional, depending on your Kafka setup. For more information on Kafka, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/kafka.html)
 
 Follow the steps below to correctly set up Kafka as a data source and run ingestion:
 ### Step 1: Add a connection to .bruin.yml file

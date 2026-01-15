@@ -22,7 +22,7 @@ func Docs() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			const docsURL = "https://bruin-data.github.io/bruin/"
+			const docsURL = "https://getbruin.com/docs/bruin/"
 			openFlag := c.Bool("open")
 
 			if openFlag {

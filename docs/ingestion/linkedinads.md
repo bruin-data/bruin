@@ -3,7 +3,7 @@ LinkedIn Ads is an advertising platform that allows businesses and marketers to 
 
 Bruin supports LinkedIn Ads as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from LinkedIn Ads into your data platform.
 
-To set up a LinkedIn Ads connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `access_token` and `account_ids`. For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/linkedin_ads.html#create-a-linkedin-developer-application-to-obtain-an-access-token)
+To set up a LinkedIn Ads connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `access_token` and `account_ids`. For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/linkedin_ads.html#create-a-linkedin-developer-application-to-obtain-an-access-token)
 
 Follow the steps below to set up LinkedIn Ads correctly as a data source and run ingestion.
 ### Step 1: Add a connection to the .bruin.yml file
