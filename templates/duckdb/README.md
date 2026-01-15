@@ -12,7 +12,7 @@ It also includes a `macros/` folder with reusable Jinja macros for common SQL pa
 The `macro_example.sql` asset demonstrates how to use these macros in your queries.
 
 ## Setup
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/ingestion/gorgias).
+The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
 
