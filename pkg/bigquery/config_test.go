@@ -1,6 +1,7 @@
 package bigquery
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -185,5 +186,66 @@ func TestNewDB_ADCWarning(t *testing.T) {
 		if !client.config.UseApplicationDefaultCredentials {
 			t.Error("Expected UseApplicationDefaultCredentials to be true")
 		}
+	}
+}
+
+func TestADCCredentialError_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		gcloudInstalled bool
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name:            "gcloud not installed - should show installation instructions",
+			gcloudInstalled: false,
+			wantContains: []string{
+				"gcloud CLI is not installed",
+				"Install the Google Cloud SDK",
+				"https://cloud.google.com/sdk/docs/install",
+				"service_account_file",
+				"use_application_default_credentials",
+			},
+			wantNotContains: []string{},
+		},
+		{
+			name:            "gcloud installed - should show auth command",
+			gcloudInstalled: true,
+			wantContains: []string{
+				"gcloud auth application-default login",
+			},
+			wantNotContains: []string{
+				"gcloud CLI is not installed",
+				"Install the Google Cloud SDK",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := &ADCCredentialError{
+				ClientType:      "BigQuery client",
+				OriginalErr:     errors.New("could not find default credentials"),
+				GcloudInstalled: tt.gcloudInstalled,
+			}
+
+			errMsg := err.Error()
+
+			for _, want := range tt.wantContains {
+				if !strings.Contains(errMsg, want) {
+					t.Errorf("Expected error message to contain %q, got: %s", want, errMsg)
+				}
+			}
+
+			for _, notWant := range tt.wantNotContains {
+				if strings.Contains(errMsg, notWant) {
+					t.Errorf("Expected error message NOT to contain %q, got: %s", notWant, errMsg)
+				}
+			}
+		})
 	}
 }
