@@ -310,7 +310,7 @@ For simpler projects, you can create a Lambda Layer with Bruin CLI:
 mkdir -p bruin-layer/bin
 
 # Download Bruin binary
-curl -L https://github.com/bruin-data/bruin/releases/latest/download/bruin_Linux_x86_64.tar.gz \
+curl -L https://github.com/bruin-data/bruin/releases/download/latest/bruin_Linux_x86_64.tar.gz \
     -o bruin.tar.gz
 
 # Extract binary
