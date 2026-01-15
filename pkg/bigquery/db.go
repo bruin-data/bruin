@@ -170,6 +170,14 @@ func (d *Client) createClient(ctx context.Context) error {
 		options...,
 	)
 	if err != nil {
+		// If ADC is enabled and client creation failed, provide a helpful error message
+		if d.config.UseApplicationDefaultCredentials {
+			return &ADCCredentialError{
+				ClientType:      "BigQuery client",
+				OriginalErr:     err,
+				GcloudInstalled: isGcloudAvailable(),
+			}
+		}
 		return errors.Wrap(err, "failed to create bigquery client")
 	}
 
@@ -214,8 +222,9 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 		_, err := google.FindDefaultCredentials(ctx, scopes...)
 		if err != nil {
 			return nil, &ADCCredentialError{
-				ClientType:  "Data Transfer client",
-				OriginalErr: err,
+				ClientType:      "Data Transfer client",
+				OriginalErr:     err,
+				GcloudInstalled: isGcloudAvailable(),
 			}
 		}
 	}
@@ -387,11 +396,25 @@ func (m NoMetadataUpdatedError) Error() string {
 
 // ADCCredentialError represents an error when Application Default Credentials cannot be found or are invalid.
 type ADCCredentialError struct {
-	ClientType  string // e.g., "BigQuery client" or "Data Transfer client"
-	OriginalErr error
+	ClientType       string // e.g., "BigQuery client" or "Data Transfer client"
+	OriginalErr      error
+	GcloudInstalled  bool
+	GcloudCheckError error // Optional: error from checking gcloud availability
 }
 
 func (e *ADCCredentialError) Error() string {
+	if !e.GcloudInstalled {
+		return fmt.Sprintf("ADC credentials not found for %s: %v\n\n"+
+			"The gcloud CLI is not installed on this machine.\n"+
+			"To use Application Default Credentials (ADC), you need to:\n"+
+			"  1. Install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install\n"+
+			"  2. Run: gcloud auth application-default login\n\n"+
+			"Alternatively, you can use a service account file instead of ADC:\n"+
+			"  - Set 'service_account_file' or 'service_account_json' in your connection config\n"+
+			"  - Set 'use_application_default_credentials' to false",
+			e.ClientType, e.OriginalErr)
+	}
+
 	return fmt.Sprintf("ADC credentials not found for %s: %v\n"+
 		"Run: gcloud auth application-default login",
 		e.ClientType, e.OriginalErr)
