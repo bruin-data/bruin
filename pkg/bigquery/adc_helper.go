@@ -3,13 +3,11 @@ package bigquery
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/manifoldco/promptui"
 	"github.com/pkg/errors"
@@ -35,22 +33,12 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 	}
 
 	// Check if gcloud is available
-	if !isGcloudAvailable() {
-		writer := ctx.Value(executor.KeyPrinter)
-		var output io.Writer = os.Stdout
-		if writer != nil {
-			if w, ok := writer.(io.Writer); ok {
-				output = w
-			}
-		}
-		fmt.Fprintf(output, "ADC credentials not found for BigQuery connection '%s'.\n", connName)
-		fmt.Fprintf(output, "gcloud CLI not available. Install it and run: gcloud auth application-default login\n")
-		if flusher, ok := output.(interface{ Flush() }); ok {
-			flusher.Flush()
-		}
+	gcloudAvailable := isGcloudAvailable()
+	if !gcloudAvailable {
 		return &ADCCredentialError{
-			ClientType:  "BigQuery client",
-			OriginalErr: err,
+			ClientType:      fmt.Sprintf("BigQuery connection '%s'", connName),
+			OriginalErr:     err,
+			GcloudInstalled: false,
 		}
 	}
 
@@ -69,8 +57,9 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 	if promptErr != nil || strings.ToLower(result) != "y" {
 		fmt.Fprintf(os.Stderr, "Cancelled. Run 'gcloud auth application-default login' manually.\n")
 		return &ADCCredentialError{
-			ClientType:  "BigQuery client",
-			OriginalErr: err,
+			ClientType:      fmt.Sprintf("BigQuery connection '%s'", connName),
+			OriginalErr:     err,
+			GcloudInstalled: true, // gcloud is available but user cancelled
 		}
 	}
 
