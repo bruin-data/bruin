@@ -140,8 +140,7 @@ When deploying to Airflow, this is automatically translated to `retries_delay` f
 This option determines how the asset will be materialized. Refer to the docs on [materialization](./materialization) for more details.
 
 ## `hooks`
-Hooks let you run small SQL snippets before and/or after the main asset query. This is useful for setup or cleanup
-steps like loading extensions, attaching databases, or writing run logs, to name a few exmpales. Each hook entry supports a single `query` field and is executed in order.
+Hooks let you run SQL snippets before and/or after the main asset query. This is useful for setup or cleanup (loading extensions, attaching databases, or writing run logs, etc.). 
 
 ```yaml
 hooks:
@@ -151,6 +150,7 @@ hooks:
   post:
     - query: "SET s3_region=''"
 ```
+Hooks are currently supported for SQL assets. Each hook entry supports a single `query` field and is executed in order. 
 
 - **Type:** `Object`
 
