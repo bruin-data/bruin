@@ -23,10 +23,10 @@ This project serves as a **template and learning resource** for developers who w
    - Shows integration with external APIs and HTTP data sources
    - Returns Pandas DataFrames that Bruin automatically materializes into tables
 
-2. **Merge Materialization Strategy**
-   - Efficient incremental processing using `merge` materialization
-   - Updates existing records and inserts new ones based on primary key
-   - Handles re-ingestion of data without creating duplicates
+2. **Append + Deduplication Strategy**
+   - Raw layer uses `append` materialization for simple, fast ingestion
+   - Staging layer deduplicates using `QUALIFY ROW_NUMBER()` to handle re-ingested data
+   - Keeps the most recently extracted record when duplicates exist
    
 3. **Time-Interval Incremental Strategy**
    - Efficient incremental processing using `time_interval` materialization
@@ -53,9 +53,9 @@ This project serves as a **template and learning resource** for developers who w
 
 ## Learning Path
 
-1. Start with `trips_raw.py` to understand Python asset materialization with merge strategy
+1. Start with `trips_raw.py` to understand Python asset materialization with append strategy
 2. Review `taxi_zone_lookup.sql` and `payment_lookup.asset.yml` to see different lookup table patterns
-3. Review `trips_summary.sql` for column normalization and enrichment patterns
+3. Review `trips_summary.sql` for column normalization, enrichment, and deduplication patterns
 4. Examine `report_trips_monthly.sql` for aggregation techniques
 5. Explore `pipeline.yml` to understand configuration and variables
 
@@ -184,7 +184,7 @@ You can still explicitly specify the `name` parameter if you want to override th
 
 #### `raw.trips_raw`
 - **Type**: `python`
-- **Strategy**: `merge`
+- **Strategy**: `append`
 - **Connection**: `duckdb-default`
 - **Purpose**: Ingest raw trip data from HTTP parquet files using Python
 
@@ -202,12 +202,12 @@ The `materialize()` function is required and must return a Pandas DataFrame. Bru
 - Column normalization (COALESCE for datetime columns, renaming) happens in staging, not in raw
 - Adds `taxi_type` column from pipeline variables
 - Adds `extracted_at` timestamp column
-- Uses `merge` strategy with composite primary key (tpep_pickup_datetime, lpep_pickup_datetime, tpep_dropoff_datetime, lpep_dropoff_datetime, pulocationid, dolocationid, taxi_type)
+- Uses `append` strategy—deduplication is handled downstream in `staging.trips_summary`
 - Python dependencies are defined in `requirements.txt` at the pipeline root
 
-**Design Choice - Why Python with merge?**:
+**Design Choice - Why Python with append?**:
 - **Python for Complex Ingestion**: Python is ideal for this use case because it allows us to dynamically loop through date ranges and taxi types using Bruin variables (`BRUIN_START_DATE`, `BRUIN_END_DATE`, and `BRUIN_VARS`). This enables flexible ingestion logic that can handle multiple sources and date ranges without hardcoding values.
-- **merge Strategy**: The merge strategy updates existing records and inserts new ones based on the primary key. This is perfect for incremental ingestion where the same data might be re-ingested (e.g., when re-running for the same month). The merge strategy ensures we don't create duplicates while keeping the most up-to-date version of the data. This eliminates the need for a separate persistent storage layer and simplifies the pipeline architecture.
+- **append Strategy**: The append strategy simply adds new records to the table. If the same date range is re-ingested (e.g., running the pipeline twice for January 2025), duplicates will be created in the raw layer. These duplicates are handled in the staging layer via `QUALIFY ROW_NUMBER()` deduplication.
 - **Bruin Python Materialization**: Utilizing Bruin's Python materialization feature eliminates the need for manual database operations. We simply return a Pandas DataFrame, and Bruin handles all the database connection management, schema inference, and table creation/insertion automatically. This keeps the code focused on data extraction and transformation logic.
 
 #### `raw.taxi_zone_lookup`
@@ -276,9 +276,23 @@ Why we chose it: This strategy is ideal for time-series data where we want to re
 - Enriches with location data from `raw.taxi_zone_lookup`
 - Enriches with payment type descriptions from `raw.payment_lookup`
 - Applies data quality filters (positive duration, reasonable trip length, non-negative amounts, valid payment types)
+- **Deduplicates records** using `QUALIFY ROW_NUMBER()` partitioned by trip attributes (see Deduplication Strategy below)
 - Adds `updated_at` timestamp column
 - Preserves `extracted_at` timestamp from raw
 - All primary key columns are non-nullable
+
+**Deduplication Strategy**:
+
+Since `raw.trips_raw` uses an **append** materialization strategy, re-ingesting the same date range (e.g., running the pipeline twice for January 2025) creates duplicate records. Deduplication is therefore handled in this staging layer using `QUALIFY ROW_NUMBER()`.
+
+The deduplication logic partitions by these columns and keeps the most recently extracted record (`ORDER BY extracted_at DESC`):
+- `pickup_time`, `dropoff_time`
+- `pickup_location_id`, `dropoff_location_id` (from raw data)
+- `pl.location_id`, `dl.location_id` (from lookup joins)
+- `taxi_type`, `trip_distance`, `passenger_count`
+- `fare_amount`, `tip_amount`, `total_amount`, `payment_type`
+
+**Why this combination?** The NYC TLC dataset has no single unique trip identifier. However, the odds of two completely identical trips (same pickup/dropoff times, locations, distance, passenger count, and payment details) occurring are effectively zero. This combination of columns reliably identifies unique rides.
 
 ### 3. Reports: Aggregated Analytics
 
@@ -424,7 +438,7 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
 - [ ] Create `nyc-taxi/pipeline.yml` with correct configuration and variables
 - [ ] Create `requirements.txt` in pipeline root with Python dependencies
 - [ ] Create `.bruin.yml` for local environment configuration
-- [ ] Create `raw.trips_raw.py` to ingest data from source website and materialize as a table using merge strategy (using Bruin Python Materialization)
+- [ ] Create `raw.trips_raw.py` to ingest data from source website and materialize as a table using append strategy (using Bruin Python Materialization)
 - [ ] Create `raw.taxi_zone_lookup.sql` with HTTP CSV ingestion
 - [ ] Create `raw.payment_lookup.csv` with payment type mapping data
 - [ ] Create `raw.payment_lookup.asset.yml` with seed file configuration
@@ -443,12 +457,12 @@ The `-ui` flag opens a web-based interface in your browser where you can run que
    - Read dates from `BRUIN_START_DATE` and `BRUIN_END_DATE` environment variables (YYYY-MM-DD format)
    - Use `generate_month_range()` function to convert date range to list of (year, month) tuples
    - Handles cross-year ranges correctly (e.g., 2021-12-01 to 2022-01-01 → Dec 2021, Jan 2022)
-2. **Primary Key Design for Merge Strategy**: 
-   - According to [NYC TLC documentation](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page), there is no single unique trip identifier. The composite primary key includes: `vendorid` (TPEP provider code), `pickup_datetime` (coalesced from `tpep_pickup_datetime` or `lpep_pickup_datetime`), `dropoff_datetime` (coalesced), `pulocationid`, `dolocationid`, and `taxi_type`.
-   - The coalesced datetime columns are created in Python to avoid NULL values in the primary key (yellow taxis have NULL `lpep_*` values, green taxis have NULL `tpep_*` values). This ensures merge strategy works correctly since primary keys cannot contain NULLs.
-   - This composite key uniquely identifies each trip and allows merge strategy to update existing records or insert new ones during incremental runs.
+2. **Deduplication in Staging**: 
+   - The ingestion layer (`raw.trips_raw`) uses an **append** strategy, meaning re-ingesting the same date range creates duplicates. Deduplication is handled in `staging.trips_summary` using `QUALIFY ROW_NUMBER()`.
+   - According to [NYC TLC documentation](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page), there is no single unique trip identifier. However, the combination of trip attributes (pickup/dropoff times, locations, distance, passenger count, fare details) reliably identifies unique rides—the probability of two completely identical trips is effectively zero.
+   - The deduplication keeps the most recently extracted record when duplicates exist (`ORDER BY extracted_at DESC`).
 3. **Column Normalization**: 
-   - **Ingestion Layer (raw.trips_raw)**: Preserves original column names from parquet files as-is (e.g., `vendorid`, `tpep_pickup_datetime` for yellow taxis, `lpep_pickup_datetime` for green taxis, `pulocationid`). Adds `taxi_type`, `extracted_at`, and coalesced datetime columns (`pickup_datetime`, `dropoff_datetime`) for the primary key.
+   - **Ingestion Layer (raw.trips_raw)**: Preserves original column names from parquet files as-is (e.g., `vendorid`, `tpep_pickup_datetime` for yellow taxis, `lpep_pickup_datetime` for green taxis, `pulocationid`). Adds `taxi_type` and `extracted_at` columns.
    - **Staging Layer (staging.trips_summary)**: Transforms column names to more human-readable, consistent formats:
      - Uses `COALESCE(tpep_pickup_datetime, lpep_pickup_datetime)` → `pickup_time` (cast to TIMESTAMP) to handle both taxi types
      - Uses `COALESCE(tpep_dropoff_datetime, lpep_dropoff_datetime)` → `dropoff_time` (cast to TIMESTAMP)
