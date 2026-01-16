@@ -440,9 +440,10 @@ func installBinary(srcDir, binDir string) error {
 // Upgrade returns the upgrade command.
 func Upgrade() *cli.Command {
 	return &cli.Command{
-		Name:    "upgrade",
-		Aliases: []string{"update"},
-		Usage:   "Upgrade Bruin CLI to the latest version",
+		Name:      "upgrade",
+		Aliases:   []string{"update"},
+		Usage:     "Upgrade Bruin CLI to the latest version or a specific version",
+		ArgsUsage: "[version]",
 		Flags: []cli.Flag{
 			&cli.DurationFlag{
 				Name:  "timeout",
@@ -463,24 +464,35 @@ func Upgrade() *cli.Command {
 			// Show download method
 			printStep("Using method: " + bold.Render(getDownloadMethod()))
 
-			// Fetch latest version
-			latestVersion, err := fetchLatestVersionForUpgrade(ctx, timeout)
-			if err != nil {
-				return errors.Wrap(err, "failed to fetch latest version")
+			// Check if a specific version was provided
+			var targetVersion string
+			if c.Args().Present() {
+				targetVersion = c.Args().First()
+				// Normalize version (add v prefix if missing)
+				if !strings.HasPrefix(targetVersion, "v") {
+					targetVersion = "v" + targetVersion
+				}
+			} else {
+				// Fetch latest version
+				latestVersion, err := fetchLatestVersionForUpgrade(ctx, timeout)
+				if err != nil {
+					return errors.Wrap(err, "failed to fetch latest version")
+				}
+				targetVersion = latestVersion
 			}
 
 			// Compare versions
 			currentClean := strings.TrimPrefix(currentVersion, "v")
-			latestClean := strings.TrimPrefix(latestVersion, "v")
+			targetClean := strings.TrimPrefix(targetVersion, "v")
 
-			if currentClean == latestClean {
-				printSuccess("Already at latest version: " + bold.Render(currentVersion))
+			if currentClean == targetClean { //nolint:govet
+				printSuccess("Already at version: " + bold.Render(currentVersion))
 				printFooter("Done")
 				return nil
 			}
 
 			// Show version transition
-			versionTransition := "From " + faintText.Render(currentVersion) + " " + coral.Render("→") + " " + green.Render(latestVersion)
+			versionTransition := "From " + faintText.Render(currentVersion) + " " + coral.Render("→") + " " + green.Render(targetVersion)
 			printStep(versionTransition)
 
 			// Create temp directory
@@ -491,7 +503,7 @@ func Upgrade() *cli.Command {
 			defer os.RemoveAll(tmpDir)
 
 			// Build download URL
-			downloadURL := buildDownloadURL(latestVersion)
+			downloadURL := buildDownloadURL(targetVersion)
 			format := getFormat()
 			archivePath := filepath.Join(tmpDir, "bruin."+format)
 

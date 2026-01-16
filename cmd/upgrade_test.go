@@ -24,8 +24,8 @@ func TestUpgradeCommand(t *testing.T) {
 		t.Error("Expected 'update' to be an alias for 'upgrade'")
 	}
 
-	if cmd.Usage != "Upgrade Bruin CLI to the latest version" {
-		t.Errorf("Expected usage to be 'Upgrade Bruin CLI to the latest version', got %s", cmd.Usage)
+	if cmd.Usage != "Upgrade Bruin CLI to the latest version or a specific version" {
+		t.Errorf("Expected usage to be 'Upgrade Bruin CLI to the latest version or a specific version', got %s", cmd.Usage)
 	}
 
 	if cmd.Action == nil {
