@@ -21,12 +21,9 @@ import (
 )
 
 const (
-	githubOwner    = "bruin-data"
-	githubRepo     = "bruin"
 	binaryName     = "bruin"
 	githubReleases = "https://github.com/bruin-data/bruin/releases"
 	githubDownload = "https://github.com/bruin-data/bruin/releases/download"
-	defaultBinDir  = "~/.local/bin"
 )
 
 var (
@@ -151,6 +148,7 @@ func fetchLatestVersionForUpgrade(ctx context.Context, timeout time.Duration) (s
 	}
 	defer resp.Body.Close()
 
+	// GitHub redirects /releases/latest to /releases/tag/<version>
 	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
 		location := resp.Header.Get("Location")
 		// Extract version from redirect URL (e.g., .../releases/tag/v0.1.0)
@@ -158,29 +156,10 @@ func fetchLatestVersionForUpgrade(ctx context.Context, timeout time.Duration) (s
 		if len(parts) == 2 {
 			return parts[1], nil
 		}
+		return "", errors.New("unexpected redirect URL format: " + location)
 	}
 
-	// Try another approach - follow redirect
-	client2 := &http.Client{Timeout: timeout}
-	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, githubReleases+"/latest", nil)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to create request")
-	}
-
-	resp2, err := client2.Do(req2)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to fetch latest version")
-	}
-	defer resp2.Body.Close()
-
-	// Extract from final URL
-	finalURL := resp2.Request.URL.String()
-	parts := strings.Split(finalURL, "/tag/")
-	if len(parts) == 2 {
-		return parts[1], nil
-	}
-
-	return "", errors.New("unable to determine latest version")
+	return "", fmt.Errorf("unexpected response status: %s", resp.Status)
 }
 
 // progressWriter wraps an io.Writer to track download progress.
@@ -225,13 +204,17 @@ func (pw *progressWriter) finish() {
 }
 
 // downloadFile downloads a file from URL to a local path with progress.
-func downloadFile(ctx context.Context, url, destPath string) error {
+func downloadFile(ctx context.Context, url, destPath string, timeout time.Duration) error {
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to create request")
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "failed to download file")
 	}
@@ -481,7 +464,9 @@ func Upgrade() *cli.Command {
 				targetVersion = latestVersion
 			}
 
-			// Compare versions
+			// Compare versions - string equality is sufficient here since we only
+			// check if versions are identical (to skip re-downloading the same version).
+			// We don't need semver comparison because we're not determining which is newer.
 			currentClean := strings.TrimPrefix(currentVersion, "v")
 			targetClean := strings.TrimPrefix(targetVersion, "v")
 
@@ -509,7 +494,7 @@ func Upgrade() *cli.Command {
 
 			// Download
 			fmt.Printf("%s  Downloading from GitHub...\n", coral.Render(bullet))
-			if err := downloadFile(ctx, downloadURL, archivePath); err != nil {
+			if err := downloadFile(ctx, downloadURL, archivePath, timeout); err != nil {
 				return errors.Wrap(err, "failed to download release")
 			}
 
