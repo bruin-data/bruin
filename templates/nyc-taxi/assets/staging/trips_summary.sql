@@ -93,6 +93,34 @@ columns:
     type: TIMESTAMP
     description: Timestamp when the data was last updated in staging
 
+custom_checks:
+  - name: all_rows_unique
+    description: Ensures that each row is unique based on the primary key columns (pickup_time, dropoff_time, pickup_location_id, dropoff_location_id, taxi_type)
+    query: |
+      SELECT COUNT(*)
+      FROM (
+        SELECT
+          pickup_time,
+          dropoff_time,
+          pickup_location_id,
+          dropoff_location_id,
+          taxi_type,
+          trip_distance,
+          passenger_count,
+          fare_amount,
+          tip_amount,
+          total_amount,
+          pickup_borough,
+          pickup_zone,
+          dropoff_borough,
+          dropoff_zone,
+          payment_type
+        FROM staging.trips_summary
+        GROUP BY ALL
+        HAVING COUNT(*) > 1
+      )
+    value: 0
+
 @bruin */
 
 WITH
@@ -142,21 +170,21 @@ normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, r
     ct.fare_amount,
     ct.tip_amount,
     ct.total_amount,
-    pickup_lookup.borough AS pickup_borough,
-    pickup_lookup.zone AS pickup_zone,
-    dropoff_lookup.borough AS dropoff_borough,
-    dropoff_lookup.zone AS dropoff_zone,
+    pl.borough AS pickup_borough,
+    pl.zone AS pickup_zone,
+    dl.borough AS dropoff_borough,
+    dl.zone AS dropoff_zone,
     ct.payment_type,
-    payment_lookup.payment_description,
+    pmt.payment_description,
     ct.extracted_at,
     CURRENT_TIMESTAMP AS updated_at,
   FROM normalized_trips AS ct
-  LEFT JOIN raw.taxi_zone_lookup AS pickup_lookup
-    ON ct.pickup_location_id = pickup_lookup.location_id
-  LEFT JOIN raw.taxi_zone_lookup AS dropoff_lookup
-    ON ct.dropoff_location_id = dropoff_lookup.location_id
-  LEFT JOIN raw.payment_lookup AS payment_lookup
-    ON ct.payment_type = payment_lookup.payment_type_id
+  LEFT JOIN raw.taxi_zone_lookup AS pl
+    ON ct.pickup_location_id = pl.location_id
+  LEFT JOIN raw.taxi_zone_lookup AS dl
+    ON ct.dropoff_location_id = dl.location_id
+  LEFT JOIN raw.payment_lookup AS pmt
+    ON ct.payment_type = pmt.payment_type_id
   WHERE 1=1
     -- filter out zero durations (trip cannot end at the same time it starts or before it starts)
     AND EXTRACT(EPOCH FROM (ct.dropoff_time - ct.pickup_time)) > 0
@@ -165,9 +193,28 @@ normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, r
     -- filter out negative total amounts
     AND ct.total_amount >= 0
     -- Only include trips that were actually charged
-    AND payment_lookup.payment_description IN ('flex_fare', 'credit_card', 'cash')
+    AND pmt.payment_description IN ('flex_fare', 'credit_card', 'cash')
     -- filter out negative trip distances as they are data quality issues (trip distance cannot be negative)
     AND ct.trip_distance >= 0
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY
+      ct.pickup_time,
+      ct.dropoff_time,
+      ct.pickup_location_id,
+      ct.dropoff_location_id,
+      ct.taxi_type,
+      ct.trip_distance,
+      ct.passenger_count,
+      ct.fare_amount,
+      ct.tip_amount,
+      ct.total_amount,
+      pl.borough,
+      pl.zone,
+      dl.borough,
+      dl.zone,
+      ct.payment_type
+    ORDER BY ct.extracted_at DESC
+  ) = 1
 )
 
 SELECT
