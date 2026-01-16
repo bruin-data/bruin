@@ -208,10 +208,8 @@ normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, r
       ct.fare_amount,
       ct.tip_amount,
       ct.total_amount,
-      pl.borough,
-      pl.zone,
-      dl.borough,
-      dl.zone,
+      pl.location_id,
+      dl.location_id,
       ct.payment_type
     ORDER BY ct.extracted_at DESC
   ) = 1
