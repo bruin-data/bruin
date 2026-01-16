@@ -14,7 +14,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/templates"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
@@ -382,10 +381,8 @@ func Init() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Send telemetry event for template usage
-			telemetry.SendEvent("init_template", analytics.Properties{
-				"template_name": templateName,
-			})
+			// Store template name for telemetry (will be sent with command_end event)
+			telemetry.SetTemplateName(templateName)
 
 			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
 			infoPrinter.Println("\nYou can run the following commands to get started:")
