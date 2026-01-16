@@ -28,6 +28,12 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: bruin-data
           password: ${{ secrets.GITHUB_TOKEN }}
+       
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+            images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push base image
         uses: depot/build-push-action@v1
@@ -36,7 +42,8 @@ jobs:
           file: Dockerfile.base
           platforms: linux/amd64
           push: false
-          tags: |
-            build-args: |
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
             VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
             BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
