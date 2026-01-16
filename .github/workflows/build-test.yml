@@ -37,8 +37,52 @@ env:
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
+  BASE_IMAGE_NAME: bruin-data/bruin-base
 
 jobs:
+  # Ensure base image exists before building main image
+  ensureBaseImage:
+    runs-on: depot-ubuntu-latest
+    name: Ensure Base Image
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    outputs:
+      base_exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: bruin-data
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if base image exists
+        id: check
+        run: |
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.BASE_IMAGE_NAME }}:latest > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Base image exists, skipping build"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Base image does not exist, will build"
+          fi
+
+      - name: Build and push base image (if not exists)
+        if: steps.check.outputs.exists == 'false'
+        uses: depot/build-push-action@v1
+        with:
+          context: .
+          file: Dockerfile.base
+          platforms: linux/amd64
+          push: false
+          tags: |
+            build-args: |
+            VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+            BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
   test:
     strategy:
       matrix:
@@ -94,6 +138,7 @@ jobs:
   dockerBuild:
     runs-on: depot-ubuntu-latest
     name: Docker Build
+    needs: ensureBaseImage  # Wait for base image to be ready
     permissions:
       # allow issuing OIDC tokens for this workflow run
       id-token: write

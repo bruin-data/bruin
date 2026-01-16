@@ -1,0 +1,42 @@
+name: Build Base Image
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 0 1 * *'  # Monthly on the 1st
+  push:
+    paths:
+      - 'Dockerfile.base'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: bruin-data/bruin-base
+
+jobs:
+  build-base:
+    runs-on: depot-ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Log in to Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: bruin-data
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push base image
+        uses: depot/build-push-action@v1
+        with:
+          context: .
+          file: Dockerfile.base
+          platforms: linux/amd64
+          push: false
+          tags: |
+            build-args: |
+            VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+            BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
