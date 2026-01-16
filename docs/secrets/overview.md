@@ -5,5 +5,6 @@ Bruin CLI normally retrieves secrets to instantiate connections to different pla
 At the moment, Bruin supports the following:
  * [Hashicorp Vault](./vault)
  * [Doppler](./doppler)
+ * [Infisical](./infisical)
  * [.bruin.yml](./bruinyml)
 
