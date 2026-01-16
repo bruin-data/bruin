@@ -2175,10 +2175,10 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
 	}
 	if len(asset.Hooks.Pre) == 0 {
-		asset.Hooks.Pre = foundPipeline.DefaultValues.Hooks.Pre
+		asset.Hooks.Pre = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Pre...)
 	}
 	if len(asset.Hooks.Post) == 0 {
-		asset.Hooks.Post = foundPipeline.DefaultValues.Hooks.Post
+		asset.Hooks.Post = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Post...)
 	}
 
 	return asset, nil
