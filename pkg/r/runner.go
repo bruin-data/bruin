@@ -13,7 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
+	"github.com/sourcegraph/conc/pool"
 )
 
 type cmd interface {
@@ -117,23 +117,31 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 		return errors.Wrap(err, "failed to get stderr")
 	}
 
-	wg := new(errgroup.Group)
-	wg.Go(func() error { return consumePipe(stdout, output) })
-	wg.Go(func() error { return consumePipe(stderr, output) })
+	p := pool.New().WithMaxGoroutines(2).WithErrors()
+	p.Go(func() error { return consumePipe(stdout, output) })
+	p.Go(func() error { return consumePipe(stderr, output) })
 
 	err = cmd.Start()
 	if err != nil {
 		return errors.Wrap(err, "failed to start CommandInstance")
 	}
 
-	res := cmd.Wait()
-	if res != nil {
-		return res
+	// Wait for pipe consumption to complete FIRST
+	// This is critical: we must finish reading from pipes before calling cmd.Wait()
+	// because cmd.Wait() will close the pipes after the command exits
+	pipeErr := p.Wait()
+
+	// Now wait for the command to finish
+	cmdErr := cmd.Wait()
+
+	// Return command error first if both exist
+	if cmdErr != nil {
+		return cmdErr
 	}
 
-	err = wg.Wait()
-	if err != nil {
-		return errors.Wrap(err, "failed to consume pipe")
+	// Return pipe error if it exists
+	if pipeErr != nil {
+		return errors.Wrap(pipeErr, "failed to consume pipe")
 	}
 
 	return nil

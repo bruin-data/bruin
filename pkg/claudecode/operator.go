@@ -19,8 +19,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/conc/pool"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 )
 
 // Parameter constants.
@@ -226,23 +226,31 @@ func (o *ClaudeCodeOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 			return errors.Wrap(err, "failed to get stderr pipe")
 		}
 
-		wg := new(errgroup.Group)
-		wg.Go(func() error { return o.consumePipe(stdout, output) })
-		wg.Go(func() error { return o.consumePipe(stderr, output) })
+		p := pool.New().WithMaxGoroutines(2).WithErrors()
+		p.Go(func() error { return o.consumePipe(stdout, output) })
+		p.Go(func() error { return o.consumePipe(stderr, output) })
 
 		err = cmd.Start()
 		if err != nil {
 			return errors.Wrap(err, "failed to start Claude command")
 		}
 
-		res := cmd.Wait()
-		if res != nil {
-			return res
+		// Wait for pipe consumption to complete FIRST
+		// This is critical: we must finish reading from pipes before calling cmd.Wait()
+		// because cmd.Wait() will close the pipes after the command exits
+		pipeErr := p.Wait()
+
+		// Now wait for the command to finish
+		cmdErr := cmd.Wait()
+
+		// Return command error first if both exist
+		if cmdErr != nil {
+			return cmdErr
 		}
 
-		err = wg.Wait()
-		if err != nil {
-			return errors.Wrap(err, "failed to consume pipe")
+		// Return pipe error if it exists
+		if pipeErr != nil {
+			return errors.Wrap(pipeErr, "failed to consume pipe")
 		}
 	}
 
