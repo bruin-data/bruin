@@ -60,6 +60,12 @@ default:
   interval_modifiers:
     start: "-1d"
     end: "-1d"
+  hooks:
+    pre:
+      - query: "LOAD httpfs"
+      - query: "SET my_var = 1"
+    post:
+      - query: "SET my_var = 0"
 
 
 variables:
@@ -375,6 +381,7 @@ Fields:
 | parameters         | Object (map[string]string) | {}      | Arbitrary key/value defaults     |
 | secrets            | Array of objects           | []      | See below                        |
 | interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers) |
+| hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |
 
 Secrets item:
 
