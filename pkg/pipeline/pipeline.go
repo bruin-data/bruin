@@ -1539,6 +1539,7 @@ type DefaultValues struct {
 	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
 	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
 	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	Hooks             Hooks             `json:"hooks" yaml:"hooks" mapstructure:"hooks"`
 	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int              `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 }
@@ -2172,6 +2173,12 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
 		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
+	}
+	if len(asset.Hooks.Pre) == 0 {
+		asset.Hooks.Pre = foundPipeline.DefaultValues.Hooks.Pre
+	}
+	if len(asset.Hooks.Post) == 0 {
+		asset.Hooks.Post = foundPipeline.DefaultValues.Hooks.Post
 	}
 
 	return asset, nil
