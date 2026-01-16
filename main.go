@@ -76,7 +76,7 @@ func main() {
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
 			cmd.Import(),
-			cmd.Update(),
+			cmd.Upgrade(),
 			mcp.MCPCmd(),
 			versionCommand,
 		},
