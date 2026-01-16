@@ -115,7 +115,7 @@ func runMCPServer(debug bool) error {
 
 func processRequest(req JSONRPCRequest, debug bool) JSONRPCResponse {
 	switch req.Method {
-	// this is the mcp handshake
+	// This is the mcp handshake
 	case "initialize":
 		return JSONRPCResponse{
 			JSONRPC: "2.0",
