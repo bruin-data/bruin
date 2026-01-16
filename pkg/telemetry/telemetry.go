@@ -31,7 +31,7 @@ var (
 	lock         sync.Mutex
 )
 
-// SetTemplateName stores the template name for telemetry (thread-safe)
+// SetTemplateName stores the template name for telemetry (thread-safe).
 func SetTemplateName(name string) {
 	lock.Lock()
 	defer lock.Unlock()
