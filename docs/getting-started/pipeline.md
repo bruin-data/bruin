@@ -62,7 +62,6 @@ default:
     end: "-1d"
   hooks:
     pre:
-      - query: "LOAD httpfs"
       - query: "SET my_var = 1"
     post:
       - query: "SET my_var = 0"
