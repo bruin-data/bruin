@@ -287,8 +287,7 @@ Since `raw.trips_raw` uses an **append** materialization strategy, re-ingesting 
 
 The deduplication logic partitions by these columns and keeps the most recently extracted record (`ORDER BY extracted_at DESC`):
 - `pickup_time`, `dropoff_time`
-- `pickup_location_id`, `dropoff_location_id` (from raw data)
-- `pl.location_id`, `dl.location_id` (from lookup joins)
+- `pickup_location_id`, `dropoff_location_id`
 - `taxi_type`, `trip_distance`, `passenger_count`
 - `fare_amount`, `tip_amount`, `total_amount`, `payment_type`
 
