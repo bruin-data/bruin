@@ -110,10 +110,6 @@ custom_checks:
           fare_amount,
           tip_amount,
           total_amount,
-          pickup_borough,
-          pickup_zone,
-          dropoff_borough,
-          dropoff_zone,
           payment_type
         FROM staging.trips_summary
         GROUP BY ALL
@@ -208,8 +204,6 @@ normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, r
       ct.fare_amount,
       ct.tip_amount,
       ct.total_amount,
-      pl.location_id,
-      dl.location_id,
       ct.payment_type
     ORDER BY ct.extracted_at DESC
   ) = 1
