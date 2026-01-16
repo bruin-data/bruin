@@ -3264,7 +3264,7 @@ func TestMacros(t *testing.T) {
 					ExitCode: 0,
 					Contains: []string{
 						// Pipeline default rerun_cooldown
-						`"default":{"type":"","parameters":null,"secrets":null,"interval_modifiers":null,"rerun_cooldown":300}`, `"retries_delay":300`,
+						`"default":{"type":"","parameters":null,"secrets":null,"hooks":{},"interval_modifiers":null,"rerun_cooldown":300}`, `"retries_delay":300`,
 						// Asset with explicit rerun_cooldown
 						`"name":"test_asset"`, `"rerun_cooldown":600`, `"retries_delay":600`,
 						// Asset that inherits from pipeline

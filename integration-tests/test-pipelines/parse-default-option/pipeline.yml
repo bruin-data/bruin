@@ -10,4 +10,9 @@ default:
   parameters:
     source_connection: chess-run-default-option
     destination: duckdb
+  hooks:
+    pre:
+      - query: "select 1"
+    post:
+      - query: "select 2"
     

@@ -49,7 +49,18 @@
     "extends": null,
     "columns": [],
     "custom_checks": [],
-    "hooks": {},
+    "hooks": {
+      "pre": [
+        {
+          "query": "select 1"
+        }
+      ],
+      "post": [
+        {
+          "query": "select 2"
+        }
+      ]
+    },
     "metadata": {},
     "snowflake": null,
     "athena": null,

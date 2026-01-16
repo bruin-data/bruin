@@ -150,7 +150,9 @@ hooks:
   post:
     - query: "SET s3_region=''"
 ```
-Hooks are currently supported for SQL assets. Each hook entry supports a single `query` field and is executed in order. 
+Hooks are currently supported for SQL assets. Each hook entry supports a single `query` field and is executed in order. Queries may have a trailing `;` or not.
+
+Hooks can also be set as pipeline defaults (see [pipeline defaults](/getting-started/pipeline#default-pipeline-level-defaults)). Assets inherit default `pre` and `post` hooks independently - defining only `pre` hooks on an asset will still inherit default `post` hooks.
 
 - **Type:** `Object`
 
