@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -390,10 +391,12 @@ func getBinaryInstallPath() (string, error) {
 }
 
 // installBinary installs the binary from extracted archive to the bin directory.
-func installBinary(srcDir, binDir string) error {
+// Returns (deferred, error) where deferred=true means the upgrade will complete
+// after the current process exits (used on Windows due to file locking).
+func installBinary(srcDir, binDir string) (bool, error) {
 	// Ensure bin directory exists
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		return errors.Wrap(err, "failed to create bin directory")
+		return false, errors.Wrap(err, "failed to create bin directory")
 	}
 
 	srcBinary := filepath.Join(srcDir, binaryName)
@@ -409,15 +412,58 @@ func installBinary(srcDir, binDir string) error {
 	// Read source binary
 	data, err := os.ReadFile(srcBinary)
 	if err != nil {
-		return errors.Wrap(err, "failed to read binary")
+		return false, errors.Wrap(err, "failed to read binary")
 	}
 
-	// Write to destination (overwrite if exists)
+	// On Windows, we cannot overwrite a running executable due to file locking.
+	// Use a batch script to perform the replacement after this process exits.
+	if runtime.GOOS == "windows" {
+		return installBinaryWindows(data, dstBinary)
+	}
+
+	// Non-Windows: direct write
 	if err := os.WriteFile(dstBinary, data, 0o755); err != nil { //nolint:gosec
-		return errors.Wrap(err, "failed to write binary")
+		return false, errors.Wrap(err, "failed to write binary")
 	}
 
-	return nil
+	return false, nil
+}
+
+// installBinaryWindows handles Windows-specific binary installation.
+// On Windows, we cannot overwrite a running executable, so we write the new
+// binary to a temp file and use a batch script to replace it after exit.
+func installBinaryWindows(data []byte, dstBinary string) (bool, error) {
+	// Write new binary to temporary location next to destination
+	tempBinary := dstBinary + ".new"
+	if err := os.WriteFile(tempBinary, data, 0o755); err != nil { //nolint:gosec
+		return false, errors.Wrap(err, "failed to write temp binary")
+	}
+
+	// Create a batch script that waits for this process to exit, then replaces the binary.
+	// The script retries the move operation until it succeeds (when the lock is released).
+	scriptContent := fmt.Sprintf(`@echo off
+:retry
+ping 127.0.0.1 -n 2 > nul
+move /Y "%s" "%s" > nul 2>&1
+if errorlevel 1 goto retry
+del "%%~f0"
+`, tempBinary, dstBinary)
+
+	scriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-upgrade-%d.bat", time.Now().UnixNano()))
+	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o755); err != nil { //nolint:gosec
+		os.Remove(tempBinary)
+		return false, errors.Wrap(err, "failed to create upgrade script")
+	}
+
+	// Start the script in background using 'start /b'
+	cmd := exec.Command("cmd", "/C", "start", "/b", "", scriptPath)
+	if err := cmd.Start(); err != nil {
+		os.Remove(tempBinary)
+		os.Remove(scriptPath)
+		return false, errors.Wrap(err, "failed to start upgrade process")
+	}
+
+	return true, nil
 }
 
 // Upgrade returns the upgrade command.
@@ -518,15 +564,21 @@ func Upgrade() *cli.Command {
 
 			// Install
 			fmt.Printf("%s  Installing to %s...\n", boxVertical, faintText.Render(binDir))
-			if err := installBinary(tmpDir, binDir); err != nil {
+			deferred, err := installBinary(tmpDir, binDir)
+			if err != nil {
 				return errors.Wrap(err, "failed to install binary")
 			}
 
 			fmt.Println(boxVertical)
 
-			// Success message
-			printSuccess("Upgrade complete")
-			printFooter("Done")
+			// Success message - on Windows the upgrade completes after exit
+			if deferred {
+				printSuccess("Upgrade prepared")
+				printFooter("The upgrade will complete when this process exits")
+			} else {
+				printSuccess("Upgrade complete")
+				printFooter("Done")
+			}
 
 			return nil
 		},
