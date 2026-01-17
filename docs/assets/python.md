@@ -262,6 +262,49 @@ Bruin uses Apache Arrow under the hood to keep the returned data efficiently, an
 
 This flow ensures that the typing information gathered from the dataframe will be preserved when loading to the destination, and it supports incremental loads, deduplication, and all the other features of ingestr.
 
+### Enforcing column types
+
+By default, ingestr infers column types from the dataframe. If you want to enforce specific column types in the destination table, you can use the `enforce_schema` parameter along with column definitions:
+
+```bruin-python
+"""@bruin
+name: tier1.users_api
+image: python:3.11
+connection: bigquery
+
+materialization:
+  type: table
+  strategy: merge
+
+parameters:
+  enforce_schema: true
+
+columns:
+  - name: id
+    type: integer
+    primary_key: true
+  - name: name
+    type: string
+  - name: email
+    type: string
+  - name: created_at
+    type: timestamp
+@bruin"""
+
+import pandas as pd
+
+def materialize():
+    # Fetch data from API
+    return pd.DataFrame({
+        'id': [1, 2, 3],
+        'name': ['Alice', 'Bob', 'Charlie'],
+        'email': ['alice@example.com', 'bob@example.com', 'charlie@example.com'],
+        'created_at': pd.to_datetime(['2024-01-01', '2024-01-02', '2024-01-03'])
+    })
+```
+
+When `enforce_schema: true` is set, Bruin passes the column type hints to ingestr, ensuring the destination table schema matches your definition rather than relying on type inference.
+
 ## Column-level lineage
 
 Bruin supports column-level lineage for Python assets as well as SQL assets. In order to get column-level lineage, you need to annotate the columns that are exposed by the Bruin asset.
