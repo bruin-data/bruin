@@ -421,9 +421,43 @@ func installBinary(srcDir, binDir string) (bool, error) {
 		return installBinaryWindows(data, dstBinary)
 	}
 
-	// Non-Windows: direct write
-	if err := os.WriteFile(dstBinary, data, 0o755); err != nil { //nolint:gosec
-		return false, errors.Wrap(err, "failed to write binary")
+	// Non-Windows: atomic replacement via temp file + rename.
+	// This prevents leaving a corrupted binary if the write fails partway through.
+	tmpFile, err := os.CreateTemp(binDir, ".bruin-upgrade-*")
+	if err != nil {
+		return false, errors.Wrap(err, "failed to create temp file")
+	}
+	tmpPath := tmpFile.Name()
+
+	// Write data to temp file
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return false, errors.Wrap(err, "failed to write temp file")
+	}
+
+	// Sync to ensure data is flushed to disk
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return false, errors.Wrap(err, "failed to sync temp file")
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpPath)
+		return false, errors.Wrap(err, "failed to close temp file")
+	}
+
+	// Set executable permissions
+	if err := os.Chmod(tmpPath, 0o755); err != nil { //nolint:gosec
+		os.Remove(tmpPath)
+		return false, errors.Wrap(err, "failed to set permissions")
+	}
+
+	// Atomic rename (works on POSIX when source and dest are on same filesystem)
+	if err := os.Rename(tmpPath, dstBinary); err != nil {
+		os.Remove(tmpPath)
+		return false, errors.Wrap(err, "failed to install binary")
 	}
 
 	return false, nil
