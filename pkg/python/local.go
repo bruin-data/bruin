@@ -195,31 +195,52 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 }
 
 func consumePipe(pipe io.Reader, output io.Writer) error {
-	scanner := bufio.NewScanner(pipe)
+	// Use bufio.Reader.ReadLine() instead of Scanner to handle unlimited line lengths.
+	// Scanner has a maximum token size limit, but ReadLine handles lines of any length
+	// by returning isPrefix=true when a line exceeds the buffer size.
+	// This is critical for ML model outputs, large JSON, and other big data workloads.
+	reader := bufio.NewReaderSize(pipe, 64*1024) // 64KB buffer for efficient reading
 
-	// Use a smaller buffer (4KB) for more responsive output instead of the default 64KB
-	// This reduces latency when streaming subprocess output in real-time
-	buf := make([]byte, 4096)
-	scanner.Buffer(buf, 4096)
+	// Buffer to assemble full line before writing. This prevents interleaving
+	// when multiple goroutines (stdout/stderr) write to the same output.
+	// By writing the complete line in a single Write call, we ensure atomicity.
+	var lineBuf []byte
 
-	for scanner.Scan() {
-		// the size of the slice here is important, the added 4 at the end includes the 3 bytes for the prefix and the 1 byte for the newline
-		msg := make([]byte, len(scanner.Bytes())+4)
-		copy(msg, ">> ")
-		copy(msg[3:], scanner.Bytes())
-		msg[len(msg)-1] = '\n'
-
-		_, err := output.Write(msg)
+	for {
+		line, isPrefix, err := reader.ReadLine()
 		if err != nil {
+			if stderrors.Is(err, io.EOF) {
+				break
+			}
 			return err
 		}
-	}
 
-	// scanner.Err() returns nil if the scanner stopped due to EOF or a closed pipe,
-	// which is the expected behavior when a subprocess finishes.
-	// We only return actual errors here.
-	if err := scanner.Err(); err != nil && !stderrors.Is(err, io.EOF) {
-		return err
+		// Start building the line with prefix
+		lineBuf = append(lineBuf[:0], ">> "...) // Reset and add prefix
+		lineBuf = append(lineBuf, line...)
+
+		// If the line was longer than the buffer, keep reading until complete.
+		// isPrefix=true means there's more data for this line (no \n found yet).
+		for isPrefix {
+			line, isPrefix, err = reader.ReadLine()
+			if err != nil {
+				// EOF mid-line: write what we have without newline and exit
+				if stderrors.Is(err, io.EOF) {
+					if len(lineBuf) > 0 {
+						_, _ = output.Write(lineBuf)
+					}
+					return nil
+				}
+				return err
+			}
+			lineBuf = append(lineBuf, line...)
+		}
+
+		// Add newline and write the complete line in a single atomic write
+		lineBuf = append(lineBuf, '\n')
+		if _, err := output.Write(lineBuf); err != nil {
+			return err
+		}
 	}
 
 	return nil
