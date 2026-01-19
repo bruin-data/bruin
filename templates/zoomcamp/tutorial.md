@@ -91,57 +91,38 @@ This module introduces Bruin as a unified data platform that combines **data ing
 
 ### Learning Goals
 - Build a complete ELT pipeline: ingestion → staging → reports
-- Use Python assets for data extraction
-- Use SQL assets for transformation and aggregation
+- Understand the three asset types: Python, SQL, and Seed
 - Apply materialization strategies for incremental processing
-- Add quality checks throughout the pipeline
+- Add quality checks and declare dependencies
 
-### 3.1 Pipeline Architecture Overview
-- **Ingestion layer**: Extract raw data from external sources into your warehouse
-- **Staging layer**: Clean, normalize, deduplicate, and enrich raw data
-- **Reports layer**: Aggregate staging data for analytics and dashboards
-- Each layer depends on the previous, forming a DAG (directed acyclic graph)
+### 3.1 Pipeline Architecture
+- **Ingestion**: Extract raw data from external sources (Python assets, seed CSVs)
+- **Staging**: Clean, normalize, deduplicate, enrich (SQL assets)
+- **Reports**: Aggregate for dashboards and analytics (SQL assets)
+- Assets form a DAG—Bruin executes them in dependency order
 
-### 3.2 Asset Types You'll Use
-- **Python assets** (`type: python`): For API extraction and custom logic
-  - Runs in isolated environments via `uv`—no global Python needed
-  - Implement `materialize()` to return a DataFrame; Bruin loads it to destination
-  - Access runtime context via env vars: `BRUIN_START_DATE`, `BRUIN_END_DATE`, `BRUIN_VARS`
-- **SQL assets** (`type: duckdb.sql`): For transformations
-  - Embedded YAML definition in `/* @bruin ... @bruin */` block
-  - Use Jinja templating: `{{ start_datetime }}`, `{{ end_datetime }}`, `{{ var.my_var }}`
-- **Seed assets** (`type: duckdb.seed`): For static CSV lookup tables
+### 3.2 Ingestion Layer
+- Python asset to fetch NYC Taxi data from the TLC public endpoint
+- Seed asset to load a static payment type lookup table from CSV
+- Use `append` strategy for raw ingestion (handle duplicates downstream)
+- Follow the TODO instructions in `assets/ingestion/trips.py` and `payment_lookup.asset.yml`
 
-### 3.3 Materialization Strategies
-- `append`: Insert new rows only (good for raw ingestion)
-- `time_interval`: Delete + insert rows within a time window (good for incremental transforms)
-- `merge`: Upsert based on primary key
-- `create+replace`: Full rebuild every run
-- Key config: `incremental_key`, `time_granularity`
+### 3.3 Staging Layer
+- SQL asset to clean, deduplicate, and join with lookup to enrich raw trip data
+- Use `time_interval` strategy for incremental processing
+- Follow the TODO instructions in `assets/staging/trips.sql`
 
-### 3.4 Dependencies and Lineage
-- Declare `depends:` to establish execution order
-- Bruin builds the DAG automatically
-- Run `bruin lineage <asset>` to visualize upstream/downstream
+### 3.4 Reports Layer
+- SQL asset to aggregate staging data into analytics-ready metrics
+- Use `time_interval` strategy and same `incremental_key` as staging for consistency
+- Follow the TODO instructions in `assets/reports/trips_report.sql`
 
-### 3.5 Quality Checks
-- **Column checks**: `not_null`, `unique`, `positive`, `non_negative`, `accepted_values`
-- **Custom checks**: SQL query returning a scalar compared to expected value
-- Checks run after asset execution; failures block downstream assets
-
-### 3.6 Building the Pipeline
-Follow the TODO instructions in each asset file and the README for detailed steps:
-- `assets/ingestion/trips.py` — Python ingestion from NYC TLC endpoint
-- `assets/ingestion/payment_lookup.asset.yml` — Seed asset for payment types
-- `assets/staging/trips.sql` — Clean, dedupe, enrich with lookups
-- `assets/reports/trips_report.sql` — Aggregate metrics by dimensions
-
-### 3.7 Running the Pipeline
-- Validate: `bruin validate ./pipeline.yml`
-- First run (create tables): `bruin run ./pipeline.yml --full-refresh`
-- Incremental run: `bruin run ./pipeline.yml --start-date YYYY-MM-DD --end-date YYYY-MM-DD`
-- Run single asset + downstream: `bruin run ./assets/ingestion/trips.py --downstream`
-- Query results: `bruin query --connection duckdb-default --query "SELECT ..."`
+### 3.5 Running and Validating
+- Validate structure before running
+- Use `--full-refresh` for initial table creation
+- Use `--start-date` / `--end-date` for incremental runs
+- Query tables directly to verify results
+- Check lineage to understand asset dependencies
 
 ---
 
@@ -158,6 +139,8 @@ Follow the TODO instructions in each asset file and the README for detailed step
 - Supported in Cursor, Claude Code, and other MCP-compatible tools
 
 ### 4.2 Setting Up Bruin MCP
+
+Bruin MCP Setup: https://getbruin.com/docs/bruin/getting-started/bruin-mcp
 
 **Cursor IDE:**
 - Go to Cursor Settings → MCP & Integrations → Add Custom MCP
@@ -218,15 +201,6 @@ claude mcp add bruin -- bruin mcp
 | `bruin format <path>` | Format code |
 | `bruin connections list` | List configured connections |
 | `bruin connections ping <name>` | Test connection connectivity |
-
----
-
-## Additional Resources
-
-- Bruin Documentation: https://getbruin.com/docs
-- Bruin GitHub: https://github.com/bruin-data/bruin
-- VS Code Extension: Search "Bruin" in Extensions
-- Bruin MCP Setup: https://getbruin.com/docs/bruin/getting-started/bruin-mcp
 
 ---
 
