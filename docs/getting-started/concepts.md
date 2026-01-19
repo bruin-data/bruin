@@ -131,9 +131,14 @@ default:
   interval_modifiers:
       start: 2h
       end: 2h
+  hooks:
+    pre:
+      - query: "SET my_var = 1"
+    post:
+      - query: "SET my_var = 0"
 ```
 
-For more details, please check the example from the template [here](https://github.com/bruin-data/bruin/blob/main/templates/chess/pipeline.yml).
+For more details, see [pipeline defaults](./pipeline.md#default-pipeline-level-defaults) and the template example [here](https://github.com/bruin-data/bruin/blob/main/templates/chess/pipeline.yml).
 
 ## Sensors
 Sensors are a special type of assets that are used to wait on certain external signals. Sensors are useful to wait on external signals such as a table being created in an external database, or a file being uploaded to S3. A common usecase for sensors is when there are datasets/files/tables that are created by a separate process and you need to wait for them to be created before running your assets.

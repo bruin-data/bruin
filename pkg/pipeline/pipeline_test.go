@@ -1849,6 +1849,54 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "should apply default hooks when missing",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Hooks: pipeline.Hooks{
+						Pre:  []pipeline.Hook{{Query: "select 1"}},
+						Post: []pipeline.Hook{{Query: "select 2"}},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.EmptyStringMap{},
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Post: []pipeline.Hook{{Query: "select 2"}},
+				},
+			},
+		},
+		{
+			name: "should not override existing hooks",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 9"}},
+					Post: []pipeline.Hook{{Query: "select 10"}},
+				},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Hooks: pipeline.Hooks{
+						Pre:  []pipeline.Hook{{Query: "select 1"}},
+						Post: []pipeline.Hook{{Query: "select 2"}},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.EmptyStringMap{},
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 9"}},
+					Post: []pipeline.Hook{{Query: "select 10"}},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
