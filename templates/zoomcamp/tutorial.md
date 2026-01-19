@@ -183,6 +183,56 @@ claude mcp add bruin -- bruin mcp
 - Debug together: Share error messages and let AI suggest fixes
 - Learn by doing: Ask "why" questions to understand Bruin concepts
 
+Example Prompt:
+```text
+Build an end-to-end NYC Taxi data pipeline using Bruin.
+
+Start with running `bruin init zoomcamp` to initialize the project.
+
+## Context
+- Project folder: @zoomcamp/pipeline
+- Reference docs: @zoomcamp/README.md and @zoomcamp/tutorial.md
+- Use Bruin MCP tools for documentation lookup and command execution
+
+## Instructions
+
+### 1. Configuration (do this first)
+- Create `.bruin.yml` with a DuckDB connection named `duckdb-default`
+- Configure `pipeline.yml`: set name, schedule (monthly), start_date, default_connections, and the `taxi_types` variable (array of strings)
+
+### 2. Build Assets (follow TODOs in each file)
+
+NYC Taxi Raw Trip Source Details:
+- **URL**: `https://d37ci6vzurychx.cloudfront.net/trip-data/`
+- **Format**: Parquet files, one per taxi type per month
+- **Naming**: `<taxi_type>_tripdata_<year>-<month>.parquet`
+- **Examples**:
+  - `yellow_tripdata_2022-03.parquet`
+  - `green_tripdata_2025-01.parquet`
+- **Taxi Types**: `yellow` (default), `green`
+
+Build in this order, validating each with `bruin validate` before moving on:
+
+a) **ingestion/payment_lookup.asset.yml** - Seed asset to load CSV lookup table
+b) **ingestion/trips.py** - Python asset to fetch NYC taxi parquet data from TLC endpoint
+   - Use `taxi_types` variable and date range from BRUIN_START_DATE/BRUIN_END_DATE
+   - Add requirements.txt with: pandas, requests, pyarrow, python-dateutil
+   - Keep the data in its rawest format without any cleaning or transformations
+c) **staging/trips.sql** - SQL asset to clean, deduplicate (ROW_NUMBER), and enrich with payment lookup
+   - Use `time_interval` strategy with `pickup_datetime` as incremental_key
+d) **reports/trips_report.sql** - SQL asset to aggregate by date, taxi_type, payment_type
+   - Use `time_interval` strategy for consistency
+
+### 3. Validate & Run
+- Validate entire pipeline: `bruin validate ./pipeline/pipeline.yml`
+- Run with: `bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2022-01-01 --end-date 2022-02-01`
+- For faster testing, use `--var 'taxi_types=["yellow"]'` (skip green taxis)
+
+### 4. Verify Results
+- Check row counts across all tables
+- Query the reports table to confirm aggregations look correct
+- Verify all quality checks passed (24 checks expected)
+```
 ---
 
 ## Key Commands Reference
