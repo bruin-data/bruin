@@ -23,12 +23,20 @@ type contextKey string
 
 var TelemetryKey string
 var (
-	OptOut     = false
-	AppVersion = ""
-	RunID      = ""
-	client     analytics.Client
-	lock       sync.Mutex
+	OptOut       = false
+	AppVersion   = ""
+	RunID        = ""
+	TemplateName = "" // Stores template name for init command (protected by lock)
+	client       analytics.Client
+	lock         sync.Mutex
 )
+
+// SetTemplateName stores the template name for telemetry (thread-safe).
+func SetTemplateName(name string) {
+	lock.Lock()
+	defer lock.Unlock()
+	TemplateName = name
+}
 
 func Init() io.Closer {
 	client = analytics.New(TelemetryKey, url)
@@ -107,10 +115,20 @@ func AfterCommand(ctx context.Context, cmd *cli.Command) error {
 	if start != nil {
 		durationMs = time.Since(start.(time.Time)).Milliseconds()
 	}
-	SendEvent("command_end", analytics.Properties{
+	properties := analytics.Properties{
 		"command":     cmd.Name,
 		"duration_ms": durationMs,
-	})
+	}
+
+	// Add template_name for init command (read and clear under lock)
+	lock.Lock()
+	if TemplateName != "" && cmd.Name == "init" {
+		properties["template_name"] = TemplateName
+		TemplateName = "" // Clear after use
+	}
+	lock.Unlock()
+
+	SendEvent("command_end", properties)
 	return nil
 }
 

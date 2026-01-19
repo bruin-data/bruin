@@ -381,6 +381,9 @@ func Init() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// Store template name for telemetry (will be sent with command_end event)
+			telemetry.SetTemplateName(templateName)
+
 			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
 			infoPrinter.Println("\nYou can run the following commands to get started:")
 			infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
