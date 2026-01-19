@@ -197,10 +197,10 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 func consumePipe(pipe io.Reader, output io.Writer) error {
 	scanner := bufio.NewScanner(pipe)
 
-	// Use a 10KB buffer to handle very long log lines from ML models, LLMs, and big data tools
-	// This prevents "token too long" errors when subprocess output contains large JSON, tensors, etc.
-	buf := make([]byte, 10*1024)
-	scanner.Buffer(buf, 10*1024)
+	// Use a smaller buffer (4KB) for more responsive output instead of the default 64KB
+	// This reduces latency when streaming subprocess output in real-time
+	buf := make([]byte, 4096)
+	scanner.Buffer(buf, 4096)
 
 	for scanner.Scan() {
 		// the size of the slice here is important, the added 4 at the end includes the 3 bytes for the prefix and the 1 byte for the newline
