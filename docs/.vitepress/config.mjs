@@ -358,6 +358,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 text: "Commands",
                 collapsed: false,
                 items: [
+                    {text: "AI Enhance", link: "/commands/ai-enhance"},
                     {text: "Init", link: "/commands/init"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections"},
