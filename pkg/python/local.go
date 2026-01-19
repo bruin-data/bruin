@@ -225,8 +225,9 @@ func consumePipe(pipe io.Reader, output io.Writer) error {
 		for isPrefix {
 			line, isPrefix, err = reader.ReadLine()
 			if err != nil {
+				// Don't write newline if we hit EOF mid-line
 				if stderrors.Is(err, io.EOF) {
-					break
+					return nil
 				}
 				return err
 			}
