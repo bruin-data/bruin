@@ -59,6 +59,8 @@ zoomcamp/
 
 ### Step 3: Validate & run the pipeline
 
+CLI Commands: https://getbruin.com/docs/bruin/commands/run
+
 ```bash
 # Validate structure & definitions
 bruin validate ./pipeline.yml --environment default
@@ -77,16 +79,11 @@ bruin run ./assets/ingestion/trips.py \
 
 # Query your tables using `bruin query`
 # Docs: https://getbruin.com/docs/bruin/commands/query
-bruin query --connection duckdb-default --query "SHOW TABLES"
 bruin query --connection duckdb-default --query "SELECT COUNT(*) FROM ingestion.trips"
-bruin query --connection duckdb-default --query "SELECT COUNT(*) FROM staging.trips"
 
 # Open DuckDB UI (useful for exploring tables interactively)
 # Requires DuckDB CLI installed locally.
 duckdb duckdb.db -ui
-
-# View asset lineage (dependencies)
-bruin lineage ./assets/staging/trips.sql
 ```
 
 ## IDE Extension (VS Code, Cursor, etc.)
@@ -145,34 +142,3 @@ Once MCP is set up, you can ask your AI assistant questions like:
 - "Run a query on my staging.trips table"
 
 The AI will use Bruin's documentation and can execute commands directly.
-
-
-## Best Practices & Tips
-
-### Choosing the Right `incremental_key`
-
-When using `time_interval` strategy, the `incremental_key` determines which rows to delete and re-insert during each run.
-
-**Key principles:**
-1. **Use the same key across all assets** - If staging uses `pickup_datetime` as the incremental key, reports should too. This ensures data flows consistently through your pipeline.
-
-2. **Match the key to your data extraction logic** - In this example, NYC taxi data files are organized by month based on when rides started. Since each file contains rides where `pickup_datetime` falls in that month, `pickup_datetime` is the natural incremental key.
-
-3. **The key should be immutable** - Once a row is extracted, its incremental key value shouldn't change. Event timestamps (like `pickup_datetime`) are better than processing timestamps for this reason.
-
-### Deduplication Strategy
-
-Since there's no unique ID per row in taxi data, you'll need a **composite key** for deduplication:
-
-- Combine columns that together identify a unique trip
-- Example: `(pickup_datetime, dropoff_datetime, pickup_location_id, dropoff_location_id, fare_amount)`
-- Use these columns as `primary_key: true` in your column definitions
-- In SQL, deduplicate using `ROW_NUMBER()` or `QUALIFY` to keep one record per composite key
-
-## Additional Docs
-
-- `bruin run`: https://getbruin.com/docs/bruin/commands/run
-- Materialization: https://getbruin.com/docs/bruin/assets/materialization
-- Python assets: https://getbruin.com/docs/bruin/assets/python
-- Seed assets: https://getbruin.com/docs/bruin/assets/seed
-- Quality checks: https://getbruin.com/docs/bruin/quality/overview
