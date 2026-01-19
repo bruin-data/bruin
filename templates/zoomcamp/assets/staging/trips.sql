@@ -16,7 +16,7 @@ type: TODO
 # Examples:
 # depends:
 #   - ingestion.trips
-#   - ingestion.zone_lookup
+#   - ingestion.payment_lookup
 depends:
   - TODO_DEP_1
   - TODO_DEP_2

@@ -18,8 +18,8 @@ depends:
   - TODO_DEP_STAGING_ASSET
 
 # TODO: Choose materialization strategy.
-# For reports, `time_interval` is often a good choice to rebuild only the relevant time window.
-# See staging/trips.sql for detailed explanation of strategies.
+# For reports, `time_interval` is a good choice to rebuild only the relevant time window.
+# Important: Use the same `incremental_key` as staging (e.g., pickup_datetime) for consistency.
 materialization:
   type: table
   # suggested strategy: time_interval
