@@ -40,7 +40,7 @@ variables:
     # TODO: pick a sensible default, e.g. ["yellow", "green"]
     default: TODO
 
-  extra_variable_for_students:
+  extra_variable:
     # TODO: define (type + default) and reference it in both Python and SQL assets.
     # Examples: a boolean flag, a list of endpoints, a string "environment", etc.
     type: TODO

@@ -13,26 +13,25 @@ This template is an **educational scaffold** for building an end-to-end data pip
 ## Pipeline skeleton (what goes where)
 
 You will implement the pipeline in the folder structure below.
-The suggested structure using a medallion (tiered) data model, but you may structure your pipeline however you like.
+The suggested structure separates ingestion, staging, and reporting, but you may structure your pipeline however you like.
 
 ```text
 .bruin.yml
-pipeline/
-  pipeline.yml
-  assets/
-    ingestion/
-    staging/
-    reports/
+pipeline.yml
+assets/
+  ingestion/
+  staging/
+  reports/
 ```
 
-## Suggested workflow (CLI)
+## Suggested workflow
 
 ### Step 1: Configure the `.bruin.yml` and `pipeline.yml` files
 - create the `.bruin.yml` file in the root directory
   - configure environments
   - create a connection for DuckDB
 
-- create a `pipeline.yml` file in the pipeline directory
+- create a `pipeline.yml` file in the same directory
   - set the pipeline name/schedule/start_date
   - initialize the `default_connections`
   - add custom `variables`
@@ -47,7 +46,7 @@ pipeline/
   - sql asset(s) to aggregate and transform data
 
 ### Step 3: Validate & run the pipeline
-- 
+
 ```bash
 # Validate structure & definitions
 bruin validate ./templates/zoomcamp/pipeline.yml --environment default
@@ -75,7 +74,7 @@ bruin query --connection duckdb-default --query "SELECT COUNT(*) FROM staging.tr
 duckdb duckdb.db -ui
 ```
 
-## Suggested workflow (VS Code extension)
+## IDE Bruin Extension (VS Code, Cursor, etc.)
 
 Please refer to the doc page for more details:
   - https://getbruin.com/docs/bruin/vscode-extension/overview.html
