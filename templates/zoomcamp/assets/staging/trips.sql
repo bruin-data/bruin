@@ -81,22 +81,21 @@ custom_checks:
 @bruin */
 
 -- TODO: Write the staging SELECT query.
-
+--
 -- Purpose of staging:
--- - Normalize schema
--- - Clean the data
--- - Deduplicate ingestion output (especially if ingestion used append-only)
--- - Add quality checks
+-- - Clean and normalize schema from ingestion
+-- - Deduplicate records (important if ingestion uses append strategy)
+-- - Enrich with lookup tables (JOINs)
+-- - Filter invalid rows (null PKs, negative values, etc.)
+--
+-- Why filter by {{ start_datetime }} / {{ end_datetime }}?
+-- When using `time_interval` strategy, Bruin:
+--   1. DELETES rows where `incremental_key` falls within the run's time window
+--   2. INSERTS the result of your query
+-- Therefore, your query MUST filter to the same time window so only that subset is inserted.
+-- If you don't filter, you'll insert ALL data but only delete the window's data = duplicates.
 
--- Required Bruin concepts to demonstrate:
--- - Use `{{ start_datetime }}` and `{{ end_datetime }}` to filter the incremental window.
--- - Deduplicate rows *within the window* (because ingestion append may re-ingest the same records).
---   This is usually done with a window function and keeping the "latest" record by an ingestion timestamp.
-
--- Keep the SQL focused:
--- - Normalize column names/types
--- - Join lookups for enrichment
--- - Filter obviously invalid rows (null PKs, negative measures, etc.)
-
-SELECT something
-FROM somewhere
+SELECT *
+FROM ingestion.trips
+WHERE pickup_datetime >= '{{ start_datetime }}'
+  AND pickup_datetime < '{{ end_datetime }}'

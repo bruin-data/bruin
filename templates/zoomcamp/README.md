@@ -72,13 +72,16 @@ bruin query --connection duckdb-default --query "SELECT COUNT(*) FROM staging.tr
 # Open DuckDB UI (useful for exploring tables interactively)
 # Requires DuckDB CLI installed locally.
 duckdb duckdb.db -ui
+
+# View asset lineage (dependencies)
+bruin lineage ./assets/staging/trips.sql
 ```
 
 ## IDE Bruin Extension (VS Code, Cursor, etc.)
 
 Please refer to the doc page for more details:
-  - https://getbruin.com/docs/bruin/vscode-extension/overview.html
-  - https://getbruin.com/docs/bruin/getting-started/features.html#vs-code-extension
+  - https://getbruin.com/docs/bruin/vscode-extension/overview
+  - https://getbruin.com/docs/bruin/getting-started/features#vs-code-extension
 
 1. Install the **Bruin VS Code extension**:
    - Open VS Code → Extensions
@@ -94,8 +97,8 @@ Please refer to the doc page for more details:
    - **Start / end dates** for incremental windows
    - **Custom variables** like `'taxi_types=["yellow"]'`
 
-### Addition Docs:
-- `bruin run`: https://getbruin.com/docs/bruin/commands/run.html
-- Materialization: https://getbruin.com/docs/bruin/assets/materialization.html
-- Python assets: https://getbruin.com/docs/bruin/assets/python.html
-- Quality checks: https://getbruin.com/docs/bruin/quality/overview.html
+### Additional Docs
+- `bruin run`: https://getbruin.com/docs/bruin/commands/run
+- Materialization: https://getbruin.com/docs/bruin/assets/materialization
+- Python assets: https://getbruin.com/docs/bruin/assets/python
+- Quality checks: https://getbruin.com/docs/bruin/quality/overview

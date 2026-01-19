@@ -1,8 +1,4 @@
 """@bruin
-# Docs:
-# - Python assets: https://getbruin.com/docs/bruin/assets/python
-# - Materialization: https://getbruin.com/docs/bruin/assets/materialization
-# - Pipeline variables: https://getbruin.com/docs/bruin/getting-started/pipeline-variables
 
 # TODO: Set the asset name (recommended pattern: schema.asset_name).
 # - Convention in this module: use an `ingestion.` schema for raw ingestion tables.
@@ -19,17 +15,15 @@ image: TODO_SET_PYTHON_IMAGE
 # TODO: Choose materialization (optional, but recommended).
 # Bruin feature: Python materialization lets you return a DataFrame (or list[dict]) and Bruin loads it into your destination.
 # This is usually the easiest way to build ingestion assets in Bruin.
-#
 # Alternative (advanced): you can skip Bruin Python materialization and write a "plain" Python asset that manually writes
 # into DuckDB (or another destination) using your own client library and SQL. In that case:
 # - you typically omit the `materialization:` block
 # - you do NOT need a `materialize()` function; you just run Python code
-# Docs: https://getbruin.com/docs/bruin/assets/python
+# Docs: https://getbruin.com/docs/bruin/assets/python#materialization
 materialization:
-  # TODO: choose `table` or `view` (ingestion should be a table)
+  # TODO: choose `table` or `view` (ingestion generally should be a table)
   type: table
   # TODO: pick a strategy.
-  # Docs: https://getbruin.com/docs/bruin/assets/materialization
   # suggested strategy: append
   strategy: TODO
 
@@ -70,6 +64,6 @@ def materialize():
     - Add a column like `extracted_at` for lineage/debugging (timestamp of extraction).
     - Prefer append-only in ingestion; handle duplicates in staging.
     """
-    raise NotImplementedError("TODO: return a pandas DataFrame from materialize().")
+    # return final_dataframe
 
 

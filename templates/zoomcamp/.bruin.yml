@@ -1,24 +1,20 @@
 # Zoomcamp template: .bruin.yml
-# Goal: help you learn Bruin environments + connections. This file is intentionally *not* runnable until you complete the TODOs.
+#
+# This file configures Bruin environments and database connections.
+# It is intentionally *not* runnable until you complete the TODOs.
 #
 # Docs:
-# - .bruin.yml schema / secrets backend: https://getbruin.com/docs/bruin/secrets/bruinyml
-# - DuckDB connection: https://getbruin.com/docs/bruin/platforms/duckdb
+# - .bruin.yml: https://getbruin.com/docs/bruin/secrets/bruinyml
+# - DuckDB: https://getbruin.com/docs/bruin/platforms/duckdb
 
-# TODO: Set the default environment name (commonly: "default", "dev", "prod")
-# default_environment: TODO_ENV_NAME
+# TODO: Uncomment and configure the section below.
+# The connection `name` must match `default_connections.duckdb` in pipeline.yml.
 
-# TODO: Define environments and add at least one DuckDB connection.
-# Notes:
-# - The connection `name` must match `default_connections.duckdb` in `pipeline.yml` (or an asset-level `connection:` override).
-# - `path` is where DuckDB stores the database file.
-#
-# Example shape (fill TODOs, then uncomment):
+# default_environment: default
 #
 # environments:
-#   TODO_ENV_NAME:
+#   default:
 #     connections:
 #       duckdb:
-#         - name: TODO_DUCKDB_CONNECTION_NAME
-#           path: TODO_DUCKDB_DB_FILE_PATH
-
+#         - name: duckdb-default
+#           path: duckdb.db
