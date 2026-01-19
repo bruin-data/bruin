@@ -201,6 +201,11 @@ func consumePipe(pipe io.Reader, output io.Writer) error {
 	// This is critical for ML model outputs, large JSON, and other big data workloads.
 	reader := bufio.NewReaderSize(pipe, 64*1024) // 64KB buffer for efficient reading
 
+	// Buffer to assemble full line before writing. This prevents interleaving
+	// when multiple goroutines (stdout/stderr) write to the same output.
+	// By writing the complete line in a single Write call, we ensure atomicity.
+	var lineBuf []byte
+
 	for {
 		line, isPrefix, err := reader.ReadLine()
 		if err != nil {
@@ -210,35 +215,30 @@ func consumePipe(pipe io.Reader, output io.Writer) error {
 			return err
 		}
 
-		// Write the ">> " prefix at the start of each new line
-		if _, err := output.Write([]byte(">> ")); err != nil {
-			return err
-		}
-
-		// Write the first chunk of the line
-		if _, err := output.Write(line); err != nil {
-			return err
-		}
+		// Start building the line with prefix
+		lineBuf = append(lineBuf[:0], ">> "...) // Reset and add prefix
+		lineBuf = append(lineBuf, line...)
 
 		// If the line was longer than the buffer, keep reading until complete.
 		// isPrefix=true means there's more data for this line (no \n found yet).
 		for isPrefix {
 			line, isPrefix, err = reader.ReadLine()
 			if err != nil {
-				// Don't write newline if we hit EOF mid-line
+				// EOF mid-line: write what we have without newline and exit
 				if stderrors.Is(err, io.EOF) {
+					if len(lineBuf) > 0 {
+						_, _ = output.Write(lineBuf)
+					}
 					return nil
 				}
 				return err
 			}
-			// Continue writing the same line (no >> prefix for continuation)
-			if _, err := output.Write(line); err != nil {
-				return err
-			}
+			lineBuf = append(lineBuf, line...)
 		}
 
-		// Write the newline at the end of the complete line
-		if _, err := output.Write([]byte("\n")); err != nil {
+		// Add newline and write the complete line in a single atomic write
+		lineBuf = append(lineBuf, '\n')
+		if _, err := output.Write(lineBuf); err != nil {
 			return err
 		}
 	}
