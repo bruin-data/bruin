@@ -232,6 +232,10 @@ func Init() *cli.Command {
 			templateName := c.Args().Get(0)
 			selectedViaInteractive := false
 			if len(templateName) == 0 {
+				if len(choices) == 0 {
+					errorPrinter.Printf("No templates available\n")
+					return cli.Exit("", 1)
+				}
 				m, err := p.Run()
 				if err != nil {
 					fmt.Printf("Error running the select: %v\n", err)
@@ -383,31 +387,31 @@ func Init() *cli.Command {
 					return err
 				}
 
-			err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
+				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
+				if err != nil {
+					errorPrinter.Printf("Could not write the %s file: %v\n", filepath.Join(absolutePath, baseName), err)
+					return err
+				}
+
+				return nil
+			})
 			if err != nil {
-				errorPrinter.Printf("Could not write the %s file: %v\n", filepath.Join(absolutePath, baseName), err)
-				return err
+				errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
+				return cli.Exit("", 1)
 			}
 
-			return nil
-		})
-		if err != nil {
-			errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
-			return cli.Exit("", 1)
-		}
+			// Store template name for telemetry (will be sent with command_end event)
+			telemetry.SetTemplateName(templateName)
 
-		// Store template name for telemetry (will be sent with command_end event)
-		telemetry.SetTemplateName(templateName)
+			// Also send an immediate event to track template selection
+			telemetry.SendEvent("template_selected", map[string]interface{}{
+				"template_name": templateName,
+				"interactive":   selectedViaInteractive,
+			})
 
-		// Also send an immediate event to track template selection
-		telemetry.SendEvent("template_selected", map[string]interface{}{
-			"template_name": templateName,
-			"interactive":   selectedViaInteractive,
-		})
-
-		successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
-		infoPrinter.Println("\nYou can run the following commands to get started:")
-		infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
+			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
+			infoPrinter.Println("\nYou can run the following commands to get started:")
+			infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
 
 			return nil
 		},
