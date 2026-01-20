@@ -28,15 +28,32 @@ Bruin supports two authentication methods for Databricks:
 
 Click on your Databricks username in the top bar, and then select "Settings" from the dropdown menu. Click on the "Developer" tab in the column "Settings" on the left. Next to "Access tokens," click "Manage." Click the "Generate new token" button. Enter Token Details and click "Generate".
 
-#### Step 2: Retrieve HTTP path
+#### Step 2: Retrieve HTTP path (SQL Warehouse URL)
 
-Click on "SQL Warehouses" in the bar on the left. Select your warehouse from the list. Click on "Connection details" towards the top of the page. Then copy the HTTP path. It should look something like /sql/1.0/warehouses/3748325bf498i274
+The HTTP path is the connection endpoint for your SQL Warehouse. To retrieve it:
 
-#### Step 3: Retrieve host
+1. In the Databricks workspace, click on **"SQL Warehouses"** in the left sidebar (under the "SQL" section)
+2. Select your SQL warehouse from the list (if you don't have one, you'll need to create a SQL warehouse first)
+3. Click on **"Connection details"** tab at the top of the warehouse details page
+4. Under the "Connection details" section, locate the **"HTTP path"** field
+5. Copy the HTTP path value. It should look something like: `/sql/1.0/warehouses/3748325bf498i274`
 
-The host URL is typically visible in the browser's address bar. It should look something like: {databricks-instance}.cloud.databricks.com.
+> 
+> If you have multiple warehouses, make sure to use the correct path for the warehouse you want to connect to.
 
-Alternatively, you can find the host URL in the workspace settings.
+#### Step 3: Retrieve host (Workspace URL)
+
+The host is your Databricks workspace URL. You can find it in several ways:
+
+- Method 1: Browser address bar
+
+    The host URL is visible in your browser's address bar when you're logged into Databricks.
+    
+    It should look like: `{workspace-name}.cloud.databricks.com` or `{workspace-name}.azuredatabricks.net` (for Azure)
+
+- Method 2: From the SQL Warehouse connection details
+
+    In the same "Connection details" tab where you found the HTTP path, the host URL is also displayed in the connection string examples
 
 #### Step 4: Enter port, catalog and schema
 
