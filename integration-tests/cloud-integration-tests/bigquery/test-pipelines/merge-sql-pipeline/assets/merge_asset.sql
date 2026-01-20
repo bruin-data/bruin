@@ -1,5 +1,5 @@
 /* @bruin
-name: dataset.target_table
+name: cloud_integration_test.merge_sql_target_table
 type: bq.sql
 
 materialization:

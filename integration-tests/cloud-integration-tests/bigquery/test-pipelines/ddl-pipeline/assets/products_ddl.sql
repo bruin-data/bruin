@@ -1,5 +1,5 @@
 /* @bruin
-name: test.products_ddl
+name: cloud_integration_test.ddl_materialization_products
 type: bq.sql
 
 materialization:

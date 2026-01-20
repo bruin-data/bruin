@@ -1,6 +1,6 @@
 /* @bruin
 
-name: test.products_merge
+name: cloud_integration_test.merge_materialization_products
 type: bq.sql
 
 materialization:

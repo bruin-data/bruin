@@ -1,6 +1,6 @@
 /* @bruin
 
-name: ddl_full_refresh.ddl
+name: cloud_integration_test.ddl_drop_pipeline_ddl
 type: bq.sql
 
 materialization:

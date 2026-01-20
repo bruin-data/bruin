@@ -1,6 +1,6 @@
 /* @bruin
 
-name: dataset.dry_run_table
+name: cloud_integration_test.dry_run_table
 type: bq.sql
 
 materialization:

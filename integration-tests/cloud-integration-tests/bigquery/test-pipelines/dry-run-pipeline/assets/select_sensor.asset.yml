@@ -1,4 +1,4 @@
-name: dataset.select_sensor
+name: cloud_integration_test.dry_run_select_sensor
 type: bq.sensor.query
 parameters:
-    query: SELECT * FROM dataset.dry_run_table
+    query: SELECT * FROM cloud_integration_test.dry_run_table

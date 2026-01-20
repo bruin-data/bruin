@@ -1,8 +1,8 @@
 /* @bruin
-name: test.sensor
+name: cloud_integration_test.table_sensor_sensor
 type: bq.sensor.table
 parameters:
-    table: test.datatable
+    table: cloud_integration_test.table_sensor_datatable
     poke_interval: 3
 @bruin */
 

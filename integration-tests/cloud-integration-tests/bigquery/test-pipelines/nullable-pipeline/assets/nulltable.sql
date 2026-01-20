@@ -1,5 +1,5 @@
 /* @bruin
-name: dataset.nulltable
+name: cloud_integration_test.merge_with_nulls_nulltable
 type: bq.sql
 
 materialization:
