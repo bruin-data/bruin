@@ -595,15 +595,15 @@ func scaleFromColumnType(columnType string) (int, bool) {
 	return 0, false
 }
 
-// extract a numeric scale from the column type string, numeric(10,4)
+// extract a numeric scale from the column type string, numeric(10,4).
 func parseScaleFromType(columnType string) (int, bool) {
 	open := strings.Index(columnType, "(")
-	close := strings.Index(columnType, ")")
-	if open == -1 || close == -1 || close <= open {
+	closeIndex := strings.Index(columnType, ")")
+	if open == -1 || closeIndex == -1 || closeIndex <= open {
 		return 0, false
 	}
 
-	parts := strings.Split(columnType[open+1:close], ",")
+	parts := strings.Split(columnType[open+1:closeIndex], ",")
 	if len(parts) != 2 {
 		return 0, false
 	}
