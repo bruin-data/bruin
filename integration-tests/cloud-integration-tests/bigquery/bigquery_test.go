@@ -766,6 +766,56 @@ func TestBigQueryWorkflows(t *testing.T) {
 			},
 		},
 		{
+			name: "ddl-materialization",
+			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
+				return e2e.Workflow{
+					Name: "ddl-materialization",
+					Steps: []e2e.Task{
+						{
+							Name:     "ddl: drop the table",
+							Command:  binary,
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_ddl;"),
+							Env:      []string{},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
+						},
+						{
+							Name:     "ddl: confirm the table is dropped",
+							Command:  binary,
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM test.products_ddl;"),
+							Env:      []string{},
+							Expected: e2e.Output{ExitCode: 1},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
+						},
+						{
+							Name:     "ddl: create table with DDL strategy",
+							Command:  binary,
+							Args:     append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/ddl-pipeline/assets/products_ddl.sql")),
+							Env:      []string{},
+							Expected: e2e.Output{ExitCode: 0, Contains: []string{"Finished: test.products_ddl"}},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+						},
+						{
+							Name:     "ddl: verify table exists and is empty",
+							Command:  binary,
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT COUNT(*) as count FROM test.products_ddl;", "--output", "csv"),
+							Env:      []string{},
+							Expected: e2e.Output{ExitCode: 0, Contains: []string{"count", "0"}},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+						},
+						{
+							Name:     "cleanup: drop table",
+							Command:  binary,
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_ddl;"),
+							Env:      []string{},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
+						},
+					},
+				}
+			},
+		},
+		{
 			name: "bigquery-scd2-by-column",
 			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
 				return e2e.Workflow{
