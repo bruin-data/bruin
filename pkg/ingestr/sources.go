@@ -13,7 +13,10 @@
 
 package ingestr
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // SourceTable represents a table available from an ingestr source with its metadata.
 type SourceTable struct {
@@ -686,7 +689,8 @@ func GetSourceTables(sourceName string) (*Source, error) {
 }
 
 // GetAllSources returns all available ingestr sources and their tables.
-func GetAllSources() ([]*Source, error) {
+// Sources are sorted by name for consistent output.
+func GetAllSources() []*Source {
 	sources := make([]*Source, 0, len(SourceTablesRegistry))
 
 	for name, tables := range SourceTablesRegistry {
@@ -696,14 +700,20 @@ func GetAllSources() ([]*Source, error) {
 		})
 	}
 
-	return sources, nil
+	sort.Slice(sources, func(i, j int) bool {
+		return sources[i].Name < sources[j].Name
+	})
+
+	return sources
 }
 
 // GetAvailableSourceNames returns a list of all available source names.
+// Names are sorted alphabetically for consistent output.
 func GetAvailableSourceNames() []string {
 	names := make([]string, 0, len(SourceTablesRegistry))
 	for name := range SourceTablesRegistry {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
