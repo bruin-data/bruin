@@ -223,6 +223,7 @@ func Init() *cli.Command {
 			defer RecoverFromPanic()
 
 			templateName := c.Args().Get(0)
+			selectedViaInteractive := false
 			if len(templateName) == 0 {
 				m, err := p.Run()
 				if err != nil {
@@ -233,9 +234,16 @@ func Init() *cli.Command {
 				if m, ok := m.(model); ok {
 					if m.choice != "" {
 						templateName = m.choice
+						selectedViaInteractive = true
 					} else if m.quitting {
 						return nil
 					}
+				}
+
+				// If still empty after interactive selection, something went wrong
+				if templateName == "" {
+					errorPrinter.Printf("No template selected\n")
+					return cli.Exit("", 1)
 				}
 			}
 
@@ -383,6 +391,12 @@ func Init() *cli.Command {
 
 			// Store template name for telemetry (will be sent with command_end event)
 			telemetry.SetTemplateName(templateName)
+			
+			// Also send an immediate event to track template selection
+			telemetry.SendEvent("template_selected", map[string]interface{}{
+				"template_name": templateName,
+				"interactive":   selectedViaInteractive,
+			})
 
 			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
 			infoPrinter.Println("\nYou can run the following commands to get started:")
