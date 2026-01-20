@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -49,6 +50,7 @@ func Internal() *cli.Command {
 			FetchColumns(),
 			ListTemplates(),
 			AssetMetadata(),
+			IngestrSources(),
 		},
 	}
 }
@@ -1386,6 +1388,63 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 			fmt.Println(string(out))
+			return nil
+		},
+	}
+}
+
+// IngestrSources returns a CLI command that lists available tables for ingestr sources.
+func IngestrSources() *cli.Command {
+	return &cli.Command{
+		Name:   "ingestr-sources",
+		Usage:  "List available tables for ingestr sources",
+		Before: telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "source",
+				Aliases: []string{"s"},
+				Usage:   "the name of the source to get tables for (e.g., stripe, shopify, hubspot)",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			sourceName := c.String("source")
+
+			// If source is specified, get tables for that source only
+			if sourceName != "" {
+				source, err := ingestr.GetSourceTables(sourceName)
+				if err != nil {
+					printErrorJSON(errors2.Wrapf(err, "failed to get tables for source '%s'", sourceName))
+					return cli.Exit("", 1)
+				}
+
+				jsonData, err := json.Marshal(source)
+				if err != nil {
+					printErrorJSON(errors2.Wrap(err, "failed to marshal result to JSON"))
+					return cli.Exit("", 1)
+				}
+				fmt.Println(string(jsonData))
+				return nil
+			}
+
+			// Get all sources
+			sources := ingestr.GetAllSources()
+
+			type jsonResponse struct {
+				Sources []*ingestr.Source `json:"sources"`
+				Count   int               `json:"count"`
+			}
+
+			finalOutput := jsonResponse{
+				Sources: sources,
+				Count:   len(sources),
+			}
+
+			jsonData, err := json.Marshal(finalOutput)
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to marshal result to JSON"))
+				return cli.Exit("", 1)
+			}
+			fmt.Println(string(jsonData))
 			return nil
 		},
 	}
