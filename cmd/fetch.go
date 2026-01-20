@@ -5,10 +5,12 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"os/signal"
 	path2 "path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -32,7 +34,9 @@ import (
 )
 
 const (
-	outputFormatPlain = "plain"
+	outputFormatPlain      = "plain"
+	defaultNumericScale    = 9
+	defaultBigNumericScale = 38
 )
 
 type ppInfo struct {
@@ -170,6 +174,7 @@ func Query() *cli.Command {
 				}
 
 				result, queryErr := querier.SelectWithSchema(timeoutCtx, &q)
+				normalizeQueryResultForOutput(result)
 
 				// Save query log (for both success and error cases)
 				inputPath := c.String("asset")
@@ -524,6 +529,101 @@ func printTable(columnNames []string, rows [][]interface{}) {
 
 	t.SetStyle(table.StyleLight)
 	t.Render()
+}
+
+func normalizeQueryResultForOutput(result *query.QueryResult) {
+	if result == nil {
+		return
+	}
+
+	for rowIdx, row := range result.Rows {
+		normalized := make([]interface{}, len(row))
+		for colIdx, cell := range row {
+			columnType := ""
+			if colIdx < len(result.ColumnTypes) {
+				columnType = result.ColumnTypes[colIdx]
+			}
+			normalized[colIdx] = normalizeCellForOutput(cell, columnType)
+		}
+		result.Rows[rowIdx] = normalized
+	}
+}
+
+func normalizeCellForOutput(cell interface{}, columnType string) interface{} {
+	switch value := cell.(type) {
+	case *big.Rat:
+		if value == nil {
+			return nil
+		}
+		return formatRatForOutput(value, columnType)
+	case big.Rat:
+		return formatRatForOutput(&value, columnType)
+	default:
+		return cell
+	}
+}
+
+func formatRatForOutput(value *big.Rat, columnType string) string {
+	if value == nil {
+		return ""
+	}
+
+	if scale, ok := scaleFromColumnType(columnType); ok {
+		return trimTrailingZeros(value.FloatString(scale))
+	}
+
+	return trimTrailingZeros(value.FloatString(defaultNumericScale))
+}
+
+func scaleFromColumnType(columnType string) (int, bool) {
+	if columnType == "" {
+		return 0, false
+	}
+
+	normalized := strings.ToLower(columnType)
+	if scale, ok := parseScaleFromType(normalized); ok {
+		return scale, true
+	}
+
+	if strings.Contains(normalized, "bignumeric") {
+		return defaultBigNumericScale, true
+	}
+	if strings.Contains(normalized, "numeric") {
+		return defaultNumericScale, true
+	}
+
+	return 0, false
+}
+
+// extract a numeric scale from the column type string, numeric(10,4)
+func parseScaleFromType(columnType string) (int, bool) {
+	open := strings.Index(columnType, "(")
+	close := strings.Index(columnType, ")")
+	if open == -1 || close == -1 || close <= open {
+		return 0, false
+	}
+
+	parts := strings.Split(columnType[open+1:close], ",")
+	if len(parts) != 2 {
+		return 0, false
+	}
+
+	scale, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return 0, false
+	}
+
+	return scale, true
+}
+
+func trimTrailingZeros(value string) string {
+	if !strings.Contains(value, ".") {
+		return value
+	}
+
+	value = strings.TrimRight(value, "0")
+	value = strings.TrimRight(value, ".")
+	return value
 }
 
 func handleError(output string, err error) error {
