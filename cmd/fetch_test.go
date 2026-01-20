@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -202,4 +204,22 @@ func TestAddLimitToQuery(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestNormalizeQueryResultForOutput(t *testing.T) {
+	t.Parallel()
+
+	result := &query.QueryResult{
+		Columns:     []string{"runtime"},
+		ColumnTypes: []string{"NUMERIC"},
+		Rows: [][]interface{}{
+			{big.NewRat(32097247, 500000)},
+		},
+	}
+
+	normalizeQueryResultForOutput(result)
+
+	require.Len(t, result.Rows, 1)
+	require.Len(t, result.Rows[0], 1)
+	assert.Equal(t, "64.194494", result.Rows[0][0])
 }
