@@ -1427,11 +1427,7 @@ func IngestrSources() *cli.Command {
 			}
 
 			// Get all sources
-			sources, err := ingestr.GetAllSources()
-			if err != nil {
-				printErrorJSON(errors2.Wrap(err, "failed to get ingestr sources"))
-				return cli.Exit("", 1)
-			}
+			sources := ingestr.GetAllSources()
 
 			type jsonResponse struct {
 				Sources []*ingestr.Source `json:"sources"`
