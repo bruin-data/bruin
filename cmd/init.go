@@ -383,17 +383,17 @@ func Init() *cli.Command {
 					return err
 				}
 
-				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
-				if err != nil {
-					errorPrinter.Printf("Could not write the %s file: %v\n", filepath.Join(absolutePath, baseName), err)
-					return err
-				}
-
-				return nil
-			})
+			err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
 			if err != nil {
-				errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
-				return cli.Exit("", 1)
+				errorPrinter.Printf("Could not write the %s file: %v\n", filepath.Join(absolutePath, baseName), err)
+				return err
+			}
+
+			return nil
+		})
+		if err != nil {
+			errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
+			return cli.Exit("", 1)
 		}
 
 		// Store template name for telemetry (will be sent with command_end event)
