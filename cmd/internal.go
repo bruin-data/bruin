@@ -1393,6 +1393,7 @@ func AssetMetadata() *cli.Command {
 	}
 }
 
+// IngestrSources returns a CLI command that lists available tables for ingestr sources.
 func IngestrSources() *cli.Command {
 	return &cli.Command{
 		Name:   "ingestr-sources",

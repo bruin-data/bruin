@@ -15,6 +15,7 @@ package ingestr
 
 import "fmt"
 
+// SourceTable represents a table available from an ingestr source with its metadata.
 type SourceTable struct {
 	Name        string `json:"name"`
 	PrimaryKey  string `json:"primary_key,omitempty"`
@@ -22,6 +23,7 @@ type SourceTable struct {
 	IncStrategy string `json:"incremental_strategy,omitempty"`
 }
 
+// Source represents an ingestr source with its available tables.
 type Source struct {
 	Name   string         `json:"name"`
 	Tables []*SourceTable `json:"tables"`
