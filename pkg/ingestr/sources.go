@@ -682,9 +682,17 @@ func GetSourceTables(sourceName string) (*Source, error) {
 		return nil, fmt.Errorf("source '%s' not found in registry", sourceName)
 	}
 
+	// Create a copy to avoid modifying the original registry
+	sortedTables := make([]*SourceTable, len(tables))
+	copy(sortedTables, tables)
+
+	sort.Slice(sortedTables, func(i, j int) bool {
+		return sortedTables[i].Name < sortedTables[j].Name
+	})
+
 	return &Source{
 		Name:   sourceName,
-		Tables: tables,
+		Tables: sortedTables,
 	}, nil
 }
 
@@ -705,15 +713,4 @@ func GetAllSources() []*Source {
 	})
 
 	return sources
-}
-
-// GetAvailableSourceNames returns a list of all available source names.
-// Names are sorted alphabetically for consistent output.
-func GetAvailableSourceNames() []string {
-	names := make([]string, 0, len(SourceTablesRegistry))
-	for name := range SourceTablesRegistry {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
 }
