@@ -824,7 +824,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: drop table if exists",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_column_menu;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.scd2_by_column_menu;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
