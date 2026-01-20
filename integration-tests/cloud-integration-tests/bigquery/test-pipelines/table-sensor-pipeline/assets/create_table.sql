@@ -1,5 +1,5 @@
 /* @bruin
-name: test.datatable
+name: cloud_integration_test.table_sensor_datatable
 type: bq.sql
 
 materialization:

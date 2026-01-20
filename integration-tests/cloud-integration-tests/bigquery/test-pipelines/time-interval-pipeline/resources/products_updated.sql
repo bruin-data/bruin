@@ -1,6 +1,6 @@
 /* @bruin
 
-name: test.products_time_interval
+name: cloud_integration_test.time_interval_materialization_products
 type: bq.sql
 
 materialization:

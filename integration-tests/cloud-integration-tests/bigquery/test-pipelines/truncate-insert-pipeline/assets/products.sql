@@ -1,6 +1,6 @@
 /* @bruin
 
-name: test.products_truncate
+name: cloud_integration_test.truncate_insert_materialization_products
 type: bq.sql
 
 materialization:

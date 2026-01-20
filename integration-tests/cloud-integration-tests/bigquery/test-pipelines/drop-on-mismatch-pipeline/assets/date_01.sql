@@ -1,5 +1,5 @@
 /* @bruin
-name: bq_test.date_01
+name: cloud_integration_test.drop_on_mismatch_date_01
 type: bq.sql
 materialization:
   type: table

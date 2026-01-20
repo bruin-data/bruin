@@ -1,5 +1,5 @@
 /* @bruin
-name: dataset.products
+name: cloud_integration_test.asset_query_products
 type: bq.sql
 
 materialization:

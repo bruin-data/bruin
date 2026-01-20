@@ -138,7 +138,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "drop the initial DDL table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS ddl_full_refresh; DROP TABLE IF EXISTS ddl_full_refresh.ddl;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.ddl_drop_pipeline_ddl;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -186,7 +186,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "query the products table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM ddl_full_refresh.ddl ORDER BY company", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM cloud_integration_test.ddl_drop_pipeline_ddl ORDER BY company", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -224,7 +224,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "query the products table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM ddl_full_refresh.ddl ORDER BY company", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM cloud_integration_test.ddl_drop_pipeline_ddl ORDER BY company", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -238,7 +238,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "cleanup: drop DDL table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS ddl_full_refresh; DROP TABLE IF EXISTS ddl_full_refresh.ddl;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.ddl_drop_pipeline_ddl;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -272,7 +272,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "query the products table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM dataset.products ORDER BY PRODUCT_ID;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM cloud_integration_test.asset_query_products ORDER BY PRODUCT_ID;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -286,7 +286,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "cleanup: drop products table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS dataset; DROP TABLE IF EXISTS dataset.products;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.asset_query_products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -320,7 +320,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "query the table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.nulltable ORDER BY id;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM cloud_integration_test.merge_with_nulls_nulltable ORDER BY id;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -358,7 +358,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "query the table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.nulltable ORDER BY id;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM cloud_integration_test.merge_with_nulls_nulltable ORDER BY id;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -372,7 +372,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "cleanup: drop the table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS dataset; DROP TABLE IF EXISTS dataset.nulltable;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.merge_with_nulls_nulltable;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -394,7 +394,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "merge: drop the table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_merge;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.merge_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -410,7 +410,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "merge: query initial table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price FROM test.products_merge ORDER BY product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price FROM cloud_integration_test.merge_materialization_products ORDER BY product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/merge-pipeline/expectations/initial_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -434,7 +434,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "merge: query merged table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price FROM test.products_merge ORDER BY product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price FROM cloud_integration_test.merge_materialization_products ORDER BY product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/merge-pipeline/expectations/merged_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -442,7 +442,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "cleanup: drop merge table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_merge;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.merge_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -460,7 +460,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "append: drop the table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_append;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.append_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -476,7 +476,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "append: query initial table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price FROM test.products_append ORDER BY product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price FROM cloud_integration_test.append_materialization_products ORDER BY product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/append-pipeline/expectations/initial_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -500,7 +500,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "append: query appended table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price FROM test.products_append ORDER BY product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price FROM cloud_integration_test.append_materialization_products ORDER BY product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/append-pipeline/expectations/appended_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -508,7 +508,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "cleanup: drop append table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_append;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.append_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -526,7 +526,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "truncate-insert: drop the table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_truncate;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.truncate_insert_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -542,7 +542,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "truncate-insert: query initial table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, stock FROM test.products_truncate ORDER BY product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, stock FROM cloud_integration_test.truncate_insert_materialization_products ORDER BY product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/truncate-insert-pipeline/expectations/initial_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -566,7 +566,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "truncate-insert: query updated table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, stock FROM test.products_truncate ORDER BY product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, stock FROM cloud_integration_test.truncate_insert_materialization_products ORDER BY product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/truncate-insert-pipeline/expectations/updated_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -574,7 +574,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "cleanup: drop truncate table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_truncate;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.truncate_insert_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -592,7 +592,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "delete-insert: drop the table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_delete_insert;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.delete_insert_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -608,7 +608,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "delete-insert: query initial table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, dt FROM test.products_delete_insert ORDER BY dt, product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, dt FROM cloud_integration_test.delete_insert_materialization_products ORDER BY dt, product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/delete-insert-pipeline/expectations/initial_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -632,7 +632,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "delete-insert: query updated table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, dt FROM test.products_delete_insert ORDER BY dt, product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, dt FROM cloud_integration_test.delete_insert_materialization_products ORDER BY dt, product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/delete-insert-pipeline/expectations/updated_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -640,7 +640,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "cleanup: drop delete-insert table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_delete_insert;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.delete_insert_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -658,7 +658,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "time-interval: drop the table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_time_interval;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.time_interval_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -674,7 +674,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "time-interval: query initial table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, dt FROM test.products_time_interval ORDER BY dt, product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, dt FROM cloud_integration_test.time_interval_materialization_products ORDER BY dt, product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/time-interval-pipeline/expectations/initial_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -698,7 +698,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "time-interval: query updated table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, dt FROM test.products_time_interval ORDER BY dt, product_id;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT product_id, product_name, price, dt FROM cloud_integration_test.time_interval_materialization_products ORDER BY dt, product_id;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, CSVFile: filepath.Join(tempDir, "test-pipelines/time-interval-pipeline/expectations/updated_expected.csv")},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByCSV},
@@ -706,7 +706,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "cleanup: drop time-interval table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_time_interval;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.time_interval_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -724,7 +724,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "table-sensor: drop the table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.datatable;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.table_sensor_datatable;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -734,7 +734,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "10", filepath.Join(tempDir, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"Poking: test.datatable", "Failed: test.sensor"}},
+							Expected: e2e.Output{ExitCode: 1, Contains: []string{"Poking: cloud_integration_test.table_sensor_datatable", "Failed: cloud_integration_test.table_sensor_sensor"}},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 						},
 						{
@@ -742,7 +742,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(tempDir, "test-pipelines/table-sensor-pipeline/assets/create_table.sql")),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 0, Contains: []string{"Finished: test.datatable"}},
+							Expected: e2e.Output{ExitCode: 0, Contains: []string{"Finished: cloud_integration_test.table_sensor_datatable"}},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 						},
 						{
@@ -750,13 +750,13 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"run"}, configFlags...), "--env", "default", "--sensor-mode", "wait", "--timeout", "20", filepath.Join(tempDir, "test-pipelines/table-sensor-pipeline/assets/table_sensor.sql")),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 0, Contains: []string{"Poking: test.datatable", "Finished: test.sensor"}},
+							Expected: e2e.Output{ExitCode: 0, Contains: []string{"Poking: cloud_integration_test.table_sensor_datatable", "Finished: cloud_integration_test.table_sensor_sensor"}},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 						},
 						{
 							Name:     "cleanup: drop sensor table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.datatable;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.table_sensor_datatable;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -774,7 +774,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "ddl: drop the table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_ddl;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.ddl_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -782,7 +782,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "ddl: confirm the table is dropped",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM test.products_ddl;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM cloud_integration_test.ddl_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 1},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -792,13 +792,13 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/ddl-pipeline/assets/products_ddl.sql")),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 0, Contains: []string{"Finished: test.products_ddl"}},
+							Expected: e2e.Output{ExitCode: 0, Contains: []string{"Finished: cloud_integration_test.ddl_materialization_products"}},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
 						},
 						{
 							Name:     "ddl: verify table exists and is empty",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT COUNT(*) as count FROM test.products_ddl;", "--output", "csv"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT COUNT(*) as count FROM cloud_integration_test.ddl_materialization_products;", "--output", "csv"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0, Contains: []string{"count", "0"}},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
@@ -806,7 +806,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:     "cleanup: drop table",
 							Command:  binary,
-							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS test; DROP TABLE IF EXISTS test.products_ddl;"),
+							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.ddl_materialization_products;"),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
 							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
@@ -824,7 +824,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: drop table if exists",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS test.menu;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_column_menu;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -860,7 +860,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: query the initial table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM cloud_integration_test.scd2_by_column_menu ORDER BY ID, _valid_from;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -898,7 +898,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: query the updated table 01",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM cloud_integration_test.scd2_by_column_menu ORDER BY ID, _valid_from;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -936,7 +936,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: query the updated table 02",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM cloud_integration_test.scd2_by_column_menu ORDER BY ID, _valid_from;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -950,7 +950,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS test.menu;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_column_menu;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -962,7 +962,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: confirm the table is dropped",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM test.menu;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM cloud_integration_test.scd2_by_column_menu;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 1, // Should fail because table doesn't exist
@@ -984,7 +984,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-time: drop table if exists",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS test.products;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_time_products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -1020,7 +1020,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-time: query the initial table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM cloud_integration_test.scd2_by_time_products ORDER BY product_id, _valid_from;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -1058,7 +1058,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-time: query the updated table 01",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM cloud_integration_test.scd2_by_time_products ORDER BY product_id, _valid_from;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -1096,7 +1096,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-time: query the updated table 02",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM cloud_integration_test.scd2_by_time_products ORDER BY product_id, _valid_from;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -1110,7 +1110,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-time: drop the table (expect error but table will be dropped)",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS test.products;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_time_products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -1122,7 +1122,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-time: confirm the table is dropped",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM test.products;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM cloud_integration_test.scd2_by_time_products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 1, // Should fail because table doesn't exist
@@ -1183,7 +1183,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "cleanup: drop the table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS dataset; DROP TABLE IF EXISTS dataset.dry_run_table;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "CREATE SCHEMA IF NOT EXISTS cloud_integration_test; DROP TABLE IF EXISTS cloud_integration_test.dry_run_table;"),
 							Expected: e2e.Output{
 								ExitCode: 0,
 							},
@@ -1204,8 +1204,21 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "drop-on-mismatch: drop schema if exists",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP SCHEMA IF EXISTS bq_test CASCADE;"),
-							Env:     []string{},
+							Args: append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", `
+								CREATE SCHEMA IF NOT EXISTS cloud_integration_test;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_compose;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_01;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_02;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_trunc_01;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_trunc_02;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_trunc_03;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_01;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_02;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_03;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_04;
+							`),
+							Env: []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
 							},
@@ -1245,27 +1258,27 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args: append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", `
 								SELECT COUNT(*) as tables_with_2025_data
 								FROM (
-									SELECT 'compose' as table_name, COUNT(*) as cnt FROM bq_test.compose WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_compose' as table_name, COUNT(*) as cnt FROM cloud_integration_test.drop_on_mismatch_compose WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'date_01', COUNT(*) FROM bq_test.date_01 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_date_01', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_date_01 WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'date_02', COUNT(*) FROM bq_test.date_02 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_date_02', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_date_02 WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'date_trunc_01', COUNT(*) FROM bq_test.date_trunc_01 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_date_trunc_01', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_date_trunc_01 WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'date_trunc_02', COUNT(*) FROM bq_test.date_trunc_02 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_date_trunc_02', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_date_trunc_02 WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'date_trunc_03', COUNT(*) FROM bq_test.date_trunc_03 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_date_trunc_03', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_date_trunc_03 WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'ts', COUNT(*) FROM bq_test.ts WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_ts', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_ts WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'ts_truncate_01', COUNT(*) FROM bq_test.ts_truncate_01 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_ts_truncate_01', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_ts_truncate_01 WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'ts_truncate_02', COUNT(*) FROM bq_test.ts_truncate_02 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_ts_truncate_02', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_ts_truncate_02 WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'ts_truncate_03', COUNT(*) FROM bq_test.ts_truncate_03 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_ts_truncate_03', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_ts_truncate_03 WHERE created_at = '2025-01-01'
 									UNION ALL
-									SELECT 'ts_truncate_04', COUNT(*) FROM bq_test.ts_truncate_04 WHERE created_at = '2025-01-01'
+									SELECT 'drop_on_mismatch_ts_truncate_04', COUNT(*) FROM cloud_integration_test.drop_on_mismatch_ts_truncate_04 WHERE created_at = '2025-01-01'
 								)
 								WHERE cnt > 0;
 							`, "--output", "csv"),
@@ -1282,18 +1295,18 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Name:    "cleanup: drop bq_test tables",
 							Command: binary,
 							Args: append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", `
-								CREATE SCHEMA IF NOT EXISTS bq_test;
-								DROP TABLE IF EXISTS bq_test.compose;
-								DROP TABLE IF EXISTS bq_test.date_01;
-								DROP TABLE IF EXISTS bq_test.date_02;
-								DROP TABLE IF EXISTS bq_test.date_trunc_01;
-								DROP TABLE IF EXISTS bq_test.date_trunc_02;
-								DROP TABLE IF EXISTS bq_test.date_trunc_03;
-								DROP TABLE IF EXISTS bq_test.ts;
-								DROP TABLE IF EXISTS bq_test.ts_truncate_01;
-								DROP TABLE IF EXISTS bq_test.ts_truncate_02;
-								DROP TABLE IF EXISTS bq_test.ts_truncate_03;
-								DROP TABLE IF EXISTS bq_test.ts_truncate_04;
+								CREATE SCHEMA IF NOT EXISTS cloud_integration_test;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_compose;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_01;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_02;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_trunc_01;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_trunc_02;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_date_trunc_03;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_01;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_02;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_03;
+								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_04;
 							`),
 							Env:      []string{},
 							Expected: e2e.Output{ExitCode: 0},
@@ -1336,7 +1349,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "merge-sql-pipeline: validate merged result",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--output", "csv", "--query", "SELECT pk, col_a, col_b, col_c, col_d FROM dataset.target_table ORDER BY pk"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--output", "csv", "--query", "SELECT pk, col_a, col_b, col_c, col_d FROM cloud_integration_test.merge_sql_target_table ORDER BY pk"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -1353,10 +1366,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args: append(append([]string{"query"}, configFlags...),
 								"--connection", "gcp-default",
 								"--query", `
-									CREATE SCHEMA IF NOT EXISTS dataset;
-									DROP TABLE IF EXISTS dataset.initial_data;
-									DROP TABLE IF EXISTS dataset.updated_source;
-									DROP TABLE IF EXISTS dataset.target_table;
+									CREATE SCHEMA IF NOT EXISTS cloud_integration_test;
+									DROP TABLE IF EXISTS cloud_integration_test.merge_sql_initial_data;
+									DROP TABLE IF EXISTS cloud_integration_test.merge_sql_updated_source;
+									DROP TABLE IF EXISTS cloud_integration_test.merge_sql_target_table;
 								`,
 							),
 							Env:      []string{},

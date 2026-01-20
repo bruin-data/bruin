@@ -1,6 +1,6 @@
 /* @bruin
 
-name: test.products_delete_insert
+name: cloud_integration_test.delete_insert_materialization_products
 type: bq.sql
 
 materialization:
