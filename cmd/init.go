@@ -36,6 +36,7 @@ type model struct {
 	quitting  bool
 }
 
+// getTerminalHeight returns the current terminal height or a default value of 24 if unable to determine.
 func getTerminalHeight() int {
 	if term.IsTerminal(int(os.Stdout.Fd())) {
 		_, h, err := term.GetSize(int(os.Stdout.Fd()))
@@ -46,11 +47,13 @@ func getTerminalHeight() int {
 	return 24 // fallback default
 }
 
+// Init initializes the bubble tea model and enters alternate screen mode.
 func (m model) Init() tea.Cmd {
 	// Set initial terminal height
 	return tea.EnterAltScreen
 }
 
+// Update handles keyboard input and window size changes for the template selection UI.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -106,6 +109,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View renders the template selection UI with pagination support.
 func (m model) View() string {
 	s := strings.Builder{}
 	s.WriteString("Please select a template below:\n\n")
@@ -150,6 +154,7 @@ func (m model) View() string {
 	return s.String()
 }
 
+// mergeTemplateConfig merges environments and connections from a template's .bruin.yml into the central config.
 func mergeTemplateConfig(centralConfig *config.Config, templateBruinContent []byte) error {
 	var templateConfig config.Config
 	if err := yaml.Unmarshal(templateBruinContent, &templateConfig); err != nil {
@@ -171,6 +176,7 @@ func mergeTemplateConfig(centralConfig *config.Config, templateBruinContent []by
 	return nil
 }
 
+// mergeEnvironment merges a template environment and its connections into the central config's environment.
 func mergeEnvironment(centralConfig *config.Config, templateEnvName string, templateEnv config.Environment) error {
 	if _, exists := centralConfig.Environments[templateEnvName]; !exists {
 		centralConfig.Environments[templateEnvName] = templateEnv
@@ -191,6 +197,7 @@ func mergeEnvironment(centralConfig *config.Config, templateEnvName string, temp
 	return nil
 }
 
+// Init creates and returns the CLI command for initializing new Bruin pipelines from templates.
 func Init() *cli.Command {
 	folders, err := templates.Templates.ReadDir(".")
 	if err != nil {
@@ -387,20 +394,20 @@ func Init() *cli.Command {
 			if err != nil {
 				errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
 				return cli.Exit("", 1)
-			}
+		}
 
-			// Store template name for telemetry (will be sent with command_end event)
-			telemetry.SetTemplateName(templateName)
-			
-			// Also send an immediate event to track template selection
-			telemetry.SendEvent("template_selected", map[string]interface{}{
-				"template_name": templateName,
-				"interactive":   selectedViaInteractive,
-			})
+		// Store template name for telemetry (will be sent with command_end event)
+		telemetry.SetTemplateName(templateName)
 
-			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
-			infoPrinter.Println("\nYou can run the following commands to get started:")
-			infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
+		// Also send an immediate event to track template selection
+		telemetry.SendEvent("template_selected", map[string]interface{}{
+			"template_name": templateName,
+			"interactive":   selectedViaInteractive,
+		})
+
+		successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
+		infoPrinter.Println("\nYou can run the following commands to get started:")
+		infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
 
 			return nil
 		},
