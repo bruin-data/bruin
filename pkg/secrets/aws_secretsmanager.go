@@ -134,13 +134,10 @@ func (c *AWSSecretsManagerClient) getAWSSecretsManager(name string) (config.Conn
 
 	detailsRaw, okDetails := secretData["details"]
 	secretType, okType := secretData["type"].(string)
-	if !okDetails && !okType {
-		return nil, errors.Errorf("secret '%s' is missing required 'details' or 'type' fields", name)
-	}
 
-	details, ok := detailsRaw.(map[string]any)
-	if !ok {
-		return nil, errors.Errorf("secret '%s' has invalid 'details' field: expected a map", name)
+	details, detailsIsMap := detailsRaw.(map[string]any)
+	if !okDetails || !detailsIsMap || !okType || secretType == "" {
+		return nil, errors.Errorf("secret '%s' must contain both 'type' (non-empty string) and 'details' (object)", name)
 	}
 
 	details["name"] = name

@@ -575,7 +575,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:    "secrets-backend",
 				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler'",
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws'",
 			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
