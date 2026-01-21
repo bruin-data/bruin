@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	path2 "path"
 	"path/filepath"
@@ -716,17 +718,18 @@ func handleSuccess(output string, message string) error {
 
 // QueryLog represents the structure of a query log entry.
 type QueryLog struct {
-	Query       string          `json:"query"`
-	Timestamp   time.Time       `json:"timestamp"`
-	Connection  string          `json:"connection"`
-	Success     bool            `json:"success"`
-	Columns     []string        `json:"columns,omitempty"`
-	Rows        [][]interface{} `json:"rows,omitempty"`
-	Error       string          `json:"error,omitempty"`
-	Asset       string          `json:"asset,omitempty"`
-	Environment string          `json:"environment,omitempty"`
-	Limit       int64           `json:"limit,omitempty"`
-	Timeout     int             `json:"timeout,omitempty"`
+	Query          string          `json:"query"`
+	FormattedQuery string          `json:"formatted_query,omitempty"`
+	Timestamp      time.Time       `json:"timestamp"`
+	Connection     string          `json:"connection"`
+	Success        bool            `json:"success"`
+	Columns        []string        `json:"columns,omitempty"`
+	Rows           [][]interface{} `json:"rows,omitempty"`
+	Error          string          `json:"error,omitempty"`
+	Asset          string          `json:"asset,omitempty"`
+	Environment    string          `json:"environment,omitempty"`
+	Limit          int64           `json:"limit,omitempty"`
+	Timeout        int             `json:"timeout,omitempty"`
 }
 
 // QueryLogOptions contains optional parameters for query logging.
@@ -735,6 +738,53 @@ type QueryLogOptions struct {
 	Environment string
 	Limit       int64
 	Timeout     int
+}
+
+// formatSQL formats a SQL query using the sql-formatter npm package.
+// It tries to run Node.js with the sql-formatter library inline.
+// If formatting fails, it returns the original query.
+func formatSQL(sqlQuery string) string {
+	// Try to format using Node.js with sql-formatter inline
+	// This approach doesn't require a separate script file
+	nodeScript := `
+const { format } = require('sql-formatter');
+let sql = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => { sql += chunk; });
+process.stdin.on('end', () => {
+    try {
+        const formatted = format(sql, {
+            language: 'sql',
+            tabWidth: 2,
+            useTabs: false,
+            keywordCase: 'upper',
+            linesBetweenQueries: 2,
+        });
+        process.stdout.write(formatted);
+    } catch (e) {
+        process.stdout.write(sql);
+    }
+});
+`
+	cmd := exec.Command("node", "-e", nodeScript)
+	cmd.Stdin = strings.NewReader(sqlQuery)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		// If Node.js is not available or formatting fails, return original query
+		return sqlQuery
+	}
+
+	formatted := strings.TrimSpace(stdout.String())
+	if formatted == "" {
+		return sqlQuery
+	}
+
+	return formatted
 }
 
 func saveQueryLog(queryStr string, connName string, result *query.QueryResult, queryErr error, opts QueryLogOptions) error {
@@ -763,15 +813,19 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 	logFileName := fmt.Sprintf("query_%d.json", timestamp.UnixMilli())
 	logPath := filepath.Join(logDir, logFileName)
 
+	// Format the SQL query for better display
+	formattedQuery := formatSQL(queryStr)
+
 	logEntry := QueryLog{
-		Query:       queryStr,
-		Timestamp:   timestamp,
-		Connection:  connName,
-		Success:     queryErr == nil,
-		Asset:       opts.Asset,
-		Environment: opts.Environment,
-		Limit:       opts.Limit,
-		Timeout:     opts.Timeout,
+		Query:          queryStr,
+		FormattedQuery: formattedQuery,
+		Timestamp:      timestamp,
+		Connection:     connName,
+		Success:        queryErr == nil,
+		Asset:          opts.Asset,
+		Environment:    opts.Environment,
+		Limit:          opts.Limit,
+		Timeout:        opts.Timeout,
 	}
 
 	if queryErr != nil {

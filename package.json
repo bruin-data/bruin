@@ -13,6 +13,7 @@
     "esbuild": "^0.27.1",
     "highlight.js": "^11.10.0",
     "markdown-it": "^14.1.0",
+    "sql-formatter": "^15.7.0",
     "vite": "^6.4.1"
   },
   "overrides": {
