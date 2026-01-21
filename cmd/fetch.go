@@ -45,6 +45,8 @@ type ppInfo struct {
 	Config   *config.Config
 }
 
+// Query returns a CLI command that executes SQL queries against a configured connection and presents or exports the resulting rows.
+// The command supports direct query strings or pipeline SQL assets, optional date range, row limiting, environment/schema prefixing, per-connection agent annotations, multiple output formats (plain, json, csv), CSV export, timeout control, and writes a query log for each execution.
 func Query() *cli.Command {
 	return &cli.Command{
 		Name:   "query",
@@ -504,6 +506,10 @@ func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlpar
 	return limitedQuery
 }
 
+// printTable prints column headers and rows as a formatted table to standard output.
+// If rows is empty it prints "No data available" instead.
+// Column headers are taken from columnNames and each cell is converted to its default string
+// representation before rendering.
 func printTable(columnNames []string, rows [][]interface{}) {
 	if len(rows) == 0 {
 		fmt.Println("No data available")
@@ -531,6 +537,10 @@ func printTable(columnNames []string, rows [][]interface{}) {
 	t.Render()
 }
 
+// normalizeQueryResultForOutput normalizes each cell in a query result for presentation,
+// converting numeric rational values (e.g., *big.Rat) into formatted strings according
+// to the corresponding column type and replacing the rows in place.
+// If result is nil the function returns immediately.
 func normalizeQueryResultForOutput(result *query.QueryResult) {
 	if result == nil {
 		return
@@ -549,6 +559,10 @@ func normalizeQueryResultForOutput(result *query.QueryResult) {
 	}
 }
 
+// normalizeCellForOutput converts Big Rat numeric cells into a formatted string using the provided
+// columnType's scale information and returns all other cell values unchanged.
+// If cell is a nil *big.Rat, it is returned as nil; if cell is a big.Rat or *big.Rat it is returned
+// as a formatted numeric string reflecting the column type's scale; otherwise the original cell is returned.
 func normalizeCellForOutput(cell interface{}, columnType string) interface{} {
 	switch value := cell.(type) {
 	case *big.Rat:
@@ -563,6 +577,12 @@ func normalizeCellForOutput(cell interface{}, columnType string) interface{} {
 	}
 }
 
+// formatRatForOutput formats a *big.Rat value into a decimal string using a scale
+// derived from the SQL column type when available, trimming trailing zeros.
+//
+// If value is nil an empty string is returned. If the column type contains a
+// parseable scale that scale is used; otherwise a default scale is applied. Trailing
+// zeros and an unnecessary decimal point are removed from the resulting string.
 func formatRatForOutput(value *big.Rat, columnType string) string {
 	if value == nil {
 		return ""
@@ -575,6 +595,11 @@ func formatRatForOutput(value *big.Rat, columnType string) string {
 	return trimTrailingZeros(value.FloatString(defaultNumericScale))
 }
 
+// scaleFromColumnType determines the numeric scale for a SQL column type and reports whether a scale was found.
+// 
+// If the type contains an explicit scale (for example, `numeric(10,4)`), that scale is returned.
+// If the type name contains `bignumeric` or `numeric` without an explicit scale, a sensible default scale is returned for those types.
+// Returns false when no scale can be determined (including empty input).
 func scaleFromColumnType(columnType string) (int, bool) {
 	if columnType == "" {
 		return 0, false
@@ -595,7 +620,8 @@ func scaleFromColumnType(columnType string) (int, bool) {
 	return 0, false
 }
 
-// extract a numeric scale from the column type string, numeric(10,4).
+// parseScaleFromType extracts the scale (the second value) from SQL type declarations that include precision and scale, for example `numeric(10,4)`.
+// It returns the parsed scale and true when a two-part parenthesized scale is present and successfully parsed; otherwise it returns 0 and false.
 func parseScaleFromType(columnType string) (int, bool) {
 	open := strings.Index(columnType, "(")
 	closeIndex := strings.Index(columnType, ")")
@@ -616,6 +642,7 @@ func parseScaleFromType(columnType string) (int, bool) {
 	return scale, true
 }
 
+// and removes the decimal point if no fractional digits remain.
 func trimTrailingZeros(value string) string {
 	if !strings.Contains(value, ".") {
 		return value
@@ -626,6 +653,9 @@ func trimTrailingZeros(value string) string {
 	return value
 }
 
+// handleError prints the provided error using the specified output format and returns a CLI exit error with code 1.
+// If output is "json", it prints a JSON object `{"error": "<message>"}`; if JSON encoding fails or output is not "json",
+// it prints the error message as plain text. It always returns a cli.Exit with exit code 1.
 func handleError(output string, err error) error {
 	if output == "json" {
 		jsonError, err := json.Marshal(map[string]string{"error": err.Error()})
