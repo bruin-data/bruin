@@ -1,0 +1,35 @@
+# ============================================
+# Bruin Base Image - Python & UV pre-installed
+# Build this image monthly or when uv/Python versions change
+# ============================================
+FROM debian:trixie-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    build-essential \
+    binutils \
+    python3-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+RUN adduser --disabled-password --gecos '' bruin \
+    && chown -R bruin:bruin /home/bruin
+
+USER bruin
+
+# Create necessary directories
+RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/share /home/bruin/.bruin
+
+# Install uv package manager to the same location bruin expects
+# Version must match pkg/uv/uv.go Version constant (currently 0.9.13)
+RUN curl -LsSf https://astral.sh/uv/0.9.13/install.sh | env UV_INSTALL_DIR=/home/bruin/.bruin sh
+
+ENV PATH="/home/bruin/.bruin:/home/bruin/.local/bin:${PATH}"
+
+# Install Python versions in parallel
+RUN /home/bruin/.bruin/uv python install 3.11.9 & \
+    /home/bruin/.bruin/uv python install 3.10.14 & \
+    /home/bruin/.bruin/uv python install 3.9.19 & \
+    wait
