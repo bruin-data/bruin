@@ -705,7 +705,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			var task *pipeline.Asset
-			if preview.RunningForAnAsset {
+			if preview.RunningForAnAsset && c.Args().Len() == 1 {
 				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, preview.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
@@ -784,9 +784,7 @@ func Run(isDebug *bool) *cli.Command {
 			// Pipeline is inferred from the first asset file
 			var assetPaths []string
 			if c.Args().Len() > 1 && pipelineInfo.RunningForAnAsset {
-				// All args are asset files
 				assetPaths = c.Args().Slice()
-				// Disable single asset mode since we're running multiple assets
 				preview.RunningForAnAsset = false
 				pipelineInfo.RunningForAnAsset = false
 				task = nil
