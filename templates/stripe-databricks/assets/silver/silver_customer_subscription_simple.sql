@@ -3,6 +3,10 @@ name: stripe_sandbox.silver_customer_subscription_simple
 type: databricks.sql
 materialization:
   type: table
+  strategy: merge
+  primary_key:
+    - subscription_id
+    
 depends:
   - stripe_sandbox.bronze_customer_data_raw
   - stripe_sandbox.bronze_subscription_data_raw
@@ -45,3 +49,4 @@ LEFT JOIN stripe_sandbox.bronze_charge_data_raw ch
 -- Join charge to its balance transaction
 LEFT JOIN stripe_sandbox.bronze_balance_transaction_data_raw bt 
     ON ch.balance_transaction = bt.id
+WHERE s.id IS NOT NULL
