@@ -883,6 +883,11 @@ func Run(isDebug *bool) *cli.Command {
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize doppler client"))
 				}
+			case "aws":
+				connectionManager, err = secrets.NewAWSSecretsManagerClientFromEnv(logger)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "failed to initialize AWS Secrets Manager client"))
+				}
 			default:
 				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
 			}
