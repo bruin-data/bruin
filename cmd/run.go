@@ -794,7 +794,6 @@ func Run(isDebug *bool) *cli.Command {
 				filter.singleCheckID = scheduler.CheckUniqueID{}
 			}
 			if len(assetPaths) > 0 {
-
 				// Get current working directory for path resolution
 				cwd, err := os.Getwd()
 				if err != nil {
