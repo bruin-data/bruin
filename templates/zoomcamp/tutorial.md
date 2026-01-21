@@ -233,6 +233,32 @@ d) **reports/trips_report.sql** - SQL asset to aggregate by date, taxi_type, pay
 - Query the reports table to confirm aggregations look correct
 - Verify all quality checks passed (24 checks expected)
 ```
+
+---
+
+## Part 5: Deploy to MotherDuck
+
+MotherDuck is cloud-hosted DuckDB. Your existing `duckdb.sql` and `duckdb.seed` assets work without major changes, just swap the connection.
+
+### 5.1 Create Account & Generate Token
+1. Sign up at [motherduck.com](https://motherduck.com)
+2. Go to **Settings → Access Tokens → Create Token**
+
+### 5.2 Add Connection to `.bruin.yml`
+```yaml
+environments:
+  default:
+    connection:
+      motherduck:
+        - name: "motherduck-prod"
+          token: "your_token_here"
+          database: "my_db"
+```
+
+### 5.3 Update Pipeline & Assets
+- In `pipeline.yml`: change `duckdb: duckdb-default` → `duckdb: motherduck-prod`
+- In Python assets with explicit `connection:`: change to `motherduck-prod`
+
 ---
 
 ## Key Commands Reference
