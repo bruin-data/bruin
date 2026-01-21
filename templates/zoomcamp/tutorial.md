@@ -238,7 +238,7 @@ d) **reports/trips_report.sql** - SQL asset to aggregate by date, taxi_type, pay
 
 ## Part 5: Deploy to MotherDuck
 
-MotherDuck is cloud-hosted DuckDB. Your existing `duckdb.sql` and `duckdb.seed` assets work without changes—just swap the connection.
+MotherDuck is cloud-hosted DuckDB. Your existing `duckdb.sql` and `duckdb.seed` assets work without major changes, just swap the connection.
 
 ### 5.1 Create Account & Generate Token
 1. Sign up at [motherduck.com](https://motherduck.com)
@@ -246,10 +246,13 @@ MotherDuck is cloud-hosted DuckDB. Your existing `duckdb.sql` and `duckdb.seed` 
 
 ### 5.2 Add Connection to `.bruin.yml`
 ```yaml
-motherduck:
-  - name: "motherduck-prod"
-    token: "your_token_here"
-    database: "my_db"
+environments:
+  default:
+    connection:
+      motherduck:
+        - name: "motherduck-prod"
+          token: "your_token_here"
+          database: "my_db"
 ```
 
 ### 5.3 Update Pipeline & Assets
