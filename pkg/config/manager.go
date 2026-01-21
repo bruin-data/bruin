@@ -142,6 +142,22 @@ func (c *Connections) ConnectionsSummaryList() map[string]string {
 	return c.typeNameMap
 }
 
+// GetSingleConnectionName returns the connection name if there's exactly one connection configured.
+// Returns the connection name and true if exactly one connection exists, otherwise returns empty string and false.
+func (c *Connections) GetSingleConnectionName() (string, bool) {
+	if c.typeNameMap == nil {
+		c.buildConnectionKeyMap()
+	}
+
+	if len(c.typeNameMap) == 1 {
+		for name := range c.typeNameMap {
+			return name, true
+		}
+	}
+
+	return "", false
+}
+
 func GetConnectionsSchema() (string, error) {
 	schema := jsonschema.Reflect(&Connections{})
 	jsonStringSchema, err := json.Marshal(schema)

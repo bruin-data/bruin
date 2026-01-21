@@ -69,10 +69,12 @@ func TestValidateFlags(t *testing.T) {
 			errorMsg:    "direct query mode requires both --connection and --query flags",
 		},
 		{
-			name:        "missing connection in direct mode",
+			name:        "query only mode (connection inferred from config)",
 			query:       "SELECT * FROM table",
-			expectError: true,
-			errorMsg:    "must use either:\n1. Direct query mode (--connection and --query), or\n2. Asset mode (--asset with optional --environment), or\n3. Auto-detect mode (--asset to detect the connection and --query to run arbitrary queries)",
+			limit:       10,
+			expectError: false,
+			// Connection will be inferred from config if there's exactly one
+			limitedQuery: "SELECT * FROM (\nSELECT * FROM table\n) as t LIMIT 10",
 		},
 		{
 			name:        "mixing direct query and asset modes",

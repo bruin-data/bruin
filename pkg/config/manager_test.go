@@ -2102,6 +2102,88 @@ func TestConnections_MergeFrom(t *testing.T) {
 	}
 }
 
+func TestConnections_GetSingleConnectionName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		connections     *Connections
+		expectedName    string
+		expectedSuccess bool
+	}{
+		{
+			name:            "no connections returns false",
+			connections:     &Connections{},
+			expectedName:    "",
+			expectedSuccess: false,
+		},
+		{
+			name: "single postgres connection returns name",
+			connections: &Connections{
+				Postgres: []PostgresConnection{
+					{Name: "my-postgres"},
+				},
+			},
+			expectedName:    "my-postgres",
+			expectedSuccess: true,
+		},
+		{
+			name: "single bigquery connection returns name",
+			connections: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{Name: "my-bigquery"},
+				},
+			},
+			expectedName:    "my-bigquery",
+			expectedSuccess: true,
+		},
+		{
+			name: "single duckdb connection returns name",
+			connections: &Connections{
+				DuckDB: []DuckDBConnection{
+					{Name: "my-duckdb"},
+				},
+			},
+			expectedName:    "my-duckdb",
+			expectedSuccess: true,
+		},
+		{
+			name: "multiple connections of same type returns false",
+			connections: &Connections{
+				Postgres: []PostgresConnection{
+					{Name: "postgres1"},
+					{Name: "postgres2"},
+				},
+			},
+			expectedName:    "",
+			expectedSuccess: false,
+		},
+		{
+			name: "multiple connections of different types returns false",
+			connections: &Connections{
+				Postgres: []PostgresConnection{
+					{Name: "my-postgres"},
+				},
+				Snowflake: []SnowflakeConnection{
+					{Name: "my-snowflake"},
+				},
+			},
+			expectedName:    "",
+			expectedSuccess: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			name, ok := tt.connections.GetSingleConnectionName()
+			assert.Equal(t, tt.expectedSuccess, ok)
+			assert.Equal(t, tt.expectedName, name)
+		})
+	}
+}
+
 func TestLoadFromFileOrEnv_EnvironmentVariable(t *testing.T) {
 	// Test data from environ.yml
 	envConfigContent := `default_environment: dev

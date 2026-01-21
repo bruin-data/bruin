@@ -277,6 +277,10 @@ func validateFlags(connection, query, asset string) error {
 		}
 		return nil
 
+	case hasQuery && !hasAsset:
+		// Query-only mode: connection will be inferred from config if there's exactly one
+		return nil
+
 	case hasAsset:
 		if hasConnection {
 			return errors.New("asset mode (--asset) cannot be combined with direct query mode (--connection and --query)")
@@ -311,7 +315,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 
 	// Direct query mode (no asset path)
 	if assetPath == "" {
-		conn, err := getConnectionFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
+		connName, conn, err := getConnectionFromConfigWithContext(ctx, env, connectionName, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
@@ -319,7 +323,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		return connectionName, conn, queryStr, "", nil, nil
+		return connName, conn, queryStr, "", nil, nil
 	}
 
 	if queryStr != "" {
@@ -392,10 +396,10 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
 }
 
-func getConnectionFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
+func getConnectionFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (string, interface{}, error) {
 	repoRoot, err := git.FindRepoFromPath(".")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to find the git repository root")
+		return "", nil, errors.Wrap(err, "failed to find the git repository root")
 	}
 
 	if configFilePath == "" {
@@ -403,27 +407,40 @@ func getConnectionFromConfigWithContext(ctx context.Context, env string, connect
 	}
 	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load or create config")
+		return "", nil, errors.Wrap(err, "failed to load or create config")
 	}
 
 	if env != "" {
 		err := cm.SelectEnvironment(env)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+			return "", nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
 		}
+	}
+
+	// If no connection name provided, try to infer from config
+	if connectionName == "" {
+		inferredName, ok := cm.SelectedEnvironment.Connections.GetSingleConnectionName()
+		if !ok {
+			connectionCount := len(cm.SelectedEnvironment.Connections.ConnectionsSummaryList())
+			if connectionCount == 0 {
+				return "", nil, errors.New("no connections configured in the selected environment")
+			}
+			return "", nil, errors.Errorf("multiple connections configured (%d), please specify --connection flag", connectionCount)
+		}
+		connectionName = inferredName
 	}
 
 	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 	if len(errs) > 0 {
-		return nil, errors.Wrap(errs[0], "failed to create connection manager")
+		return "", nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	conn := manager.GetConnection(connectionName)
 	if conn == nil {
-		return nil, errors.Errorf("failed to get connection '%s'", connectionName)
+		return "", nil, errors.Errorf("failed to get connection '%s'", connectionName)
 	}
 
-	return conn, nil
+	return connectionName, conn, nil
 }
 
 func extractQuery(content string, extractor query.QueryExtractor) (string, error) {
