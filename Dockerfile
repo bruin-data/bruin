@@ -21,7 +21,7 @@ COPY . .
 
 # Build the application with version information from build args (with build cache for incremental builds)
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
+    CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -trimpath -buildvcs=false -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
 
 # Final stage
 FROM debian:trixie-slim
