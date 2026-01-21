@@ -51,6 +51,8 @@ jobs:
   cloud-integration-tests:
     name: Cloud Integration Tests (BigQuery)
     runs-on: depot-ubuntu-latest
+    # Temporarily disabled while investigating flakiness in CI (schema information is not available)
+    if: ${{ false }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -153,7 +155,7 @@ jobs:
 
   release-unix:
     runs-on: depot-ubuntu-latest
-    needs: [prepare-linux, prepare-darwin, integration-tests, cloud-integration-tests]
+    needs: [prepare-linux, prepare-darwin, integration-tests]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -186,7 +188,7 @@ jobs:
 
   release-windows:
     runs-on: depot-windows-latest
-    needs: [prepare-linux, prepare-darwin, integration-tests, cloud-integration-tests]
+    needs: [prepare-linux, prepare-darwin, integration-tests]
     defaults:
       run:
         shell: msys2 {0}

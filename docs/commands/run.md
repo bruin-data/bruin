@@ -163,6 +163,9 @@ Run with full refresh to reprocess all historical data:
 bruin run --full-refresh
 ```
 
+> [!TIP]
+> You can protect specific assets from being dropped during full refresh by setting `refresh_restricted: true` in the asset definition. See [Materialization](../assets/materialization.md#full-refresh-and-refresh_restricted) for more details.
+
 Run with default query annotations:
 ```bash
 bruin run path/to/your/asset.sql --query-annotations default

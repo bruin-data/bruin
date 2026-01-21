@@ -343,6 +343,7 @@ type taskDefinition struct {
 	Domains           []string          `yaml:"domains"`
 	Meta              map[string]string `yaml:"meta"`
 	RerunCooldown     *int              `yaml:"rerun_cooldown"`
+	RefreshRestricted *bool             `yaml:"refresh_restricted,omitempty"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -521,6 +522,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Domains:           definition.Domains,
 		Meta:              definition.Meta,
 		RerunCooldown:     definition.RerunCooldown,
+		RefreshRestricted: definition.RefreshRestricted,
 	}
 
 	for index, check := range definition.CustomChecks {
