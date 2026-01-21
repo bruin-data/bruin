@@ -1971,6 +1971,312 @@ func TestValidateDateRange(t *testing.T) {
 	}
 }
 
+func TestHandleMultipleAssets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		pipeline        *pipeline.Pipeline
+		filter          *Filter
+		expectedPending []string
+		expectError     bool
+		expectedError   string
+	}{
+		{
+			name: "Run multiple selected assets",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task4", Type: pipeline.AssetTypePython},
+				},
+			},
+			filter: &Filter{
+				SelectedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			expectedPending: []string{"Task1", "Task3"},
+			expectError:     false,
+		},
+		{
+			name: "Run multiple selected assets with downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task1"}}},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task2"}}},
+				},
+			},
+			filter: &Filter{
+				SelectedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task1", "Task2", "Task3"},
+			expectError:     false,
+		},
+		{
+			name: "Cannot use selected assets with tag flag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"tag1"}},
+				},
+			},
+			filter: &Filter{
+				SelectedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+				IncludeTag: "tag1",
+			},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot specify assets with --tag flag",
+		},
+		{
+			name: "Selected assets with exclude tag requires downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+					{Name: "Task2", Type: pipeline.AssetTypePython, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task1"}}},
+				},
+			},
+			filter: &Filter{
+				SelectedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+				},
+				ExcludeTag: "exclude",
+			},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "when specifying assets with --exclude-tag, you must also use --downstream flag",
+		},
+		{
+			name: "Selected assets with exclude tag and downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+					{Name: "Task2", Type: pipeline.AssetTypePython, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task1"}}},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task2"}}},
+				},
+			},
+			filter: &Filter{
+				SelectedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+				},
+				ExcludeTag:        "exclude",
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task2", "Task3"},
+			expectError:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			logger := zap.NewNop().Sugar()
+			s := scheduler.NewScheduler(logger, tt.pipeline, "test")
+
+			// Copy SelectedAssets from filter to actual pipeline assets
+			if len(tt.filter.SelectedAssets) > 0 {
+				actualAssets := make([]*pipeline.Asset, 0)
+				for _, selected := range tt.filter.SelectedAssets {
+					for _, pAsset := range tt.pipeline.Assets {
+						if pAsset.Name == selected.Name {
+							actualAssets = append(actualAssets, pAsset)
+							break
+						}
+					}
+				}
+				tt.filter.SelectedAssets = actualAssets
+			}
+
+			err := ApplyAllFilters(t.Context(), tt.filter, s, tt.pipeline)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				markedTasks := s.GetTaskInstancesByStatus(scheduler.Pending)
+
+				taskNames := []string{}
+				for _, task := range markedTasks {
+					taskNames = append(taskNames, task.GetHumanID())
+				}
+
+				for _, name := range tt.expectedPending {
+					assert.Contains(t, taskNames, name)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadAssetsFromPaths(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		assetPaths    []string
+		pipeline      *pipeline.Pipeline
+		repoRoot      string
+		cwd           string
+		expectedNames []string
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:       "Load assets by name",
+			assetPaths: []string{"Task1", "Task2"},
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: "/repo/pipeline.yml",
+				},
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			repoRoot:      "/repo",
+			cwd:           "/repo",
+			expectedNames: []string{"Task1", "Task2"},
+			expectError:   false,
+		},
+		{
+			name:       "Load assets by path",
+			assetPaths: []string{"/repo/assets/task1.sql"},
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: "/repo/pipeline.yml",
+				},
+				Assets: []*pipeline.Asset{
+					{
+						Name: "Task1",
+						Type: pipeline.AssetTypeBigqueryQuery,
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "/repo/assets/task1.sql",
+						},
+					},
+				},
+			},
+			repoRoot:      "/repo",
+			cwd:           "/repo",
+			expectedNames: []string{"Task1"},
+			expectError:   false,
+		},
+		{
+			name:       "Asset not found returns error",
+			assetPaths: []string{"NonExistent"},
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: "/repo/pipeline.yml",
+				},
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			repoRoot:      "/repo",
+			cwd:           "/repo",
+			expectError:   true,
+			errorContains: "assets not found",
+		},
+		{
+			name:       "Empty asset paths returns error",
+			assetPaths: []string{},
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: "/repo/pipeline.yml",
+				},
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			repoRoot:      "/repo",
+			cwd:           "/repo",
+			expectError:   true,
+			errorContains: "no valid assets found",
+		},
+		{
+			name:       "Case insensitive name lookup",
+			assetPaths: []string{"task1", "TASK2"},
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: "/repo/pipeline.yml",
+				},
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython},
+				},
+			},
+			repoRoot:      "/repo",
+			cwd:           "/repo",
+			expectedNames: []string{"Task1", "Task2"},
+			expectError:   false,
+		},
+		{
+			name:       "Skip empty paths",
+			assetPaths: []string{"Task1", "", "Task2"},
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: "/repo/pipeline.yml",
+				},
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython},
+				},
+			},
+			repoRoot:      "/repo",
+			cwd:           "/repo",
+			expectedNames: []string{"Task1", "Task2"},
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assets, err := loadAssetsFromPaths(tt.assetPaths, tt.pipeline, tt.repoRoot, tt.cwd)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+				require.Len(t, assets, len(tt.expectedNames))
+
+				assetNames := make([]string, len(assets))
+				for i, asset := range assets {
+					assetNames[i] = asset.Name
+				}
+
+				for _, name := range tt.expectedNames {
+					assert.Contains(t, assetNames, name)
+				}
+			}
+		})
+	}
+}
+
 func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 	t.Parallel()
 
