@@ -248,7 +248,7 @@ MotherDuck is cloud-hosted DuckDB. Your existing `duckdb.sql` and `duckdb.seed` 
 ```yaml
 environments:
   default:
-    connection:
+    connections:
       motherduck:
         - name: "motherduck-prod"
           token: "your_token_here"
