@@ -1,6 +1,14 @@
-# Zoomcamp - Data Platform (Bruin) Template
+# Build Your First End-to-End Data Platform
 
-This template is an **educational scaffold** for building an end-to-end data pipeline in Bruin (ingestion → staging → reporting) with **no implementation provided**.
+This hands-on tutorial guides you through building a **complete NYC Taxi data pipeline** from scratch using Bruin—a unified CLI tool for data ingestion, transformation, and quality.
+
+You'll learn to build a production-ready ELT pipeline that:
+- **Ingests** real NYC taxi trip data from public APIs using Python
+- **Transforms** and cleans raw data with SQL, applying incremental strategies and deduplication
+- **Reports** aggregated analytics with built-in quality checks
+- **Deploys** to cloud infrastructure (MotherDuck)
+
+This is a learn-by-doing experience with AI assistance available through Bruin MCP. Follow the comprehensive `tutorial.md` for step-by-step guidance, or use the AI agent to build the entire pipeline interactively.
 
 ## Learning Goals
 
