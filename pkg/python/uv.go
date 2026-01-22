@@ -356,16 +356,49 @@ df = module.materialize()
 import pyarrow as pa
 import pyarrow.ipc as ipc
 
-if str(type(df)) == "<class 'pandas.core.frame.DataFrame'>":
+# Try importing pandas and polars for isinstance checks
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    import polars as pl
+except ImportError:
+    pl = None
+
+# Use isinstance() for robust type checking across pandas/polars versions
+# This works across all pandas versions (including 3.0+) regardless of string representation
+if pd is not None and isinstance(df, pd.DataFrame):
     table = pa.Table.from_pandas(df)
-elif str(type(df)) == "<class 'polars.dataframe.frame.DataFrame'>":
+elif pl is not None and isinstance(df, pl.DataFrame):
     table = df.to_arrow()
-elif str(type(df)) == "<class 'generator'>":
-    table = pa.Table.from_pylist(list(df)) # TODO: Terrible implementation, but works for now
-elif str(type(df)) == "<class 'list'>":
-    table = pa.Table.from_pylist(df)
+elif isinstance(df, (list, tuple)):
+    table = pa.Table.from_pylist(list(df))
+elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
+    # Handle generators and other iterables (but not strings/bytes)
+    table = pa.Table.from_pylist(list(df))
 else:
-    raise TypeError(f"Unsupported return type: {type(df)}")
+    # Fallback: check type module/name for pandas/polars if isinstance failed
+    # This handles edge cases where pandas/polars might not be importable
+    type_name = type(df).__name__
+    type_module = type(df).__module__
+    if 'pandas' in type_module and type_name == 'DataFrame':
+        # Try to import pandas if not already imported
+        try:
+            import pandas as pd
+            table = pa.Table.from_pandas(df)
+        except ImportError:
+            raise TypeError(f"Unsupported return type: {type(df)}. pandas DataFrame detected but pandas cannot be imported.")
+    elif 'polars' in type_module and type_name == 'DataFrame':
+        # Try to import polars if not already imported
+        try:
+            import polars as pl
+            table = df.to_arrow()
+        except ImportError:
+            raise TypeError(f"Unsupported return type: {type(df)}. polars DataFrame detected but polars cannot be imported.")
+    else:
+        raise TypeError(f"Unsupported return type: {type(df)}")
 
 # Write to memory mapped file
 with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
