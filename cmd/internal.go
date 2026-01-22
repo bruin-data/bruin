@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -21,9 +22,11 @@ import (
 	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/pkg/uv"
 	"github.com/bruin-data/bruin/templates"
 	color2 "github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -51,6 +54,7 @@ func Internal() *cli.Command {
 			ListTemplates(),
 			AssetMetadata(),
 			IngestrSources(),
+			LockAssetDependencies(),
 		},
 	}
 }
@@ -1445,6 +1449,142 @@ func IngestrSources() *cli.Command {
 				return cli.Exit("", 1)
 			}
 			fmt.Println(string(jsonData))
+			return nil
+		},
+	}
+}
+
+// LockAssetDependencies returns a CLI command that locks Python dependencies for an asset.
+// It finds the asset's requirements file, creates/uses a uv environment, and updates the
+// requirements file with locked versions using uv pip compile.
+func LockAssetDependencies() *cli.Command {
+	return &cli.Command{
+		Name:      "lock-asset-dependencies",
+		Usage:     "Lock Python dependencies for a Bruin asset using uv",
+		ArgsUsage: "[path to the asset definition]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "python-version",
+				Aliases:     []string{"p"},
+				Usage:       "Python version to use for dependency resolution (e.g., 3.11, 3.12)",
+				DefaultText: "3.11",
+				Value:       "3.11",
+			},
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Value:       "plain",
+				Usage:       "the output type, possible values are: plain, json",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			assetPath := c.Args().Get(0)
+			if assetPath == "" {
+				printErrorJSON(errors2.New("asset path is required"))
+				return cli.Exit("", 1)
+			}
+
+			pythonVersion := c.String("python-version")
+			output := c.String("output")
+
+			// Validate Python version
+			if !python.AvailablePythonVersions[pythonVersion] {
+				printErrorJSON(errors2.Errorf("unsupported Python version: %s. Supported versions: 3.8, 3.9, 3.10, 3.11, 3.12, 3.13", pythonVersion))
+				return cli.Exit("", 1)
+			}
+
+			// Get absolute path
+			absoluteAssetPath, err := filepath.Abs(assetPath)
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to get absolute asset path"))
+				return cli.Exit("", 1)
+			}
+
+			// Parse the asset
+			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(absoluteAssetPath, nil)
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to parse asset"))
+				return cli.Exit("", 1)
+			}
+
+			// Check if asset is a Python asset
+			if asset.Type != pipeline.AssetTypePython && !strings.HasSuffix(asset.ExecutableFile.Path, ".py") {
+				printErrorJSON(errors2.New("asset is not a Python asset"))
+				return cli.Exit("", 1)
+			}
+
+			// Find the git repo
+			repo, err := git.FindRepoFromPath(absoluteAssetPath)
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to find repository"))
+				return cli.Exit("", 1)
+			}
+
+			// Find requirements.txt
+			moduleFinder := &python.ModulePathFinder{}
+			requirementsTxt, err := moduleFinder.FindRequirementsTxtInPath(repo.Path, &asset.ExecutableFile)
+			if err != nil {
+				var noReqsError *python.NoRequirementsFoundError
+				if errors.As(err, &noReqsError) {
+					printErrorJSON(errors2.New("no requirements.txt found for this asset"))
+					return cli.Exit("", 1)
+				}
+				printErrorJSON(errors2.Wrap(err, "failed to find requirements.txt"))
+				return cli.Exit("", 1)
+			}
+
+			// Ensure uv is installed
+			uvChecker := &uv.Checker{}
+			uvBinaryPath, err := uvChecker.EnsureUvInstalled(ctx)
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to ensure uv is installed"))
+				return cli.Exit("", 1)
+			}
+
+			// Run uv pip compile to lock dependencies
+			// uv pip compile requirements.txt -o requirements.txt --python-version X.Y --no-header
+			cmd := exec.CommandContext(ctx, uvBinaryPath, "pip", "compile", requirementsTxt, "-o", requirementsTxt, "--python-version", pythonVersion, "--quiet", "--no-header") //nolint:gosec
+			cmd.Dir = repo.Path
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+
+			err = cmd.Run()
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to lock dependencies with uv pip compile"))
+				return cli.Exit("", 1)
+			}
+
+			// Output result
+			switch output {
+			case outputFormatPlain:
+				fmt.Printf("Successfully locked dependencies in %s\n", requirementsTxt)
+			case "json":
+				type jsonResponse struct {
+					RequirementsPath string `json:"requirements_path"`
+					PythonVersion    string `json:"python_version"`
+					AssetPath        string `json:"asset_path"`
+					Success          bool   `json:"success"`
+				}
+
+				finalOutput := jsonResponse{
+					RequirementsPath: requirementsTxt,
+					PythonVersion:    pythonVersion,
+					AssetPath:        absoluteAssetPath,
+					Success:          true,
+				}
+
+				jsonData, err := json.Marshal(finalOutput)
+				if err != nil {
+					printErrorJSON(errors2.Wrap(err, "failed to marshal result to JSON"))
+					return cli.Exit("", 1)
+				}
+				fmt.Println(string(jsonData))
+			default:
+				printErrorJSON(errors2.Errorf("invalid output type: %s", output))
+				return cli.Exit("", 1)
+			}
+
 			return nil
 		},
 	}
