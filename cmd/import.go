@@ -243,7 +243,12 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		}
 		for _, table := range schemaObj.Tables {
 			fullName := fmt.Sprintf("%s.%s", schemaObj.Name, table.Name)
-			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns)
+			// Pass columns from summary when fillColumns is true, otherwise pass nil
+			var dbColumns []*ansisql.DBColumn
+			if fillColumns {
+				dbColumns = table.Columns
+			}
+			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, dbColumns)
 			if warning != "" {
 				warnings = append(warnings, importWarning{tableName: fullName, message: warning})
 			}
@@ -371,7 +376,7 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	return nil
 }
 
-func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool) (*pipeline.Asset, string) {
+func createAsset(_ context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, dbColumns []*ansisql.DBColumn) (*pipeline.Asset, string) {
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 
 	fileName := strings.ToLower(tableName) + ".asset.yml"
@@ -385,11 +390,18 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 		Description: fmt.Sprintf("Imported table %s.%s", schemaName, tableName),
 	}
 
-	if fillColumns {
-		err := fillAssetColumnsFromDB(ctx, asset, conn, schemaName, tableName)
-		if err != nil {
-			return asset, fmt.Sprintf("Could not fill columns: %v", err)
+	// Use pre-fetched columns from GetDatabaseSummary if provided
+	if len(dbColumns) > 0 {
+		columns := make([]pipeline.Column, 0, len(dbColumns))
+		for _, col := range dbColumns {
+			columns = append(columns, pipeline.Column{
+				Name:      col.Name,
+				Type:      col.Type,
+				Checks:    []pipeline.ColumnCheck{},
+				Upstreams: []*pipeline.UpstreamColumn{},
+			})
 		}
+		asset.Columns = columns
 	}
 
 	return asset, ""

@@ -1241,12 +1241,12 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		Schemas: []*ansisql.DBSchema{},
 	}
 
-	mu := sync.Mutex{}
-	var errs []error
-
-	workers := max(runtime.NumCPU(), 8)
-
-	p := pool.New().WithMaxGoroutines(workers)
+	// Phase 1: Collect all datasets and their table names (fast, no metadata fetching)
+	type datasetInfo struct {
+		name       string
+		tableNames []string
+	}
+	var datasets []datasetInfo
 
 	datasetsIter := d.client.Datasets(ctx)
 	for {
@@ -1258,44 +1258,75 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 			return nil, fmt.Errorf("failed to list BigQuery datasets: %w", err)
 		}
 
+		var tableNames []string
+		tables := ds.Tables(ctx)
+		for {
+			t, err := tables.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to list tables in dataset %s: %w", ds.DatasetID, err)
+			}
+			tableNames = append(tableNames, t.TableID)
+		}
+
+		datasets = append(datasets, datasetInfo{name: ds.DatasetID, tableNames: tableNames})
+	}
+
+	// Phase 2: For each dataset, determine which tables need metadata (skip older shards)
+	// and create schema structures
+	type tableJob struct {
+		datasetName string
+		actualTable string
+		displayName string
+		schemaIndex int
+	}
+	var jobs []tableJob
+
+	for i, ds := range datasets {
+		schema := &ansisql.DBSchema{
+			Name:   ds.name,
+			Tables: []*ansisql.DBTable{},
+		}
+		summary.Schemas = append(summary.Schemas, schema)
+
+		// Select only tables that need metadata (non-sharded + most recent shard per group)
+		tablesToFetch := selectTablesToFetch(ds.tableNames)
+		for _, tf := range tablesToFetch {
+			jobs = append(jobs, tableJob{
+				datasetName: ds.name,
+				actualTable: tf.actualName,
+				displayName: tf.displayName,
+				schemaIndex: i,
+			})
+		}
+	}
+
+	// Phase 3: Fetch all table metadata in parallel
+	mu := sync.Mutex{}
+	var errs []error
+
+	workers := max(runtime.NumCPU(), 8)
+	p := pool.New().WithMaxGoroutines(workers)
+
+	for _, job := range jobs {
 		p.Go(func() {
-			schema := &ansisql.DBSchema{
-				Name:   ds.DatasetID,
-				Tables: []*ansisql.DBTable{},
+			columns, err := d.getTableColumns(ctx, job.datasetName, job.actualTable)
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", job.datasetName, job.actualTable, err))
+				mu.Unlock()
+				return
 			}
 
-			tables := ds.Tables(ctx)
-			for {
-				t, err := tables.Next()
-				if errors.Is(err, iterator.Done) {
-					break
-				}
-				if err != nil {
-					mu.Lock()
-					errs = append(errs, fmt.Errorf("failed to list tables in dataset %s: %w", ds.DatasetID, err))
-					mu.Unlock()
-					return
-				}
-
-				columns, err := d.getTableColumns(ctx, ds.DatasetID, t.TableID)
-				if err != nil {
-					mu.Lock()
-					errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", ds.DatasetID, t.TableID, err))
-					mu.Unlock()
-					return
-				}
-
-				schema.Tables = append(schema.Tables, &ansisql.DBTable{
-					Name:    t.TableID,
-					Columns: columns,
-				})
+			table := &ansisql.DBTable{
+				Name:    job.displayName,
+				Columns: columns,
 			}
-
-			// Consolidate sharded tables (tables with _YYYYMMDD suffix) into single entries
-			schema.Tables = consolidateShardedTables(schema.Tables)
 
 			mu.Lock()
-			summary.Schemas = append(summary.Schemas, schema)
+			summary.Schemas[job.schemaIndex].Tables = append(summary.Schemas[job.schemaIndex].Tables, table)
 			mu.Unlock()
 		})
 	}
@@ -1306,6 +1337,10 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		return nil, errs[0]
 	}
 
+	// Sort tables within each schema and sort schemas
+	for _, schema := range summary.Schemas {
+		sort.Slice(schema.Tables, func(i, j int) bool { return schema.Tables[i].Name < schema.Tables[j].Name })
+	}
 	sort.Slice(summary.Schemas, func(i, j int) bool { return summary.Schemas[i].Name < summary.Schemas[j].Name })
 
 	return summary, nil
@@ -1323,53 +1358,84 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 		Schemas: []*ansisql.DBSchema{},
 	}
 
+	// Phase 1: Collect all table names for each requested schema (fast, no metadata fetching)
+	type datasetInfo struct {
+		name       string
+		tableNames []string
+	}
+	var datasets []datasetInfo
+
+	for _, schemaName := range schemas {
+		ds := d.client.Dataset(schemaName)
+		var tableNames []string
+
+		tables := ds.Tables(ctx)
+		for {
+			t, err := tables.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to list tables in dataset %s: %w", schemaName, err)
+			}
+			tableNames = append(tableNames, t.TableID)
+		}
+
+		datasets = append(datasets, datasetInfo{name: schemaName, tableNames: tableNames})
+	}
+
+	// Phase 2: For each dataset, determine which tables need metadata (skip older shards)
+	type tableJob struct {
+		datasetName string
+		actualTable string
+		displayName string
+		schemaIndex int
+	}
+	var jobs []tableJob
+
+	for i, ds := range datasets {
+		schema := &ansisql.DBSchema{
+			Name:   ds.name,
+			Tables: []*ansisql.DBTable{},
+		}
+		summary.Schemas = append(summary.Schemas, schema)
+
+		// Select only tables that need metadata (non-sharded + most recent shard per group)
+		tablesToFetch := selectTablesToFetch(ds.tableNames)
+		for _, tf := range tablesToFetch {
+			jobs = append(jobs, tableJob{
+				datasetName: ds.name,
+				actualTable: tf.actualName,
+				displayName: tf.displayName,
+				schemaIndex: i,
+			})
+		}
+	}
+
+	// Phase 3: Fetch all table metadata in parallel
 	mu := sync.Mutex{}
 	var errs []error
 
 	workers := max(runtime.NumCPU(), 8)
 	p := pool.New().WithMaxGoroutines(workers)
 
-	// Only iterate over requested schemas (datasets)
-	for _, schemaName := range schemas {
+	for _, job := range jobs {
 		p.Go(func() {
-			ds := d.client.Dataset(schemaName)
-			schema := &ansisql.DBSchema{
-				Name:   schemaName,
-				Tables: []*ansisql.DBTable{},
+			columns, err := d.getTableColumns(ctx, job.datasetName, job.actualTable)
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", job.datasetName, job.actualTable, err))
+				mu.Unlock()
+				return
 			}
 
-			tables := ds.Tables(ctx)
-			for {
-				t, err := tables.Next()
-				if errors.Is(err, iterator.Done) {
-					break
-				}
-				if err != nil {
-					mu.Lock()
-					errs = append(errs, fmt.Errorf("failed to list tables in dataset %s: %w", schemaName, err))
-					mu.Unlock()
-					return
-				}
-
-				columns, err := d.getTableColumns(ctx, schemaName, t.TableID)
-				if err != nil {
-					mu.Lock()
-					errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", schemaName, t.TableID, err))
-					mu.Unlock()
-					return
-				}
-
-				schema.Tables = append(schema.Tables, &ansisql.DBTable{
-					Name:    t.TableID,
-					Columns: columns,
-				})
+			table := &ansisql.DBTable{
+				Name:    job.displayName,
+				Columns: columns,
 			}
-
-			// Consolidate sharded tables (tables with _YYYYMMDD suffix) into single entries
-			schema.Tables = consolidateShardedTables(schema.Tables)
 
 			mu.Lock()
-			summary.Schemas = append(summary.Schemas, schema)
+			summary.Schemas[job.schemaIndex].Tables = append(summary.Schemas[job.schemaIndex].Tables, table)
 			mu.Unlock()
 		})
 	}
@@ -1380,6 +1446,10 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 		return nil, errs[0]
 	}
 
+	// Sort tables within each schema and sort schemas
+	for _, schema := range summary.Schemas {
+		sort.Slice(schema.Tables, func(i, j int) bool { return schema.Tables[i].Name < schema.Tables[j].Name })
+	}
 	sort.Slice(summary.Schemas, func(i, j int) bool { return summary.Schemas[i].Name < summary.Schemas[j].Name })
 
 	return summary, nil
@@ -1464,5 +1534,59 @@ func consolidateShardedTables(tables []*ansisql.DBTable) []*ansisql.DBTable {
 	}
 
 	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	return result
+}
+
+// tableToFetch represents a table that needs metadata fetching
+type tableToFetch struct {
+	actualName  string // The actual table name in BigQuery (e.g., "events_20240115")
+	displayName string // The name to use in output (e.g., "events" for sharded, or same as actual for non-sharded)
+}
+
+// selectTablesToFetch analyzes table names and returns only the tables that need metadata fetching.
+// For sharded tables, only the most recent shard is included. This optimization reduces API calls
+// by skipping metadata fetches for older shards that would be discarded anyway.
+func selectTablesToFetch(tableNames []string) []tableToFetch {
+	// Build set of non-sharded table names first
+	nonShardedNames := make(map[string]bool)
+	var result []tableToFetch
+
+	for _, name := range tableNames {
+		if !isShardedTableName(name) {
+			nonShardedNames[name] = true
+			result = append(result, tableToFetch{actualName: name, displayName: name})
+		}
+	}
+
+	// Track most recent shard for each base name
+	shardGroups := make(map[string]string) // base name -> most recent actual table name
+	shardDates := make(map[string]string)  // base name -> most recent date
+
+	for _, name := range tableNames {
+		if !isShardedTableName(name) {
+			continue
+		}
+
+		baseName := getShardedTableBaseName(name)
+
+		// Skip if a non-sharded table with the same name exists
+		if nonShardedNames[baseName] {
+			continue
+		}
+
+		shardDate := getShardDate(name)
+
+		// Keep the most recent shard
+		if existingDate, exists := shardDates[baseName]; !exists || shardDate > existingDate {
+			shardDates[baseName] = shardDate
+			shardGroups[baseName] = name
+		}
+	}
+
+	// Add sharded tables (only most recent shard of each group)
+	for baseName, actualName := range shardGroups {
+		result = append(result, tableToFetch{actualName: actualName, displayName: baseName})
+	}
+
 	return result
 }

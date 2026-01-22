@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -2332,4 +2333,74 @@ func TestClient_GetDatabaseSummary_WithShardedTables(t *testing.T) {
 	}
 
 	assert.Equal(t, want, got)
+}
+
+func TestSelectTablesToFetch(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		tableNames []string
+		want       []tableToFetch
+	}{
+		{
+			name:       "only most recent shard selected",
+			tableNames: []string{"events_20240101", "events_20240115", "events_20240102"},
+			want: []tableToFetch{
+				{actualName: "events_20240115", displayName: "events"},
+			},
+		},
+		{
+			name:       "non-sharded tables pass through",
+			tableNames: []string{"users", "orders"},
+			want: []tableToFetch{
+				{actualName: "users", displayName: "users"},
+				{actualName: "orders", displayName: "orders"},
+			},
+		},
+		{
+			name:       "mixed sharded and non-sharded",
+			tableNames: []string{"events_20240101", "events_20240115", "users"},
+			want: []tableToFetch{
+				{actualName: "users", displayName: "users"},
+				{actualName: "events_20240115", displayName: "events"},
+			},
+		},
+		{
+			name:       "non-sharded takes precedence over sharded with same base",
+			tableNames: []string{"events", "events_20240115"},
+			want: []tableToFetch{
+				{actualName: "events", displayName: "events"},
+			},
+		},
+		{
+			name:       "multiple sharded groups",
+			tableNames: []string{"events_20240101", "events_20240115", "logs_20240101", "logs_20240120"},
+			want: []tableToFetch{
+				{actualName: "events_20240115", displayName: "events"},
+				{actualName: "logs_20240120", displayName: "logs"},
+			},
+		},
+		{
+			name:       "empty input",
+			tableNames: []string{},
+			want:       nil,
+		},
+		{
+			name:       "nil input",
+			tableNames: nil,
+			want:       nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := selectTablesToFetch(tt.tableNames)
+
+			// Sort both for comparison since order in map iteration is non-deterministic
+			sort.Slice(got, func(i, j int) bool { return got[i].displayName < got[j].displayName })
+			sort.Slice(tt.want, func(i, j int) bool { return tt.want[i].displayName < tt.want[j].displayName })
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

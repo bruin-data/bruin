@@ -59,24 +59,19 @@ func TestCreateAsset(t *testing.T) {
 	testAssetsPath := filepath.Join("test", "assets")
 
 	tests := []struct {
-		name        string
-		schemaName  string
-		tableName   string
-		assetType   pipeline.AssetType
-		fillColumns bool
-		setupConn   func() *mockConnection
-		want        *pipeline.Asset
-		wantWarning string
+		name       string
+		schemaName string
+		tableName  string
+		assetType  pipeline.AssetType
+		dbColumns  []*ansisql.DBColumn
+		want       *pipeline.Asset
 	}{
 		{
-			name:        "successful asset creation without columns",
-			schemaName:  "public",
-			tableName:   "users",
-			assetType:   pipeline.AssetTypePostgresSource,
-			fillColumns: false,
-			setupConn: func() *mockConnection {
-				return &mockConnection{}
-			},
+			name:       "successful asset creation without columns",
+			schemaName: "public",
+			tableName:  "users",
+			assetType:  pipeline.AssetTypePostgresSource,
+			dbColumns:  nil,
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
@@ -88,20 +83,14 @@ func TestCreateAsset(t *testing.T) {
 			},
 		},
 		{
-			name:        "successful asset creation with columns",
-			schemaName:  "public",
-			tableName:   "products",
-			assetType:   pipeline.AssetTypePostgresSource,
-			fillColumns: true,
-			setupConn: func() *mockConnection {
-				conn := &mockConnection{}
-				conn.On("SelectWithSchema", mock.Anything, mock.MatchedBy(func(q *query.Query) bool {
-					return strings.Contains(q.Query, "SELECT * FROM public.products WHERE 1=0 LIMIT 0")
-				})).Return(&query.QueryResult{
-					Columns:     []string{"id", "name", "price"},
-					ColumnTypes: []string{"INTEGER", "VARCHAR", "DECIMAL"},
-				}, nil)
-				return conn
+			name:       "successful asset creation with columns",
+			schemaName: "public",
+			tableName:  "products",
+			assetType:  pipeline.AssetTypePostgresSource,
+			dbColumns: []*ansisql.DBColumn{
+				{Name: "id", Type: "INTEGER"},
+				{Name: "name", Type: "VARCHAR"},
+				{Name: "price", Type: "DECIMAL"},
 			},
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
@@ -118,43 +107,19 @@ func TestCreateAsset(t *testing.T) {
 			},
 		},
 		{
-			name:        "asset creation with columns but connection fails",
-			schemaName:  "public",
-			tableName:   "orders",
-			assetType:   pipeline.AssetTypePostgresSource,
-			fillColumns: true,
-			setupConn: func() *mockConnection {
-				conn := &mockConnection{}
-				conn.On("SelectWithSchema", mock.Anything, mock.Anything).Return((*query.QueryResult)(nil), errors.New("connection failed"))
-				return conn
-			},
-			wantWarning: "Could not fill columns: failed to query columns for table public.orders: connection failed",
-		},
-		{
-			name:        "asset creation with special column names filtered out",
-			schemaName:  "public",
-			tableName:   "temporal_table",
-			assetType:   pipeline.AssetTypePostgresSource,
-			fillColumns: true,
-			setupConn: func() *mockConnection {
-				conn := &mockConnection{}
-				conn.On("SelectWithSchema", mock.Anything, mock.Anything).Return(&query.QueryResult{
-					Columns:     []string{"id", "_IS_CURRENT", "name", "_VALID_UNTIL", "_VALID_FROM"},
-					ColumnTypes: []string{"INTEGER", "BOOLEAN", "VARCHAR", "TIMESTAMP", "TIMESTAMP"},
-				}, nil)
-				return conn
-			},
+			name:       "asset creation with empty columns slice",
+			schemaName: "public",
+			tableName:  "orders",
+			assetType:  pipeline.AssetTypePostgresSource,
+			dbColumns:  []*ansisql.DBColumn{},
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
-					Name: "temporal_table.asset.yml",
-					Path: filepath.Join(testAssetsPath, "public", "temporal_table.asset.yml"),
+					Name: "orders.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public", "orders.asset.yml"),
 				},
-				Description: "Imported table public.temporal_table",
-				Columns: []pipeline.Column{
-					{Name: "id", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
-					{Name: "name", Type: "VARCHAR", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
-				},
+				Description: "Imported table public.orders",
+				Columns:     nil,
 			},
 		},
 	}
@@ -164,21 +129,11 @@ func TestCreateAsset(t *testing.T) {
 			t.Parallel()
 
 			ctx := t.Context()
-			conn := tt.setupConn()
 
-			got, warning := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, conn, tt.fillColumns)
-
-			if tt.wantWarning != "" {
-				assert.Contains(t, warning, tt.wantWarning)
-				return
-			}
+			got, warning := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, tt.dbColumns)
 
 			assert.Equal(t, "", warning)
 			assert.Equal(t, tt.want, got)
-
-			if tt.fillColumns {
-				conn.AssertExpectations(t)
-			}
 		})
 	}
 }
