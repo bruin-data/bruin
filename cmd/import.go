@@ -191,6 +191,19 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		schemaList = []string{schema}
 	}
 
+	pathParts := strings.Split(pipelinePath, "/")
+	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
+		pipelinePath = strings.Join(pathParts[:len(pathParts)-2], "/")
+	}
+	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)
+	if err != nil {
+		return errors2.Wrap(err, "failed to get pipeline from path")
+	}
+	existingAssets := make(map[string]*pipeline.Asset, len(pipelineFound.Assets))
+	for _, asset := range pipelineFound.Assets {
+		existingAssets[strings.ToLower(asset.Name)] = asset
+	}
+
 	// If schema(s) specified, try to use GetDatabaseSummaryForSchemas if available
 	if len(schemaList) > 0 {
 		if schemaSummarizer, ok := conn.(interface {
@@ -216,19 +229,6 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		if err != nil {
 			return errors2.Wrap(err, "failed to retrieve database summary")
 		}
-	}
-
-	pathParts := strings.Split(pipelinePath, "/")
-	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
-		pipelinePath = strings.Join(pathParts[:len(pathParts)-2], "/")
-	}
-	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)
-	if err != nil {
-		return errors2.Wrap(err, "failed to get pipeline from path")
-	}
-	existingAssets := make(map[string]*pipeline.Asset, len(pipelineFound.Assets))
-	for _, asset := range pipelineFound.Assets {
-		existingAssets[strings.ToLower(asset.Name)] = asset
 	}
 
 	assetsPath := filepath.Join(pipelinePath, "assets")
