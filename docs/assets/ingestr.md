@@ -71,6 +71,7 @@ parameters:
 | `sql_limit` | No | `--sql-limit` | Applies a `LIMIT` clause when extracting from the source. |
 | `sql_exclude_columns` | No | `--sql-exclude-columns` | List of columns to skip during extraction. |
 | `staging_bucket` | No | `--staging-bucket` | Overrides the staging bucket that Ingestr uses for intermediate files. |
+| `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
 
 ### Column metadata
 
@@ -121,3 +122,35 @@ parameters:
   source_table: <mysheetid>.<sheetname>
   destination: snowflake
 ```
+
+### Enforce schema with column types
+This example shows how to use `enforce_schema` to ensure the destination table has the correct column types. This is useful when the source system's type inference doesn't match your requirements.
+
+```yaml
+name: raw.users
+type: ingestr
+parameters:
+  source_connection: mongodb_prod
+  source_table: prod.users
+  destination: bigquery
+  incremental_strategy: merge
+  incremental_key: updated_at
+  enforce_schema: true
+
+columns:
+  - name: _id
+    type: string
+    primary_key: true
+  - name: name
+    type: string
+  - name: email
+    type: string
+  - name: age
+    type: integer
+  - name: created_at
+    type: timestamp
+  - name: updated_at
+    type: timestamp
+```
+
+When `enforce_schema: true` is set, Bruin passes the column type hints to Ingestr via the `--columns` flag, ensuring the destination table schema matches your definition.
