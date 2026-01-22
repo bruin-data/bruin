@@ -2120,3 +2120,216 @@ func TestClient_GetTables(t *testing.T) {
 		})
 	}
 }
+
+func TestIsShardedTableName(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		tableName string
+		want      bool
+	}{
+		{"valid sharded table", "events_20240115", true},
+		{"sharded with underscores in name", "user_click_events_20240115", true},
+		{"non-sharded table", "events", false},
+		{"table with underscore but no date", "events_v2", false},
+		{"table with short suffix", "events_2024", false},
+		{"table with 7 digit suffix", "events_2024011", false},
+		{"table with 9 digit suffix", "events_202401150", false},
+		{"table ending with underscore", "events_", false},
+		{"empty string", "", false},
+		{"only digits after underscore", "test_12345678", true},
+		{"multiple underscores with date", "a_b_c_20240115", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isShardedTableName(tt.tableName))
+		})
+	}
+}
+
+func TestGetShardedTableBaseName(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		tableName string
+		want      string
+	}{
+		{"sharded table", "events_20240115", "events"},
+		{"sharded table with underscores", "user_click_events_20240115", "user_click_events"},
+		{"non-sharded table", "events", "events"},
+		{"non-sharded with underscore", "events_v2", "events_v2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, getShardedTableBaseName(tt.tableName))
+		})
+	}
+}
+
+func TestGetShardDate(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		tableName string
+		want      string
+	}{
+		{"sharded table", "events_20240115", "20240115"},
+		{"sharded table with underscores", "user_click_events_20240115", "20240115"},
+		{"non-sharded table", "events", ""},
+		{"non-sharded with underscore", "events_v2", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, getShardDate(tt.tableName))
+		})
+	}
+}
+
+func TestConsolidateShardedTables(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		tables []*ansisql.DBTable
+		want   []*ansisql.DBTable
+	}{
+		{
+			name: "consolidate multiple shards to most recent",
+			tables: []*ansisql.DBTable{
+				{Name: "events_20240101", Columns: []*ansisql.DBColumn{{Name: "old"}}},
+				{Name: "events_20240115", Columns: []*ansisql.DBColumn{{Name: "new"}}},
+				{Name: "events_20240102", Columns: []*ansisql.DBColumn{{Name: "mid"}}},
+				{Name: "users", Columns: []*ansisql.DBColumn{{Name: "id"}}},
+			},
+			want: []*ansisql.DBTable{
+				{Name: "events", Columns: []*ansisql.DBColumn{{Name: "new"}}},
+				{Name: "users", Columns: []*ansisql.DBColumn{{Name: "id"}}},
+			},
+		},
+		{
+			name: "non-sharded table takes precedence over shards",
+			tables: []*ansisql.DBTable{
+				{Name: "events", Columns: []*ansisql.DBColumn{{Name: "base"}}},
+				{Name: "events_20240115", Columns: []*ansisql.DBColumn{{Name: "shard"}}},
+			},
+			want: []*ansisql.DBTable{
+				{Name: "events", Columns: []*ansisql.DBColumn{{Name: "base"}}},
+			},
+		},
+		{
+			name: "single shard becomes base name",
+			tables: []*ansisql.DBTable{
+				{Name: "events_20240115", Columns: []*ansisql.DBColumn{{Name: "col"}}},
+			},
+			want: []*ansisql.DBTable{
+				{Name: "events", Columns: []*ansisql.DBColumn{{Name: "col"}}},
+			},
+		},
+		{
+			name: "multiple sharded table groups",
+			tables: []*ansisql.DBTable{
+				{Name: "events_20240101", Columns: []*ansisql.DBColumn{{Name: "e1"}}},
+				{Name: "events_20240115", Columns: []*ansisql.DBColumn{{Name: "e2"}}},
+				{Name: "logs_20240101", Columns: []*ansisql.DBColumn{{Name: "l1"}}},
+				{Name: "logs_20240120", Columns: []*ansisql.DBColumn{{Name: "l2"}}},
+			},
+			want: []*ansisql.DBTable{
+				{Name: "events", Columns: []*ansisql.DBColumn{{Name: "e2"}}},
+				{Name: "logs", Columns: []*ansisql.DBColumn{{Name: "l2"}}},
+			},
+		},
+		{
+			name: "no sharded tables",
+			tables: []*ansisql.DBTable{
+				{Name: "users", Columns: []*ansisql.DBColumn{{Name: "id"}}},
+				{Name: "orders", Columns: []*ansisql.DBColumn{{Name: "id"}}},
+			},
+			want: []*ansisql.DBTable{
+				{Name: "orders", Columns: []*ansisql.DBColumn{{Name: "id"}}},
+				{Name: "users", Columns: []*ansisql.DBColumn{{Name: "id"}}},
+			},
+		},
+		{
+			name:   "empty input",
+			tables: []*ansisql.DBTable{},
+			want:   []*ansisql.DBTable{},
+		},
+		{
+			name:   "nil input",
+			tables: nil,
+			want:   []*ansisql.DBTable{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := consolidateShardedTables(tt.tables)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestClient_GetDatabaseSummary_WithShardedTables(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+
+	datasetTables := map[string]map[string][]string{
+		"dataset1": {
+			"events_20240101": {"event_id"},
+			"events_20240115": {"event_id", "new_col"},
+			"events_20240102": {"event_id", "mid_col"},
+			"users":           {"id", "name"},
+		},
+	}
+
+	srv := httptest.NewServer(mockBqSummaryHandler(t, projectID, datasetTables))
+	defer srv.Close()
+
+	client, err := bigquery.NewClient(
+		t.Context(),
+		projectID,
+		option.WithEndpoint(srv.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID:   projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	c := Client{client: client, config: &Config{ProjectID: projectID}}
+
+	got, err := c.GetDatabaseSummary(t.Context())
+	require.NoError(t, err)
+
+	// Should consolidate events shards into single "events" entry using most recent shard columns
+	want := &ansisql.DBDatabase{
+		Name: projectID,
+		Schemas: []*ansisql.DBSchema{
+			{
+				Name: "dataset1",
+				Tables: []*ansisql.DBTable{
+					{
+						Name: "events",
+						Columns: []*ansisql.DBColumn{
+							{Name: "event_id", Type: "STRING", Nullable: true},
+							{Name: "new_col", Type: "STRING", Nullable: true},
+						},
+					},
+					{
+						Name: "users",
+						Columns: []*ansisql.DBColumn{
+							{Name: "id", Type: "STRING", Nullable: true},
+							{Name: "name", Type: "STRING", Nullable: true},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, want, got)
+}
