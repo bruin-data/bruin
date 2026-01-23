@@ -1363,7 +1363,7 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 		name       string
 		tableNames []string
 	}
-	var datasets []datasetInfo
+	datasets := make([]datasetInfo, 0, len(schemas))
 
 	for _, schemaName := range schemas {
 		ds := d.client.Dataset(schemaName)
@@ -1455,10 +1455,10 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 	return summary, nil
 }
 
-// shardedTablePattern matches BigQuery sharded table naming convention: tablename_YYYYMMDD
+// shardedTablePattern matches BigQuery sharded table naming convention: tablename_YYYYMMDD.
 var shardedTablePattern = regexp.MustCompile(`^(.+)_(\d{8})$`)
 
-// isShardedTableName checks if a table name follows the BigQuery sharded table pattern (_YYYYMMDD suffix)
+// isShardedTableName checks if a table name follows the BigQuery sharded table pattern (_YYYYMMDD suffix).
 func isShardedTableName(tableName string) bool {
 	return shardedTablePattern.MatchString(tableName)
 }
@@ -1537,7 +1537,7 @@ func consolidateShardedTables(tables []*ansisql.DBTable) []*ansisql.DBTable {
 	return result
 }
 
-// tableToFetch represents a table that needs metadata fetching
+// tableToFetch represents a table that needs metadata fetching.
 type tableToFetch struct {
 	actualName  string // The actual table name in BigQuery (e.g., "events_20240115")
 	displayName string // The name to use in output (e.g., "events" for sharded, or same as actual for non-sharded)
@@ -1549,7 +1549,7 @@ type tableToFetch struct {
 func selectTablesToFetch(tableNames []string) []tableToFetch {
 	// Build set of non-sharded table names first
 	nonShardedNames := make(map[string]bool)
-	var result []tableToFetch
+	result := make([]tableToFetch, 0, len(tableNames))
 
 	for _, name := range tableNames {
 		if !isShardedTableName(name) {

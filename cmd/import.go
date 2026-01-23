@@ -193,7 +193,11 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 
 	pathParts := strings.Split(pipelinePath, "/")
 	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
-		pipelinePath = strings.Join(pathParts[:len(pathParts)-2], "/")
+		if len(pathParts) == 1 {
+			pipelinePath = "."
+		} else {
+			pipelinePath = strings.Join(pathParts[:len(pathParts)-1], "/")
+		}
 	}
 	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)
 	if err != nil {
@@ -243,12 +247,7 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		}
 		for _, table := range schemaObj.Tables {
 			fullName := fmt.Sprintf("%s.%s", schemaObj.Name, table.Name)
-			// Pass columns from summary when fillColumns is true, otherwise pass nil
-			var dbColumns []*ansisql.DBColumn
-			if fillColumns {
-				dbColumns = table.Columns
-			}
-			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, dbColumns)
+			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns, table.Columns)
 			if warning != "" {
 				warnings = append(warnings, importWarning{tableName: fullName, message: warning})
 			}
@@ -376,7 +375,7 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	return nil
 }
 
-func createAsset(_ context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, dbColumns []*ansisql.DBColumn) (*pipeline.Asset, string) {
+func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool, dbColumns []*ansisql.DBColumn) (*pipeline.Asset, string) {
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 
 	fileName := strings.ToLower(tableName) + ".asset.yml"
@@ -390,7 +389,11 @@ func createAsset(_ context.Context, assetsPath, schemaName, tableName string, as
 		Description: fmt.Sprintf("Imported table %s.%s", schemaName, tableName),
 	}
 
-	// Use pre-fetched columns from GetDatabaseSummary if provided
+	if !fillColumns {
+		return asset, ""
+	}
+
+	// Use pre-fetched columns from GetDatabaseSummary if available (e.g., BigQuery)
 	if len(dbColumns) > 0 {
 		columns := make([]pipeline.Column, 0, len(dbColumns))
 		for _, col := range dbColumns {
@@ -402,6 +405,14 @@ func createAsset(_ context.Context, assetsPath, schemaName, tableName string, as
 			})
 		}
 		asset.Columns = columns
+		return asset, ""
+	}
+
+	// Fall back to querying the database directly for databases that don't
+	// populate columns in GetDatabaseSummary (e.g., Postgres, Snowflake)
+	err := fillAssetColumnsFromDB(ctx, asset, conn, schemaName, tableName)
+	if err != nil {
+		return asset, fmt.Sprintf("Could not fill columns: %v", err)
 	}
 
 	return asset, ""
@@ -1490,7 +1501,11 @@ func importSelectedQueries(ctx context.Context, pipelinePath string, queries []S
 	// Ensure pipeline path and get pipeline info
 	pathParts := strings.Split(pipelinePath, "/")
 	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
-		pipelinePath = strings.Join(pathParts[:len(pathParts)-2], "/")
+		if len(pathParts) == 1 {
+			pipelinePath = "."
+		} else {
+			pipelinePath = strings.Join(pathParts[:len(pathParts)-1], "/")
+		}
 	}
 
 	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)

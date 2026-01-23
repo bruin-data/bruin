@@ -59,19 +59,21 @@ func TestCreateAsset(t *testing.T) {
 	testAssetsPath := filepath.Join("test", "assets")
 
 	tests := []struct {
-		name       string
-		schemaName string
-		tableName  string
-		assetType  pipeline.AssetType
-		dbColumns  []*ansisql.DBColumn
-		want       *pipeline.Asset
+		name        string
+		schemaName  string
+		tableName   string
+		assetType   pipeline.AssetType
+		fillColumns bool
+		dbColumns   []*ansisql.DBColumn
+		want        *pipeline.Asset
 	}{
 		{
-			name:       "successful asset creation without columns",
-			schemaName: "public",
-			tableName:  "users",
-			assetType:  pipeline.AssetTypePostgresSource,
-			dbColumns:  nil,
+			name:        "successful asset creation without columns (fillColumns false)",
+			schemaName:  "public",
+			tableName:   "users",
+			assetType:   pipeline.AssetTypePostgresSource,
+			fillColumns: false,
+			dbColumns:   nil,
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
@@ -83,10 +85,11 @@ func TestCreateAsset(t *testing.T) {
 			},
 		},
 		{
-			name:       "successful asset creation with columns",
-			schemaName: "public",
-			tableName:  "products",
-			assetType:  pipeline.AssetTypePostgresSource,
+			name:        "successful asset creation with pre-fetched columns",
+			schemaName:  "public",
+			tableName:   "products",
+			assetType:   pipeline.AssetTypePostgresSource,
+			fillColumns: true,
 			dbColumns: []*ansisql.DBColumn{
 				{Name: "id", Type: "INTEGER"},
 				{Name: "name", Type: "VARCHAR"},
@@ -107,11 +110,12 @@ func TestCreateAsset(t *testing.T) {
 			},
 		},
 		{
-			name:       "asset creation with empty columns slice",
-			schemaName: "public",
-			tableName:  "orders",
-			assetType:  pipeline.AssetTypePostgresSource,
-			dbColumns:  []*ansisql.DBColumn{},
+			name:        "fillColumns true but no pre-fetched columns and no conn returns empty",
+			schemaName:  "public",
+			tableName:   "orders",
+			assetType:   pipeline.AssetTypePostgresSource,
+			fillColumns: true,
+			dbColumns:   []*ansisql.DBColumn{},
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
@@ -130,9 +134,17 @@ func TestCreateAsset(t *testing.T) {
 
 			ctx := t.Context()
 
-			got, warning := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, tt.dbColumns)
+			// Pass nil for conn since we're testing the pre-fetched columns path
+			// When dbColumns is empty and conn is nil, it will try fillAssetColumnsFromDB
+			// which will fail, but for these tests we're just checking the pre-fetched path
+			got, warning := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, nil, tt.fillColumns, tt.dbColumns)
 
-			assert.Equal(t, "", warning)
+			// When dbColumns is empty and conn is nil, we get a warning about failing to fill columns
+			if tt.fillColumns && len(tt.dbColumns) == 0 {
+				assert.Contains(t, warning, "Could not fill columns")
+			} else {
+				assert.Equal(t, "", warning)
+			}
 			assert.Equal(t, tt.want, got)
 		})
 	}
