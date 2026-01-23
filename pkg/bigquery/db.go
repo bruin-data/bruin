@@ -793,17 +793,7 @@ func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 		return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 	}
 
-	schemaTemplate := strings.Join([]string{
-		"SELECT",
-		"  column_name,",
-		"  data_type,",
-		"  is_nullable,",
-		"  is_partitioning_column",
-		"FROM `%s.INFORMATION_SCHEMA.COLUMNS`",
-		"WHERE table_name = '%s'",
-		"ORDER BY ordinal_position",
-	}, "\n")
-	schemaQuery := fmt.Sprintf(schemaTemplate, datasetRef, targetTable)
+	schemaQuery := buildSchemaQuery(datasetRef, targetTable)
 
 	schemaResult, err := d.Select(ctx, &query.Query{Query: schemaQuery})
 	if err != nil {
@@ -899,6 +889,20 @@ func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 		RowCount: rowCount,
 		Table:    dbTable,
 	}, nil
+}
+
+func buildSchemaQuery(datasetRef, targetTable string) string {
+	schemaTemplate := strings.Join([]string{
+		"SELECT",
+		"  column_name,",
+		"  data_type,",
+		"  is_nullable,",
+		"  is_partitioning_column",
+		"FROM `%s.INFORMATION_SCHEMA.COLUMNS`",
+		"WHERE table_name = '%s'",
+		"ORDER BY ordinal_position",
+	}, "\n")
+	return fmt.Sprintf(schemaTemplate, datasetRef, targetTable)
 }
 
 func (d *Client) fetchNumericalStats(ctx context.Context, tableName, columnName string) (*diff.NumericalStatistics, error) {
