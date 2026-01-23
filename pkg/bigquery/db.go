@@ -1547,6 +1547,10 @@ type tableToFetch struct {
 // For sharded tables, only the most recent shard is included. This optimization reduces API calls
 // by skipping metadata fetches for older shards that would be discarded anyway.
 func selectTablesToFetch(tableNames []string) []tableToFetch {
+	if len(tableNames) == 0 {
+		return nil
+	}
+
 	// Build set of non-sharded table names first
 	nonShardedNames := make(map[string]bool)
 	result := make([]tableToFetch, 0, len(tableNames))
