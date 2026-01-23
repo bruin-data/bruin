@@ -782,27 +782,13 @@ func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 	switch len(tableComponents) {
 	case 2:
 		// dataset.table format
-		schemaQuery = fmt.Sprintf(`
-			SELECT 
-				column_name,
-				data_type,
-				is_nullable,
-				is_partitioning_column
-			FROM %s.%s.INFORMATION_SCHEMA.COLUMNS 
-			WHERE table_name = '%s'
-			ORDER BY ordinal_position`,
+		schemaQuery = fmt.Sprintf(
+			"SELECT \n\tcolumn_name,\n\tdata_type,\n\tis_nullable,\n\tis_partitioning_column\nFROM `%s.%s.INFORMATION_SCHEMA.COLUMNS`\nWHERE table_name = '%s'\nORDER BY ordinal_position",
 			d.config.ProjectID, tableComponents[0], tableComponents[1])
 	case 3:
 		// project.dataset.table format
-		schemaQuery = fmt.Sprintf(`
-			SELECT 
-				column_name,
-				data_type,
-				is_nullable,
-				is_partitioning_column
-			FROM %s.%s.INFORMATION_SCHEMA.COLUMNS 
-			WHERE table_name = '%s'
-			ORDER BY ordinal_position`,
+		schemaQuery = fmt.Sprintf(
+			"SELECT \n\tcolumn_name,\n\tdata_type,\n\tis_nullable,\n\tis_partitioning_column\nFROM `%s.%s.INFORMATION_SCHEMA.COLUMNS`\nWHERE table_name = '%s'\nORDER BY ordinal_position",
 			tableComponents[0], tableComponents[1], tableComponents[2])
 	default:
 		return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
