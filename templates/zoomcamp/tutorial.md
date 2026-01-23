@@ -53,7 +53,26 @@ This module introduces Bruin as a unified data platform that combines **data ing
 ### 2.1 Installation
 - Install Bruin CLI: `curl -LsSf https://getbruin.com/install/cli | sh`
   - Verify installation: `bruin version`
-- Install Bruin Extension
+
+#### IDE Extension (VS Code, Cursor, etc.)
+
+Please refer to the doc page for more details:
+  - https://getbruin.com/docs/bruin/vscode-extension/overview
+  - https://getbruin.com/docs/bruin/getting-started/features#vs-code-extension
+
+1. Install the **Bruin VS Code extension**:
+   - Open VS Code → Extensions
+   - Search: "Bruin" (publisher: bruin)
+   - Install, then reload VS Code
+
+2. Open this template folder and run from the Bruin panel:
+   - Open `pipeline.yml` or any asset file
+   - Use the Bruin panel to run `validate`, `run`, and see rendered code
+   - To open the panel, click the Bruin logo in the top-right corner of the file
+
+3. Set run parameters when creating a run:
+   - **Start / end dates** for incremental windows
+   - **Custom variables** like `taxi_types=["yellow"]`
 
 ### 2.2 Project Initialization
 - Initialize the zoomcamp template: `bruin init zoomcamp my-pipeline`
@@ -118,11 +137,36 @@ This module introduces Bruin as a unified data platform that combines **data ing
 - Follow the TODO instructions in `assets/reports/trips_report.sql`
 
 ### 3.5 Running and Validating
-- Validate structure before running
-- Use `--full-refresh` for initial table creation
-- Use `--start-date` / `--end-date` for incremental runs
-- Query tables directly to verify results
-- Check lineage to understand asset dependencies
+
+CLI Commands: https://getbruin.com/docs/bruin/commands/run
+
+```bash
+# Validate structure & definitions
+bruin validate ./pipeline.yml --environment default
+
+# First-time run tip:
+# Use --full-refresh to create/replace tables from scratch (helpful on a new DuckDB file).
+bruin run ./pipeline.yml --environment default --full-refresh
+
+# Run an ingestion asset, then downstream (to test incrementally)
+bruin run ./assets/ingestion/trips.py \
+  --environment default \
+  --start-date 2021-01-01 \
+  --end-date 2021-01-31 \
+  --var taxi_types='["yellow"]' \
+  --downstream
+
+# Query your tables using `bruin query`
+# Docs: https://getbruin.com/docs/bruin/commands/query
+bruin query --connection duckdb-default --query "SELECT COUNT(*) FROM ingestion.trips"
+
+# Open DuckDB UI (useful for exploring tables interactively)
+# Requires DuckDB CLI installed locally.
+duckdb duckdb.db -ui
+
+# Check lineage to understand asset dependencies
+bruin lineage ./pipeline.yml
+```
 
 ---
 
@@ -169,12 +213,26 @@ claude mcp add bruin -- bruin mcp
 - Execute commands: "Run the staging.trips asset with --full-refresh"
 
 ### 4.4 Example Prompts
+
+**Questions about Bruin documentation:**
 - "How do I create a DuckDB connection in Bruin?"
-- "Write a Python asset that fetches data from this API endpoint"
-- "Add a not_null quality check to the pickup_datetime column"
 - "What does the time_interval materialization strategy do?"
-- "Run a query to show row counts for all my tables"
+- "What materialization strategies does Bruin support?"
+
+**Commands to build or make changes to pipeline:**
+- "Write a Python asset that fetches data from this API endpoint"
 - "Generate the SQL for deduplicating trips using a composite key"
+- "Add a not_null quality check to the pickup_datetime column"
+
+**Commands to test and validate pipeline:**
+- "Validate the entire pipeline"
+- "Run the staging.trips asset with --full-refresh"
+- "Check the lineage for my reports.trips_report asset"
+
+**Commands to query and analyze the data:**
+- "Run a query to show row counts for all my tables"
+- "Query the reports table to show top 10 payment types by trip count"
+- "Show me the data schema for staging.trips"
 
 ### 4.5 AI-Assisted Workflow
 - Start with configuration: Let AI help set up `.bruin.yml` and `pipeline.yml`
@@ -183,7 +241,7 @@ claude mcp add bruin -- bruin mcp
 - Debug together: Share error messages and let AI suggest fixes
 - Learn by doing: Ask "why" questions to understand Bruin concepts
 
-Example Prompt:
+Example prompt to create the entire pipeline end-to-end and test it:
 ```text
 Build an end-to-end NYC Taxi data pipeline using Bruin.
 
@@ -233,6 +291,32 @@ d) **reports/trips_report.sql** - SQL asset to aggregate by date, taxi_type, pay
 - Query the reports table to confirm aggregations look correct
 - Verify all quality checks passed (24 checks expected)
 ```
+
+---
+
+## Part 5: Deploy to MotherDuck
+
+MotherDuck is cloud-hosted DuckDB. Your existing `duckdb.sql` and `duckdb.seed` assets work without major changes, just swap the connection.
+
+### 5.1 Create Account & Generate Token
+1. Sign up at [motherduck.com](https://motherduck.com)
+2. Go to **Settings → Access Tokens → Create Token**
+
+### 5.2 Add Connection to `.bruin.yml`
+```yaml
+environments:
+  default:
+    connections:
+      motherduck:
+        - name: "motherduck-prod"
+          token: "your_token_here"
+          database: "my_db"
+```
+
+### 5.3 Update Pipeline & Assets
+- In `pipeline.yml`: change `duckdb: duckdb-default` → `duckdb: motherduck-prod`
+- In Python assets with explicit `connection:`: change to `motherduck-prod`
+
 ---
 
 ## Key Commands Reference

@@ -1,6 +1,14 @@
-# Zoomcamp - Data Platform (Bruin) Template
+# Build Your First End-to-End Data Platform
 
-This template is an **educational scaffold** for building an end-to-end data pipeline in Bruin (ingestion → staging → reporting) with **no implementation provided**.
+This hands-on tutorial guides you through building a **complete NYC Taxi data pipeline** from scratch using Bruin—a unified CLI tool for data ingestion, transformation, and quality.
+
+You'll learn to build a production-ready ELT pipeline that:
+- **Ingests** real NYC taxi trip data from public APIs using Python
+- **Transforms** and cleans raw data with SQL, applying incremental strategies and deduplication
+- **Reports** aggregated analytics with built-in quality checks
+- **Deploys** to cloud infrastructure (MotherDuck)
+
+This is a learn-by-doing experience with AI assistance available through Bruin MCP. Follow the comprehensive `tutorial.md` for step-by-step guidance, or use the AI agent to build the entire pipeline interactively.
 
 ## Learning Goals
 
@@ -9,6 +17,14 @@ This template is an **educational scaffold** for building an end-to-end data pip
 - Declare **dependencies** and explore lineage (`bruin lineage`)
 - Apply **metadata** (columns, primary keys, descriptions) and **quality checks**
 - Parameterize runs with **pipeline variables**
+
+## Tutorial Outline
+
+- **Part 1**: What is a Data Platform? - Learn about modern data stack components and where Bruin fits in
+- **Part 2**: Setting Up Your First Bruin Project - Install Bruin, initialize a project, and configure environments
+- **Part 3**: End-to-End NYC Taxi ELT Pipeline - Build ingestion, staging, and reporting layers with real data
+- **Part 4**: Data Engineering with AI Agent - Use Bruin MCP to build pipelines with AI assistance
+- **Part 5**: Deploy to MotherDuck - Deploy your local pipeline to cloud-hosted DuckDB
 
 ## Pipeline Skeleton
 
@@ -35,110 +51,3 @@ zoomcamp/
     └── reports/
         └── trips_report.sql                # Aggregation for analytics
 ```
-
-## Suggested Workflow
-
-### Step 1: Configure the `.bruin.yml` and `pipeline.yml` files
-- Create the `.bruin.yml` file in the root directory
-  - Configure environments
-  - Create a connection for DuckDB
-
-- Create a `pipeline.yml` file in the same directory
-  - Set the pipeline name/schedule/start_date
-  - Initialize the `default_connections`
-  - Add custom `variables`
-
-### Step 2: Create the pipeline assets
-- **ingestion**
-  - Python script to extract files from source endpoint
-  - Seed assets (.asset.yml + .csv) for lookup tables
-- **staging**
-  - SQL asset(s) to clean, normalize schema, deduplicate
-- **reports**
-  - SQL asset(s) to aggregate and transform data
-
-### Step 3: Validate & run the pipeline
-
-CLI Commands: https://getbruin.com/docs/bruin/commands/run
-
-```bash
-# Validate structure & definitions
-bruin validate ./pipeline.yml --environment default
-
-# First-time run tip:
-# Use --full-refresh to create/replace tables from scratch (helpful on a new DuckDB file).
-bruin run ./pipeline.yml --environment default --full-refresh
-
-# Run an ingestion asset, then downstream (to test incrementally)
-bruin run ./assets/ingestion/trips.py \
-  --environment default \
-  --start-date 2021-01-01 \
-  --end-date 2021-01-31 \
-  --var taxi_types='["yellow"]' \
-  --downstream
-
-# Query your tables using `bruin query`
-# Docs: https://getbruin.com/docs/bruin/commands/query
-bruin query --connection duckdb-default --query "SELECT COUNT(*) FROM ingestion.trips"
-
-# Open DuckDB UI (useful for exploring tables interactively)
-# Requires DuckDB CLI installed locally.
-duckdb duckdb.db -ui
-```
-
-## IDE Extension (VS Code, Cursor, etc.)
-
-Please refer to the doc page for more details:
-  - https://getbruin.com/docs/bruin/vscode-extension/overview
-  - https://getbruin.com/docs/bruin/getting-started/features#vs-code-extension
-
-1. Install the **Bruin VS Code extension**:
-   - Open VS Code → Extensions
-   - Search: "Bruin" (publisher: bruin)
-   - Install, then reload VS Code
-
-2. Open this template folder and run from the Bruin panel:
-   - Open `pipeline.yml` or any asset file
-   - Use the Bruin panel to run `validate`, `run`, and see rendered code
-   - To open the panel, click the Bruin logo in the top-right corner of the file
-
-3. Set run parameters when creating a run:
-   - **Start / end dates** for incremental windows
-   - **Custom variables** like `taxi_types=["yellow"]`
-
-## Bruin MCP (AI Assistant Integration)
-
-Bruin MCP extends AI assistants (Claude, Cursor, Codex) to help you build and understand data pipelines.
-
-Docs: https://getbruin.com/docs/bruin/getting-started/bruin-mcp
-
-### Setup
-
-**Cursor IDE:**
-Go to Cursor Settings → MCP & Integrations → Add Custom MCP, then add:
-
-```json
-{
-  "mcpServers": {
-    "bruin": {
-      "command": "bruin",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-**Claude Code:**
-```bash
-claude mcp add bruin -- bruin mcp
-```
-
-### What You Can Ask
-
-Once MCP is set up, you can ask your AI assistant questions like:
-- "How do I create a BigQuery asset in Bruin?"
-- "What materialization strategies does Bruin support?"
-- "How do I set up a DuckDB connection?"
-- "Run a query on my staging.trips table"
-
-The AI will use Bruin's documentation and can execute commands directly.
