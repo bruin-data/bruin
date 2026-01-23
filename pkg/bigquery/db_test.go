@@ -262,6 +262,23 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 	}
 }
 
+func TestBuildSchemaQuery(t *testing.T) {
+	t.Parallel()
+
+	query := buildSchemaQuery("my-project.my_dataset", "my_table")
+
+	expected := "SELECT\n" +
+		"  column_name,\n" +
+		"  data_type,\n" +
+		"  is_nullable,\n" +
+		"  is_partitioning_column\n" +
+		"FROM `my-project.my_dataset.INFORMATION_SCHEMA.COLUMNS`\n" +
+		"WHERE table_name = 'my_table'\n" +
+		"ORDER BY ordinal_position"
+
+	assert.Equal(t, expected, query)
+}
+
 type jobSubmitResponse struct {
 	response   any
 	statusCode int
