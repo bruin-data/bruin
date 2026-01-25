@@ -1483,60 +1483,6 @@ func getShardDate(tableName string) string {
 	return matches[2]
 }
 
-// consolidateShardedTables groups sharded tables by base name and returns only the most recent shard.
-// Non-sharded tables pass through unchanged. If a non-sharded table exists with the same name as
-// a sharded table's base name, the non-sharded table takes precedence.
-func consolidateShardedTables(tables []*ansisql.DBTable) []*ansisql.DBTable {
-	// Build set of non-sharded table names first
-	nonShardedNames := make(map[string]bool)
-	var nonShardedTables []*ansisql.DBTable
-
-	for _, table := range tables {
-		if !isShardedTableName(table.Name) {
-			nonShardedNames[table.Name] = true
-			nonShardedTables = append(nonShardedTables, table)
-		}
-	}
-
-	// Map base name -> most recent shard
-	shardGroups := make(map[string]*ansisql.DBTable)
-	shardDates := make(map[string]string)
-
-	for _, table := range tables {
-		if !isShardedTableName(table.Name) {
-			continue
-		}
-
-		baseName := getShardedTableBaseName(table.Name)
-
-		// Skip if a non-sharded table with the same name exists
-		if nonShardedNames[baseName] {
-			continue
-		}
-
-		shardDate := getShardDate(table.Name)
-
-		// Keep the most recent shard (string comparison works for YYYYMMDD)
-		if existingDate, exists := shardDates[baseName]; !exists || shardDate > existingDate {
-			shardDates[baseName] = shardDate
-			shardGroups[baseName] = &ansisql.DBTable{
-				Name:    baseName,
-				Columns: table.Columns,
-			}
-		}
-	}
-
-	// Combine results
-	result := make([]*ansisql.DBTable, 0, len(nonShardedTables)+len(shardGroups))
-	result = append(result, nonShardedTables...)
-	for _, table := range shardGroups {
-		result = append(result, table)
-	}
-
-	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
-	return result
-}
-
 // tableToFetch represents a table that needs metadata fetching.
 type tableToFetch struct {
 	actualName  string // The actual table name in BigQuery (e.g., "events_20240115")
