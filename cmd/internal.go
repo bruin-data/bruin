@@ -229,7 +229,7 @@ func DBSummary() *cli.Command {
 			output := c.String("output")
 
 			// Get connection from config
-			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
+			_, conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
@@ -805,7 +805,7 @@ func FetchDatabases() *cli.Command {
 			output := c.String("output")
 
 			// Get connection from config
-			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
+			_, conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
@@ -920,7 +920,7 @@ func FetchTables() *cli.Command {
 			environment := c.String("environment")
 			output := c.String("output")
 
-			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
+			_, conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
@@ -1120,7 +1120,7 @@ func FetchColumns() *cli.Command {
 			output := c.String("output")
 
 			// Get connection from config
-			conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
+			_, conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, c.String("config-file"))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
 			}
