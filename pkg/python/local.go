@@ -15,7 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
+	"github.com/sourcegraph/conc/pool"
 )
 
 const WINDOWS = "windows"
@@ -164,9 +164,9 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 
 	// Start reading from pipes in goroutines before starting the command
 	// This prevents deadlock if the command generates a lot of output
-	wg := new(errgroup.Group)
-	wg.Go(func() error { return consumePipe(stdout, output) })
-	wg.Go(func() error { return consumePipe(stderr, output) })
+	p := pool.New().WithMaxGoroutines(2).WithErrors()
+	p.Go(func() error { return consumePipe(stdout, output) })
+	p.Go(func() error { return consumePipe(stderr, output) })
 
 	err = cmd.Start()
 	if err != nil {
@@ -176,7 +176,7 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 	// Wait for pipe consumption to complete FIRST
 	// This is critical: we must finish reading from pipes before calling cmd.Wait()
 	// because cmd.Wait() will close the pipes after the command exits
-	pipeErr := wg.Wait()
+	pipeErr := p.Wait()
 
 	// Now wait for the command to finish
 	cmdErr := cmd.Wait()

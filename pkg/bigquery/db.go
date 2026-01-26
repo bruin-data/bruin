@@ -1244,7 +1244,8 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	mu := sync.Mutex{}
 	var errs []error
 
-	workers := max(runtime.NumCPU(), 8)
+	// Use a smaller pool size to reduce API call frequency
+	workers := min(runtime.NumCPU(), 4)
 
 	p := pool.New().WithMaxGoroutines(workers)
 
@@ -1325,7 +1326,8 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 	mu := sync.Mutex{}
 	var errs []error
 
-	workers := max(runtime.NumCPU(), 8)
+	// Use a smaller pool size to reduce API call frequency
+	workers := min(runtime.NumCPU(), 4)
 	p := pool.New().WithMaxGoroutines(workers)
 
 	// Only iterate over requested schemas (datasets)
