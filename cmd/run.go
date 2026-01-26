@@ -719,9 +719,6 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, executor.KeyVerbose, c.Bool("verbose"))
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
-			if runConfig.UseGong {
-				runCtx = context.WithValue(runCtx, python.CtxGongPath, defaultGongPath)
-			}
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
@@ -785,6 +782,11 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				startDate = parsedStartDate
 				endDate = parsedEndDate
+			}
+
+			// Set gong context after --continue restores RunConfig to ensure consistency
+			if runConfig.UseGong {
+				runCtx = context.WithValue(runCtx, python.CtxGongPath, defaultGongPath)
 			}
 
 			// Load macros from the pipeline's macros directory

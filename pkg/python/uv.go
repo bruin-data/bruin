@@ -104,6 +104,10 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	// Check if gong path is provided in context - if so, use gong binary directly
 	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
 		if path, ok := gongPath.(string); ok && path != "" {
+			// Warn if extraPackages are provided but will be ignored with gong
+			if len(extraPackages) > 0 {
+				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
+			}
 			// Use gong binary directly instead of ingestr
 			return u.Cmd.Run(ctx, repo, &CommandInstance{
 				Name: path,
