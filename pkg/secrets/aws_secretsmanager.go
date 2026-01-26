@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -23,6 +24,7 @@ type awsSecretsManagerClient interface {
 type AWSSecretsManagerClient struct {
 	client                  awsSecretsManagerClient
 	logger                  logger.Logger
+	cacheMu                 sync.RWMutex
 	cacheConnections        map[string]any
 	cacheConnectionsDetails map[string]any
 }
@@ -41,12 +43,13 @@ func NewAWSSecretsManagerClientFromEnv(logger logger.Logger) (*AWSSecretsManager
 	if region == "" {
 		return nil, errors.New("BRUIN_AWS_REGION env variable not set")
 	}
+	sessionToken := os.Getenv("BRUIN_AWS_SESSION_TOKEN")
 
-	return NewAWSSecretsManagerClient(logger, accessKeyID, secretAccessKey, region)
+	return NewAWSSecretsManagerClient(logger, accessKeyID, secretAccessKey, region, sessionToken)
 }
 
 // NewAWSSecretsManagerClient creates a new AWS Secrets Manager client.
-func NewAWSSecretsManagerClient(logger logger.Logger, accessKeyID, secretAccessKey, region string) (*AWSSecretsManagerClient, error) {
+func NewAWSSecretsManagerClient(logger logger.Logger, accessKeyID, secretAccessKey, region, sessionToken string) (*AWSSecretsManagerClient, error) {
 	if accessKeyID == "" {
 		return nil, errors.New("empty AWS access key ID provided")
 	}
@@ -62,7 +65,7 @@ func NewAWSSecretsManagerClient(logger logger.Logger, accessKeyID, secretAccessK
 		Credentials: credentials.NewStaticCredentialsProvider(
 			accessKeyID,
 			secretAccessKey,
-			"",
+			sessionToken,
 		),
 	}
 
@@ -78,9 +81,12 @@ func NewAWSSecretsManagerClient(logger logger.Logger, accessKeyID, secretAccessK
 
 // GetConnection retrieves a connection by name from AWS Secrets Manager.
 func (c *AWSSecretsManagerClient) GetConnection(name string) any {
+	c.cacheMu.RLock()
 	if conn, ok := c.cacheConnections[name]; ok {
+		c.cacheMu.RUnlock()
 		return conn
 	}
+	c.cacheMu.RUnlock()
 
 	manager, err := c.getAWSSecretsManager(name)
 	if err != nil {
@@ -89,16 +95,22 @@ func (c *AWSSecretsManagerClient) GetConnection(name string) any {
 	}
 
 	conn := manager.GetConnection(name)
+
+	c.cacheMu.Lock()
 	c.cacheConnections[name] = conn
+	c.cacheMu.Unlock()
 
 	return conn
 }
 
 // GetConnectionDetails retrieves connection details by name from AWS Secrets Manager.
 func (c *AWSSecretsManagerClient) GetConnectionDetails(name string) any {
+	c.cacheMu.RLock()
 	if deets, ok := c.cacheConnectionsDetails[name]; ok {
+		c.cacheMu.RUnlock()
 		return deets
 	}
+	c.cacheMu.RUnlock()
 
 	manager, err := c.getAWSSecretsManager(name)
 	if err != nil {
@@ -107,7 +119,10 @@ func (c *AWSSecretsManagerClient) GetConnectionDetails(name string) any {
 	}
 
 	deets := manager.GetConnectionDetails(name)
+
+	c.cacheMu.Lock()
 	c.cacheConnectionsDetails[name] = deets
+	c.cacheMu.Unlock()
 
 	return deets
 }

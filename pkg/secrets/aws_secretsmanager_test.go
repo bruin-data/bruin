@@ -17,7 +17,7 @@ func TestNewAWSSecretsManagerClient(t *testing.T) {
 
 	t.Run("returns error if access key ID is empty", func(t *testing.T) {
 		t.Parallel()
-		client, err := NewAWSSecretsManagerClient(log, "", "secret", "us-east-1")
+		client, err := NewAWSSecretsManagerClient(log, "", "secret", "us-east-1", "")
 		require.Error(t, err)
 		require.Nil(t, client)
 		require.Contains(t, err.Error(), "empty AWS access key ID")
@@ -25,7 +25,7 @@ func TestNewAWSSecretsManagerClient(t *testing.T) {
 
 	t.Run("returns error if secret access key is empty", func(t *testing.T) {
 		t.Parallel()
-		client, err := NewAWSSecretsManagerClient(log, "key", "", "us-east-1")
+		client, err := NewAWSSecretsManagerClient(log, "key", "", "us-east-1", "")
 		require.Error(t, err)
 		require.Nil(t, client)
 		require.Contains(t, err.Error(), "empty AWS secret access key")
@@ -33,7 +33,7 @@ func TestNewAWSSecretsManagerClient(t *testing.T) {
 
 	t.Run("returns error if region is empty", func(t *testing.T) {
 		t.Parallel()
-		client, err := NewAWSSecretsManagerClient(log, "key", "secret", "")
+		client, err := NewAWSSecretsManagerClient(log, "key", "secret", "", "")
 		require.Error(t, err)
 		require.Nil(t, client)
 		require.Contains(t, err.Error(), "empty AWS region")
@@ -41,7 +41,7 @@ func TestNewAWSSecretsManagerClient(t *testing.T) {
 
 	t.Run("creates client with valid credentials", func(t *testing.T) {
 		t.Parallel()
-		client, err := NewAWSSecretsManagerClient(log, "key", "secret", "us-east-1")
+		client, err := NewAWSSecretsManagerClient(log, "key", "secret", "us-east-1", "")
 		require.NoError(t, err)
 		require.NotNil(t, client)
 	})
