@@ -144,8 +144,8 @@ ruleset:
 
 | Name | Target | 
 | ---  | --- | 
-| [asset](https://github.com/bruin-data/bruin/blob/f9c7d0083d2f53538102e77126e55f9dfc8840a5/pkg/pipeline/pipeline.go#L622-L645) | `asset` | 
-| [pipeline](https://github.com/bruin-data/bruin/blob/f9c7d0083d2f53538102e77126e55f9dfc8840a5/pkg/pipeline/pipeline.go#L1106-L1121) | `asset`, `pipeline` |
+| asset | `asset` | 
+| pipeline | `asset`, `pipeline` |
 
 ::: warning
 The variables exposed here are direct Go structs, therefore it is recommended to check the latest version of these given structs. 
