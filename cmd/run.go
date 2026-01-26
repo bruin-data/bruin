@@ -784,14 +784,26 @@ func Run(isDebug *bool) *cli.Command {
 			// Pipeline is inferred from the first asset file
 			var assetPaths []string
 			if c.Args().Len() > 1 && pipelineInfo.RunningForAnAsset {
+				// Cannot use --single-check with multiple assets
+				if singleCheckID != "" {
+					errorPrinter.Printf("Cannot use --single-check flag when running multiple assets. --single-check can only be used with a single asset.\n")
+					return cli.Exit("", 1)
+				}
 				assetPaths = c.Args().Slice()
 				preview.RunningForAnAsset = false
 				pipelineInfo.RunningForAnAsset = false
 				task = nil
 				filter.SingleTask = nil
 				filter.singleCheckID = scheduler.CheckUniqueID{}
+				// Clear local variable to prevent incorrect output formatting
+				singleCheckID = ""
 			}
 			if len(assetPaths) > 0 {
+				// Cannot use --single-check with multiple assets
+				if singleCheckID != "" {
+					errorPrinter.Printf("Cannot use --single-check flag when running multiple assets. --single-check can only be used with a single asset.\n")
+					return cli.Exit("", 1)
+				}
 				// Get current working directory for path resolution
 				cwd, err := os.Getwd()
 				if err != nil {
@@ -810,6 +822,8 @@ func Run(isDebug *bool) *cli.Command {
 
 				// Update filter with loaded assets
 				filter.SelectedAssets = selectedAssets
+				// Clear local variable to prevent incorrect output formatting
+				singleCheckID = ""
 			}
 
 			// Re-determine start date based on pipeline configuration and full-refresh flag
