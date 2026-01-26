@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 FROM golang:1.25.4-trixie AS builder
 
 # Build argument for version information
@@ -23,7 +24,6 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${BRANCH_NAME}" -o "bin/bruin" .
 
-# syntax=docker/dockerfile:1.6
 # Final stage
 FROM debian:trixie-slim
 
