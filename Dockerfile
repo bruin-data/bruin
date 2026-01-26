@@ -73,7 +73,7 @@ RUN --mount=type=secret,id=gcp_key,required=false \
         if [ -z "${SELECTED_RELEASE}" ]; then \
             echo "No release tag provided, downloading latest..." && \
             gsutil cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" /tmp/latest.txt && \
-            SELECTED_RELEASE=$(cat /tmp/latest.txt | tr -d '\r\n') && \
+            SELECTED_RELEASE=$(tr -d '\r\n' < /tmp/latest.txt) && \
             rm -f /tmp/latest.txt && \
             echo "Using latest release: ${SELECTED_RELEASE}"; \
         else \
