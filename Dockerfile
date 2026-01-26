@@ -29,6 +29,7 @@ FROM debian:trixie-slim
 
 ARG GCS_BUCKET_NAME=gong-release
 ARG GCS_PREFIX=releases
+ARG RELEASE_TAG=
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -68,11 +69,17 @@ RUN --mount=type=secret,id=gcp_key,required=false \
     if [ -f /run/secrets/gcp_key ]; then \
         echo "Downloading gong binaries from GCS..." && \
         gcloud auth activate-service-account --key-file=/run/secrets/gcp_key && \
-        gsutil cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" /tmp/latest.txt && \
-        RELEASE_TAG=$(cat /tmp/latest.txt | tr -d '\r\n') && \
-        rm -f /tmp/latest.txt && \
-        echo "Using release: $RELEASE_TAG" && \
-        gsutil -m cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${RELEASE_TAG}/*/*" /home/bruin/.local/bin/gong/ && \
+        SELECTED_RELEASE="${RELEASE_TAG}" && \
+        if [ -z "${SELECTED_RELEASE}" ]; then \
+            echo "No release tag provided, downloading latest..." && \
+            gsutil cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" /tmp/latest.txt && \
+            SELECTED_RELEASE=$(cat /tmp/latest.txt | tr -d '\r\n') && \
+            rm -f /tmp/latest.txt && \
+            echo "Using latest release: ${SELECTED_RELEASE}"; \
+        else \
+            echo "Using provided release tag: ${SELECTED_RELEASE}"; \
+        fi && \
+        gsutil -m cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/*/*" /home/bruin/.local/bin/gong/ && \
         chmod +x /home/bruin/.local/bin/gong/* && \
         chown -R bruin:bruin /home/bruin/.local/bin/gong && \
         echo "Gong binaries downloaded successfully"; \
