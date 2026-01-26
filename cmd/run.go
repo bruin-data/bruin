@@ -575,7 +575,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:    "secrets-backend",
 				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler'",
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws'",
 			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
@@ -882,6 +882,11 @@ func Run(isDebug *bool) *cli.Command {
 				connectionManager, err = secrets.NewDopplerClientFromEnv(logger)
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize doppler client"))
+				}
+			case "aws":
+				connectionManager, err = secrets.NewAWSSecretsManagerClientFromEnv(logger)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "failed to initialize AWS Secrets Manager client"))
 				}
 			default:
 				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
