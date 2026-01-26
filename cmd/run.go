@@ -705,7 +705,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			var task *pipeline.Asset
-			if preview.RunningForAnAsset {
+			if preview.RunningForAnAsset && c.Args().Len() == 1 {
 				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, preview.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
@@ -728,6 +728,10 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
 				return cli.Exit("", 1)
 			}
+
+			// Initialize selectedAssets early (will be populated later if multiple assets are specified)
+			var selectedAssets []*pipeline.Asset
+
 			singleCheckID := c.String("single-check")
 			filter := &Filter{
 				IncludeTag:        runConfig.Tag,
@@ -735,6 +739,7 @@ func Run(isDebug *bool) *cli.Command {
 				IncludeDownstream: preview.RunDownstreamTasks,
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
+				SelectedAssets:    selectedAssets,
 				ExcludeTag:        runConfig.ExcludeTag,
 				singleCheckID: scheduler.CheckUniqueID{
 					ID:    singleCheckID,
@@ -774,6 +779,53 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
+			// Load assets from positional arguments
+			// This allows: bruin run asset1.sql asset2.sql asset3.sql
+			// Pipeline is inferred from the first asset file
+			var assetPaths []string
+			if c.Args().Len() > 1 && pipelineInfo.RunningForAnAsset {
+				// Cannot use --single-check with multiple assets
+				if singleCheckID != "" {
+					errorPrinter.Printf("Cannot use --single-check flag when running multiple assets. --single-check can only be used with a single asset.\n")
+					return cli.Exit("", 1)
+				}
+				assetPaths = c.Args().Slice()
+				preview.RunningForAnAsset = false
+				pipelineInfo.RunningForAnAsset = false
+				task = nil
+				filter.SingleTask = nil
+				filter.singleCheckID = scheduler.CheckUniqueID{}
+				// Clear local variable to prevent incorrect output formatting
+				singleCheckID = ""
+			}
+			if len(assetPaths) > 0 {
+				// Cannot use --single-check with multiple assets
+				if singleCheckID != "" {
+					errorPrinter.Printf("Cannot use --single-check flag when running multiple assets. --single-check can only be used with a single asset.\n")
+					return cli.Exit("", 1)
+				}
+				// Get current working directory for path resolution
+				cwd, err := os.Getwd()
+				if err != nil {
+					cwd = repoRoot.Path // Fallback to repo root
+				}
+				selectedAssets, err = loadAssetsFromPaths(assetPaths, pipelineInfo.Pipeline, repoRoot.Path, cwd)
+				if err != nil {
+					errorPrinter.Printf("Failed to load assets: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				if len(selectedAssets) == 0 {
+					errorPrinter.Printf("No valid assets found from the provided paths\n")
+					return cli.Exit("", 1)
+				}
+
+				// Update filter with loaded assets
+				filter.SelectedAssets = selectedAssets
+				// Clear local variable to prevent incorrect output formatting
+				singleCheckID = ""
+			}
+
 			// Re-determine start date based on pipeline configuration and full-refresh flag
 			startDate, err = DetermineStartDate(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
 			if err != nil {
@@ -806,6 +858,12 @@ func Run(isDebug *bool) *cli.Command {
 
 				if pipelineInfo.RunningForAnAsset {
 					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+				} else if len(filter.SelectedAssets) > 0 {
+					assetNames := make([]string, len(filter.SelectedAssets))
+					for i, asset := range filter.SelectedAssets {
+						assetNames[i] = asset.Name
+					}
+					infoPrinter.Printf("Running selected assets: %s\n", strings.Join(assetNames, ", "))
 				}
 				executionStartLog = "Starting the pipeline execution..."
 			}
@@ -845,6 +903,12 @@ func Run(isDebug *bool) *cli.Command {
 				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
 				if pipelineInfo.RunningForAnAsset {
 					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
+				} else if len(filter.SelectedAssets) > 0 {
+					assetNames := make([]string, len(filter.SelectedAssets))
+					for i, asset := range filter.SelectedAssets {
+						assetNames[i] = asset.Name
+					}
+					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, strings.Join(assetNames, "_"))
 				}
 
 				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
@@ -1852,7 +1916,8 @@ type Filter struct {
 	OnlyTaskTypes     []string // Task types to include (from `--only`)
 	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
 	PushMetaData      bool
-	SingleTask        *pipeline.Asset
+	SingleTask        *pipeline.Asset   // Single asset (from running asset file directly)
+	SelectedAssets    []*pipeline.Asset // Multiple assets specified as positional arguments
 	ExcludeTag        string
 	singleCheckID     scheduler.CheckUniqueID // ID of the single check to run, if any
 }
@@ -1869,13 +1934,58 @@ func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Sche
 	return nil
 }
 
+func HandleMultipleAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if len(f.SelectedAssets) == 0 {
+		return nil
+	}
+
+	// Cannot use with single asset mode
+	if f.SingleTask != nil {
+		return errors.New("cannot specify multiple assets when running a single asset file directly")
+	}
+
+	// Cannot use with tags
+	if f.IncludeTag != "" {
+		return errors.New("cannot specify assets with --tag flag")
+	}
+
+	// Mark all as skipped first
+	s.MarkAll(scheduler.Skipped)
+
+	// Mark selected assets as pending
+	for _, asset := range f.SelectedAssets {
+		s.MarkAsset(asset, scheduler.Pending, f.IncludeDownstream)
+	}
+
+	// Handle exclude-tag if specified
+	if f.ExcludeTag != "" {
+		if !f.IncludeDownstream {
+			return errors.New("when specifying assets with --exclude-tag, you must also use --downstream flag")
+		}
+		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
+		if len(excludedAssets) == 0 {
+			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		}
+		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	}
+
+	return nil
+}
+
 func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if f.SingleTask == nil {
-		if f.IncludeDownstream {
+		// Allow downstream with selected assets, but not for whole pipeline
+		if f.IncludeDownstream && len(f.SelectedAssets) == 0 {
 			return errors.New("cannot use the --downstream flag when running the whole pipeline")
 		}
 		return nil
 	}
+
+	// Cannot use with multiple assets
+	if len(f.SelectedAssets) > 0 {
+		return errors.New("cannot specify multiple assets when running a single asset file directly")
+	}
+
 	s.MarkAll(scheduler.Skipped)
 	s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
 	if f.IncludeTag != "" {
@@ -1898,6 +2008,12 @@ func HandleIncludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p
 	if f.IncludeTag == "" {
 		return nil
 	}
+
+	// Cannot use with multiple assets
+	if len(f.SelectedAssets) > 0 {
+		return errors.New("cannot use --tag flag when specifying assets")
+	}
+
 	s.MarkAll(scheduler.Skipped)
 	includedAssets := p.GetAssetsByTag(f.IncludeTag)
 	if len(includedAssets) == 0 {
@@ -1959,8 +2075,9 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 	s.MarkAll(scheduler.Pending)
 
 	funcs := []FilterMutator{
-		HandleSingleTask,
-		HandleIncludeTags,
+		HandleMultipleAssets, // Check for multiple assets first
+		HandleSingleTask,     // Then single asset
+		HandleIncludeTags,    // Then tags
 		HandleExcludeTags,
 		FilterTaskTypes,
 		SkipAllTasksIfSingleCheck,
@@ -2016,5 +2133,111 @@ func ensurePythonCacheGitignore(fs afero.Fs, repoRoot string) error {
 			return fmt.Errorf("failed to add %s: %w", pattern, err)
 		}
 	}
+	return nil
+}
+
+// loadAssetsFromPaths loads assets from a list of paths or names.
+// It tries to find assets by path first, then by name if path lookup fails.
+// All assets must belong to the same pipeline.
+func loadAssetsFromPaths(assetPaths []string, p *pipeline.Pipeline, repoRoot, cwd string) ([]*pipeline.Asset, error) {
+	assets := make([]*pipeline.Asset, 0, len(assetPaths))
+	notFound := make([]string, 0)
+
+	// Get pipeline directory for path resolution
+	pipelineDir := filepath.Dir(p.DefinitionFile.Path)
+
+	for _, assetPath := range assetPaths {
+		if assetPath == "" {
+			continue
+		}
+
+		var asset *pipeline.Asset
+
+		// Try multiple base paths for relative paths
+		basePaths := []string{cwd, repoRoot, pipelineDir}
+
+		// First, try as absolute path
+		if filepath.IsAbs(assetPath) {
+			absPath, err := filepath.Abs(assetPath)
+			if err == nil {
+				asset = p.GetAssetByPath(absPath)
+				if asset == nil {
+					asset = findAssetByExecutablePath(p, absPath)
+				}
+			}
+		}
+
+		// If not found, try relative to each base path
+		if asset == nil && !filepath.IsAbs(assetPath) {
+			for _, base := range basePaths {
+				relativePath := filepath.Join(base, assetPath)
+				absPath, err := filepath.Abs(relativePath)
+				if err == nil {
+					asset = p.GetAssetByPath(absPath)
+					if asset == nil {
+						asset = findAssetByExecutablePath(p, absPath)
+					}
+					if asset != nil {
+						break
+					}
+				}
+			}
+		}
+
+		// If still not found, try by asset name
+		if asset == nil {
+			// Try with the path as-is (might be just the name)
+			asset = p.GetAssetByName(assetPath)
+		}
+
+		// Try without file extension
+		if asset == nil {
+			nameWithoutExt := strings.TrimSuffix(filepath.Base(assetPath), filepath.Ext(assetPath))
+			asset = p.GetAssetByName(nameWithoutExt)
+		}
+
+		// Try case-insensitive name lookup
+		if asset == nil {
+			asset = p.GetAssetByNameCaseInsensitive(assetPath)
+		}
+
+		// Try case-insensitive without extension
+		if asset == nil {
+			nameWithoutExt := strings.TrimSuffix(filepath.Base(assetPath), filepath.Ext(assetPath))
+			asset = p.GetAssetByNameCaseInsensitive(nameWithoutExt)
+		}
+
+		if asset == nil {
+			notFound = append(notFound, assetPath)
+			continue
+		}
+
+		assets = append(assets, asset)
+	}
+
+	if len(notFound) > 0 {
+		return nil, fmt.Errorf("assets not found: %s. Make sure the asset paths or names are correct and belong to the pipeline", strings.Join(notFound, ", "))
+	}
+
+	if len(assets) == 0 {
+		return nil, errors.New("no valid assets found")
+	}
+
+	return assets, nil
+}
+
+// findAssetByExecutablePath finds an asset by its executable file path.
+func findAssetByExecutablePath(p *pipeline.Pipeline, absPath string) *pipeline.Asset {
+	absPath, err := filepath.Abs(absPath)
+	if err != nil {
+		return nil
+	}
+
+	for _, asset := range p.Assets {
+		if asset.ExecutableFile.Path == absPath {
+			return asset
+		}
+	}
+
 	return nil
 }
