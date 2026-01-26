@@ -25,9 +25,21 @@ type DBSchema struct {
 	Tables []*DBTable `json:"tables"`
 }
 
+// DBTableType represents the type of a database table.
+type DBTableType string
+
+const (
+	// DBTableTypeTable represents a regular table.
+	DBTableTypeTable DBTableType = "table"
+	// DBTableTypeView represents a view.
+	DBTableTypeView DBTableType = "view"
+)
+
 type DBTable struct {
-	Name    string      `json:"name"`
-	Columns []*DBColumn `json:"columns"`
+	Name           string      `json:"name"`
+	Type           DBTableType `json:"type,omitempty"`           // "table" or "view"
+	ViewDefinition string      `json:"view_definition,omitempty"` // SQL definition for views
+	Columns        []*DBColumn `json:"columns"`
 }
 
 type DBColumn struct {

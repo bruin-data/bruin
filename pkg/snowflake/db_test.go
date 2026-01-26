@@ -805,18 +805,22 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 			name: "successful database summary",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT
-    table_schema,
-    table_name
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    v.view_definition
 FROM
-    TESTDB.INFORMATION_SCHEMA.TABLES
+    TESTDB.INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    TESTDB.INFORMATION_SCHEMA.VIEWS v ON t.table_schema = v.table_schema AND t.table_name = v.table_name
 WHERE
-    table_type IN \('BASE TABLE', 'VIEW'\)
-AND table_schema != 'INFORMATION_SCHEMA'
-ORDER BY table_schema, table_name;`).
-					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
-						AddRow("SCHEMA1", "TABLE1").
-						AddRow("SCHEMA1", "TABLE2").
-						AddRow("SCHEMA2", "TABLE1"))
+    t.table_type IN \('BASE TABLE', 'VIEW'\)
+AND t.table_schema != 'INFORMATION_SCHEMA'
+ORDER BY t.table_schema, t.table_name;`).
+					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition"}).
+						AddRow("SCHEMA1", "TABLE1", "BASE TABLE", nil).
+						AddRow("SCHEMA1", "TABLE2", "BASE TABLE", nil).
+						AddRow("SCHEMA2", "TABLE1", "BASE TABLE", nil))
 			},
 			want: &ansisql.DBDatabase{
 				Name: "TESTDB",
@@ -824,14 +828,47 @@ ORDER BY table_schema, table_name;`).
 					{
 						Name: "SCHEMA1",
 						Tables: []*ansisql.DBTable{
-							{Name: "TABLE1", Columns: []*ansisql.DBColumn{}},
-							{Name: "TABLE2", Columns: []*ansisql.DBColumn{}},
+							{Name: "TABLE1", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
+							{Name: "TABLE2", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
 						},
 					},
 					{
 						Name: "SCHEMA2",
 						Tables: []*ansisql.DBTable{
-							{Name: "TABLE1", Columns: []*ansisql.DBColumn{}},
+							{Name: "TABLE1", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "database summary with views",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    v.view_definition
+FROM
+    TESTDB.INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    TESTDB.INFORMATION_SCHEMA.VIEWS v ON t.table_schema = v.table_schema AND t.table_name = v.table_name
+WHERE
+    t.table_type IN \('BASE TABLE', 'VIEW'\)
+AND t.table_schema != 'INFORMATION_SCHEMA'
+ORDER BY t.table_schema, t.table_name;`).
+					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition"}).
+						AddRow("PUBLIC", "USERS", "BASE TABLE", nil).
+						AddRow("PUBLIC", "ACTIVE_USERS", "VIEW", "SELECT * FROM USERS WHERE ACTIVE = TRUE"))
+			},
+			want: &ansisql.DBDatabase{
+				Name: "TESTDB",
+				Schemas: []*ansisql.DBSchema{
+					{
+						Name: "PUBLIC",
+						Tables: []*ansisql.DBTable{
+							{Name: "USERS", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
+							{Name: "ACTIVE_USERS", Type: ansisql.DBTableTypeView, ViewDefinition: "SELECT * FROM USERS WHERE ACTIVE = TRUE", Columns: []*ansisql.DBColumn{}},
 						},
 					},
 				},
@@ -841,14 +878,18 @@ ORDER BY table_schema, table_name;`).
 			name: "query error",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT
-    table_schema,
-    table_name
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    v.view_definition
 FROM
-    TESTDB.INFORMATION_SCHEMA.TABLES
+    TESTDB.INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    TESTDB.INFORMATION_SCHEMA.VIEWS v ON t.table_schema = v.table_schema AND t.table_name = v.table_name
 WHERE
-    table_type IN \('BASE TABLE', 'VIEW'\)
-AND table_schema != 'INFORMATION_SCHEMA'
-ORDER BY table_schema, table_name;`).
+    t.table_type IN \('BASE TABLE', 'VIEW'\)
+AND t.table_schema != 'INFORMATION_SCHEMA'
+ORDER BY t.table_schema, t.table_name;`).
 					WillReturnError(errors.New("connection error"))
 			},
 			wantErr: "failed to query Snowflake INFORMATION_SCHEMA: connection error",

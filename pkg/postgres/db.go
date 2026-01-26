@@ -343,13 +343,19 @@ func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	db := c.config.GetDatabase()
 	q := `
 SELECT
-    table_schema,
-    table_name
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    v.view_definition
 FROM
-    information_schema.tables
+    information_schema.tables t
+LEFT JOIN
+    information_schema.views v ON t.table_schema = v.table_schema AND t.table_name = v.table_name
 WHERE
-	table_catalog = $1 AND table_schema NOT IN ('pg_catalog', 'information_schema')
-ORDER BY table_schema, table_name;
+	t.table_catalog = $1 
+    AND t.table_schema NOT IN ('pg_catalog', 'information_schema')
+    AND t.table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY t.table_schema, t.table_name;
 `
 
 	rows, err := c.connection.Query(ctx, q, db)
@@ -373,12 +379,17 @@ ORDER BY table_schema, table_name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range collectedRows {
-		if len(row) != 2 {
+		if len(row) != 4 {
 			continue
 		}
 
 		schemaName := row[0].(string)
 		tableName := row[1].(string)
+		tableType := row[2].(string)
+		var viewDefinition string
+		if row[3] != nil {
+			viewDefinition = row[3].(string)
+		}
 
 		// Create schema if it doesn't exist
 		schemaKey := db + "." + schemaName
@@ -390,10 +401,20 @@ ORDER BY table_schema, table_name;
 			schemas[schemaKey] = schema
 		}
 
+		// Determine table type
+		var dbTableType ansisql.DBTableType
+		if tableType == "VIEW" {
+			dbTableType = ansisql.DBTableTypeView
+		} else {
+			dbTableType = ansisql.DBTableTypeTable
+		}
+
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name:    tableName,
-			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
+			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaKey].Tables = append(schemas[schemaKey].Tables, table)
 	}
