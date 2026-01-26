@@ -67,6 +67,8 @@ COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 USER root
 RUN --mount=type=secret,id=gcp_key,required=false \
     if [ -f /run/secrets/gcp_key ]; then \
+        mkdir -p /tmp/gcloud && \
+        export CLOUDSDK_CONFIG=/tmp/gcloud && \
         echo "Downloading gong binaries from GCS..." && \
         gcloud auth activate-service-account --key-file=/run/secrets/gcp_key && \
         SELECTED_RELEASE="${RELEASE_TAG}" && \
@@ -82,7 +84,8 @@ RUN --mount=type=secret,id=gcp_key,required=false \
         gsutil -m cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/*/*" /home/bruin/.local/bin/gong/ && \
         chmod +x /home/bruin/.local/bin/gong/* && \
         chown -R bruin:bruin /home/bruin/.local/bin/gong && \
-        echo "Gong binaries downloaded successfully"; \
+        echo "Gong binaries downloaded successfully" && \
+        rm -rf /tmp/gcloud; \
     else \
         echo "GCP key secret not provided, skipping gong binary download"; \
     fi
