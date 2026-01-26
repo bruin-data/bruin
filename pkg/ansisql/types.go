@@ -37,7 +37,7 @@ const (
 
 type DBTable struct {
 	Name           string      `json:"name"`
-	Type           DBTableType `json:"type,omitempty"`           // "table" or "view"
+	Type           DBTableType `json:"type,omitempty"`            // "table" or "view"
 	ViewDefinition string      `json:"view_definition,omitempty"` // SQL definition for views
 	Columns        []*DBColumn `json:"columns"`
 }

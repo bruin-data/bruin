@@ -459,6 +459,7 @@ func getTableTypeDescription(tableType ansisql.DBTableType) string {
 
 // convertSourceTypeToQueryType converts a source asset type to its corresponding query type.
 // This is needed because views need to be executable queries, not source definitions.
+// nolint:exhaustive
 func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetType {
 	switch sourceType {
 	case pipeline.AssetTypeBigquerySource:
@@ -482,7 +483,7 @@ func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetT
 	case pipeline.AssetTypeClickHouseSource:
 		return pipeline.AssetTypeClickHouse
 	case pipeline.AssetTypeOracleSource:
-		return pipeline.AssetTypeEmpty // Oracle doesn't have a query type, leave as source
+		return pipeline.AssetTypeOracleQuery
 	default:
 		// For types without a query equivalent, return the original
 		return sourceType

@@ -1164,7 +1164,7 @@ func (d *Client) getTableMetadata(ctx context.Context, datasetID, tableID string
 		if meta.MaterializedView != nil {
 			result.ViewDefinition = meta.MaterializedView.Query
 		}
-	default:
+	case bigquery.RegularTable, bigquery.ExternalTable, bigquery.Snapshot:
 		result.TableType = ansisql.DBTableTypeTable
 	}
 
