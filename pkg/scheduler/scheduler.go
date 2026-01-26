@@ -144,6 +144,7 @@ type RunConfig struct {
 	SensorMode             string   `json:"sensorMode"`
 	ApplyIntervalModifiers bool     `json:"applyIntervalModifiers"`
 	Annotations            string   `json:"annotations"`
+	UseGong                bool     `json:"useGong"`
 }
 
 type PipelineAssetState struct {

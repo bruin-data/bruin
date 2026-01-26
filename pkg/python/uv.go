@@ -101,6 +101,20 @@ func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 }
 
 func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
+	// Check if gong path is provided in context - if so, use gong binary directly
+	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
+		if path, ok := gongPath.(string); ok && path != "" {
+			// Use gong binary directly instead of ingestr
+			return u.Cmd.Run(ctx, repo, &CommandInstance{
+				Name: path,
+				Args: args,
+				EnvVars: map[string]string{
+					"PYTHONUNBUFFERED": "1",
+				},
+			})
+		}
+	}
+
 	binaryFullPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
 	if err != nil {
 		return err
@@ -266,29 +280,45 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
-		Name: u.binaryFullPath,
-		Args: u.ingestrInstallCmd(ctx, nil),
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to install ingestr")
-	}
-
-	runArgs := slices.Concat([]string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
-
-	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
-		boolVal := debug.(*bool)
-		if *boolVal {
-			_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
+	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
+		if path, ok := gongPath.(string); ok && path != "" {
+			err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
+				Name: path,
+				Args: cmdArgs,
+			})
+			if err != nil {
+				return errors.Wrap(err, "failed to run load the data into the destination")
+			}
+			return nil
 		}
 	}
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
-		Name: u.binaryFullPath,
-		Args: runArgs,
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to run load the data into the destination")
+	// Default behavior: use ingestr via uv
+	{
+		err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
+			Name: u.binaryFullPath,
+			Args: u.ingestrInstallCmd(ctx, nil),
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to install ingestr")
+		}
+
+		runArgs := slices.Concat([]string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
+
+		if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
+			boolVal := debug.(*bool)
+			if *boolVal {
+				_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
+			}
+		}
+
+		err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
+			Name: u.binaryFullPath,
+			Args: runArgs,
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to run load the data into the destination")
+		}
 	}
 
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))

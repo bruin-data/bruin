@@ -61,7 +61,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const LogsFolder = "logs"
+const (
+	LogsFolder      = "logs"
+	defaultGongPath = "/home/bruin/.local/bin/gong/gong"
+)
 
 var pythonCacheGitignorePatterns = []string{
 	"__pycache__/",
@@ -567,6 +570,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "debug-ingestr-src",
 				Usage: "Use ingestr from the given path instead of the builtin version.",
 			},
+			&cli.BoolFlag{
+				Name:   "use-gong",
+				Usage:  "use gong binary for execution",
+				Hidden: true,
+			},
 			&cli.StringFlag{
 				Name:    "config-file",
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
@@ -621,6 +629,22 @@ func Run(isDebug *bool) *cli.Command {
 			fullRefresh := c.Bool("full-refresh")
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
+			useGong := c.Bool("use-gong")
+
+			// When using gong, the path must exist and be executable
+			if useGong {
+				info, err := os.Stat(defaultGongPath)
+				if err != nil {
+					if os.IsNotExist(err) {
+						return cli.Exit("gong binary not found at path: "+defaultGongPath, 1)
+					}
+					return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", defaultGongPath, err), 1)
+				}
+				if info.Mode()&0o111 == 0 {
+					return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", defaultGongPath), 1)
+				}
+			}
+
 			runConfig := &scheduler.RunConfig{
 				Downstream:             c.Bool("downstream"),
 				StartDate:              c.String("start-date"),
@@ -641,6 +665,7 @@ func Run(isDebug *bool) *cli.Command {
 				SensorMode:             c.String("sensor-mode"),
 				ApplyIntervalModifiers: applyIntervalModifiers,
 				Annotations:            c.String("query-annotations"),
+				UseGong:                useGong,
 			}
 
 			var startDate, endDate time.Time
@@ -694,6 +719,9 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, executor.KeyVerbose, c.Bool("verbose"))
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
+			if runConfig.UseGong {
+				runCtx = context.WithValue(runCtx, python.CtxGongPath, defaultGongPath)
+			}
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
