@@ -280,19 +280,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
-		if path, ok := gongPath.(string); ok && path != "" {
-			err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
-				Name: path,
-				Args: cmdArgs,
-			})
-			if err != nil {
-				return errors.Wrap(err, "failed to run load the data into the destination")
-			}
-			return nil
-		}
-	}
-
 	// Default behavior: use ingestr via uv
 	{
 		err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
