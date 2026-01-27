@@ -1447,6 +1447,9 @@
         },
         "dev_token": {
           "type": "string"
+        },
+        "login_customer_id": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
