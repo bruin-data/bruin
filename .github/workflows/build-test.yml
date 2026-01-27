@@ -61,8 +61,6 @@ jobs:
   cloud-integration-tests-bigquery:
     name: Cloud Integration Tests (BigQuery)
     runs-on: depot-ubuntu-latest
-    # Secrets are not available to forked PRs.
-    if: ${{ github.event_name == 'pull_request' && env.IS_FORK != 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
