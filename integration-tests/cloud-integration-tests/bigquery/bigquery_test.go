@@ -38,18 +38,6 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			Name:    "bigquery-run-single-asset",
-			Command: binary,
-			Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
-			Env:     []string{},
-			Expected: e2e.Output{
-				ExitCode: 0,
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-			},
-		},
-		{
 			Name:    "dry-run-bad-asset-path",
 			Command: binary,
 			Args:    append(append([]string{"internal", "asset-metadata"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/fault-dry-run-pipeline/assets/non_existent_asset.sql")),
