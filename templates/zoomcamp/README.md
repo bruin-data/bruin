@@ -12,7 +12,7 @@ This is a learn-by-doing experience with AI assistance available through Bruin M
 
 ## Learning Goals
 
-- Understand how Bruin projects are structured (`pipeline.yml` + `assets/`)
+- Understand how Bruin projects are structured (`pipeline/pipeline.yml` + `pipeline/assets/`)
 - Use **materialization strategies** intentionally (append, time_interval, etc.)
 - Declare **dependencies** and explore lineage (`bruin lineage`)
 - Apply **metadata** (columns, primary keys, descriptions) and **quality checks**
@@ -32,24 +32,25 @@ The suggested structure separates ingestion, staging, and reporting, but you may
 
 The required parts of a Bruin project are:
 - `.bruin.yml` in the root directory
-- `pipeline.yml` in the pipeline directory (or root directory if there's no pipeline-specific sub-directory)
-- `assets/` folder containing your Python, SQL, and YAML asset files
+- `pipeline.yml` in the `pipeline/` directory (or in the root directory if you keep everything flat)
+- `assets/` folder next to `pipeline.yml` containing your Python, SQL, and YAML asset files
 
 ```text
 zoomcamp/
 ├── .bruin.yml                              # Environments + connections (local DuckDB, BigQuery, etc.)
-├── pipeline.yml                            # Pipeline name, schedule, variables
-├── requirements.txt                        # Python dependencies placeholder
 ├── README.md                               # Learning goals, workflow, best practices
-└── assets/
-    ├── ingestion/
-    │   ├── trips.py                        # Python ingestion
-    │   ├── payment_lookup.asset.yml        # Seed asset definition
-    │   └── payment_lookup.csv              # Seed data
-    ├── staging/
-    │   └── trips.sql                       # Clean and transform
-    └── reports/
-        └── trips_report.sql                # Aggregation for analytics
+└── pipeline/
+    ├── pipeline.yml                        # Pipeline name, schedule, variables
+    └── assets/
+        ├── ingestion/
+        │   ├── trips.py                    # Python ingestion
+        │   ├── requirements.txt            # Python dependencies for ingestion
+        │   ├── payment_lookup.asset.yml    # Seed asset definition
+        │   └── payment_lookup.csv          # Seed data
+        ├── staging/
+        │   └── trips.sql                   # Clean and transform
+        └── reports/
+            └── trips_report.sql            # Aggregation for analytics
 ```
 
 # Step-by-Step Tutorial
@@ -131,7 +132,7 @@ Please refer to the doc page for more details:
    - Install, then reload VS Code
 
 2. Open this template folder and run from the Bruin panel:
-   - Open `pipeline.yml` or any asset file
+   - Open `pipeline/pipeline.yml` or any asset file under `pipeline/assets/`
    - Use the Bruin panel to run `validate`, `run`, and see rendered code
    - To open the panel, click the Bruin logo in the top-right corner of the file
 
@@ -143,9 +144,9 @@ Please refer to the doc page for more details:
 - Initialize the zoomcamp template: `bruin init zoomcamp my-pipeline`
 - Explore the generated structure:
   - `.bruin.yml` — environment and connection configuration
-  - `pipeline.yml` — pipeline name, schedule, variables
-  - `assets/` — where your SQL/Python assets live
-  - `requirements.txt` — Python dependencies
+  - `pipeline/pipeline.yml` — pipeline name, schedule, variables
+  - `pipeline/assets/` — where your SQL/Python assets live
+  - `pipeline/assets/**/requirements.txt` — Python dependencies (scoped to the nearest folder)
 
 **Important**: Bruin CLI requires a git-initialized folder (uses git to detect project root); `bruin init` auto-initializes git if needed
 
@@ -190,17 +191,17 @@ Please refer to the doc page for more details:
 - Python asset to fetch NYC Taxi data from the TLC public endpoint
 - Seed asset to load a static payment type lookup table from CSV
 - Use `append` strategy for raw ingestion (handle duplicates downstream)
-- Follow the TODO instructions in `assets/ingestion/trips.py` and `payment_lookup.asset.yml`
+- Follow the TODO instructions in `pipeline/assets/ingestion/trips.py` and `pipeline/assets/ingestion/payment_lookup.asset.yml`
 
 ### 3.3 Staging Layer
 - SQL asset to clean, deduplicate, and join with lookup to enrich raw trip data
 - Use `time_interval` strategy for incremental processing
-- Follow the TODO instructions in `assets/staging/trips.sql`
+- Follow the TODO instructions in `pipeline/assets/staging/trips.sql`
 
 ### 3.4 Reports Layer
 - SQL asset to aggregate staging data into analytics-ready metrics
 - Use `time_interval` strategy and same `incremental_key` as staging for consistency
-- Follow the TODO instructions in `assets/reports/trips_report.sql`
+- Follow the TODO instructions in `pipeline/assets/reports/trips_report.sql`
 
 ### 3.5 Running and Validating
 
@@ -208,14 +209,14 @@ CLI Commands: https://getbruin.com/docs/bruin/commands/run
 
 ```bash
 # Validate structure & definitions
-bruin validate ./pipeline.yml --environment default
+bruin validate ./pipeline/pipeline.yml --environment default
 
 # First-time run tip:
 # Use --full-refresh to create/replace tables from scratch (helpful on a new DuckDB file).
-bruin run ./pipeline.yml --environment default --full-refresh
+bruin run ./pipeline/pipeline.yml --environment default --full-refresh
 
 # Run an ingestion asset, then downstream (to test incrementally)
-bruin run ./assets/ingestion/trips.py \
+bruin run ./pipeline/assets/ingestion/trips.py \
   --environment default \
   --start-date 2021-01-01 \
   --end-date 2021-01-31 \
@@ -231,7 +232,7 @@ bruin query --connection duckdb-default --query "SELECT COUNT(*) FROM ingestion.
 duckdb duckdb.db -ui
 
 # Check lineage to understand asset dependencies
-bruin lineage ./pipeline.yml
+bruin lineage ./pipeline/pipeline.yml
 ```
 
 ---
@@ -337,14 +338,14 @@ NYC Taxi Raw Trip Source Details:
 
 Build in this order, validating each with `bruin validate` before moving on:
 
-a) **ingestion/payment_lookup.asset.yml** - Seed asset to load CSV lookup table
-b) **ingestion/trips.py** - Python asset to fetch NYC taxi parquet data from TLC endpoint
+a) **pipeline/assets/ingestion/payment_lookup.asset.yml** - Seed asset to load CSV lookup table
+b) **pipeline/assets/ingestion/trips.py** - Python asset to fetch NYC taxi parquet data from TLC endpoint
    - Use `taxi_types` variable and date range from BRUIN_START_DATE/BRUIN_END_DATE
    - Add requirements.txt with: pandas, requests, pyarrow, python-dateutil
    - Keep the data in its rawest format without any cleaning or transformations
-c) **staging/trips.sql** - SQL asset to clean, deduplicate (ROW_NUMBER), and enrich with payment lookup
+c) **pipeline/assets/staging/trips.sql** - SQL asset to clean, deduplicate (ROW_NUMBER), and enrich with payment lookup
    - Use `time_interval` strategy with `pickup_datetime` as incremental_key
-d) **reports/trips_report.sql** - SQL asset to aggregate by date, taxi_type, payment_type
+d) **pipeline/assets/reports/trips_report.sql** - SQL asset to aggregate by date, taxi_type, payment_type
    - Use `time_interval` strategy for consistency
 
 ### 3. Validate & Run
@@ -396,7 +397,7 @@ environments:
 ```
 
 ### 5.4 Update Pipeline & Assets
-- In `pipeline.yml`: change `default_connections.duckdb` → `default_connections.bigquery`
+- In `pipeline/pipeline.yml`: change `default_connections.duckdb` → `default_connections.bigquery`
   - Example: `duckdb: duckdb-default` → `bigquery: gcp-default`
 - In SQL assets: change the `type` to BigQuery:
   - `duckdb.sql` → `bq.sql`
@@ -462,13 +463,13 @@ Since there's no unique ID per row in taxi data, you'll need a **composite key**
 
 ### Project Organization
 
-- Keep assets in `/assets` folder
+- Keep assets in `pipeline/assets/`
 - Use schemas to organize layers: `ingestion.`, `staging.`, `reports.`
 - Put non-asset SQL in separate folders (`/analyses`, `/queries`)
 
 ### Local Development
 
-- Always validate before running: `bruin validate ./pipeline.yml`
+- Always validate before running: `bruin validate ./pipeline/pipeline.yml`
 - Use `--full-refresh` for initial runs on new databases
 - Query tables directly to verify results: `bruin query --connection duckdb-default --query "..."`
 - Check lineage to understand impact of changes: `bruin lineage <asset>`
