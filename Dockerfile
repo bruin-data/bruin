@@ -30,6 +30,8 @@ FROM debian:trixie-slim
 ARG GCS_BUCKET_NAME=gong-release
 ARG GCS_PREFIX=releases
 ARG RELEASE_TAG=
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -81,9 +83,14 @@ RUN --mount=type=secret,id=gcp_key,required=false \
         else \
             echo "Using provided release tag: ${SELECTED_RELEASE}"; \
         fi && \
-        gsutil -m cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/*/*" /home/bruin/.local/bin/gong/ && \
-        chmod +x /home/bruin/.local/bin/gong/* && \
-        chown -R bruin:bruin /home/bruin/.local/bin/gong && \
+        TARGETOS="${TARGETOS:-linux}" && \
+        TARGETARCH="${TARGETARCH:-amd64}" && \
+        GONG_BINARY_NAME="gong_${TARGETARCH}" && \
+        GONG_SOURCE_PATH="gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
+        echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_SOURCE_PATH}..." && \
+        gsutil cp "${GONG_SOURCE_PATH}" /home/bruin/.local/bin/gong/gong && \
+        chmod +x /home/bruin/.local/bin/gong/gong && \
+        chown bruin:bruin /home/bruin/.local/bin/gong/gong && \
         echo "Gong binaries downloaded successfully" && \
         rm -rf /tmp/gcloud; \
     else \
