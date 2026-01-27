@@ -802,17 +802,21 @@ func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	defer UnlockDatabase(c.config.ToDBConnectionURI())
 
 	// DuckDB uses a catalog approach, we'll use the INFORMATION_SCHEMA
-	// First, let's get all schemas and tables
+	// First, let's get all schemas and tables with view definitions
 	q := `
 SELECT
-    table_schema,
-    table_name
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    dv.sql as view_definition
 FROM
-    information_schema.tables
+    information_schema.tables t
+LEFT JOIN
+    duckdb_views() dv ON t.table_schema = dv.schema_name AND t.table_name = dv.view_name
 WHERE
-    table_type IN ('BASE TABLE', 'VIEW')
-    AND table_schema NOT IN ('information_schema', 'pg_catalog')
-ORDER BY table_schema, table_name;
+    t.table_type IN ('BASE TABLE', 'VIEW')
+    AND t.table_schema NOT IN ('information_schema', 'pg_catalog')
+ORDER BY t.table_schema, t.table_name;
 `
 
 	rows, err := c.connection.QueryContext(ctx, q)
@@ -828,14 +832,16 @@ ORDER BY table_schema, table_name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for rows.Next() {
-		var schemaName, tableName string
-		if err := rows.Scan(&schemaName, &tableName); err != nil {
+		var schemaName, tableName, tableType string
+		var viewDefinition sql.NullString
+		if err := rows.Scan(&schemaName, &tableName, &tableType, &viewDefinition); err != nil {
 			return nil, fmt.Errorf("failed to scan schema and table names: %w", err)
 		}
 
 		// Copy strings to avoid ADBC memory issues
 		schemaName = copyString(schemaName)
 		tableName = copyString(tableName)
+		tableType = copyString(tableType)
 
 		// Create schema if it doesn't exist
 		if _, exists := schemas[schemaName]; !exists {
@@ -846,10 +852,20 @@ ORDER BY table_schema, table_name;
 			schemas[schemaName] = schema
 		}
 
+		// Determine table type
+		var dbTableType ansisql.DBTableType
+		if tableType == "VIEW" {
+			dbTableType = ansisql.DBTableTypeView
+		} else {
+			dbTableType = ansisql.DBTableTypeTable
+		}
+
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name:    tableName,
-			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition.String,
+			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
 	}

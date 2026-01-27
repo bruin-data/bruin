@@ -445,22 +445,12 @@ func TestClient_GetDatabaseSummary(t *testing.T) {
 			name:   "successful database summary",
 			config: &Config{ServiceName: "ORCL"},
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`SELECT
-    owner as schema_name,
-    table_name
-FROM
-    all_tables
-WHERE
-    owner NOT IN \(
-        'SYS', 'SYSTEM', 'OUTLN', 'DIP', 'ORACLE_OCM', 'APPQOSSYS', 'DBSNMP', 'CTXSYS', 'XDB', 'ANONYMOUS', 'EXFSYS', 'MDDATA', 'DBSFWUSER', 'REMOTE_SCHEDULER_AGENT', 'SI_INFORMTN_SCHEMA', 'ORDDATA', 'ORDSYS', 'MDSYS', 'OLAPSYS', 'WMSYS', 'APEX_040000', 'APEX_PUBLIC_USER', 'FLOWS_FILES', 'SPATIAL_CSW_ADMIN_USR', 'SPATIAL_WFS_ADMIN_USR', 'HR', 'OE', 'PM', 'IX', 'SH', 'BI', 'SCOTT',
-        'DVSYS', 'LBACSYS', 'OJVMSYS', 'VECSYS', 'AUDSYS', 'GSMADMIN_INTERNAL',
-        'DGPDB_INT', 'DVF', 'GGSHAREDCAP', 'GGSYS', 'GSMCATUSER', 'GSMUSER', 'SYS\$UMF', 'SYSBACKUP', 'SYSDG', 'SYSKM', 'SYSRAC', 'XS\$NULL', 'PDBADMIN'
-    \)
-ORDER BY owner, table_name`).
-					WillReturnRows(sqlmock.NewRows([]string{"schema_name", "table_name"}).
-						AddRow("schema1", "table1").
-						AddRow("schema1", "table2").
-						AddRow("schema2", "table1"))
+				// Match any query containing all_tables and all_views
+				mock.ExpectQuery(`.*all_tables.*`).
+					WillReturnRows(sqlmock.NewRows([]string{"schema_name", "table_name", "object_type", "view_definition"}).
+						AddRow("schema1", "table1", "TABLE", nil).
+						AddRow("schema1", "table2", "TABLE", nil).
+						AddRow("schema2", "table1", "TABLE", nil))
 			},
 			want: &ansisql.DBDatabase{
 				Name: "ORCL",
@@ -468,14 +458,14 @@ ORDER BY owner, table_name`).
 					{
 						Name: "schema1",
 						Tables: []*ansisql.DBTable{
-							{Name: "table1", Columns: []*ansisql.DBColumn{}},
-							{Name: "table2", Columns: []*ansisql.DBColumn{}},
+							{Name: "table1", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
+							{Name: "table2", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
 						},
 					},
 					{
 						Name: "schema2",
 						Tables: []*ansisql.DBTable{
-							{Name: "table1", Columns: []*ansisql.DBColumn{}},
+							{Name: "table1", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
 						},
 					},
 				},
@@ -485,39 +475,17 @@ ORDER BY owner, table_name`).
 			name:   "query error",
 			config: &Config{ServiceName: "ORCL"},
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`SELECT
-    owner as schema_name,
-    table_name
-FROM
-    all_tables
-WHERE
-    owner NOT IN \(
-        'SYS', 'SYSTEM', 'OUTLN', 'DIP', 'ORACLE_OCM', 'APPQOSSYS', 'DBSNMP', 'CTXSYS', 'XDB', 'ANONYMOUS', 'EXFSYS', 'MDDATA', 'DBSFWUSER', 'REMOTE_SCHEDULER_AGENT', 'SI_INFORMTN_SCHEMA', 'ORDDATA', 'ORDSYS', 'MDSYS', 'OLAPSYS', 'WMSYS', 'APEX_040000', 'APEX_PUBLIC_USER', 'FLOWS_FILES', 'SPATIAL_CSW_ADMIN_USR', 'SPATIAL_WFS_ADMIN_USR', 'HR', 'OE', 'PM', 'IX', 'SH', 'BI', 'SCOTT',
-        'DVSYS', 'LBACSYS', 'OJVMSYS', 'VECSYS', 'AUDSYS', 'GSMADMIN_INTERNAL',
-        'DGPDB_INT', 'DVF', 'GGSHAREDCAP', 'GGSYS', 'GSMCATUSER', 'GSMUSER', 'SYS\$UMF', 'SYSBACKUP', 'SYSDG', 'SYSKM', 'SYSRAC', 'XS\$NULL', 'PDBADMIN'
-    \)
-ORDER BY owner, table_name`).
+				mock.ExpectQuery(`.*all_tables.*`).
 					WillReturnError(errors.New("connection error"))
 			},
-			wantErr: "failed to query Oracle all_tables: failed to execute select query: connection error",
+			wantErr: "failed to query Oracle all_tables/all_views: failed to execute select query: connection error",
 		},
 		{
 			name:   "empty result set",
 			config: &Config{ServiceName: "ORCL"},
 			mockConnection: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`SELECT
-    owner as schema_name,
-    table_name
-FROM
-    all_tables
-WHERE
-    owner NOT IN \(
-        'SYS', 'SYSTEM', 'OUTLN', 'DIP', 'ORACLE_OCM', 'APPQOSSYS', 'DBSNMP', 'CTXSYS', 'XDB', 'ANONYMOUS', 'EXFSYS', 'MDDATA', 'DBSFWUSER', 'REMOTE_SCHEDULER_AGENT', 'SI_INFORMTN_SCHEMA', 'ORDDATA', 'ORDSYS', 'MDSYS', 'OLAPSYS', 'WMSYS', 'APEX_040000', 'APEX_PUBLIC_USER', 'FLOWS_FILES', 'SPATIAL_CSW_ADMIN_USR', 'SPATIAL_WFS_ADMIN_USR', 'HR', 'OE', 'PM', 'IX', 'SH', 'BI', 'SCOTT',
-        'DVSYS', 'LBACSYS', 'OJVMSYS', 'VECSYS', 'AUDSYS', 'GSMADMIN_INTERNAL',
-        'DGPDB_INT', 'DVF', 'GGSHAREDCAP', 'GGSYS', 'GSMCATUSER', 'GSMUSER', 'SYS\$UMF', 'SYSBACKUP', 'SYSDG', 'SYSKM', 'SYSRAC', 'XS\$NULL', 'PDBADMIN'
-    \)
-ORDER BY owner, table_name`).
-					WillReturnRows(sqlmock.NewRows([]string{"schema_name", "table_name"}))
+				mock.ExpectQuery(`.*all_tables.*`).
+					WillReturnRows(sqlmock.NewRows([]string{"schema_name", "table_name", "object_type", "view_definition"}))
 			},
 			want: &ansisql.DBDatabase{
 				Name:    "ORCL",

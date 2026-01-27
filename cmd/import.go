@@ -247,7 +247,7 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		}
 		for _, table := range schemaObj.Tables {
 			fullName := fmt.Sprintf("%s.%s", schemaObj.Name, table.Name)
-			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns, table.Columns)
+			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns, table)
 			if warning != "" {
 				warnings = append(warnings, importWarning{tableName: fullName, message: warning})
 			}
@@ -375,18 +375,49 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	return nil
 }
 
-func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool, dbColumns []*ansisql.DBColumn) (*pipeline.Asset, string) {
+func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool, table *ansisql.DBTable) (*pipeline.Asset, string) {
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 
-	fileName := strings.ToLower(tableName) + ".asset.yml"
-	filePath := filepath.Join(schemaFolder, fileName)
+	// Check if this is a view with a view definition
+	isView := table.Type == ansisql.DBTableTypeView && table.ViewDefinition != ""
+
+	var fileName, filePath string
+	var materializationType pipeline.MaterializationType
+	var content string
+
+	if isView {
+		// For views, create a .sql file with the view definition
+		fileName = strings.ToLower(tableName) + ".sql"
+		filePath = filepath.Join(schemaFolder, fileName)
+		content = table.ViewDefinition
+		materializationType = pipeline.MaterializationTypeView
+	} else {
+		// For tables, create a .asset.yml file
+		fileName = strings.ToLower(tableName) + ".asset.yml"
+		filePath = filepath.Join(schemaFolder, fileName)
+	}
+
+	// Determine the asset type for views - convert source types to query types
+	actualAssetType := assetType
+	if isView {
+		actualAssetType = convertSourceTypeToQueryType(assetType)
+	}
+
 	asset := &pipeline.Asset{
-		Type: assetType,
+		Type: actualAssetType,
 		ExecutableFile: pipeline.ExecutableFile{
-			Name: fileName,
-			Path: filePath,
+			Name:    fileName,
+			Path:    filePath,
+			Content: content,
 		},
-		Description: fmt.Sprintf("Imported table %s.%s", schemaName, tableName),
+		Description: fmt.Sprintf("Imported %s %s.%s", getTableTypeDescription(table.Type), schemaName, tableName),
+	}
+
+	// Set materialization for views
+	if isView {
+		asset.Materialization = pipeline.Materialization{
+			Type: materializationType,
+		}
 	}
 
 	if !fillColumns {
@@ -394,9 +425,9 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	}
 
 	// Use pre-fetched columns from GetDatabaseSummary if available (e.g., BigQuery)
-	if len(dbColumns) > 0 {
-		columns := make([]pipeline.Column, 0, len(dbColumns))
-		for _, col := range dbColumns {
+	if len(table.Columns) > 0 {
+		columns := make([]pipeline.Column, 0, len(table.Columns))
+		for _, col := range table.Columns {
 			columns = append(columns, pipeline.Column{
 				Name:      col.Name,
 				Type:      col.Type,
@@ -416,6 +447,47 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	}
 
 	return asset, ""
+}
+
+// getTableTypeDescription returns a human-readable description for the table type.
+func getTableTypeDescription(tableType ansisql.DBTableType) string {
+	if tableType == ansisql.DBTableTypeView {
+		return "view"
+	}
+	return "table"
+}
+
+// convertSourceTypeToQueryType converts a source asset type to its corresponding query type.
+// This is needed because views need to be executable queries, not source definitions.
+// nolint:exhaustive
+func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetType {
+	switch sourceType {
+	case pipeline.AssetTypeBigquerySource:
+		return pipeline.AssetTypeBigqueryQuery
+	case pipeline.AssetTypeSnowflakeSource:
+		return pipeline.AssetTypeSnowflakeQuery
+	case pipeline.AssetTypePostgresSource:
+		return pipeline.AssetTypePostgresQuery
+	case pipeline.AssetTypeRedshiftSource:
+		return pipeline.AssetTypeRedshiftQuery
+	case pipeline.AssetTypeMsSQLSource:
+		return pipeline.AssetTypeMsSQLQuery
+	case pipeline.AssetTypeSynapseSource:
+		return pipeline.AssetTypeSynapseQuery
+	case pipeline.AssetTypeDatabricksSource:
+		return pipeline.AssetTypeDatabricksQuery
+	case pipeline.AssetTypeAthenaSource:
+		return pipeline.AssetTypeAthenaQuery
+	case pipeline.AssetTypeDuckDBSource:
+		return pipeline.AssetTypeDuckDBQuery
+	case pipeline.AssetTypeClickHouseSource:
+		return pipeline.AssetTypeClickHouse
+	case pipeline.AssetTypeOracleSource:
+		return pipeline.AssetTypeOracleQuery
+	default:
+		// For types without a query equivalent, return the original
+		return sourceType
+	}
 }
 
 // maxInt returns the larger of two integers.

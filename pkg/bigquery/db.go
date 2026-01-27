@@ -1121,7 +1121,14 @@ func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	return stats, nil
 }
 
-func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string) ([]*ansisql.DBColumn, error) {
+// tableMetadataResult holds the result of fetching table metadata.
+type tableMetadataResult struct {
+	Columns        []*ansisql.DBColumn
+	TableType      ansisql.DBTableType
+	ViewDefinition string
+}
+
+func (d *Client) getTableMetadata(ctx context.Context, datasetID, tableID string) (*tableMetadataResult, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
@@ -1142,7 +1149,34 @@ func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string)
 	}
 
 	sort.Slice(cols, func(i, j int) bool { return cols[i].Name < cols[j].Name })
-	return cols, nil
+
+	result := &tableMetadataResult{
+		Columns: cols,
+	}
+
+	// Determine table type and get view definition
+	switch meta.Type {
+	case bigquery.ViewTable:
+		result.TableType = ansisql.DBTableTypeView
+		result.ViewDefinition = meta.ViewQuery
+	case bigquery.MaterializedView:
+		result.TableType = ansisql.DBTableTypeView
+		if meta.MaterializedView != nil {
+			result.ViewDefinition = meta.MaterializedView.Query
+		}
+	case bigquery.RegularTable, bigquery.ExternalTable, bigquery.Snapshot:
+		result.TableType = ansisql.DBTableTypeTable
+	}
+
+	return result, nil
+}
+
+func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string) ([]*ansisql.DBColumn, error) {
+	result, err := d.getTableMetadata(ctx, datasetID, tableID)
+	if err != nil {
+		return nil, err
+	}
+	return result.Columns, nil
 }
 
 func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
@@ -1312,17 +1346,19 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 
 	for _, job := range jobs {
 		p.Go(func() {
-			columns, err := d.getTableColumns(ctx, job.datasetName, job.actualTable)
+			metadata, err := d.getTableMetadata(ctx, job.datasetName, job.actualTable)
 			if err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", job.datasetName, job.actualTable, err))
+				errs = append(errs, fmt.Errorf("failed to get metadata for table %s.%s: %w", job.datasetName, job.actualTable, err))
 				mu.Unlock()
 				return
 			}
 
 			table := &ansisql.DBTable{
-				Name:    job.displayName,
-				Columns: columns,
+				Name:           job.displayName,
+				Type:           metadata.TableType,
+				ViewDefinition: metadata.ViewDefinition,
+				Columns:        metadata.Columns,
 			}
 
 			mu.Lock()
@@ -1421,17 +1457,19 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 
 	for _, job := range jobs {
 		p.Go(func() {
-			columns, err := d.getTableColumns(ctx, job.datasetName, job.actualTable)
+			metadata, err := d.getTableMetadata(ctx, job.datasetName, job.actualTable)
 			if err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", job.datasetName, job.actualTable, err))
+				errs = append(errs, fmt.Errorf("failed to get metadata for table %s.%s: %w", job.datasetName, job.actualTable, err))
 				mu.Unlock()
 				return
 			}
 
 			table := &ansisql.DBTable{
-				Name:    job.displayName,
-				Columns: columns,
+				Name:           job.displayName,
+				Type:           metadata.TableType,
+				ViewDefinition: metadata.ViewDefinition,
+				Columns:        metadata.Columns,
 			}
 
 			mu.Lock()

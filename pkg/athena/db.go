@@ -311,11 +311,12 @@ ORDER BY ordinal_position;
 
 func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	// Athena uses AWS Glue Data Catalog
-	// We'll query INFORMATION_SCHEMA to get all schemas and tables
+	// We'll query INFORMATION_SCHEMA to get all schemas and tables with their types
 	q := `
 SELECT
     table_schema,
-    table_name
+    table_name,
+    table_type
 FROM
     information_schema.tables
 WHERE
@@ -336,7 +337,7 @@ ORDER BY table_schema, table_name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 2 {
+		if len(row) != 3 {
 			continue
 		}
 
@@ -345,6 +346,10 @@ ORDER BY table_schema, table_name;
 			continue
 		}
 		tableName, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+		tableType, ok := row[2].(string)
 		if !ok {
 			continue
 		}
@@ -358,9 +363,19 @@ ORDER BY table_schema, table_name;
 			schemas[schemaName] = schema
 		}
 
+		// Determine table type
+		var dbTableType ansisql.DBTableType
+		if tableType == "VIEW" {
+			dbTableType = ansisql.DBTableTypeView
+		} else {
+			dbTableType = ansisql.DBTableTypeTable
+		}
+
 		// Add table to schema
+		// Note: Athena doesn't provide view definitions in INFORMATION_SCHEMA
 		table := &ansisql.DBTable{
 			Name:    tableName,
+			Type:    dbTableType,
 			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)

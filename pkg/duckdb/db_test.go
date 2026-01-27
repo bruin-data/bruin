@@ -216,18 +216,22 @@ func TestClient_GetDatabaseSummary(t *testing.T) {
 			name: "successful database summary",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT
-    table_schema,
-    table_name
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    dv.sql as view_definition
 FROM
-    information_schema.tables
+    information_schema.tables t
+LEFT JOIN
+    duckdb_views\(\) dv ON t.table_schema = dv.schema_name AND t.table_name = dv.view_name
 WHERE
-    table_type IN \('BASE TABLE', 'VIEW'\)
-    AND table_schema NOT IN \('information_schema', 'pg_catalog'\)
-ORDER BY table_schema, table_name;`).
-					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
-						AddRow("schema1", "table1").
-						AddRow("schema1", "table2").
-						AddRow("schema2", "table1"))
+    t.table_type IN \('BASE TABLE', 'VIEW'\)
+    AND t.table_schema NOT IN \('information_schema', 'pg_catalog'\)
+ORDER BY t.table_schema, t.table_name;`).
+					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition"}).
+						AddRow("schema1", "table1", "BASE TABLE", nil).
+						AddRow("schema1", "table2", "BASE TABLE", nil).
+						AddRow("schema2", "table1", "BASE TABLE", nil))
 			},
 			want: &ansisql.DBDatabase{
 				Name: "duckdb",
@@ -235,14 +239,14 @@ ORDER BY table_schema, table_name;`).
 					{
 						Name: "schema1",
 						Tables: []*ansisql.DBTable{
-							{Name: "table1", Columns: []*ansisql.DBColumn{}},
-							{Name: "table2", Columns: []*ansisql.DBColumn{}},
+							{Name: "table1", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
+							{Name: "table2", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
 						},
 					},
 					{
 						Name: "schema2",
 						Tables: []*ansisql.DBTable{
-							{Name: "table1", Columns: []*ansisql.DBColumn{}},
+							{Name: "table1", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
 						},
 					},
 				},
@@ -252,14 +256,18 @@ ORDER BY table_schema, table_name;`).
 			name: "query error",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`SELECT
-    table_schema,
-    table_name
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    dv.sql as view_definition
 FROM
-    information_schema.tables
+    information_schema.tables t
+LEFT JOIN
+    duckdb_views\(\) dv ON t.table_schema = dv.schema_name AND t.table_name = dv.view_name
 WHERE
-    table_type IN \('BASE TABLE', 'VIEW'\)
-    AND table_schema NOT IN \('information_schema', 'pg_catalog'\)
-ORDER BY table_schema, table_name;`).
+    t.table_type IN \('BASE TABLE', 'VIEW'\)
+    AND t.table_schema NOT IN \('information_schema', 'pg_catalog'\)
+ORDER BY t.table_schema, t.table_name;`).
 					WillReturnError(errors.New("connection error"))
 			},
 			wantErr: "failed to query DuckDB information_schema: connection error",
