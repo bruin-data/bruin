@@ -26,15 +26,17 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 
 	tasks := []e2e.Task{
 		{
-			Name:    "bigquery-run-pipeline",
+			Name:    "full-run",
 			Command: binary,
-			Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
+			Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/run-pipeline")),
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: cloud_integration_test.run_pipeline_products"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
