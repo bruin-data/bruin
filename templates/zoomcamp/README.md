@@ -107,9 +107,7 @@ This module introduces Bruin as a unified data platform that combines **data ing
 - Configure environments and connections
 
 ### 2.1 Installation
-- **Option A (recommended on macOS)**: `brew install bruin`
-  - Homebrew handles your PATH updates automatically.
-- **Option B**: Install Bruin CLI via script: `curl -LsSf https://getbruin.com/install/cli | sh`
+- Install Bruin CLI: `curl -LsSf https://getbruin.com/install/cli | sh`
   - Verify installation: `bruin version`
 
 If your terminal prints `To use the installed binaries, please restart the shell`, do one of the following:
