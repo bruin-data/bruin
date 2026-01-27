@@ -11,6 +11,7 @@ type Config struct {
 	DeveloperToken     string
 	ServiceAccountFile string
 	ServiceAccountJSON string
+	LoginCustomerID    string
 }
 
 func (c *Config) GetIngestrURI() string {
@@ -28,6 +29,11 @@ func (c *Config) GetIngestrURI() string {
 				[]byte(svcJSON),
 			),
 		)
+	}
+
+	loginCustomerID := strings.TrimSpace(c.LoginCustomerID)
+	if loginCustomerID != "" {
+		params.Set("login_customer_id", loginCustomerID)
 	}
 
 	uri := url.URL{
