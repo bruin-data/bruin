@@ -6,7 +6,7 @@ You'll learn to build a production-ready ELT pipeline that:
 - **Ingests** real NYC taxi trip data from public APIs using Python
 - **Transforms** and cleans raw data with SQL, applying incremental strategies and deduplication
 - **Reports** aggregated analytics with built-in quality checks
-- **Deploys** to cloud infrastructure (MotherDuck)
+- **Deploys** to cloud infrastructure (BigQuery)
 
 This is a learn-by-doing experience with AI assistance available through Bruin MCP. Follow the comprehensive step-by-step tutorial section below.
 
@@ -24,7 +24,7 @@ This is a learn-by-doing experience with AI assistance available through Bruin M
 - **Part 2**: Setting Up Your First Bruin Project - Install Bruin, initialize a project, and configure environments
 - **Part 3**: End-to-End NYC Taxi ELT Pipeline - Build ingestion, staging, and reporting layers with real data
 - **Part 4**: Data Engineering with AI Agent - Use Bruin MCP to build pipelines with AI assistance
-- **Part 5**: Deploy to MotherDuck - Deploy your local pipeline to cloud-hosted DuckDB
+- **Part 5**: Deploy to BigQuery - Deploy your local pipeline to Google BigQuery
 
 ## Pipeline Skeleton
 
@@ -37,7 +37,7 @@ The required parts of a Bruin project are:
 
 ```text
 zoomcamp/
-├── .bruin.yml                              # Environment + DuckDB connection config
+├── .bruin.yml                              # Environments + connections (local DuckDB, BigQuery, etc.)
 ├── pipeline.yml                            # Pipeline name, schedule, variables
 ├── requirements.txt                        # Python dependencies placeholder
 ├── README.md                               # Learning goals, workflow, best practices
@@ -65,7 +65,7 @@ This module introduces Bruin as a unified data platform that combines **data ing
 ### Learning Goals
 - Understand what a data platform is and why you need one
 - Learn how Bruin fits into the modern data stack
-- Grasp Bruin's core abstractions: assets, pipelines, connections
+- Grasp Bruin's core abstractions: assets, pipelines, environments, connections
 
 ### 1.1 The Modern Data Stack Components
 - **Data extraction/ingestion**: Moving data from sources to your warehouse
@@ -91,6 +91,7 @@ This module introduces Bruin as a unified data platform that combines **data ing
 ### 1.4 Core Concepts
 - **Asset**: Any data artifact that carries value (table, view, file, ML model, etc.)
 - **Pipeline**: A group of assets executed together in dependency order
+- **Environment**: A named set of connection configs (e.g., `default`, `production`) so the same pipeline can run locally and in production
 - **Connection**: Credentials to authenticate with external data sources & destinations
 - **Pipeline run**: A single execution instance with specific dates and configuration
 
@@ -105,8 +106,18 @@ This module introduces Bruin as a unified data platform that combines **data ing
 - Configure environments and connections
 
 ### 2.1 Installation
-- Install Bruin CLI: `curl -LsSf https://getbruin.com/install/cli | sh`
+- **Option A (recommended on macOS)**: `brew install bruin`
+  - Homebrew handles your PATH updates automatically.
+- **Option B**: Install Bruin CLI via script: `curl -LsSf https://getbruin.com/install/cli | sh`
   - Verify installation: `bruin version`
+
+If your terminal prints `To use the installed binaries, please restart the shell`, do one of the following:
+- **Restart your terminal** (close + reopen) — simplest and most reliable
+- **Reload your shell**:
+  - `exec $SHELL -l` (works for most shells)
+  - zsh: `source ~/.zshrc`
+  - bash: `source ~/.bashrc` (or `source ~/.bash_profile` on some macOS setups)
+  - fish: `exec fish`
 
 #### IDE Extension (VS Code, Cursor, etc.)
 
@@ -143,7 +154,8 @@ Please refer to the doc page for more details:
 #### `.bruin.yml`
 - Defines environments (e.g., `default`, `production`)
 - Contains connection credentials (DuckDB, BigQuery, Snowflake, etc.)
-- Lives at the project root; auto-added to `.gitignore`
+- Lives at the project root and **must be gitignored** because it contains credentials/secrets
+  - `bruin init` auto-adds it to `.gitignore`, but double-check before committing anything
 
 #### `pipeline.yml`
 - `name`: Pipeline identifier (appears in logs, `BRUIN_PIPELINE` env var)
@@ -238,8 +250,6 @@ bruin lineage ./pipeline.yml
 
 ### 4.2 Setting Up Bruin MCP
 
-Bruin MCP Setup: https://getbruin.com/docs/bruin/getting-started/bruin-mcp
-
 **Cursor IDE:**
 - Go to Cursor Settings → MCP & Integrations → Add Custom MCP
 - Add the Bruin MCP server configuration:
@@ -258,6 +268,8 @@ Bruin MCP Setup: https://getbruin.com/docs/bruin/getting-started/bruin-mcp
 ```bash
 claude mcp add bruin -- bruin mcp
 ```
+
+Bruin MCP Docs: https://getbruin.com/docs/bruin/getting-started/bruin-mcp
 
 ### 4.3 Building the Pipeline with AI
 - Ask the AI to help configure `.bruin.yml` and `pipeline.yml`
@@ -348,28 +360,56 @@ d) **reports/trips_report.sql** - SQL asset to aggregate by date, taxi_type, pay
 
 ---
 
-## Part 5: Deploy to MotherDuck
+## Part 5: Deploy to BigQuery
 
-MotherDuck is cloud-hosted DuckDB. Your existing `duckdb.sql` and `duckdb.seed` assets work without major changes, just swap the connection.
+This part takes what you built locally and runs it on **Google BigQuery**.
 
-### 5.1 Create Account & Generate Token
-1. Sign up at [motherduck.com](https://motherduck.com)
-2. Go to **Settings → Access Tokens → Create Token**
+> **Note on SQL dialects**: BigQuery SQL is not identical to DuckDB SQL. Your pipeline structure stays the same, but you may need to update SQL syntax and types when switching engines.
 
-### 5.2 Add Connection to `.bruin.yml`
+### 5.1 Create a GCP Project + BigQuery Datasets
+1. Create (or pick) a GCP project and enable the BigQuery API
+2. Create datasets that match your asset schemas (recommended for this module):
+   - `ingestion`
+   - `staging`
+   - `reports`
+
+### 5.2 Create Credentials (Choose One)
+- **Option A (recommended for local dev)**: Application Default Credentials (ADC)
+  - Install gcloud and authenticate: `gcloud auth application-default login`
+- **Option B**: Service account JSON (for CI/CD)
+  - Create a service account with BigQuery permissions and download the JSON key
+
+### 5.3 Add Connection to `.bruin.yml`
 ```yaml
 environments:
   default:
     connections:
-      motherduck:
-        - name: "motherduck-prod"
-          token: "your_token_here"
-          database: "my_db"
+      google_cloud_platform:
+        - name: "gcp-default"
+          project_id: "your-gcp-project-id"
+          location: "US" # or "EU", or your region
+          # Authentication options (choose one):
+          use_application_default_credentials: true
+          # service_account_file: "/path/to/service-account.json"
+          # service_account_json: |
+          #   { "type": "service_account", ... }
 ```
 
-### 5.3 Update Pipeline & Assets
-- In `pipeline.yml`: change `duckdb: duckdb-default` → `duckdb: motherduck-prod`
-- In Python assets with explicit `connection:`: change to `motherduck-prod`
+### 5.4 Update Pipeline & Assets
+- In `pipeline.yml`: change `default_connections.duckdb` → `default_connections.bigquery`
+  - Example: `duckdb: duckdb-default` → `bigquery: gcp-default`
+- In SQL assets: change the `type` to BigQuery:
+  - `duckdb.sql` → `bq.sql`
+- In seed assets: change the `type` to BigQuery:
+  - `duckdb.seed` → `bq.seed`
+- In Python assets that use materialization: set/update `connection:` to `gcp-default`
+- Fix any SQL dialect issues:
+  - Data types can differ (e.g., `INTEGER` vs `INT64`, timestamp handling, quoting)
+  - Some functions/operators may need a BigQuery equivalent
+
+Docs:
+- BigQuery platform: https://getbruin.com/docs/bruin/platforms/bigquery
+- `.bruin.yml` secrets backend: https://getbruin.com/docs/bruin/secrets/bruinyml
 
 ---
 
