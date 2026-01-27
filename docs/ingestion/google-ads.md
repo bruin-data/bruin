@@ -20,6 +20,7 @@ To connect to Google Ads, you need to add a configuration item to the connection
           customer_id: "YOUR_GOOGLE_ADS_CUSTOMER_ID"
           dev_token: "YOUR_DEVELOPER_TOKEN"
           service_account_file: "/path/to/service-account.json"
+          login_customer_id: "YOUR_MCC_CUSTOMER_ID"  # optional, only needed for MCC accounts
 
           # alternatively, you can specify the service account json directly
           service_account_json: |
@@ -27,13 +28,14 @@ To connect to Google Ads, you need to add a configuration item to the connection
             "type": "service_account",
             ...
           }
-          
+
 ```
 
 - `customer_id`: The account ID of your google ads account.
-- `dev_token`: [Developer Token](https://developers.google.com/google-ads/api/docs/get-started/dev-token) for your application. 
+- `dev_token`: [Developer Token](https://developers.google.com/google-ads/api/docs/get-started/dev-token) for your application.
 - `service_account_file`: The path to the service account JSON file
 - `service_account_json`: The service account JSON content itself
+- `login_customer_id` (optional): The Manager Account (MCC) ID to use when accessing client accounts. Required when your service account has access to an MCC and you want to pull data from a client account under that MCC. See [Google Ads API docs](https://developers.google.com/google-ads/api/docs/concepts/call-structure#cid) for more details.
 
 
 For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/google-ads.html#setting-up-a-google-ads-integration).

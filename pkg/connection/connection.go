@@ -1466,6 +1466,7 @@ func (m *Manager) AddGoogleAdsConnectionFromConfig(connection *config.GoogleAdsC
 		DeveloperToken:     connection.DeveloperToken,
 		ServiceAccountFile: connection.ServiceAccountFile,
 		ServiceAccountJSON: connection.ServiceAccountJSON,
+		LoginCustomerID:    connection.LoginCustomerID,
 	})
 	if err != nil {
 		return err
