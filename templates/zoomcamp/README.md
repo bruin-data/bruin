@@ -314,7 +314,7 @@ Start with running `bruin init zoomcamp` to initialize the project.
 
 ## Context
 - Project folder: @zoomcamp/pipeline
-- Reference docs: @zoomcamp/README.md and @zoomcamp/tutorial.md
+- Reference docs: @zoomcamp/README.md
 - Use Bruin MCP tools for documentation lookup and command execution
 
 ## Instructions
