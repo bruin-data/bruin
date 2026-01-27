@@ -30,8 +30,8 @@ FROM debian:trixie-slim
 ARG GCS_BUCKET_NAME=gong-release
 ARG GCS_PREFIX=releases
 ARG RELEASE_TAG=
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+ARG TARGETOS
+ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -83,8 +83,6 @@ RUN --mount=type=secret,id=gcp_key,required=false \
         else \
             echo "Using provided release tag: ${SELECTED_RELEASE}"; \
         fi && \
-        TARGETOS="${TARGETOS:-linux}" && \
-        TARGETARCH="${TARGETARCH:-amd64}" && \
         GONG_BINARY_NAME="gong_${TARGETARCH}" && \
         GONG_SOURCE_PATH="gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
         echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_SOURCE_PATH}..." && \
