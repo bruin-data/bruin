@@ -39,7 +39,6 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     binutils \
     python3-dev \
-    gnupg \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
