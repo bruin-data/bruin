@@ -64,7 +64,7 @@ RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/bin/gong /home/bruin/.loc
 # Copy the built binary from builder stage
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
-# Download gong binaries from GCS (public bucket, no auth)
+# Download gong binaries from GCS (public bucket, no auth). Optional: build continues if not found.
 USER root
 RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
     if [ -z "${SELECTED_RELEASE}" ]; then \
@@ -79,10 +79,11 @@ RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
     GONG_BINARY_NAME="gong_${TARGETARCH}" && \
     GONG_SOURCE_PATH="gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
     echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_SOURCE_PATH}..." && \
-    gsutil cp "${GONG_SOURCE_PATH}" /home/bruin/.local/bin/gong/gong && \
-    chmod +x /home/bruin/.local/bin/gong/gong && \
-    chown bruin:bruin /home/bruin/.local/bin/gong/gong && \
-    echo "Gong binaries downloaded successfully"
+    (gsutil cp "${GONG_SOURCE_PATH}" /home/bruin/.local/bin/gong/gong && \
+     chmod +x /home/bruin/.local/bin/gong/gong && \
+     chown bruin:bruin /home/bruin/.local/bin/gong/gong && \
+     echo "Gong binaries downloaded successfully") || \
+    echo "Gong binary not available for ${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}, skipping"
 
 USER bruin
 
