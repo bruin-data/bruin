@@ -1454,6 +1454,72 @@ func IngestrSources() *cli.Command {
 	}
 }
 
+// LockDependenciesCommand handles locking Python dependencies for assets.
+type LockDependenciesCommand struct {
+	builder taskCreator
+}
+
+// LockDependenciesResult contains the result of locking dependencies.
+type LockDependenciesResult struct {
+	RequirementsPath string
+	PythonVersion    string
+	InputPath        string
+}
+
+// FindRequirementsPath finds the requirements.txt path for the given input.
+// It handles both direct requirements.txt files and Python assets.
+func (l *LockDependenciesCommand) FindRequirementsPath(inputPath string) (*LockDependenciesResult, error) {
+	// Get absolute path
+	absolutePath, err := filepath.Abs(inputPath)
+	if err != nil {
+		return nil, errors2.Wrap(err, "failed to get absolute path")
+	}
+
+	// Find the git repo
+	repo, err := git.FindRepoFromPath(absolutePath)
+	if err != nil {
+		return nil, errors2.Wrap(err, "failed to find repository")
+	}
+
+	var requirementsTxt string
+
+	// Check if input is a requirements.txt file directly
+	if strings.HasSuffix(inputPath, "requirements.txt") {
+		requirementsTxt = absolutePath
+	} else {
+		// Parse the asset
+		asset, err := l.builder.CreateAssetFromFile(absolutePath, nil)
+		if err != nil {
+			return nil, errors2.Wrap(err, "failed to parse asset")
+		}
+
+		if asset == nil {
+			return nil, errors2.New("file is not a valid asset")
+		}
+
+		// Check if asset is a Python asset
+		if asset.Type != pipeline.AssetTypePython && !strings.HasSuffix(asset.ExecutableFile.Path, ".py") {
+			return nil, errors2.New("asset is not a Python asset")
+		}
+
+		// Find requirements.txt
+		moduleFinder := &python.ModulePathFinder{}
+		requirementsTxt, err = moduleFinder.FindRequirementsTxtInPath(repo.Path, &asset.ExecutableFile)
+		if err != nil {
+			var noReqsError *python.NoRequirementsFoundError
+			if errors.As(err, &noReqsError) {
+				return nil, errors2.New("no requirements.txt found for this asset")
+			}
+			return nil, errors2.Wrap(err, "failed to find requirements.txt")
+		}
+	}
+
+	return &LockDependenciesResult{
+		RequirementsPath: requirementsTxt,
+		InputPath:        absolutePath,
+	}, nil
+}
+
 // LockAssetDependencies returns a CLI command that locks Python dependencies for an asset.
 // It finds the asset's requirements file, creates/uses a uv environment, and updates the
 // requirements file with locked versions using uv pip compile.
@@ -1461,7 +1527,7 @@ func LockAssetDependencies() *cli.Command {
 	return &cli.Command{
 		Name:      "lock-asset-dependencies",
 		Usage:     "Lock Python dependencies for a Bruin asset using uv",
-		ArgsUsage: "[path to the asset definition]",
+		ArgsUsage: "[path to the asset definition or requirements.txt]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "python-version",
@@ -1494,48 +1560,23 @@ func LockAssetDependencies() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Get absolute path
-			absoluteAssetPath, err := filepath.Abs(assetPath)
+			// Use the refactored command to find requirements path
+			cmd := &LockDependenciesCommand{
+				builder: DefaultPipelineBuilder,
+			}
+
+			result, err := cmd.FindRequirementsPath(assetPath)
 			if err != nil {
-				printErrorJSON(errors2.Wrap(err, "failed to get absolute asset path"))
+				printErrorJSON(err)
 				return cli.Exit("", 1)
 			}
 
-			// Parse the asset
-			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(absoluteAssetPath, nil)
-			if err != nil {
-				printErrorJSON(errors2.Wrap(err, "failed to parse asset"))
-				return cli.Exit("", 1)
-			}
+			result.PythonVersion = pythonVersion
 
-			if asset == nil {
-				printErrorJSON(errors2.New("file is not a valid asset"))
-				return cli.Exit("", 1)
-			}
-
-			// Check if asset is a Python asset
-			if asset.Type != pipeline.AssetTypePython && !strings.HasSuffix(asset.ExecutableFile.Path, ".py") {
-				printErrorJSON(errors2.New("asset is not a Python asset"))
-				return cli.Exit("", 1)
-			}
-
-			// Find the git repo
-			repo, err := git.FindRepoFromPath(absoluteAssetPath)
+			// Find the git repo for working directory
+			repo, err := git.FindRepoFromPath(result.InputPath)
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to find repository"))
-				return cli.Exit("", 1)
-			}
-
-			// Find requirements.txt
-			moduleFinder := &python.ModulePathFinder{}
-			requirementsTxt, err := moduleFinder.FindRequirementsTxtInPath(repo.Path, &asset.ExecutableFile)
-			if err != nil {
-				var noReqsError *python.NoRequirementsFoundError
-				if errors.As(err, &noReqsError) {
-					printErrorJSON(errors2.New("no requirements.txt found for this asset"))
-					return cli.Exit("", 1)
-				}
-				printErrorJSON(errors2.Wrap(err, "failed to find requirements.txt"))
 				return cli.Exit("", 1)
 			}
 
@@ -1549,12 +1590,12 @@ func LockAssetDependencies() *cli.Command {
 
 			// Run uv pip compile to lock dependencies
 			// uv pip compile requirements.txt -o requirements.txt --python-version X.Y --no-header
-			cmd := exec.CommandContext(ctx, uvBinaryPath, "pip", "compile", requirementsTxt, "-o", requirementsTxt, "--python-version", pythonVersion, "--quiet", "--no-header") //nolint:gosec
-			cmd.Dir = repo.Path
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
+			execCmd := exec.CommandContext(ctx, uvBinaryPath, "pip", "compile", result.RequirementsPath, "-o", result.RequirementsPath, "--python-version", pythonVersion, "--quiet", "--no-header") //nolint:gosec
+			execCmd.Dir = repo.Path
+			execCmd.Stdout = os.Stdout
+			execCmd.Stderr = os.Stderr
 
-			err = cmd.Run()
+			err = execCmd.Run()
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to lock dependencies with uv pip compile"))
 				return cli.Exit("", 1)
@@ -1563,7 +1604,7 @@ func LockAssetDependencies() *cli.Command {
 			// Output result
 			switch output {
 			case outputFormatPlain:
-				fmt.Printf("Successfully locked dependencies in %s\n", requirementsTxt)
+				fmt.Printf("Successfully locked dependencies in %s\n", result.RequirementsPath)
 			case "json":
 				type jsonResponse struct {
 					RequirementsPath string `json:"requirements_path"`
@@ -1573,9 +1614,9 @@ func LockAssetDependencies() *cli.Command {
 				}
 
 				finalOutput := jsonResponse{
-					RequirementsPath: requirementsTxt,
+					RequirementsPath: result.RequirementsPath,
 					PythonVersion:    pythonVersion,
-					AssetPath:        absoluteAssetPath,
+					AssetPath:        result.InputPath,
 					Success:          true,
 				}
 
