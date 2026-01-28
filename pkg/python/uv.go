@@ -112,9 +112,6 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 			return u.Cmd.Run(ctx, repo, &CommandInstance{
 				Name: path,
 				Args: args,
-				EnvVars: map[string]string{
-					"PYTHONUNBUFFERED": "1",
-				},
 			})
 		}
 	}
@@ -139,6 +136,9 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	noDependencyCommand := &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: flags,
+		EnvVars: map[string]string{
+			"PYTHONUNBUFFERED": "1",
+		},
 	}
 
 	return u.Cmd.Run(ctx, repo, noDependencyCommand)
