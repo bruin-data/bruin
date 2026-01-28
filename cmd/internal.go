@@ -1508,6 +1508,11 @@ func LockAssetDependencies() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			if asset == nil {
+				printErrorJSON(errors2.New("file is not a valid asset"))
+				return cli.Exit("", 1)
+			}
+
 			// Check if asset is a Python asset
 			if asset.Type != pipeline.AssetTypePython && !strings.HasSuffix(asset.ExecutableFile.Path, ".py") {
 				printErrorJSON(errors2.New("asset is not a Python asset"))
