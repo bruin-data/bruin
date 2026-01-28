@@ -139,9 +139,6 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	noDependencyCommand := &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: flags,
-		EnvVars: map[string]string{
-			"PYTHONUNBUFFERED": "1",
-		},
 	}
 
 	return u.Cmd.Run(ctx, repo, noDependencyCommand)
@@ -284,32 +281,29 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	// Default behavior: use ingestr via uv
-	{
-		err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
-			Name: u.binaryFullPath,
-			Args: u.ingestrInstallCmd(ctx, nil),
-		})
-		if err != nil {
-			return errors.Wrap(err, "failed to install ingestr")
-		}
+	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
+		Name: u.binaryFullPath,
+		Args: u.ingestrInstallCmd(ctx, nil),
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to install ingestr")
+	}
 
-		runArgs := slices.Concat([]string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
+	runArgs := slices.Concat([]string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
 
-		if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
-			boolVal := debug.(*bool)
-			if *boolVal {
-				_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
-			}
+	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
+		boolVal := debug.(*bool)
+		if *boolVal {
+			_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
 		}
+	}
 
-		err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
-			Name: u.binaryFullPath,
-			Args: runArgs,
-		})
-		if err != nil {
-			return errors.Wrap(err, "failed to run load the data into the destination")
-		}
+	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
+		Name: u.binaryFullPath,
+		Args: runArgs,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to run load the data into the destination")
 	}
 
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
