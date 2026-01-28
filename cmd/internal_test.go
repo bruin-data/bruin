@@ -204,3 +204,126 @@ func normalize(s string) string {
 	}
 	return strings.Join(out, "\n")
 }
+
+func TestLockDependenciesCommand_FindRequirementsPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		inputPath      string
+		wantErr        bool
+		wantErrContain string
+		wantReqSuffix  string
+	}{
+		{
+			name:          "direct requirements.txt input",
+			inputPath:     "./testdata/lineage/assets/nested/requirements.txt",
+			wantErr:       false,
+			wantReqSuffix: "requirements.txt",
+		},
+		{
+			name:          "python asset input finds requirements.txt",
+			inputPath:     "./testdata/lineage/assets/nested/hello_python.py",
+			wantErr:       false,
+			wantReqSuffix: "requirements.txt",
+		},
+		{
+			name:           "sql asset returns error - not a python asset",
+			inputPath:      "./testdata/lineage/assets/hello_bq.sql",
+			wantErr:        true,
+			wantErrContain: "asset is not a Python asset",
+		},
+		{
+			name:           "non-existent file returns error",
+			inputPath:      "./testdata/lineage/assets/nonexistent.py",
+			wantErr:        true,
+			wantErrContain: "failed to parse asset",
+		},
+		{
+			name:           "random txt file returns error - not a valid asset",
+			inputPath:      "./testdata/lineage/pipeline.yml",
+			wantErr:        true,
+			wantErrContain: "file is not a valid asset",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := &LockDependenciesCommand{
+				builder: DefaultPipelineBuilder,
+			}
+
+			result, err := cmd.FindRequirementsPath(tt.inputPath)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("FindRequirementsPath() expected error, got nil")
+					return
+				}
+				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Errorf("FindRequirementsPath() error = %v, want error containing %q", err, tt.wantErrContain)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("FindRequirementsPath() unexpected error: %v", err)
+				return
+			}
+
+			if result == nil {
+				t.Error("FindRequirementsPath() returned nil result")
+				return
+			}
+
+			if tt.wantReqSuffix != "" && !strings.HasSuffix(result.RequirementsPath, tt.wantReqSuffix) {
+				t.Errorf("FindRequirementsPath() RequirementsPath = %v, want suffix %v", result.RequirementsPath, tt.wantReqSuffix)
+			}
+
+			if result.InputPath == "" {
+				t.Error("FindRequirementsPath() InputPath should not be empty")
+			}
+		})
+	}
+}
+
+func TestLockDependenciesCommand_FindRequirementsPath_PythonAssetWithoutRequirements(t *testing.T) {
+	t.Parallel()
+
+	// Create a temp directory with a Python asset but no requirements.txt
+	tmpDir := t.TempDir()
+
+	// Initialize a git repo in the temp directory
+	gitDir := filepath.Join(tmpDir, ".git")
+	if err := os.Mkdir(gitDir, 0o755); err != nil {
+		t.Fatalf("Failed to create .git directory: %v", err)
+	}
+
+	// Create a Python asset file
+	pyContent := `"""@bruin
+name: test_asset
+@bruin"""
+
+print("hello")
+`
+	pyPath := filepath.Join(tmpDir, "test_asset.py")
+	if err := os.WriteFile(pyPath, []byte(pyContent), 0o644); err != nil {
+		t.Fatalf("Failed to create Python file: %v", err)
+	}
+
+	cmd := &LockDependenciesCommand{
+		builder: DefaultPipelineBuilder,
+	}
+
+	_, err := cmd.FindRequirementsPath(pyPath)
+	if err == nil {
+		t.Error("FindRequirementsPath() expected error for Python asset without requirements.txt, got nil")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "no requirements.txt found") {
+		t.Errorf("FindRequirementsPath() error = %v, want error containing 'no requirements.txt found'", err)
+	}
+}
