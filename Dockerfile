@@ -43,15 +43,6 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Google Cloud SDK (for gong binary download)
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-    | tee /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-    | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
-    && apt-get update \
-    && apt-get install -y google-cloud-cli \
-    && rm -rf /var/lib/apt/lists/*
-
 RUN adduser --disabled-password --gecos '' bruin
 
 RUN chown -R bruin:bruin /home/bruin
@@ -64,12 +55,12 @@ RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/bin/gong /home/bruin/.loc
 # Copy the built binary from builder stage
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
-# Download gong binaries from GCS (public bucket, no auth). Optional: build continues if not found.
+# Download gong binaries from GCS (public bucket via HTTPS). Optional: build continues if not found.
 USER root
 RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
     if [ -z "${SELECTED_RELEASE}" ]; then \
         echo "No release tag provided, downloading latest..." && \
-        gsutil cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" /tmp/latest.txt && \
+        curl -fsSL "https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" -o /tmp/latest.txt && \
         SELECTED_RELEASE=$(tr -d '\r\n' < /tmp/latest.txt) && \
         rm -f /tmp/latest.txt && \
         echo "Using latest release: ${SELECTED_RELEASE}"; \
@@ -77,9 +68,9 @@ RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
         echo "Using provided release tag: ${SELECTED_RELEASE}"; \
     fi && \
     GONG_BINARY_NAME="gong_${TARGETARCH}" && \
-    GONG_SOURCE_PATH="gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
-    echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_SOURCE_PATH}..." && \
-    (gsutil cp "${GONG_SOURCE_PATH}" /home/bruin/.local/bin/gong/gong && \
+    GONG_URL="https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
+    echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_URL}..." && \
+    (curl -fsSL "${GONG_URL}" -o /home/bruin/.local/bin/gong/gong && \
      chmod +x /home/bruin/.local/bin/gong/gong && \
      chown bruin:bruin /home/bruin/.local/bin/gong/gong && \
      echo "Gong binaries downloaded successfully") || \
