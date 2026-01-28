@@ -100,3 +100,5 @@ jobs:
           build-args: |
             VERSION=${{ steps.workflow_tag.outputs.tag || steps.manual_tag.outputs.tag }}
             BRANCH_NAME=${{ steps.workflow_tag.outputs.tag || steps.manual_tag.outputs.tag }}
+          secrets: |
+            gcp_key=${{ secrets.GCP_GONG_RELEASE_KEY}}
