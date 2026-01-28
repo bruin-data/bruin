@@ -777,36 +777,23 @@ func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 
 	// Get table schema using INFORMATION_SCHEMA
 	tableComponents := strings.Split(tableName, ".")
-	var schemaQuery string
+	var datasetRef string
+	var targetTable string
 
 	switch len(tableComponents) {
 	case 2:
 		// dataset.table format
-		schemaQuery = fmt.Sprintf(`
-			SELECT 
-				column_name,
-				data_type,
-				is_nullable,
-				is_partitioning_column
-			FROM %s.%s.INFORMATION_SCHEMA.COLUMNS 
-			WHERE table_name = '%s'
-			ORDER BY ordinal_position`,
-			d.config.ProjectID, tableComponents[0], tableComponents[1])
+		datasetRef = fmt.Sprintf("%s.%s", d.config.ProjectID, tableComponents[0])
+		targetTable = tableComponents[1]
 	case 3:
 		// project.dataset.table format
-		schemaQuery = fmt.Sprintf(`
-			SELECT 
-				column_name,
-				data_type,
-				is_nullable,
-				is_partitioning_column
-			FROM %s.%s.INFORMATION_SCHEMA.COLUMNS 
-			WHERE table_name = '%s'
-			ORDER BY ordinal_position`,
-			tableComponents[0], tableComponents[1], tableComponents[2])
+		datasetRef = fmt.Sprintf("%s.%s", tableComponents[0], tableComponents[1])
+		targetTable = tableComponents[2]
 	default:
 		return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 	}
+
+	schemaQuery := buildSchemaQuery(datasetRef, targetTable)
 
 	schemaResult, err := d.Select(ctx, &query.Query{Query: schemaQuery})
 	if err != nil {
@@ -902,6 +889,20 @@ func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 		RowCount: rowCount,
 		Table:    dbTable,
 	}, nil
+}
+
+func buildSchemaQuery(datasetRef, targetTable string) string {
+	schemaTemplate := strings.Join([]string{
+		"SELECT",
+		"  column_name,",
+		"  data_type,",
+		"  is_nullable,",
+		"  is_partitioning_column",
+		"FROM `%s.INFORMATION_SCHEMA.COLUMNS`",
+		"WHERE table_name = '%s'",
+		"ORDER BY ordinal_position",
+	}, "\n")
+	return fmt.Sprintf(schemaTemplate, datasetRef, targetTable)
 }
 
 func (d *Client) fetchNumericalStats(ctx context.Context, tableName, columnName string) (*diff.NumericalStatistics, error) {
