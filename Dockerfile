@@ -29,7 +29,7 @@ FROM debian:trixie-slim
 
 ARG GCS_BUCKET_NAME=gong-release
 ARG GCS_PREFIX=releases
-ARG RELEASE_TAG=
+ARG RELEASE_TAG=v0.1.0
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -64,36 +64,25 @@ RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/bin/gong /home/bruin/.loc
 # Copy the built binary from builder stage
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
-# Download gong binaries from GCS (optional - only if secret is provided)
-# This step runs as root to configure gcloud, then switches to bruin user
+# Download gong binaries from GCS (public bucket, no auth)
 USER root
-RUN --mount=type=secret,id=gcp_key,required=false \
-    if [ -f /run/secrets/gcp_key ]; then \
-        mkdir -p /tmp/gcloud && \
-        export CLOUDSDK_CONFIG=/tmp/gcloud && \
-        echo "Downloading gong binaries from GCS..." && \
-        gcloud auth activate-service-account --key-file=/run/secrets/gcp_key && \
-        SELECTED_RELEASE="${RELEASE_TAG}" && \
-        if [ -z "${SELECTED_RELEASE}" ]; then \
-            echo "No release tag provided, downloading latest..." && \
-            gsutil cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" /tmp/latest.txt && \
-            SELECTED_RELEASE=$(tr -d '\r\n' < /tmp/latest.txt) && \
-            rm -f /tmp/latest.txt && \
-            echo "Using latest release: ${SELECTED_RELEASE}"; \
-        else \
-            echo "Using provided release tag: ${SELECTED_RELEASE}"; \
-        fi && \
-        GONG_BINARY_NAME="gong_${TARGETARCH}" && \
-        GONG_SOURCE_PATH="gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
-        echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_SOURCE_PATH}..." && \
-        gsutil cp "${GONG_SOURCE_PATH}" /home/bruin/.local/bin/gong/gong && \
-        chmod +x /home/bruin/.local/bin/gong/gong && \
-        chown bruin:bruin /home/bruin/.local/bin/gong/gong && \
-        echo "Gong binaries downloaded successfully" && \
-        rm -rf /tmp/gcloud; \
+RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
+    if [ -z "${SELECTED_RELEASE}" ]; then \
+        echo "No release tag provided, downloading latest..." && \
+        gsutil cp "gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" /tmp/latest.txt && \
+        SELECTED_RELEASE=$(tr -d '\r\n' < /tmp/latest.txt) && \
+        rm -f /tmp/latest.txt && \
+        echo "Using latest release: ${SELECTED_RELEASE}"; \
     else \
-        echo "GCP key secret not provided, skipping gong binary download"; \
-    fi
+        echo "Using provided release tag: ${SELECTED_RELEASE}"; \
+    fi && \
+    GONG_BINARY_NAME="gong_${TARGETARCH}" && \
+    GONG_SOURCE_PATH="gs://${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
+    echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_SOURCE_PATH}..." && \
+    gsutil cp "${GONG_SOURCE_PATH}" /home/bruin/.local/bin/gong/gong && \
+    chmod +x /home/bruin/.local/bin/gong/gong && \
+    chown bruin:bruin /home/bruin/.local/bin/gong/gong && \
+    echo "Gong binaries downloaded successfully"
 
 USER bruin
 
