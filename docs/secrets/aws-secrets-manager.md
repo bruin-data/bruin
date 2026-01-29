@@ -125,7 +125,7 @@ The `type` field must be one of the valid Bruin connection types. Common types i
 - `databricks` - Databricks
 - `generic` - Generic key-value secrets
 
-For a complete list of supported connection types and their configuration schemas, see the [connections documentation](../getting-started/introduction/quickstart.md#bruin-yml).
+For a complete list of supported connection types and their configuration schemas, see the [connections documentation](../getting-started/introduction/quickstart.md#setting-up-your-bruinyml-file).
 
 ## How It Works
 
