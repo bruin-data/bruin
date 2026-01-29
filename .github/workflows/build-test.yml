@@ -134,10 +134,8 @@ jobs:
   dockerTestOldImage:
     runs-on: depot-ubuntu-latest
     name: Test old Docker image (smoke)
-    if: ${{ env.IS_FORK != 'true' }}
     permissions:
       contents: read
-      packages: read
     steps:
       - uses: actions/checkout@v4
 
