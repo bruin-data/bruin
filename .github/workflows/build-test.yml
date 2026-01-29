@@ -37,6 +37,7 @@ env:
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
+  OLD_IMAGE_TAG: latest
 
 jobs:
   test:
@@ -129,6 +130,78 @@ jobs:
           build-args: |
             VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
             BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+
+  dockerTestOldImage:
+    runs-on: depot-ubuntu-latest
+    name: Test old Docker image (smoke)
+    if: ${{ env.IS_FORK != 'true' }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: bruin-data
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull old Docker image
+        run: |
+          echo "Pulling image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.OLD_IMAGE_TAG }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.OLD_IMAGE_TAG }}
+
+      - name: Test Python pipeline initialization
+        run: |
+          echo "Creating test directory..."
+          mkdir -p /tmp/docker-test
+
+          echo "Initializing Python pipeline..."
+          docker run --rm \
+            -v /tmp/docker-test:/tmp/docker-test \
+            -w /tmp/docker-test \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.OLD_IMAGE_TAG }} \
+            bruin init python --in-place python-pipeline
+
+          echo "Verifying Python pipeline was created..."
+          ls -la /tmp/docker-test/python-pipeline
+
+      - name: Test running Python pipeline
+        run: |
+          echo "Running Python pipeline..."
+          docker run --rm \
+            -v /tmp/docker-test:/tmp/docker-test \
+            -w /tmp/docker-test/python-pipeline \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.OLD_IMAGE_TAG }} \
+            bruin run .
+
+      - name: Test DuckDB pipeline initialization
+        run: |
+          echo "Initializing DuckDB pipeline..."
+          docker run --rm \
+            -v /tmp/docker-test:/tmp/docker-test \
+            -w /tmp/docker-test \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.OLD_IMAGE_TAG }} \
+            bruin init duckdb --in-place duckdb-pipeline
+
+          echo "Verifying DuckDB pipeline was created..."
+          ls -la /tmp/docker-test/duckdb-pipeline
+
+      - name: Test running DuckDB pipeline
+        run: |
+          echo "Running DuckDB pipeline..."
+          docker run --rm \
+            -v /tmp/docker-test:/tmp/docker-test \
+            -w /tmp/docker-test/duckdb-pipeline \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.OLD_IMAGE_TAG }} \
+            bruin run .
+
+      - name: Cleanup test files
+        if: always()
+        run: |
+          rm -rf /tmp/docker-test
 
   lint:
     runs-on: depot-ubuntu-latest
