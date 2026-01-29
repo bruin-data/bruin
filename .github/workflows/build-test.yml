@@ -201,6 +201,12 @@ jobs:
       - name: Cleanup test files
         if: always()
         run: |
+          # The image runs as user `bruin` and may create root-owned or non-runner-owned files
+          # in the bind mount; cleanup via a root container avoids permission issues.
+          docker run --rm --user root \
+            -v /tmp/docker-test:/tmp/docker-test \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.OLD_IMAGE_TAG }} \
+            sh -c 'find /tmp/docker-test -mindepth 1 -delete'
           rm -rf /tmp/docker-test
 
   lint:
