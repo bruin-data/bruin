@@ -32,6 +32,7 @@ type Connections struct {
 	MsSQL               []MsSQLConnection               `yaml:"mssql,omitempty" json:"mssql,omitempty" mapstructure:"mssql"`
 	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks,omitempty" mapstructure:"databricks"`
 	Synapse             []SynapseConnection             `yaml:"synapse,omitempty" json:"synapse,omitempty" mapstructure:"synapse"`
+	FabricWarehouse     []FabricWarehouseConnection     `yaml:"fabric_warehouse,omitempty" json:"fabric_warehouse,omitempty" mapstructure:"fabric_warehouse"`
 	Mongo               []MongoConnection               `yaml:"mongo,omitempty" json:"mongo,omitempty" mapstructure:"mongo"`
 	Couchbase           []CouchbaseConnection           `yaml:"couchbase,omitempty" json:"couchbase,omitempty" mapstructure:"couchbase"`
 	Cursor              []CursorConnection              `yaml:"cursor,omitempty" json:"cursor,omitempty" mapstructure:"cursor"`

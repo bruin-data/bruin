@@ -1,0 +1,48 @@
+{
+  "columns": [
+    {
+      "name": "product_id",
+      "type": "INT"
+    },
+    {
+      "name": "product_name",
+      "type": "VARCHAR"
+    },
+    {
+      "name": "price",
+      "type": "DECIMAL"
+    },
+    {
+      "name": "stock",
+      "type": "INT"
+    }
+  ],
+  "rows": [
+    [
+      "1",
+      "Laptop",
+      "999.99",
+      "10"
+    ],
+    [
+      "2",
+      "Smartphone",
+      "699.99",
+      "50"
+    ],
+    [
+      "3",
+      "Headphones",
+      "199.99",
+      "100"
+    ],
+    [
+      "4",
+      "Monitor",
+      "299.99",
+      "25"
+    ]
+  ],
+  "connectionName": "fabric_warehouse-default",
+  "query": "SELECT\n    1 AS product_id, 'Laptop' AS product_name, 999.99 AS price, 10 AS stock\nUNION ALL\nSELECT\n    2 AS product_id, 'Smartphone' AS product_name, 699.99 AS price, 50 AS stock\nUNION ALL\nSELECT\n    3 AS product_id, 'Headphones' AS product_name, 199.99 AS price, 100 AS stock\nUNION ALL\nSELECT\n    4 AS product_id, 'Monitor' AS product_name, 299.99 AS price, 25 AS stock;"
+}

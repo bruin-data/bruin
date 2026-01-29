@@ -92,6 +92,8 @@ fabric.properties
 ### macOS ###
 # General
 .DS_Store
+.bruin.cloud.yml
+integration-tests/cloud-integration-tests/.bruin.cloud.yml
 .AppleDouble
 .LSOverride
 
