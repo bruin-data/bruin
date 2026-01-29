@@ -155,6 +155,7 @@ jobs:
         run: |
           echo "Creating test directory..."
           mkdir -p /tmp/docker-test
+          chmod 777 /tmp/docker-test
 
           echo "Initializing Python pipeline..."
           docker run --rm \
@@ -178,6 +179,7 @@ jobs:
       - name: Test DuckDB pipeline initialization
         run: |
           echo "Initializing DuckDB pipeline..."
+          chmod 777 /tmp/docker-test
           docker run --rm \
             -v /tmp/docker-test:/tmp/docker-test \
             -w /tmp/docker-test \
