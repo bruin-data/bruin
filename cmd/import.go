@@ -472,7 +472,7 @@ func buildEnhancedDescription(table *ansisql.DBTable, schemaName, tableName stri
 	}
 
 	// Add import metadata section
-	parts = append(parts, fmt.Sprintf("Imported %s: %s.%s", getTableTypeDescription(table.Type), schemaName, tableName))
+	parts = append(parts, "Imported "+getTableTypeDescription(table.Type)+": "+schemaName+"."+tableName)
 
 	// Add extraction timestamp (current time)
 	extractedAt := time.Now().UTC().Format(time.RFC3339)
@@ -490,17 +490,17 @@ func buildEnhancedDescription(table *ansisql.DBTable, schemaName, tableName stri
 
 	// Add row count if available
 	if table.RowCount != nil {
-		parts = append(parts, fmt.Sprintf("Row count: %s", formatNumber(*table.RowCount)))
+		parts = append(parts, "Row count: "+formatNumber(*table.RowCount))
 	}
 
 	// Add size if available
 	if table.SizeBytes != nil {
-		parts = append(parts, fmt.Sprintf("Size: %s", formatBytes(*table.SizeBytes)))
+		parts = append(parts, "Size: "+formatBytes(*table.SizeBytes))
 	}
 
 	// Add owner if available
 	if table.Owner != "" {
-		parts = append(parts, fmt.Sprintf("Owner: %s", table.Owner))
+		parts = append(parts, "Owner: "+table.Owner)
 	}
 
 	return strings.Join(parts, "\n")
