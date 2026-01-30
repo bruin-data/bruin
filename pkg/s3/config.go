@@ -30,12 +30,24 @@ func (c *Config) GetIngestrURI() string {
 		params.Add("layout", layout)
 	}
 
+	// When bucket and path are empty (e.g. S3 as source),
+	// Go's url.URL.String() produces "s3:?params" (no "//"). Force "s3://?params"
+	bucket := strings.TrimSpace(c.BucketName)
+	pathToFile := strings.TrimSpace(c.PathToFile)
+	if bucket == "" && pathToFile == "" {
+		q := params.Encode()
+		if q != "" {
+			return "s3://?" + q
+		}
+		return "s3://"
+	}
+
 	uri := url.URL{
 		Scheme:   "s3",
 		Host:     c.BucketName,
 		Path:     c.PathToFile,
 		RawQuery: params.Encode(),
 	}
-
+   
 	return uri.String()
 }

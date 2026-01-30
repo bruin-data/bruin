@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/url"
+	"strings"
 )
 
 type Config struct {
@@ -31,6 +32,19 @@ func (c Config) GetIngestrURI() (string, error) {
 		)
 	}
 	params.Set("layout", c.Layout)
+
+	// When bucket and path are empty (e.g. GCS as source),
+	// Go's url.URL.String() produces "gs:?params" (no "//"). Force "gs://?params".
+	bucket := strings.TrimSpace(c.BucketName)
+	pathToFile := strings.TrimSpace(c.PathToFile)
+	if bucket == "" && pathToFile == "" {
+		q := params.Encode()
+		if q != "" {
+			return "gs://?" + q, nil
+		}
+		return "gs://", nil
+	}
+
 	uri := url.URL{
 		Scheme:   "gs",
 		Host:     c.BucketName,
