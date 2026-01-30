@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -475,16 +476,16 @@ func buildEnhancedDescription(table *ansisql.DBTable, schemaName, tableName stri
 
 	// Add extraction timestamp (current time)
 	extractedAt := time.Now().UTC().Format(time.RFC3339)
-	parts = append(parts, fmt.Sprintf("Extracted at: %s", extractedAt))
+	parts = append(parts, "Extracted at: "+extractedAt)
 
 	// Add creation timestamp if available
 	if table.CreatedAt != nil {
-		parts = append(parts, fmt.Sprintf("Created at: %s", table.CreatedAt.UTC().Format(time.RFC3339)))
+		parts = append(parts, "Created at: "+table.CreatedAt.UTC().Format(time.RFC3339))
 	}
 
 	// Add last modification timestamp if available
 	if table.LastModified != nil {
-		parts = append(parts, fmt.Sprintf("Last modified: %s", table.LastModified.UTC().Format(time.RFC3339)))
+		parts = append(parts, "Last modified: "+table.LastModified.UTC().Format(time.RFC3339))
 	}
 
 	// Add row count if available
@@ -508,10 +509,10 @@ func buildEnhancedDescription(table *ansisql.DBTable, schemaName, tableName stri
 // formatNumber formats a number with commas for readability.
 func formatNumber(n int64) string {
 	if n < 1000 {
-		return fmt.Sprintf("%d", n)
+		return strconv.FormatInt(n, 10)
 	}
 
-	s := fmt.Sprintf("%d", n)
+	s := strconv.FormatInt(n, 10)
 	var result strings.Builder
 
 	for i, c := range s {
