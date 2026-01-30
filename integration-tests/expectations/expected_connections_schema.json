@@ -414,6 +414,12 @@
           },
           "type": "array"
         },
+        "customerio": {
+          "items": {
+            "$ref": "#/$defs/CustomerIoConnection"
+          },
+          "type": "array"
+        },
         "mongo_atlas": {
           "items": {
             "$ref": "#/$defs/MongoAtlasConnection"
@@ -946,6 +952,25 @@
           "type": "string"
         },
         "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "CustomerIoConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "region": {
           "type": "string"
         }
       },
