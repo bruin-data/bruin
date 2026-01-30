@@ -48,6 +48,6 @@ func (c *Config) GetIngestrURI() string {
 		Path:     c.PathToFile,
 		RawQuery: params.Encode(),
 	}
-   
+
 	return uri.String()
 }
