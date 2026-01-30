@@ -59,13 +59,14 @@ func TestCreateAsset(t *testing.T) {
 	testAssetsPath := filepath.Join("test", "assets")
 
 	tests := []struct {
-		name        string
-		schemaName  string
-		tableName   string
-		assetType   pipeline.AssetType
-		fillColumns bool
-		table       *ansisql.DBTable
-		want        *pipeline.Asset
+		name              string
+		schemaName        string
+		tableName         string
+		assetType         pipeline.AssetType
+		fillColumns       bool
+		table             *ansisql.DBTable
+		want              *pipeline.Asset
+		descriptionPrefix string // Expected prefix of the description (since it now includes dynamic timestamp)
 	}{
 		{
 			name:        "successful asset creation without columns (fillColumns false)",
@@ -84,9 +85,9 @@ func TestCreateAsset(t *testing.T) {
 					Name: "users.asset.yml",
 					Path: filepath.Join(testAssetsPath, "public", "users.asset.yml"),
 				},
-				Description: "Imported table public.users",
-				Columns:     nil,
+				Columns: nil,
 			},
+			descriptionPrefix: "Imported table: public.users",
 		},
 		{
 			name:        "successful asset creation with pre-fetched columns",
@@ -109,13 +110,13 @@ func TestCreateAsset(t *testing.T) {
 					Name: "products.asset.yml",
 					Path: filepath.Join(testAssetsPath, "public", "products.asset.yml"),
 				},
-				Description: "Imported table public.products",
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 					{Name: "name", Type: "VARCHAR", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 					{Name: "price", Type: "DECIMAL", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 				},
 			},
+			descriptionPrefix: "Imported table: public.products",
 		},
 		{
 			name:        "fillColumns true but no pre-fetched columns and no conn returns empty",
@@ -134,9 +135,9 @@ func TestCreateAsset(t *testing.T) {
 					Name: "orders.asset.yml",
 					Path: filepath.Join(testAssetsPath, "public", "orders.asset.yml"),
 				},
-				Description: "Imported table public.orders",
-				Columns:     nil,
+				Columns: nil,
 			},
+			descriptionPrefix: "Imported table: public.orders",
 		},
 		{
 			name:        "view asset creation with view definition",
@@ -157,12 +158,12 @@ func TestCreateAsset(t *testing.T) {
 					Path:    filepath.Join(testAssetsPath, "public", "active_users.sql"),
 					Content: "SELECT * FROM users WHERE active = true",
 				},
-				Description: "Imported view public.active_users",
 				Materialization: pipeline.Materialization{
 					Type: pipeline.MaterializationTypeView,
 				},
 				Columns: nil,
 			},
+			descriptionPrefix: "Imported view: public.active_users",
 		},
 		{
 			name:        "view without view definition is not treated as view",
@@ -182,9 +183,9 @@ func TestCreateAsset(t *testing.T) {
 					Name: "some_view.asset.yml",
 					Path: filepath.Join(testAssetsPath, "public", "some_view.asset.yml"),
 				},
-				Description: "Imported view public.some_view",
-				Columns:     nil,
+				Columns: nil,
 			},
+			descriptionPrefix: "Imported view: public.some_view",
 		},
 		{
 			name:        "bigquery view asset creation",
@@ -205,12 +206,12 @@ func TestCreateAsset(t *testing.T) {
 					Path:    filepath.Join(testAssetsPath, "analytics", "daily_metrics.sql"),
 					Content: "SELECT date, COUNT(*) as cnt FROM events GROUP BY date",
 				},
-				Description: "Imported view analytics.daily_metrics",
 				Materialization: pipeline.Materialization{
 					Type: pipeline.MaterializationTypeView,
 				},
 				Columns: nil,
 			},
+			descriptionPrefix: "Imported view: analytics.daily_metrics",
 		},
 	}
 
@@ -231,6 +232,15 @@ func TestCreateAsset(t *testing.T) {
 			} else {
 				assert.Equal(t, "", warning)
 			}
+
+			// Check the description contains the expected prefix and "Extracted at:" timestamp
+			assert.True(t, strings.Contains(got.Description, tt.descriptionPrefix),
+				"Expected description to contain %q, got %q", tt.descriptionPrefix, got.Description)
+			assert.True(t, strings.Contains(got.Description, "Extracted at:"),
+				"Expected description to contain 'Extracted at:', got %q", got.Description)
+
+			// Compare all other fields except Description
+			tt.want.Description = got.Description // Copy description to make comparison work
 			assert.Equal(t, tt.want, got)
 		})
 	}
