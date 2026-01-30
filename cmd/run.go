@@ -576,6 +576,12 @@ func Run(isDebug *bool) *cli.Command {
 				Hidden: true,
 			},
 			&cli.StringFlag{
+				Name:   "gong-path",
+				Usage:  "path to the gong binary (when using --use-gong)",
+				Value:  defaultGongPath,
+				Hidden: true,
+			},
+			&cli.StringFlag{
 				Name:    "config-file",
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
@@ -630,18 +636,19 @@ func Run(isDebug *bool) *cli.Command {
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
 			useGong := c.Bool("use-gong")
+			gongPath := c.String("gong-path")
 
 			// When using gong, the path must exist and be executable
 			if useGong {
-				info, err := os.Stat(defaultGongPath)
+				info, err := os.Stat(gongPath)
 				if err != nil {
 					if os.IsNotExist(err) {
-						return cli.Exit("gong binary not found at path: "+defaultGongPath, 1)
+						return cli.Exit("gong binary not found at path: "+gongPath, 1)
 					}
-					return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", defaultGongPath, err), 1)
+					return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", gongPath, err), 1)
 				}
 				if info.Mode()&0o111 == 0 {
-					return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", defaultGongPath), 1)
+					return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", gongPath), 1)
 				}
 			}
 
@@ -791,7 +798,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			// Set gong context after --continue restores RunConfig to ensure consistency
 			if runConfig.UseGong {
-				runCtx = context.WithValue(runCtx, python.CtxGongPath, defaultGongPath)
+				runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath)
 			}
 
 			// Load macros from the pipeline's macros directory
