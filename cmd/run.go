@@ -576,9 +576,10 @@ func Run(isDebug *bool) *cli.Command {
 				Hidden: true,
 			},
 			&cli.StringFlag{
-				Name:  "gong-path",
-				Usage: "path to the gong binary (when using --use-gong)",
-				Value: defaultGongPath,
+				Name:   "gong-path",
+				Usage:  "path to the gong binary (when using --use-gong)",
+				Value:  defaultGongPath,
+				Hidden: true,
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
