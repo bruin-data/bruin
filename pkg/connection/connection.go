@@ -28,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/clickup"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/couchbase"
+	"github.com/bruin-data/bruin/pkg/customerio"
 	"github.com/bruin-data/bruin/pkg/cursor"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
@@ -196,6 +197,7 @@ type Manager struct {
 	InfluxDB             map[string]*influxdb.Client
 	Tableau              map[string]*tableau.Client
 	Trino                map[string]*trino.Client
+	CustomerIo           map[string]*customerio.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -2436,6 +2438,26 @@ func (m *Manager) AddIndeedConnectionFromConfig(connection *config.IndeedConnect
 	return nil
 }
 
+func (m *Manager) AddCustomerIoConnectionFromConfig(connection *config.CustomerIoConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.CustomerIo == nil {
+		m.CustomerIo = make(map[string]*customerio.Client)
+	}
+
+	client, err := customerio.NewClient(customerio.Config{
+		APIKey: connection.APIKey,
+		Region: connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+	m.CustomerIo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2721,6 +2743,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

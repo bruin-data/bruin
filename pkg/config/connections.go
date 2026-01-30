@@ -1227,3 +1227,13 @@ type IndeedConnection struct {
 func (c IndeedConnection) GetName() string {
 	return c.Name
 }
+
+type CustomerIoConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Region string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+}
+
+func (c CustomerIoConnection) GetName() string {
+	return c.Name
+}
