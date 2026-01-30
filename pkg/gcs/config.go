@@ -47,8 +47,8 @@ func (c Config) GetIngestrURI() (string, error) {
 
 	uri := url.URL{
 		Scheme:   "gs",
-		Host:     c.BucketName,
-		Path:     c.PathToFile,
+		Host:     bucket,
+		Path:     pathToFile,
 		RawQuery: params.Encode(),
 	}
 	return uri.String(), nil

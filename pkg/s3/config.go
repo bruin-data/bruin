@@ -44,8 +44,8 @@ func (c *Config) GetIngestrURI() string {
 
 	uri := url.URL{
 		Scheme:   "s3",
-		Host:     c.BucketName,
-		Path:     c.PathToFile,
+		Host:     bucket,
+		Path:     pathToFile,
 		RawQuery: params.Encode(),
 	}
 
