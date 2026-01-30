@@ -403,6 +403,9 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 		actualAssetType = convertSourceTypeToQueryType(assetType)
 	}
 
+	// Build enhanced description with metadata
+	description := buildEnhancedDescription(table, schemaName, tableName)
+
 	asset := &pipeline.Asset{
 		Type: actualAssetType,
 		ExecutableFile: pipeline.ExecutableFile{
@@ -410,7 +413,7 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 			Path:    filePath,
 			Content: content,
 		},
-		Description: fmt.Sprintf("Imported %s %s.%s", getTableTypeDescription(table.Type), schemaName, tableName),
+		Description: description,
 	}
 
 	// Set materialization for views
@@ -455,6 +458,93 @@ func getTableTypeDescription(tableType ansisql.DBTableType) string {
 		return "view"
 	}
 	return "table"
+}
+
+// buildEnhancedDescription creates a rich description for imported assets with metadata.
+func buildEnhancedDescription(table *ansisql.DBTable, schemaName, tableName string) string {
+	var parts []string
+
+	// Start with the original database description if available
+	if table.Description != "" {
+		parts = append(parts, table.Description)
+		parts = append(parts, "") // Empty line for separation
+	}
+
+	// Add import metadata section
+	parts = append(parts, fmt.Sprintf("Imported %s: %s.%s", getTableTypeDescription(table.Type), schemaName, tableName))
+
+	// Add extraction timestamp (current time)
+	extractedAt := time.Now().UTC().Format(time.RFC3339)
+	parts = append(parts, fmt.Sprintf("Extracted at: %s", extractedAt))
+
+	// Add creation timestamp if available
+	if table.CreatedAt != nil {
+		parts = append(parts, fmt.Sprintf("Created at: %s", table.CreatedAt.UTC().Format(time.RFC3339)))
+	}
+
+	// Add last modification timestamp if available
+	if table.LastModified != nil {
+		parts = append(parts, fmt.Sprintf("Last modified: %s", table.LastModified.UTC().Format(time.RFC3339)))
+	}
+
+	// Add row count if available
+	if table.RowCount != nil {
+		parts = append(parts, fmt.Sprintf("Row count: %s", formatNumber(*table.RowCount)))
+	}
+
+	// Add size if available
+	if table.SizeBytes != nil {
+		parts = append(parts, fmt.Sprintf("Size: %s", formatBytes(*table.SizeBytes)))
+	}
+
+	// Add owner if available
+	if table.Owner != "" {
+		parts = append(parts, fmt.Sprintf("Owner: %s", table.Owner))
+	}
+
+	return strings.Join(parts, "\n")
+}
+
+// formatNumber formats a number with commas for readability.
+func formatNumber(n int64) string {
+	if n < 1000 {
+		return fmt.Sprintf("%d", n)
+	}
+
+	s := fmt.Sprintf("%d", n)
+	var result strings.Builder
+
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			result.WriteRune(',')
+		}
+		result.WriteRune(c)
+	}
+
+	return result.String()
+}
+
+// formatBytes formats a byte count into a human-readable string.
+func formatBytes(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+		TB = GB * 1024
+	)
+
+	switch {
+	case bytes >= TB:
+		return fmt.Sprintf("%.2f TB", float64(bytes)/TB)
+	case bytes >= GB:
+		return fmt.Sprintf("%.2f GB", float64(bytes)/GB)
+	case bytes >= MB:
+		return fmt.Sprintf("%.2f MB", float64(bytes)/MB)
+	case bytes >= KB:
+		return fmt.Sprintf("%.2f KB", float64(bytes)/KB)
+	default:
+		return fmt.Sprintf("%d bytes", bytes)
+	}
 }
 
 // convertSourceTypeToQueryType converts a source asset type to its corresponding query type.

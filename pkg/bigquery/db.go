@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	datatransfer "cloud.google.com/go/bigquery/datatransfer/apiv1"
@@ -1127,6 +1128,13 @@ type tableMetadataResult struct {
 	Columns        []*ansisql.DBColumn
 	TableType      ansisql.DBTableType
 	ViewDefinition string
+
+	// Metadata for enriched import descriptions
+	CreatedAt    *time.Time
+	LastModified *time.Time
+	RowCount     *int64
+	SizeBytes    *int64
+	Description  string
 }
 
 func (d *Client) getTableMetadata(ctx context.Context, datasetID, tableID string) (*tableMetadataResult, error) {
@@ -1152,7 +1160,26 @@ func (d *Client) getTableMetadata(ctx context.Context, datasetID, tableID string
 	sort.Slice(cols, func(i, j int) bool { return cols[i].Name < cols[j].Name })
 
 	result := &tableMetadataResult{
-		Columns: cols,
+		Columns:     cols,
+		Description: meta.Description,
+	}
+
+	// Populate metadata timestamps and sizes
+	if !meta.CreationTime.IsZero() {
+		createdAt := meta.CreationTime
+		result.CreatedAt = &createdAt
+	}
+	if !meta.LastModifiedTime.IsZero() {
+		lastModified := meta.LastModifiedTime
+		result.LastModified = &lastModified
+	}
+	if meta.NumRows > 0 {
+		rowCount := int64(meta.NumRows)
+		result.RowCount = &rowCount
+	}
+	if meta.NumBytes > 0 {
+		sizeBytes := meta.NumBytes
+		result.SizeBytes = &sizeBytes
 	}
 
 	// Determine table type and get view definition
@@ -1360,6 +1387,11 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 				Type:           metadata.TableType,
 				ViewDefinition: metadata.ViewDefinition,
 				Columns:        metadata.Columns,
+				CreatedAt:      metadata.CreatedAt,
+				LastModified:   metadata.LastModified,
+				RowCount:       metadata.RowCount,
+				SizeBytes:      metadata.SizeBytes,
+				Description:    metadata.Description,
 			}
 
 			mu.Lock()
@@ -1471,6 +1503,11 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 				Type:           metadata.TableType,
 				ViewDefinition: metadata.ViewDefinition,
 				Columns:        metadata.Columns,
+				CreatedAt:      metadata.CreatedAt,
+				LastModified:   metadata.LastModified,
+				RowCount:       metadata.RowCount,
+				SizeBytes:      metadata.SizeBytes,
+				Description:    metadata.Description,
 			}
 
 			mu.Lock()

@@ -346,15 +346,26 @@ SELECT
     t.table_schema,
     t.table_name,
     t.table_type,
-    v.view_definition
+    v.view_definition,
+    pg_catalog.obj_description(c.oid, 'pg_class') as table_comment,
+    c.reltuples::bigint as row_count,
+    pg_catalog.pg_table_size(c.oid) as size_bytes,
+    r.rolname as owner
 FROM
     information_schema.tables t
 LEFT JOIN
     information_schema.views v ON t.table_schema = v.table_schema AND t.table_name = v.table_name
+LEFT JOIN
+    pg_catalog.pg_class c ON c.relname = t.table_name
+LEFT JOIN
+    pg_catalog.pg_namespace n ON n.oid = c.relnamespace AND n.nspname = t.table_schema
+LEFT JOIN
+    pg_catalog.pg_roles r ON r.oid = c.relowner
 WHERE
 	t.table_catalog = $1 
     AND t.table_schema NOT IN ('pg_catalog', 'information_schema')
     AND t.table_type IN ('BASE TABLE', 'VIEW')
+    AND (n.nspname = t.table_schema OR n.nspname IS NULL)
 ORDER BY t.table_schema, t.table_name;
 `
 
@@ -379,7 +390,7 @@ ORDER BY t.table_schema, t.table_name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range collectedRows {
-		if len(row) != 4 {
+		if len(row) < 4 {
 			continue
 		}
 
@@ -389,6 +400,31 @@ ORDER BY t.table_schema, t.table_name;
 		var viewDefinition string
 		if row[3] != nil {
 			viewDefinition = row[3].(string)
+		}
+
+		// Extract additional metadata
+		var tableComment string
+		if len(row) > 4 && row[4] != nil {
+			tableComment = row[4].(string)
+		}
+
+		var rowCount *int64
+		if len(row) > 5 && row[5] != nil {
+			if rc, ok := row[5].(int64); ok && rc >= 0 {
+				rowCount = &rc
+			}
+		}
+
+		var sizeBytes *int64
+		if len(row) > 6 && row[6] != nil {
+			if sb, ok := row[6].(int64); ok && sb >= 0 {
+				sizeBytes = &sb
+			}
+		}
+
+		var owner string
+		if len(row) > 7 && row[7] != nil {
+			owner = row[7].(string)
 		}
 
 		// Create schema if it doesn't exist
@@ -415,6 +451,10 @@ ORDER BY t.table_schema, t.table_name;
 			Type:           dbTableType,
 			ViewDefinition: viewDefinition,
 			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
+			Description:    tableComment,
+			RowCount:       rowCount,
+			SizeBytes:      sizeBytes,
+			Owner:          owner,
 		}
 		schemas[schemaKey].Tables = append(schemas[schemaKey].Tables, table)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -359,14 +360,29 @@ SELECT
     t.TABLE_SCHEMA,
     t.TABLE_NAME,
     t.TABLE_TYPE,
-    v.VIEW_DEFINITION
+    v.VIEW_DEFINITION,
+    o.create_date,
+    o.modify_date,
+    CAST(p.rows AS BIGINT) as row_count,
+    CAST(SUM(a.total_pages) * 8 * 1024 AS BIGINT) as size_bytes,
+    CAST(ep.value AS NVARCHAR(MAX)) as table_comment
 FROM
     INFORMATION_SCHEMA.TABLES t
 LEFT JOIN
     INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
+LEFT JOIN
+    sys.objects o ON o.name = t.TABLE_NAME AND SCHEMA_NAME(o.schema_id) = t.TABLE_SCHEMA
+LEFT JOIN
+    sys.partitions p ON o.object_id = p.object_id AND p.index_id IN (0, 1)
+LEFT JOIN
+    sys.allocation_units a ON p.partition_id = a.container_id
+LEFT JOIN
+    sys.extended_properties ep ON o.object_id = ep.major_id AND ep.minor_id = 0 AND ep.name = 'MS_Description'
 WHERE
     t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
     AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+GROUP BY
+    t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_TYPE, v.VIEW_DEFINITION, o.create_date, o.modify_date, p.rows, ep.value
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `, currentDB)
 
@@ -382,7 +398,7 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 4 {
+		if len(row) < 4 {
 			continue
 		}
 
@@ -405,6 +421,48 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 		if row[3] != nil {
 			if vd, ok := row[3].(string); ok {
 				viewDefinition = vd
+			}
+		}
+
+		// Extract additional metadata
+		var createdAt, lastModified *time.Time
+		if len(row) > 4 && row[4] != nil {
+			if t, ok := row[4].(time.Time); ok {
+				createdAt = &t
+			}
+		}
+		if len(row) > 5 && row[5] != nil {
+			if t, ok := row[5].(time.Time); ok {
+				lastModified = &t
+			}
+		}
+
+		var rowCount *int64
+		if len(row) > 6 && row[6] != nil {
+			switch v := row[6].(type) {
+			case int64:
+				rowCount = &v
+			case float64:
+				rc := int64(v)
+				rowCount = &rc
+			}
+		}
+
+		var sizeBytes *int64
+		if len(row) > 7 && row[7] != nil {
+			switch v := row[7].(type) {
+			case int64:
+				sizeBytes = &v
+			case float64:
+				sb := int64(v)
+				sizeBytes = &sb
+			}
+		}
+
+		var tableComment string
+		if len(row) > 8 && row[8] != nil {
+			if c, ok := row[8].(string); ok {
+				tableComment = c
 			}
 		}
 
@@ -431,6 +489,11 @@ ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 			Type:           dbTableType,
 			ViewDefinition: viewDefinition,
 			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
+			CreatedAt:      createdAt,
+			LastModified:   lastModified,
+			RowCount:       rowCount,
+			SizeBytes:      sizeBytes,
+			Description:    tableComment,
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
 	}
