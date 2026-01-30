@@ -1,0 +1,10 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      fabric_warehouse:
+        - name: fabric_warehouse-default
+          host: your-workspace.datawarehouse.fabric.microsoft.com
+          port: 1433
+          database: your_warehouse
+          use_azure_default_credential: true

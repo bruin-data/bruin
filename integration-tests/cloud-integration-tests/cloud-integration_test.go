@@ -21,12 +21,13 @@ type Environment struct {
 }
 
 var platformConnectionMap = map[string]string{
-	"bigquery":   "google_cloud_platform",
-	"snowflake":  "snowflake",
-	"postgres":   "postgres",
-	"redshift":   "redshift",
-	"athena":     "athena",
-	"databricks": "databricks",
+	"bigquery":         "google_cloud_platform",
+	"snowflake":        "snowflake",
+	"postgres":         "postgres",
+	"redshift":         "redshift",
+	"athena":           "athena",
+	"databricks":       "databricks",
+	"fabric_warehouse": "fabric_warehouse",
 }
 
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {
@@ -211,5 +212,24 @@ func TestCloudIntegration(t *testing.T) {
 		t.Logf("Databricks platform is available - running integration tests")
 
 		runTestsInDirectory(t, databricksDir, "Databricks")
+	})
+
+	t.Run("FabricWarehouse", func(t *testing.T) {
+		t.Parallel()
+
+		if !availablePlatforms["fabric_warehouse"] {
+			t.Skip("Skipping Fabric Warehouse tests - no connection configured")
+			return
+		}
+
+		fabricDir := filepath.Join(currentFolder, "fabric_warehouse")
+		require.DirExists(t, fabricDir, "Fabric Warehouse test directory should exist")
+
+		testFile := filepath.Join(fabricDir, "fabric_warehouse_test.go")
+		require.FileExists(t, testFile, "Fabric Warehouse test file should exist")
+
+		t.Logf("Fabric Warehouse platform is available - running integration tests")
+
+		runTestsInDirectory(t, fabricDir, "Fabric Warehouse")
 	})
 }

@@ -30,6 +30,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/fabric_warehouse"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -1622,6 +1623,41 @@ func SetupExecutors(
 		// we set the Python runners to run the checks on MsSQL
 		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		}
+	}
+
+	//nolint: dupl
+	if s.WillRunTaskOfType(pipeline.AssetTypeFabricWarehouseQuery) || estimateCustomCheckType == pipeline.AssetTypeFabricWarehouseQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricWarehouseSeed) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricWarehouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricWarehouseTableSensor) {
+		fabricOperator := fabric_warehouse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+			Mat: fabric_warehouse.NewMaterializer(fullRefresh),
+		})
+
+		fabricCheckRunner := fabric_warehouse.NewColumnCheckOperator(conn)
+
+		fabricQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		fabricTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+
+		mainExecutors[pipeline.AssetTypeFabricWarehouseQuery][scheduler.TaskInstanceTypeMain] = fabricOperator
+		mainExecutors[pipeline.AssetTypeFabricWarehouseQuery][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricWarehouseQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricWarehouseSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeFabricWarehouseSeed][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricWarehouseSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricWarehouseQuerySensor][scheduler.TaskInstanceTypeMain] = fabricQuerySensor
+		mainExecutors[pipeline.AssetTypeFabricWarehouseQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricWarehouseQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricWarehouseTableSensor][scheduler.TaskInstanceTypeMain] = fabricTableSensor
+		mainExecutors[pipeline.AssetTypeFabricWarehouseTableSensor][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricWarehouseTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		if estimateCustomCheckType == pipeline.AssetTypeFabricWarehouseQuery {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}

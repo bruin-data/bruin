@@ -1,0 +1,5 @@
+product_id,product_name,price,stock
+1,Laptop,999.99,10
+2,Smartphone,699.99,50
+3,Headphones,199.99,100
+4,Monitor,299.99,25

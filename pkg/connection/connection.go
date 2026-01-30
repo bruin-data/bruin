@@ -37,6 +37,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
+	"github.com/bruin-data/bruin/pkg/fabric_warehouse"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fireflies"
 	"github.com/bruin-data/bruin/pkg/fluxx"
@@ -111,6 +112,7 @@ type Manager struct {
 	Postgres             map[string]*postgres.Client
 	MsSQL                map[string]*mssql.DB
 	Databricks           map[string]*databricks.DB
+	FabricWarehouse      map[string]*fabric_warehouse.DB
 	Mongo                map[string]*mongo.DB
 	Couchbase            map[string]*couchbase.DB
 	Cursor               map[string]*cursor.Client
@@ -555,6 +557,38 @@ func (m *Manager) AddSynapseSQLConnectionFromConfig(connection *config.SynapseCo
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.MsSQL[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddFabricWarehouseConnectionFromConfig(connection *config.FabricWarehouseConnection) error {
+	m.mutex.Lock()
+	if m.FabricWarehouse == nil {
+		m.FabricWarehouse = make(map[string]*fabric_warehouse.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := fabric_warehouse.NewDB(&fabric_warehouse.Config{
+		Username:                  connection.Username,
+		Password:                  connection.Password,
+		Host:                      connection.Host,
+		Port:                      connection.Port,
+		Database:                  connection.Database,
+		Options:                   connection.Options,
+		UseAzureDefaultCredential: connection.UseAzureDefaultCredential,
+		ClientID:                  connection.ClientID,
+		ClientSecret:              connection.ClientSecret,
+		TenantID:                  connection.TenantID,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.FabricWarehouse[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2634,8 +2668,9 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 		return connectionManager.AddRedshiftConnectionFromConfig(ctx, conn)
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.FabricWarehouse, connectionManager.AddFabricWarehouseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)

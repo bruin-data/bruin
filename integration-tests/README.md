@@ -83,4 +83,34 @@ Each test runs in isolation with:
 
 3. **Ingestr Tests Failing**: Rerun tests. If that doesn't help, verify Ingestr is properly configured if running ingestr tests
 
+## Cloud Integration Tests
 
+Cloud integration tests live under `integration-tests/cloud-integration-tests/` and run only when a matching
+connection is present in `integration-tests/cloud-integration-tests/.bruin.cloud.yml`.
+
+### Fabric Warehouse
+
+Add a local config file with a Fabric connection (no credentials are committed):
+
+```yaml
+default_environment: default
+environments:
+  default:
+    connections:
+      fabric_warehouse:
+        - name: fabric_warehouse-default
+          host: your-workspace.datawarehouse.fabric.microsoft.com
+          port: 1433
+          database: your_warehouse
+          use_azure_default_credential: true
+```
+
+Then run the cloud integration suite:
+
+```bash
+make build
+go test ./integration-tests/cloud-integration-tests -run FabricWarehouse -v
+```
+
+If the Fabric connection is missing, the tests are skipped.
+An example config is available at `integration-tests/cloud-integration-tests/.bruin.cloud.yml.example`.
