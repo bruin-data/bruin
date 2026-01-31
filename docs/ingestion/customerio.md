@@ -46,37 +46,37 @@ parameters:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| activities | id | – | replace | Retrieves account activity log. |
+| activities | – | – | replace | Retrieves account activity log. |
 | broadcasts | id | updated | merge | Retrieves broadcast campaigns. |
 | broadcast_actions | id | updated | merge | Retrieves actions for broadcasts. |
-| broadcast_action_metrics:period | broadcast_id, action_id, period, step_index | – | replace | Retrieves metrics for broadcast actions. Period: `hours`, `days`, `weeks`, `months`. |
+| broadcast_action_metrics:period | – | – | replace | Retrieves metrics for broadcast actions. Period: `hours`, `days`, `weeks`, `months`. |
 | broadcast_messages | id | – | merge | Retrieves messages sent by broadcasts. |
-| broadcast_metrics:period | broadcast_id, period, step_index | – | replace | Retrieves metrics for all broadcasts. Period: `hours`, `days`, `weeks`, `months`. |
+| broadcast_metrics:period | – | – | replace | Retrieves metrics for all broadcasts. Period: `hours`, `days`, `weeks`, `months`. |
 | campaigns | id | updated | merge | Retrieves triggered campaigns. |
 | campaign_actions | id | updated | merge | Retrieves actions for campaigns. |
-| campaign_action_metrics:period | campaign_id, action_id, period, step_index | – | replace | Retrieves metrics for campaign actions. Period: `hours`, `days`, `weeks`, `months`. |
+| campaign_action_metrics:period | – | – | replace | Retrieves metrics for campaign actions. Period: `hours`, `days`, `weeks`, `months`. |
 | campaign_messages | id | – | merge | Retrieves messages/deliveries sent from campaigns. |
-| campaign_metrics:period | campaign_id, period, step_index | – | replace | Retrieves metrics for all campaigns. Period: `hours`, `days`, `weeks`, `months`. |
+| campaign_metrics:period | – | – | replace | Retrieves metrics for all campaigns. Period: `hours`, `days`, `weeks`, `months`. |
 | collections | id | updated_at | merge | Retrieves data collections. |
-| customers | cio_id | – | replace | Retrieves all customers/people in the workspace. |
-| customer_activities | id | – | replace | Retrieves activities performed by each customer. |
-| customer_attributes | customer_id | – | replace | Retrieves attributes for each customer. |
+| customers | – | – | replace | Retrieves all customers/people in the workspace. |
+| customer_activities | – | – | replace | Retrieves activities performed by each customer. |
+| customer_attributes | – | – | replace | Retrieves attributes for each customer. |
 | customer_messages | id | – | merge | Retrieves messages sent to each customer. |
-| customer_relationships | customer_id, object_type_id, object_id | – | replace | Retrieves object relationships for each customer. |
+| customer_relationships | – | – | replace | Retrieves object relationships for each customer. |
 | exports | id | updated_at | merge | Retrieves export jobs. |
-| info_ip_addresses | ip | – | replace | Retrieves IP addresses used by Customer.io. |
+| info_ip_addresses | – | – | replace | Retrieves IP addresses used by Customer.io. |
 | messages | id | – | merge | Retrieves sent messages. |
 | newsletters | id | updated | merge | Retrieves newsletters. |
-| newsletter_metrics:period | newsletter_id, period, step_index | – | replace | Retrieves metrics for all newsletters. Period: `hours`, `days`, `weeks`, `months`. |
-| newsletter_test_groups | id | – | replace | Retrieves test groups for newsletters. |
-| object_types | id | – | replace | Retrieves object types in the workspace. |
-| objects | object_type_id, object_id | – | replace | Retrieves all objects for each object type. |
-| reporting_webhooks | id | – | replace | Retrieves reporting webhooks. |
+| newsletter_metrics:period | – | – | replace | Retrieves metrics for all newsletters. Period: `hours`, `days`, `weeks`, `months`. |
+| newsletter_test_groups | – | – | replace | Retrieves test groups for newsletters. |
+| object_types | – | – | replace | Retrieves object types in the workspace. |
+| objects | – | – | replace | Retrieves all objects for each object type. |
+| reporting_webhooks | – | – | replace | Retrieves reporting webhooks. |
 | segments | id | updated_at | merge | Retrieves customer segments. |
-| sender_identities | id | – | replace | Retrieves sender identities. |
-| subscription_topics | id | – | replace | Retrieves subscription topics. |
-| transactional_messages | id | – | replace | Retrieves transactional message templates. |
-| workspaces | id | – | replace | Retrieves workspaces in your account. |
+| sender_identities | – | – | replace | Retrieves sender identities. |
+| subscription_topics | – | – | replace | Retrieves subscription topics. |
+| transactional_messages | – | – | replace | Retrieves transactional message templates. |
+| workspaces | – | – | replace | Retrieves workspaces in your account. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
