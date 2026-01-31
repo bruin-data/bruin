@@ -1276,13 +1276,8 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		Schemas: []*ansisql.DBSchema{},
 	}
 
-	// Phase 1: Collect all datasets and their table names (fast, no metadata fetching)
-	type datasetInfo struct {
-		name       string
-		tableNames []string
-	}
-	var datasets []datasetInfo
-
+	// Phase 1: Collect all dataset names first
+	var datasetNames []string
 	datasetsIter := d.client.Datasets(ctx)
 	for {
 		ds, err := datasetsIter.Next()
@@ -1292,21 +1287,49 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to list BigQuery datasets: %w", err)
 		}
+		datasetNames = append(datasetNames, ds.DatasetID)
+	}
 
-		var tableNames []string
-		tables := ds.Tables(ctx)
-		for {
-			t, err := tables.Next()
-			if errors.Is(err, iterator.Done) {
-				break
-			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to list tables in dataset %s: %w", ds.DatasetID, err)
-			}
-			tableNames = append(tableNames, t.TableID)
-		}
+	// Phase 2: Fetch table names for each dataset in parallel
+	type datasetInfo struct {
+		name       string
+		tableNames []string
+	}
+	datasets := make([]datasetInfo, len(datasetNames))
+	var listErrs []error
+	var listMu sync.Mutex
 
-		datasets = append(datasets, datasetInfo{name: ds.DatasetID, tableNames: tableNames})
+	listWorkers := max(runtime.NumCPU(), 8) * 5
+	listPool := pool.New().WithMaxGoroutines(listWorkers)
+
+	for i, dsName := range datasetNames {
+		listPool.Go(func() {
+			var tableNames []string
+			tables := d.client.Dataset(dsName).Tables(ctx)
+			for {
+				t, err := tables.Next()
+				if errors.Is(err, iterator.Done) {
+					break
+				}
+				if err != nil {
+					listMu.Lock()
+					listErrs = append(listErrs, fmt.Errorf("failed to list tables in dataset %s: %w", dsName, err))
+					listMu.Unlock()
+					return
+				}
+				tableNames = append(tableNames, t.TableID)
+			}
+
+			listMu.Lock()
+			datasets[i] = datasetInfo{name: dsName, tableNames: tableNames}
+			listMu.Unlock()
+		})
+	}
+
+	listPool.Wait()
+
+	if len(listErrs) > 0 {
+		return nil, listErrs[0]
 	}
 
 	// Phase 2: For each dataset, determine which tables need metadata (skip older shards)
@@ -1342,7 +1365,7 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	mu := sync.Mutex{}
 	var errs []error
 
-	workers := max(runtime.NumCPU(), 8)
+	workers := max(runtime.NumCPU(), 8) * 5
 	p := pool.New().WithMaxGoroutines(workers)
 
 	for _, job := range jobs {
@@ -1395,30 +1418,46 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 		Schemas: []*ansisql.DBSchema{},
 	}
 
-	// Phase 1: Collect all table names for each requested schema (fast, no metadata fetching)
+	// Phase 1: Fetch table names for each requested schema in parallel
 	type datasetInfo struct {
 		name       string
 		tableNames []string
 	}
-	datasets := make([]datasetInfo, 0, len(schemas))
+	datasets := make([]datasetInfo, len(schemas))
+	var listErrs []error
+	var listMu sync.Mutex
 
-	for _, schemaName := range schemas {
-		ds := d.client.Dataset(schemaName)
-		var tableNames []string
+	listWorkers := max(runtime.NumCPU(), 8) * 5
+	listPool := pool.New().WithMaxGoroutines(listWorkers)
 
-		tables := ds.Tables(ctx)
-		for {
-			t, err := tables.Next()
-			if errors.Is(err, iterator.Done) {
-				break
+	for i, schemaName := range schemas {
+		listPool.Go(func() {
+			var tableNames []string
+			tables := d.client.Dataset(schemaName).Tables(ctx)
+			for {
+				t, err := tables.Next()
+				if errors.Is(err, iterator.Done) {
+					break
+				}
+				if err != nil {
+					listMu.Lock()
+					listErrs = append(listErrs, fmt.Errorf("failed to list tables in dataset %s: %w", schemaName, err))
+					listMu.Unlock()
+					return
+				}
+				tableNames = append(tableNames, t.TableID)
 			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to list tables in dataset %s: %w", schemaName, err)
-			}
-			tableNames = append(tableNames, t.TableID)
-		}
 
-		datasets = append(datasets, datasetInfo{name: schemaName, tableNames: tableNames})
+			listMu.Lock()
+			datasets[i] = datasetInfo{name: schemaName, tableNames: tableNames}
+			listMu.Unlock()
+		})
+	}
+
+	listPool.Wait()
+
+	if len(listErrs) > 0 {
+		return nil, listErrs[0]
 	}
 
 	// Phase 2: For each dataset, determine which tables need metadata (skip older shards)
@@ -1453,7 +1492,7 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 	mu := sync.Mutex{}
 	var errs []error
 
-	workers := max(runtime.NumCPU(), 8)
+	workers := max(runtime.NumCPU(), 8) * 5
 	p := pool.New().WithMaxGoroutines(workers)
 
 	for _, job := range jobs {
