@@ -9,9 +9,13 @@ type Config struct {
 
 func (c *Config) GetIngestrURI() string {
 	params := url.Values{}
-	params.Add("api_key", c.APIKey)
+	params.Set("api_key", c.APIKey)
 	if c.Region != "" {
-		params.Add("region", c.Region)
+		params.Set("region", c.Region)
 	}
-	return "customerio://?" + params.Encode()
+	uri := url.URL{
+		Scheme:   "customerio",
+		RawQuery: params.Encode(),
+	}
+	return uri.String()
 }
