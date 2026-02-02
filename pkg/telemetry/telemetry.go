@@ -29,6 +29,7 @@ var (
 	TemplateName = "" // Stores template name for init command (protected by lock)
 	client       analytics.Client
 	lock         sync.Mutex
+	installID    string
 )
 
 // SetTemplateName stores the template name for telemetry (thread-safe).
@@ -40,6 +41,30 @@ func SetTemplateName(name string) {
 
 func Init() io.Closer {
 	client = analytics.New(TelemetryKey, url)
+
+	if OptOut || TelemetryKey == "" {
+		return client
+	}
+
+	state, isNew, err := loadOrCreateInstallState(AppVersion)
+	if err == nil {
+		lock.Lock()
+		installID = state.InstallID
+		lock.Unlock()
+
+		if isNew {
+			SendEvent("install", analytics.Properties{
+				"install_id":      state.InstallID,
+				"install_at":      state.InstallAt,
+				"install_version": state.InstallVersion,
+			})
+			SendEvent("first_run", analytics.Properties{
+				"install_id":      state.InstallID,
+				"install_at":      state.InstallAt,
+				"install_version": state.InstallVersion,
+			})
+		}
+	}
 
 	return client
 }
@@ -53,8 +78,24 @@ func SendEvent(event string, properties analytics.Properties) {
 	if OptOut || TelemetryKey == "" {
 		return
 	}
-	id, _ := machineid.ID()
+
+	if properties == nil {
+		properties = analytics.Properties{}
+	}
+	if installID != "" {
+		if _, ok := properties["install_id"]; !ok {
+			properties["install_id"] = installID
+		}
+	}
 	properties["run_id"] = RunID
+
+	id := installID
+	if id == "" {
+		id, _ = machineid.ID()
+	}
+	if id == "" {
+		id = RunID
+	}
 
 	if client == nil {
 		panic("Telemetry client not initialized")
