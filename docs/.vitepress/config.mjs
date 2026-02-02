@@ -386,7 +386,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "dbt Projects", link: "/cloud/dbt"},
                     {text: "Notifications", link: "/cloud/notifications"},
                     {text: "Instance Types", link: "/cloud/instance-types"},
-                    {text: "MCP Setup", link: "/cloud/mcp-setup"},
+                    {text: "Cloud MCP", link: "/cloud/mcp-setup"},
                 ],
             },
         ],
