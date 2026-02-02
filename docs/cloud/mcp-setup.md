@@ -91,5 +91,5 @@ Once the Asset server is connected, you can ask in natural language, for example
 - **401 Unauthorized:** Missing or invalid Bearer token. Check that the token is correct and not expired.
 - **403 Forbidden / “Insufficient token permissions”:** Token does not have the `mcp:token` ability. Create a new token with MCP permission.
 - **Cursor, tools not showing:** Ensure `.cursor/mcp.json` is valid JSON and restart Cursor.
-- **Claude Code, server not found:** Run `claude mcp list` to confirm the server is configured; use `claude mcp get asset` to check its URL and headers.
+- **Claude Code, server not found:** Run `claude mcp list` to confirm the server is configured; use `claude mcp get asset_server` to check its URL and headers.
 - **Codex CLI, tools not available:** Ensure `~/.codex/config.toml` is valid toml and restart Codex CLI.
