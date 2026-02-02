@@ -265,10 +265,14 @@ ORDER BY position;
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	// ClickHouse has databases and tables
 	// We'll query system.tables to get all databases and tables
+	// The engine column tells us if it's a view (View, MaterializedView) or table
+	// The as_select column contains the view query for View and MaterializedView engines
 	q := `
 SELECT
     database,
-    name as table_name
+    name as table_name,
+    engine,
+    as_select
 FROM
     system.tables
 WHERE
@@ -288,7 +292,7 @@ ORDER BY database, name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 2 {
+		if len(row) != 4 {
 			continue
 		}
 
@@ -300,6 +304,16 @@ ORDER BY database, name;
 		if !ok {
 			continue
 		}
+		engine, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+		var viewDefinition string
+		if row[3] != nil {
+			if vd, ok := row[3].(string); ok {
+				viewDefinition = vd
+			}
+		}
 
 		// Create schema if it doesn't exist
 		if _, exists := schemas[schemaName]; !exists {
@@ -310,10 +324,20 @@ ORDER BY database, name;
 			schemas[schemaName] = schema
 		}
 
+		// Determine table type based on engine
+		var dbTableType ansisql.DBTableType
+		if engine == "View" || engine == "MaterializedView" {
+			dbTableType = ansisql.DBTableTypeView
+		} else {
+			dbTableType = ansisql.DBTableTypeTable
+		}
+
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name:    tableName,
-			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
+			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
 	}

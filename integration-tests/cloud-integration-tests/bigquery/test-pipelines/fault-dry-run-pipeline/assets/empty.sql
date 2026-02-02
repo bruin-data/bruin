@@ -1,4 +1,4 @@
 /* @bruin
-name: dataset.non_bq_asset
+name: cloud_integration_test.empty_asset
 type: bq.sql
 @bruin */

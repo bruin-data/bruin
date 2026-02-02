@@ -1,6 +1,6 @@
 /* @bruin
-name: dataset.select_sample_data
+name: cloud_integration_test.dry_run_select_sample_data
 type: bq.sql
 @bruin */
 
-SELECT * FROM dataset.dry_run_table;
+SELECT * FROM cloud_integration_test.dry_run_table;

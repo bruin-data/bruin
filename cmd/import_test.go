@@ -64,18 +64,19 @@ func TestCreateAsset(t *testing.T) {
 		tableName   string
 		assetType   pipeline.AssetType
 		fillColumns bool
-		setupConn   func() *mockConnection
+		table       *ansisql.DBTable
 		want        *pipeline.Asset
-		wantWarning string
 	}{
 		{
-			name:        "successful asset creation without columns",
+			name:        "successful asset creation without columns (fillColumns false)",
 			schemaName:  "public",
 			tableName:   "users",
 			assetType:   pipeline.AssetTypePostgresSource,
 			fillColumns: false,
-			setupConn: func() *mockConnection {
-				return &mockConnection{}
+			table: &ansisql.DBTable{
+				Name:    "users",
+				Type:    ansisql.DBTableTypeTable,
+				Columns: nil,
 			},
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
@@ -88,20 +89,19 @@ func TestCreateAsset(t *testing.T) {
 			},
 		},
 		{
-			name:        "successful asset creation with columns",
+			name:        "successful asset creation with pre-fetched columns",
 			schemaName:  "public",
 			tableName:   "products",
 			assetType:   pipeline.AssetTypePostgresSource,
 			fillColumns: true,
-			setupConn: func() *mockConnection {
-				conn := &mockConnection{}
-				conn.On("SelectWithSchema", mock.Anything, mock.MatchedBy(func(q *query.Query) bool {
-					return strings.Contains(q.Query, "SELECT * FROM public.products WHERE 1=0 LIMIT 0")
-				})).Return(&query.QueryResult{
-					Columns:     []string{"id", "name", "price"},
-					ColumnTypes: []string{"INTEGER", "VARCHAR", "DECIMAL"},
-				}, nil)
-				return conn
+			table: &ansisql.DBTable{
+				Name: "products",
+				Type: ansisql.DBTableTypeTable,
+				Columns: []*ansisql.DBColumn{
+					{Name: "id", Type: "INTEGER"},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "DECIMAL"},
+				},
 			},
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
@@ -118,43 +118,98 @@ func TestCreateAsset(t *testing.T) {
 			},
 		},
 		{
-			name:        "asset creation with columns but connection fails",
+			name:        "fillColumns true but no pre-fetched columns and no conn returns empty",
 			schemaName:  "public",
 			tableName:   "orders",
 			assetType:   pipeline.AssetTypePostgresSource,
 			fillColumns: true,
-			setupConn: func() *mockConnection {
-				conn := &mockConnection{}
-				conn.On("SelectWithSchema", mock.Anything, mock.Anything).Return((*query.QueryResult)(nil), errors.New("connection failed"))
-				return conn
-			},
-			wantWarning: "Could not fill columns: failed to query columns for table public.orders: connection failed",
-		},
-		{
-			name:        "asset creation with special column names filtered out",
-			schemaName:  "public",
-			tableName:   "temporal_table",
-			assetType:   pipeline.AssetTypePostgresSource,
-			fillColumns: true,
-			setupConn: func() *mockConnection {
-				conn := &mockConnection{}
-				conn.On("SelectWithSchema", mock.Anything, mock.Anything).Return(&query.QueryResult{
-					Columns:     []string{"id", "_IS_CURRENT", "name", "_VALID_UNTIL", "_VALID_FROM"},
-					ColumnTypes: []string{"INTEGER", "BOOLEAN", "VARCHAR", "TIMESTAMP", "TIMESTAMP"},
-				}, nil)
-				return conn
+			table: &ansisql.DBTable{
+				Name:    "orders",
+				Type:    ansisql.DBTableTypeTable,
+				Columns: []*ansisql.DBColumn{},
 			},
 			want: &pipeline.Asset{
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
-					Name: "temporal_table.asset.yml",
-					Path: filepath.Join(testAssetsPath, "public", "temporal_table.asset.yml"),
+					Name: "orders.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public", "orders.asset.yml"),
 				},
-				Description: "Imported table public.temporal_table",
-				Columns: []pipeline.Column{
-					{Name: "id", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
-					{Name: "name", Type: "VARCHAR", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+				Description: "Imported table public.orders",
+				Columns:     nil,
+			},
+		},
+		{
+			name:        "view asset creation with view definition",
+			schemaName:  "public",
+			tableName:   "active_users",
+			assetType:   pipeline.AssetTypePostgresSource,
+			fillColumns: false,
+			table: &ansisql.DBTable{
+				Name:           "active_users",
+				Type:           ansisql.DBTableTypeView,
+				ViewDefinition: "SELECT * FROM users WHERE active = true",
+				Columns:        nil,
+			},
+			want: &pipeline.Asset{
+				Type: pipeline.AssetTypePostgresQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "active_users.sql",
+					Path:    filepath.Join(testAssetsPath, "public", "active_users.sql"),
+					Content: "SELECT * FROM users WHERE active = true",
 				},
+				Description: "Imported view public.active_users",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeView,
+				},
+				Columns: nil,
+			},
+		},
+		{
+			name:        "view without view definition is not treated as view",
+			schemaName:  "public",
+			tableName:   "some_view",
+			assetType:   pipeline.AssetTypePostgresSource,
+			fillColumns: false,
+			table: &ansisql.DBTable{
+				Name:           "some_view",
+				Type:           ansisql.DBTableTypeView,
+				ViewDefinition: "", // Empty view definition
+				Columns:        nil,
+			},
+			want: &pipeline.Asset{
+				Type: pipeline.AssetTypePostgresSource,
+				ExecutableFile: pipeline.ExecutableFile{
+					Name: "some_view.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public", "some_view.asset.yml"),
+				},
+				Description: "Imported view public.some_view",
+				Columns:     nil,
+			},
+		},
+		{
+			name:        "bigquery view asset creation",
+			schemaName:  "analytics",
+			tableName:   "daily_metrics",
+			assetType:   pipeline.AssetTypeBigquerySource,
+			fillColumns: false,
+			table: &ansisql.DBTable{
+				Name:           "daily_metrics",
+				Type:           ansisql.DBTableTypeView,
+				ViewDefinition: "SELECT date, COUNT(*) as cnt FROM events GROUP BY date",
+				Columns:        nil,
+			},
+			want: &pipeline.Asset{
+				Type: pipeline.AssetTypeBigqueryQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "daily_metrics.sql",
+					Path:    filepath.Join(testAssetsPath, "analytics", "daily_metrics.sql"),
+					Content: "SELECT date, COUNT(*) as cnt FROM events GROUP BY date",
+				},
+				Description: "Imported view analytics.daily_metrics",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeView,
+				},
+				Columns: nil,
 			},
 		},
 	}
@@ -164,21 +219,19 @@ func TestCreateAsset(t *testing.T) {
 			t.Parallel()
 
 			ctx := t.Context()
-			conn := tt.setupConn()
 
-			got, warning := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, conn, tt.fillColumns)
+			// Pass nil for conn since we're testing the pre-fetched columns path
+			// When dbColumns is empty and conn is nil, it will try fillAssetColumnsFromDB
+			// which will fail, but for these tests we're just checking the pre-fetched path
+			got, warning := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, nil, tt.fillColumns, tt.table)
 
-			if tt.wantWarning != "" {
-				assert.Contains(t, warning, tt.wantWarning)
-				return
+			// When dbColumns is empty and conn is nil, we get a warning about failing to fill columns
+			if tt.fillColumns && len(tt.table.Columns) == 0 {
+				assert.Contains(t, warning, "Could not fill columns")
+			} else {
+				assert.Equal(t, "", warning)
 			}
-
-			assert.Equal(t, "", warning)
 			assert.Equal(t, tt.want, got)
-
-			if tt.fillColumns {
-				conn.AssertExpectations(t)
-			}
 		})
 	}
 }

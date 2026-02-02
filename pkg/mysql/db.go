@@ -206,14 +206,18 @@ func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	// MySQL uses schemas as databases, so we'll get all databases and their tables
 	q := `
 SELECT
-    table_schema,
-    table_name
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    v.view_definition
 FROM
-    information_schema.tables
+    information_schema.tables t
+LEFT JOIN
+    information_schema.views v ON t.table_schema = v.table_schema AND t.table_name = v.table_name
 WHERE
-    table_type IN ('BASE TABLE', 'VIEW')
-    AND table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
-ORDER BY table_schema, table_name;
+    t.table_type IN ('BASE TABLE', 'VIEW')
+    AND t.table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
+ORDER BY t.table_schema, t.table_name;
 `
 
 	result, err := c.Select(ctx, &query.Query{Query: q})
@@ -228,7 +232,7 @@ ORDER BY table_schema, table_name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 2 {
+		if len(row) != 4 {
 			continue
 		}
 
@@ -240,6 +244,16 @@ ORDER BY table_schema, table_name;
 		if !ok {
 			continue
 		}
+		tableType, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+		var viewDefinition string
+		if row[3] != nil {
+			if vd, ok := row[3].(string); ok {
+				viewDefinition = vd
+			}
+		}
 
 		// Create schema if it doesn't exist
 		if _, exists := schemas[schemaName]; !exists {
@@ -250,10 +264,20 @@ ORDER BY table_schema, table_name;
 			schemas[schemaName] = schema
 		}
 
+		// Determine table type
+		var dbTableType ansisql.DBTableType
+		if tableType == "VIEW" {
+			dbTableType = ansisql.DBTableTypeView
+		} else {
+			dbTableType = ansisql.DBTableTypeTable
+		}
+
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name:    tableName,
-			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
+			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
 	}

@@ -145,24 +145,35 @@ func (db *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (
 }
 
 func (db *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
-	// Query to get all schemas and tables in the database
-	q := `
-SELECT
+	excludedOwners := `'SYS', 'SYSTEM', 'OUTLN', 'DIP', 'ORACLE_OCM', 'APPQOSSYS', 'DBSNMP', 'CTXSYS', 'XDB', 'ANONYMOUS', 'EXFSYS', 'MDDATA', 'DBSFWUSER', 'REMOTE_SCHEDULER_AGENT', 'SI_INFORMTN_SCHEMA', 'ORDDATA', 'ORDSYS', 'MDSYS', 'OLAPSYS', 'WMSYS', 'APEX_040000', 'APEX_PUBLIC_USER', 'FLOWS_FILES', 'SPATIAL_CSW_ADMIN_USR', 'SPATIAL_WFS_ADMIN_USR', 'HR', 'OE', 'PM', 'IX', 'SH', 'BI', 'SCOTT', 'DVSYS', 'LBACSYS', 'OJVMSYS', 'VECSYS', 'AUDSYS', 'GSMADMIN_INTERNAL', 'DGPDB_INT', 'DVF', 'GGSHAREDCAP', 'GGSYS', 'GSMCATUSER', 'GSMUSER', 'SYS$UMF', 'SYSBACKUP', 'SYSDG', 'SYSKM', 'SYSRAC', 'XS$NULL', 'PDBADMIN'`
+
+	// Query to get all schemas, tables and views in the database
+	// We use UNION ALL to combine tables and views
+	q := fmt.Sprintf(`
+SELECT 
     owner as schema_name,
-    table_name
+    table_name,
+    'TABLE' as object_type,
+    NULL as view_definition
 FROM
     all_tables
 WHERE
-    owner NOT IN (
-        'SYS', 'SYSTEM', 'OUTLN', 'DIP', 'ORACLE_OCM', 'APPQOSSYS', 'DBSNMP', 'CTXSYS', 'XDB', 'ANONYMOUS', 'EXFSYS', 'MDDATA', 'DBSFWUSER', 'REMOTE_SCHEDULER_AGENT', 'SI_INFORMTN_SCHEMA', 'ORDDATA', 'ORDSYS', 'MDSYS', 'OLAPSYS', 'WMSYS', 'APEX_040000', 'APEX_PUBLIC_USER', 'FLOWS_FILES', 'SPATIAL_CSW_ADMIN_USR', 'SPATIAL_WFS_ADMIN_USR', 'HR', 'OE', 'PM', 'IX', 'SH', 'BI', 'SCOTT',
-        'DVSYS', 'LBACSYS', 'OJVMSYS', 'VECSYS', 'AUDSYS', 'GSMADMIN_INTERNAL',
-        'DGPDB_INT', 'DVF', 'GGSHAREDCAP', 'GGSYS', 'GSMCATUSER', 'GSMUSER', 'SYS$UMF', 'SYSBACKUP', 'SYSDG', 'SYSKM', 'SYSRAC', 'XS$NULL', 'PDBADMIN'
-    )
-ORDER BY owner, table_name`
+    owner NOT IN (%s)
+UNION ALL
+SELECT 
+    owner as schema_name,
+    view_name as table_name,
+    'VIEW' as object_type,
+    text as view_definition
+FROM
+    all_views
+WHERE
+    owner NOT IN (%s)
+ORDER BY 1, 2`, excludedOwners, excludedOwners)
 
 	result, err := db.Select(ctx, &query.Query{Query: q})
 	if err != nil {
-		return nil, fmt.Errorf("failed to query Oracle all_tables: %w", err)
+		return nil, fmt.Errorf("failed to query Oracle all_tables/all_views: %w", err)
 	}
 
 	summary := &ansisql.DBDatabase{
@@ -172,7 +183,7 @@ ORDER BY owner, table_name`
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 2 {
+		if len(row) != 4 {
 			continue
 		}
 
@@ -184,6 +195,16 @@ ORDER BY owner, table_name`
 		if !ok {
 			continue
 		}
+		objectType, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+		var viewDefinition string
+		if row[3] != nil {
+			if vd, ok := row[3].(string); ok {
+				viewDefinition = vd
+			}
+		}
 
 		// Create schema if it doesn't exist
 		if _, exists := schemas[schemaName]; !exists {
@@ -194,10 +215,20 @@ ORDER BY owner, table_name`
 			schemas[schemaName] = schema
 		}
 
+		// Determine table type
+		var dbTableType ansisql.DBTableType
+		if objectType == "VIEW" {
+			dbTableType = ansisql.DBTableTypeView
+		} else {
+			dbTableType = ansisql.DBTableTypeTable
+		}
+
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name:    tableName,
-			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
+			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
 	}

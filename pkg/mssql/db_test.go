@@ -121,21 +121,25 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 				expectedQuery := `
 USE [testdb];
 SELECT
-    TABLE_SCHEMA,
-    TABLE_NAME
+    t.TABLE_SCHEMA,
+    t.TABLE_NAME,
+    t.TABLE_TYPE,
+    v.VIEW_DEFINITION
 FROM
-    INFORMATION_SCHEMA.TABLES
+    INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
 WHERE
-    TABLE_TYPE IN ('BASE TABLE', 'VIEW')
-    AND TABLE_SCHEMA NOT IN ('sys', 'information_schema')
-ORDER BY TABLE_SCHEMA, TABLE_NAME;
+    t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+    AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `
 				mock.ExpectQuery(expectedQuery).
-					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME"}).
-						AddRow("dbo", "users").
-						AddRow("dbo", "orders").
-						AddRow("sales", "products").
-						AddRow("sales", "categories"))
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION"}).
+						AddRow("dbo", "users", "BASE TABLE", nil).
+						AddRow("dbo", "orders", "BASE TABLE", nil).
+						AddRow("sales", "products", "BASE TABLE", nil).
+						AddRow("sales", "categories", "BASE TABLE", nil))
 			},
 			config: &Config{Database: "testdb"},
 			want: &ansisql.DBDatabase{
@@ -144,15 +148,15 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 					{
 						Name: "dbo",
 						Tables: []*ansisql.DBTable{
-							{Name: "users", Columns: []*ansisql.DBColumn{}},
-							{Name: "orders", Columns: []*ansisql.DBColumn{}},
+							{Name: "users", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
+							{Name: "orders", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
 						},
 					},
 					{
 						Name: "sales",
 						Tables: []*ansisql.DBTable{
-							{Name: "products", Columns: []*ansisql.DBColumn{}},
-							{Name: "categories", Columns: []*ansisql.DBColumn{}},
+							{Name: "products", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
+							{Name: "categories", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
 						},
 					},
 				},
@@ -165,19 +169,23 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 				expectedQuery := `
 USE [testdb];
 SELECT
-    TABLE_SCHEMA,
-    TABLE_NAME
+    t.TABLE_SCHEMA,
+    t.TABLE_NAME,
+    t.TABLE_TYPE,
+    v.VIEW_DEFINITION
 FROM
-    INFORMATION_SCHEMA.TABLES
+    INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
 WHERE
-    TABLE_TYPE IN ('BASE TABLE', 'VIEW')
-    AND TABLE_SCHEMA NOT IN ('sys', 'information_schema')
-ORDER BY TABLE_SCHEMA, TABLE_NAME;
+    t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+    AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `
 				mock.ExpectQuery(expectedQuery).
-					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME"}).
-						AddRow("dbo", "users").
-						AddRow("dbo", "orders"))
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION"}).
+						AddRow("dbo", "users", "BASE TABLE", nil).
+						AddRow("dbo", "orders", "BASE TABLE", nil))
 			},
 			config: &Config{Database: "testdb"},
 			want: &ansisql.DBDatabase{
@@ -186,8 +194,8 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 					{
 						Name: "dbo",
 						Tables: []*ansisql.DBTable{
-							{Name: "users", Columns: []*ansisql.DBColumn{}},
-							{Name: "orders", Columns: []*ansisql.DBColumn{}},
+							{Name: "users", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
+							{Name: "orders", Type: ansisql.DBTableTypeTable, Columns: []*ansisql.DBColumn{}},
 						},
 					},
 				},
@@ -200,17 +208,21 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 				expectedQuery := `
 USE [testdb];
 SELECT
-    TABLE_SCHEMA,
-    TABLE_NAME
+    t.TABLE_SCHEMA,
+    t.TABLE_NAME,
+    t.TABLE_TYPE,
+    v.VIEW_DEFINITION
 FROM
-    INFORMATION_SCHEMA.TABLES
+    INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
 WHERE
-    TABLE_TYPE IN ('BASE TABLE', 'VIEW')
-    AND TABLE_SCHEMA NOT IN ('sys', 'information_schema')
-ORDER BY TABLE_SCHEMA, TABLE_NAME;
+    t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+    AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `
 				mock.ExpectQuery(expectedQuery).
-					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME"}))
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION"}))
 			},
 			config: &Config{Database: "testdb"},
 			want: &ansisql.DBDatabase{
@@ -225,14 +237,18 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 				expectedQuery := `
 USE [testdb];
 SELECT
-    TABLE_SCHEMA,
-    TABLE_NAME
+    t.TABLE_SCHEMA,
+    t.TABLE_NAME,
+    t.TABLE_TYPE,
+    v.VIEW_DEFINITION
 FROM
-    INFORMATION_SCHEMA.TABLES
+    INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
 WHERE
-    TABLE_TYPE IN ('BASE TABLE', 'VIEW')
-    AND TABLE_SCHEMA NOT IN ('sys', 'information_schema')
-ORDER BY TABLE_SCHEMA, TABLE_NAME;
+    t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+    AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `
 				mock.ExpectQuery(expectedQuery).
 					WillReturnError(errors.New("database connection failed"))

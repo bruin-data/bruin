@@ -687,6 +687,7 @@ type GoogleAdsConnection struct {
 	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 	DeveloperToken     string `yaml:"dev_token,omitempty" json:"dev_token" mapstructure:"dev_token"`
+	LoginCustomerID    string `yaml:"login_customer_id,omitempty" json:"login_customer_id,omitempty" mapstructure:"login_customer_id"`
 }
 
 func (c GoogleAdsConnection) GetName() string {
@@ -1224,5 +1225,15 @@ type IndeedConnection struct {
 }
 
 func (c IndeedConnection) GetName() string {
+	return c.Name
+}
+
+type CustomerIoConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Region string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+}
+
+func (c CustomerIoConnection) GetName() string {
 	return c.Name
 }

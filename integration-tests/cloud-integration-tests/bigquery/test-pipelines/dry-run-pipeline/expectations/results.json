@@ -13,7 +13,7 @@
       "Timeline": null,
       "ReferencedTables": [
         {
-          "DatasetID": "dataset",
+          "DatasetID": "cloud_integration_test",
           "TableID": "dry_run_table"
         }
       ],

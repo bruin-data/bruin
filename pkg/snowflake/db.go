@@ -1084,18 +1084,22 @@ func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, erro
 	// Get the current database name
 	databaseName := db.config.Database
 
-	// Query to get all schemas and tables in the database
+	// Query to get all schemas and tables in the database with view definitions
 	q := fmt.Sprintf(`
 SELECT
-    table_schema,
-    table_name
+    t.table_schema,
+    t.table_name,
+    t.table_type,
+    v.view_definition
 FROM
-    %s.INFORMATION_SCHEMA.TABLES
+    %s.INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    %s.INFORMATION_SCHEMA.VIEWS v ON t.table_schema = v.table_schema AND t.table_name = v.table_name
 WHERE
-    table_type IN ('BASE TABLE', 'VIEW') 
-AND table_schema != 'INFORMATION_SCHEMA'
-ORDER BY table_schema, table_name;
-`, databaseName)
+    t.table_type IN ('BASE TABLE', 'VIEW') 
+AND t.table_schema != 'INFORMATION_SCHEMA'
+ORDER BY t.table_schema, t.table_name;
+`, databaseName, databaseName)
 
 	result, err := db.Select(ctx, &query.Query{Query: q})
 	if err != nil {
@@ -1109,7 +1113,7 @@ ORDER BY table_schema, table_name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 2 {
+		if len(row) != 4 {
 			continue
 		}
 
@@ -1120,6 +1124,16 @@ ORDER BY table_schema, table_name;
 		tableName, ok := row[1].(string)
 		if !ok {
 			continue
+		}
+		tableType, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+		var viewDefinition string
+		if row[3] != nil {
+			if vd, ok := row[3].(string); ok {
+				viewDefinition = vd
+			}
 		}
 
 		// Create schema if it doesn't exist
@@ -1132,10 +1146,20 @@ ORDER BY table_schema, table_name;
 			schemas[schemaKey] = schema
 		}
 
+		// Determine table type
+		var dbTableType ansisql.DBTableType
+		if tableType == "VIEW" {
+			dbTableType = ansisql.DBTableTypeView
+		} else {
+			dbTableType = ansisql.DBTableTypeTable
+		}
+
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name:    tableName,
-			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
+			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaKey].Tables = append(schemas[schemaKey].Tables, table)
 	}

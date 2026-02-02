@@ -191,6 +191,23 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		schemaList = []string{schema}
 	}
 
+	pathParts := strings.Split(pipelinePath, "/")
+	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
+		if len(pathParts) == 1 {
+			pipelinePath = "."
+		} else {
+			pipelinePath = strings.Join(pathParts[:len(pathParts)-1], "/")
+		}
+	}
+	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)
+	if err != nil {
+		return errors2.Wrap(err, "failed to get pipeline from path")
+	}
+	existingAssets := make(map[string]*pipeline.Asset, len(pipelineFound.Assets))
+	for _, asset := range pipelineFound.Assets {
+		existingAssets[strings.ToLower(asset.Name)] = asset
+	}
+
 	// If schema(s) specified, try to use GetDatabaseSummaryForSchemas if available
 	if len(schemaList) > 0 {
 		if schemaSummarizer, ok := conn.(interface {
@@ -218,19 +235,6 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		}
 	}
 
-	pathParts := strings.Split(pipelinePath, "/")
-	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
-		pipelinePath = strings.Join(pathParts[:len(pathParts)-2], "/")
-	}
-	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)
-	if err != nil {
-		return errors2.Wrap(err, "failed to get pipeline from path")
-	}
-	existingAssets := make(map[string]*pipeline.Asset, len(pipelineFound.Assets))
-	for _, asset := range pipelineFound.Assets {
-		existingAssets[strings.ToLower(asset.Name)] = asset
-	}
-
 	assetsPath := filepath.Join(pipelinePath, "assets")
 	assetType := determineAssetTypeFromConnection(connectionName, conn)
 	totalTables := 0
@@ -243,7 +247,7 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 		}
 		for _, table := range schemaObj.Tables {
 			fullName := fmt.Sprintf("%s.%s", schemaObj.Name, table.Name)
-			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns)
+			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns, table)
 			if warning != "" {
 				warnings = append(warnings, importWarning{tableName: fullName, message: warning})
 			}
@@ -371,28 +375,119 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	return nil
 }
 
-func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool) (*pipeline.Asset, string) {
+func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool, table *ansisql.DBTable) (*pipeline.Asset, string) {
 	schemaFolder := filepath.Join(assetsPath, strings.ToLower(schemaName))
 
-	fileName := strings.ToLower(tableName) + ".asset.yml"
-	filePath := filepath.Join(schemaFolder, fileName)
-	asset := &pipeline.Asset{
-		Type: assetType,
-		ExecutableFile: pipeline.ExecutableFile{
-			Name: fileName,
-			Path: filePath,
-		},
-		Description: fmt.Sprintf("Imported table %s.%s", schemaName, tableName),
+	// Check if this is a view with a view definition
+	isView := table.Type == ansisql.DBTableTypeView && table.ViewDefinition != ""
+
+	var fileName, filePath string
+	var materializationType pipeline.MaterializationType
+	var content string
+
+	if isView {
+		// For views, create a .sql file with the view definition
+		fileName = strings.ToLower(tableName) + ".sql"
+		filePath = filepath.Join(schemaFolder, fileName)
+		content = table.ViewDefinition
+		materializationType = pipeline.MaterializationTypeView
+	} else {
+		// For tables, create a .asset.yml file
+		fileName = strings.ToLower(tableName) + ".asset.yml"
+		filePath = filepath.Join(schemaFolder, fileName)
 	}
 
-	if fillColumns {
-		err := fillAssetColumnsFromDB(ctx, asset, conn, schemaName, tableName)
-		if err != nil {
-			return asset, fmt.Sprintf("Could not fill columns: %v", err)
+	// Determine the asset type for views - convert source types to query types
+	actualAssetType := assetType
+	if isView {
+		actualAssetType = convertSourceTypeToQueryType(assetType)
+	}
+
+	asset := &pipeline.Asset{
+		Type: actualAssetType,
+		ExecutableFile: pipeline.ExecutableFile{
+			Name:    fileName,
+			Path:    filePath,
+			Content: content,
+		},
+		Description: fmt.Sprintf("Imported %s %s.%s", getTableTypeDescription(table.Type), schemaName, tableName),
+	}
+
+	// Set materialization for views
+	if isView {
+		asset.Materialization = pipeline.Materialization{
+			Type: materializationType,
 		}
 	}
 
+	if !fillColumns {
+		return asset, ""
+	}
+
+	// Use pre-fetched columns from GetDatabaseSummary if available (e.g., BigQuery)
+	if len(table.Columns) > 0 {
+		columns := make([]pipeline.Column, 0, len(table.Columns))
+		for _, col := range table.Columns {
+			columns = append(columns, pipeline.Column{
+				Name:      col.Name,
+				Type:      col.Type,
+				Checks:    []pipeline.ColumnCheck{},
+				Upstreams: []*pipeline.UpstreamColumn{},
+			})
+		}
+		asset.Columns = columns
+		return asset, ""
+	}
+
+	// Fall back to querying the database directly for databases that don't
+	// populate columns in GetDatabaseSummary (e.g., Postgres, Snowflake)
+	err := fillAssetColumnsFromDB(ctx, asset, conn, schemaName, tableName)
+	if err != nil {
+		return asset, fmt.Sprintf("Could not fill columns: %v", err)
+	}
+
 	return asset, ""
+}
+
+// getTableTypeDescription returns a human-readable description for the table type.
+func getTableTypeDescription(tableType ansisql.DBTableType) string {
+	if tableType == ansisql.DBTableTypeView {
+		return "view"
+	}
+	return "table"
+}
+
+// convertSourceTypeToQueryType converts a source asset type to its corresponding query type.
+// This is needed because views need to be executable queries, not source definitions.
+// nolint:exhaustive
+func convertSourceTypeToQueryType(sourceType pipeline.AssetType) pipeline.AssetType {
+	switch sourceType {
+	case pipeline.AssetTypeBigquerySource:
+		return pipeline.AssetTypeBigqueryQuery
+	case pipeline.AssetTypeSnowflakeSource:
+		return pipeline.AssetTypeSnowflakeQuery
+	case pipeline.AssetTypePostgresSource:
+		return pipeline.AssetTypePostgresQuery
+	case pipeline.AssetTypeRedshiftSource:
+		return pipeline.AssetTypeRedshiftQuery
+	case pipeline.AssetTypeMsSQLSource:
+		return pipeline.AssetTypeMsSQLQuery
+	case pipeline.AssetTypeSynapseSource:
+		return pipeline.AssetTypeSynapseQuery
+	case pipeline.AssetTypeDatabricksSource:
+		return pipeline.AssetTypeDatabricksQuery
+	case pipeline.AssetTypeAthenaSource:
+		return pipeline.AssetTypeAthenaQuery
+	case pipeline.AssetTypeDuckDBSource:
+		return pipeline.AssetTypeDuckDBQuery
+	case pipeline.AssetTypeClickHouseSource:
+		return pipeline.AssetTypeClickHouse
+	case pipeline.AssetTypeOracleSource:
+		return pipeline.AssetTypeOracleQuery
+	default:
+		// For types without a query equivalent, return the original
+		return sourceType
+	}
 }
 
 // maxInt returns the larger of two integers.
@@ -1478,7 +1573,11 @@ func importSelectedQueries(ctx context.Context, pipelinePath string, queries []S
 	// Ensure pipeline path and get pipeline info
 	pathParts := strings.Split(pipelinePath, "/")
 	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
-		pipelinePath = strings.Join(pathParts[:len(pathParts)-2], "/")
+		if len(pathParts) == 1 {
+			pipelinePath = "."
+		} else {
+			pipelinePath = strings.Join(pathParts[:len(pathParts)-1], "/")
+		}
 	}
 
 	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)

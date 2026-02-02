@@ -953,12 +953,14 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 			name: "test successful database summary",
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "schema_name"},
+					pgconn.FieldDescription{Name: "table_schema"},
 					pgconn.FieldDescription{Name: "table_name"},
+					pgconn.FieldDescription{Name: "table_type"},
+					pgconn.FieldDescription{Name: "view_definition"},
 				).
-					AddRow("schema1", "table1").
-					AddRow("schema1", "table2").
-					AddRow("schema2", "table2")
+					AddRow("schema1", "table1", "BASE TABLE", nil).
+					AddRow("schema1", "table2", "BASE TABLE", nil).
+					AddRow("schema2", "table2", "BASE TABLE", nil)
 
 				mock.ExpectQuery(".*").WithArgs("database1").WillReturnRows(rows)
 			},
@@ -970,10 +972,12 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 						Tables: []*ansisql.DBTable{
 							{
 								Name:    "table1",
+								Type:    ansisql.DBTableTypeTable,
 								Columns: []*ansisql.DBColumn{},
 							},
 							{
 								Name:    "table2",
+								Type:    ansisql.DBTableTypeTable,
 								Columns: []*ansisql.DBColumn{},
 							},
 						},
@@ -983,7 +987,44 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 						Tables: []*ansisql.DBTable{
 							{
 								Name:    "table2",
+								Type:    ansisql.DBTableTypeTable,
 								Columns: []*ansisql.DBColumn{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "test database summary with views",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "table_schema"},
+					pgconn.FieldDescription{Name: "table_name"},
+					pgconn.FieldDescription{Name: "table_type"},
+					pgconn.FieldDescription{Name: "view_definition"},
+				).
+					AddRow("public", "users", "BASE TABLE", nil).
+					AddRow("public", "active_users", "VIEW", "SELECT * FROM users WHERE active = true")
+
+				mock.ExpectQuery(".*").WithArgs("database1").WillReturnRows(rows)
+			},
+			want: &ansisql.DBDatabase{
+				Name: "database1",
+				Schemas: []*ansisql.DBSchema{
+					{
+						Name: "public",
+						Tables: []*ansisql.DBTable{
+							{
+								Name:    "users",
+								Type:    ansisql.DBTableTypeTable,
+								Columns: []*ansisql.DBColumn{},
+							},
+							{
+								Name:           "active_users",
+								Type:           ansisql.DBTableTypeView,
+								ViewDefinition: "SELECT * FROM users WHERE active = true",
+								Columns:        []*ansisql.DBColumn{},
 							},
 						},
 					},

@@ -20,6 +20,7 @@ To connect to Google Ads, you need to add a configuration item to the connection
           customer_id: "YOUR_GOOGLE_ADS_CUSTOMER_ID"
           dev_token: "YOUR_DEVELOPER_TOKEN"
           service_account_file: "/path/to/service-account.json"
+          login_customer_id: "YOUR_MCC_CUSTOMER_ID"  # optional, only needed for MCC accounts
 
           # alternatively, you can specify the service account json directly
           service_account_json: |
@@ -27,13 +28,14 @@ To connect to Google Ads, you need to add a configuration item to the connection
             "type": "service_account",
             ...
           }
-          
+
 ```
 
-- `customer_id`: The account ID of your google ads account.
-- `dev_token`: [Developer Token](https://developers.google.com/google-ads/api/docs/get-started/dev-token) for your application. 
+- `customer_id`: The account ID of your google ads account. You can specify multiple customer IDs separated by commas (e.g., `1234567890,0987654321`).
+- `dev_token`: [Developer Token](https://developers.google.com/google-ads/api/docs/get-started/dev-token) for your application.
 - `service_account_file`: The path to the service account JSON file
 - `service_account_json`: The service account JSON content itself
+- `login_customer_id` (optional): The Manager Account (MCC) ID to use when accessing client accounts. Required when your service account has access to an MCC and you want to pull data from a client account under that MCC. See [Google Ads API docs](https://developers.google.com/google-ads/api/docs/concepts/call-structure#cid) for more details.
 
 
 For details on how to obtain these credentials, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/google-ads.html#setting-up-a-google-ads-integration).
@@ -58,6 +60,34 @@ parameters:
 - connection: This is the destination connection.
 - source_connection: The name of the Google Ads connection defined in .bruin.yml.
 - source_table: The name of the resource in Google Ads you want to ingest. You can also request a custom report by specifying the source table as `daily:{resource}:{dimensions}:{metrics}`.
+
+### Overriding Customer IDs per Table
+
+You can override the customer ID from the connection by appending `:customer_ids` to the table name. This is useful when you want to ingest data from multiple customer accounts:
+
+```yaml
+name: public.campaigns
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-googleads
+  source_table: 'campaign_report_daily:1234567890,0987654321'
+  destination: postgres
+```
+
+For custom reports, you can also specify customer IDs at the end of the report specification:
+
+```yaml
+name: public.custom_report
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-googleads
+  source_table: 'daily:campaign:campaign.id,customer.id:clicks,impressions:1234567890,0987654321'
+  destination: postgres
+```
 
 ## Available Source Tables
 

@@ -1,5 +1,5 @@
 /* @bruin
-name: test.menu
+name: cloud_integration_test.scd2_by_column_menu
 type: bq.sql 
 materialization:
   type: table

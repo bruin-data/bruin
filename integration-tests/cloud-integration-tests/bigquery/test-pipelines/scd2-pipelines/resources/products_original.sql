@@ -1,5 +1,5 @@
 /* @bruin
-name: test.products
+name: cloud_integration_test.scd2_by_time_products
 type: bq.sql
 
 materialization:

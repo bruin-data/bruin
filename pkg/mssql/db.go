@@ -356,14 +356,18 @@ func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, erro
 	q := fmt.Sprintf(`
 USE [%s];
 SELECT
-    TABLE_SCHEMA,
-    TABLE_NAME
+    t.TABLE_SCHEMA,
+    t.TABLE_NAME,
+    t.TABLE_TYPE,
+    v.VIEW_DEFINITION
 FROM
-    INFORMATION_SCHEMA.TABLES
+    INFORMATION_SCHEMA.TABLES t
+LEFT JOIN
+    INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
 WHERE
-    TABLE_TYPE IN ('BASE TABLE', 'VIEW')
-    AND TABLE_SCHEMA NOT IN ('sys', 'information_schema')
-ORDER BY TABLE_SCHEMA, TABLE_NAME;
+    t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+    AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `, currentDB)
 
 	result, err := db.Select(ctx, &query.Query{Query: q})
@@ -378,7 +382,7 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 2 {
+		if len(row) != 4 {
 			continue
 		}
 
@@ -392,6 +396,18 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 			continue
 		}
 
+		tableType, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		var viewDefinition string
+		if row[3] != nil {
+			if vd, ok := row[3].(string); ok {
+				viewDefinition = vd
+			}
+		}
+
 		// Create schema if it doesn't exist
 		if _, exists := schemas[schemaName]; !exists {
 			schema := &ansisql.DBSchema{
@@ -401,10 +417,20 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 			schemas[schemaName] = schema
 		}
 
+		// Determine table type
+		var dbTableType ansisql.DBTableType
+		if tableType == "VIEW" {
+			dbTableType = ansisql.DBTableTypeView
+		} else {
+			dbTableType = ansisql.DBTableTypeTable
+		}
+
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name:    tableName,
-			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+			Name:           tableName,
+			Type:           dbTableType,
+			ViewDefinition: viewDefinition,
+			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
 	}

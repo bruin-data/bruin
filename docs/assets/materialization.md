@@ -106,6 +106,38 @@ select 2 as one
 
 The result will be a table `dashboard.hello_bq` with the result of the query.
 
+## Full Refresh and `refresh_restricted`
+
+When running assets with the `--full-refresh` flag, Bruin will drop and recreate tables to ensure a clean state. However, there are cases where you may want to protect certain tables from being dropped during a full refresh, such as:
+
+- Tables with external dependencies
+- Tables that take a long time to rebuild
+- Critical production tables that should never be accidentally dropped
+
+You can use the `refresh_restricted` flag to prevent an asset from being dropped during a full refresh:
+
+```bruin-sql
+/* @bruin
+
+name: dashboard.critical_table
+type: bq.sql
+
+materialization:
+    type: table
+
+refresh_restricted: true
+
+@bruin */
+
+select * from important_data
+```
+
+**Behavior:**
+- `refresh_restricted: true` - Table will NOT be dropped during full refresh. The asset will use its normal materialization strategy instead.
+- `refresh_restricted: false` or not set - Table will be dropped and recreated during full refresh (default behavior).
+
+This is useful when you want to run `bruin run --full-refresh` on your entire pipeline but protect specific critical tables from being dropped.
+
 ### `delete+insert`
 `delete+insert` strategy is useful for incremental updates. It deletes the rows that are no longer present in the query results and inserts the new rows. This is useful when you have a large table and you want to minimize the amount of data that needs to be written.
 
@@ -558,4 +590,4 @@ Notice how:
 | **Configuration** | Only requires primary_key columns | Requires both primary_key columns and incremental_key |
 
 > [!WARNING]
-> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL and DuckDB.
+> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, and Databricks.

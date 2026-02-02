@@ -232,6 +232,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "ClickUp", link: "/ingestion/clickup"},
                             {text: "Couchbase", link: "/ingestion/couchbase"},
                             {text: "Cursor", link: "/ingestion/cursor"},
+                            {text: "Customer.io", link: "/ingestion/customerio"},
                             {text: "DB2", link: "/ingestion/db2"},
                             {text: "Docebo", link: "/ingestion/docebo"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb"},

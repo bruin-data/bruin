@@ -36,7 +36,7 @@ var AvailablePythonVersions = map[string]bool{
 
 const (
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.14.119"
+	ingestrVersion          = "0.14.126"
 	sqlfluffVersion         = "3.4.1"
 )
 
@@ -101,6 +101,21 @@ func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 }
 
 func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
+	// Check if gong path is provided in context - if so, use gong binary directly
+	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
+		if path, ok := gongPath.(string); ok && path != "" {
+			// Warn if extraPackages are provided but will be ignored with gong
+			if len(extraPackages) > 0 {
+				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
+			}
+			// Use gong binary directly instead of ingestr
+			return u.Cmd.Run(ctx, repo, &CommandInstance{
+				Name: path,
+				Args: args,
+			})
+		}
+	}
+
 	binaryFullPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
 	if err != nil {
 		return err
@@ -356,16 +371,49 @@ df = module.materialize()
 import pyarrow as pa
 import pyarrow.ipc as ipc
 
-if str(type(df)) == "<class 'pandas.core.frame.DataFrame'>":
+# Try importing pandas and polars for isinstance checks
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    import polars as pl
+except ImportError:
+    pl = None
+
+# Use isinstance() for robust type checking across pandas/polars versions
+# This works across all pandas versions (including 3.0+) regardless of string representation
+if pd is not None and isinstance(df, pd.DataFrame):
     table = pa.Table.from_pandas(df)
-elif str(type(df)) == "<class 'polars.dataframe.frame.DataFrame'>":
+elif pl is not None and isinstance(df, pl.DataFrame):
     table = df.to_arrow()
-elif str(type(df)) == "<class 'generator'>":
-    table = pa.Table.from_pylist(list(df)) # TODO: Terrible implementation, but works for now
-elif str(type(df)) == "<class 'list'>":
-    table = pa.Table.from_pylist(df)
+elif isinstance(df, (list, tuple)):
+    table = pa.Table.from_pylist(list(df))
+elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
+    # Handle generators and other iterables (but not strings/bytes)
+    table = pa.Table.from_pylist(list(df))
 else:
-    raise TypeError(f"Unsupported return type: {type(df)}")
+    # Fallback: check type module/name for pandas/polars if isinstance failed
+    # This handles edge cases where pandas/polars might not be importable
+    type_name = type(df).__name__
+    type_module = type(df).__module__
+    if 'pandas' in type_module and type_name == 'DataFrame':
+        # Try to import pandas if not already imported
+        try:
+            import pandas as pd
+            table = pa.Table.from_pandas(df)
+        except ImportError:
+            raise TypeError(f"Unsupported return type: {type(df)}. pandas DataFrame detected but pandas cannot be imported.")
+    elif 'polars' in type_module and type_name == 'DataFrame':
+        # Try to import polars if not already imported
+        try:
+            import polars as pl
+            table = df.to_arrow()
+        except ImportError:
+            raise TypeError(f"Unsupported return type: {type(df)}. polars DataFrame detected but polars cannot be imported.")
+    else:
+        raise TypeError(f"Unsupported return type: {type(df)}")
 
 # Write to memory mapped file
 with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
