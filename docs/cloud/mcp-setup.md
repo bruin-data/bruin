@@ -48,7 +48,7 @@ claude mcp list
 claude mcp get asset_server
 
 # Remove a server
-claude mcp remove asset
+claude mcp remove asset_server
 ```
 
 Inside Claude Code, type **`/mcp`** to see MCP status and connected servers.
