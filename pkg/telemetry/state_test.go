@@ -9,6 +9,8 @@ import (
 )
 
 func TestLoadOrCreateInstallStateWithFS_CreatesAndPersists(t *testing.T) {
+	t.Parallel()
+
 	fs := afero.NewMemMapFs()
 	homeDir := "/home/test/.bruin"
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
