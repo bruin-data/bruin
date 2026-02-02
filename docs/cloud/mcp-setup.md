@@ -1,4 +1,4 @@
-# How to Use MCP Tools in Cursor and Claude Code
+# Cloud MCP
 
 This guide shows how to connect **Cursor**, **Claude Code** and **Codex** to the **Bruin Asset MCP server** so your AI assistant can securely call Bruin Cloud tools (for example: listing pipelines, inspecting runs, or triggering actions) directly from chat.
 
