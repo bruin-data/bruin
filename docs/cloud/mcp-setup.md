@@ -45,7 +45,7 @@ claude mcp add --transport http asset_server https://cloud.getbruin.com/mcp/api/
 claude mcp list
 
 # Details for one server
-claude mcp get asset
+claude mcp get asset_server
 
 # Remove a server
 claude mcp remove asset
