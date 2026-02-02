@@ -47,7 +47,7 @@ func loadOrCreateInstallStateWithFS(fs afero.Fs, bruinHomeDir string, appVersion
 	}
 
 	if err := writeInstallState(fs, statePath, newState); err != nil {
-		return newState, false, err
+		return newState, true, err
 	}
 
 	return newState, true, nil

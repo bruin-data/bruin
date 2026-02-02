@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -47,23 +48,26 @@ func Init() io.Closer {
 	}
 
 	state, isNew, err := loadOrCreateInstallState(AppVersion)
-	if err == nil {
-		lock.Lock()
-		installID = state.InstallID
-		lock.Unlock()
+	if err != nil {
+		log.Printf("telemetry: failed to load install state: %v", err)
+		return client
+	}
 
-		if isNew {
-			SendEvent("install", analytics.Properties{
-				"install_id":      state.InstallID,
-				"install_at":      state.InstallAt,
-				"install_version": state.InstallVersion,
-			})
-			SendEvent("first_run", analytics.Properties{
-				"install_id":      state.InstallID,
-				"install_at":      state.InstallAt,
-				"install_version": state.InstallVersion,
-			})
-		}
+	lock.Lock()
+	installID = state.InstallID
+	lock.Unlock()
+
+	if isNew {
+		SendEvent("install", analytics.Properties{
+			"install_id":      state.InstallID,
+			"install_at":      state.InstallAt,
+			"install_version": state.InstallVersion,
+		})
+		SendEvent("first_run", analytics.Properties{
+			"install_id":      state.InstallID,
+			"install_at":      state.InstallAt,
+			"install_version": state.InstallVersion,
+		})
 	}
 
 	return client
