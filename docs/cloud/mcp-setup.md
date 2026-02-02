@@ -10,7 +10,7 @@ The Asset MCP server is exposed at:
 
 Create API token with MCP permission:
 
-1. Log in to the Bruin cloud.
+1. Log in to the Bruin Cloud.
 2. Go to **Team settings** → **API Tokens**.
 3. Create a new token and grant it (`mcp:token`) permission.
 4. Copy the **plain-text token** once; it is not shown again.
@@ -19,14 +19,20 @@ Create API token with MCP permission:
 
 Go to Settings > Cursor Settings > Tools & MCP > New MCP Server.
 
-Edit the **`.cursor/mcp.toml`** file and add your token.
+Edit the **`.cursor/mcp.json`** file and add your token.
 
-```toml
-[mcpServers.asset]
-url = "https://cloud.getbruin.com/mcp/api/asset"
-
-[mcpServers.asset.headers]
-Authorization = "Bearer YOUR_TOKEN_HERE"
+```json
+{
+  "mcpServers": {
+    "asset": {
+      "type": "streamable-http",
+      "url": "https://cloud.getbruin.com/mcp/api/asset",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
 ```
 
 Restart Cursor (or reload the window) so it picks up the MCP config.
