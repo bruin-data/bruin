@@ -112,10 +112,6 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: fmt.Sprintf("Failed to materialize query: %s", err),
-				Context: []string{
-					"The failing query is as follows:",
-					foundQuery.Query,
-				},
 			})
 		}
 		foundQuery.Query = materialized
@@ -148,19 +144,11 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: fmt.Sprintf("Failed to validate query: %s", err),
-			Context: []string{
-				"The failing query is as follows:",
-				foundQuery.Query,
-			},
 		})
 	} else if !valid {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "Query is invalid: " + foundQuery.Query,
-			Context: []string{
-				"The failing query is as follows:",
-				foundQuery.Query,
-			},
 		})
 	}
 
@@ -238,10 +226,6 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 					issues = append(issues, &Issue{
 						Task:        task,
 						Description: fmt.Sprintf("Failed to materialize query: %s", err),
-						Context: []string{
-							"The failing query is as follows:",
-							foundQuery.Query,
-						},
 					})
 				}
 				foundQuery.Query = materialized
@@ -277,10 +261,6 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 				issues = append(issues, &Issue{
 					Task:        task,
 					Description: fmt.Sprintf("Invalid query found: %s", err),
-					Context: []string{
-						"The failing query is as follows:",
-						foundQuery.Query,
-					},
 				})
 				mu.Unlock()
 			} else if !valid {
@@ -288,10 +268,6 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 				issues = append(issues, &Issue{
 					Task:        task,
 					Description: fmt.Sprintf("Query '%s' is invalid", foundQuery.Query),
-					Context: []string{
-						"The failing query is as follows:",
-						foundQuery.Query,
-					},
 				})
 				mu.Unlock()
 			}

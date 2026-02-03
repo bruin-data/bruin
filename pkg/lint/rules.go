@@ -1319,13 +1319,11 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 				issues = append(issues, &Issue{
 					Task:        asset,
 					Description: fmt.Sprintf("Failed to validate custom check query '%s': %s", check.Name, err),
-					Context:     []string{renderedQuery},
 				})
 			} else if !valid {
 				issues = append(issues, &Issue{
 					Task:        asset,
 					Description: "Custom check query is invalid:" + renderedQuery,
-					Context:     []string{renderedQuery},
 				})
 			}
 		}
