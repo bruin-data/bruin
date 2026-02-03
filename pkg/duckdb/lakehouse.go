@@ -8,7 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 )
 
-// Validates the lakehouse config for DuckDB-specific requirements
+// Validates the lakehouse config for DuckDB-specific requirements.
 func ValidateLakehouseConfig(lh *config.LakehouseConfig) error {
 	if lh == nil {
 		return nil

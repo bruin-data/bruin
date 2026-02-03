@@ -19,7 +19,6 @@ const (
 	// Future: CatalogTypeRest, CatalogTypePostgres.
 )
 
-
 type CatalogAuth struct {
 	// AWS credentials (for Glue)
 	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key"`
@@ -43,10 +42,10 @@ type CatalogConfig struct {
 
 	// Authentication
 	Auth *CatalogAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+
+	// Optional secret name for catalog authentication
+	SecretName string `yaml:"secret_name,omitempty" json:"secret_name,omitempty" mapstructure:"secret_name"`
 }
-
-
-
 
 type StorageType string
 
@@ -74,6 +73,10 @@ type StorageConfig struct {
 	Location string       `yaml:"location" json:"location" mapstructure:"location"`
 	Region   string       `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Auth     *StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+
+	// Optional secret name and scope for storage authentication
+	SecretName string `yaml:"secret_name,omitempty" json:"secret_name,omitempty" mapstructure:"secret_name"`
+	Scope      string `yaml:"scope,omitempty" json:"scope,omitempty" mapstructure:"scope"`
 }
 
 type LakehouseConfig struct {
@@ -82,7 +85,7 @@ type LakehouseConfig struct {
 	Storage *StorageConfig  `yaml:"storage,omitempty" json:"storage,omitempty" mapstructure:"storage"`
 }
 
-// Validate performs basic structural validation of the LakehouseConfig. (engine-agnostic)
+// Validate performs basic structural validation of the LakehouseConfig (engine-agnostic).
 func (lh *LakehouseConfig) Validate() error {
 	if lh.Format == "" {
 		return errors.New("lakehouse format is required")
