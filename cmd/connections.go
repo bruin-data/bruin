@@ -18,7 +18,7 @@ import (
 
 func Connections() *cli.Command {
 	return &cli.Command{
-		Name:   "connections",
+		Name: "connections",
 		Commands: []*cli.Command{
 			ListConnections(),
 			AddConnection(),
