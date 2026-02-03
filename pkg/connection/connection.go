@@ -1185,7 +1185,8 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	m.mutex.Unlock()
 
 	client, err := duck.NewClient(duck.Config{
-		Path: connection.Path,
+		Path:      connection.Path,
+		Lakehouse: connection.Lakehouse,
 	})
 	if err != nil {
 		return err
