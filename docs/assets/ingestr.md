@@ -44,7 +44,7 @@ parameters:
   incremental_strategy: replace | append | merge | delete+insert
   incremental_key: string
   sql_backend: pyarrow | sqlalchemy
-  loader_file_format: jsonl | csv | parquet]
+  loader_file_format: jsonl | csv | parquet
   enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
 ```
 

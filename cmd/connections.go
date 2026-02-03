@@ -19,7 +19,6 @@ import (
 func Connections() *cli.Command {
 	return &cli.Command{
 		Name:   "connections",
-		Hidden: true,
 		Commands: []*cli.Command{
 			ListConnections(),
 			AddConnection(),
