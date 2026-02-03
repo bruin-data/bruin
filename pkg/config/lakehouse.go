@@ -66,13 +66,9 @@ func (a *StorageAuth) IsS3() bool {
 }
 
 type StorageConfig struct {
-	Type     StorageType  `yaml:"type" json:"type" mapstructure:"type"`
-	Location string       `yaml:"location" json:"location" mapstructure:"location"`
-	Region   string       `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
-	Auth     *StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
-
-	// Optional secret name and scope for storage authentication
-	Scope string `yaml:"scope,omitempty" json:"scope,omitempty" mapstructure:"scope"`
+	Type   StorageType  `yaml:"type" json:"type" mapstructure:"type"`
+	Region string       `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+	Auth   *StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
 }
 
 type LakehouseConfig struct {

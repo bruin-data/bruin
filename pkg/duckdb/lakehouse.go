@@ -115,7 +115,7 @@ func (l *LakehouseAttacher) generateSecretStatements(lh *config.LakehouseConfig,
 
 	// Storage
 	if lh.Storage != nil && lh.Storage.Auth != nil && lh.Storage.Auth.IsS3() {
-		storageSecret := l.generateS3Secret(defaultSecretName(alias, "storage"), lh.Storage, l.storageScope(lh.Storage))
+		storageSecret := l.generateS3Secret(defaultSecretName(alias, "storage"), lh.Storage)
 		if storageSecret != "" {
 			statements = append(statements, storageSecret)
 		}
@@ -132,20 +132,7 @@ func (l *LakehouseAttacher) generateSecretStatements(lh *config.LakehouseConfig,
 	return statements
 }
 
-func (l *LakehouseAttacher) storageScope(storage *config.StorageConfig) string {
-	if storage == nil {
-		return ""
-	}
-	if storage.Scope != "" {
-		return storage.Scope
-	}
-	if strings.HasPrefix(storage.Location, "s3://") {
-		return storage.Location
-	}
-	return ""
-}
-
-func (l *LakehouseAttacher) generateS3Secret(name string, storage *config.StorageConfig, scope string) string {
+func (l *LakehouseAttacher) generateS3Secret(name string, storage *config.StorageConfig) string {
 	auth := storage.Auth
 	if auth.AccessKey == "" || auth.SecretKey == "" {
 		return ""
@@ -164,9 +151,7 @@ func (l *LakehouseAttacher) generateS3Secret(name string, storage *config.Storag
 	if storage.Region != "" {
 		parts = append(parts, ",   REGION "+dollarQuote(storage.Region))
 	}
-	if scope != "" {
-		parts = append(parts, ",   SCOPE "+dollarQuote(scope))
-	}
+	parts = append(parts, ",   SCOPE "+dollarQuote("s3://"))
 
 	parts = append(parts, ")")
 	return strings.Join(parts, "\n")
