@@ -115,7 +115,7 @@ func (l *LakehouseAttacher) generateSecretStatements(lh *config.LakehouseConfig,
 
 	// Storage
 	if lh.Storage != nil && lh.Storage.Auth != nil && lh.Storage.Auth.IsS3() {
-		storageSecret := l.generateS3Secret(l.storageSecretName(alias, lh.Storage), lh.Storage, l.storageScope(lh.Storage))
+		storageSecret := l.generateS3Secret(defaultSecretName(alias, "storage"), lh.Storage, l.storageScope(lh.Storage))
 		if storageSecret != "" {
 			statements = append(statements, storageSecret)
 		}
@@ -123,27 +123,13 @@ func (l *LakehouseAttacher) generateSecretStatements(lh *config.LakehouseConfig,
 
 	// Catalog
 	if lh.Catalog != nil && lh.Catalog.Auth != nil && lh.Catalog.Auth.IsAWS() {
-		catalogSecret := l.generateCatalogSecret(l.catalogSecretName(alias, lh.Catalog), lh.Catalog)
+		catalogSecret := l.generateCatalogSecret(defaultSecretName(alias, "catalog"), lh.Catalog)
 		if catalogSecret != "" {
 			statements = append(statements, catalogSecret)
 		}
 	}
 
 	return statements
-}
-
-func (l *LakehouseAttacher) storageSecretName(alias string, storage *config.StorageConfig) string {
-	if storage != nil && storage.SecretName != "" {
-		return storage.SecretName
-	}
-	return defaultSecretName(alias, "storage")
-}
-
-func (l *LakehouseAttacher) catalogSecretName(alias string, catalog *config.CatalogConfig) string {
-	if catalog != nil && catalog.SecretName != "" {
-		return catalog.SecretName
-	}
-	return defaultSecretName(alias, "catalog")
 }
 
 func (l *LakehouseAttacher) storageScope(storage *config.StorageConfig) string {

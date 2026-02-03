@@ -42,9 +42,6 @@ type CatalogConfig struct {
 
 	// Authentication
 	Auth *CatalogAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
-
-	// Optional secret name for catalog authentication
-	SecretName string `yaml:"secret_name,omitempty" json:"secret_name,omitempty" mapstructure:"secret_name"`
 }
 
 type StorageType string
@@ -75,8 +72,7 @@ type StorageConfig struct {
 	Auth     *StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
 
 	// Optional secret name and scope for storage authentication
-	SecretName string `yaml:"secret_name,omitempty" json:"secret_name,omitempty" mapstructure:"secret_name"`
-	Scope      string `yaml:"scope,omitempty" json:"scope,omitempty" mapstructure:"scope"`
+	Scope string `yaml:"scope,omitempty" json:"scope,omitempty" mapstructure:"scope"`
 }
 
 type LakehouseConfig struct {
