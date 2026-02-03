@@ -96,14 +96,6 @@ func TestValidateLakehouseConfig(t *testing.T) {
 	}
 }
 
-func TestLakehouseAttacher_GenerateAttachStatements_Nil(t *testing.T) {
-	t.Parallel()
-	attacher := NewLakehouseAttacher()
-	statements, err := attacher.GenerateAttachStatements(nil, "test_alias")
-	require.NoError(t, err)
-	assert.Nil(t, statements)
-}
-
 func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 	t.Parallel()
 
@@ -157,7 +149,6 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 	tests := []struct {
 		name    string
 		storage *config.StorageConfig
-		scope   string
 		want    string
 	}{
 		{
@@ -170,13 +161,13 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 					SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 				},
 			},
-			scope: "",
 			want: `CREATE OR REPLACE SECRET test_secret (
     TYPE s3
 ,   PROVIDER config
 ,   KEY_ID 'AKIAIOSFODNN7EXAMPLE'
 ,   SECRET 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
 ,   REGION 'us-east-1'
+,   SCOPE 's3://'
 )`,
 		},
 		{
@@ -190,7 +181,6 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 					SessionToken: "FwoGZXIvYXdzEBYaDPe...",
 				},
 			},
-			scope: "",
 			want: `CREATE OR REPLACE SECRET test_secret (
     TYPE s3
 ,   PROVIDER config
@@ -198,26 +188,7 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 ,   SECRET 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
 ,   SESSION_TOKEN 'FwoGZXIvYXdzEBYaDPe...'
 ,   REGION 'us-west-2'
-)`,
-		},
-		{
-			name: "s3 with scope",
-			storage: &config.StorageConfig{
-				Type:   config.StorageTypeS3,
-				Region: "us-east-1",
-				Auth: &config.StorageAuth{
-					AccessKey: "AKIAIOSFODNN7EXAMPLE",
-					SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-				},
-			},
-			scope: "s3://my-bucket/path",
-			want: `CREATE OR REPLACE SECRET test_secret (
-    TYPE s3
-,   PROVIDER config
-,   KEY_ID 'AKIAIOSFODNN7EXAMPLE'
-,   SECRET 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
-,   REGION 'us-east-1'
-,   SCOPE 's3://my-bucket/path'
+,   SCOPE 's3://'
 )`,
 		},
 		{
@@ -226,15 +197,14 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 				Type: config.StorageTypeS3,
 				Auth: &config.StorageAuth{},
 			},
-			scope: "",
-			want:  "",
+			want: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := attacher.generateS3Secret("test_secret", tt.storage, tt.scope)
+			result := attacher.generateS3Secret("test_secret", tt.storage)
 			assert.Equal(t, tt.want, result)
 		})
 	}
@@ -302,7 +272,7 @@ func TestLakehouseAttacher_GenerateIcebergAttach(t *testing.T) {
 	}
 }
 
-func TestLakehouseAttacher_GenerateAttachStatements_FullFlow(t *testing.T) {
+func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 	t.Parallel()
 	attacher := NewLakehouseAttacher()
 
@@ -312,8 +282,15 @@ func TestLakehouseAttacher_GenerateAttachStatements_FullFlow(t *testing.T) {
 		alias        string
 		wantContains []string
 		wantMinLen   int
+		wantNil      bool
 		wantErr      bool
 	}{
+		{
+			name:    "nil config returns nil statements",
+			lh:      nil,
+			alias:   "test_alias",
+			wantNil: true,
+		},
 		{
 			name: "iceberg with glue, s3 storage and credentials",
 			lh: &config.LakehouseConfig{
@@ -324,9 +301,8 @@ func TestLakehouseAttacher_GenerateAttachStatements_FullFlow(t *testing.T) {
 					Region:    "us-east-1",
 				},
 				Storage: &config.StorageConfig{
-					Type:     config.StorageTypeS3,
-					Location: "s3://my-bucket/warehouse",
-					Region:   "us-east-1",
+					Type:   config.StorageTypeS3,
+					Region: "us-east-1",
 					Auth: &config.StorageAuth{
 						AccessKey: "AKIAEXAMPLE",
 						SecretKey: "secretkey",
@@ -380,6 +356,11 @@ func TestLakehouseAttacher_GenerateAttachStatements_FullFlow(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			if tt.wantNil {
+				assert.Nil(t, statements)
+				return
+			}
+
 			assert.GreaterOrEqual(t, len(statements), tt.wantMinLen)
 
 			// Join all statements to check for expected content

@@ -97,8 +97,7 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 					Region:    "us-east-1",
 				},
 				Storage: &StorageConfig{
-					Type:     StorageTypeS3,
-					Location: "s3://my-bucket/warehouse",
+					Type: StorageTypeS3,
 				},
 			},
 			wantErr: false,
@@ -120,22 +119,25 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 	}
 }
 
-func TestLakehouseFormat_Constants(t *testing.T) {
+func TestTypeConstants(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, LakehouseFormatIceberg, LakehouseFormat("iceberg"))
-}
+	tests := []struct {
+		name string
+		got  any
+		want any
+	}{
+		{"lakehouse format", LakehouseFormat("iceberg"), LakehouseFormatIceberg},
+		{"catalog type", CatalogType("glue"), CatalogTypeGlue},
+		{"storage type", StorageType("s3"), StorageTypeS3},
+	}
 
-func TestCatalogType_Constants(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, CatalogTypeGlue, CatalogType("glue"))
-}
-
-func TestStorageType_Constants(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, StorageTypeS3, StorageType("s3"))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.got)
+		})
+	}
 }
 
 func TestCatalogAuth_IsAWS(t *testing.T) {
@@ -183,37 +185,19 @@ func TestStorageAuth_IsS3(t *testing.T) {
 	}
 }
 
-func TestCatalogAuth_Fields(t *testing.T) {
+func TestStructFieldAssignments(t *testing.T) {
 	t.Parallel()
 
-	auth := CatalogAuth{
+	catalogAuth := CatalogAuth{
 		AccessKey:    "access",
 		SecretKey:    "secret",
 		SessionToken: "session",
 	}
-
-	assert.Equal(t, "access", auth.AccessKey)
-	assert.Equal(t, "secret", auth.SecretKey)
-	assert.Equal(t, "session", auth.SessionToken)
-}
-
-func TestStorageAuth_Fields(t *testing.T) {
-	t.Parallel()
-
-	auth := StorageAuth{
+	storageAuth := StorageAuth{
 		AccessKey:    "access",
 		SecretKey:    "secret",
 		SessionToken: "session",
 	}
-
-	assert.Equal(t, "access", auth.AccessKey)
-	assert.Equal(t, "secret", auth.SecretKey)
-	assert.Equal(t, "session", auth.SessionToken)
-}
-
-func TestCatalogConfig_Fields(t *testing.T) {
-	t.Parallel()
-
 	catalog := CatalogConfig{
 		Type:      CatalogTypeGlue,
 		CatalogID: "123456789012",
@@ -223,37 +207,14 @@ func TestCatalogConfig_Fields(t *testing.T) {
 			SecretKey: "secret",
 		},
 	}
-
-	assert.Equal(t, CatalogTypeGlue, catalog.Type)
-	assert.Equal(t, "123456789012", catalog.CatalogID)
-	assert.Equal(t, "us-east-1", catalog.Region)
-	assert.NotNil(t, catalog.Auth)
-	assert.Equal(t, "AKIA...", catalog.Auth.AccessKey)
-}
-
-func TestStorageConfig_Fields(t *testing.T) {
-	t.Parallel()
-
 	storage := StorageConfig{
-		Type:     StorageTypeS3,
-		Location: "s3://my-bucket/warehouse",
-		Region:   "us-west-2",
+		Type:   StorageTypeS3,
+		Region: "us-west-2",
 		Auth: &StorageAuth{
 			AccessKey: "AKIAEXAMPLE",
 			SecretKey: "secretkey",
 		},
 	}
-
-	assert.Equal(t, StorageTypeS3, storage.Type)
-	assert.Equal(t, "s3://my-bucket/warehouse", storage.Location)
-	assert.Equal(t, "us-west-2", storage.Region)
-	assert.NotNil(t, storage.Auth)
-	assert.Equal(t, "AKIAEXAMPLE", storage.Auth.AccessKey)
-}
-
-func TestLakehouseConfig_Fields(t *testing.T) {
-	t.Parallel()
-
 	lh := LakehouseConfig{
 		Format: LakehouseFormatIceberg,
 		Catalog: &CatalogConfig{
@@ -261,14 +222,41 @@ func TestLakehouseConfig_Fields(t *testing.T) {
 			CatalogID: "123456789012",
 		},
 		Storage: &StorageConfig{
-			Type:     StorageTypeS3,
-			Location: "s3://my-bucket/warehouse",
+			Type: StorageTypeS3,
 		},
 	}
 
-	assert.Equal(t, LakehouseFormatIceberg, lh.Format)
-	assert.NotNil(t, lh.Catalog)
-	assert.Equal(t, CatalogTypeGlue, lh.Catalog.Type)
-	assert.NotNil(t, lh.Storage)
-	assert.Equal(t, StorageTypeS3, lh.Storage.Type)
+	tests := []struct {
+		name string
+		got  any
+		want any
+	}{
+		{"catalog auth access key", catalogAuth.AccessKey, "access"},
+		{"catalog auth secret key", catalogAuth.SecretKey, "secret"},
+		{"catalog auth session token", catalogAuth.SessionToken, "session"},
+		{"storage auth access key", storageAuth.AccessKey, "access"},
+		{"storage auth secret key", storageAuth.SecretKey, "secret"},
+		{"storage auth session token", storageAuth.SessionToken, "session"},
+		{"catalog type", catalog.Type, CatalogTypeGlue},
+		{"catalog id", catalog.CatalogID, "123456789012"},
+		{"catalog region", catalog.Region, "us-east-1"},
+		{"catalog auth present", catalog.Auth != nil, true},
+		{"catalog auth access key", catalog.Auth.AccessKey, "AKIA..."},
+		{"storage type", storage.Type, StorageTypeS3},
+		{"storage region", storage.Region, "us-west-2"},
+		{"storage auth present", storage.Auth != nil, true},
+		{"storage auth access key", storage.Auth.AccessKey, "AKIAEXAMPLE"},
+		{"lakehouse format", lh.Format, LakehouseFormatIceberg},
+		{"lakehouse catalog present", lh.Catalog != nil, true},
+		{"lakehouse catalog type", lh.Catalog.Type, CatalogTypeGlue},
+		{"lakehouse storage present", lh.Storage != nil, true},
+		{"lakehouse storage type", lh.Storage.Type, StorageTypeS3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.got)
+		})
+	}
 }
