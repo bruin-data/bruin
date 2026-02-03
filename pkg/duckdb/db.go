@@ -15,6 +15,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -157,7 +158,20 @@ func (w *sqlxWrapper) QueryRowContext(ctx context.Context, query string, args ..
 func NewClient(c DuckDBConfig) (*Client, error) {
 	LockDatabase(c.ToDBConnectionURI())
 	defer UnlockDatabase(c.ToDBConnectionURI())
-	conn, err := NewEphemeralConnection(c)
+
+	// Extract lakehouse config if available
+	var lakehouse *config.LakehouseConfig
+	var alias string
+	if cfg, ok := c.(Config); ok && cfg.HasLakehouse() {
+		// Validate lakehouse config for DuckDB-specific requirements
+		if err := ValidateLakehouseConfig(cfg.Lakehouse); err != nil {
+			return nil, fmt.Errorf("invalid lakehouse config: %w", err)
+		}
+		lakehouse = cfg.Lakehouse
+		alias = cfg.GetLakehouseAlias()
+	}
+
+	conn, err := NewEphemeralConnection(c, lakehouse, alias)
 	if err != nil {
 		return nil, err
 	}
