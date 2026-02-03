@@ -318,10 +318,12 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 				"CREATE OR REPLACE SECRET",
 				"PROVIDER config",
 				"ATTACH '123456789012' AS iceberg_catalog",
+				"CREATE SCHEMA IF NOT EXISTS iceberg_catalog.main",
+				"USE iceberg_catalog",
 				"TYPE 'iceberg'",
 				"ENDPOINT_TYPE 'glue'",
 			},
-			wantMinLen: 5, // at least 5 statements
+			wantMinLen: 7, // includes schema + use
 		},
 		{
 			name: "iceberg with glue only (no storage auth)",
@@ -340,8 +342,10 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 				"INSTALL aws",
 				"LOAD aws",
 				"ATTACH '123456789012' AS glue_only",
+				"CREATE SCHEMA IF NOT EXISTS glue_only.main",
+				"USE glue_only",
 			},
-			wantMinLen: 5,
+			wantMinLen: 7,
 		},
 	}
 

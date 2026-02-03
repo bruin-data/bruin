@@ -73,6 +73,8 @@ func (l *LakehouseAttacher) GenerateAttachStatements(lh *config.LakehouseConfig,
 		return nil, fmt.Errorf("failed to generate ATTACH statement: %w", err)
 	}
 	statements = append(statements, attachStmt)
+	statements = append(statements, "CREATE SCHEMA IF NOT EXISTS "+alias+".main")
+	statements = append(statements, "USE "+alias)
 
 	return statements, nil
 }
