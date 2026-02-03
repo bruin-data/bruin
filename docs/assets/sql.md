@@ -23,7 +23,7 @@ The `type` key in the configuration defines what platform to run the query again
 You can see the "Data Platforms" on the left sidebar to see supported types.
 
 ##  Examples
-The examples below show how to use the `ingestr` asset type in your pipeline. Feel free to change them as you wish according to your needs.
+The examples below show how to use SQL assets in your pipeline. Feel free to change them as you wish according to your needs.
 
 ### Simplest: run `SELECT 1`
 ```bruin-sql

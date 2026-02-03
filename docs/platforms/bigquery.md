@@ -103,12 +103,12 @@ where event_name = "install"
 group by 1;
 
 create or replace table events.install
-select
+select 
     user_id, 
     i.install_ts,
     i.platform, 
     i.country,
-    a.channel,
+    a.channel
 from first_installs as i
 join marketing.attribution as a
     using(user_id)
@@ -181,7 +181,7 @@ parameters:
 ### `bq.seed`
 `bq.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your BigQuery database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the BigQuery database.
 
-You can define seed assets in a file ending with `.yaml`:
+You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
 ```yaml
 name: dashboard.hello
 type: bq.seed

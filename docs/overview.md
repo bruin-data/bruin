@@ -7,8 +7,8 @@ bruin run [FLAGS] [path to the pipeline/asset]
 **Flags:**
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--downstream` | bool | false | Run all downstream tasks as well |
-| `--workers` | int | 16 | Number of workers to run tasks in parallel |
+| `--downstream` | bool | false | Run all downstream assets as well |
+| `--workers` | int | 16 | Number of workers to run assets in parallel |
 | `--start-date` | str | Beginning of yesterday | Start date range (YYYY-MM-DD format) |
 | `--end-date` | str | End of yesterday | End date range (YYYY-MM-DD format) |
 | `--environment` | str | - | The environment to use |
