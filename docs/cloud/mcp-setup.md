@@ -1,12 +1,12 @@
 # Cloud MCP
 
-This guide shows how to connect **Cursor**, **Claude Code** and **Codex** to the **Bruin Asset MCP server** so your AI assistant can securely call Bruin Cloud tools (for example: listing pipelines, inspecting runs, or triggering actions) directly from chat.
+This guide shows how to connect **Cursor**, **Claude Code** and **Codex** to the **Bruin Cloud MCP** so your AI assistant can securely call Bruin Cloud tools (for example: listing pipelines, inspecting runs, or triggering actions) directly from chat.
 
 ## Setup
 
-The Asset MCP server is exposed at:
+The Bruin Cloud MCP is exposed at:
 
- `https://cloud.getbruin.com/mcp/api/asset`
+ `https://cloud.getbruin.com/mcp`
 
 Create API token with MCP permission:
 
@@ -24,9 +24,9 @@ Edit the **`.cursor/mcp.json`** file and add your token.
 ```json
 {
   "mcpServers": {
-    "asset": {
+    "bruin_cloud": {
       "type": "streamable-http",
-      "url": "https://cloud.getbruin.com/mcp/api/asset",
+      "url": "https://cloud.getbruin.com/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_TOKEN_HERE"
       }
@@ -42,7 +42,7 @@ Restart Cursor (or reload the window) so it picks up the MCP config.
 From a terminal (any directory):
 
 ```bash
-claude mcp add --transport http asset_server https://cloud.getbruin.com/mcp/api/asset --header "Authorization: Bearer YOUR_TOKEN_HERE"
+claude mcp add --transport http bruin_cloud https://cloud.getbruin.com/mcp --header "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
 
@@ -51,10 +51,10 @@ claude mcp add --transport http asset_server https://cloud.getbruin.com/mcp/api/
 claude mcp list
 
 # Details for one server
-claude mcp get asset_server
+claude mcp get bruin_cloud
 
 # Remove a server
-claude mcp remove asset_server
+claude mcp remove bruin_cloud
 ```
 
 Inside Claude Code, type **`/mcp`** to see MCP status and connected servers.
@@ -64,8 +64,8 @@ Inside Claude Code, type **`/mcp`** to see MCP status and connected servers.
 
 Edit your Codex configuration file at `~/.codex/config.toml`:
 ```toml
-[mcp_servers.asset_server]
-url = "https://cloud.getbruin.com/mcp/api/asset"
+[mcp_servers.bruin_cloud]
+url = "https://cloud.getbruin.com/mcp"
 http_headers = { Authorization = "Bearer YOUR_TOKEN_HERE" }
 enabled = true
 ```
@@ -76,7 +76,7 @@ enabled = true
 ---
 ### Using the tools
 
-Once the Asset server is connected, you can ask in natural language, for example:
+Once the Bruin Cloud MCP server is connected, you can ask in natural language, for example:
 
 - “List all pipelines for my team.”
 - “Show pipeline runs status failed.”
@@ -97,5 +97,5 @@ Once the Asset server is connected, you can ask in natural language, for example
 - **401 Unauthorized:** Missing or invalid Bearer token. Check that the token is correct and not expired.
 - **403 Forbidden / “Insufficient token permissions”:** Token does not have the `mcp:token` ability. Create a new token with MCP permission.
 - **Cursor, tools not showing:** Ensure `.cursor/mcp.json` is valid JSON and restart Cursor.
-- **Claude Code, server not found:** Run `claude mcp list` to confirm the server is configured; use `claude mcp get asset_server` to check its URL and headers.
+- **Claude Code, server not found:** Run `claude mcp list` to confirm the server is configured; use `claude mcp get bruin_cloud` to check its URL and headers.
 - **Codex CLI, tools not available:** Ensure `~/.codex/config.toml` is valid toml and restart Codex CLI.
