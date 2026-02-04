@@ -8,13 +8,10 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"reflect"
-
-	"github.com/bruin-data/bruin/pkg/config"
 )
 
 type EphemeralConnection struct {
-	config              DuckDBConfig
-	lakehouseStatements []string
+	config DuckDBConfig
 }
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
@@ -22,31 +19,8 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 		return nil, fmt.Errorf("failed to ensure ADBC driver is installed: %w", err)
 	}
 
-	// Extract lakehouse config if available
-	var lakehouse *config.LakehouseConfig
-	var alias string
-	if cfg, ok := c.(Config); ok && cfg.HasLakehouse() {
-		// Validate lakehouse config for DuckDB-specific requirements
-		if err := ValidateLakehouseConfig(cfg.Lakehouse); err != nil {
-			return nil, fmt.Errorf("invalid lakehouse config: %w", err)
-		}
-		lakehouse = cfg.Lakehouse
-		alias = cfg.GetLakehouseAlias()
-	}
-
-	var statements []string
-	if lakehouse != nil {
-		attacher := NewLakehouseAttacher()
-		var err error
-		statements, err = attacher.GenerateAttachStatements(lakehouse, alias)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate lakehouse statements: %w", err)
-		}
-	}
-
 	return &EphemeralConnection{
-		config:              c,
-		lakehouseStatements: statements,
+		config: c,
 	}, nil
 }
 
@@ -64,7 +38,22 @@ func (e *EphemeralConnection) openDB(ctx context.Context) (*sql.DB, error) {
 }
 
 func (e *EphemeralConnection) setupLakehouse(ctx context.Context, db *sql.DB) error {
-	for _, stmt := range e.lakehouseStatements {
+	cfg, ok := e.config.(Config)
+	if !ok || !cfg.HasLakehouse() {
+		return nil
+	}
+
+	attacher := NewLakehouseAttacher()
+	if err := ValidateLakehouseConfig(cfg.Lakehouse); err != nil {
+		return fmt.Errorf("invalid lakehouse config: %w", err)
+	}
+
+	statements, err := attacher.GenerateAttachStatements(cfg.Lakehouse, cfg.GetLakehouseAlias())
+	if err != nil {
+		return fmt.Errorf("failed to generate lakehouse statements: %w", err)
+	}
+
+	for _, stmt := range statements {
 		if err := e.execLakehouseStatement(ctx, db, stmt); err != nil {
 			return err
 		}
