@@ -115,6 +115,7 @@ type TaskInstance interface {
 }
 
 type PipelineState struct {
+	Cmdline           []string              `json:"cmdline"`
 	Parameters        RunConfig             `json:"parameters"`
 	Metadata          Metadata              `json:"metadata"`
 	State             []*PipelineAssetState `json:"state"`
@@ -764,7 +765,7 @@ func (s *Scheduler) hasPipelineFinished() bool {
 	return true
 }
 
-func (s *Scheduler) SavePipelineState(fs afero.Fs, param *RunConfig, runID, statePath string) error {
+func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfig, runID, statePath string) error {
 	state := make([]*PipelineAssetState, 0)
 	dict := make(map[string][]TaskInstanceStatus)
 	for _, task := range s.taskInstances {
@@ -780,6 +781,7 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, param *RunConfig, runID, stat
 	}
 
 	pipelineState := &PipelineState{
+		Cmdline:    cmd,
 		Parameters: *param,
 		Metadata: Metadata{
 			Version: version.Version,
