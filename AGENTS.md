@@ -1,4 +1,4 @@
-# AGENTS.md - AI Agent Contribution Guide
+# AGENTS.md/CLAUDE.md - AI Agent Contribution Guide
 
 This document provides comprehensive information for AI agents to understand and contribute to the Bruin project effectively.
 
