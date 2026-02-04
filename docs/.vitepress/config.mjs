@@ -178,6 +178,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 ],
             },
             {
+                text: "Lakehouse",
+                collapsed: false,
+                items: [
+                    {text: "Overview", link: "/lakehouse/overview"},
+                    {text: "DuckDB", link: "/lakehouse/duckdb"},
+                    {text: "Trino", link: "/lakehouse/trino"},
+                ],
+            },
+            {
                 text: "Assets",
                 collapsed: false,
                 items: [
