@@ -5,8 +5,6 @@ package duck
 import (
 	"context"
 	"database/sql"
-
-	"github.com/bruin-data/bruin/pkg/config"
 )
 
 // Row interface abstracts sql.Row to allow custom implementations.
@@ -29,7 +27,7 @@ type EphemeralConnection struct {
 	config DuckDBConfig
 }
 
-func NewEphemeralConnection(c DuckDBConfig, lakehouse *config.LakehouseConfig, alias string) (*EphemeralConnection, error) {
+func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 	return nil, errDuckDBNotSupported
 }
 
