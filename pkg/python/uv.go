@@ -274,6 +274,10 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
 
+	// Compute extra packages based on destination URI (e.g., pyodbc for MSSQL)
+	var extraPackages []string
+	extraPackages = AddExtraPackages(destURI, "", extraPackages)
+
 	if strings.HasPrefix(destURI, "duckdb://") {
 		if dbURIGetter, ok := destConnectionInst.(interface{ GetDBConnectionURI() string }); ok {
 			duck.LockDatabase(dbURIGetter.GetDBConnectionURI())
@@ -283,7 +287,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: u.ingestrInstallCmd(ctx, nil),
+		Args: u.ingestrInstallCmd(ctx, extraPackages),
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
