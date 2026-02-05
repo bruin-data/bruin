@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -357,6 +358,9 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 		"_VALID_FROM":  true,
 	}
 
+	// Try to fetch column descriptions from the database
+	columnDescriptions := fetchColumnDescriptions(ctx, conn, schemaName, tableName)
+
 	// Create column definitions
 	columns := make([]pipeline.Column, 0, len(result.Columns))
 	for i, colName := range result.Columns {
@@ -364,15 +368,99 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 			continue
 		}
 		columns = append(columns, pipeline.Column{
-			Name:      colName,
-			Type:      result.ColumnTypes[i],
-			Checks:    []pipeline.ColumnCheck{},
-			Upstreams: []*pipeline.UpstreamColumn{},
+			Name:        colName,
+			Type:        result.ColumnTypes[i],
+			Description: columnDescriptions[colName],
+			Checks:      []pipeline.ColumnCheck{},
+			Upstreams:   []*pipeline.UpstreamColumn{},
 		})
 	}
 
 	asset.Columns = columns
 	return nil
+}
+
+// fetchColumnDescriptions fetches column descriptions from the database's information schema.
+// Returns a map of column name to description. If descriptions can't be fetched, returns an empty map.
+func fetchColumnDescriptions(ctx context.Context, conn interface{}, schemaName, tableName string) map[string]string {
+	descriptions := make(map[string]string)
+
+	// Check if connection supports Select
+	selector, ok := conn.(interface {
+		Select(ctx context.Context, q *query.Query) ([][]interface{}, error)
+	})
+	if !ok {
+		return descriptions
+	}
+
+	var queryStr string
+
+	// Build database-specific query for column descriptions
+	switch conn.(type) {
+	case *postgres.Client:
+		// PostgreSQL: Query pg_description for column comments
+		queryStr = fmt.Sprintf(`
+SELECT 
+    a.attname as column_name,
+    pg_catalog.col_description(a.attrelid, a.attnum) as column_description
+FROM 
+    pg_catalog.pg_attribute a
+JOIN 
+    pg_catalog.pg_class c ON a.attrelid = c.oid
+JOIN 
+    pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+WHERE 
+    n.nspname = '%s'
+    AND c.relname = '%s'
+    AND a.attnum > 0
+    AND NOT a.attisdropped
+    AND pg_catalog.col_description(a.attrelid, a.attnum) IS NOT NULL
+`, schemaName, tableName)
+
+	case *mssql.DB:
+		// MSSQL: Query extended properties for column descriptions
+		queryStr = fmt.Sprintf(`
+SELECT 
+    c.name AS column_name,
+    CAST(ep.value AS NVARCHAR(MAX)) AS column_description
+FROM 
+    sys.columns c
+JOIN 
+    sys.tables t ON c.object_id = t.object_id
+JOIN 
+    sys.schemas s ON t.schema_id = s.schema_id
+LEFT JOIN 
+    sys.extended_properties ep ON c.object_id = ep.major_id 
+    AND c.column_id = ep.minor_id 
+    AND ep.name = 'MS_Description'
+WHERE 
+    s.name = '%s'
+    AND t.name = '%s'
+    AND ep.value IS NOT NULL
+`, schemaName, tableName)
+
+	default:
+		// For other databases, we don't have a standard way to fetch column descriptions
+		return descriptions
+	}
+
+	result, err := selector.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		// Silently ignore errors - column descriptions are optional
+		return descriptions
+	}
+
+	for _, row := range result {
+		if len(row) >= 2 && row[0] != nil && row[1] != nil {
+			if colName, ok := row[0].(string); ok {
+				if desc, ok := row[1].(string); ok {
+					descriptions[colName] = desc
+				}
+			}
+		}
+	}
+
+	return descriptions
 }
 
 func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool, table *ansisql.DBTable) (*pipeline.Asset, string) {
@@ -403,6 +491,9 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 		actualAssetType = convertSourceTypeToQueryType(assetType)
 	}
 
+	// Build enhanced description with metadata
+	description := buildEnhancedDescription(table, schemaName, tableName)
+
 	asset := &pipeline.Asset{
 		Type: actualAssetType,
 		ExecutableFile: pipeline.ExecutableFile{
@@ -410,7 +501,7 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 			Path:    filePath,
 			Content: content,
 		},
-		Description: fmt.Sprintf("Imported %s %s.%s", getTableTypeDescription(table.Type), schemaName, tableName),
+		Description: description,
 	}
 
 	// Set materialization for views
@@ -429,10 +520,11 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 		columns := make([]pipeline.Column, 0, len(table.Columns))
 		for _, col := range table.Columns {
 			columns = append(columns, pipeline.Column{
-				Name:      col.Name,
-				Type:      col.Type,
-				Checks:    []pipeline.ColumnCheck{},
-				Upstreams: []*pipeline.UpstreamColumn{},
+				Name:        col.Name,
+				Type:        col.Type,
+				Description: col.Description,
+				Checks:      []pipeline.ColumnCheck{},
+				Upstreams:   []*pipeline.UpstreamColumn{},
 			})
 		}
 		asset.Columns = columns
@@ -455,6 +547,93 @@ func getTableTypeDescription(tableType ansisql.DBTableType) string {
 		return "view"
 	}
 	return "table"
+}
+
+// buildEnhancedDescription creates a rich description for imported assets with metadata.
+func buildEnhancedDescription(table *ansisql.DBTable, schemaName, tableName string) string {
+	var parts []string
+
+	// Start with the original database description if available
+	if table.Description != "" {
+		parts = append(parts, table.Description)
+		parts = append(parts, "") // Empty line for separation
+	}
+
+	// Add import metadata section
+	parts = append(parts, "Imported "+getTableTypeDescription(table.Type)+": "+schemaName+"."+tableName)
+
+	// Add extraction timestamp (current time)
+	extractedAt := time.Now().UTC().Format(time.RFC3339)
+	parts = append(parts, "Extracted at: "+extractedAt)
+
+	// Add creation timestamp if available
+	if table.CreatedAt != nil {
+		parts = append(parts, "Created at: "+table.CreatedAt.UTC().Format(time.RFC3339))
+	}
+
+	// Add last modification timestamp if available
+	if table.LastModified != nil {
+		parts = append(parts, "Last modified: "+table.LastModified.UTC().Format(time.RFC3339))
+	}
+
+	// Add row count if available
+	if table.RowCount != nil {
+		parts = append(parts, "Row count: "+formatNumber(*table.RowCount))
+	}
+
+	// Add size if available
+	if table.SizeBytes != nil {
+		parts = append(parts, "Size: "+formatBytes(*table.SizeBytes))
+	}
+
+	// Add owner if available
+	if table.Owner != "" {
+		parts = append(parts, "Owner: "+table.Owner)
+	}
+
+	return strings.Join(parts, "\n")
+}
+
+// formatNumber formats a number with commas for readability.
+func formatNumber(n int64) string {
+	if n < 1000 {
+		return strconv.FormatInt(n, 10)
+	}
+
+	s := strconv.FormatInt(n, 10)
+	var result strings.Builder
+
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			result.WriteRune(',')
+		}
+		result.WriteRune(c)
+	}
+
+	return result.String()
+}
+
+// formatBytes formats a byte count into a human-readable string.
+func formatBytes(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+		TB = GB * 1024
+	)
+
+	switch {
+	case bytes >= TB:
+		return fmt.Sprintf("%.2f TB", float64(bytes)/TB)
+	case bytes >= GB:
+		return fmt.Sprintf("%.2f GB", float64(bytes)/GB)
+	case bytes >= MB:
+		return fmt.Sprintf("%.2f MB", float64(bytes)/MB)
+	case bytes >= KB:
+		return fmt.Sprintf("%.2f KB", float64(bytes)/KB)
+	default:
+		return fmt.Sprintf("%d bytes", bytes)
+	}
 }
 
 // convertSourceTypeToQueryType converts a source asset type to its corresponding query type.

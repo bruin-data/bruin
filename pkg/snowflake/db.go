@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -1084,13 +1085,19 @@ func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, erro
 	// Get the current database name
 	databaseName := db.config.Database
 
-	// Query to get all schemas and tables in the database with view definitions
+	// Query to get all schemas and tables in the database with view definitions and metadata
 	q := fmt.Sprintf(`
 SELECT
     t.table_schema,
     t.table_name,
     t.table_type,
-    v.view_definition
+    v.view_definition,
+    t.created,
+    t.last_altered,
+    t.row_count,
+    t.bytes,
+    t.comment,
+    t.table_owner
 FROM
     %s.INFORMATION_SCHEMA.TABLES t
 LEFT JOIN
@@ -1113,7 +1120,7 @@ ORDER BY t.table_schema, t.table_name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 4 {
+		if len(row) < 4 {
 			continue
 		}
 
@@ -1133,6 +1140,55 @@ ORDER BY t.table_schema, t.table_name;
 		if row[3] != nil {
 			if vd, ok := row[3].(string); ok {
 				viewDefinition = vd
+			}
+		}
+
+		// Extract additional metadata
+		var createdAt, lastModified *time.Time
+		if len(row) > 4 && row[4] != nil {
+			if t, ok := row[4].(time.Time); ok {
+				createdAt = &t
+			}
+		}
+		if len(row) > 5 && row[5] != nil {
+			if t, ok := row[5].(time.Time); ok {
+				lastModified = &t
+			}
+		}
+
+		var rowCount *int64
+		if len(row) > 6 && row[6] != nil {
+			switch v := row[6].(type) {
+			case int64:
+				rowCount = &v
+			case float64:
+				rc := int64(v)
+				rowCount = &rc
+			}
+		}
+
+		var sizeBytes *int64
+		if len(row) > 7 && row[7] != nil {
+			switch v := row[7].(type) {
+			case int64:
+				sizeBytes = &v
+			case float64:
+				sb := int64(v)
+				sizeBytes = &sb
+			}
+		}
+
+		var tableComment string
+		if len(row) > 8 && row[8] != nil {
+			if c, ok := row[8].(string); ok {
+				tableComment = c
+			}
+		}
+
+		var owner string
+		if len(row) > 9 && row[9] != nil {
+			if o, ok := row[9].(string); ok {
+				owner = o
 			}
 		}
 
@@ -1160,6 +1216,12 @@ ORDER BY t.table_schema, t.table_name;
 			Type:           dbTableType,
 			ViewDefinition: viewDefinition,
 			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
+			CreatedAt:      createdAt,
+			LastModified:   lastModified,
+			RowCount:       rowCount,
+			SizeBytes:      sizeBytes,
+			Description:    tableComment,
+			Owner:          owner,
 		}
 		schemas[schemaKey].Tables = append(schemas[schemaKey].Tables, table)
 	}
