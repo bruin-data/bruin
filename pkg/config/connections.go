@@ -284,6 +284,11 @@ type PostgresConnection struct {
 	Schema       string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
 	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns,omitempty" mapstructure:"pool_max_conns" default:"10"`
 	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode" default:"allow"`
+	// CDC (Change Data Capture) configuration
+	CDC         bool   `yaml:"cdc,omitempty" json:"cdc,omitempty" mapstructure:"cdc"`
+	Publication string `yaml:"publication,omitempty" json:"publication,omitempty" mapstructure:"publication"`
+	Slot        string `yaml:"slot,omitempty" json:"slot,omitempty" mapstructure:"slot"`
+	CDCMode     string `yaml:"cdc_mode,omitempty" json:"cdc_mode,omitempty" mapstructure:"cdc_mode" jsonschema:"enum=batch,enum=stream"`
 }
 
 func (c PostgresConnection) GetName() string {
