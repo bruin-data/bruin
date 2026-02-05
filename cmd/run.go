@@ -31,6 +31,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -61,10 +62,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	LogsFolder      = "logs"
-	defaultGongPath = "/home/bruin/.local/bin/gong/gong"
-)
+const LogsFolder = "logs"
 
 var pythonCacheGitignorePatterns = []string{
 	"__pycache__/",
@@ -578,7 +576,6 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:   "gong-path",
 				Usage:  "path to the gong binary (when using --use-gong)",
-				Value:  defaultGongPath,
 				Hidden: true,
 			},
 			&cli.StringFlag{
@@ -638,17 +635,28 @@ func Run(isDebug *bool) *cli.Command {
 			useGong := c.Bool("use-gong")
 			gongPath := c.String("gong-path")
 
-			// When using gong, the path must exist and be executable
+			// When using gong, ensure binary is available
 			if useGong {
-				info, err := os.Stat(gongPath)
-				if err != nil {
-					if os.IsNotExist(err) {
-						return cli.Exit("gong binary not found at path: "+gongPath, 1)
+				if gongPath == "" {
+					// Auto-install gong if no custom path provided
+					gongChecker := &gong.Checker{}
+					installedPath, err := gongChecker.EnsureGongInstalled(ctx)
+					if err != nil {
+						return cli.Exit(fmt.Sprintf("failed to install gong: %v", err), 1)
 					}
-					return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", gongPath, err), 1)
-				}
-				if info.Mode()&0o111 == 0 {
-					return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", gongPath), 1)
+					gongPath = installedPath
+				} else {
+					// User provided custom path - verify it exists and is executable
+					info, err := os.Stat(gongPath)
+					if err != nil {
+						if os.IsNotExist(err) {
+							return cli.Exit("gong binary not found at path: "+gongPath, 1)
+						}
+						return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", gongPath, err), 1)
+					}
+					if info.Mode()&0o111 == 0 {
+						return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", gongPath), 1)
+					}
 				}
 			}
 
