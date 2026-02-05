@@ -18,17 +18,65 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 	if err := EnsureADBCDriverInstalled(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to ensure ADBC driver is installed: %w", err)
 	}
-	return &EphemeralConnection{config: c}, nil
+
+	return &EphemeralConnection{
+		config: c,
+	}, nil
 }
 
-func (e *EphemeralConnection) openDB() (*sql.DB, error) {
+func (e *EphemeralConnection) openDB(ctx context.Context) (*sql.DB, error) {
 	path := e.config.ToDBConnectionURI()
-	return sql.Open("adbc_duckdb", "driver=duckdb;path="+path)
+	db, err := sql.Open("adbc_duckdb", "driver=duckdb;path="+path)
+	if err != nil {
+		return nil, err
+	}
+	if err := e.setupLakehouse(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+func (e *EphemeralConnection) setupLakehouse(ctx context.Context, db *sql.DB) error {
+	cfg, ok := e.config.(Config)
+	if !ok || !cfg.HasLakehouse() {
+		return nil
+	}
+
+	attacher := NewLakehouseAttacher()
+	if err := ValidateLakehouseConfig(cfg.Lakehouse); err != nil {
+		return fmt.Errorf("invalid lakehouse config: %w", err)
+	}
+
+	statements, err := attacher.GenerateAttachStatements(cfg.Lakehouse, cfg.GetLakehouseAlias())
+	if err != nil {
+		return fmt.Errorf("failed to generate lakehouse statements: %w", err)
+	}
+
+	for _, stmt := range statements {
+		if err := e.execLakehouseStatement(ctx, db, stmt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (e *EphemeralConnection) execLakehouseStatement(ctx context.Context, db *sql.DB, stmt string) error {
+	rows, err := db.QueryContext(ctx, stmt)
+	if err != nil {
+		return fmt.Errorf("failed to execute lakehouse statement: %w", err)
+	}
+	defer rows.Close()
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to execute lakehouse statement: %w", err)
+	}
+	return nil
 }
 
 //nolint:ireturn
 func (e *EphemeralConnection) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
-	db, err := e.openDB()
+	db, err := e.openDB(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +92,7 @@ func (e *EphemeralConnection) QueryContext(ctx context.Context, query string, ar
 }
 
 func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, arguments ...any) (sql.Result, error) {
-	db, err := e.openDB()
+	db, err := e.openDB(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +109,7 @@ func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, ar
 
 //nolint:ireturn
 func (e *EphemeralConnection) QueryRowContext(ctx context.Context, query string, args ...any) Row {
-	db, err := e.openDB()
+	db, err := e.openDB(ctx)
 	if err != nil {
 		return &errorRow{err: err}
 	}

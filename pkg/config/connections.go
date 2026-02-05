@@ -490,8 +490,9 @@ func (c AirtableConnection) GetName() string {
 }
 
 type DuckDBConnection struct {
-	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Path string `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+	Name      string           `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Path      string           `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+	Lakehouse *LakehouseConfig `yaml:"lakehouse,omitempty" json:"lakehouse,omitempty" mapstructure:"lakehouse"`
 }
 
 func (d DuckDBConnection) GetName() string {

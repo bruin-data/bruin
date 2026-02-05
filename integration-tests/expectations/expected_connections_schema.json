@@ -261,6 +261,42 @@
         "api_token"
       ]
     },
+    "CatalogAuth": {
+      "properties": {
+        "access_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "session_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CatalogConfig": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "catalog_id": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "auth": {
+          "$ref": "#/$defs/CatalogAuth"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type"
+      ]
+    },
     "ChessConnection": {
       "properties": {
         "name": {
@@ -1164,6 +1200,9 @@
         },
         "path": {
           "type": "string"
+        },
+        "lakehouse": {
+          "$ref": "#/$defs/LakehouseConfig"
         }
       },
       "additionalProperties": false,
@@ -1833,6 +1872,24 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "LakehouseConfig": {
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "catalog": {
+          "$ref": "#/$defs/CatalogConfig"
+        },
+        "storage": {
+          "$ref": "#/$defs/StorageConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "format"
       ]
     },
     "LinearConnection": {
@@ -2736,6 +2793,39 @@
         "project_id",
         "instance_id",
         "database"
+      ]
+    },
+    "StorageAuth": {
+      "properties": {
+        "access_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "session_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "StorageConfig": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "auth": {
+          "$ref": "#/$defs/StorageAuth"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type"
       ]
     },
     "StripeConnection": {
