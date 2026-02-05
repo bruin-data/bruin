@@ -1149,11 +1149,12 @@ func (d *Client) getTableMetadata(ctx context.Context, datasetID, tableID string
 	cols := make([]*ansisql.DBColumn, 0, len(meta.Schema))
 	for _, field := range meta.Schema {
 		cols = append(cols, &ansisql.DBColumn{
-			Name:       field.Name,
-			Type:       string(field.Type),
-			Nullable:   !field.Required,
-			PrimaryKey: false,
-			Unique:     false,
+			Name:        field.Name,
+			Type:        string(field.Type),
+			Nullable:    !field.Required,
+			PrimaryKey:  false,
+			Unique:      false,
+			Description: field.Description,
 		})
 	}
 

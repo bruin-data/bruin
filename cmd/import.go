@@ -358,6 +358,9 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 		"_VALID_FROM":  true,
 	}
 
+	// Try to fetch column descriptions from the database
+	columnDescriptions := fetchColumnDescriptions(ctx, conn, schemaName, tableName)
+
 	// Create column definitions
 	columns := make([]pipeline.Column, 0, len(result.Columns))
 	for i, colName := range result.Columns {
@@ -365,15 +368,99 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 			continue
 		}
 		columns = append(columns, pipeline.Column{
-			Name:      colName,
-			Type:      result.ColumnTypes[i],
-			Checks:    []pipeline.ColumnCheck{},
-			Upstreams: []*pipeline.UpstreamColumn{},
+			Name:        colName,
+			Type:        result.ColumnTypes[i],
+			Description: columnDescriptions[colName],
+			Checks:      []pipeline.ColumnCheck{},
+			Upstreams:   []*pipeline.UpstreamColumn{},
 		})
 	}
 
 	asset.Columns = columns
 	return nil
+}
+
+// fetchColumnDescriptions fetches column descriptions from the database's information schema.
+// Returns a map of column name to description. If descriptions can't be fetched, returns an empty map.
+func fetchColumnDescriptions(ctx context.Context, conn interface{}, schemaName, tableName string) map[string]string {
+	descriptions := make(map[string]string)
+
+	// Check if connection supports Select
+	selector, ok := conn.(interface {
+		Select(ctx context.Context, q *query.Query) ([][]interface{}, error)
+	})
+	if !ok {
+		return descriptions
+	}
+
+	var queryStr string
+
+	// Build database-specific query for column descriptions
+	switch conn.(type) {
+	case *postgres.Client:
+		// PostgreSQL: Query pg_description for column comments
+		queryStr = fmt.Sprintf(`
+SELECT 
+    a.attname as column_name,
+    pg_catalog.col_description(a.attrelid, a.attnum) as column_description
+FROM 
+    pg_catalog.pg_attribute a
+JOIN 
+    pg_catalog.pg_class c ON a.attrelid = c.oid
+JOIN 
+    pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+WHERE 
+    n.nspname = '%s'
+    AND c.relname = '%s'
+    AND a.attnum > 0
+    AND NOT a.attisdropped
+    AND pg_catalog.col_description(a.attrelid, a.attnum) IS NOT NULL
+`, schemaName, tableName)
+
+	case *mssql.DB:
+		// MSSQL: Query extended properties for column descriptions
+		queryStr = fmt.Sprintf(`
+SELECT 
+    c.name AS column_name,
+    CAST(ep.value AS NVARCHAR(MAX)) AS column_description
+FROM 
+    sys.columns c
+JOIN 
+    sys.tables t ON c.object_id = t.object_id
+JOIN 
+    sys.schemas s ON t.schema_id = s.schema_id
+LEFT JOIN 
+    sys.extended_properties ep ON c.object_id = ep.major_id 
+    AND c.column_id = ep.minor_id 
+    AND ep.name = 'MS_Description'
+WHERE 
+    s.name = '%s'
+    AND t.name = '%s'
+    AND ep.value IS NOT NULL
+`, schemaName, tableName)
+
+	default:
+		// For other databases, we don't have a standard way to fetch column descriptions
+		return descriptions
+	}
+
+	result, err := selector.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		// Silently ignore errors - column descriptions are optional
+		return descriptions
+	}
+
+	for _, row := range result {
+		if len(row) >= 2 && row[0] != nil && row[1] != nil {
+			if colName, ok := row[0].(string); ok {
+				if desc, ok := row[1].(string); ok {
+					descriptions[colName] = desc
+				}
+			}
+		}
+	}
+
+	return descriptions
 }
 
 func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool, table *ansisql.DBTable) (*pipeline.Asset, string) {
@@ -433,10 +520,11 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 		columns := make([]pipeline.Column, 0, len(table.Columns))
 		for _, col := range table.Columns {
 			columns = append(columns, pipeline.Column{
-				Name:      col.Name,
-				Type:      col.Type,
-				Checks:    []pipeline.ColumnCheck{},
-				Upstreams: []*pipeline.UpstreamColumn{},
+				Name:        col.Name,
+				Type:        col.Type,
+				Description: col.Description,
+				Checks:      []pipeline.ColumnCheck{},
+				Upstreams:   []*pipeline.UpstreamColumn{},
 			})
 		}
 		asset.Columns = columns

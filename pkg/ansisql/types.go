@@ -55,11 +55,12 @@ type DBTable struct {
 }
 
 type DBColumn struct {
-	Name       string `json:"name"`
-	Type       string `json:"type"`
-	Nullable   bool   `json:"nullable"`
-	PrimaryKey bool   `json:"primary_key"`
-	Unique     bool   `json:"unique"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Nullable    bool   `json:"nullable"`
+	PrimaryKey  bool   `json:"primary_key"`
+	Unique      bool   `json:"unique"`
+	Description string `json:"description,omitempty"` // Column description/comment
 }
 
 type DBColumnType struct {
