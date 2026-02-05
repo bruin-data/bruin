@@ -816,6 +816,41 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
+			// Auto-enable gong for PostgreSQL CDC sources
+			if !runConfig.UseGong && cm.SelectedEnvironment != nil && cm.SelectedEnvironment.Connections != nil {
+				for _, asset := range pipelineInfo.Pipeline.Assets {
+					if asset.Type == pipeline.AssetTypeIngestr {
+						sourceConn, ok := asset.Parameters["source_connection"]
+						if !ok {
+							continue
+						}
+						// Check if source connection is PostgreSQL with CDC enabled
+						for _, pg := range cm.SelectedEnvironment.Connections.Postgres {
+							if pg.GetName() == sourceConn && pg.CDC {
+								// PostgreSQL CDC detected, enable gong
+								runConfig.UseGong = true
+								// Validate gong binary exists
+								info, gongErr := os.Stat(gongPath)
+								if gongErr != nil {
+									if os.IsNotExist(gongErr) {
+										return cli.Exit("PostgreSQL CDC detected but gong binary not found at path: "+gongPath+"\nPlease install gong or disable CDC on the connection.", 1)
+									}
+									return cli.Exit(fmt.Sprintf("PostgreSQL CDC detected but failed to access gong binary at path '%s': %v", gongPath, gongErr), 1)
+								}
+								if info.Mode()&0o111 == 0 {
+									return cli.Exit(fmt.Sprintf("PostgreSQL CDC detected but gong binary at path '%s' is not executable", gongPath), 1)
+								}
+								runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath)
+								break
+							}
+						}
+						if runConfig.UseGong {
+							break
+						}
+					}
+				}
+			}
+
 			// Load assets from positional arguments
 			// This allows: bruin run asset1.sql asset2.sql asset3.sql
 			// Pipeline is inferred from the first asset file
