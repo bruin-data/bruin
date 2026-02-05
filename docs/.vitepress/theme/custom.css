@@ -57,3 +57,13 @@ html:not(.dark) .vp-code-dark {
 .VPSidebarItem .text {
   padding-top: 0.1rem !important;
 }
+
+.lh-check {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+
+.lh-check::before {
+  content: "\2713";
+}

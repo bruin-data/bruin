@@ -9,39 +9,49 @@ Add the `lakehouse` block to your DuckDB connection in `.bruin.yml`:
 ```yaml
 connections:
   duckdb:
-    - name: "analytics"
-      path: "./analytics.db"
+    - name: "example-conn"
+      path: "./path/to/duckdb.db"
       lakehouse:
-        format: iceberg | ducklake
+        format: <iceberg|ducklake>
         catalog:
-          type: glue | postgres
+          type: <glue|postgres>
           auth: { ... } # optional
         storage:
-          type: s3
-          auth: { ... } 
+          type: <s3>
+          auth: { ... } # optional
 ```
 
-## Configuration Reference
-
-### `lakehouse`
+<br>
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `format` | string | Yes | Table format: `iceberg` or `ducklake` |
-| `catalog` | object | Yes | Catalog configuration |
+| `catalog` | object | Yes | Catalog configuration (Glue for Iceberg, Postgres for DuckLake) |
 | `storage` | object | No | Storage configuration (required for DuckLake) |
 
-## Supported Configurations
+## Supported Combinations
 
-| Component | Supported | Notes |
-|-----------|-----------|-------|
-| **Formats** | Iceberg, DuckLake | Delta planned |
-| **Catalogs** | AWS Glue, Postgres | Glue for Iceberg, Postgres for DuckLake |
-| **Storage** | S3 | Required for DuckLake, optional for Iceberg |
+### Iceberg
 
-### Catalogs
+| Catalog \ Storage | S3 | GCS |
+|-------------------|----|-----|
+| Glue | <span class="lh-check" aria-label="supported"></span> | |
 
-#### Glue catalog
+
+### DuckLake
+
+| Catalog \ Storage | S3 | GCS |
+|-------------------|----|-----|
+| DuckDB | <span class="lh-check" aria-label="supported"></span> |  |
+| SQLite   |  |  |
+| Postgres |  |  |
+| MySQL    |  |  |
+
+
+
+## Catalog Options
+
+### Glue
 
 ```yaml
 catalog:
@@ -54,7 +64,8 @@ catalog:
     session_token: "${AWS_SESSION_TOKEN}" # optional
 ```
 
-#### Postgres catalog (DuckLake)
+### Postgres
+
 
 ```yaml
 catalog:
@@ -67,9 +78,12 @@ catalog:
     password: "ducklake_password"
 ```
 
-### Storage
+## Storage Options
 
-#### S3 storage
+### S3
+
+Bruin currently only supports explicit AWS credentials in the `auth` block.
+Session tokens are supported for temporary credentials (AWS STS).
 
 ```yaml
 storage:
@@ -84,7 +98,7 @@ storage:
 
 ## Usage
 
-Bruin attaches the lakehouse as `iceberg_catalog` or `ducklake_catalog`, creates a `main` schema, and runs `USE <catalog>` to set it active. You can query tables with or without a schema:
+Bruin makes the lakehouse catalog active for your session and ensures a default `main` schema is available (cannot create Iceberg on S3 schemas/tables, so they must already exist). You can query tables with or without a schema:
 
 ```sql
 SELECT * FROM users;
@@ -97,7 +111,7 @@ SELECT * FROM iceberg_catalog.demo.users;
 ```
 
 > [!NOTE]
-> Unqualified table names resolve to the `main` schema of the active catalog. Use `schema.table` to target non-main schemas.
+> Unqualified table names resolve to the `main` schema of the active catalog. Use `<schema>.<table>` to target non-main schemas.
 
 ### Example Asset
 
@@ -105,7 +119,7 @@ SELECT * FROM iceberg_catalog.demo.users;
 /* @bruin
 name: daily_sales
 type: duckdb.sql
-connection: analytics
+connection: example-conn
 @bruin */
 
 SELECT
@@ -115,37 +129,3 @@ FROM demo.orders
 WHERE order_date >= '{{ start_date }}'
 GROUP BY 1;
 ```
-
-## AWS Credentials
-
-> [!WARNING]
-> Avoid hardcoding credentials. Use environment variables or a secrets manager.
-
-Bruin currently only supports explicit AWS credentials in the `auth` block. If `auth` is omitted, Bruin will not create DuckDB secrets; you must configure secrets in DuckDB separately.
-
-Session tokens are supported for temporary credentials (AWS STS).
-
-> [!NOTE]
-> DuckLake uses a Postgres catalog; ensure the DuckDB process can reach the Postgres host and credentials.
-
-### Required IAM Permissions
-
-**Glue Catalog:**
-```
-glue:GetDatabase
-glue:GetDatabases
-glue:GetTable
-glue:GetTables
-```
-
-**S3 Storage:**
-```
-s3:GetObject
-s3:ListBucket
-```
-
-## Limitations
-
-- One lakehouse per DuckDB connection
-- Only Iceberg + Glue + S3 and DuckLake + Postgres + S3 supported right now
-- Lakehouse setup (extensions, secrets, attach, use) runs per connection
