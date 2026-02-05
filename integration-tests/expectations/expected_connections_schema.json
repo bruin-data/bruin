@@ -450,12 +450,6 @@
           },
           "type": "array"
         },
-        "customerio": {
-          "items": {
-            "$ref": "#/$defs/CustomerIoConnection"
-          },
-          "type": "array"
-        },
         "mongo_atlas": {
           "items": {
             "$ref": "#/$defs/MongoAtlasConnection"
@@ -945,6 +939,12 @@
         "indeed": {
           "items": {
             "$ref": "#/$defs/IndeedConnection"
+          },
+          "type": "array"
+        },
+        "customerio": {
+          "items": {
+            "$ref": "#/$defs/CustomerIoConnection"
           },
           "type": "array"
         }
@@ -2345,6 +2345,22 @@
         },
         "ssl_mode": {
           "type": "string"
+        },
+        "cdc": {
+          "type": "boolean"
+        },
+        "publication": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "string"
+        },
+        "cdc_mode": {
+          "type": "string",
+          "enum": [
+            "batch",
+            "stream"
+          ]
         }
       },
       "additionalProperties": false,
