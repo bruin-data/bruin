@@ -840,7 +840,7 @@ func Run(isDebug *bool) *cli.Command {
 								if info.Mode()&0o111 == 0 {
 									return cli.Exit(fmt.Sprintf("PostgreSQL CDC detected but gong binary at path '%s' is not executable", gongPath), 1)
 								}
-								runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath)
+								runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath) //nolint
 								break
 							}
 						}
