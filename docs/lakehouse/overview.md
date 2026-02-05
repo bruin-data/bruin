@@ -7,7 +7,7 @@ Bruin supports querying open table formats (Iceberg, DuckLake; Delta planned) st
 
 ## What is a Lakehouse?
 
-A lakehouse combines the scalability of data lakes with the reliability of data warehouses. Data is stored in open formats on object storage (S3, GCS, Azure Blob) while metadata catalogs track schema, partitions, and table history.
+A lakehouse combines the **scalability** of data lakes with the **reliability** of data warehouses. Data is stored in open formats on object storage (S3, GCS, Azure Blob) while metadata catalogs track schema, partitions, and table history.
 
 <!-- Architecture -->
 
@@ -15,8 +15,8 @@ A lakehouse combines the scalability of data lakes with the reliability of data 
 %%{init: {"flowchart": {"useMaxWidth": true, "nodeSpacing": 180, "rankSpacing": 80}}}%%
 flowchart TB
   QE["Query Engine<br/>(DuckDB, Trino, ...)<br/>&nbsp;"]
-  Catalog["**Catalog**<br/>(Glue, REST, ...)<br/>Table metadata, Schema info, Partition info<br/>&nbsp;"]
-  Storage["**Storage**<br/>(S3, GCS, ...)<br/>**Format**(Iceberg, DuckLake)<br/>Parquet files, Manifest files, Data files<br/>&nbsp;"]
+  Catalog["**Catalog**<br/>(Glue, REST, ...)<br/><br/>Table metadata, Schema info, Partition info<br/>&nbsp;"]
+  Storage["**Storage**<br/>(S3, GCS, ...)<br/>**Format**(Iceberg, DuckLake)<br/><br/>Parquet files, Manifest files, Data files<br/>&nbsp;"]
 
   QE --> Catalog
   QE --> Storage
@@ -50,7 +50,14 @@ connections:
 
 Then query your Iceberg tables (defaults to the `main` schema):
 
-```sql
+```bruin-sql
+/* @bruin
+name: lakehouse_users
+type: duckdb.sql
+connection: analytics
+@bruin */
+
+
 SELECT * FROM users;
 ```
 
