@@ -96,8 +96,8 @@ func getArchName() string {
 
 func (g *Checker) downloadGong(ctx context.Context, destPath string) error {
 	var output io.Writer = os.Stdout
-	if ctx.Value(executor.KeyPrinter) != nil {
-		output = ctx.Value(executor.KeyPrinter).(io.Writer)
+	if printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
+		output = printer
 	}
 
 	_, _ = fmt.Fprintf(output, "===============================\n")
