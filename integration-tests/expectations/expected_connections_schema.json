@@ -2345,22 +2345,6 @@
         },
         "ssl_mode": {
           "type": "string"
-        },
-        "cdc": {
-          "type": "boolean"
-        },
-        "publication": {
-          "type": "string"
-        },
-        "slot": {
-          "type": "string"
-        },
-        "cdc_mode": {
-          "type": "string",
-          "enum": [
-            "batch",
-            "stream"
-          ]
         }
       },
       "additionalProperties": false,
