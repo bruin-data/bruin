@@ -92,6 +92,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Environments", link: "/getting-started/devenv"},
                             {text: "Variables", link: "/getting-started/pipeline-variables"},
                             {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
+                            {text: "Lakehouse Support", link: "/getting-started/lakehouse"},
                         ]
                     },
                     {text: "Concepts", link: "/getting-started/concepts"},
@@ -175,15 +176,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
                     {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                     {text: "GCP Dataproc Serverless", link: "/platforms/dataproc_serverless"},
-                ],
-            },
-            {
-                text: "Lakehouse",
-                collapsed: false,
-                items: [
-                    {text: "Overview", link: "/lakehouse/overview"},
-                    {text: "DuckDB", link: "/lakehouse/duckdb"},
-                    {text: "Trino", link: "/lakehouse/trino"},
                 ],
             },
             {

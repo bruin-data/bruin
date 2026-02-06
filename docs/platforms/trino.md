@@ -81,3 +81,19 @@ type: trino.sensor.query
 parameters:
     query: select exists(select 1 from upstream_table where inserted_at > '{{ end_timestamp }}')
 ```
+
+
+## Lakehouse Support (Planned)
+
+> [!WARNING]
+> Trino lakehouse support is not yet available. This section documents the planned configuration.
+
+### Planned Support
+
+| Component | Status |
+|-----------|--------|
+| Iceberg | Planned |
+| Glue Catalog | Planned |
+| REST Catalog | Planned |
+| S3 Storage | Planned |
+| GCS Storage | Planned |

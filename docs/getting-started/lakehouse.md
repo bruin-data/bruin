@@ -1,13 +1,16 @@
-# Lakehouse <Badge type="warning" text="beta" />
+# Lakehouse Support <Badge type="warning" text="beta" />
 
 > [!WARNING]
 > Lakehouse support is currently in **beta**. APIs and configuration may change in future releases.
 
-Bruin supports querying open table formats (Iceberg, DuckLake; Delta planned) stored in cloud object storage through various query engines. Start with the engine-specific docs: [DuckDB](./duckdb.md) or [Trino](./trino.md).
+Bruin supports querying open table formats (Iceberg, DuckLake) stored in cloud object storage. Engine‑specific configuration lives in the Data Platforms pages:
+
+- [DuckDB](../platforms/duckdb.md#lakehouse-support) (available)
+- [Trino](../platforms/trino.md#lakehouse-support) (planned)
 
 ## What is a Lakehouse?
 
-A lakehouse combines the **scalability** of data lakes with the **reliability** of data warehouses. Data is stored in open formats on object storage (S3, GCS, Azure Blob) while metadata catalogs track schema, partitions, and table history.
+A lakehouse combines the scalability of data lakes with the reliability of data warehouses. Data is stored in open formats on object storage (S3, GCS, Azure Blob) while metadata catalogs track schema, partitions, and table history.
 
 <!-- Architecture -->
 
@@ -24,7 +27,7 @@ flowchart TB
 
 ## Quick Start
 
-Add a lakehouse configuration to your DuckDB connection:
+Let's add a lakehouse (Iceberg Format, Glue Catalog, S3 Storage) configuration to your DuckDB connection:
 
 ```yaml
 connections:
