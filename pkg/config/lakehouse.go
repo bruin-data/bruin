@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"slices"
 )
 
 type LakehouseFormat string
@@ -76,6 +77,18 @@ const (
 	// Future: StorageTypeGCS, StorageTypeLocal.
 )
 
+var (
+	supportedCatalogTypes = []CatalogType{
+		CatalogTypeGlue,
+		CatalogTypePostgres,
+		CatalogTypeDuckDB,
+		CatalogTypeSQLite,
+	}
+	supportedStorageTypes = []StorageType{
+		StorageTypeS3,
+	}
+)
+
 type StorageAuth struct {
 	// AWS S3 credentials
 	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key"`
@@ -119,29 +132,13 @@ func (lh *LakehouseConfig) Validate() error {
 	}
 
 	// Validate catalog type if specified
-	if lh.Catalog != nil && lh.Catalog.Type != "" {
-		switch lh.Catalog.Type {
-		case CatalogTypeGlue:
-			// valid catalog type
-		case CatalogTypePostgres:
-			// valid catalog type
-		case CatalogTypeDuckDB:
-			// valid catalog type
-		case CatalogTypeSQLite:
-			// valid catalog type
-		default:
-			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb, sqlite)", lh.Catalog.Type)
-		}
+	if lh.Catalog != nil && lh.Catalog.Type != "" && !slices.Contains(supportedCatalogTypes, lh.Catalog.Type) {
+		return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
 	// Validate storage type if specified
-	if lh.Storage != nil && lh.Storage.Type != "" {
-		switch lh.Storage.Type {
-		case StorageTypeS3:
-			// valid storage type
-		default:
-			return fmt.Errorf("unsupported storage type: %s (supported: s3)", lh.Storage.Type)
-		}
+	if lh.Storage != nil && lh.Storage.Type != "" && !slices.Contains(supportedStorageTypes, lh.Storage.Type) {
+		return fmt.Errorf("unsupported storage type: %s (supported: s3)", lh.Storage.Type)
 	}
 
 	return nil
