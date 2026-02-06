@@ -158,6 +158,21 @@ func TestValidateLakehouseConfig(t *testing.T) {
 			errMsg:  "DuckDB ducklake with duckdb catalog requires path",
 		},
 		{
+			name: "ducklake with sqlite missing path fails",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeSQLite,
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
+			},
+			wantErr: true,
+			errMsg:  "DuckDB ducklake with sqlite catalog requires path",
+		},
+		{
 			name: "ducklake with postgres and s3 storage passes",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
@@ -185,6 +200,21 @@ func TestValidateLakehouseConfig(t *testing.T) {
 				Catalog: &config.CatalogConfig{
 					Type: config.CatalogTypeDuckDB,
 					Path: "metadata.ducklake",
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "ducklake with sqlite and s3 storage passes",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeSQLite,
+					Path: "metadata.sqlite",
 				},
 				Storage: &config.StorageConfig{
 					Type: config.StorageTypeS3,
@@ -267,6 +297,20 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 				},
 			},
 			wantExts: []string{"ducklake", "aws", "httpfs"},
+		},
+		{
+			name: "ducklake with sqlite and s3",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeSQLite,
+					Path: "metadata.sqlite",
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+				},
+			},
+			wantExts: []string{"ducklake", "sqlite", "aws", "httpfs"},
 		},
 	}
 
@@ -531,6 +575,38 @@ func TestLakehouseAttacher_GenerateDuckLakeAttach(t *testing.T) {
 			alias: "ducklake_catalog",
 			want:  "ATTACH 'ducklake:metadata.ducklake' AS ducklake_catalog (DATA_PATH 's3://ducklake/warehouse', OVERRIDE_DATA_PATH true)",
 		},
+		{
+			name: "sqlite catalog",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeSQLite,
+					Path: "metadata.sqlite",
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
+			},
+			alias: "ducklake_catalog",
+			want:  "ATTACH 'ducklake:sqlite:metadata.sqlite' AS ducklake_catalog (DATA_PATH 's3://ducklake/warehouse', OVERRIDE_DATA_PATH true)",
+		},
+		{
+			name: "sqlite catalog with ducklake prefix",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeSQLite,
+					Path: "ducklake:sqlite:metadata.sqlite",
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
+			},
+			alias: "ducklake_catalog",
+			want:  "ATTACH 'ducklake:sqlite:metadata.sqlite' AS ducklake_catalog (DATA_PATH 's3://ducklake/warehouse', OVERRIDE_DATA_PATH true)",
+		},
 	}
 
 	for _, tt := range tests {
@@ -694,6 +770,42 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 				"USE ducklake_catalog",
 			},
 			wantMinLen: 8,
+		},
+		{
+			name: "ducklake with sqlite and s3 storage",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeSQLite,
+					Path: "metadata.sqlite",
+				},
+				Storage: &config.StorageConfig{
+					Type:   config.StorageTypeS3,
+					Path:   "s3://ducklake/warehouse",
+					Region: "us-east-1",
+					Auth: &config.StorageAuth{
+						AccessKey: "AKIAEXAMPLE",
+						SecretKey: "secretkey",
+					},
+				},
+			},
+			alias: "ducklake_catalog",
+			wantContains: []string{
+				"INSTALL ducklake",
+				"LOAD ducklake",
+				"INSTALL sqlite",
+				"LOAD sqlite",
+				"INSTALL aws",
+				"LOAD aws",
+				"CREATE OR REPLACE SECRET",
+				"TYPE s3",
+				"ATTACH 'ducklake:sqlite:metadata.sqlite' AS ducklake_catalog",
+				"DATA_PATH 's3://ducklake/warehouse'",
+				"OVERRIDE_DATA_PATH true",
+				"CREATE SCHEMA IF NOT EXISTS ducklake_catalog.main",
+				"USE ducklake_catalog",
+			},
+			wantMinLen: 10,
 		},
 	}
 

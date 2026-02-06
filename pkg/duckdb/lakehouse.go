@@ -46,6 +46,8 @@ func validateIcebergForDuckDB(lh *config.LakehouseConfig) error {
 		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
 	case config.CatalogTypeDuckDB:
 		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
+	case config.CatalogTypeSQLite:
+		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
 	default:
 		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
 	}
@@ -77,10 +79,14 @@ func validateDuckLakeForDuckDB(lh *config.LakehouseConfig) error {
 		if lh.Catalog.Path == "" {
 			return errors.New("DuckDB ducklake with duckdb catalog requires path")
 		}
+	case config.CatalogTypeSQLite:
+		if lh.Catalog.Path == "" {
+			return errors.New("DuckDB ducklake with sqlite catalog requires path")
+		}
 	case config.CatalogTypeGlue:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	default:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
 	if lh.Storage == nil {
@@ -158,6 +164,9 @@ func (l *LakehouseAttacher) getRequiredExtensions(lh *config.LakehouseConfig) []
 	if lh.Catalog != nil && lh.Catalog.Type == config.CatalogTypePostgres {
 		extensions = append(extensions, "postgres")
 	}
+	if lh.Catalog != nil && lh.Catalog.Type == config.CatalogTypeSQLite {
+		extensions = append(extensions, "sqlite")
+	}
 
 	return l.deduplicateExtensions(extensions)
 }
@@ -232,6 +241,8 @@ func (l *LakehouseAttacher) generateCatalogSecret(name string, catalog *config.C
 	case config.CatalogTypePostgres:
 		return l.generatePostgresSecret(name, catalog)
 	case config.CatalogTypeDuckDB:
+		return ""
+	case config.CatalogTypeSQLite:
 		return ""
 	default:
 		return ""
@@ -347,6 +358,8 @@ func (l *LakehouseAttacher) generateIcebergAttach(lh *config.LakehouseConfig, al
 		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
 	case config.CatalogTypeDuckDB:
 		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
+	case config.CatalogTypeSQLite:
+		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
 	default:
 		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
 	}
@@ -362,31 +375,43 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh *config.LakehouseConfig, a
 	if lh.Storage.Path == "" {
 		return "", errors.New("ducklake format requires storage path")
 	}
-	if lh.Catalog.Type != config.CatalogTypePostgres {
-		if lh.Catalog.Type == config.CatalogTypeDuckDB {
-			catalogPath := strings.TrimSpace(lh.Catalog.Path)
-			if catalogPath == "" {
-				return "", errors.New("ducklake format requires catalog path")
-			}
-			catalogPath = strings.TrimPrefix(catalogPath, "ducklake:")
-			options := []string{
-				"DATA_PATH " + dollarQuote(lh.Storage.Path),
-				"OVERRIDE_DATA_PATH true",
-			}
-
-			return "ATTACH 'ducklake:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+	switch lh.Catalog.Type {
+	case config.CatalogTypePostgres:
+		secretName := defaultSecretName(alias, "catalog")
+		options := []string{
+			"DATA_PATH " + dollarQuote(lh.Storage.Path),
+			"META_SECRET " + dollarQuote(secretName),
+			"OVERRIDE_DATA_PATH true",
 		}
+		return "ATTACH 'ducklake:postgres:' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+	case config.CatalogTypeDuckDB:
+		catalogPath := strings.TrimSpace(lh.Catalog.Path)
+		if catalogPath == "" {
+			return "", errors.New("ducklake format requires catalog path")
+		}
+		catalogPath = strings.TrimPrefix(catalogPath, "ducklake:")
+		options := []string{
+			"DATA_PATH " + dollarQuote(lh.Storage.Path),
+			"OVERRIDE_DATA_PATH true",
+		}
+		return "ATTACH 'ducklake:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+	case config.CatalogTypeSQLite:
+		catalogPath := strings.TrimSpace(lh.Catalog.Path)
+		if catalogPath == "" {
+			return "", errors.New("ducklake format requires catalog path")
+		}
+		catalogPath = strings.TrimPrefix(catalogPath, "ducklake:")
+		catalogPath = strings.TrimPrefix(catalogPath, "sqlite:")
+		options := []string{
+			"DATA_PATH " + dollarQuote(lh.Storage.Path),
+			"OVERRIDE_DATA_PATH true",
+		}
+		return "ATTACH 'ducklake:sqlite:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+	case config.CatalogTypeGlue:
+		return "", fmt.Errorf("unsupported catalog type for ducklake: %s", lh.Catalog.Type)
+	default:
 		return "", fmt.Errorf("unsupported catalog type for ducklake: %s", lh.Catalog.Type)
 	}
-
-	secretName := defaultSecretName(alias, "catalog")
-	options := []string{
-		"DATA_PATH " + dollarQuote(lh.Storage.Path),
-		"META_SECRET " + dollarQuote(secretName),
-		"OVERRIDE_DATA_PATH true",
-	}
-
-	return "ATTACH 'ducklake:postgres:' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
 }
 
 // escapeSQL escapes single quotes in SQL strings.
