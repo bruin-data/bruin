@@ -468,12 +468,6 @@
           },
           "type": "array"
         },
-        "customerio": {
-          "items": {
-            "$ref": "#/$defs/CustomerIoConnection"
-          },
-          "type": "array"
-        },
         "mongo_atlas": {
           "items": {
             "$ref": "#/$defs/MongoAtlasConnection"
@@ -963,6 +957,12 @@
         "indeed": {
           "items": {
             "$ref": "#/$defs/IndeedConnection"
+          },
+          "type": "array"
+        },
+        "customerio": {
+          "items": {
+            "$ref": "#/$defs/CustomerIoConnection"
           },
           "type": "array"
         }
