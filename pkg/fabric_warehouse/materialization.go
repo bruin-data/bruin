@@ -1,6 +1,7 @@
-package fabric_warehouse
+package fabricwarehouse
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -36,7 +37,7 @@ func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("CREATE OR ALTER VIEW %s AS\n%s", QuoteIdentifier(asset.Name), strings.TrimSuffix(query, ";")), nil
+	return "CREATE OR ALTER VIEW " + QuoteIdentifier(asset.Name) + " AS\n" + strings.TrimSuffix(query, ";"), nil
 }
 
 // buildCreateReplaceQuery uses a temp table swap pattern because Fabric doesn't support CREATE OR REPLACE TABLE.
@@ -55,29 +56,29 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 	query = strings.TrimSuffix(query, ";")
 
 	queries := []string{
-		fmt.Sprintf("DROP TABLE IF EXISTS %s", tempName),
-		fmt.Sprintf("DROP TABLE IF EXISTS %s", backupName),
-		fmt.Sprintf("SELECT * INTO %s FROM (\n%s\n) AS __bruin_src", tempName, query),
-		fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL BEGIN EXEC sp_rename '%s', '%s' END", targetFullName, targetFullName, backupBase),
-		fmt.Sprintf("EXEC sp_rename '%s', '%s'", tempFullName, targetBase),
-		fmt.Sprintf("DROP TABLE IF EXISTS %s", backupName),
+		"DROP TABLE IF EXISTS " + tempName,
+		"DROP TABLE IF EXISTS " + backupName,
+		"SELECT * INTO " + tempName + " FROM (\n" + query + "\n) AS __bruin_src",
+		"IF OBJECT_ID('" + targetFullName + "', 'U') IS NOT NULL BEGIN EXEC sp_rename '" + targetFullName + "', '" + backupBase + "' END",
+		"EXEC sp_rename '" + tempFullName + "', '" + targetBase + "'",
+		"DROP TABLE IF EXISTS " + backupName,
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("INSERT INTO %s\n%s", QuoteIdentifier(asset.Name), strings.TrimSuffix(query, ";")), nil
+	return "INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"), nil
 }
 
 func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error) {
 	if len(asset.Columns) == 0 {
-		return "", fmt.Errorf("delete+insert strategy requires columns to be defined")
+		return "", errors.New("delete+insert strategy requires columns to be defined")
 	}
 
 	pkCols := getPrimaryKeyColumns(asset)
 	if len(pkCols) == 0 {
-		return "", fmt.Errorf("delete+insert strategy requires primary key columns")
+		return "", errors.New("delete+insert strategy requires primary key columns")
 	}
 
 	tableName := QuoteIdentifier(asset.Name)
@@ -87,11 +88,11 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 	query = strings.TrimSuffix(query, ";")
 
 	queries := []string{
-		fmt.Sprintf("DROP TABLE IF EXISTS %s", tempName),
-		fmt.Sprintf("SELECT * INTO %s FROM (\n%s\n) AS __bruin_src", tempName, query),
-		fmt.Sprintf("DELETE FROM %s WHERE EXISTS (\n  SELECT 1 FROM %s WHERE %s\n)", tableName, tempName, deleteCondition),
-		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", tableName, tempName),
-		fmt.Sprintf("DROP TABLE IF EXISTS %s", tempName),
+		"DROP TABLE IF EXISTS " + tempName,
+		"SELECT * INTO " + tempName + " FROM (\n" + query + "\n) AS __bruin_src",
+		"DELETE FROM " + tableName + " WHERE EXISTS (\n  SELECT 1 FROM " + tempName + " WHERE " + deleteCondition + "\n)",
+		"INSERT INTO " + tableName + " SELECT * FROM " + tempName,
+		"DROP TABLE IF EXISTS " + tempName,
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
@@ -104,8 +105,8 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, error) {
 	queries := []string{
-		fmt.Sprintf("TRUNCATE TABLE %s", QuoteIdentifier(asset.Name)),
-		fmt.Sprintf("INSERT INTO %s\n%s", QuoteIdentifier(asset.Name), strings.TrimSuffix(query, ";")),
+		"TRUNCATE TABLE " + QuoteIdentifier(asset.Name),
+		"INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"),
 	}
 	return strings.Join(queries, ";\n") + ";", nil
 }

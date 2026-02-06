@@ -30,7 +30,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
-	"github.com/bruin-data/bruin/pkg/fabric_warehouse"
+	fabricwarehouse "github.com/bruin-data/bruin/pkg/fabric_warehouse"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/ingestr"
@@ -1681,11 +1681,11 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeFabricWarehouseQuery) || estimateCustomCheckType == pipeline.AssetTypeFabricWarehouseQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricWarehouseSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricWarehouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricWarehouseTableSensor) {
-		fabricOperator := fabric_warehouse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: fabric_warehouse.NewMaterializer(fullRefresh),
+		fabricOperator := fabricwarehouse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+			Mat: fabricwarehouse.NewMaterializer(fullRefresh),
 		})
 
-		fabricCheckRunner := fabric_warehouse.NewColumnCheckOperator(conn)
+		fabricCheckRunner := fabricwarehouse.NewColumnCheckOperator(conn)
 
 		fabricQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		fabricTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)

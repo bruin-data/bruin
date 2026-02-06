@@ -1,4 +1,4 @@
-package fabric_warehouse
+package fabricwarehouse
 
 import (
 	"fmt"
