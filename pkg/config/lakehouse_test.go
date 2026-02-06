@@ -65,6 +65,16 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid duckdb catalog type passes",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: &CatalogConfig{
+					Type: CatalogTypeDuckDB,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "invalid catalog type fails",
 			lh: &LakehouseConfig{
 				Format: LakehouseFormatIceberg,
@@ -148,6 +158,7 @@ func TestTypeConstants(t *testing.T) {
 		{"lakehouse format ducklake", LakehouseFormat("ducklake"), LakehouseFormatDuckLake},
 		{"catalog type", CatalogType("glue"), CatalogTypeGlue},
 		{"catalog type postgres", CatalogType("postgres"), CatalogTypePostgres},
+		{"catalog type duckdb", CatalogType("duckdb"), CatalogTypeDuckDB},
 		{"storage type", StorageType("s3"), StorageTypeS3},
 	}
 

@@ -16,8 +16,11 @@ const (
 type CatalogType string
 
 const (
-	CatalogTypeGlue     CatalogType = "glue"
+	CatalogTypeGlue CatalogType = "glue"
+
+	// DuckLake Specific.
 	CatalogTypePostgres CatalogType = "postgres"
+	CatalogTypeDuckDB   CatalogType = "duckdb"
 	// Future: CatalogTypeRest.
 )
 
@@ -52,6 +55,9 @@ type CatalogConfig struct {
 	// Glue-specific
 	CatalogID string `yaml:"catalog_id,omitempty" json:"catalog_id,omitempty" mapstructure:"catalog_id"`
 	Region    string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+
+	// DuckDB-specific
+	Path string `yaml:"path,omitempty" json:"path,omitempty" mapstructure:"path"`
 
 	// Postgres-specific
 	Host     string `yaml:"host,omitempty" json:"host,omitempty" mapstructure:"host"`
@@ -118,8 +124,10 @@ func (lh *LakehouseConfig) Validate() error {
 			// valid catalog type
 		case CatalogTypePostgres:
 			// valid catalog type
+		case CatalogTypeDuckDB:
+			// valid catalog type
 		default:
-			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres)", lh.Catalog.Type)
+			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb)", lh.Catalog.Type)
 		}
 	}
 
