@@ -167,33 +167,24 @@ connections:
 ---
 
 
-<div class="lh-combo-grid">
-<div class="lh-combo-card">
 
 #### DuckLake
-<br>
 
-| Catalog \ Storage | S3 | GCS |
-|-------------------|----|-----|
-| DuckDB |  |  |
-| SQLite   |  |  |
-| Postgres | <span class="lh-check" aria-label="supported"></span> |  |
-| MySQL    |  |  |
+| Catalog \ Storage | S3 |
+|-------------------|----|
+| DuckDB |  |
+| SQLite   |  |
+| Postgres | <span class="lh-check" aria-label="supported"></span> |
+| MySQL    |  |
 
 
-<br>
-</div>
-<div class="lh-combo-card">
 
 #### Iceberg
-<br>
 
-| Catalog \ Storage | S3 | GCS |
-|-------------------|----|-----|
-| Glue | <span class="lh-check" aria-label="supported"></span> | |
+| Catalog \ Storage | S3 |
+|-------------------|----|
+| Glue | <span class="lh-check" aria-label="supported"></span> |
 
-</div>
-</div>
 
 For background, see DuckDB's [lakehouse format overview](https://duckdb.org/docs/stable/lakehouse_formats).
 

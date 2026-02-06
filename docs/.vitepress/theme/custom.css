@@ -63,23 +63,6 @@ html:not(.dark) .vp-code-dark {
   font-weight: 600;
 }
 
-
 .lh-check::before {
   content: "\2713";
-}
-
-
-.lh-combo-grid {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.lh-combo-card {
-  flex: 1 1 320px;
-  min-width: 280px;
-}
-
-.lh-combo-card table {
-  margin: 0;
 }

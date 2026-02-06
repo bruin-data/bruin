@@ -90,10 +90,7 @@ parameters:
 
 ### Planned Support
 
-| Component | Status |
-|-----------|--------|
-| Iceberg | Planned |
-| Glue Catalog | Planned |
-| REST Catalog | Planned |
-| S3 Storage | Planned |
-| GCS Storage | Planned |
+| Catalog \ Storage | S3 |
+|-------------------|----|
+| Glue | Planned |
+| Nessie | Planned |

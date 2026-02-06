@@ -10,44 +10,31 @@ Bruin supports querying open table formats (Iceberg, DuckLake) stored in cloud o
 
 See the DuckDB lakehouse configuration: [DuckDB](../platforms/duckdb.md#lakehouse-support).
 
-<div class="lh-combo-grid">
-<div class="lh-combo-card">
-
 #### DuckLake
-<br>
 
-| Catalog \ Storage | S3 | GCS |
-|-------------------|----|-----|
-| DuckDB   |  |  |
-| SQLite   |  |  |
-| Postgres | <span class="lh-check" aria-label="supported"></span> |  |
-| MySQL    |  |  |
+| Catalog \ Storage | S3 |
+|-------------------|----|
+| DuckDB |  |
+| SQLite   |  |
+| Postgres | <span class="lh-check" aria-label="supported"></span> |
+| MySQL    |  |
 
 
-<br>
-</div>
-<div class="lh-combo-card">
 
 #### Iceberg
-<br>
 
-| Catalog \ Storage | S3 | GCS |
-|-------------------|----|-----|
-| Glue | <span class="lh-check" aria-label="supported"></span> | |
-| Nessie | Planned | |
-
-<br>
-</div>
-</div>
+| Catalog \ Storage | S3 |
+|-------------------|----|
+| Glue | <span class="lh-check" aria-label="supported"></span> |
 
 ### Trino (Planned)
 
 See the Trino lakehouse section: [Trino](../platforms/trino.md#lakehouse-support-planned).
 
-| Format | Status |
-|--------|--------|
-| Iceberg | Planned |
-
+| Catalog \ Storage | S3 |
+|-------------------|----|
+| Glue | Planned |
+| Nessie | Planned |
 
 ## What is a Lakehouse?
 
