@@ -7,7 +7,7 @@ Bring lakehouse tables directly into your Bruin pipelines. Query Iceberg and Duc
 
 ## Engines and formats
 
-DuckDB and Trino (planned) are the engines Bruin supports. In each section, you can discover the lakehouse format + catalog/storage combination supported by Bruin. Visit [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support-planned) for Bruin configurations.
+DuckDB and Trino are the engines Bruin supports. In each section, you can discover the lakehouse format + catalog/storage combination supported by Bruin. Visit [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support) for Bruin configurations.
 
 ### DuckDB [↗](../platforms/duckdb.md#lakehouse-support)
 
@@ -37,14 +37,14 @@ Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws
 | Glue | <span class="lh-check" aria-label="supported"></span> |
 
 
-### Trino (Planned)  [↗](../platforms/trino.md#lakehouse-support-planned)
+### Trino [↗](../platforms/trino.md#lakehouse-support)
 
-Trino support is planned via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with Glue and [Nessie](https://projectnessie.org/) catalogs. Check out [Trino](../platforms/trino.md#lakehouse-support-planned). for Bruin configuration. The table lists planned storage + catalog combinations.
+Trino supports lakehouse access via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with Glue and [Nessie](https://projectnessie.org/) catalogs. Detailed setup guides are coming soon. Check out [Trino](../platforms/trino.md#lakehouse-support) for Bruin configuration.
 
 | Catalog \ Storage | S3 |
 |-------------------|----|
-| Glue | Planned |
-| Nessie | Planned |
+| Glue | <span class="lh-check" aria-label="supported"></span> |
+| Nessie | <span class="lh-check" aria-label="supported"></span> |
 
 ## What is a Lakehouse?
 
@@ -99,4 +99,4 @@ connection: analytics
 SELECT * FROM users;
 ```
 
-See the engine-specific pages [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support-planned) for detailed configuration options.
+See the engine-specific pages [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support) for detailed configuration options.

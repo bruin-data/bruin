@@ -83,14 +83,12 @@ parameters:
 ```
 
 
-## Lakehouse Support (Planned)
+## Lakehouse Support
 
 > [!WARNING]
-> Trino lakehouse support is not yet available. This section documents the planned configuration.
-
-### Planned Support
+> Trino lakehouse support is available. Detailed setup guides are coming soon.
 
 | Catalog \ Storage | S3 |
 |-------------------|----|
-| Glue | Planned |
-| Nessie | Planned |
+| Glue | <span class="lh-check" aria-label="supported"></span> |
+| Nessie | <span class="lh-check" aria-label="supported"></span> |
