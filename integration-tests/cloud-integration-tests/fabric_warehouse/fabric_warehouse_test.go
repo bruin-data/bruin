@@ -1,9 +1,9 @@
 package fabricwarehouse
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,8 +24,8 @@ func TestFabricWarehouseWorkflows(t *testing.T) {
 
 	configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 
-	runID := fmt.Sprintf("%d", time.Now().UnixNano())
-	tableName := fmt.Sprintf("products_%s", runID)
+	runID := strconv.FormatInt(time.Now().UnixNano(), 10)
+	tableName := "products_" + runID
 
 	tempDir := t.TempDir()
 	tempPipelineDir := filepath.Join(tempDir, "fw-asset-query")
@@ -94,7 +94,7 @@ func TestFabricWarehouseWorkflows(t *testing.T) {
 					{
 						Name:    "query the products table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "fabric_warehouse-default", "--query", fmt.Sprintf("SELECT product_id, product_name, CAST(price AS VARCHAR(20)) AS price, stock FROM bruin_test.%s ORDER BY product_id;", tableName), "--output", "csv"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "fabric_warehouse-default", "--query", "SELECT product_id, product_name, CAST(price AS VARCHAR(20)) AS price, stock FROM bruin_test."+tableName+" ORDER BY product_id;", "--output", "csv"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -111,7 +111,6 @@ func TestFabricWarehouseWorkflows(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			require.NoError(t, tt.workflow.Run())
