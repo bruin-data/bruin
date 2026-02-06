@@ -134,7 +134,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ## Lakehouse Support <Badge type="warning" text="beta" />
 
-DuckDB can query [Iceberg](https://duckdb.org/docs/extensions/iceberg) and [DuckLake](https://duckdb.org/docs/extensions/ducklake) tables through its native extensions. DuckLake supports DuckDB or Postgres catalogs with S3-backed storage.
+DuckDB can query [Iceberg](https://duckdb.org/docs/extensions/iceberg) and [DuckLake](https://duckdb.org/docs/extensions/ducklake) tables through its native extensions. DuckLake supports DuckDB, SQLite, or Postgres catalogs with S3-backed storage.
 
 ### Connection
 
@@ -148,7 +148,7 @@ connections:
       lakehouse:
         format: <iceberg|ducklake>
         catalog:
-          type: <glue|postgres|duckdb>
+          type: <glue|postgres|duckdb|sqlite>
           auth: { ... } # optional
         storage:
           type: <s3>
@@ -160,7 +160,7 @@ connections:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `format` | string | Yes | Table format: `iceberg` or `ducklake` |
-| `catalog` | object | Yes | Catalog configuration (Glue for Iceberg, DuckDB/Postgres for DuckLake) |
+| `catalog` | object | Yes | Catalog configuration (Glue for Iceberg, DuckDB/SQLite/Postgres for DuckLake) |
 | `storage` | object | No | Storage configuration (required for DuckLake) |
 
 ---
@@ -173,7 +173,7 @@ connections:
 | Catalog \ Storage | S3 |
 |-------------------|----|
 | DuckDB | <span class="lh-check" aria-label="supported"></span> |
-| SQLite   |  |
+| SQLite | <span class="lh-check" aria-label="supported"></span> |
 | Postgres | <span class="lh-check" aria-label="supported"></span> |
 | MySQL    |  |
 
@@ -231,6 +231,14 @@ catalog:
 `catalog.path` should point to the DuckLake metadata file.
 
 Note that if you are using DuckDB as your catalog database, you're limited to a single client.
+
+#### SQLite
+
+```yaml
+catalog:
+  type: sqlite
+  path: "metadata.sqlite"
+```
 
 
 ---

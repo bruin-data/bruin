@@ -15,14 +15,14 @@ DuckDB and Trino (planned) are the engines bruin supports. In each section, you 
 
 #### DuckLake
 
-DuckLake uses a DuckDB or Postgres catalog. The table shows supported storage + catalog combinations. 
+DuckLake uses a DuckDB, SQLite, or Postgres catalog. The table shows supported storage + catalog combinations.
 For more guidance, see DuckLake's [choosing a catalog database](https://ducklake.select/docs/stable/duckdb/usage/choosing_a_catalog_database).
 
 
 | Catalog \ Storage | S3 |
 |-------------------|----|
 | DuckDB| <span class="lh-check" aria-label="supported"></span> |
-| SQLite   |  |
+| SQLite | <span class="lh-check" aria-label="supported"></span> |
 | Postgres| <span class="lh-check" aria-label="supported"></span> |
 | MySQL    |  |
 
