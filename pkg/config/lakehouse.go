@@ -21,6 +21,7 @@ const (
 	// DuckLake Specific.
 	CatalogTypePostgres CatalogType = "postgres"
 	CatalogTypeDuckDB   CatalogType = "duckdb"
+	CatalogTypeSQLite   CatalogType = "sqlite"
 	// Future: CatalogTypeRest.
 )
 
@@ -56,7 +57,7 @@ type CatalogConfig struct {
 	CatalogID string `yaml:"catalog_id,omitempty" json:"catalog_id,omitempty" mapstructure:"catalog_id"`
 	Region    string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 
-	// DuckDB-specific
+	// DuckDB and SQLite-specific
 	Path string `yaml:"path,omitempty" json:"path,omitempty" mapstructure:"path"`
 
 	// Postgres-specific
@@ -126,8 +127,10 @@ func (lh *LakehouseConfig) Validate() error {
 			// valid catalog type
 		case CatalogTypeDuckDB:
 			// valid catalog type
+		case CatalogTypeSQLite:
+			// valid catalog type
 		default:
-			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb)", lh.Catalog.Type)
+			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb, sqlite)", lh.Catalog.Type)
 		}
 	}
 
