@@ -175,7 +175,7 @@ connections:
 | DuckDB | <span class="lh-check" aria-label="supported"></span> |
 | SQLite | <span class="lh-check" aria-label="supported"></span> |
 | Postgres | <span class="lh-check" aria-label="supported"></span> |
-| MySQL    |  |
+| MySQL    | Planned |
 
 
 
