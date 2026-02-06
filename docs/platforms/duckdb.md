@@ -170,7 +170,7 @@ connections:
 
 #### DuckLake
 
-| Catalog \ Storage | S3 |
+| Catalog | S3 |
 |-------------------|----|
 | DuckDB | <span class="lh-check" aria-label="supported"></span> |
 | SQLite | <span class="lh-check" aria-label="supported"></span> |
@@ -181,7 +181,7 @@ connections:
 
 #### Iceberg
 
-| Catalog \ Storage | S3 |
+| Catalog | S3 |
 |-------------------|----|
 | Glue | <span class="lh-check" aria-label="supported"></span> |
 

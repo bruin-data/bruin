@@ -19,7 +19,7 @@ DuckLake uses a DuckDB, SQLite, or Postgres catalog. The table shows supported s
 For more guidance, see DuckLake's [choosing a catalog database](https://ducklake.select/docs/stable/duckdb/usage/choosing_a_catalog_database).
 
 
-| Catalog \ Storage | S3 |
+| Catalog | S3 |
 |-------------------|----|
 | DuckDB| <span class="lh-check" aria-label="supported"></span> |
 | SQLite | <span class="lh-check" aria-label="supported"></span> |
@@ -32,7 +32,7 @@ For more guidance, see DuckLake's [choosing a catalog database](https://ducklake
 
 Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-data-catalog.html)). The table shows supported storage + catalog combinations.
 
-| Catalog \ Storage | S3 |
+| Catalog | S3 |
 |-------------------|----|
 | Glue | <span class="lh-check" aria-label="supported"></span> |
 
@@ -41,7 +41,7 @@ Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws
 
 Trino supports lakehouse access via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with Glue and [Nessie](https://projectnessie.org/) catalogs. Detailed setup guides are coming soon. Check out [Trino](../platforms/trino.md#lakehouse-support) for Bruin configuration.
 
-| Catalog \ Storage | S3 |
+| Catalog | S3 |
 |-------------------|----|
 | Glue | <span class="lh-check" aria-label="supported"></span> |
 | Nessie | <span class="lh-check" aria-label="supported"></span> |
