@@ -297,7 +297,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	}
 	if value, exists := asset.Parameters["incremental_strategy"]; exists && value == "merge" {
 		// Skip PK validation for CDC mode - PKs are determined by the source
-		if asset.Parameters["mode"] != "cdc" {
+		if asset.Parameters["cdc"] != "true" {
 			primaryKeys := asset.ColumnNamesWithPrimaryKey()
 			if len(primaryKeys) == 0 {
 				issues = append(issues, &Issue{

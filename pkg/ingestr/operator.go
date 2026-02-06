@@ -100,7 +100,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	// Handle CDC mode - transform PostgreSQL URI to CDC format and auto-set merge strategy
-	if asset.Parameters["mode"] == "cdc" {
+	if asset.Parameters["cdc"] == "true" {
 		// Transform URI to CDC format
 		sourceURI = strings.ReplaceAll(sourceURI, "postgresql://", "postgres+cdc://")
 

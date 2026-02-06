@@ -827,7 +827,7 @@ func Run(isDebug *bool) *cli.Command {
 			// Auto-enable gong for CDC mode assets
 			if !runConfig.UseGong {
 				for _, asset := range pipelineInfo.Pipeline.Assets {
-					if asset.Type == pipeline.AssetTypeIngestr && asset.Parameters["mode"] == "cdc" {
+					if asset.Type == pipeline.AssetTypeIngestr && asset.Parameters["cdc"] == "true" {
 						// CDC mode detected, enable gong
 						runConfig.UseGong = true
 
@@ -844,7 +844,7 @@ func Run(isDebug *bool) *cli.Command {
 							info, gongErr := os.Stat(gongPath)
 							if gongErr != nil {
 								if os.IsNotExist(gongErr) {
-									return cli.Exit("CDC mode detected but gong binary not found at path: "+gongPath+"\nPlease install gong or remove mode: cdc from your asset.", 1)
+									return cli.Exit("CDC mode detected but gong binary not found at path: "+gongPath+"\nPlease install gong or remove cdc: true from your asset.", 1)
 								}
 								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to access gong binary at path '%s': %v", gongPath, gongErr), 1)
 							}
