@@ -830,17 +830,29 @@ func Run(isDebug *bool) *cli.Command {
 					if asset.Type == pipeline.AssetTypeIngestr && asset.Parameters["mode"] == "cdc" {
 						// CDC mode detected, enable gong
 						runConfig.UseGong = true
-						// Validate gong binary exists
-						info, gongErr := os.Stat(gongPath)
-						if gongErr != nil {
-							if os.IsNotExist(gongErr) {
-								return cli.Exit("CDC mode detected but gong binary not found at path: "+gongPath+"\nPlease install gong or remove mode: cdc from your asset.", 1)
+
+						if gongPath == "" {
+							// Auto-install gong if no custom path provided
+							gongChecker := &gong.Checker{}
+							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx)
+							if gongErr != nil {
+								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to install gong: %v", gongErr), 1)
 							}
-							return cli.Exit(fmt.Sprintf("CDC mode detected but failed to access gong binary at path '%s': %v", gongPath, gongErr), 1)
+							gongPath = installedPath
+						} else {
+							// User provided custom path - verify it exists and is executable
+							info, gongErr := os.Stat(gongPath)
+							if gongErr != nil {
+								if os.IsNotExist(gongErr) {
+									return cli.Exit("CDC mode detected but gong binary not found at path: "+gongPath+"\nPlease install gong or remove mode: cdc from your asset.", 1)
+								}
+								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to access gong binary at path '%s': %v", gongPath, gongErr), 1)
+							}
+							if info.Mode()&0o111 == 0 {
+								return cli.Exit(fmt.Sprintf("CDC mode detected but gong binary at path '%s' is not executable", gongPath), 1)
+							}
 						}
-						if info.Mode()&0o111 == 0 {
-							return cli.Exit(fmt.Sprintf("CDC mode detected but gong binary at path '%s' is not executable", gongPath), 1)
-						}
+
 						runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath) //nolint
 						break
 					}
