@@ -7,8 +7,11 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const testGenericSecretJSONAzure = `{"details": {"value": "somevalue"}, "type": "generic"}`
 
 // mockAzureKeyVaultClient implements azureKeyVaultSecretsClient for testing.
 type mockAzureKeyVaultClient struct {
@@ -103,7 +106,7 @@ func TestAzureKeyVaultClient_GetConnection_ReturnsConnection(t *testing.T) {
 
 func TestAzureKeyVaultClient_GetConnection_ReturnsGenericConnection(t *testing.T) {
 	t.Parallel()
-	secretValue := `{"details": {"value": "somevalue"}, "type": "generic"}`
+	secretValue := testGenericSecretJSONAzure
 	c := &AzureKeyVaultClient{
 		client: &mockAzureKeyVaultClient{
 			response: azsecrets.GetSecretResponse{
@@ -155,7 +158,7 @@ func TestAzureKeyVaultClient_GetConnection_ReturnsFromCache(t *testing.T) {
 
 func TestAzureKeyVaultClient_GetConnection_ThreadSafe(t *testing.T) {
 	t.Parallel()
-	secretValue := `{"details": {"value": "somevalue"}, "type": "generic"}`
+	secretValue := testGenericSecretJSONAzure
 
 	c := &AzureKeyVaultClient{
 		client: &mockAzureKeyVaultClient{
@@ -173,12 +176,12 @@ func TestAzureKeyVaultClient_GetConnection_ThreadSafe(t *testing.T) {
 
 	// Run concurrent access
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			conn := c.GetConnection("test-connection")
-			require.NotNil(t, conn)
+			assert.NotNil(t, conn)
 		}()
 	}
 	wg.Wait()
@@ -186,7 +189,7 @@ func TestAzureKeyVaultClient_GetConnection_ThreadSafe(t *testing.T) {
 
 func TestAzureKeyVaultClient_GetConnectionDetails_ReturnsDetails(t *testing.T) {
 	t.Parallel()
-	secretValue := `{"details": {"value": "somevalue"}, "type": "generic"}`
+	secretValue := testGenericSecretJSONAzure
 	c := &AzureKeyVaultClient{
 		client: &mockAzureKeyVaultClient{
 			response: azsecrets.GetSecretResponse{
