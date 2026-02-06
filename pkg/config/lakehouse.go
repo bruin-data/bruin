@@ -21,6 +21,7 @@ const (
 	// DuckLake Specific.
 	CatalogTypePostgres CatalogType = "postgres"
 	CatalogTypeDuckDB   CatalogType = "duckdb"
+	CatalogTypeSQLite   CatalogType = "sqlite"
 	// Future: CatalogTypeRest.
 )
 
@@ -126,8 +127,10 @@ func (lh *LakehouseConfig) Validate() error {
 			// valid catalog type
 		case CatalogTypeDuckDB:
 			// valid catalog type
+		case CatalogTypeSQLite:
+			// valid catalog type
 		default:
-			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb)", lh.Catalog.Type)
+			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb, sqlite)", lh.Catalog.Type)
 		}
 	}
 
