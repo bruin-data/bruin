@@ -7,7 +7,7 @@ Bring lakehouse tables directly into your Bruin pipelines. Query Iceberg and Duc
 
 ## Engines and formats
 
-DuckDB and Trino (planned) are the engines bruin supports. In each section, you can discover the lakehouse format + catalog/storage combination supported by bruin. Visit [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support) for bruin configurations.
+DuckDB and Trino (planned) are the engines bruin supports. In each section, you can discover the lakehouse format + catalog/storage combination supported by bruin. Visit [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support-planned) for bruin configurations.
 
 ### DuckDB [↗](../platforms/duckdb.md#lakehouse-support)
 
@@ -37,7 +37,7 @@ Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws
 | Glue | <span class="lh-check" aria-label="supported"></span> |
 
 
-### Trino (Planned)  [↗](../platforms/trino.md#lakehouse-support)
+### Trino (Planned)  [↗](../platforms/trino.md#lakehouse-support-planned)
 
 Trino support is planned via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with Glue and [Nessie](https://projectnessie.org/) catalogs. Check out [Trino](../platforms/trino.md#lakehouse-support-planned). for bruin configuration. The table lists planned storage + catalog combinations.
 
