@@ -143,6 +143,21 @@ func TestValidateLakehouseConfig(t *testing.T) {
 			errMsg:  "DuckDB ducklake with s3 storage requires path",
 		},
 		{
+			name: "ducklake with duckdb missing path fails",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeDuckDB,
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
+			},
+			wantErr: true,
+			errMsg:  "DuckDB ducklake with duckdb catalog requires path",
+		},
+		{
 			name: "ducklake with postgres and s3 storage passes",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
@@ -155,6 +170,21 @@ func TestValidateLakehouseConfig(t *testing.T) {
 						Username: "ducklake_user",
 						Password: "ducklake_password",
 					},
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "ducklake with duckdb and s3 storage passes",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeDuckDB,
+					Path: "metadata.ducklake",
 				},
 				Storage: &config.StorageConfig{
 					Type: config.StorageTypeS3,
@@ -223,6 +253,20 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 				},
 			},
 			wantExts: []string{"ducklake", "postgres", "aws", "httpfs"},
+		},
+		{
+			name: "ducklake with duckdb and s3",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeDuckDB,
+					Path: "metadata.ducklake",
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+				},
+			},
+			wantExts: []string{"ducklake", "aws", "httpfs"},
 		},
 	}
 
@@ -444,26 +488,59 @@ func TestLakehouseAttacher_GenerateDuckLakeAttach(t *testing.T) {
 	t.Parallel()
 	attacher := NewLakehouseAttacher()
 
-	lh := &config.LakehouseConfig{
-		Format: config.LakehouseFormatDuckLake,
-		Catalog: &config.CatalogConfig{
-			Type:     config.CatalogTypePostgres,
-			Host:     "localhost",
-			Database: "ducklake_catalog",
-			Auth: &config.CatalogAuth{
-				Username: "ducklake_user",
-				Password: "ducklake_password",
+	tests := []struct {
+		name  string
+		lh    *config.LakehouseConfig
+		alias string
+		want  string
+	}{
+		{
+			name: "postgres catalog",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type:     config.CatalogTypePostgres,
+					Host:     "localhost",
+					Database: "ducklake_catalog",
+					Auth: &config.CatalogAuth{
+						Username: "ducklake_user",
+						Password: "ducklake_password",
+					},
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
 			},
+			alias: "ducklake_catalog",
+			want:  "ATTACH 'ducklake:postgres:' AS ducklake_catalog (DATA_PATH 's3://ducklake/warehouse', META_SECRET 'bruin_ducklake_catalog_catalog', OVERRIDE_DATA_PATH true)",
 		},
-		Storage: &config.StorageConfig{
-			Type: config.StorageTypeS3,
-			Path: "s3://ducklake/warehouse",
+		{
+			name: "duckdb catalog",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeDuckDB,
+					Path: "metadata.ducklake",
+				},
+				Storage: &config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
+			},
+			alias: "ducklake_catalog",
+			want:  "ATTACH 'ducklake:metadata.ducklake' AS ducklake_catalog (DATA_PATH 's3://ducklake/warehouse', OVERRIDE_DATA_PATH true)",
 		},
 	}
 
-	result, err := attacher.generateDuckLakeAttach(lh, "ducklake_catalog")
-	require.NoError(t, err)
-	assert.Equal(t, "ATTACH 'ducklake:postgres:' AS ducklake_catalog (DATA_PATH 's3://ducklake/warehouse', META_SECRET 'bruin_ducklake_catalog_catalog', OVERRIDE_DATA_PATH true)", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := attacher.generateDuckLakeAttach(tt.lh, tt.alias)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+		})
+	}
 }
 
 func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
@@ -583,6 +660,40 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 				"USE ducklake_catalog",
 			},
 			wantMinLen: 9,
+		},
+		{
+			name: "ducklake with duckdb and s3 storage",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: &config.CatalogConfig{
+					Type: config.CatalogTypeDuckDB,
+					Path: "metadata.ducklake",
+				},
+				Storage: &config.StorageConfig{
+					Type:   config.StorageTypeS3,
+					Path:   "s3://ducklake/warehouse",
+					Region: "us-east-1",
+					Auth: &config.StorageAuth{
+						AccessKey: "AKIAEXAMPLE",
+						SecretKey: "secretkey",
+					},
+				},
+			},
+			alias: "ducklake_catalog",
+			wantContains: []string{
+				"INSTALL ducklake",
+				"LOAD ducklake",
+				"INSTALL aws",
+				"LOAD aws",
+				"CREATE OR REPLACE SECRET",
+				"TYPE s3",
+				"ATTACH 'ducklake:metadata.ducklake' AS ducklake_catalog",
+				"DATA_PATH 's3://ducklake/warehouse'",
+				"OVERRIDE_DATA_PATH true",
+				"CREATE SCHEMA IF NOT EXISTS ducklake_catalog.main",
+				"USE ducklake_catalog",
+			},
+			wantMinLen: 8,
 		},
 	}
 

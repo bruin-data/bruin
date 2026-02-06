@@ -293,6 +293,9 @@
         "region": {
           "type": "string"
         },
+        "path": {
+          "type": "string"
+        },
         "host": {
           "type": "string"
         },
