@@ -158,12 +158,18 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, []string{
+	baseArgs := []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
-		"--source-table",
-		sourceTable,
+	}
+
+	// Omit --source-table for CDC wildcard mode so ingestr replicates all tables
+	if !(asset.Parameters["cdc"] == "true" && sourceTable == "*") {
+		baseArgs = append(baseArgs, "--source-table", sourceTable)
+	}
+
+	baseArgs = append(baseArgs,
 		"--dest-uri",
 		destURI,
 		"--dest-table",
@@ -171,7 +177,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--yes",
 		"--progress",
 		"log",
-	}, &python.ColumnHintOptions{
+	)
+
+	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   false,
 		EnforceSchemaByDefault: false,
 	})
