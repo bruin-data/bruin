@@ -7,22 +7,26 @@ Bring lakehouse tables directly into your Bruin pipelines. Query Iceberg and Duc
 
 ## Engines and formats
 
-DuckDB and Trino (planned) are the engines bruin supports. In each section, you can discover the lakehouse format + catalog/storage combination supported by bruin.
+DuckDB and Trino (planned) are the engines bruin supports. In each section, you can discover the lakehouse format + catalog/storage combination supported by bruin. Visit [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support) for bruin configurations.
 
-### DuckDB
+### DuckDB [↗](../platforms/duckdb.md#lakehouse-support)
 
-[DuckDB](https://duckdb.org/docs/) is supported today. [Iceberg](https://duckdb.org/docs/extensions/iceberg) and [DuckLake](https://duckdb.org/docs/extensions/ducklake) run via DuckDB extensions. Check out [DuckDB](../platforms/duckdb.md#lakehouse-support) for bruin configuration.
+[Iceberg](https://duckdb.org/docs/extensions/iceberg) and [DuckLake](https://duckdb.org/docs/extensions/ducklake) format are supported and they run via DuckDB extensions. 
 
 #### DuckLake
 
-DuckLake uses a Postgres-backed catalog ([PostgreSQL](https://www.postgresql.org/docs/)). The table shows supported storage + catalog combinations.
+DuckLake uses a DuckDB or Postgres catalog. The table shows supported storage + catalog combinations. 
+For more guidance, see DuckLake's [choosing a catalog database](https://ducklake.select/docs/stable/duckdb/usage/choosing_a_catalog_database).
+
 
 | Catalog \ Storage | S3 |
 |-------------------|----|
-| DuckDB |  |
+| DuckDB| <span class="lh-check" aria-label="supported"></span> |
 | SQLite   |  |
-| Postgres | <span class="lh-check" aria-label="supported"></span> |
+| Postgres| <span class="lh-check" aria-label="supported"></span> |
 | MySQL    |  |
+
+
 
 #### Iceberg
 
@@ -33,7 +37,7 @@ Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws
 | Glue | <span class="lh-check" aria-label="supported"></span> |
 
 
-### Trino (Planned)
+### Trino (Planned)  [↗](../platforms/trino.md#lakehouse-support)
 
 Trino support is planned via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with Glue and [Nessie](https://projectnessie.org/) catalogs. Check out [Trino](../platforms/trino.md#lakehouse-support-planned). for bruin configuration. The table lists planned storage + catalog combinations.
 
