@@ -132,13 +132,11 @@ B,LinkedIn,SDE 2,2024-01-01
 ```
 
 
-## Lakehouse Support<Badge type="warning" text="beta" />
+## Lakehouse Support <Badge type="warning" text="beta" />
 
-DuckDB can query Iceberg and DuckLake tables through its native extensions. For background, see DuckDB's [lakehouse format overview](https://duckdb.org/docs/stable/lakehouse_formats).
+DuckDB can query Iceberg and DuckLake tables through its native extensions.
 
-### Lakehouse Connection
-
-## Connection
+### Connection
 
 Add the `lakehouse` block to your DuckDB connection in `.bruin.yml`:
 
@@ -165,12 +163,14 @@ connections:
 | `catalog` | object | Yes | Catalog configuration (Glue for Iceberg, Postgres for DuckLake) |
 | `storage` | object | No | Storage configuration (required for DuckLake) |
 
-## Supported Combinations
+### Supported Combinations
+---
+
 
 <div class="lh-combo-grid">
 <div class="lh-combo-card">
 
-### DuckLake
+#### DuckLake
 <br>
 
 | Catalog \ Storage | S3 | GCS |
@@ -185,21 +185,22 @@ connections:
 </div>
 <div class="lh-combo-card">
 
-### Iceberg
+#### Iceberg
 <br>
 
 | Catalog \ Storage | S3 | GCS |
 |-------------------|----|-----|
 | Glue | <span class="lh-check" aria-label="supported"></span> | |
 
-<br>
 </div>
 </div>
 
+For background, see DuckDB's [lakehouse format overview](https://duckdb.org/docs/stable/lakehouse_formats).
 
-## Catalog Options
+### Catalog Options
+---
 
-### Glue
+#### Glue
 
 ```yaml
 catalog:
@@ -212,7 +213,7 @@ catalog:
     session_token: "${AWS_SESSION_TOKEN}" # optional
 ```
 
-### Postgres
+#### Postgres
 
 
 ```yaml
@@ -226,9 +227,10 @@ catalog:
     password: "ducklake_password"
 ```
 
-## Storage Options
+### Storage Options
+---
 
-### S3
+#### S3
 
 Bruin currently only supports explicit AWS credentials in the `auth` block.
 Session tokens are supported for temporary credentials (AWS STS).
@@ -244,7 +246,8 @@ storage:
     session_token: "${AWS_SESSION_TOKEN}" # optional
 ```
 
-## Usage
+### Usage
+---
 
 Bruin makes the lakehouse catalog active for your session and ensures a default `main` schema is available (cannot create Iceberg on S3 schemas/tables, so they must already exist). You can query tables with or without a schema:
 
@@ -261,7 +264,7 @@ SELECT * FROM iceberg_catalog.main.my_table;
 > [!NOTE]
 > Unqualified table names resolve to the `main` schema of the active catalog. Use `<schema>.<table>` to target non-main schemas.
 
-### Example Asset
+#### Example Asset
 
 ```bruin-sql
 /* @bruin
