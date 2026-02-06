@@ -6,8 +6,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,7 +20,7 @@ import (
 )
 
 const (
-	Version = "v0.1.2"
+	Version = "v0.1.3"
 	BaseURL = "https://storage.googleapis.com/gong-release"
 
 	binDir          = "bin"
@@ -58,6 +60,24 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		return gongBinaryPath, nil
+	}
+
+	installedVersion := ""
+	cmd := exec.Command(gongBinaryPath, "--version")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		installedVersion = parseVersionOutput(strings.TrimSpace(string(output)))
+	}
+
+	// DEBUG
+	fmt.Printf("current = %s, want = %s\n", installedVersion, Version)
+
+	if installedVersion != Version {
+		err = g.downloadGong(ctx, gongBinaryPath)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return gongBinaryPath, nil
@@ -92,6 +112,22 @@ func getArchName() string {
 	default:
 		return runtime.GOARCH
 	}
+}
+
+// parseVersionOutput extracts the version from "gong version X.Y.Z" output
+// and normalizes it to "vX.Y.Z" to match the Version constant.
+func parseVersionOutput(output string) string {
+	// Expected format: "gong version X.Y.Z"
+	parts := strings.Fields(output)
+	if len(parts) < 3 {
+		return output
+	}
+
+	ver := parts[len(parts)-1]
+	if !strings.HasPrefix(ver, "v") {
+		ver = "v" + ver
+	}
+	return ver
 }
 
 func (g *Checker) downloadGong(ctx context.Context, destPath string) error {
