@@ -44,6 +44,8 @@ func validateIcebergForDuckDB(lh *config.LakehouseConfig) error {
 		}
 	case config.CatalogTypePostgres:
 		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
+	case config.CatalogTypeDuckDB:
+		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
 	default:
 		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
 	}
@@ -71,10 +73,14 @@ func validateDuckLakeForDuckDB(lh *config.LakehouseConfig) error {
 		if lh.Catalog.Auth == nil || !lh.Catalog.Auth.IsPostgres() {
 			return errors.New("DuckDB ducklake with postgres catalog requires username and password")
 		}
+	case config.CatalogTypeDuckDB:
+		if lh.Catalog.Path == "" {
+			return errors.New("DuckDB ducklake with duckdb catalog requires path")
+		}
 	case config.CatalogTypeGlue:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb)", lh.Catalog.Type)
 	default:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb)", lh.Catalog.Type)
 	}
 
 	if lh.Storage == nil {
@@ -225,6 +231,8 @@ func (l *LakehouseAttacher) generateCatalogSecret(name string, catalog *config.C
 		return l.generateGlueSecret(name, catalog)
 	case config.CatalogTypePostgres:
 		return l.generatePostgresSecret(name, catalog)
+	case config.CatalogTypeDuckDB:
+		return ""
 	default:
 		return ""
 	}
@@ -337,6 +345,8 @@ func (l *LakehouseAttacher) generateIcebergAttach(lh *config.LakehouseConfig, al
 
 	case config.CatalogTypePostgres:
 		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
+	case config.CatalogTypeDuckDB:
+		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
 	default:
 		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
 	}
@@ -353,6 +363,19 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh *config.LakehouseConfig, a
 		return "", errors.New("ducklake format requires storage path")
 	}
 	if lh.Catalog.Type != config.CatalogTypePostgres {
+		if lh.Catalog.Type == config.CatalogTypeDuckDB {
+			catalogPath := strings.TrimSpace(lh.Catalog.Path)
+			if catalogPath == "" {
+				return "", errors.New("ducklake format requires catalog path")
+			}
+			catalogPath = strings.TrimPrefix(catalogPath, "ducklake:")
+			options := []string{
+				"DATA_PATH " + dollarQuote(lh.Storage.Path),
+				"OVERRIDE_DATA_PATH true",
+			}
+
+			return "ATTACH 'ducklake:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+		}
 		return "", fmt.Errorf("unsupported catalog type for ducklake: %s", lh.Catalog.Type)
 	}
 
