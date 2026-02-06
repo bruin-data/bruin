@@ -65,7 +65,7 @@ flowchart TB
 
 ## Quick Start
 
-Let's add a lakehouse (Iceberg Format, Glue Catalog, S3 Storage) configuration to your DuckDB connection:
+Let's add a DuckLake lakehouse configuration to your DuckDB connection (DuckDB catalog + S3 storage):
 
 ```yaml
 connections:
@@ -73,16 +73,13 @@ connections:
     - name: "analytics"
       path: "./path/to/duckdb.db"
       lakehouse:
-        format: iceberg
+        format: ducklake
         catalog:
-          type: glue
-          catalog_id: "123456789012"
-          region: "us-east-1"
-          auth:
-            access_key: "AKIA..."
-            secret_key: "..."
+          type: duckdb
+          path: "metadata.ducklake"
         storage:
           type: s3
+          path: "s3://my-ducklake-warehouse/path"
           region: "us-east-1"
           auth:
             access_key: "AKIA..."
