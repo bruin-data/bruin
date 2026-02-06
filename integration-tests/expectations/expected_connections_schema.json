@@ -271,6 +271,12 @@
         },
         "session_token": {
           "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -285,6 +291,15 @@
           "type": "string"
         },
         "region": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
           "type": "string"
         },
         "auth": {
@@ -2813,6 +2828,9 @@
     "StorageConfig": {
       "properties": {
         "type": {
+          "type": "string"
+        },
+        "path": {
           "type": "string"
         },
         "region": {

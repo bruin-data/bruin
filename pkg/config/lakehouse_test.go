@@ -38,11 +38,28 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "ducklake format is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+			},
+			wantErr: false,
+		},
+		{
 			name: "valid catalog type passes",
 			lh: &LakehouseConfig{
 				Format: LakehouseFormatIceberg,
 				Catalog: &CatalogConfig{
 					Type: CatalogTypeGlue,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid postgres catalog type passes",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: &CatalogConfig{
+					Type: CatalogTypePostgres,
 				},
 			},
 			wantErr: false,
@@ -128,7 +145,9 @@ func TestTypeConstants(t *testing.T) {
 		want any
 	}{
 		{"lakehouse format", LakehouseFormat("iceberg"), LakehouseFormatIceberg},
+		{"lakehouse format ducklake", LakehouseFormat("ducklake"), LakehouseFormatDuckLake},
 		{"catalog type", CatalogType("glue"), CatalogTypeGlue},
+		{"catalog type postgres", CatalogType("postgres"), CatalogTypePostgres},
 		{"storage type", StorageType("s3"), StorageTypeS3},
 	}
 
@@ -153,12 +172,36 @@ func TestCatalogAuth_IsAWS(t *testing.T) {
 		{"with access and secret key", &CatalogAuth{AccessKey: "AKIA...", SecretKey: "secret"}, true},
 		{"only access key", &CatalogAuth{AccessKey: "AKIA..."}, false},
 		{"only secret key", &CatalogAuth{SecretKey: "secret"}, false},
+		{"postgres creds do not count as aws", &CatalogAuth{Username: "user", Password: "pass"}, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, tt.auth.IsAWS())
+		})
+	}
+}
+
+func TestCatalogAuth_IsPostgres(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		auth *CatalogAuth
+		want bool
+	}{
+		{"nil auth", nil, false},
+		{"empty auth", &CatalogAuth{}, false},
+		{"with username and password", &CatalogAuth{Username: "user", Password: "pass"}, true},
+		{"only username", &CatalogAuth{Username: "user"}, false},
+		{"only password", &CatalogAuth{Password: "pass"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.auth.IsPostgres())
 		})
 	}
 }

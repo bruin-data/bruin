@@ -8,15 +8,17 @@ import (
 type LakehouseFormat string
 
 const (
-	LakehouseFormatIceberg LakehouseFormat = "iceberg"
-	// Future: LakehouseFormatDuckLake, LakehouseFormatDelta.
+	LakehouseFormatIceberg  LakehouseFormat = "iceberg"
+	LakehouseFormatDuckLake LakehouseFormat = "ducklake"
+	// Future: LakehouseFormatDelta.
 )
 
 type CatalogType string
 
 const (
-	CatalogTypeGlue CatalogType = "glue"
-	// Future: CatalogTypeRest, CatalogTypePostgres.
+	CatalogTypeGlue     CatalogType = "glue"
+	CatalogTypePostgres CatalogType = "postgres"
+	// Future: CatalogTypeRest.
 )
 
 type CatalogAuth struct {
@@ -24,6 +26,10 @@ type CatalogAuth struct {
 	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key"`
 	SecretKey    string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key"`
 	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token"`
+
+	// Postgres credentials (for DuckLake)
+	Username string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
 }
 
 func (auth *CatalogAuth) IsAWS() bool {
@@ -33,12 +39,24 @@ func (auth *CatalogAuth) IsAWS() bool {
 	return auth.AccessKey != "" && auth.SecretKey != ""
 }
 
+func (auth *CatalogAuth) IsPostgres() bool {
+	if auth == nil {
+		return false
+	}
+	return auth.Username != "" && auth.Password != ""
+}
+
 type CatalogConfig struct {
 	Type CatalogType `yaml:"type" json:"type" mapstructure:"type"`
 
 	// Glue-specific
 	CatalogID string `yaml:"catalog_id,omitempty" json:"catalog_id,omitempty" mapstructure:"catalog_id"`
 	Region    string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+
+	// Postgres-specific
+	Host     string `yaml:"host,omitempty" json:"host,omitempty" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	Database string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 
 	// Authentication
 	Auth *CatalogAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
@@ -67,6 +85,7 @@ func (a *StorageAuth) IsS3() bool {
 
 type StorageConfig struct {
 	Type   StorageType  `yaml:"type" json:"type" mapstructure:"type"`
+	Path   string       `yaml:"path,omitempty" json:"path,omitempty" mapstructure:"path"`
 	Region string       `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Auth   *StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
 }
@@ -86,8 +105,10 @@ func (lh *LakehouseConfig) Validate() error {
 	switch lh.Format {
 	case LakehouseFormatIceberg:
 		// valid format
+	case LakehouseFormatDuckLake:
+		// valid format
 	default:
-		return fmt.Errorf("unsupported lakehouse format: %s (supported: iceberg)", lh.Format)
+		return fmt.Errorf("unsupported lakehouse format: %s (supported: iceberg, ducklake)", lh.Format)
 	}
 
 	// Validate catalog type if specified
@@ -95,8 +116,10 @@ func (lh *LakehouseConfig) Validate() error {
 		switch lh.Catalog.Type {
 		case CatalogTypeGlue:
 			// valid catalog type
+		case CatalogTypePostgres:
+			// valid catalog type
 		default:
-			return fmt.Errorf("unsupported catalog type: %s (supported: glue)", lh.Catalog.Type)
+			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres)", lh.Catalog.Type)
 		}
 	}
 
