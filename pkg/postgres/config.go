@@ -16,11 +16,6 @@ type Config struct {
 	Schema       string
 	PoolMaxConns int
 	SslMode      string
-	// CDC (Change Data Capture) configuration
-	CDC         bool
-	Publication string
-	Slot        string
-	CDCMode     string
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
@@ -41,10 +36,6 @@ func (c Config) ToDBConnectionURI() string {
 }
 
 func (c Config) GetIngestrURI() string {
-	if c.CDC {
-		return c.getCDCIngestrURI()
-	}
-
 	connString := fmt.Sprintf("postgresql://%s:%s@%s/%s",
 		url.PathEscape(c.Username),
 		url.PathEscape(c.Password),
@@ -54,35 +45,6 @@ func (c Config) GetIngestrURI() string {
 
 	if c.SslMode != "" {
 		connString += "?sslmode=" + c.SslMode
-	}
-
-	return connString
-}
-
-func (c Config) getCDCIngestrURI() string {
-	connString := fmt.Sprintf("postgres+cdc://%s:%s@%s/%s",
-		url.PathEscape(c.Username),
-		url.PathEscape(c.Password),
-		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
-		c.Database,
-	)
-
-	params := url.Values{}
-	if c.Publication != "" {
-		params.Set("publication", c.Publication)
-	}
-	if c.Slot != "" {
-		params.Set("slot", c.Slot)
-	}
-	if c.CDCMode != "" {
-		params.Set("mode", c.CDCMode)
-	}
-	if c.SslMode != "" {
-		params.Set("sslmode", c.SslMode)
-	}
-
-	if len(params) > 0 {
-		connString += "?" + params.Encode()
 	}
 
 	return connString

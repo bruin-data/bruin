@@ -464,3 +464,129 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestBasicOperator_CDCMode(t *testing.T) {
+	t.Parallel()
+
+	mockPg := new(mockConnection)
+	mockPg.On("GetIngestrURI").Return("postgresql://user:pass@localhost:5432/db", nil)
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+
+	fetcher := simpleConnectionFetcher{
+		connections: map[string]*mockConnection{
+			"pg": mockPg,
+			"bq": mockBq,
+		},
+	}
+
+	finder := new(mockFinder)
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []string
+	}{
+		{
+			name: "CDC mode transforms URI and auto-sets merge strategy",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"mode":              "cdc",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "CDC mode with publication and slot params",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset-with-params",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"mode":              "cdc",
+					"publication":       "my_publication",
+					"slot":              "my_slot",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db?publication=my_publication&slot=my_slot",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset-with-params",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "CDC mode with explicit incremental strategy",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset-explicit-strategy",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection":    "pg",
+					"source_table":         "public.users",
+					"destination":          "bigquery",
+					"mode":                 "cdc",
+					"incremental_strategy": "append",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset-explicit-strategy",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "append",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runner := new(mockRunner)
+			runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+
+			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+
+			o := &BasicOperator{
+				conn:          &fetcher,
+				finder:        finder,
+				runner:        runner,
+				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "ingestr-test", "ingestr-test", nil),
+			}
+
+			ti := scheduler.AssetInstance{
+				Pipeline: &pipeline.Pipeline{},
+				Asset:    tt.asset,
+			}
+
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+
+			err := o.Run(ctx, &ti)
+			require.NoError(t, err)
+		})
+	}
+}

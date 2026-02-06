@@ -491,10 +491,6 @@ func (m *Manager) addPgLikeConnectionFromConfig(ctx context.Context, connection 
 			Schema:       connection.Schema,
 			PoolMaxConns: poolMaxConns,
 			SslMode:      connection.SslMode,
-			CDC:          connection.CDC,
-			Publication:  connection.Publication,
-			Slot:         connection.Slot,
-			CDCMode:      connection.CDCMode,
 		})
 	}
 
