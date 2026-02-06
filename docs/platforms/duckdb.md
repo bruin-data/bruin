@@ -163,8 +163,8 @@ connections:
 | `catalog` | object | Yes | Catalog configuration (Glue for Iceberg, Postgres for DuckLake) |
 | `storage` | object | No | Storage configuration (required for DuckLake) |
 
-### Supported Combinations
 ---
+### Supported Combinations
 
 
 
@@ -188,8 +188,8 @@ connections:
 
 For background, see DuckDB's [lakehouse format overview](https://duckdb.org/docs/stable/lakehouse_formats).
 
-### Catalog Options
 ---
+### Catalog Options
 
 #### Glue
 
@@ -218,8 +218,8 @@ catalog:
     password: "ducklake_password"
 ```
 
-### Storage Options
 ---
+### Storage Options
 
 #### S3
 
@@ -237,8 +237,8 @@ storage:
     session_token: "${AWS_SESSION_TOKEN}" # optional
 ```
 
-### Usage
 ---
+### Usage
 
 Bruin makes the lakehouse catalog active for your session and ensures a default `main` schema is available (cannot create Iceberg on S3 schemas/tables, so they must already exist). You can query tables with or without a schema:
 
