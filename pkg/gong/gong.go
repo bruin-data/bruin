@@ -70,9 +70,6 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 		installedVersion = parseVersionOutput(strings.TrimSpace(string(output)))
 	}
 
-	// DEBUG
-	fmt.Printf("current = %s, want = %s\n", installedVersion, Version)
-
 	if installedVersion != Version {
 		err = g.downloadGong(ctx, gongBinaryPath)
 		if err != nil {
