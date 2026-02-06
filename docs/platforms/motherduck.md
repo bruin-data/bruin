@@ -105,7 +105,7 @@ parameters:
 
 `duckdb.seed` assets work seamlessly with MotherDuck connections. This asset type is used to represent CSV files that contain data prepared outside of your pipeline that will be loaded into your MotherDuck database.
 
-You can define seed assets in a file ending with `.yaml`:
+You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
 ```yaml
 name: dashboard.hello
 type: duckdb.seed

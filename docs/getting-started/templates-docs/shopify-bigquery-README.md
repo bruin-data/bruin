@@ -47,7 +47,7 @@ Starting the pipeline execution...
 
 
 
-Executed 1 tasks in 9.656s
+Executed 1 assets in 9.656s
 ```
 
 You can also run a single task:
@@ -68,7 +68,7 @@ Pipeline: bruin-init (.)
 Starting the pipeline execution...
 
 
-Executed 1 tasks in 9.656s
+Executed 1 assets in 9.656s
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.

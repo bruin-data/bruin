@@ -1,6 +1,6 @@
 # Bruin VS Code Extension
 
-The Bruin VS Code extension complements the Bruin CLI by offering a more visual and interactive approach to managing data pipelines. Integrated directly into VS Code, it simplifies tasks like building, managing, and deploying pipelines, making it easier for developers to interact with their projects.
+The Bruin VS Code extension complements the Bruin CLI by offering a more visual and interactive approach to managing data pipelines. Integrated directly into VS Code, it simplifies workflows like building, managing, and deploying pipelines, making it easier for developers to interact with their projects.
 
 ![Bruin Action Buttons](/vscode-extension/render-asset.gif)
 

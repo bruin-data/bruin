@@ -300,7 +300,7 @@ Fields:
 
 ### Retries
 
-Control resilience to transient failures by retrying tasks/runs a limited number of times. Increase for flaky
+Control resilience to transient failures by retrying assets/runs a limited number of times. Increase for flaky
 networks/services; keep low to surface real issues.
 
 Example:
@@ -314,7 +314,7 @@ retries: 2
 
 ### Rerun Cooldown
 
-Set a delay (in seconds) between retry attempts for failed tasks. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. When deploying to Airflow, this is automatically translated to `retries_delay` for compatibility.
+Set a delay (in seconds) between retry attempts for failed assets. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. When deploying to Airflow, this is automatically translated to `retries_delay` for compatibility.
 
 Example:
 
@@ -447,4 +447,3 @@ Variable schema fields (subset):
 | type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array, null. See [variables type reference](/getting-started/pipeline-variables#supported-json-schema-keywords) for details and examples. |
 | default | any    | yes      | REQUIRED. Must be present; used as the variable value unless overridden                 |
 | enum    | Array  | no       | Restrict values to a fixed list (e.g. `enum: ["self_serve", "enterprise", "partner"]`). See [variables documentation](/getting-started/pipeline-variables#supported-json-schema-keywords) for more JSON Schema keywords you can use. |
-

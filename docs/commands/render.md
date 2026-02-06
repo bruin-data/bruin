@@ -11,7 +11,7 @@ bruin render [path to asset definition] [flags]
 <img alt="Bruin - clean" src="/render.gif" style="margin: 10px;" />
 ### Arguments
 
-**path-to-asset-definition* (required):
+**path-to-asset-definition** (required):
 - The file path to the Bruin SQL asset you want to render.
 
 
@@ -32,17 +32,17 @@ bruin render [path to asset definition] [flags]
 **Render an Asset with Default Settings :**
 
 ```bash
-bruin render path/to/asset.yml
+bruin render path/to/sample.asset.yml
 ```
 **Render an Asset with a Date Range:**
 ```bash
-bruin render path/to/asset.yml --start-date 2024-01-01 --end-date 2024-01-31
+bruin render path/to/sample.asset.yml --start-date 2024-01-01 --end-date 2024-01-31
 ```
 **Render an Asset in JSON Format:**
 ```bash
-bruin render path/to/asset.yml --output json
+bruin render path/to/sample.asset.yml --output json
 ```
 **Render an Asset with Full Refresh:**
 ```bash
-bruin render path/to/asset.yml --full-refresh
+bruin render path/to/sample.asset.yml --full-refresh
 ```

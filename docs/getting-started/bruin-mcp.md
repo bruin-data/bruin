@@ -110,11 +110,10 @@ Or you can give direct commands like:
 - "Connect to my PostgreSQL database and run a query with Bruin"
 - "Create a table in my data warehouse using Bruin"
 - "Build a data pipeline in Bruin for ingesting CSV files"
-- "Run data quality checks on my tables in BVruin"
+- "Run data quality checks on my tables in Bruin"
 
-The AI assistant will answer these questions using up-to-date Bruin documentation and provide you with accurate examples. It can also execute Bruin commands directly to help you connect to databases, run queries, perform ingestion tasks, and create complete data pipelines.
+The AI assistant will answer these questions using up-to-date Bruin documentation and provide you with accurate examples. It can also execute Bruin commands directly to help you connect to databases, run queries, perform ingestion workflows, and create complete data pipelines.
 
 ## Feedback
 
 We'd love to hear your feedback on Bruin MCP. Please [create an issue](https://github.com/bruin-data/bruin/issues/new) so that we can improve Bruin CLI & Bruin MCP.
-

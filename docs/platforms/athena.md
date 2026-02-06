@@ -97,7 +97,7 @@ group by order_date;
 ### `athena.seed`
 `athena.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Athena database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Athena database.
 
-You can define seed assets in a file ending with `.yaml`:
+You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
 ```yaml
 name: dashboard.hello
 type: athena.seed

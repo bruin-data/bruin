@@ -264,7 +264,7 @@ bruin run ./quality-checks-example
 <span style="color:#8D8F8A">[2025-05-11 18:10:00]</span> <span style="color:#C4A000">... output omitted for brevity ...</span>
 <span style="color:#8D8F8A">[2025-05-11 18:10:05]</span> <span style="color:#C4A000">Finished: users</span>
 
-<span style="color:#4E9A06"><b>Executed 1 tasks in 5s</b></span>
+<span style="color:#4E9A06"><b>Executed 1 assets in 5s</b></span>
 </pre>
 :::
 
@@ -383,7 +383,7 @@ bruin run ./quality-checks-example
 <span style="color:#8D8F8A">[2025-05-11 18:21:06]</span> <span style="color:#75507B">Finished: users:id:non_negative</span>
 <span style="color:#8D8F8A">[2025-05-11 18:21:06]</span> <span style="color:#C4A000">Finished: users:custom-check:users_are_adults</span>
 
-<span style="color:#4E9A06"><b>Executed 3 tasks in 30s</b></span>
+<span style="color:#4E9A06"><b>Executed 3 assets in 30s</b></span>
 </pre>
 :::
 

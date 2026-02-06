@@ -31,6 +31,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -61,10 +62,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	LogsFolder      = "logs"
-	defaultGongPath = "/home/bruin/.local/bin/gong/gong"
-)
+const LogsFolder = "logs"
 
 var pythonCacheGitignorePatterns = []string{
 	"__pycache__/",
@@ -576,6 +574,11 @@ func Run(isDebug *bool) *cli.Command {
 				Hidden: true,
 			},
 			&cli.StringFlag{
+				Name:   "gong-path",
+				Usage:  "path to the gong binary (when using --use-gong)",
+				Hidden: true,
+			},
+			&cli.StringFlag{
 				Name:    "config-file",
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
@@ -630,18 +633,30 @@ func Run(isDebug *bool) *cli.Command {
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
 			useGong := c.Bool("use-gong")
+			gongPath := c.String("gong-path")
 
-			// When using gong, the path must exist and be executable
+			// When using gong, ensure binary is available
 			if useGong {
-				info, err := os.Stat(defaultGongPath)
-				if err != nil {
-					if os.IsNotExist(err) {
-						return cli.Exit("gong binary not found at path: "+defaultGongPath, 1)
+				if gongPath == "" {
+					// Auto-install gong if no custom path provided
+					gongChecker := &gong.Checker{}
+					installedPath, err := gongChecker.EnsureGongInstalled(ctx)
+					if err != nil {
+						return cli.Exit(fmt.Sprintf("failed to install gong: %v", err), 1)
 					}
-					return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", defaultGongPath, err), 1)
-				}
-				if info.Mode()&0o111 == 0 {
-					return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", defaultGongPath), 1)
+					gongPath = installedPath
+				} else {
+					// User provided custom path - verify it exists and is executable
+					info, err := os.Stat(gongPath)
+					if err != nil {
+						if os.IsNotExist(err) {
+							return cli.Exit("gong binary not found at path: "+gongPath, 1)
+						}
+						return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", gongPath, err), 1)
+					}
+					if info.Mode()&0o111 == 0 {
+						return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", gongPath), 1)
+					}
 				}
 			}
 
@@ -791,7 +806,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			// Set gong context after --continue restores RunConfig to ensure consistency
 			if runConfig.UseGong {
-				runCtx = context.WithValue(runCtx, python.CtxGongPath, defaultGongPath)
+				runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath)
 			}
 
 			// Load macros from the pipeline's macros directory
@@ -807,6 +822,41 @@ func Run(isDebug *bool) *cli.Command {
 			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
 			if err != nil {
 				return err
+			}
+
+			// Auto-enable gong for CDC mode assets
+			if !runConfig.UseGong {
+				for _, asset := range pipelineInfo.Pipeline.Assets {
+					if asset.Type == pipeline.AssetTypeIngestr && asset.Parameters["mode"] == "cdc" {
+						// CDC mode detected, enable gong
+						runConfig.UseGong = true
+
+						if gongPath == "" {
+							// Auto-install gong if no custom path provided
+							gongChecker := &gong.Checker{}
+							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx)
+							if gongErr != nil {
+								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to install gong: %v", gongErr), 1)
+							}
+							gongPath = installedPath
+						} else {
+							// User provided custom path - verify it exists and is executable
+							info, gongErr := os.Stat(gongPath)
+							if gongErr != nil {
+								if os.IsNotExist(gongErr) {
+									return cli.Exit("CDC mode detected but gong binary not found at path: "+gongPath+"\nPlease install gong or remove mode: cdc from your asset.", 1)
+								}
+								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to access gong binary at path '%s': %v", gongPath, gongErr), 1)
+							}
+							if info.Mode()&0o111 == 0 {
+								return cli.Exit(fmt.Sprintf("CDC mode detected but gong binary at path '%s' is not executable", gongPath), 1)
+							}
+						}
+
+						runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath) //nolint
+						break
+					}
+				}
 			}
 
 			// Load assets from positional arguments
@@ -1080,7 +1130,7 @@ func Run(isDebug *bool) *cli.Command {
 			results := s.Run(runCtx)
 			duration := time.Since(start)
 
-			if err := s.SavePipelineState(afero.NewOsFs(), runConfig, runID, statePath); err != nil {
+			if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
 				logger.Error("failed to save pipeline state", zap.Error(err))
 			}
 

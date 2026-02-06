@@ -3,6 +3,7 @@ package ingestr
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -96,6 +97,33 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	// always feasible. In the case of GSheets, we have to reuse the same GCP credentials, but change the prefix with gsheets://
 	if asset.Parameters["source"] == "gsheets" {
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
+	}
+
+	// Handle CDC mode - transform PostgreSQL URI to CDC format and auto-set merge strategy
+	if asset.Parameters["mode"] == "cdc" {
+		// Transform URI to CDC format
+		sourceURI = strings.ReplaceAll(sourceURI, "postgresql://", "postgres+cdc://")
+
+		// Build CDC query parameters
+		cdcParams := url.Values{}
+		if pub := asset.Parameters["publication"]; pub != "" {
+			cdcParams.Set("publication", pub)
+		}
+		if slot := asset.Parameters["slot"]; slot != "" {
+			cdcParams.Set("slot", slot)
+		}
+		if len(cdcParams) > 0 {
+			if strings.Contains(sourceURI, "?") {
+				sourceURI += "&" + cdcParams.Encode()
+			} else {
+				sourceURI += "?" + cdcParams.Encode()
+			}
+		}
+
+		// Auto-set merge strategy for CDC if not already set
+		if _, exists := asset.Parameters["incremental_strategy"]; !exists {
+			asset.Parameters["incremental_strategy"] = "merge"
+		}
 	}
 
 	sourceTable, ok := asset.Parameters["source_table"]

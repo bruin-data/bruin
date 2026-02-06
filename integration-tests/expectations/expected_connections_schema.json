@@ -261,6 +261,60 @@
         "api_token"
       ]
     },
+    "CatalogAuth": {
+      "properties": {
+        "access_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "session_token": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CatalogConfig": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "catalog_id": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        },
+        "auth": {
+          "$ref": "#/$defs/CatalogAuth"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type"
+      ]
+    },
     "ChessConnection": {
       "properties": {
         "name": {
@@ -905,6 +959,12 @@
             "$ref": "#/$defs/IndeedConnection"
           },
           "type": "array"
+        },
+        "customerio": {
+          "items": {
+            "$ref": "#/$defs/CustomerIoConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -946,6 +1006,25 @@
           "type": "string"
         },
         "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "CustomerIoConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "region": {
           "type": "string"
         }
       },
@@ -1139,6 +1218,9 @@
         },
         "path": {
           "type": "string"
+        },
+        "lakehouse": {
+          "$ref": "#/$defs/LakehouseConfig"
         }
       },
       "additionalProperties": false,
@@ -1808,6 +1890,24 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "LakehouseConfig": {
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "catalog": {
+          "$ref": "#/$defs/CatalogConfig"
+        },
+        "storage": {
+          "$ref": "#/$defs/StorageConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "format"
       ]
     },
     "LinearConnection": {
@@ -2711,6 +2811,42 @@
         "project_id",
         "instance_id",
         "database"
+      ]
+    },
+    "StorageAuth": {
+      "properties": {
+        "access_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "session_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "StorageConfig": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "auth": {
+          "$ref": "#/$defs/StorageAuth"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type"
       ]
     },
     "StripeConnection": {

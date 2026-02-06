@@ -4,7 +4,7 @@ This pipeline is a simple example of a Bruin pipeline for Firebase.
 
 The pipeline includes several sample assets:
 
-- `events/events.asset.yaml`: Monitors for new events data in BigQuery to trigger downstream tasks when new data is detected.
+- `events/events.asset.yaml`: Monitors for new events data in BigQuery to trigger downstream assets when new data is detected.
 - `events/events.sql`: Defines a BigQuery view for formatted Firebase Analytics event data to support ad-hoc analysis.
 - `fn/date_in_range.sql`: A function asset that checks if a date is within a specified range.
 - `fn/get_params_to_json.sql`: A function asset that converts parameter data to JSON format.
@@ -53,7 +53,7 @@ Starting the pipeline execution...
 [2023-03-16T18:25:16Z] [worker-4] [hello] >> Hello, world!
 [2023-03-16T18:25:16Z] [worker-4] Completed: hello (116ms)
 
-Executed 2 tasks in 1.798s
+Executed 2 assets in 1.798s
 ```
 
 You can also run a single task:
@@ -70,7 +70,7 @@ Starting the pipeline execution...
 [2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
 
 
-Executed 1 tasks in 103ms
+Executed 1 assets in 103ms
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.

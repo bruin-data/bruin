@@ -70,7 +70,7 @@ The owner of the asset, has no functional implications on Bruin CLI as of today,
 ## `tags`
 As the name states, tags that are applied to the asset. These tags can then be used while running assets, e.g.:
 ```bash
-bruin run --tags client1
+bruin run --tag client1
 ```
 - **Type:** `String[]`
 

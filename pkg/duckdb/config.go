@@ -1,7 +1,10 @@
 package duck
 
+import "github.com/bruin-data/bruin/pkg/config"
+
 type Config struct {
-	Path string
+	Path      string
+	Lakehouse *config.LakehouseConfig
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
@@ -13,6 +16,18 @@ func (c Config) GetIngestrURI() string {
 	connString := "duckdb:///" + c.Path
 
 	return connString
+}
+
+func (c Config) HasLakehouse() bool {
+	return c.Lakehouse != nil
+}
+
+func (c Config) GetLakehouseAlias() string {
+	if c.Lakehouse == nil {
+		return ""
+	}
+	// Default alias based on format
+	return string(c.Lakehouse.Format) + "_catalog"
 }
 
 type MotherDuckConfig struct {

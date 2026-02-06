@@ -25,8 +25,10 @@ Defaults to the current directory (".") if not provided.
 | `--exclude-warnings`     |            | Excludes warnings from the validation output.                              |
 | `--config-file`          |            | The path to the `.bruin.yml` file.                                           |
 | `--exclude-tag`          |            | Excludes assets with the given tag from validation.                          |
+| `--var`                  |            | Override pipeline variables with custom values.                              |
 | `--fast`                 |            | Runs only fast validation rules, excludes some important rules such as query validation. |
 | `--exclude-paths`        |            | Excludes the given paths from the folders that are searched during validation. |
+| `--full-refresh`         |            | Validate with full refresh mode enabled.                                     |
 
 
 ### Dry-run Validation

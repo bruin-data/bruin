@@ -10,7 +10,7 @@ It includes:
 - support for data ingestion, data transformation, data quality and governance
 - dedicated support from the founding team
 
-If you are interested, feel free to drop your email [here](https://github.com/bruin-data/bruin).
+If you are interested, feel free to drop your email [here](https://getbruin.com).
 
 > [!INFO]
 > This part of the documentation is relevant for Bruin Cloud customers.

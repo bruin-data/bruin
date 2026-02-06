@@ -63,7 +63,7 @@ pre-configured for chess data ingestion. Open this file to take a look at your a
 - **`player_summary.sql`**: A SQL asset that creates a summary table of player statistics, aggregating game results, wins, and win rates for each player based on the ingested data.
 > [!INFO]
 > **What is an Asset?**  
-> An asset in Bruin is a configuration that details specific data processing tasks, such as ingestion, transformation. Learn more about [Bruin assets](../../assets/definition-schema.md).
+> An asset in Bruin is a configuration that details specific data processing steps, such as ingestion or transformation. Learn more about [Bruin assets](../../assets/definition-schema.md).
 
 ## Step 4: Check Your `pipeline.yml` file
 Just like in Step 3, the pipeline.yml file also comes pre-configured for our task, and it follows this structure:

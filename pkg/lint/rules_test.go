@@ -1777,6 +1777,38 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErrMessage: "",
 			wantErr:        assert.NoError,
 		},
+		{
+			name: "CDC ingestr asset with merge strategy but no primary key should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"mode":                 "cdc",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "CDC ingestr asset with publication and slot params should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"mode":                 "cdc",
+					"publication":          "my_publication",
+					"slot":                 "my_slot",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

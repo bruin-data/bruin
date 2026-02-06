@@ -762,7 +762,11 @@ func TestScheduler_RestoreState(t *testing.T) {
 
 	s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "2024_12_19_22_59_13")
 
-	err = s.SavePipelineState(fs, &RunConfig{
+	cmd := []string{
+		"/usr/bin/bruin", "run", "test",
+	}
+
+	err = s.SavePipelineState(fs, cmd, &RunConfig{
 		Tag:          "test",
 		Only:         []string{"bq.sql"},
 		PushMetadata: true,
@@ -779,6 +783,7 @@ func TestScheduler_RestoreState(t *testing.T) {
 	require.Error(t, err, "unknown status: pending. Please report this issue at https://github.com/bruin-data/bruin/issues/new")
 
 	expectedState := &PipelineState{
+		Cmdline: cmd,
 		Parameters: RunConfig{
 			Tag:          "test",
 			Only:         []string{"bq.sql"},
@@ -815,4 +820,5 @@ func TestScheduler_RestoreState(t *testing.T) {
 	assert.Equal(t, expectedState.CompatibilityHash, pipelineState.CompatibilityHash, "CompatibilityHash should match")
 	assert.Equal(t, expectedState.RunID, pipelineState.RunID, "RunID should match")
 	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")
+	assert.Equal(t, expectedState.Cmdline, pipelineState.Cmdline, "Cmdline should match")
 }

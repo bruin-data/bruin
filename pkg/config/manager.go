@@ -117,6 +117,7 @@ type Connections struct {
 	BruinCloud          []BruinCloudConnection          `yaml:"bruin,omitempty" json:"bruin,omitempty" mapstructure:"bruin"`
 	Primer              []PrimerConnection              `yaml:"primer,omitempty" json:"primer,omitempty" mapstructure:"primer"`
 	Indeed              []IndeedConnection              `yaml:"indeed,omitempty" json:"indeed,omitempty" mapstructure:"indeed"`
+	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -1090,6 +1091,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Indeed = append(env.Connections.Indeed, conn)
+	case "customerio":
+		var conn CustomerIoConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.CustomerIo = append(env.Connections.CustomerIo, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1299,6 +1307,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Primer = removeConnection(env.Connections.Primer, connectionName)
 	case "indeed":
 		env.Connections.Indeed = removeConnection(env.Connections.Indeed, connectionName)
+	case "customerio":
+		env.Connections.CustomerIo = removeConnection(env.Connections.CustomerIo, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1421,6 +1431,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.BruinCloud, source.BruinCloud)
 	mergeConnectionList(&c.Primer, source.Primer)
 	mergeConnectionList(&c.Indeed, source.Indeed)
+	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
 	c.buildConnectionKeyMap()
 	return nil
 }
