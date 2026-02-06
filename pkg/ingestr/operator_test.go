@@ -520,8 +520,8 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 					"source_table":      "public.users",
 					"destination":       "bigquery",
 					"cdc":               "true",
-					"publication":       "my_publication",
-					"slot":              "my_slot",
+					"cdc_publication":   "my_publication",
+					"cdc_slot":          "my_slot",
 				},
 			},
 			want: []string{
