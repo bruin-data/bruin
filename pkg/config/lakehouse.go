@@ -16,9 +16,9 @@ const (
 type CatalogType string
 
 const (
-	CatalogTypeGlue     CatalogType = "glue"
+	CatalogTypeGlue CatalogType = "glue"
 
-	// DuckLake Specific
+	// DuckLake Specific.
 	CatalogTypePostgres CatalogType = "postgres"
 	CatalogTypeDuckDB   CatalogType = "duckdb"
 	// Future: CatalogTypeRest.
