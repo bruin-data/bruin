@@ -496,7 +496,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 					"source_connection": "pg",
 					"source_table":      "public.users",
 					"destination":       "bigquery",
-					"mode":              "cdc",
+					"cdc":               "true",
 				},
 			},
 			want: []string{
@@ -519,9 +519,9 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 					"source_connection": "pg",
 					"source_table":      "public.users",
 					"destination":       "bigquery",
-					"mode":              "cdc",
-					"publication":       "my_publication",
-					"slot":              "my_slot",
+					"cdc":               "true",
+					"cdc_publication":   "my_publication",
+					"cdc_slot":          "my_slot",
 				},
 			},
 			want: []string{
@@ -536,6 +536,28 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			},
 		},
 		{
+			name: "CDC wildcard source_table omits --source-table flag",
+			asset: &pipeline.Asset{
+				Name:       "cdc-wildcard-asset",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "pg",
+					"source_table":      "*",
+					"destination":       "bigquery",
+					"cdc":               "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-wildcard-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
 			name: "CDC mode with explicit incremental strategy",
 			asset: &pipeline.Asset{
 				Name:       "cdc-asset-explicit-strategy",
@@ -544,7 +566,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 					"source_connection":    "pg",
 					"source_table":         "public.users",
 					"destination":          "bigquery",
-					"mode":                 "cdc",
+					"cdc":                  "true",
 					"incremental_strategy": "append",
 				},
 			},
