@@ -3,10 +3,51 @@
 > [!WARNING]
 > Lakehouse support is currently in **beta**. APIs and configuration may change in future releases.
 
-Bruin supports querying open table formats (Iceberg, DuckLake) stored in cloud object storage. Engine‑specific configuration lives in the Data Platforms pages:
+Bruin supports querying open table formats (Iceberg, DuckLake) stored in cloud object storage. Engine-specific configuration lives in the Data Platforms pages:
 
-- [DuckDB](../platforms/duckdb.md#lakehouse-support) (available)
-- [Trino](../platforms/trino.md#lakehouse-support) (planned)
+
+### DuckDB
+
+See the DuckDB lakehouse configuration: [DuckDB](../platforms/duckdb.md#lakehouse-support).
+
+<div class="lh-combo-grid">
+<div class="lh-combo-card">
+
+#### DuckLake
+<br>
+
+| Catalog \ Storage | S3 | GCS |
+|-------------------|----|-----|
+| DuckDB   |  |  |
+| SQLite   |  |  |
+| Postgres | <span class="lh-check" aria-label="supported"></span> |  |
+| MySQL    |  |  |
+
+
+<br>
+</div>
+<div class="lh-combo-card">
+
+#### Iceberg
+<br>
+
+| Catalog \ Storage | S3 | GCS |
+|-------------------|----|-----|
+| Glue | <span class="lh-check" aria-label="supported"></span> | |
+| Nessie | Planned | |
+
+<br>
+</div>
+</div>
+
+### Trino (Planned)
+
+See the Trino lakehouse section: [Trino](../platforms/trino.md#lakehouse-support-planned).
+
+| Format | Status |
+|--------|--------|
+| Iceberg | Planned |
+
 
 ## What is a Lakehouse?
 
@@ -64,4 +105,5 @@ connection: analytics
 SELECT * FROM users;
 ```
 
-See the engine-specific pages [DuckDB](./duckdb.md) or [Trino](./trino.md) for detailed configuration options.
+See the engine-specific pages [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support-planned) for detailed configuration options.
+

@@ -167,22 +167,34 @@ connections:
 
 ## Supported Combinations
 
+<div class="lh-combo-grid">
+<div class="lh-combo-card">
+
+### DuckLake
+<br>
+
+| Catalog \ Storage | S3 | GCS |
+|-------------------|----|-----|
+| DuckDB |  |  |
+| SQLite   |  |  |
+| Postgres | <span class="lh-check" aria-label="supported"></span> |  |
+| MySQL    |  |  |
+
+
+<br>
+</div>
+<div class="lh-combo-card">
+
 ### Iceberg
+<br>
 
 | Catalog \ Storage | S3 | GCS |
 |-------------------|----|-----|
 | Glue | <span class="lh-check" aria-label="supported"></span> | |
 
-
-### DuckLake
-
-| Catalog \ Storage | S3 | GCS |
-|-------------------|----|-----|
-| DuckDB | <span class="lh-check" aria-label="supported"></span> |  |
-| SQLite   |  |  |
-| Postgres |  |  |
-| MySQL    |  |  |
-
+<br>
+</div>
+</div>
 
 
 ## Catalog Options
