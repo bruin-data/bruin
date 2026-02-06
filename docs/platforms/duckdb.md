@@ -164,7 +164,7 @@ connections:
 | `storage` | object | No | Storage configuration (required for DuckLake) |
 
 ---
-### Supported Combinations
+### Supported Lakehouse Formats
 
 
 
