@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testGenericSecretJSON = `{"details": {"value": "somevalue"}, "type": "generic"}`
+
 func TestNewAWSSecretsManagerClient(t *testing.T) {
 	t.Parallel()
 	log := &mockLogger{}
@@ -76,7 +78,7 @@ func TestAWSSecretsManagerClient_GetConnection_ReturnsConnection(t *testing.T) {
 
 func TestAWSSecretsManagerClient_GetConnection_ReturnsGenericConnection(t *testing.T) {
 	t.Parallel()
-	secretString := `{"details": {"value": "somevalue"}, "type": "generic"}`
+	secretString := testGenericSecretJSON
 	c := &AWSSecretsManagerClient{
 		client: &mockAWSSecretsManagerClient{
 			response: &secretsmanager.GetSecretValueOutput{
@@ -126,7 +128,7 @@ func TestAWSSecretsManagerClient_GetConnection_ReturnsFromCache(t *testing.T) {
 
 func TestAWSSecretsManagerClient_GetConnectionDetails_ReturnsDetails(t *testing.T) {
 	t.Parallel()
-	secretString := `{"details": {"value": "somevalue"}, "type": "generic"}`
+	secretString := testGenericSecretJSON
 	c := &AWSSecretsManagerClient{
 		client: &mockAWSSecretsManagerClient{
 			response: &secretsmanager.GetSecretValueOutput{
