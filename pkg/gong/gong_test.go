@@ -55,6 +55,28 @@ func TestGetArchName(t *testing.T) {
 	}
 }
 
+func TestParseVersionOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		input  string
+		expect string
+	}{
+		{"standard output", "gong version 0.1.2", "v0.1.2"},
+		{"already has v prefix", "gong version v0.1.2", "v0.1.2"},
+		{"just version number", "0.1.2", "0.1.2"},
+		{"empty string", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expect, parseVersionOutput(tt.input))
+		})
+	}
+}
+
 func TestBuildDownloadURL_Format(t *testing.T) {
 	t.Parallel()
 
