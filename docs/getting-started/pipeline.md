@@ -350,6 +350,8 @@ concurrency: 4
 > [!WARNING]
 > Setting concurrency too high can overload downstream systems. Tune based on your warehouse/engine capacity.
 
+See also: [Concurrency & Resource Limits](/getting-started/concurrency).
+
 ### Default (pipeline-level defaults)
 
 Set sensible defaults for all assets in the pipeline so you don’t repeat yourself. Override at the asset level only when
