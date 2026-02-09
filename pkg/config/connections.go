@@ -470,8 +470,8 @@ type ShopifyConnection struct {
 	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	URL          string `yaml:"url,omitempty" json:"url" mapstructure:"url"`
 	APIKey       string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
-	ClientID     string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
-	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
 }
 
 func (c ShopifyConnection) GetName() string {
