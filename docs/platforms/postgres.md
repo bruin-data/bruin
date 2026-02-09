@@ -165,3 +165,92 @@ name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
 ```
+
+## CDC (Change Data Capture)
+
+Bruin supports PostgreSQL CDC via the `ingestr` asset type. CDC uses PostgreSQL's [logical replication](https://www.postgresql.org/docs/current/logical-replication.html) to capture row-level changes (inserts, updates, deletes) and replicate them to a destination.
+
+### Prerequisites
+
+Your source PostgreSQL database must be configured for logical replication:
+
+- `wal_level` set to `logical`
+- A [publication](https://www.postgresql.org/docs/current/sql-createpublication.html) created for the tables you want to replicate
+- A [replication slot](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html#LOGICALDECODING-REPLICATION-SLOTS) allocated for the CDC consumer
+
+Refer to the [PostgreSQL logical replication documentation](https://www.postgresql.org/docs/current/logical-replication.html) for detailed setup instructions.
+
+### Parameters
+
+CDC is enabled by setting `cdc: "true"` on an `ingestr` asset with a PostgreSQL source connection.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `cdc` | Yes | Set to `"true"` to enable CDC mode |
+| `cdc_mode` | No | `"stream"` for real-time streaming or `"batch"` for batch replication |
+| `cdc_publication` | No | Name of the PostgreSQL publication to use |
+| `cdc_slot` | No | Name of the PostgreSQL replication slot to use |
+| `source_table` | Yes | Source table in `schema.table` format, or `"*"` to replicate all tables in the publication |
+| `incremental_strategy` | No | Defaults to `"merge"` when CDC is enabled; can be overridden to `"append"` |
+
+> [!NOTE]
+> When CDC is enabled, primary key columns do not need to be specified in the asset definition — they are determined automatically from the source table.
+
+### Examples
+
+#### Basic CDC replication
+```yaml
+name: public.users
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_pg
+  source_table: public.users
+  destination: bigquery
+  cdc: "true"
+```
+
+#### CDC with explicit publication and slot
+```yaml
+name: public.users
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_pg
+  source_table: public.users
+  destination: bigquery
+  cdc: "true"
+  cdc_publication: my_publication
+  cdc_slot: my_slot
+```
+
+#### CDC with stream mode
+```yaml
+name: public.orders
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_pg
+  source_table: public.orders
+  destination: bigquery
+  cdc: "true"
+  cdc_mode: stream
+```
+
+#### Wildcard CDC — replicate all tables
+When `source_table` is set to `"*"`, all tables in the publication are replicated to the destination.
+
+```yaml
+name: public.all_tables
+type: ingestr
+connection: bigquery
+
+parameters:
+  source_connection: my_pg
+  source_table: "*"
+  destination: bigquery
+  cdc: "true"
+```
