@@ -2,6 +2,7 @@ package shopify
 
 import (
 	"fmt"
+	"net/url"
 )
 
 type Config struct {
@@ -12,12 +13,13 @@ type Config struct {
 }
 
 func (c *Config) GetIngestrURI() string {
-	uri := fmt.Sprintf("shopify://%s?api_key=%s", c.URL, c.APIKey)
+	params := url.Values{}
+	params.Set("api_key", c.APIKey)
 	if c.ClientID != "" {
-		uri += fmt.Sprintf("&client_id=%s", c.ClientID)
+		params.Set("client_id", c.ClientID)
 	}
 	if c.ClientSecret != "" {
-		uri += fmt.Sprintf("&client_secret=%s", c.ClientSecret)
+		params.Set("client_secret", c.ClientSecret)
 	}
-	return uri
+	return fmt.Sprintf("shopify://%s?%s", c.URL, params.Encode())
 }
