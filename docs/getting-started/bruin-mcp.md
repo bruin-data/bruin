@@ -116,9 +116,9 @@ The AI assistant will answer these questions using up-to-date Bruin documentatio
 
 ## Best Practices for AI Agents
 
-### Use `agents.md` Files
+### Use `AGENTS.md` Files
 
-Add `agents.md` files to guide AI agents working in your repository:
+Add `AGENTS.md` files to guide AI agents working in your repository:
 
 **Root level** - Keep it high-level:
 - What the project does
@@ -132,7 +132,7 @@ Add `agents.md` files to guide AI agents working in your repository:
 
 ### Document Pitfalls
 
-In each `agents.md`, list common mistakes:
+In each `AGENTS.md`, list common mistakes:
 - Time zone handling (e.g., "all timestamps are UTC")
 - Data arrival delays (e.g., "15-minute sync lag")
 - Schema gotchas (e.g., "`customer_id` is NULL for guest checkouts")
@@ -157,7 +157,7 @@ dev:
   schema_prefix: dev_agent_
 ```
 
-Make this explicit in `agents.md` so agents know dev is safe for experimentation and prod requires explicit access.
+Make this explicit in `AGENTS.md` so agents know dev is safe for experimentation and prod requires explicit access.
 
 ## Feedback
 
