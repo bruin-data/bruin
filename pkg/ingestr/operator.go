@@ -115,6 +115,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		if slot := asset.Parameters["cdc_slot"]; slot != "" {
 			q.Set("slot", slot)
 		}
+		if mode := asset.Parameters["cdc_mode"]; mode != "" {
+			q.Set("mode", mode)
+		}
 		parsedURI.RawQuery = q.Encode()
 
 		sourceURI = parsedURI.String()
