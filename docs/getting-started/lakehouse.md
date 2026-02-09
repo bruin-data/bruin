@@ -39,7 +39,7 @@ Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws
 
 ### Trino [↗](../platforms/trino.md#lakehouse-support)
 
-Trino supports lakehouse access via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with Glue and [Nessie](https://projectnessie.org/) catalogs. Detailed setup guides are coming soon. Check out [Trino](../platforms/trino.md#lakehouse-support) for Bruin configuration.
+Trino supports lakehouse access via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with [Glue](https://aws.amazon.com/glue/) and [Nessie](https://projectnessie.org/) catalogs. Configuration happens in Trino, while Bruin connection config remains unchanged. See [Trino lakehouse support](../platforms/trino.md#lakehouse-support), [Glue + S3 guide](../platforms/trino.md#guide-glue-s3), and [Nessie (in-memory) + S3 guide](../platforms/trino.md#guide-nessie-in-memory-s3).
 
 | Catalog | S3 |
 |-------------------|----|
