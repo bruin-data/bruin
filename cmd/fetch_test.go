@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
-	"encoding/json"
-	"math/big"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

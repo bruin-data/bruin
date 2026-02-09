@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"os/signal"
 	path2 "path"
@@ -12,7 +13,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"math/big"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
