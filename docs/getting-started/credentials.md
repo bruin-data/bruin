@@ -4,6 +4,9 @@ Bruin allows you to store all of your credentials in a non-versioned file called
 
 The `.bruin.yml` file contains a list of credentials for each connection type, as well as among different environments.
 
+> [!TIP]
+> For a complete reference of the `.bruin.yml` file structure, see the [.bruin.yml Reference](../secrets/bruinyml.md).
+
 Here's an example of a `.bruin.yml` file:
 
 ```yaml
