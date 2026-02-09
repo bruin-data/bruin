@@ -4,8 +4,7 @@ Bruin supports column definitions inside assets to make them a part of your data
 
 - you can document the existing columns in an asset and add further metadata, e.g. `primary_key`
 - you can define column-level quality checks
-- you can define whether or not a column should be updated as a result of a [
-  `merge` materialization](./materialization.md#merge)
+- you can define whether or not a column should be updated as a result of a [`merge` materialization](./materialization.md#merge)
 
 ## Definition Schema
 
@@ -60,5 +59,6 @@ The structure of the quality checks is rather simple:
 |------------|--------|------|-------------------------------------------------------------------|
 | `name`     | String | yes  | The name of the quality check, see [Quality](../quality/overview) |
 | `blocking` | Bool   | no   | Whether the check should block the downstreams, default `true`    |
-| `value`    | Any    | no   | Check-specific expected value                                     |                                     
+| `value`    | Any    | no   | Check-specific expected value                                     |
+
 For more details on the quality checks, please refer to the  [Quality](../quality/overview) documentation.

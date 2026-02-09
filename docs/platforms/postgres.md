@@ -3,6 +3,7 @@
 Bruin supports PostgreSQL as a data platform.
 
 ## Connection
+
 In order to set up a PostgreSQL connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
 
 ```yaml
@@ -25,10 +26,11 @@ In order to set up a PostgreSQL connection, you need to add a configuration item
 ## PostgreSQL Assets
 
 ### `pg.sql`
+
 Runs a materialized Postgres asset or an sql script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
-
 #### Example: Create a table using table materialization
+
 ```bruin-sql
 /* @bruin
 name: events.install
@@ -43,6 +45,7 @@ where event_name = "install"
 ```
 
 #### Example: Run a Postgres script
+
 ```bruin-sql
 /* @bruin
 name: events.install
@@ -75,7 +78,6 @@ join marketing.attribution as a
 
 Sensors are a special type of assets that are used to wait on certain external signals.
 
-
 Checks if a table exists in Postgres, runs by default every 30 seconds until this table is available.
 
 ```yaml
@@ -85,11 +87,11 @@ parameters:
     table: string
     poke_interval: int (optional)
 ```
+
 **Parameters**:
+
 - `table`: `schema_id.table_id` or (for default schema `public`) `table_id` format.
-- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
-
-
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 ### `pg.sensor.query`
 
@@ -104,13 +106,14 @@ parameters:
 ```
 
 **Parameters**:
+
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
-
 
 #### Example: Partitioned upstream table
 
 Checks if the data available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: pg.sensor.query
@@ -121,6 +124,7 @@ parameters:
 #### Example: Streaming upstream table
 
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: pg.sensor.query
@@ -129,9 +133,11 @@ parameters:
 ```
 
 ### `pg.seed`
+
 `pg.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your PostgreSQL database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the PostgreSQL database.
 
 You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: pg.seed
@@ -141,15 +147,16 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
-
-####  Examples: Load csv into a Postgres database
+#### Examples: Load csv into a Postgres database
 
 The examples below show how to load a CSV into a PostgreSQL database.
+
 ```yaml
 name: dashboard.hello
 type: pg.seed

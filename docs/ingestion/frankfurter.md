@@ -1,9 +1,12 @@
 # Frankfurter
+
 [Frankfurter](https://www.frankfurter.app/) is a free API for current and historical foreign exchange rates.
 
 Bruin supports Frankfurter as a source for ingestr assets, allowing you to ingest exchange rate data directly into your data warehouse.
 
-To set up Frankfurter as a data source and perform data ingestion, follow the instructions provided below. 
+To set up Frankfurter as a data source and perform data ingestion, follow the instructions provided below.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -32,8 +35,8 @@ parameters:
 
 ```
 
-- `name`: The name of the asset. This must be unique within the pipeline. 
-- `type`: Specifies the type of the asset. As Frankfurter is an `ingestr` asset, this should be set to `ingestr`. 
+- `name`: The name of the asset. This must be unique within the pipeline.
+- `type`: Specifies the type of the asset. As Frankfurter is an `ingestr` asset, this should be set to `ingestr`.
 - `connection`: The destination connection where the data will be stored. Here `duckdb-default` refers to the database defined in `.bruin.yml`.
 - `source_connection`: The name of the Frankfurter connection defined in `.bruin.yml`.
 - `source_table`: The name of the Frankfurter table you want to ingest.
@@ -57,12 +60,15 @@ bruin run assets/frankfurter.asset.yml
 ```
 
 ### Step 4: Query Your Data in DuckDB
+
 Now that the data is in your database, you can query it to verify the results. Open a terminal and run the following commands to inspect your data:
 
 ```bash
 bruin query --c duckdb-default  --q "SELECT DATE, CURRENCY_NAME, RATE FROM dataset.frankfurter LIMIT 10;" 
 ```
+
 After executing the query, you will see the following results displayed in your terminal in a clear and organized table format:
+
 ```plaintext
 ┌────────────┬───────────────┬─────────┐
 │ DATE       │ CURRENCY_NAME │ RATE    │

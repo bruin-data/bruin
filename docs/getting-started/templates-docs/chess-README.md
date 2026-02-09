@@ -3,11 +3,13 @@
 This pipeline is a simple example of a Bruin pipeline. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes three sample assets already:
+
 - `chess_games.asset.yml`: Transfers chess game data from source database to DuckDB.
 - `chess_profiles.asset.yml`: Transfers chess player profiles data from source to DuckDB.
 - `player_summary.sql`:Creates a summary table of chess player stats, including games, wins, and win rates as white/black.
 
 ## Setup
+
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
@@ -28,7 +30,6 @@ environments:
 ```
 
 You can simply switch the environment using the `--environment` flag, e.g.:
-
 
 ## Running the pipeline
 

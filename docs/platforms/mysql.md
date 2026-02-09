@@ -3,6 +3,7 @@
 Bruin supports MySQL as a data platform for SQL assets and ingestion pipelines.
 
 ## Connection
+
 Add a MySQL entry under `connections` in `.bruin.yml` using the following schema.
 
 ```yaml
@@ -26,10 +27,11 @@ connections:
 ## MySQL Assets
 
 ### `my.sql`
+
 Executes a materialized MySQL SQL asset. See the [definition schema](../assets/definition-schema.md) for available parameters.
 
-
 #### Example: Create and refresh a table
+
 ```bruin-sql
 /* @bruin
 name: warehouse.example
@@ -46,9 +48,11 @@ FROM staging.customers
 ```
 
 ### `my.seed`
+
 `my.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your MySQL database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the MySQL database.
 
 You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: my.seed
@@ -58,15 +62,16 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
-
-####  Examples: Load csv into a MySQL database
+#### Examples: Load csv into a MySQL database
 
 The examples below show how to load a CSV into a MySQL database.
+
 ```yaml
 name: dashboard.hello
 type: my.seed

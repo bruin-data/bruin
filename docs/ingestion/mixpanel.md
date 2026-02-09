@@ -1,4 +1,5 @@
 # Mixpanel
+
 [Mixpanel](https://mixpanel.com/) is an analytics service used for tracking user interactions with web and mobile applications.
 
 Bruin supports Mixpanel as a source for [Ingestr assets](/assets/ingestr). You can ingest data from Mixpanel into your data platform.
@@ -7,7 +8,10 @@ To set up a Mixpanel connection, add a configuration item in the `.bruin.yml` fi
 
 Follow these steps to set up Mixpanel and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to the .bruin.yml file
+
 ```yaml
 connections:
   mixpanel:
@@ -17,13 +21,16 @@ connections:
       project_id: "12345"
       server: "eu"
 ```
+
 - `username`: Mixpanel service account username.
 - `password`: Secret associated with the service account.
 - `project_id`: The numeric project ID.
 - `server`: (Optional) Server region (`us`, `eu`, or `in`). Defaults to `eu`.
 
 ### Step 2: Create an asset file for data ingestion
+
 Create an [asset configuration](/assets/ingestr#asset-structure) file (e.g., `mixpanel_ingestion.yml`) inside the assets folder with the following content:
+
 ```yaml
 name: public.mixpanel
 type: ingestr
@@ -34,6 +41,7 @@ parameters:
 
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Always `ingestr` for Mixpanel.
 - `source_connection`: The Mixpanel connection name defined in `.bruin.yml`.
@@ -48,9 +56,11 @@ parameters:
 | profiles | distinct_id | last_seen | merge | Retrieves Mixpanel user profiles and attributes. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/mixpanel_ingestion.yml
 ```
+
 Running this command ingests data from Mixpanel into your Postgres database.
 
 <img alt="Mixpanel" src="./media/mixpanel.png">

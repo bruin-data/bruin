@@ -1,4 +1,5 @@
 # Mailchimp
+
 [Mailchimp](https://mailchimp.com/) is an all-in-one marketing platform that helps businesses manage and talk to their clients, customers, and other interested parties through email marketing campaigns, automated messages, and targeted ads.
 
 Bruin supports Mailchimp as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Mailchimp into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Mailchimp as a source for [Ingestr assets](/assets/ingestr), and 
 In order to set up Mailchimp connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `api_key` and `server`. For details on how to obtain these credentials, please refer [here](https://mailchimp.com/developer/marketing/guides/quick-start/).
 
 Follow the steps below to correctly set up Mailchimp as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -78,7 +81,9 @@ parameters:
 | reports_unsubscribed | - | - | replace | Retrieves list of members who unsubscribed from the campaign. Includes `reports_id` reference. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/mailchimp_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Mailchimp table into your Postgres database.

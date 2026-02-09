@@ -1,4 +1,5 @@
 # Snapchat Ads
+
 Snapchat Ads is an advertising platform that enables businesses to create, manage, and analyze ad campaigns targeting Snapchat's user base.
 
 Bruin supports Snapchat Ads as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Snapchat Ads into your data warehouse.
@@ -7,7 +8,10 @@ In order to set up Snapchat Ads connection, you need to add a configuration item
 
 Follow the steps below to correctly set up Snapchat Ads as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to Snapchat Ads as a source, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
 ```yaml
@@ -19,12 +23,14 @@ connections:
        client_secret: "your_client_secret"
        organization_id: "your_organization_id"
 ```
+
 - `refresh_token` (required): OAuth refresh token for Snapchat Ads API authentication.
 - `client_id` (required): OAuth client ID for your Snapchat Ads API app.
 - `client_secret` (required): OAuth client secret for your Snapchat Ads API app.
 - `organization_id` (optional): Organization ID. Required for most resources except `organizations`.
 
 ### Step 2: Create an asset file for data ingestion
+
 To ingest data from Snapchat Ads, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., snapchat_ads_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
@@ -64,6 +70,7 @@ These resources require only authentication credentials:
 ### Ad Account-level Resources
 
 These resources can fetch data for a specific ad account, multiple ad accounts, or all ad accounts in the organization. All of these resources support the following formats:
+
 - `table:ad_account_id` - fetch data for a single ad account
 - `table:ad_account_id1,ad_account_id2` - fetch data for multiple ad accounts
 
@@ -154,7 +161,9 @@ parameters:
 ```
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/snapchat_ads_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Snapchat Ads table into your Postgres database.

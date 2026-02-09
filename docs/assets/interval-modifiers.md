@@ -26,6 +26,7 @@ interval_modifiers:
 ```
 
 This example:
+
 - Shifts the start time back by 20 days if the start timestamp is at midnight (hour = 00)
 - Otherwise, applies no shift (0)
 
@@ -44,7 +45,8 @@ default:
 
 Individual assets can override these defaults by specifying their own `interval_modifiers`. If an asset doesn't specify interval modifiers, it will inherit the pipeline defaults.
 
-### Examples:
+### Examples
+
 - `start: -2h` → shift start time back 2 hours
 - `end: -1h` →  shift end time back 1 hour
 
@@ -94,12 +96,13 @@ columns:
 Let's say your pipeline is scheduled to run daily. Here's how the interval modifiers affect your processing window:
 
 **Original interval:**
+
 - Start: 2025-01-10 00:00:00
 - End: 2025-01-11 00:00:00
 
 **Modified interval:**
+
 - Start: 2025-01-09 22:00:00 (shifted back 2 hours)
 - End: 2025-01-11 01:00:00 (shifted forward 1 hour)
 
 This ensures you capture any late-arriving data from the previous day and any early events from the next interval.
-

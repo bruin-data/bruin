@@ -1,7 +1,6 @@
-# Google Cloud Storage 
+# Google Cloud Storage
 
-[Google Cloud Storage](https://cloud.google.com/storage?hl=en) (GCS) is an online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. It is an Infrastructure as a Service (IaaS), comparable to Amazon S3. 
-
+[Google Cloud Storage](https://cloud.google.com/storage?hl=en) (GCS) is an online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. It is an Infrastructure as a Service (IaaS), comparable to Amazon S3.
 
 Bruin supports GCS as a source and a destination for [Ingestr assets](/assets/ingestr), and you can use it to move data to and from your data warehouse.
 
@@ -29,6 +28,7 @@ To connect to GCS, you need to add a configuration item to the connections secti
               ...
             }
 ```
+
 - `service_account_file`: The path to the service account JSON file
 - `service_account_json`: The service account JSON content itself
 
@@ -47,6 +47,7 @@ parameters:
 
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
@@ -54,21 +55,25 @@ parameters:
 - `source_table`: bucket name and file path (or [file glob](https://getbruin.com/docs/ingestr/supported-sources/gcs.html#file-pattern)) separated by a forward slash (`/`).
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/gcs_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given gcs bucket into your Postgres database.
 
 ### File type hints
+
 Bruin can read 3 types of files from GCS:
-* CSV
-* JSONL
-* Parquet
+
+- CSV
+- JSONL
+- Parquet
 
 Bruin will check the file extension to determine the right decoder to use. If you file names are missing the correct extension, then you can explicitly tell Bruin to use a specific decoder using `file_type` parameter.
 
-
 For example:
+
 ```yaml
 name: public.fees
 type: ingestr
@@ -83,7 +88,8 @@ parameters:
 
 This asset will load the contents `fees.log`, treating it as if it were a CSV File.
 
-### Working with compressed files.
+### Working with compressed files
+
 Bruin automatically detects and handles gzipped files in your GCS bucket. You can load data from compressed files with the `.gz` extension without any additional configuration.
 
 ## Writing to a GCS
@@ -111,6 +117,7 @@ To connect to GCS, you need to add a configuration item to the connections secti
           layout: "{table_name}.{ext}" #optional
           
 ```
+
 - `service_account_file`: The path to the service account JSON file
 - `service_account_json`: The service account JSON content itself
 - `bucket_name`: The name of the GCS bucket where data will be written.
@@ -132,12 +139,15 @@ parameters:
 
   destination: gcs
 ```
+
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `gcs` indicates that the ingested data will be stored in a GCS database.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/stripe_gcs.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Stripe source to your GCS database.

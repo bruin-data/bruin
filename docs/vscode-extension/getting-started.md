@@ -12,6 +12,7 @@ To access Bruin features, add a Bruin section in your code. You can do this manu
 
 - **Using Snippets**: Quickly create Bruin sections with these snippets:
   - **For SQL Files**: Type `!fullsqlasset` and select the snippet to insert a Bruin section. Or, create it manually like this:
+
     ```bruin-sql
     /* @bruin
       Your Bruin-specific SQL commands or configurations go here.
@@ -19,6 +20,7 @@ To access Bruin features, add a Bruin section in your code. You can do this manu
     ```
 
   - **For Python Files**: Type `!fullpythonasset` and select the snippet to insert a Bruin section. Alternatively, create it manually like this:
+
     ```bruin-python
     """@bruin
     Your Bruin-specific Python logic or configurations go here.
@@ -47,4 +49,3 @@ The Bruin extension provides two main panels :
 - **Side Panel**: Displays the current asset’s details with tabs for viewing asset information, columns, and settings.
 - **Lineage Panel**: Found at the bottom of VS Code, near the terminal, this panel shows the asset lineage, giving you a visual overview of how the asset connects to other assets.
 - **Query Preview Panel**: Found near the `Lineage` panel, this panel allows you to preview query results directly within VS Code. When running a query, results will be displayed in this panel, enabling quick debugging and verification without switching to an external database tool.
-

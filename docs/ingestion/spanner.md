@@ -1,14 +1,19 @@
 # GCP Spanner
+
 GCP Spanner is a fully managed, mission-critical database service that combines the capabilities of relational databases, key-value stores, and search engines.
 
-Bruin supports GCP Spanner as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Spanner into your data warehouse. 
+Bruin supports GCP Spanner as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Spanner into your data warehouse.
 
 In order to set up a GCP Spanner connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
 Follow the steps below to correctly set up GCP Spanner as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to GCP Spanner, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
+
 ```yaml
     connections:
       spanner:
@@ -18,7 +23,9 @@ To connect to GCP Spanner, you need to add a configuration item to the connectio
           database: "my-db"
           service_account_file: "./service_account.json"
 ```
+
 URI parameters:
+
 - `project_id`: Your Google Cloud project ID
 - `instance_id`: The Spanner instance ID
 - `database`: The database name
@@ -40,6 +47,7 @@ parameters:
 
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: The name of the destination connection. For example, "neon" is a connection name.
@@ -48,9 +56,11 @@ parameters:
 - `destination`: The name or type of the destination connection, which is Postgres.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/gcp_spanner_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given GCP Spanner table into your Postgres database.
 
 <img alt="Spanner" src="./media/spanner_ingestion.png">

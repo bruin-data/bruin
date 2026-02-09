@@ -142,11 +142,13 @@ When you run Bruin with `--secrets-backend aws`:
 ### Environment Variables Not Set
 
 If you see an error like:
-```
+
+```bash
 failed to initialize AWS Secrets Manager client: BRUIN_AWS_ACCESS_KEY_ID env variable not set
 ```
 
 Make sure all required environment variables are set:
+
 ```bash
 echo $BRUIN_AWS_ACCESS_KEY_ID
 echo $BRUIN_AWS_SECRET_ACCESS_KEY
@@ -156,11 +158,13 @@ echo $BRUIN_AWS_REGION
 ### Secret Not Found
 
 If you see an error like:
-```
+
+```bash
 failed to read secret 'my-connection' from AWS Secrets Manager
 ```
 
 Verify that:
+
 1. The secret exists in AWS Secrets Manager with the exact name used in your pipeline
 2. The secret is in the correct AWS region
 3. Your AWS credentials have the `secretsmanager:GetSecretValue` permission for that secret
@@ -168,11 +172,13 @@ Verify that:
 ### Invalid Secret Format
 
 If you see an error like:
-```
+
+```bash
 failed to parse secret as JSON
 ```
 
 Verify that:
+
 1. The secret value in AWS Secrets Manager is valid JSON
 2. The JSON includes both `type` and `details` fields
 3. The `type` value matches a supported connection type
@@ -181,7 +187,8 @@ Verify that:
 ### Secret Has No String Value
 
 If you see an error like:
-```
+
+```bash
 secret 'my-connection' has no string value
 ```
 

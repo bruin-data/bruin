@@ -6,13 +6,13 @@ Bruin supports using [HashiCorp Vault](https://www.vaultproject.io/) with a **kv
 
 To use Vault as your secrets backend, pass the flag:
 
-```
+```bash
 bruin run --secrets-backend vault
 ```
 
 You can also set the backend via environment variable:
 
-```
+```bash
 export BRUIN_SECRETS_BACKEND=vault
 ```
 
@@ -24,7 +24,6 @@ Bruin connects to Vault using environment variables. The following are required:
 - `BRUIN_VAULT_MOUNT_PATH`: The path of the kv secrets engine
 - `BRUIN_VAULT_PATH`: The subpath within the engine to where the secrets are
 - either `BRUIN_VAULT_TOKEN` or `BRUIN_VAULT_ROLE`: The authentication token for Vault access or If you are running Bruin inside a Kubernetes cluster, you can use a Kubernetes role for authentication with Vault by setting the `BRUIN_VAULT_ROLE` environment variable in your pod or deployment.
-
 
 ### Storing Secrets in Vault
 

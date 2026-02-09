@@ -9,6 +9,7 @@ This guide shows you how to orchestrate Bruin pipelines using Apache Airflow. Yo
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - Apache Airflow installed and running
 - Access to your Airflow environment
 - A Bruin project ready to deploy
@@ -212,6 +213,7 @@ create_config >> run_pipeline
 ```
 
 To set the variable in Airflow UI:
+
 1. Go to **Admin** → **Variables**
 2. Create a new variable named `bruin_config`
 3. Paste your entire `.bruin.yml` content as the value
@@ -587,7 +589,7 @@ run_pipeline = KubernetesPodOperator(
 
 ## Using Specific Bruin Docker Image Versions
 
-The official Bruin Docker images are available at: https://github.com/bruin-data/bruin/pkgs/container/bruin
+The official Bruin Docker images are available at: <https://github.com/bruin-data/bruin/pkgs/container/bruin>
 
 You can use specific versions for production stability:
 
@@ -781,29 +783,35 @@ Always set `is_delete_operator_pod=True` to clean up completed pods.
 ### BashOperator Issues
 
 **Bruin command not found:**
+
 - Ensure Bruin is installed on all worker nodes
 - Verify PATH includes `~/.local/bin`
 
 **Permission denied:**
+
 - Check file permissions on `.bruin.yml`
 - Ensure the Airflow user has access to the project directory
 
 ### KubernetesPodOperator Issues
 
 **ImagePullBackOff:**
+
 - Verify the image name and tag are correct
 - Check if you need image pull secrets for private registries
 
 **Pod stuck in pending:**
+
 - Check resource requests/limits
 - Verify the namespace exists
 - Check node availability
 
 **Secret not found:**
+
 - Verify the secret exists in the correct namespace
 - Check secret name in the volume configuration
 
 **Git clone fails:**
+
 - Verify repository URL is correct
 - For private repos, ensure SSH keys are properly mounted
 - Check network policies allow outbound connections

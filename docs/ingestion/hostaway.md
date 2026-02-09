@@ -12,17 +12,20 @@ Hostaway connections are defined using the following properties:
 - `api_key`: Your Hostaway API access token (required)
 
 :::code-group
+
 ```yaml [connections.yml]
 connections:
   hostaway:
     - name: "my_hostaway"
       api_key: "your_access_token_here"
 ```
+
 :::
 
 You can also use environment variables in your connections.yml by using the `&#123;&#123; env_var("ENV_VAR_NAME") &#125;&#125;` syntax.
 
 For example:
+
 ```yaml
 connections:
   hostaway:
@@ -37,6 +40,7 @@ Hostaway uses OAuth 2.0 client credentials for authentication. Follow these step
 ### 1. Get Your Credentials
 
 First, you need your Hostaway account credentials:
+
 - `client_id`: Your Hostaway account ID
 - `client_secret`: Your API client secret (available in Hostaway settings)
 
@@ -93,11 +97,9 @@ Hostaway assets will be ingested to your data warehouse as defined in the `desti
 | Webhook Reservations | `webhook_reservations` | replace | Webhook configurations for reservation events |
 | Tasks | `tasks` | replace | Tasks and to-dos within the system |
 
-
 ## Notes
 
 - **Authentication**: Hostaway uses OAuth 2.0 client credentials authentication. Access tokens are JWTs with configurable expiration times - manage them securely and rotate them as needed.
 - **Incremental Loading**: Only `listings` and `listing_fee_settings` support incremental loading. Use `--interval-start` and `--interval-end` parameters for these tables.
 - **API Documentation**: More details on the Hostaway API can be found in the [official API documentation](https://api-docs.hostaway.com/).
 - **Rate Limits**: Be aware of Hostaway API rate limits when ingesting large amounts of data.
-

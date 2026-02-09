@@ -3,6 +3,7 @@
 Bruin supports AWS Redshift as a data platform, which means you can use Bruin to build tables and views in your Redshift data warehouse.
 
 ## Connection
+
 In order to set up a Redshift connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema
 Mind that, despite the connection being at all effects a Postgres connection, the default `port` field of Amazon Redshift is `5439`.
 
@@ -21,7 +22,6 @@ Mind that, despite the connection being at all effects a Postgres connection, th
 > [!NOTE]
 > `ssl_mode` should be one of the modes describe in the [PostgreSQL documentation](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION).
 
-
 ### Making Redshift publicly accessible
 
 Before the connection works properly, you need to ensure that the Redshift cluster can be accessed from the outside. In order to do that you must mark the configuration option in your Redshift cluster
@@ -34,13 +34,14 @@ In addition to this, you must configure the inbound rules of the security group 
 
 If you have trouble setting this up you can check [AWS documentation](https://repost.aws/knowledge-center/redshift-cluster-private-public) on the topic
 
-
 ## AWS Redshift Assets
 
 ### `rs.sql`
+
 Runs a materialized AWS Redshift asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a table for product reviews
+
 ```bruin-sql
 /* @bruin
 name: product_reviews.table
@@ -60,6 +61,7 @@ create table product_reviews (
 ```
 
 #### Example: Run an AWS Redshift script to clean up old data
+
 ```bruin-sql
 /* @bruin
 name: clean_old_data
@@ -90,13 +92,13 @@ parameters:
 ```
 
 **Parameters**:
+
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 ### `redshift.sensor.table`
 
 Sensors are a special type of assets that are used to wait on certain external signals.
-
 
 Checks if a table exists in Redshift, runs by default every 30 seconds until this table is available.
 
@@ -107,14 +109,16 @@ parameters:
     table: string
     poke_interval: int (optional)
 ```
-**Parameters**:
-- `table`: `schema_id.table_id` or (for default schema `public`) `table_id` format.
-- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
 
+**Parameters**:
+
+- `table`: `schema_id.table_id` or (for default schema `public`) `table_id` format.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
 
 Checks if the data available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: rs.sensor.query
@@ -125,6 +129,7 @@ parameters:
 #### Example: Streaming upstream table
 
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: rs.sensor.query
@@ -133,9 +138,11 @@ parameters:
 ```
 
 ### `rs.seed`
+
 `rs.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Redshift database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Redshift database.
 
 You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: rs.seed
@@ -145,15 +152,16 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
-
-####  Examples: Load csv into a Redshift database
+#### Examples: Load csv into a Redshift database
 
 The examples below show how to load a CSV into a Redshift database.
+
 ```yaml
 name: dashboard.hello
 type: rs.seed

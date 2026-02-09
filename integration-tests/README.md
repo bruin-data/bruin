@@ -53,7 +53,7 @@ ENABLE_PARALLEL=1 make integration-test-light
 
 Each test pipeline in `test-pipelines/` should follow a standard structure:
 
-```
+```text
 test-pipelines/
 ├── pipeline-name/
 │   ├── pipeline.yml          # Pipeline configuration

@@ -1,4 +1,5 @@
 # Kafka
+
 [Kafka](https://kafka.apache.org/) is a distributed event streaming platform used by thousands of companies for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications.
 
 Bruin supports Kafka as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Kafka into your data warehouse.
@@ -6,6 +7,9 @@ Bruin supports Kafka as a source for [Ingestr assets](/assets/ingestr), and you 
 In order to set up a Kafka connection, you need to add a configuration item to connections in the .bruin.yml file, following the schema below. The required fields include `bootstrap_servers` and `group_id`. The SASL-related fields (`security_protocol`, `sasl_mechanisms`, `sasl_username`, `sasl_password`) as well as `batch_size` and `batch_timeout` are optional, depending on your Kafka setup. For more information on Kafka, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/kafka.html)
 
 Follow the steps below to correctly set up Kafka as a data source and run ingestion:
+
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
 
 To connect to Kafka, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
@@ -17,9 +21,9 @@ To connect to Kafka, you need to add a configuration item to the connections sec
           bootstrap_servers: "localhost:9093"
           group_id: "test123"
 ```
+
 - `bootstrap_servers`: The Kafka server or servers to connect to, typically in the form of a host and port.
 - `group_id` : The consumer group ID used for identifying the client when consuming messages.
-
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -35,6 +39,7 @@ parameters:
   source_table: 'kafka.my_topic'
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. It will be always ingestr type for Kafka.
 - `connection`: This is the destination connection.
@@ -42,7 +47,9 @@ parameters:
 - `source_table`: The name of the data table in kafka you want to ingest.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/kafka_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Kafka table into your Postgres database.

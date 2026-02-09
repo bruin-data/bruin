@@ -1,12 +1,14 @@
 # Monday.com
-[Monday.com](https://monday.com/) is a Work OS that powers teams to run projects and workflows with confidence. It's a simple, yet powerful platform that enables people to manage work, meet deadlines, and build a culture of transparency.
 
+[Monday.com](https://monday.com/) is a Work OS that powers teams to run projects and workflows with confidence. It's a simple, yet powerful platform that enables people to manage work, meet deadlines, and build a culture of transparency.
 
 Bruin supports Monday.com as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Monday.com into your data warehouse.
 
 In order to set up Monday.com connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
 Follow the steps below to correctly set up Monday.com as a data source and run ingestion:
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -39,11 +41,11 @@ parameters:
   destination: postgres
 ```
 
-- name: The name of the asset.
-- type: Specifies the type of the asset. It will be always ingestr type for Monday.com.
-- connection: This is the destination connection.
-- source_connection: The name of the Monday.com connection defined in .bruin.yml.
-- source_table: The name of the data table in Monday.com you want to ingest.
+* name: The name of the asset.
+* type: Specifies the type of the asset. It will be always ingestr type for Monday.com.
+* connection: This is the destination connection.
+* source_connection: The name of the Monday.com connection defined in .bruin.yml.
+* source_table: The name of the data table in Monday.com you want to ingest.
 
 ## Available Source Tables
 
@@ -63,9 +65,11 @@ parameters:
 | `board_views` | - | - | replace | Views configured for boards with their filters and settings. Full reload on each run. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/monday_integration.asset.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Monday.com table into your Postgres database.
 
 ## Incremental Loading
@@ -74,6 +78,5 @@ The `boards` and `updates` tables support incremental loading based on the `upda
 
 > [!NOTE]
 > Most tables use "replace" write disposition, meaning they will overwrite existing data on each run. Only the `boards` and `updates` tables support incremental loading with "merge" disposition.
-
 > [!NOTE]
 > Monday.com has rate limits for API requests. The source handles pagination automatically and respects the API's maximum page size of 100 items.

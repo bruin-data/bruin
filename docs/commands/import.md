@@ -7,6 +7,7 @@ The `import` commands allow you to automatically import existing resources from 
 - `bruin import database` - Import database tables as Bruin assets
 - `bruin import bq-scheduled-queries` - Import BigQuery scheduled queries as Bruin assets
 - `bruin import tableau` - Import Tableau dashboards, workbooks, and data sources as Bruin assets
+
 ---
 
 ## `import database`
@@ -23,7 +24,7 @@ The database import command streamlines the process of migrating existing databa
 
 - Connecting to your database using existing connection configurations
 - Scanning database schemas and tables
-- Creating asset definition files 
+- Creating asset definition files
 - Optionally filling column metadata from the database schema
 - Organizing assets in the pipeline's `assets/` directory
 
@@ -55,16 +56,16 @@ table td:first-child {
 
 ### Supported Database Types
 
-- **Snowflake** → `snowflake` 
-- **BigQuery** → `bigquery` 
-- **PostgreSQL** → `postgres` 
-- **Redshift** → `redshift` 
-- **Athena** → `athena` 
+- **Snowflake** → `snowflake`
+- **BigQuery** → `bigquery`
+- **PostgreSQL** → `postgres`
+- **Redshift** → `redshift`
+- **Athena** → `athena`
 - **Databricks** → `databricks`
-- **DuckDB** → `duckdb` 
+- **DuckDB** → `duckdb`
 - **ClickHouse** → `clickhouse`
 - **Azure Synapse** → `synapse`
-- **MS SQL Server** → `mssql` 
+- **MS SQL Server** → `mssql`
 
 ### How It Works
 
@@ -129,6 +130,7 @@ description: "Imported table schema.table"
 These are metadata-only source assets. SQL transformation assets live in `.sql` files, and `import database` does not generate SQL templates.
 
 The asset file includes:
+
 - **File Name**: `assets/<schema>/<table>.asset.yml` (lowercase)
 - **Description**: `"Imported table {schema}.{table}"`
 - **Asset Type**: Automatically determined from connection type
@@ -186,8 +188,8 @@ Common errors and solutions:
 2. **Column Metadata**: Column metadata is filled by default for richer asset definitions
 3. **Review Generated Assets**: Check and customize the generated assets  as needed
 
-
 ### Related Commands
+
 - [`bruin run`](./run.md) - Execute the imported assets
 - [`bruin validate`](./validate.md) - Validate the imported pipeline structure
 
@@ -323,7 +325,7 @@ GROUP BY date
 
 The command provides real-time feedback during the import process:
 
-```
+```plaintext
 🔍 Searching for scheduled queries across all BigQuery regions...
 ✨ Found 5 queries in us-central1
 ✨ Found 3 queries in europe-west1
@@ -361,9 +363,11 @@ Common issues and solutions:
 - Imported queries maintain their original SQL without modification
 
 ### Related Commands
+
 - [`bruin run`](./run.md) - Execute the imported query assets
 - [`bruin validate`](./validate.md) - Validate the imported pipeline structure
 - [`bruin import database`](#import-database) - Import database tables as assets
+
 ---
 
 ## `import tableau`
@@ -401,12 +405,12 @@ The Tableau import command enables you to:
 ### How It Works
 
 1. **Authentication**: Uses your Tableau Personal Access Token from `.bruin.yml`
-2. **Discovery Phase**: 
+2. **Discovery Phase**:
    - Fetches all projects to understand the hierarchy
    - Retrieves workbooks and their associated views (dashboards/worksheets)
    - Identifies data source connections
 3. **Parallel Processing**: Uses up to 10 concurrent workers to fetch workbook details efficiently
-4. **Asset Generation**: 
+4. **Asset Generation**:
    - Creates folder structure matching Tableau projects
    - Generates YAML assets for dashboards, workbooks, and data sources
    - Establishes dependency relationships
@@ -434,7 +438,7 @@ bruin import tableau ./my-pipeline --connection tableau-cloud --env production
 
 The import command creates a hierarchical folder structure that mirrors your Tableau project organization:
 
-```
+```text
 assets/
 └── tableau/
     ├── data_sources/
@@ -495,6 +499,7 @@ The importer maintains your Tableau project structure, creating nested folders t
 #### Automatic Dependency Detection
 
 The importer automatically:
+
 - Identifies which data sources each dashboard depends on
 - Creates proper dependency chains using full asset paths
 - Ensures correct execution order in your pipeline
@@ -502,6 +507,7 @@ The importer automatically:
 #### Metadata Preservation
 
 Each asset includes metadata about:
+
 - Parent workbook name and URL
 - Project hierarchy
 - Original Tableau IDs for programmatic access
@@ -541,7 +547,7 @@ connections:
 
 The command provides progress updates during import:
 
-```
+```plaintext
 Fetching Tableau workbooks and dashboards...
 Found 15 workbooks with 47 dashboards
 Fetching details for all workbooks (using 10 parallel workers)...
@@ -584,6 +590,7 @@ Common issues and solutions:
 - Extremely long or complex project hierarchies may be truncated for filesystem compatibility
 
 ### Related Commands
+
 - [`bruin run`](./run.md) - Execute the imported Tableau assets
 - [`bruin validate`](./validate.md) - Validate the imported pipeline structure
 - [Tableau Asset Documentation](../assets/tableau-refresh.md) - Learn about Tableau asset types and refresh capabilities

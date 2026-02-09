@@ -15,7 +15,7 @@ Choose this template when you want to:
 
 ## Pipeline overview
 
-```
+```text
 bronze-silver-postgres/
 ├── .bruin.yml
 ├── pipeline.yml

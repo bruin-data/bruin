@@ -1,4 +1,5 @@
 # PhantomBuster
+
 [PhantomBuster](https://phantombuster.com/) is a cloud-based data automation and web scraping platform that allows users to extract data from websites, automate actions.
 
 Bruin supports PhantomBuster as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from PhantomBuster into your data warehouse.
@@ -7,7 +8,10 @@ In order to set up PhantomBuster connection, you need to add a configuration ite
 
 Follow the steps below to correctly set up PhantomBuster as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to PhantomBuster, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
 ```yaml
@@ -15,9 +19,11 @@ To connect to PhantomBuster, you need to add a configuration item to the connect
     - name: "phantombuster"
       api_key: "key_123"
 ```
+
 - `api_key`: the API key used for authentication with the PhantomBuster API
 
 ### Step 2: Create an asset file for data ingestion
+
 To ingest data from PhantomBuster, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., PhantomBuster_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
@@ -48,8 +54,9 @@ For now, we only support `completed_phantoms` tables followed by an agent ID. Fo
 `completed_phantoms:<agentid>`. An Agent ID is a unique identifier for a specific Phantom.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/phantombuster_ingestion.yml
 ```
-As a result of this command, Bruin will ingest data from the given PhantomBuster table into your Postgres database.
 
+As a result of this command, Bruin will ingest data from the given PhantomBuster table into your Postgres database.

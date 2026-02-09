@@ -1,4 +1,5 @@
 # LinkedIn Ads
+
 LinkedIn Ads is an advertising platform that allows businesses and marketers to create, manage, and analyze advertising campaigns.
 
 Bruin supports LinkedIn Ads as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from LinkedIn Ads into your data platform.
@@ -8,6 +9,7 @@ To set up a LinkedIn Ads connection, you must add a configuration item in the `.
 Follow the steps below to set up LinkedIn Ads correctly as a data source and run ingestion.
 
 ## Step 1: Add a connection to the .bruin.yml file
+
 In order to set up LinkedIn Ads connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. This configuration must comply with the following schema:
 
 ```yaml
@@ -17,10 +19,12 @@ connections:
           access_token: "token_123"
           account_ids: "id_123,id_456"  # Required only for custom tables
 ```
+
 - `access_token` (required): The access token is used for authentication and allows your app to access data based on the permissions configured in the Developer App for your LinkedIn account.
-- `account_ids` (optional): A comma-separated list of LinkedIn Ad Account IDs that identifies the accounts from which you want to retrieve data. This is only required for custom tables. 
+- `account_ids` (optional): A comma-separated list of LinkedIn Ad Account IDs that identifies the accounts from which you want to retrieve data. This is only required for custom tables.
 
 ## Step 2: Create an asset file for data ingestion
+
 To ingest data from LinkedIn Ads, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., linkedin_ads.asset.yml) inside the assets folder and add the following content:
 
 ```yaml
@@ -60,6 +64,7 @@ LinkedIn Ads source allows ingesting the following sources:
 ### Example
 
 #### Retrieve all campaigns
+
 ```yaml
 name: public.campaigns
 type: ingestr
@@ -80,11 +85,13 @@ The `custom` table uses LinkedIn's [Analytics Finder API](https://learn.microsof
 > When using custom tables, you must include `account_ids` in your `.bruin.yml` connection configuration.
 
 **Format:**
-```
+
+```html
 custom:<dimensions>:<metrics>
 ```
 
 **Parameters:**
+
 - `dimensions` (required): A comma-separated list of dimensions is required. It must include at least one of the following: `campaign`, `account`, or `creative`, along with one time-based dimension, either `date` or `month`.
   - `date`: group the data in your report by day
   - `month`: group the data in your report by month
@@ -96,6 +103,7 @@ custom:<dimensions>:<metrics>
 ### Custom Reports Examples
 
 #### Retrieve campaign data with daily metrics
+
 ```yaml
 name: public.campaign_daily
 type: ingestr
@@ -107,11 +115,14 @@ parameters:
 
   destination: postgres
 ```
+
 The applied parameters for the report are:
+
 - dimensions: `campaign`, `date`
 - metrics: `impressions`, `clicks`
 
-#### Retrieve creative data with monthly metrics 
+#### Retrieve creative data with monthly metrics
+
 ```yaml
 name: public.creative_monthly
 type: ingestr
@@ -123,11 +134,14 @@ parameters:
 
   destination: postgres
 ```
+
 The applied parameters for the report are:
+
 - dimensions: `creative`, `month`
 - metrics: `shares`, `impressions`, `videoCompletions`
 
 #### Retrieve account data with monthly metrics
+
 ```yaml
 name: public.account_monthly
 type: ingestr
@@ -139,13 +153,16 @@ parameters:
 
   destination: postgres
 ```
+
 The applied parameters for the report are:
+
 - dimensions: `account`, `month`
 - metrics: `totalEngagements`, `impressions`
 
 ## Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/linkedin_ads.asset.yml
 ```
-As a result of this command, Bruin will ingest data from the given LinkedIn Ads table into your Postgres database.
 
+As a result of this command, Bruin will ingest data from the given LinkedIn Ads table into your Postgres database.

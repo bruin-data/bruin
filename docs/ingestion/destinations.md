@@ -2,7 +2,6 @@
 
 Bruin supports all the data platforms mentioned in the Data Platforms section as destinations for your ingested data. This means you can configure Bruin to load data into these platforms using [Ingestr Assets](../assets/ingestr.md).
 
-
 ## Supported Platforms
 
 <script setup>
@@ -15,7 +14,6 @@ const platformsGroup = sidebarGroups.value.find(group => group.text === 'Data Pl
 </script>
 
 <div v-if="platformsGroup && platformsGroup.items.length > 0">
-
 
 <ul>
 <li v-for="platform in platformsGroup.items" :key="platform">

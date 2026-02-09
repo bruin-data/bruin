@@ -13,4 +13,3 @@ You can define any schedule you want using the cron syntax. The above example wi
 
 > [!NOTE]
 > The `bruin_schedule` variable is optional. If you don't define it, your dbt pipeline will not run automatically.
-

@@ -17,7 +17,7 @@ This pipeline demonstrates a complete bronze-to-silver ingestion workflow using 
 
 Balance transactions in Stripe don't have a direct `customer` field. To link them to customers, we join through charges:
 
-```
+```text
 customer ← charge (via charge.customer) → balance_transaction (via charge.balance_transaction)
 ```
 
@@ -27,7 +27,7 @@ customer ← charge (via charge.customer) → balance_transaction (via charge.ba
 
 Before running the pipeline, you need to configure your Stripe API credentials. **Important: You must use a Secret API key, not a Publishable API key.** Using a publishable key will result in errors like:
 
-```
+```plaintext
 PermissionError: This API call cannot be made with a publishable API key. Please use a secret API key.
 ```
 
@@ -88,7 +88,7 @@ bruin run assets/bronze/bronze_customer_data_raw.asset.yml
 
 ## Pipeline Flow
 
-```
+```text
 bronze_customer_data_raw ─────────────┐
                                       │
 bronze_subscription_data_raw ─────────┼──► silver_customer_subscription_simple

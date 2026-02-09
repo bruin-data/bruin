@@ -1,4 +1,5 @@
 # Pinterest
+
 [Pinterest](https://www.pinterest.com/) is a social media platform for discovering and sharing ideas using visual bookmarks.
 
 Bruin supports Pinterest as a source for [Ingestr assets](/assets/ingestr), allowing you to ingest data from Pinterest into your data warehouse.
@@ -7,7 +8,10 @@ To connect to Pinterest you must add a configuration item to the `.bruin.yml` fi
 
 Follow the steps below to correctly set up Pinterest as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 Add the connection configuration to the connections section of `.bruin.yml`:
 
 ```yaml
@@ -20,6 +24,7 @@ connections:
 - `access_token`: The token used for authentication with the Pinterest API. You can obtain an access token from the [official Pinterest documentation](https://developers.pinterest.com/docs/getting-started/connect-app/).
 
 ### Step 2: Create an asset file for data ingestion
+
 Create an [asset configuration](/assets/ingestr#asset-structure) file to define the data flow:
 
 ```yaml
@@ -40,10 +45,12 @@ parameters:
 |--------|----|-----------|--------------|-----------------------------|
 | pins   | id | created_at | merge        | Retrieves a list of pins.   |
 | boards | id | created_at | merge        | Retrieves a list of boards. |
+
 - `destination`: name of the destination connection.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/pinterest_asset.yml
 ```
 

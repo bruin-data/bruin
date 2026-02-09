@@ -9,6 +9,7 @@ This guide shows you how to run Bruin pipelines using AWS Lambda functions. This
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - An AWS account with appropriate permissions
 - AWS CLI installed and configured
 - Docker installed (for building Lambda container images)
@@ -647,6 +648,7 @@ aws lambda tag-resource \
 ### Lambda Timeout
 
 If pipelines take longer than 15 minutes, consider:
+
 - Breaking pipelines into smaller chunks
 - Using AWS Batch or ECS for long-running tasks
 - Optimizing your SQL queries
@@ -664,6 +666,7 @@ aws lambda update-function-configuration \
 ### Permission Errors
 
 Ensure IAM role has necessary permissions for:
+
 - Secrets Manager access
 - CloudWatch Logs
 - VPC access (if applicable)
@@ -672,6 +675,7 @@ Ensure IAM role has necessary permissions for:
 ### Container Image Too Large
 
 Lambda has a 10GB image size limit. To reduce size:
+
 - Use multi-stage builds
 - Remove unnecessary files
 - Use Alpine base images

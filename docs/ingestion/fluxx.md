@@ -1,4 +1,5 @@
 # Fluxx
+
 [Fluxx](https://www.fluxx.io/) is a cloud-based grants management platform designed to streamline and automate the entire grantmaking process for foundations, corporations, governments, and other funding organizations.
 
 Bruin supports Fluxx as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Fluxx into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Fluxx as a source for [Ingestr assets](/assets/ingestr), and you 
 In order to set up Fluxx connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `instance`, `client_id`, and `client_secret`. For details on how to obtain these credentials, please refer to your Fluxx administrator.
 
 Follow the steps below to correctly set up Fluxx as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -105,15 +108,18 @@ Fluxx source allows ingesting the following sources into separate tables:
 ### Field Selection
 
 Each resource contains numerous fields. You can:
+
 1. **Ingest all fields**: Use the resource name directly (e.g., `grant_request`)
 2. **Select specific fields**: Use colon syntax (e.g., `grant_request:id,name,amount_requested`)
 
 The field selection feature is particularly useful for large resources like `grant_request` which has over 300 fields.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/fluxx_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Fluxx table into your Postgres database.
 
 ## Authentication

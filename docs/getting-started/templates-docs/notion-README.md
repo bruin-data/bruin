@@ -3,11 +3,13 @@
 This pipeline is a simple example of a Bruin pipeline that copies data from Notion to BigQuery. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes two sample assets already:
+
 - `raw.notion`: A simple ingestr asset that takes copies a table from Notion to BigQuery
 - `myschema.example`: A simple SQL asset that creates a table in BigQuery.
   - Feel free to change the type from `bq.sql` to anything.
 
 ## Setup
+
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:

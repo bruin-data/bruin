@@ -9,6 +9,7 @@ This guide shows you how to deploy and run Bruin pipelines automatically using G
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - A GitHub repository with your Bruin project
 - Access to configure GitHub Actions in your repository
 - Credentials for your data platforms (stored as GitHub Secrets)
@@ -117,6 +118,7 @@ jobs:
 GitHub Actions supports multiple trigger types:
 
 ### On Push
+
 Run the pipeline whenever code is pushed to specific branches:
 
 ```yaml
@@ -126,6 +128,7 @@ on:
 ```
 
 ### On Schedule
+
 Run the pipeline on a schedule using cron syntax:
 
 ```yaml
@@ -140,7 +143,8 @@ on:
 ```
 
 **Cron syntax reference:**
-```
+
+```text
 * * * * *
 │ │ │ │ │
 │ │ │ │ └─── Day of week (0-7, Sunday = 0 or 7)
@@ -151,6 +155,7 @@ on:
 ```
 
 ### Manual Trigger
+
 Allow manual workflow runs from the GitHub UI:
 
 ```yaml
@@ -159,6 +164,7 @@ on:
 ```
 
 ### On Pull Request
+
 Run validation on pull requests:
 
 ```yaml
@@ -168,6 +174,7 @@ on:
 ```
 
 ### Combined Triggers
+
 You can combine multiple triggers:
 
 ```yaml
@@ -395,6 +402,7 @@ jobs:
 ### 1. Use Environment-Specific Secrets
 
 Create separate secrets for different environments:
+
 - `PROD_POSTGRES_PASSWORD`
 - `STAGING_POSTGRES_PASSWORD`
 - `DEV_POSTGRES_PASSWORD`

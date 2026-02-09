@@ -1,9 +1,10 @@
 # Query Command
 
-The `query` command executes and retrieves the results of a query on a specified connection and 
+The `query` command executes and retrieves the results of a query on a specified connection and
 returns the results in table format, JSON, or CSV.
 
 You can run it in three modes:
+
 - **Direct query**: provide `--connection` and `--query`
 - **Asset query**: provide `--asset` (optional `--environment`) to execute the SQL from an asset file
 - **Auto-detect**: provide `--asset` + `--query` to run an ad-hoc query using the asset's connection and dialect
@@ -23,13 +24,14 @@ You can run it in three modes:
 | `--output [format]`  | `-o`  | Output type: `plain`, `json`, `csv`.                                       |
 | `--config-file`      |       | The path to the `.bruin.yml` file.                                         |
 
-
-### Example
+## Example
 
 ```bash
 bruin query --connection my_connection --query "SELECT * FROM table"
 ```
+
 **Example output:**
+
 ```plaintext
 +-------------+-------------+----------------+
 |   Column1   |   Column2   |    Column3     |

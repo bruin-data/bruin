@@ -1,14 +1,19 @@
 # MongoDB
+
 MongoDB is a popular, open source NoSQL database known for its flexibility, scalability, and wide adoption in a variety of applications.
 
-Bruin supports MongoDB as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from MongoDB into your data warehouse. 
+Bruin supports MongoDB as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from MongoDB into your data warehouse.
 
 In order to set up MongoDB connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
 Follow the steps below to correctly set up MongoDB as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to MongoDB, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
+
 ```yaml
     connections:
       mongo:
@@ -19,6 +24,7 @@ To connect to MongoDB, you need to add a configuration item to the connections s
           port: 27018
           database: "testDB"
 ```
+
 - `name`: The name to identify this MongoDB connection
 - `username`: The MongoDB username with access to the database
 - `password`: The password for the specified username
@@ -41,6 +47,7 @@ parameters:
 
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
@@ -48,11 +55,11 @@ parameters:
 - `source_table`: The name of the data table in MongoDB that you want to ingest.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/mongo_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given MongoDB table into your Postgres database.
 
 <img width="1017" alt="image" src="https://github.com/user-attachments/assets/2bad9131-baa1-4f20-8e3d-eed4329e7f90">
-
-

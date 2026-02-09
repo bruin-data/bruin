@@ -52,7 +52,7 @@ Assets consist of:
 
 ### Pipelines
 Groups of assets executed together in dependency order. Structure:
-```
+```text
 my-pipeline/
 ├─ pipeline.yml
 └─ assets/

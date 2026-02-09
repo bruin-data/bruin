@@ -13,7 +13,8 @@ Since `start_date` and `end_date` parameters are automatically passed to your as
 You can do more complex stuff such as looping over a list of values, or using conditional logic. Here's an example of a SQL asset that loops over a list of days and dynamically generates column names.
 ::: tip Example
 `pipeline.yaml`
-```yaml 
+
+```yaml
 name: sql-pipeline
 variables:
   days:
@@ -22,6 +23,7 @@ variables:
 ```
 
 `asset.sql`
+
 ```sql
 SELECT
     conversion_date,
@@ -34,6 +36,7 @@ SELECT
 FROM user_cohorts
 GROUP BY 1,2
 ```
+
 :::
 
 > [!TIP]
@@ -54,11 +57,13 @@ SELECT
 FROM user_cohorts
 GROUP BY 1,2
 ```
+
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
 
 ## Builtin variables
 
 Bruin injects various variables by default:
+
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `start_date` | The start date in YYYY-MM-DD format | "2023-12-01" |
@@ -72,12 +77,14 @@ Bruin injects various variables by default:
 | `full_refresh` | Boolean indicating whether the `--full-refresh` flag was used | `True` or `False` |
 
 You can use these variables in your SQL queries by referencing them with the `{{ }}` syntax:
+
 ```sql
 SELECT * FROM my_table
 WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 ```
 
 The `full_refresh` variable is particularly useful for implementing different logic based on whether a full refresh is being performed:
+
 ```sql
 SELECT * FROM my_table
 {% if full_refresh %}
@@ -104,6 +111,7 @@ Jinja templating allows you to write conditional logic in your SQL queries using
 One of the most common use cases for conditional rendering is handling full refresh versus incremental loads. The `full_refresh` variable allows you to write a single asset definition that behaves differently depending on whether you run it with the `--full-refresh` flag.
 
 ::: tip Example: Different Date Ranges
+
 ```sql
 SELECT
     order_id,
@@ -120,6 +128,7 @@ When you run this asset normally, it will process data from the `start_date` (ty
 You can also use conditional rendering for more complex scenarios:
 
 ::: tip Example: Different Aggregation Logic
+
 ```sql
 {% if full_refresh %}
 -- Full refresh: rebuild the entire aggregation table
@@ -169,4 +178,5 @@ WHERE event_date = '{{ start_date }}'
 You can read more about [Jinja conditionals](https://jinja.palletsprojects.com/en/3.1.x/templates/#if) in the official Jinja documentation.
 
 ## Custom variables
+
 You can define your own variables and use them across your Assets. See [variables](/getting-started/pipeline-variables) for more information.

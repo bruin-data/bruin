@@ -4,13 +4,14 @@ outline: deep
 
 # What is Bruin?
 
-End-to-end data framework: data ingestion + transformations + quality. 
+End-to-end data framework: data ingestion + transformations + quality.
 
 If dbt, Airbyte, and Great Expectations had a lovechild, it would be Bruin.
 
 <img alt="Bruin - Demo" src="/demo.gif" />
 
 Bruin is packed with features:
+
 - 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
 - ✨ run SQL, Python & R transformations on [many platforms](#supported-platforms)
 - 📐 table/view [materializations](assets/materialization.md), incremental tables
@@ -30,7 +31,6 @@ Bruin is packed with features:
 I know, that's a lot. Let's dive into the details.
 
 You can get started with Bruin [via installing it](getting-started/introduction/installation.md) with a single command.
-
 
 ## Supported Platforms
 

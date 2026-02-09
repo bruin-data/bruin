@@ -3,6 +3,7 @@
 First off, thank you for considering contributing to Bruin!
 
 There are a few ways to contribute:
+
 - [Reporting bugs](https://github.com/bruin-data/bruin/issues)
 - Suggesting features
 - Writing documentation
@@ -11,7 +12,9 @@ There are a few ways to contribute:
 We are pretty chill about the format of the contribution, although having an issue first to discuss the change is always a good idea. Feel free to deliver a PR early, we can always iterate on it.
 
 ## Writing Code
+
 There are a few guidelines that you should follow when writing code:
+
 - All new features should be covered by tests.
 - All new features should be documented.
 - The pull request should contain detailed description of the changes made, as well as the reasoning behind them.
@@ -31,6 +34,7 @@ We use Makefile to build the code, which contains a set of commands to lint, tes
 - If you get errors related to missing duckdb library, try running `make duck-db-static-lib` and retrying.
 
 You can simply run it:
+
 ```sh
 ./bin/bruin --help
 ```
@@ -38,4 +42,3 @@ You can simply run it:
 ### Testing
 
 You can run the tests by running `make test`.
-

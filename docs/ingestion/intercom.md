@@ -13,6 +13,7 @@ Intercom connections are defined using the following properties:
 - `region`: The Intercom region for your app (optional, defaults to "us"). Supported regions: "us", "eu", "au"
 
 :::code-group
+
 ```yaml [connections.yml]
 connections:
   intercom:
@@ -20,11 +21,13 @@ connections:
       access_token: "your_access_token_here"
       region: "us"
 ```
+
 :::
 
 You can also use environment variables in your connections.yml by using the `&#123;&#123; env_var("ENV_VAR_NAME") &#125;&#125;` syntax.
 
 For example:
+
 ```yaml
 connections:
   intercom:
@@ -53,7 +56,9 @@ Intercom assets will be ingested to your data warehouse as defined in the `desti
 ## Asset-Specific Configuration
 
 ### Incremental Assets
+
 The following tables support incremental loading based on the `updated_at` field:
+
 - `contacts`
 - `companies`
 - `conversations`
@@ -61,7 +66,9 @@ The following tables support incremental loading based on the `updated_at` field
 - `articles`
 
 ### Full Refresh Assets
+
 The following tables use full refresh mode as they represent current state data:
+
 - `tags`
 - `segments`
 - `teams`
@@ -78,4 +85,3 @@ The following tables use full refresh mode as they represent current state data:
 - **Custom Attributes**: Custom attributes for contacts, companies, and conversations are included as JSON fields.
 - **Search API**: For large datasets, the source uses Intercom's Search API for contacts, companies, and conversations to support efficient incremental loading.
 - **Data Freshness**: Data is typically available in real-time through the Intercom API.
-

@@ -4,7 +4,7 @@ A simple Databricks pipeline template that demonstrates querying data from one c
 
 ## Project Structure
 
-```
+```text
 databricks/
 ├── pipeline.yml                    # Pipeline configuration
 ├── README.md                      # This file

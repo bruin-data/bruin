@@ -1,31 +1,34 @@
 # Loading Notion Data To PostgreSQL Database Using Bruin
-Welcome! 👋 This tutorial is a simple, step-by-step guide to help you load data from Notion into a PostgreSQL database using Bruin. Notion is an incredibly versatile tool for organizing projects, taking notes, and managing databases. However, when you want to leverage this data for analytics, reporting, or integration with other systems, you often need to move it into a structured database like PostgreSQL. That’s where Bruin comes in. Bruin makes it easy to automate and manage data pipelines, letting you move data from Notion (and other sources) to destinations like PostgreSQL with minimal effort. If you’re just starting out, don’t worry—this guide is designed for beginners. You’ll learn the basics of setting up a Bruin project, creating a pipeline, and connecting Notion with PostgreSQL. By the end, you’ll have a working example that you can extend or customize for your own needs.
 
-### Prerequisites
-#### Bruin CLI
+Welcome! 👋 This tutorial is a simple, step-by-step guide to help you load data from Notion into a PostgreSQL database using Bruin. Notion is an incredibly versatile tool for organizing projects, taking notes, and managing databases. However, when you want to leverage this data for analytics, reporting, or integration with other systems, you often need to move it into a structured database like PostgreSQL. That's where Bruin comes in. Bruin makes it easy to automate and manage data pipelines, letting you move data from Notion (and other sources) to destinations like PostgreSQL with minimal effort. If you're just starting out, don't worry—this guide is designed for beginners. You'll learn the basics of setting up a Bruin project, creating a pipeline, and connecting Notion with PostgreSQL. By the end, you'll have a working example that you can extend or customize for your own needs.
+
+## Prerequisites
+
+### Bruin CLI
 
 To install Bruin CLI depending upon your machine, follow the installation instructions [here](../introduction/installation.md)
 
-#### Bruin VS Code Extension
+### Bruin VS Code Extension
+
 To install the Bruin VS Code extension, follow the instructions [here](../../vscode-extension/overview.md)
 
 <img width="685" alt="bruin_extension" src="./tutorial-media/bruin-extension.png">
 
-
 ### Getting Started
+
 To create the basic structure of a Bruin project, you can simply run:
 
-   ```
+   ```bash
    bruin init {folder name} [template name]
    ```
 
 If you don't define the folder name and template name, it will create `default` template with folder name `bruin-pipeline`. This command will:
 
-    Create a project named bruin-pipeline 
-    Generate a folder called bruin-pipeline containing the following:
-        -  An assets folder (where you add asset file)
-        - .bruin.yml file (where connection and credentials are added)
-        -  pipeline.yml file to manage your pipeline
+- Create a project named bruin-pipeline
+- Generate a folder called bruin-pipeline containing the following:
+  - An assets folder (where you add asset file)
+  - .bruin.yml file (where connection and credentials are added)
+  - pipeline.yml file to manage your pipeline
 
 #### Adding a new asset
 
@@ -49,9 +52,11 @@ parameters:
 - `destination`: The name of the destination, you want to store. Here, we are using PostgreSQL.
 
 #### Adding connection and credentials in .bruin.yml
+
 Make sure, you have [Notion credentials](https://dlthub.com/docs/dlt-ecosystem/verified-sources/notion#setup-guide) and Postgres credentials.
 
 Using Bruin vscode extension
+
 - Add destination connection - PostgreSQL
 - Add source connection - Notion
 
@@ -60,10 +65,10 @@ Using Bruin vscode extension
   Your browser does not support the video tag.
 </video>
 
-
 You can customize your pipeline by making changes in the pipeline.yml file. You can set the schedule to daily, weekly, or monthly.
 
 #### Validate and Run your pipeline
+
 - Bruin CLI can run the whole pipeline or any task with the downstreams.
   `Make sure, asset file is open`
 
@@ -73,8 +78,8 @@ You can customize your pipeline by making changes in the pipeline.yml file. You 
 </video>
 <br>
 
+#### This is what Notion data looks like at the destination
 
-#### This is what Notion data looks like at the destination:
 <br>
 
 <img alt="notion-dest" src="./tutorial-media/notion-table.png" />

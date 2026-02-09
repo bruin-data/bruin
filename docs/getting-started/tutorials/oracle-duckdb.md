@@ -162,7 +162,7 @@ duckdb oracle_duckdb.duckdb "SELECT * FROM duckdb.sales_per_customer ORDER BY cu
 
 Example output:
 
-```
+```plaintext
 ┌─────────────┬──────────────┬───────────────┬─────────────┬─────────────────────┐
 │ customer_id │  full_name   │ total_revenue │ order_count │   last_order_date   │
 ├─────────────┼──────────────┼───────────────┼─────────────┼─────────────────────┤

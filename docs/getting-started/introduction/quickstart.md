@@ -3,6 +3,7 @@ outline: deep
 ---
 
 # Quickstart
+
 Make sure you have [installed](./installation.md) Bruin CLI already in your device.
 
 > [!INFO]
@@ -11,21 +12,22 @@ Make sure you have [installed](./installation.md) Bruin CLI already in your devi
 ## Create your first pipeline
 
 Bruin includes a handy command called `init`, you can simply run that command to create a new Bruin project. [learn more](../../commands/init.md)
-      
+
 ```bash
 bruin init default my-pipeline  
 cd bruin/my-pipeline
 ```
 
 This command will:
+
 - Create a project named `my-pipeline`.
 - Generate a folder called `my-pipeline` containing the following:
-    - `assets/` with three sample assets: ingestr, Python, and SQL (we will walk through them below)
-    - `.bruin.yml` with sample duckdb connections used in this guide (you can edit it or use a secrets manager, see [Secrets](../../secrets/overview.md))
-    - `pipeline.yml` file to manage your pipeline.
-
+  - `assets/` with three sample assets: ingestr, Python, and SQL (we will walk through them below)
+  - `.bruin.yml` with sample duckdb connections used in this guide (you can edit it or use a secrets manager, see [Secrets](../../secrets/overview.md))
+  - `pipeline.yml` file to manage your pipeline.
 
 Once you have the project structure, you can run the whole pipeline:
+
 ```bash
 bruin run
 ```
@@ -37,6 +39,7 @@ In a nutshell, an asset is anything that generates value with data. In practice,
 The `default` template already includes 3 sample assets under `assets/`. In the next sections, we will walk through each one. You can use the same patterns to add new assets by creating new files under `assets/`.
 
 ### Creating a `ingestr` asset
+
 Let's start by ingesting some data from an external source.
 
 ingestr is an [open-source CLI tool](https://github.com/bruin-data/ingestr) that allows ingesting data from any source into any destination.
@@ -55,6 +58,7 @@ parameters:
 ```
 
 The configuration in the YAML file has a few bits:
+
 - `name`: the name of the asset, also the table that will store the ingested data
 - `connection`: the destination that will be used to load the data
 - `parameters`: the configuration for ingestr
@@ -64,8 +68,10 @@ The configuration in the YAML file has a few bits:
 That's it, this asset will load data from the `chess` source and load it into your DuckDB database.
 
 ### Setting up your `.bruin.yml` file
-This file specifies environments and the connections your pipeline will use. To ensure assets you add work correctly, configure your environments and connections by editing your `.bruin.yml` file. 
+
+This file specifies environments and the connections your pipeline will use. To ensure assets you add work correctly, configure your environments and connections by editing your `.bruin.yml` file.
 If you used `bruin init default`, this is already included. Otherwise, add the following:
+
 ```yaml
 default_environment: default
 environments:
@@ -85,6 +91,7 @@ environments:
 _Bear_ in mind, there are other ways to provide credentials and secrets. See [Secrets](../../secrets/overview.md).
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
+
 ```bash
 bruin run assets/players.asset.yml
 ```
@@ -113,6 +120,7 @@ GROUP BY 1
 ```
 
 This asset has a few lines of configuration at the top:
+
 - `name`: the name of the asset, needs to be unique within a pipeline
 - `type`: `duckdb.sql` means DuckDB SQL, Bruin supports many other types of assets.
 - `materialization`: take the query result and materialize it as a table
@@ -124,11 +132,13 @@ materialization type instead of `table` to create a view instead.
 > Bruin supports many [asset](/assets/definition-schema.html) types, including BigQuery, Snowflake, Python, R, Redshift, Databricks, and more.
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
+
 ```bash
 bruin run assets/player_stats.sql
 ```
 
 ### Creating a Python asset
+
 Similar to SQL, Bruin supports running Python natively as well.
 
 The template includes a Python asset in `assets/my_python_asset.py`:
@@ -145,19 +155,23 @@ print('hello world')
 - The rest of the body is a regular Python script.
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
+
 ```bash
 bruin run assets/my_python_asset.py
 ```
 
 At this point, you can also run the whole pipeline:
+
 ```bash
 bruin run
 ```
 
 ## Data Quality Checks
+
 Bruin supports data quality checks natively, as part of the asset definition. It includes a handful of data quality checks, and it also supports custom checks.
 
 The default template already includes some example data quality checks on `dataset.player_stats`. If you'd like to add or change checks, this is what the asset definition can look like:
+
 ```bruin-sql
 /* @bruin
 
@@ -201,22 +215,26 @@ GROUP BY 1
 The asset includes a `columns` section that contains a list of columns and the checks applied to them.
 
 Under the `checks` section, each column defines some quality checks:
+
 - `name` column is marked to be not null and unique
 - `player_count` column is marked to be not null and consisting of positive numbers
 
 Under the `custom_checks` section, there is a custom quality check that verifies the table is not empty.
 
 You can refresh the asset & run the quality checks via simply running the asset:
+
 ```bash
 bruin run assets/player_stats.sql
 ```
 
 If you'd like to run only the checks, you can run:
+
 ```bash
 bruin run --only checks assets/player_stats.sql
 ```
 
 ## Optional: Adding an R asset
+
 If you'd like to try R, you can add an R asset manually. Create `assets/my_r_asset.r` with:
 
 > [!INFO]
@@ -238,9 +256,11 @@ cat(sprintf("2 + 2 = %d\n", result))
 - The rest of the file is a regular R script.
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
+
 ```bash
 bruin run assets/my_r_asset.r
 ```
 
 ## Next steps
+
 You have created your first pipeline, ingested data from a new source, explored the sample assets, and ran quality checks. You are ready to dig deeper. Jump into the [Concepts](../concepts.md) to learn more about the underlying concepts Bruin uses for your data pipelines.

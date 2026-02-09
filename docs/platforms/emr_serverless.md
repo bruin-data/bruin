@@ -1,13 +1,14 @@
 # AWS EMR Serverless Spark
+
 Amazon EMR (Elastic MapReduce) Serverless is a deployment option for Amazon EMR that provides a serverless runtime environment. This simplifies the operation of analytics applications that use the latest open-source frameworks, such as Apache Spark and Apache Hive. With EMR Serverless, you don’t have to configure, optimize, secure, or operate clusters to run applications with these frameworks.
 
-Bruin supports EMR Serverless as a data platform. You can use Bruin to integrate your Spark workloads into complex pipelines that use different data technologies, all without leaving your terminal. 
+Bruin supports EMR Serverless as a data platform. You can use Bruin to integrate your Spark workloads into complex pipelines that use different data technologies, all without leaving your terminal.
 
 ## Connection
 
 In order to use Bruin to run Spark jobs in EMR Serverless, you need to define an `emr_serverless` connection in your `.bruin.yml` file. Here's a sample `.bruin.yml` with the required fields defined.
 
-```yaml 
+```yaml
 environments:
   default:
     connections:
@@ -34,12 +35,13 @@ environments:
 
 ```
 
-
 ## Logs
+
 Bruin supports log streaming for spark jobs. This is only supported for spark logs stored in [S3](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/logging.html#jobs-log-storage-s3-buckets). Both `DRIVER` and `EXECUTOR` logs are streamed by default.
 
 In order to stream logs, one of the following conditions must be met:
-* Your EMR Serverless Application is pre-configured with an S3 Log Storage Location. 
+
+* Your EMR Serverless Application is pre-configured with an S3 Log Storage Location.
 * `parameters.logs` must be defined
 
 > [!NOTE]
@@ -48,10 +50,12 @@ In order to stream logs, one of the following conditions must be met:
 ## EMR Serverless Assets
 
 Bruin supports two different ways of defining a Spark asset:
-- what we call a "managed" PySpark asset where Bruin takes care of delivering the code to the cluster as well
-- as an external asset defined with YAML where Bruin simply orchestrates
+
+* what we call a "managed" PySpark asset where Bruin takes care of delivering the code to the cluster as well
+* as an external asset defined with YAML where Bruin simply orchestrates
 
 ### `emr_serverless.pyspark`
+
 A fully managed option where Bruin takes care of job setup, configuration, and execution. You only need to define the workload logic.
 
 * Supports only PySpark scripts.
@@ -61,6 +65,7 @@ A fully managed option where Bruin takes care of job setup, configuration, and e
 * Bundles internal dependencies and configures your job to use them.
 
 #### Example: Standalone script
+
 ```bruin-python
 """ @bruin
 name: pyspark_job
@@ -94,7 +99,8 @@ Advanced Spark users often package core logic into reusable libraries to improve
 Bruin has seamless support for pyspark modules.
 
 For this example, let's assume this is how your Bruin pipeline is structured:
-```
+
+```text
 acme_pipeline/
 ├── assets
 │   └── main.py
@@ -106,6 +112,7 @@ acme_pipeline/
 Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `sanitize` that takes in a Spark DataFrame and sanitize its columns (A common operation in Data Analytics).
 
 ::: code-group
+
 ```python [acme_pipeline/lib/core.py]
 from pyspark.sql import DataFrame
 
@@ -115,10 +122,12 @@ def sanitize(df: DataFrame):
   """
   ...
 ```
+
 :::
 
 You can now import this package in your PySpark assets.
 ::: code-group
+
 ```bruin-python [acme_pipeline/assets/main.py]
 """ @bruin
 name: raw.transaction
@@ -136,14 +145,17 @@ if __name__ == "__main__":
   session.stop()
 
 ```
+
 :::
 
-Bruin internally sets the [`PYTHONPATH`](https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH) to the root of your pipeline. So you'll always have to use the fully qualified package name to import any internal packages. 
+Bruin internally sets the [`PYTHONPATH`](https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH) to the root of your pipeline. So you'll always have to use the fully qualified package name to import any internal packages.
 
 #### Workspace
+
 Python assets require `workspace` to be configured in your `emr_serverless` connection. Workspace is a S3 path that is used by Bruin as working storage for jobs that run on `emr_serverless`.
 
 Bruin uses this S3 path for:
+
 * Storing Logs.
 * Staging your entrypoint file.
 * Uploading bundled dependencies.
@@ -151,7 +163,8 @@ Bruin uses this S3 path for:
 ![workspace diagram](media/pyspark-workspace.svg)
 
 ### `emr_serverless.spark`
-A lightweight option that only supports triggering a job. 
+
+A lightweight option that only supports triggering a job.
 
 * Supports both PySpark scripts and JARs.
 * Users are responsible for:
@@ -159,7 +172,6 @@ A lightweight option that only supports triggering a job.
   * managing internal dependencies
 
 Choose the format that best fits your use case—use YAML when you want to integrate with pre-existing infrastructure, or use Python for a streamlined, fully-managed experience.
-
 
 #### Example
 
@@ -176,17 +188,20 @@ This defines an asset that runs a spark job on an EMR Serverless Application def
 
 > [!note]
 > YAML and Python assets require different `type` parameter.
-> * YAML-style assets: `emr_serverless.spark` 
+>
+> * YAML-style assets: `emr_serverless.spark`
 > * Python assets:  `emr_serverless.pyspark`.
 
 ## Quality Checks
-[Quality checks](/quality/overview.md) for EMR Serverless are powered via [AWS Athena](/platforms/athena.md). 
+
+[Quality checks](/quality/overview.md) for EMR Serverless are powered via [AWS Athena](/platforms/athena.md).
 
 > [!WARNING]
 > Bruin currently requires a few extra steps in order to be able to run quality checks for your EMR Serverless Assets.
-> Future versions of Bruin will automate this process for you. 
+> Future versions of Bruin will automate this process for you.
 
 ### Prerequisites
+
 * Configure an [athena connection](/platforms/athena.html#connection) in your `bruin.yml`.
 * Set `parameters.athena_connection` to the name of your Athena connection.
 * Create an `athena` table on top of your data with the same name as your Asset's name.
@@ -198,12 +213,14 @@ To demonstrate quality checks, we're going to write a simple pyspark script that
 #### Initial Setup
 
 We're going to start by creating a pipeline called `quality-checks-example`. We first run `bruin init` to create the skeleton structure.
+
 ```sh
 bruin init default quality-checks-example
 ```
 
 Now we'll add the pyspark asset.
 ::: code-group
+
 ```bruin-python [quality-checks-example/assets/users.py]
 """ @bruin
 name: users
@@ -227,10 +244,12 @@ if __name__ == "__main__":
   df.write.csv("s3://acme/user/list", mode="overwrite")
   spark.stop()
 ```
+
 :::
 
 Next let's setup the `bruin.yml` file with the credentials necessary to run our job.
 ::: code-group
+
 ```yaml [bruin.yml]
 environments:
   default:
@@ -244,9 +263,11 @@ environments:
         execution_role: IAM_ROLE_ARN
         workspace: s3://acme/bruin-pyspark-workspace/
 ```
+
 :::
 
 We can now run the pipeline to verify that it works
+
 ```sh
 bruin run ./quality-checks-example
 ```
@@ -271,10 +292,12 @@ bruin run ./quality-checks-example
 #### Enabling quality checks
 
 In order to run quality checks, we need to:
+
 1. Create an Athena table in our AWS account.
 2. Configure an `athena` connection in our `bruin.yml` file.
 
 To start, let's first create our Athena table. Go to your AWS Athena console and run the following DDL Query to create a table over the data our pyspark job created.
+
 ```sql
 CREATE EXTERNAL TABLE users (id int, name string, age int)
 ROW FORMAT DELIMITED
@@ -313,6 +336,7 @@ environments:
 Now we can update our assets to define some quality checks. For this example, we're going to add one column and one custom check.
 
 ::: code-group
+
 ```bruin-python [quality-checks-example/assets/users.py]
 """ @bruin
 name: users
@@ -347,21 +371,23 @@ if __name__ == "__main__":
   df.write.csv("s3://acme/user/list", mode="overwrite")
   spark.stop()
 ```
+
 :::
 
 ::: tip
 If all your assets share the same `type` and `parameters.athena_connection`, you can set them as [defaults](/getting-started/concepts.html#defaults) in your `pipeline.yml` to avoid repeating them for each asset.
 
-
-```yaml 
+```yaml
 name: my-pipeline
 default:
   type: emr_serverless.pyspark
   parameters:
     athena_connection: quality-checks
 ```
+
 :::
 Now when we run our Bruin pipeline again, our quality checks should run after our Asset run finishes.
+
 ```sh
 bruin run ./quality-checks-example
 ```
@@ -398,6 +424,7 @@ Refer to the [Python assets documentation](/assets/python.md#environment-variabl
 ::: tip
 These variables are available in both `pyspark` and `spark` assets. So you can leverage the power of variables regardless of which asset kind you utilize.
 :::
+
 ## Asset Schema
 
 Here's the full schema of the `emr_serverless.spark` asset along with a brief explanation:
@@ -438,6 +465,5 @@ parameters:
 ```
 
 For more details on EMR Serverless applications, see [AWS Documentation][emr-app]
-
 
 [emr-app]: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/emr-serverless.html

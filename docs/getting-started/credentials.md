@@ -36,9 +36,11 @@ When you run a pipeline, Bruin will find this file in the repo root, parse the c
 > The first time you run `bruin validate` or `bruin run`, Bruin will create an empty `.bruin.yml` file and add it to `.gitignore` automatically.
 
 ## Credential Types
+
 Bruin supports many different types of credentials for each platform. Please visit the corresponding platform page from the sidebar to see the supported credential types.
 
 ## Generic Credentials
+
 Generic credentials are key-value pairs that can be used to inject secrets into your assets from outside.
 
 ```yaml
@@ -75,6 +77,7 @@ environments:
 > Environment variables are not expanded in the `.bruin.yml` file. They are expanded when Bruin runs your assets.
 
 ## Custom Credentials File
+
 Bruin looks for a `.bruin.yml` file in the project root by default; however, in some cases you might want to override the value per project.
 
 In order to do that, you can simply use the `--config-file` flag in many commands, or you can use `BRUIN_CONFIG_FILE` environment variable.

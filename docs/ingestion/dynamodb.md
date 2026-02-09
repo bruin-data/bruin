@@ -1,12 +1,14 @@
 # DynamoDB
-Amazon [DynamoDB](https://aws.amazon.com/dynamodb/) is a managed NoSQL database service provided by Amazon Web Services (AWS). It supports key-value and document data structures and is designed to handle a wide range of applications requiring scalability and performance. 
 
+Amazon [DynamoDB](https://aws.amazon.com/dynamodb/) is a managed NoSQL database service provided by Amazon Web Services (AWS). It supports key-value and document data structures and is designed to handle a wide range of applications requiring scalability and performance.
 
 Bruin supports DynamoDB as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from DynamoDB into your data warehouse.
 
-In order to set up DynamoDB connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. 
+In order to set up DynamoDB connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
 Follow the steps below to correctly set up DynamoDB as a data source and run ingestion:
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -43,14 +45,16 @@ parameters:
   destination: postgres
 ```
 
-- name: The name of the asset.
-- type: Specifies the type of the asset. It will be always ingestr type for DynamoDB.
-- connection: This is the destination connection.
-- source_connection: The name of the DynamoDB connection defined in .bruin.yml.
-- source_table: The name of the table in DynamoDB you want to ingest. 
+* name: The name of the asset.
+* type: Specifies the type of the asset. It will be always ingestr type for DynamoDB.
+* connection: This is the destination connection.
+* source_connection: The name of the DynamoDB connection defined in .bruin.yml.
+* source_table: The name of the table in DynamoDB you want to ingest.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/dynamodb_integration.asset.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given DynamoDB table into your Postgres database.

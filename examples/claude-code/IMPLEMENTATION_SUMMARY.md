@@ -33,7 +33,7 @@ Successfully implemented a comprehensive `agent.claude_code` asset type for Brui
 - ✅ Backward compatibility with simple configuration
 
 ## File Structure
-```
+```text
 pkg/claudecode/
 ├── operator.go          # Enhanced operator with all features
 ├── operator_test.go     # Comprehensive test suite

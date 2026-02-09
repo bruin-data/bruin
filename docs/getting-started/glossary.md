@@ -1,8 +1,9 @@
 # Glossary
 
-Bruin focuses on enabling independent teams designing independent data products. These products ought to be built and developed independently, while all working towards a cohesive data strategy. 
+Bruin focuses on enabling independent teams designing independent data products. These products ought to be built and developed independently, while all working towards a cohesive data strategy.
 
 One of the most important aspects of this aligned approach to building data products is agreeing on the language. For instance, if you go to an e-commerce company and ask different individuals in different teams "what is a customer for you?", you will get different answers:
+
 - a CRM manager might say: "a customer is someone who signed up to our email list.
 - a backend engineer could say: "a customer is a row in the `customers` table in the backend.
 - a marketing manager could say: "a customer is everyone that successfully finished signing up to our platform"
@@ -18,6 +19,7 @@ In order to align on different teams on building on a shared language, Bruin has
 ## Entities & Attributes
 
 Glossaries in Bruin support three primary concepts at the time of writing:
+
 - Entity: a high-level business entity that is not necessarily tied to a data asset, e.g. `Customer` or `Order`
 - Attribute: the logical attributes of an entity, e.g. `ID` for a `Customer`, or `Address` for an `Order`.
   - Attributes have names, types and descriptions.
@@ -26,33 +28,37 @@ Glossaries in Bruin support three primary concepts at the time of writing:
 An entity can have zero or more attributes, while an attribute must always be within an entity.
 
 Entities can have additional metadata including:
+
 - **Domains**: Business domains that the entity belongs to, used for organizing and categorizing by business function
 - **Tags**: Labels for categorization and filtering  
 - **Owners**: Responsible parties for governance and lineage tracking
 
 Attributes have the following metadata:
+
 - **Name**: The name of the attribute
 - **Type**: The data type of the attribute
 - **Description**: The human-readable description of the attribute
 
 Domains can have the following metadata:
+
 - **Name**: The name of the domain
 - **Description**: A description of the business domain and its purpose
 - **Owners**: Responsible parties for the domain
 - **Tags**: Labels for categorization and filtering
-- **Contact**: Contact information for the domain (email, slack, etc.) 
+- **Contact**: Contact information for the domain (email, slack, etc.)
 
 > [!INFO]
 > Glossaries are primarily utilized for entities in its first version. In the future they will be used to incorporate further business concepts.
 
-
 ## Defining a glossary
 
 In order to define your glossary, you need to put a file called `glossary.yml` at the root of the repo:
+
 - The file `glossary.yml` must be at the root of the repo.
 - The file must be named `glossary.yml` or `glossary.yaml`, nothing else.
 
 Below is an example `glossary.yml` file that defines 2 entities, a `Customer` entity and an `Address` entity, along with domain definitions:
+
 ```yaml
 domains:
   customer-management:
@@ -124,7 +130,9 @@ entities:
 The file structure is flexible enough to allow conceptual attributes to be defined here. You can define unlimited number of entities and attributes.
 
 ### Schema
+
 The `glossary.yml` file has a rather simple schema:
+
 - `domains` (optional): key-value pairs of string - Domain objects
 - `Domain` object:
   - `description`: string, description of the business domain
@@ -142,6 +150,7 @@ The `glossary.yml` file has a rather simple schema:
 Take a look at the example above and modify it as per your needs.
 
 ## Utilizing entities in assets via `extends`
+
 One of the early uses of entities is addressing & documenting concepts that repeat in multiple places. For instance, let's say you have a "age" property that is used across 5 different assets, this means you would have to go and document each of these columns one by one inside the assets. Using "entities", you can instead refer them all to a single attribute using the `extends` keyword.
 
 ```yaml
@@ -153,14 +162,15 @@ columns:
 ```
 
 Let's take a look at the `extends` key here:
+
 - The format it follows is `<entity>.<attribute>`, e.g. `Customer.ID` refers to the `ID` attribute in the `Customer` entity.
 - In this example, the column `id` extends the attribute `ID` of `Customer`, which means it will take the attribute definition as the default:
   - There's already a `name` defined, `id`, that takes priority.
   - There's no `description` for the column, and the attribute has that, therefore take the `description` from the `Customer.ID` attribute.
-  - There's no `type` defined for the column, therefore take the `type` from the `Customer.ID` attribute too. 
-
+  - There's no `type` defined for the column, therefore take the `type` from the `Customer.ID` attribute too.
 
 In the end, the resulting asset will behave as if it is defined this way:
+
 ```yaml
 name: raw.customers
 
@@ -173,17 +183,21 @@ columns:
 Thanks to the entities, you don't have to repeat definitions across assets.
 
 ### Order of priority
+
 Entities are used as defaults when there are no explicit definitions on an asset column. Entity attributes support the following fields:
+
 - `name`: the name of the attribute
 - `type`: the type of the attribute
 - `description`: the human-readable description of the attribute, ideally in relation to the business
 
 Bruin will take all of the fields from the attribute, and combine them with the asset column:
+
 - if the column definition already has a value for a field, use that.
 - if not, and the entity attribute has that, use that.
 - if neither has the value for the field, leave it empty.
 
 This means, the following asset definition will still produce a valid asset:
+
 ```yaml
 name: raw.customers
 
@@ -193,7 +207,6 @@ columns:
 ```
 
 Bruin will parse the `extends` references, and merge them with the corresponding attribute definitions.
-
 
 ## Using extends to generate columns in assets
 
@@ -216,12 +229,10 @@ columns:
 ```
 
 The `extends` approach is particularly useful when:
+
 - Your asset represents a complete entity from your glossary
 - You want to ensure all attributes of an entity are included
 - You want to reduce boilerplate in your asset definitions
 
-
 > [!WARNING]
 > Explicit definition of a column will always take priority over entity attributes. Attributes are there to provide defaults, not to override explicit definitions on an asset level. Asset has higher priority than the glossary.
-
-

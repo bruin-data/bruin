@@ -21,7 +21,9 @@ This eliminates the need to manually download and replace the CLI binary.
 ## Examples
 
 ### Upgrade to the Latest Version
+
 Upgrade to the latest version:
+
 ```shell
 bruin upgrade
 ```
@@ -33,7 +35,9 @@ The upgrade command downloads the release archive directly from GitHub, so it re
 ## Platform Notes
 
 ### Windows
+
 On Windows, make sure to run the upgrade command in:
+
 - **Git Bash** (recommended)
 - **WSL (Windows Subsystem for Linux)**
 
@@ -42,6 +46,7 @@ The command will warn you if you're on Windows to ensure you're using the correc
 ## Error Handling
 
 The command will fail gracefully if:
+
 - The download fails due to network issues
 - You don't have write permissions to the installation directory
 

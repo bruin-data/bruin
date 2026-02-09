@@ -2,9 +2,11 @@
   "scripts": {
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "docs:lint": "markdownlint-cli2 --fix"
   },
   "devDependencies": {
+    "markdownlint-cli2": "^0.20.0",
     "mermaid": "^11.6.0",
     "vitepress": "^1.6.4",
     "vitepress-plugin-mermaid": "^2.0.17"

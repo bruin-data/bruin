@@ -8,7 +8,10 @@ In order to set up Gorgias connection, you need to add a configuration item in t
 
 Follow the steps below to correctly set up Gorgias as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to Gorgias, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
 ```yaml
@@ -19,6 +22,7 @@ To connect to Gorgias, you need to add a configuration item to the connections s
           email: "myemail@domain.com"
           api_key: "abc123"
 ```
+
 - `domain`: the domain of the Gorgias account without the full gorgias.com, e.g. mycompany
 - `api_key`: the integration token used for authentication with the Gorgias API
 - `email`: the email address of the user to connect to the Gorgias API
@@ -38,6 +42,7 @@ parameters:
 
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
@@ -45,7 +50,9 @@ parameters:
 - `source_table`: The name of the data table in Gorgias that you want to ingest. For example, `customers` is the table of Gorgias that you want to ingest. You can find the available source tables in Gorgias [here](https://getbruin.com/docs/ingestr/supported-sources/gorgias.html#supported-entities)
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/gorgias_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Gorgias table into your Postgres database.

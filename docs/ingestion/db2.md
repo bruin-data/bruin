@@ -1,6 +1,6 @@
 # IBM Db2
-[IBM Db2](https://www.ibm.com/db2) is a high-performance, enterprise-grade relational database system designed for reliability, scalability, and transactional integrity.
 
+[IBM Db2](https://www.ibm.com/db2) is a high-performance, enterprise-grade relational database system designed for reliability, scalability, and transactional integrity.
 
 Bruin supports DB2 as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from DB2 into your data warehouse.
 
@@ -8,7 +8,10 @@ In order to set up DB2 connection, you need to add a configuration item in the `
 
 Follow the steps below to correctly set up DB2 as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to DB2, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
 ```yaml
@@ -20,6 +23,7 @@ To connect to DB2, you need to add a configuration item to the connections secti
       port: 50000
       database: "testdb"
 ```
+
 - `username`: The username to connect to the database
 - `password`: The password for the user
 - `host`: The host address of the database server
@@ -27,6 +31,7 @@ To connect to DB2, you need to add a configuration item to the connections secti
 - `database`: the name of the database to connect to
 
 ### Step 2: Create an asset file for data ingestion
+
 To ingest data from DB2, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., db2_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
@@ -48,9 +53,11 @@ parameters:
 - `source_table`: The name of the data table in DB2 that you want to ingest.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/db2_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given DB2 table into your Postgres database.
 
 <img alt="applovinmax" src="./media/db2.png">

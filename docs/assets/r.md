@@ -1,6 +1,7 @@
 # R Assets
 
 Bruin brings R statistical computing capabilities to your data pipelines:
+
 - Run R scripts with full access to R's powerful statistical and data analysis packages
 - Automatic dependency management with renv integration
 - Access to connection credentials and secrets via environment variables
@@ -34,7 +35,8 @@ print(results)
 R assets support dependency management through [renv](https://rstudio.github.io/renv/), R's standard dependency management tool. Bruin searches for the closest `renv.lock` file in the file tree and automatically restores the environment with the specified packages.
 
 For example, assume you have a file tree such as:
-```
+
+```text
 * folder1/
     * folder2/
         * analysis.r
@@ -49,9 +51,9 @@ For example, assume you have a file tree such as:
 * renv.lock
 ```
 
-* When Bruin runs `analysis.r`, it will use `folder1/folder2/renv.lock` since they are in the same folder
-* For `report.r`, since there is no `renv.lock` in the same folder, Bruin goes up one level and finds `folder1/renv.lock`
-* Similarly, `renv.lock` in the main folder is used for `model.r` since none of `folder6`, `folder5`, or `folder4` have any `renv.lock` files
+- When Bruin runs `analysis.r`, it will use `folder1/folder2/renv.lock` since they are in the same folder
+- For `report.r`, since there is no `renv.lock` in the same folder, Bruin goes up one level and finds `folder1/renv.lock`
+- Similarly, `renv.lock` in the main folder is used for `model.r` since none of `folder6`, `folder5`, or `folder4` have any `renv.lock` files
 
 ### Using renv
 
@@ -107,12 +109,14 @@ cat("Hello from R!\n")
 ```
 
 The configuration block must:
+
 - Start with `"@bruin` on its own line (can also use single quotes `'@bruin`)
 - End with `@bruin"` on its own line (matching quote type)
 - Contain valid YAML configuration between the markers
 - Preserve proper YAML indentation
 
 All standard asset parameters are supported. See the [SQL asset documentation](/assets/sql#definition) for a complete list of available configuration options including:
+
 - Dependencies (`depends`)
 - Secrets and connections (`secrets`)
 - Parameters (`parameters`)
@@ -313,6 +317,7 @@ R assets require R to be installed on your system. Install R using one of these 
 - **Other platforms**: See [CRAN installation guides](https://cran.r-project.org/)
 
 To verify R is installed correctly:
+
 ```bash
 R --version
 ```
