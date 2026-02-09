@@ -107,8 +107,16 @@ This module introduces Bruin as a unified data platform that combines **data ing
 - Configure environments and connections
 
 ### 2.1 Installation
-- Install Bruin CLI: `curl -LsSf https://getbruin.com/install/cli | sh`
-  - Verify installation: `bruin version`
+
+> **Installation Order**: Install the **CLI first**, then the IDE extension. The extension depends on the CLI being available in your PATH.
+
+**Step 1: Install Bruin CLI**
+
+```bash
+curl -LsSf https://getbruin.com/install/cli | sh
+```
+
+Verify installation: `bruin version`
 
 If your terminal prints `To use the installed binaries, please restart the shell`, do one of the following:
 - **Restart your terminal** (close + reopen) — simplest and most reliable
@@ -118,7 +126,7 @@ If your terminal prints `To use the installed binaries, please restart the shell
   - bash: `source ~/.bashrc` (or `source ~/.bash_profile` on some macOS setups)
   - fish: `exec fish`
 
-#### IDE Extension (VS Code, Cursor, etc.)
+**Step 2: Install IDE Extension (VS Code, Cursor, etc.)**
 
 Please refer to the doc page for more details:
   - https://getbruin.com/docs/bruin/vscode-extension/overview
@@ -176,6 +184,15 @@ Please refer to the doc page for more details:
 > **Data Availability Note**: NYC Taxi & Limousine Commission (TLC) trip data is not available after November 2025. When selecting date ranges for your pipeline, use dates before December 2025.
 >
 > **Development Tip**: Given the size of the parquet files (each month can be hundreds of MB), it's best to ingest **1-3 months of data** when developing and testing your pipeline. Once your pipeline is working correctly, run a full backfill for the desired years/months.
+>
+> **Ingesting Historical Data**: To backfill historical data, use the `--start-date` and `--end-date` flags:
+> ```bash
+> # Development: ingest 1-3 months
+> bruin run ./pipeline/pipeline.yml --start-date 2022-01-01 --end-date 2022-03-01
+>
+> # Full backfill: ingest multiple years (run after pipeline is tested)
+> bruin run ./pipeline/pipeline.yml --start-date 2019-01-01 --end-date 2025-11-30
+> ```
 
 ### Learning Goals
 - Build a complete ELT pipeline: ingestion → staging → reports
@@ -208,6 +225,17 @@ Please refer to the doc page for more details:
 ### 3.5 Running and Validating
 
 CLI Commands: https://getbruin.com/docs/bruin/commands/run
+
+#### What does `validate` check?
+
+The `bruin validate` command performs static analysis on your pipeline without executing anything:
+- **Syntax validation**: Checks YAML/SQL/Python files for parsing errors
+- **Schema validation**: Verifies asset definitions have required fields (name, type, etc.)
+- **Dependency resolution**: Ensures all referenced dependencies exist
+- **Connection references**: Validates that referenced connections are defined
+- **Column definitions**: Checks column metadata syntax and types
+
+Run `validate` frequently during development to catch errors early—it's much faster than running the full pipeline.
 
 ```bash
 # Validate structure & definitions
@@ -308,13 +336,62 @@ Bruin MCP Docs: https://getbruin.com/docs/bruin/getting-started/bruin-mcp
 - "Show me the data schema for staging.trips"
 
 ### 4.5 AI-Assisted Workflow
-- Start with configuration: Let AI help set up `.bruin.yml` and `pipeline.yml`
-- Build incrementally: Create one asset at a time, validate, run, iterate
-- Use AI for documentation: Ask about Bruin features instead of searching docs
-- Debug together: Share error messages and let AI suggest fixes
-- Learn by doing: Ask "why" questions to understand Bruin concepts
 
-Example prompt to create the entire pipeline end-to-end and test it:
+**Recommended: Hybrid Approach**
+
+For the best learning experience, consider a hybrid approach where you do the initial setup yourself, then let AI help with more complex parts:
+
+1. **You do**: Install CLI, run `bruin init`, explore the generated files
+2. **AI helps**: Configure connections, explain materialization strategies
+3. **You do**: Create your first simple asset (e.g., the seed CSV)
+4. **AI helps**: Build the Python ingestion and complex SQL transformations
+5. **You do**: Run and validate, inspect the data
+6. **AI helps**: Debug issues, add quality checks, optimize
+
+This approach ensures you understand the fundamentals while leveraging AI for productivity.
+
+**Layer-by-Layer Prompts**
+
+Instead of building everything at once, progress through each layer:
+
+**Layer 1 - Configuration:**
+```text
+Help me configure my Bruin project:
+1. Set up `.bruin.yml` with a DuckDB connection named `duckdb-default`
+2. Configure `pipeline.yml` with name, schedule, and a `taxi_types` variable
+Reference: @pipeline/pipeline.yml
+```
+
+**Layer 2 - Ingestion:**
+```text
+Build the ingestion layer for NYC taxi data:
+1. Create the payment_lookup seed asset from the CSV
+2. Create the Python trips.py ingestion asset
+Use append strategy, handle the taxi_types variable, fetch from TLC endpoint.
+Reference: @pipeline/assets/ingestion/
+```
+
+**Layer 3 - Staging:**
+```text
+Build the staging layer to clean and deduplicate trips:
+1. Create staging/trips.sql with time_interval strategy
+2. Join with payment lookup, deduplicate using ROW_NUMBER
+3. Add quality checks for required columns
+Reference: @pipeline/assets/staging/
+```
+
+**Layer 4 - Reports:**
+```text
+Build the reports layer to aggregate data:
+1. Create reports/trips_report.sql with time_interval strategy
+2. Aggregate by date, taxi_type, payment_type
+3. Add quality checks for the aggregated metrics
+Reference: @pipeline/assets/reports/
+```
+
+**Full Pipeline Prompt**
+
+If you prefer to build everything at once, use this comprehensive prompt:
 ```text
 Build an end-to-end NYC Taxi data pipeline using Bruin.
 
@@ -446,8 +523,8 @@ Bruin Cloud provides managed infrastructure to schedule and run your pipelines a
 
 | Command | Purpose |
 |---------|---------|
-| `bruin init <template> <folder>` | Initialize a new project |
-| `bruin validate <path>` | Validate pipeline/asset structure |
+| `bruin init <template> <folder>` | Initialize a new project from a template |
+| `bruin validate <path>` | Check syntax, schemas, dependencies without running (fast!) |
 | `bruin run <path>` | Execute pipeline or asset |
 | `bruin run --downstream` | Run asset and all downstream assets |
 | `bruin run --full-refresh` | Truncate and rebuild from scratch |
@@ -462,6 +539,56 @@ Bruin Cloud provides managed infrastructure to schedule and run your pipelines a
 ---
 
 ## Best Practices & Tips
+
+### Materialization Strategies: When to Use What
+
+Bruin supports several materialization strategies. Choose based on your data characteristics:
+
+| Strategy | Use When | How It Works |
+|----------|----------|--------------|
+| `view` | Data should always reflect latest source | Creates a SQL view (no data stored) |
+| `table` | Small tables, full refresh each run | Drops and recreates the entire table |
+| `append` | Raw ingestion, event logs, immutable data | Inserts new rows without touching existing data |
+| `merge` | Need upsert behavior with a unique key | Updates existing rows, inserts new ones |
+| `time_interval` | Time-series data with incremental loads | Deletes rows in date range, then re-inserts |
+| `delete+insert` | Similar to merge but delete-first approach | Deletes matching rows, then inserts |
+
+**For this NYC Taxi pipeline:**
+- **Ingestion layer**: Use `append` — raw data arrives, duplicates handled downstream
+- **Staging/Reports layers**: Use `time_interval` — allows re-processing specific date ranges without full refresh
+
+Docs: https://getbruin.com/docs/bruin/assets/materialization
+
+### Column Metadata: Required vs Optional Fields
+
+When defining columns in your assets, here's what's required vs optional:
+
+**Required fields:**
+- `name`: Column name (must match the actual column in your query)
+- `type`: Data type (e.g., `string`, `integer`, `timestamp`, `float`, `boolean`)
+
+**Optional fields (recommended for documentation and quality):**
+- `description`: Human-readable explanation of the column
+- `primary_key: true`: Marks column as part of the primary key (used for deduplication)
+- `checks`: Array of quality checks to run on this column
+
+**Example:**
+```yaml
+columns:
+  - name: pickup_datetime
+    type: timestamp
+    description: "When the trip started"
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: fare_amount
+    type: float
+    description: "Base fare in USD"
+    checks:
+      - name: non_negative
+```
+
+Docs: https://getbruin.com/docs/bruin/assets/columns
 
 ### Choosing the Right `incremental_key`
 
