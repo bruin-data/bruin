@@ -810,6 +810,9 @@ func formatQueryCellForDisplay(cell interface{}) interface{} {
 func formatQueryCellForJSON(cell interface{}) interface{} {
 	switch v := cell.(type) {
 	case *big.Rat:
+		if v == nil {
+			return nil
+		}
 		return json.Number(formatBigRatAsDecimal(v))
 	case big.Rat:
 		vcopy := v
