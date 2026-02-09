@@ -1,0 +1,102 @@
+# Lakehouse Support <Badge type="warning" text="beta" />
+
+> [!WARNING]
+> Lakehouse support is currently in **beta**. APIs and configuration may change in future releases.
+
+Bring lakehouse tables directly into your Bruin pipelines. Query Iceberg and DuckLake data on cloud object storage with a catalog-backed metadata layer, all from the same workflows you already use. This page summarizes supported engines, catalogs, and storage backends.
+
+## Engines and formats
+
+DuckDB and Trino are the engines Bruin supports. In each section, you can discover the lakehouse format + catalog/storage combination supported by Bruin. Visit [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support) for Bruin configurations.
+
+### DuckDB [↗](../platforms/duckdb.md#lakehouse-support)
+
+[Iceberg](https://duckdb.org/docs/extensions/iceberg) and [DuckLake](https://duckdb.org/docs/extensions/ducklake) format are natively supported in Bruin.
+
+#### DuckLake
+
+DuckLake uses a DuckDB, SQLite, or Postgres catalog. The table shows supported storage + catalog combinations.
+For more guidance, see DuckLake's [choosing a catalog database](https://ducklake.select/docs/stable/duckdb/usage/choosing_a_catalog_database).
+
+
+| Catalog | S3 |
+|-------------------|----|
+| DuckDB| <span class="lh-check" aria-label="supported"></span> |
+| SQLite | <span class="lh-check" aria-label="supported"></span> |
+| Postgres| <span class="lh-check" aria-label="supported"></span> |
+| MySQL    | Planned |
+
+
+
+#### Iceberg
+
+Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-data-catalog.html)). The table shows supported storage + catalog combinations.
+
+| Catalog | S3 |
+|-------------------|----|
+| Glue | <span class="lh-check" aria-label="supported"></span> |
+
+
+### Trino [↗](../platforms/trino.md#lakehouse-support)
+
+Trino supports lakehouse access via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with Glue and [Nessie](https://projectnessie.org/) catalogs. Detailed setup guides are coming soon. Check out [Trino](../platforms/trino.md#lakehouse-support) for Bruin configuration.
+
+| Catalog | S3 |
+|-------------------|----|
+| Glue | <span class="lh-check" aria-label="supported"></span> |
+| Nessie | <span class="lh-check" aria-label="supported"></span> |
+
+## What is a Lakehouse?
+
+A lakehouse combines the scalability of data lakes with the reliability of data warehouses. Data is stored in open formats on object storage (S3, GCS, Azure Blob) while metadata catalogs track schema, partitions, and table history.
+
+<!-- Architecture -->
+
+```mermaid
+%%{init: {"flowchart": {"useMaxWidth": true, "nodeSpacing": 180, "rankSpacing": 80}}}%%
+flowchart TB
+  QE["Query Engine<br/>(DuckDB, Trino, ...)<br/>&nbsp;"]
+  Catalog["**Catalog**<br/>(Glue, REST, ...)<br/><br/>Table metadata, Schema info, Partition info<br/>&nbsp;"]
+  Storage["**Storage**<br/>(S3, GCS, ...)<br/>**Format**(Iceberg, DuckLake)<br/><br/>Parquet files, Manifest files, Data files<br/>&nbsp;"]
+
+  QE --> Catalog
+  QE --> Storage
+```
+
+## Quick Start
+
+Let's add a DuckLake lakehouse configuration to your DuckDB connection (DuckDB catalog + S3 storage):
+
+```yaml
+connections:
+  duckdb:
+    - name: "analytics"
+      path: "./path/to/duckdb.db"
+      lakehouse:
+        format: ducklake
+        catalog:
+          type: duckdb
+          path: "metadata.ducklake"
+        storage:
+          type: s3
+          path: "s3://my-ducklake-warehouse/path"
+          region: "us-east-1"
+          auth:
+            access_key: "AKIA..."
+            secret_key: "..."
+```
+
+Then query your Iceberg tables (defaults to the `main` schema):
+
+```Bruin-sql
+/* @Bruin
+name: lakehouse_users
+type: duckdb.sql
+connection: analytics
+@Bruin */
+
+
+SELECT * FROM users;
+```
+
+See the engine-specific pages [DuckDB](../platforms/duckdb.md#lakehouse-support) or [Trino](../platforms/trino.md#lakehouse-support) for detailed configuration options.

@@ -81,3 +81,14 @@ type: trino.sensor.query
 parameters:
     query: select exists(select 1 from upstream_table where inserted_at > '{{ end_timestamp }}')
 ```
+
+
+## Lakehouse Support
+
+> [!WARNING]
+> Trino lakehouse support is available. Detailed setup guides are coming soon.
+
+| Catalog \ Storage | S3 |
+|-------------------|----|
+| Glue | <span class="lh-check" aria-label="supported"></span> |
+| Nessie | <span class="lh-check" aria-label="supported"></span> |

@@ -92,6 +92,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Environments", link: "/getting-started/devenv"},
                             {text: "Variables", link: "/getting-started/pipeline-variables"},
                             {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
+                            {text: "Lakehouse Support", link: "/getting-started/lakehouse"},
                         ]
                     },
                     {text: "Concepts", link: "/getting-started/concepts"},
