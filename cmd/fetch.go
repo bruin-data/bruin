@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"math/big"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -222,7 +223,7 @@ func Query() *cli.Command {
 					// Prepare the final output struct
 					finalOutput := jsonResponse{
 						Columns:  jsonCols,
-						Rows:     result.Rows,
+						Rows:     formatQueryRowsForJSON(result.Rows),
 						ConnName: connName,
 						Query:    queryStr,
 					}
@@ -244,7 +245,7 @@ func Query() *cli.Command {
 							if val == nil {
 								rowStrings[i] = ""
 							} else {
-								rowStrings[i] = fmt.Sprintf("%v", val)
+								rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
 							}
 						}
 						if err = writer.Write(rowStrings); err != nil {
@@ -517,7 +518,7 @@ func printTable(columnNames []string, rows [][]interface{}) {
 	for _, row := range rows {
 		rowData := make(table.Row, len(row))
 		for i, cell := range row {
-			rowData[i] = fmt.Sprintf("%v", cell)
+			rowData[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(cell))
 		}
 		t.AppendRow(rowData)
 	}
@@ -631,7 +632,7 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 			if val == nil {
 				rowStrings[i] = ""
 			} else {
-				rowStrings[i] = fmt.Sprintf("%v", val)
+				rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
 			}
 		}
 		if err = writer.Write(rowStrings); err != nil {
@@ -778,7 +779,7 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 		logEntry.Error = queryErr.Error()
 	} else if result != nil {
 		logEntry.Columns = result.Columns
-		logEntry.Rows = result.Rows
+		logEntry.Rows = formatQueryRowsForJSON(result.Rows)
 	}
 
 	jsonData, err := json.MarshalIndent(logEntry, "", "  ")
@@ -792,4 +793,63 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 	}
 
 	return nil
+}
+
+func formatQueryCellForDisplay(cell interface{}) interface{} {
+	switch v := cell.(type) {
+	case *big.Rat:
+		return formatBigRatAsDecimal(v)
+	case big.Rat:
+		vcopy := v
+		return formatBigRatAsDecimal(&vcopy)
+	default:
+		return cell
+	}
+}
+
+func formatQueryCellForJSON(cell interface{}) interface{} {
+	switch v := cell.(type) {
+	case *big.Rat:
+		return json.Number(formatBigRatAsDecimal(v))
+	case big.Rat:
+		vcopy := v
+		return json.Number(formatBigRatAsDecimal(&vcopy))
+	default:
+		return cell
+	}
+}
+
+func formatQueryRowsForJSON(rows [][]interface{}) [][]interface{} {
+	formattedRows := make([][]interface{}, len(rows))
+	for rowIdx, row := range rows {
+		formattedRow := make([]interface{}, len(row))
+		for colIdx, cell := range row {
+			formattedRow[colIdx] = formatQueryCellForJSON(cell)
+		}
+		formattedRows[rowIdx] = formattedRow
+	}
+
+	return formattedRows
+}
+
+func formatBigRatAsDecimal(rat *big.Rat) string {
+	if rat == nil {
+		return ""
+	}
+
+	// BigQuery NUMERIC/BIGNUMERIC scale is up to 38 decimal points.
+	return trimDecimalString(rat.FloatString(38))
+}
+
+func trimDecimalString(value string) string {
+	if !strings.Contains(value, ".") {
+		return value
+	}
+
+	trimmed := strings.TrimRight(strings.TrimRight(value, "0"), ".")
+	if trimmed == "" || trimmed == "-" {
+		return "0"
+	}
+
+	return trimmed
 }
