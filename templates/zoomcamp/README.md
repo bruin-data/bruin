@@ -24,7 +24,7 @@ This is a learn-by-doing experience with AI assistance available through Bruin M
 - **Part 2**: Setting Up Your First Bruin Project - Install Bruin, initialize a project, and configure environments
 - **Part 3**: End-to-End NYC Taxi ELT Pipeline - Build ingestion, staging, and reporting layers with real data
 - **Part 4**: Data Engineering with AI Agent - Use Bruin MCP to build pipelines with AI assistance
-- **Part 5**: Deploy to BigQuery - Deploy your local pipeline to Google BigQuery
+- **Part 5**: Deploy to Cloud - Deploy to BigQuery and run pipelines on Bruin Cloud
 
 ## Pipeline Skeleton
 
@@ -173,6 +173,10 @@ Please refer to the doc page for more details:
 
 ## Part 3: End-to-End NYC Taxi ELT Pipeline
 
+> **Data Availability Note**: NYC Taxi & Limousine Commission (TLC) trip data is not available after November 2025. When selecting date ranges for your pipeline, use dates before December 2025.
+>
+> **Development Tip**: Given the size of the parquet files (each month can be hundreds of MB), it's best to ingest **1-3 months of data** when developing and testing your pipeline. Once your pipeline is working correctly, run a full backfill for the desired years/months.
+
 ### Learning Goals
 - Build a complete ELT pipeline: ingestion → staging → reports
 - Understand the three asset types: Python, SQL, and Seed
@@ -236,6 +240,10 @@ bruin lineage ./pipeline/pipeline.yml
 ---
 
 ## Part 4: Data Engineering with AI Agent
+
+> **Data Availability Note**: NYC Taxi trip data is not available after November 2025. Use dates before December 2025 in your prompts.
+>
+> **Development Tip**: Start with 1-3 months of data for faster iteration during development. Run a full backfill once your pipeline is complete.
 
 ### Learning Goals
 - Set up Bruin MCP to extend AI assistants with Bruin context
@@ -350,6 +358,7 @@ d) **pipeline/assets/reports/trips_report.sql** - SQL asset to aggregate by date
 - Validate entire pipeline: `bruin validate ./pipeline/pipeline.yml`
 - Run with: `bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2022-01-01 --end-date 2022-02-01`
 - For faster testing, use `--var 'taxi_types=["yellow"]'` (skip green taxis)
+- Note: Start with 1-3 months for development; run full backfill once complete
 
 ### 4. Verify Results
 - Check row counts across all tables
@@ -359,9 +368,11 @@ d) **pipeline/assets/reports/trips_report.sql** - SQL asset to aggregate by date
 
 ---
 
-## Part 5: Deploy to BigQuery
+## Part 5: Deploy to Cloud
 
-This part takes what you built locally and runs it on **Google BigQuery**.
+This part takes what you built locally and deploys it to the cloud. You'll learn to:
+- Run your pipeline on **Google BigQuery** instead of local DuckDB
+- Configure **Bruin Cloud** to schedule and run your pipelines automatically
 
 > **Note on SQL dialects**: BigQuery SQL is not identical to DuckDB SQL. Your pipeline structure stays the same, but you may need to update SQL syntax and types when switching engines.
 
@@ -409,6 +420,25 @@ environments:
 Docs:
 - BigQuery platform: https://getbruin.com/docs/bruin/platforms/bigquery
 - `.bruin.yml` secrets backend: https://getbruin.com/docs/bruin/secrets/bruinyml
+
+### 5.5 Deploy to Bruin Cloud
+
+Bruin Cloud provides managed infrastructure to schedule and run your pipelines automatically.
+
+**Sign Up and Connect Your Repository:**
+
+1. Go to [getbruin.com](https://getbruin.com) and click **Sign Up**
+2. Complete the onboarding flow
+3. When prompted to connect your GitHub repository, select the repo containing your Bruin pipelines
+4. Follow the remaining onboarding steps to complete setup
+
+**Enable and Run Your Pipeline:**
+
+1. From the Bruin Cloud home page, navigate to the **Pipelines** page
+2. Find your pipeline and click to enable it
+3. Create a run to execute your pipeline on Bruin Cloud infrastructure
+
+> **Free Tier**: The free signup does not require a credit card. There are limitations on the number of pipelines, server instance sizes, and other usage constraints. Check the Bruin Cloud documentation for current limits.
 
 ---
 
