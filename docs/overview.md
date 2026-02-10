@@ -69,7 +69,7 @@ By default, the command exits with code 0 even when differences are detected. Us
 | `--connection value` | `-c value` | Default connection name (e.g. conn:table) |
 | `--config-file value` | | Path to .bruin.yml file |
 | `--tolerance value` | `-t value` | Tolerance percentage for equality (default: 0.001%) |
-| `--schema-only` | | Compare only schemas, not data |
+| `--full` | | Include detailed row counts and column statistics (schema-only by default) |
 | `--fail-if-diff` | | Exit with non-zero code if differences found |
 | `--help` | `-h` | Show help |
 
