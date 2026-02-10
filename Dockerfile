@@ -29,7 +29,7 @@ FROM debian:trixie-slim
 
 ARG GCS_BUCKET_NAME=gong-release
 ARG GCS_PREFIX=releases
-ARG RELEASE_TAG=v0.1.3
+ARG GONG_VERSION
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -60,7 +60,7 @@ ENV GONG_PATH="/home/bruin/.bruin/bin"
 COPY --from=builder /src/pkg/gong/version.txt gong_version.txt
 
 # Download gong binaries from GCS (public bucket via HTTPS). Optional: build continues if not found.
-RUN SELECTED_RELEASE="${RELEASE_TAG:-$(cat gong_version.txt)}" && \
+RUN SELECTED_RELEASE="${GONG_VERSION:-$(cat gong_version.txt)}" && \
     if [ -z "${SELECTED_RELEASE}" ]; then \
         echo "No release tag provided, downloading latest..." && \
         curl -fsSL "https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" -o /tmp/latest.txt && \
