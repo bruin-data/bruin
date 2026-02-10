@@ -1,6 +1,6 @@
 # `data-diff` Command
 
-The `data-diff` command compares data between two tables from the same or different data sources. It provides comprehensive schema comparison, statistical analysis, and data profiling to help identify differences between datasets across environments or sources.
+The `data-diff` command compares data between two tables from the same or different data sources. By default, it performs a fast schema-only comparison. Use the `--full` flag to include detailed statistical analysis and data profiling.
 
 This command is particularly useful for:
 - Comparing tables between development, staging, and production environments
@@ -38,7 +38,7 @@ table td:first-child {
 | `--connection`, `-c` | str | - | Name of the default connection to use when connection is not specified in table arguments |
 | `--tolerance`, `-t` | float | `0.001` | Tolerance percentage for considering values equal. Values with percentage difference below this threshold are considered equal |
 | `--config-file` | str | `.bruin.yml` | Optional path to the `.bruin.yml` configuration file . Other [secret backends](../secrets/overview.md) can be used.|
-| `--schema-only` | bool | `false` | Compare only table schemas without analyzing row counts or column distributions |
+| `--full` | bool | `false` | Include detailed row counts and column statistics analysis in addition to schema comparison |
 | `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
 | `--target-dialect` | str | auto-detect | Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, generic). Auto-detected from connection types if not specified |
 | `--reverse` | bool | `false` | Reverse the direction of ALTER statements (transform Table1 to match Table2 instead of Table2 to match Table1) |
@@ -56,16 +56,18 @@ Tables can be specified in two formats:
 
 ## What Gets Compared
 
-The `data-diff` command performs a comprehensive comparison that includes:
+### Schema Comparison (Default)
 
-### Schema Comparison
+By default, the `data-diff` command performs a fast schema-only comparison that includes:
+
 - **Column names and types:** Identifies missing, extra, and mismatched columns
 - **Data type compatibility:** Checks if different types are comparable (e.g., `VARCHAR` vs `STRING`)
 - **Nullability constraints:** Compares nullable/not-null settings
 - **Uniqueness constraints:** Compares unique/non-unique settings
 
-### Statistical Analysis
-For each column that exists in both tables, the command provides detailed statistics based on the column's data type:
+### Statistical Analysis (with `--full` flag)
+
+When using the `--full` flag, the command also provides detailed statistics for each column based on its data type:
 
 #### Numerical Columns
 - Row count and null count
@@ -220,14 +222,14 @@ bruin data-diff --target-dialect postgresql prod_duck:users staging_bq:users
 
 This generates PostgreSQL-compatible ALTER statements even when comparing DuckDB and BigQuery tables.
 
-### Schema-Only Comparison
+### Full Comparison with Statistics
 
-Compare only table schemas without statistical analysis:
+Include detailed row counts and column statistics analysis:
 ```bash
-bruin data-diff --schema-only prod:large_table staging:large_table
+bruin data-diff --full prod:large_table staging:large_table
 ```
 
-This is faster for large tables when you only need schema differences.
+By default, data-diff performs a fast schema-only comparison. Use `--full` when you need detailed statistical analysis of the data.
 
 ## Supported Data Platforms
 
@@ -277,10 +279,13 @@ bruin data-diff source_db:customer_data target_db:customer_data
 ```
 
 ### Environment Consistency Checks
-If you are comparing different environments, you can use the `--schema-only` flag to only compare the schema of the tables and not the data.
+By default, data-diff performs a fast schema-only comparison, which is ideal for checking environment consistency:
 ```bash
-# Ensure staging matches production structure
-bruin data-diff --schema-only prod:important_table staging:important_table --tolerance 0.01
+# Ensure staging matches production structure (schema-only by default)
+bruin data-diff prod:important_table staging:important_table
+
+# Include full statistics analysis if needed
+bruin data-diff --full prod:important_table staging:important_table --tolerance 0.01
 ```
 
 ### ETL Process Monitoring  
