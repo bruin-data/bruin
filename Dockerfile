@@ -71,7 +71,6 @@ RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
     GONG_URL="https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
     echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_URL}..." && \
     (curl -fsSL "${GONG_URL}" -o ${GONG_PATH}/gong && \
-     chmod +x ${GONG_PATH}/gong && \
      chown bruin:bruin ${GONG_PATH}/gong && \
      echo "Gong binaries downloaded successfully") || \
     echo "Gong binary not available for ${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}, skipping"
