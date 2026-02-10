@@ -29,7 +29,7 @@ FROM debian:trixie-slim
 
 ARG GCS_BUCKET_NAME=gong-release
 ARG GCS_PREFIX=releases
-ARG RELEASE_TAG=v0.1.3
+ARG GONG_VERSION
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -55,9 +55,12 @@ RUN mkdir -p /home/bruin/.local/bin /home/bruin/.bruin/bin /home/bruin/.local/sh
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
 ENV GONG_PATH="/home/bruin/.bruin/bin"
-# Download gong binaries from GCS (public bucket via HTTPS). Optional: build continues if not found.
 
-RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
+# Obtain the gong version required
+COPY --from=builder /src/pkg/gong/version.txt gong_version.txt
+
+# Download gong binaries from GCS (public bucket via HTTPS). Optional: build continues if not found.
+RUN SELECTED_RELEASE="${GONG_VERSION:-$(cat gong_version.txt)}" && \
     if [ -z "${SELECTED_RELEASE}" ]; then \
         echo "No release tag provided, downloading latest..." && \
         curl -fsSL "https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" -o /tmp/latest.txt && \
@@ -71,7 +74,7 @@ RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
     GONG_URL="https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
     echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_URL}..." && \
     (curl -fsSL "${GONG_URL}" -o ${GONG_PATH}/gong && \
-     chown bruin:bruin ${GONG_PATH}/gong && \
+     chmod +x ${GONG_PATH}/gong && \
      echo "Gong binaries downloaded successfully") || \
     echo "Gong binary not available for ${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}, skipping"
 
