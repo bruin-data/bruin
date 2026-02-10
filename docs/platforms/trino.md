@@ -21,6 +21,9 @@ In order to set up a Trino connection, you need to add a configuration item to `
 ### `trino.sql`
 Runs a materialized Trino asset or a Trino script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page. For information about materialization strategies, see the [Materialization](../assets/materialization.md) page.
 
+> [!IMPORTANT]
+> Use a single SQL statement per `trino.sql` asset. Multi-statement queires are not supported by Trino.
+
 #### Example: Create a table using table materialization
 ```bruin-sql
 /* @bruin
@@ -124,6 +127,8 @@ node.data-dir=/data/trino
 - `node.id` must be unique per node and stable across restarts/upgrades.
 - `node.data-dir` must be writable by Trino.
 
+<br>
+
 ### Guide: Iceberg + Glue + S3 {#guide-glue-s3}
 
 Use this when you want AWS Glue as the Iceberg catalog.
@@ -146,9 +151,10 @@ services:
       - ./trino/etc:/etc/trino
 ```
 
+
 `trino/etc/catalog/analytics_catalog.properties`:
 
-This file configures a Trino catalog that uses the Iceberg connector with AWS Glue as the metadata catalog and S3 as the warehouse location for table data.
+This file configures a Trino catalog to use Iceberg connector with AWS Glue as the metadata catalog and S3 as the storage location for table data.
 
 ```properties
 connector.name=iceberg
@@ -162,6 +168,8 @@ hive.metastore.glue.default-warehouse-dir=s3://example-lakehouse/warehouse/
 fs.native-s3.enabled=true
 s3.region=us-east-1
 ```
+
+<br>
 
 ### Guide: Iceberg + Nessie (In-Memory) + S3 {#guide-nessie-in-memory-s3}
 
@@ -194,10 +202,13 @@ services:
     depends_on:
       - nessie
 ```
+note that `IN_MEMORY` does not persist Nessie metadata across restarts.
+
+<br>
 
 `trino/etc/catalog/analytics_catalog.properties`:
 
-This file tells Trino to use Iceberg tables with Nessie as the metadata catalog and S3 as the data warehouse. In practice: `iceberg.catalog.type=nessie` selects Nessie, `iceberg.nessie-catalog.uri` points to the Nessie API, `iceberg.nessie-catalog.ref` selects the active branch/ref, and `iceberg.nessie-catalog.default-warehouse-dir` sets where Iceberg data files are written in S3.
+This file tells Trino to use Iceberg tables with Nessie as the metadata catalog and S3 as the data warehouse.
 
 ```properties
 connector.name=iceberg
@@ -210,9 +221,13 @@ iceberg.nessie-catalog.default-warehouse-dir=s3://example-lakehouse/warehouse
 fs.native-s3.enabled=true
 s3.region=us-east-1
 ```
+- `iceberg.nessie-catalog.uri` points to the Nessie API, 
+- `iceberg.nessie-catalog.ref` selects the active branch/ref, and 
+- `iceberg.nessie-catalog.default-warehouse-dir` sets where Iceberg data files are written in S3.
 
 
-`IN_MEMORY` does not persist Nessie metadata across restarts.
+
+<br>
 
 ### Validate With Bruin
 
@@ -251,13 +266,6 @@ environments:
 name: analytics.smoke_test
 type: trino.sql
 @bruin */
-
-CREATE TABLE IF NOT EXISTS sample_users (
-  id BIGINT,
-  name VARCHAR
-);
-
-INSERT INTO sample_users VALUES (1, 'alice'), (2, 'bob');
 
 SELECT * FROM sample_users ORDER BY id;
 ```
