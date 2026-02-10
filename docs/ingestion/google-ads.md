@@ -115,3 +115,69 @@ Google Ads source allows ingesting the following sources into separate tables:
 bruin run assets/google_ads_integration.asset.yml
 ```
 As a result of this command, Bruin will ingest data for the given Google Ads resource into your Postgres database.
+
+## GAQL Queries
+
+In addition to predefined tables and custom reports, you can execute raw [Google Ads Query Language (GAQL)](https://developers.google.com/google-ads/api/docs/query/overview) queries directly. This gives you full flexibility to query any resource with any combination of fields, segments, and metrics.
+
+### GAQL Query Format
+
+To run a GAQL query, use the `gaql_query:` prefix followed by your query:
+
+```yaml
+name: public.campaigns
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-googleads
+  source_table: 'gaql_query:SELECT campaign.id, campaign.name, campaign.status FROM campaign LIMIT 10'
+  destination: postgres
+```
+
+### Date Filtering with Placeholders
+
+GAQL queries support special placeholders for date filtering that integrate with Bruin's incremental strategy:
+
+- `:interval_start` - Replaced with the start date of the run interval (defaults to `1970-01-01` if not provided)
+- `:interval_end` - Replaced with the end date of the run interval (defaults to today's date if not provided)
+
+**Example with date range:**
+```yaml
+name: public.campaign_metrics
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-googleads
+  source_table: 'gaql_query:SELECT campaign.id, campaign.name, metrics.impressions, metrics.clicks, segments.date FROM campaign WHERE segments.date BETWEEN :interval_start AND :interval_end'
+  destination: postgres
+```
+
+### GAQL Query Examples
+
+**Get all campaigns with their status:**
+```yaml
+source_table: 'gaql_query:SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type FROM campaign'
+```
+
+**Get ad group performance metrics:**
+```yaml
+source_table: 'gaql_query:SELECT ad_group.id, ad_group.name, campaign.name, metrics.impressions, metrics.clicks, metrics.cost_micros, segments.date FROM ad_group WHERE segments.date DURING LAST_30_DAYS'
+```
+
+**Get keyword performance:**
+```yaml
+source_table: 'gaql_query:SELECT ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type, metrics.impressions, metrics.clicks, metrics.conversions, segments.date FROM keyword_view WHERE segments.date DURING LAST_7_DAYS'
+```
+
+**Get search terms report:**
+```yaml
+source_table: 'gaql_query:SELECT search_term_view.search_term, campaign.name, ad_group.name, metrics.impressions, metrics.clicks, metrics.cost_micros FROM search_term_view WHERE segments.date DURING LAST_30_DAYS ORDER BY metrics.impressions DESC LIMIT 100'
+```
+
+> [!NOTE]
+> GAQL queries use `append` write disposition by default. Each row includes a `customer_id` field to identify which account the data came from.
+
+> [!TIP]
+> Use the [Google Ads Query Builder](https://developers.google.com/google-ads/api/fields/v18/overview_query_builder) to construct and validate your GAQL queries before using them with ingestr.

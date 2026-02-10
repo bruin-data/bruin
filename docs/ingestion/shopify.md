@@ -16,8 +16,12 @@ To ingest data from Shopify, you need to create an [asset configuration](/assets
         - name: my-shopify
           url: test.myshopify.com
           api_key: abckey
+          client_id: your_client_id
+          client_secret: your_client_secret
 ```
 - `api_key`: the API key used for authentication with Shopify
+- `client_id`: the OAuth client ID for your Shopify app (optional)
+- `client_secret`: the OAuth client secret for your Shopify app (optional)
 
 ### Step 2: Create an asset file for data ingestion
 

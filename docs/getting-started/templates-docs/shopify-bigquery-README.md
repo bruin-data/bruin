@@ -18,12 +18,31 @@ environments:
             google_cloud_platform:
                 - name: "gcp"
                   service_account_file: "<path to service account file>"
-                  project_id: "bruin-common-health-check"
+                  project_id: "your-project-id"
 
             shopify:
                 - name: "my-shopify-connection"
                   api_key: "********"
                   url: "******.myshopify.com"
+```
+
+Alternatively, you can authenticate using OAuth credentials (`client_id` and `client_secret`) instead of an `api_key`:
+
+```yaml
+default_environment: default
+environments:
+    default:
+        connections:
+            google_cloud_platform:
+                - name: "gcp"
+                  service_account_file: "<path to service account file>"
+                  project_id: "your-project-id"
+
+            shopify:
+                - name: "my-shopify-connection"
+                  url: "******.myshopify.com"
+                  client_id: "your_client_id"
+                  client_secret: "your_client_secret"
 ```
 
 ## Running the pipeline
