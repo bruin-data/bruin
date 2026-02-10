@@ -89,7 +89,7 @@ func DataDiffCmd() *cli.Command {
 	// configFilePath is added to allow overriding the default .bruin.yml path, similar to other commands
 	var configFilePath string
 	var tolerance float64
-	var schemaOnly bool
+	var full bool
 	var failIfDiff bool
 	var targetDialect string
 	var reverse bool
@@ -121,9 +121,9 @@ func DataDiffCmd() *cli.Command {
 				Value:       0.001,
 			},
 			&cli.BoolFlag{
-				Name:        "schema-only",
-				Usage:       "Compare only table schemas without analyzing row counts or column distributions",
-				Destination: &schemaOnly,
+				Name:        "full",
+				Usage:       "Include detailed row counts and column statistics analysis in addition to schema comparison",
+				Destination: &full,
 			},
 			&cli.BoolFlag{
 				Name:        "fail-if-diff",
@@ -239,7 +239,7 @@ func DataDiffCmd() *cli.Command {
 				return fmt.Errorf("connection type %T for '%s' does not support table summarization", conn2, conn2Name)
 			}
 
-			schemaComparison, err := compareTables(ctx, s1, s2, table1Name, table2Name, schemaOnly)
+			schemaComparison, err := compareTables(ctx, s1, s2, table1Name, table2Name, !full)
 			if err != nil {
 				if outputFormat == "json" {
 					jsonErr := map[string]string{"error": fmt.Sprintf("error comparing tables '%s' and '%s': %v", table1Identifier, table2Identifier, err)}
@@ -277,7 +277,7 @@ func DataDiffCmd() *cli.Command {
 				}
 
 				// Plain text output (original behavior)
-				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.ErrWriter)
+				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, !full, c.ErrWriter)
 
 				// Print ALTER TABLE statements
 				if len(alterStatements) > 0 {

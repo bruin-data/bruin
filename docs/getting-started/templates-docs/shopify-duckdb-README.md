@@ -24,6 +24,25 @@ environments:
                   api_key: "********"
                   url: "******.myshopify.com"
 ```
+
+Alternatively, you can authenticate using OAuth credentials (`client_id` and `client_secret`) instead of an `api_key`:
+
+```yaml
+default_environment: default
+environments:
+    default:
+        connections:
+            duckdb:
+                - name: "duckdb-default"
+                  path: "<path to database>"
+
+            shopify:
+                - name: "my-shopify-connection"
+                  url: "******.myshopify.com"
+                  client_id: "your_client_id"
+                  client_secret: "your_client_secret"
+```
+
 ## Running the pipeline
 Bruin CLI can run the whole pipeline or any task with the downstreams:
 ```shell
