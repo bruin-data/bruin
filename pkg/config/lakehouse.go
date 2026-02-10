@@ -38,16 +38,10 @@ type CatalogAuth struct {
 }
 
 func (auth *CatalogAuth) IsAWS() bool {
-	if auth == nil {
-		return false
-	}
 	return auth.AccessKey != "" && auth.SecretKey != ""
 }
 
 func (auth *CatalogAuth) IsPostgres() bool {
-	if auth == nil {
-		return false
-	}
 	return auth.Username != "" && auth.Password != ""
 }
 
@@ -97,9 +91,6 @@ type StorageAuth struct {
 }
 
 func (a *StorageAuth) IsS3() bool {
-	if a == nil {
-		return false
-	}
 	return a.AccessKey != "" && a.SecretKey != ""
 }
 
@@ -122,23 +113,18 @@ func (lh *LakehouseConfig) Validate() error {
 		return errors.New("lakehouse format is required")
 	}
 
-	switch lh.Format {
-	case LakehouseFormatIceberg:
-		// valid format
-	case LakehouseFormatDuckLake:
-		// valid format
-	default:
+	if !slices.Contains([]LakehouseFormat{LakehouseFormatIceberg, LakehouseFormatDuckLake}, lh.Format) {
 		return fmt.Errorf("unsupported lakehouse format: %s (supported: iceberg, ducklake)", lh.Format)
 	}
 
 	// Validate catalog type if specified
-	if lh.Catalog != nil && lh.Catalog.Type != "" && !slices.Contains(supportedCatalogTypes, lh.Catalog.Type) {
-		return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb, sqlite)", lh.Catalog.Type)
+	if lh.Catalog == nil || !slices.Contains(supportedCatalogTypes, lh.Catalog.Type) {
+		return fmt.Errorf("empty or unsupported catalog type: (supported: glue, postgres, duckdb, sqlite)")
 	}
 
 	// Validate storage type if specified
-	if lh.Storage != nil && lh.Storage.Type != "" && !slices.Contains(supportedStorageTypes, lh.Storage.Type) {
-		return fmt.Errorf("unsupported storage type: %s (supported: s3)", lh.Storage.Type)
+	if lh.Storage == nil || !slices.Contains(supportedStorageTypes, lh.Storage.Type) {
+		return fmt.Errorf("empty or unsupported storage type: (supported: s3)")
 	}
 
 	return nil
