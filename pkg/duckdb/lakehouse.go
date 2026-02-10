@@ -35,8 +35,12 @@ func ValidateLakehouseConfig(lh *config.LakehouseConfig) error {
 }
 
 func validateIcebergForDuckDB(lh *config.LakehouseConfig) error {
-	if lh.Catalog == nil || lh.Catalog.Type == "" {
-		return errors.New("DuckDB iceberg catalog configuration missing or incomplete")
+	if lh.Catalog == nil {
+		return errors.New("DuckDB iceberg requires catalog configuration")
+	}
+
+	if lh.Catalog.Type == "" {
+		return errors.New("DuckDB iceberg requires catalog type")
 	}
 
 	if lh.Catalog.Type != config.CatalogTypeGlue {
