@@ -110,6 +110,12 @@ func NewLakehouseAttacher() *LakehouseAttacher {
 	return &LakehouseAttacher{}
 }
 
+type icebergAttachBuilder func(catalog *config.CatalogConfig, alias string) (string, error)
+
+var icebergAttachBuilders = map[config.CatalogType]icebergAttachBuilder{
+	config.CatalogTypeGlue: buildIcebergGlueAttach,
+}
+
 func (l *LakehouseAttacher) GenerateAttachStatements(lh *config.LakehouseConfig, alias string) ([]string, error) {
 	if lh == nil {
 		return nil, nil
@@ -342,24 +348,17 @@ func (l *LakehouseAttacher) generateIcebergAttach(lh *config.LakehouseConfig, al
 		return "", errors.New("iceberg format requires catalog configuration")
 	}
 
-	var options []string
-	options = append(options, "TYPE 'iceberg'")
-
-	switch lh.Catalog.Type {
-	case config.CatalogTypeGlue:
-		// ATTACH '{catalog_id}' AS alias (TYPE 'iceberg', ENDPOINT_TYPE 'glue')
-		options = append(options, "ENDPOINT_TYPE 'glue'")
-		return "ATTACH '" + escapeSQL(lh.Catalog.CatalogID) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
-
-	case config.CatalogTypePostgres:
-		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
-	case config.CatalogTypeDuckDB:
-		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
-	case config.CatalogTypeSQLite:
-		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
-	default:
+	buildAttach, ok := icebergAttachBuilders[lh.Catalog.Type]
+	if !ok {
 		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
 	}
+
+	return buildAttach(lh.Catalog, alias)
+}
+
+func buildIcebergGlueAttach(catalog *config.CatalogConfig, alias string) (string, error) {
+	options := []string{"TYPE 'iceberg'", "ENDPOINT_TYPE 'glue'"}
+	return "ATTACH " + dollarQuote(catalog.CatalogID) + " AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
 }
 
 func (l *LakehouseAttacher) generateDuckLakeAttach(lh *config.LakehouseConfig, alias string) (string, error) {
