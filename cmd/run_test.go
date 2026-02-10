@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"path/filepath"
 	"testing"
@@ -2316,7 +2317,7 @@ func TestGenerateLogFileName(t *testing.T) {
 			assets: func() []*pipeline.Asset {
 				assets := make([]*pipeline.Asset, 50)
 				for i := range 50 {
-					assets[i] = &pipeline.Asset{Name: "very_long_asset_name_that_will_make_filename_too_long_" + string(rune('a'+i))}
+					assets[i] = &pipeline.Asset{Name: fmt.Sprintf("very_long_asset_name_that_will_make_filename_too_long_%d", i)}
 				}
 				return assets
 			}(),
@@ -2361,7 +2362,7 @@ func TestGenerateLogFileName(t *testing.T) {
 			if tt.expectHash {
 				// Should contain asset count and hash
 				assert.Contains(t, result, "_assets_", "Should contain '_assets_' when using hash")
-				assert.True(t, len(result) > len(tt.expectedPrefix), "Should have hash suffix")
+				assert.Greater(t, len(result), len(tt.expectedPrefix), "Should have hash suffix")
 			} else {
 				// Should match exactly
 				assert.Equal(t, tt.expectedPrefix, result)

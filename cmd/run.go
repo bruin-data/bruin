@@ -1966,7 +1966,7 @@ func (c *clearFileWriter) Write(p []byte) (int, error) {
 // generateLogFileName creates a log file name for multiple selected assets.
 // If the combined name would exceed filesystem limits (255 bytes), it uses a hash instead.
 func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) string {
-	const maxFileNameLength = 200 // Leave room for .log extension and path separators
+	const maxFileNameLength = 196 // 200 - 4 for ".log" extension
 
 	assetNames := make([]string, len(assets))
 	for i, asset := range assets {
