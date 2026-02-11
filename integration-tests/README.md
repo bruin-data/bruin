@@ -97,8 +97,8 @@ default_environment: default
 environments:
   default:
     connections:
-      fabric_warehouse:
-        - name: fabric_warehouse-default
+      fabric:
+        - name: fabric-default
           host: your-workspace.datawarehouse.fabric.microsoft.com
           port: 1433
           database: your_warehouse
@@ -109,7 +109,7 @@ Then run the cloud integration suite:
 
 ```bash
 make build
-go test ./integration-tests/cloud-integration-tests -run FabricWarehouse -v
+go test ./integration-tests/cloud-integration-tests -run Fabric -v
 ```
 
 If the Fabric connection is missing, the tests are skipped.

@@ -2,8 +2,8 @@ default_environment: default
 environments:
   default:
     connections:
-      fabric_warehouse:
-        - name: fabric_warehouse-default
+      fabric:
+        - name: fabric-default
           host: your-workspace.datawarehouse.fabric.microsoft.com
           port: 1433
           database: your_warehouse

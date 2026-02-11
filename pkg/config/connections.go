@@ -180,7 +180,7 @@ func (c SynapseConnection) GetName() string {
 	return c.Name
 }
 
-type FabricWarehouseConnection struct {
+type FabricConnection struct {
 	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Host                      string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
 	Port                      int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
@@ -194,7 +194,7 @@ type FabricWarehouseConnection struct {
 	TenantID                  string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
 }
 
-func (c FabricWarehouseConnection) GetName() string {
+func (c FabricConnection) GetName() string {
 	return c.Name
 }
 

@@ -4,14 +4,14 @@ Bruin supports Microsoft Fabric Warehouse through the SQL endpoint (TDS protocol
 
 ## Connection configuration
 
-Add a Fabric Warehouse connection under `fabric_warehouse`:
+Add a Fabric Warehouse connection under `fabric`:
 
 ```yaml
 # .bruin.yml
 environments:
   default:
     connections:
-      fabric_warehouse:
+      fabric:
         - name: fabric-default
           host: your-workspace.datawarehouse.fabric.microsoft.com
           port: 1433
@@ -30,7 +30,7 @@ If `use_azure_default_credential: true` is set, the connector uses Azure's Defau
 environments:
   default:
     connections:
-      fabric_warehouse:
+      fabric:
         - name: fabric-sp
           host: your-workspace.datawarehouse.fabric.microsoft.com
           port: 1433
@@ -46,7 +46,7 @@ environments:
 environments:
   default:
     connections:
-      fabric_warehouse:
+      fabric:
         - name: fabric-sql
           host: your-workspace.datawarehouse.fabric.microsoft.com
           port: 1433
@@ -57,17 +57,17 @@ environments:
 
 ## Asset types
 
-- `fw.sql`
-- `fw.seed`
-- `fw.sensor.query`
-- `fw.sensor.table`
+- `fabric.sql`
+- `fabric.seed`
+- `fabric.sensor.query`
+- `fabric.sensor.table`
 
 ## Example asset
 
 ```sql
 /* @bruin
 name: my_schema.my_table
-type: fw.sql
+type: fabric.sql
 materialization:
   type: table
   strategy: delete+insert

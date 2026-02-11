@@ -38,7 +38,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
-	fabricwarehouse "github.com/bruin-data/bruin/pkg/fabric_warehouse"
+	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fireflies"
 	"github.com/bruin-data/bruin/pkg/fluxx"
@@ -113,7 +113,7 @@ type Manager struct {
 	Postgres             map[string]*postgres.Client
 	MsSQL                map[string]*mssql.DB
 	Databricks           map[string]*databricks.DB
-	FabricWarehouse      map[string]*fabricwarehouse.DB
+	Fabric               map[string]*fabric.DB
 	Mongo                map[string]*mongo.DB
 	Couchbase            map[string]*couchbase.DB
 	Cursor               map[string]*cursor.Client
@@ -565,14 +565,14 @@ func (m *Manager) AddSynapseSQLConnectionFromConfig(connection *config.SynapseCo
 	return nil
 }
 
-func (m *Manager) AddFabricWarehouseConnectionFromConfig(connection *config.FabricWarehouseConnection) error {
+func (m *Manager) AddFabricConnectionFromConfig(connection *config.FabricConnection) error {
 	m.mutex.Lock()
-	if m.FabricWarehouse == nil {
-		m.FabricWarehouse = make(map[string]*fabricwarehouse.DB)
+	if m.Fabric == nil {
+		m.Fabric = make(map[string]*fabric.DB)
 	}
 	m.mutex.Unlock()
 
-	client, err := fabricwarehouse.NewDB(&fabricwarehouse.Config{
+	client, err := fabric.NewDB(&fabric.Config{
 		Username:                  connection.Username,
 		Password:                  connection.Password,
 		Host:                      connection.Host,
@@ -590,7 +590,7 @@ func (m *Manager) AddFabricWarehouseConnectionFromConfig(connection *config.Fabr
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.FabricWarehouse[connection.Name] = client
+	m.Fabric[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2694,7 +2694,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.FabricWarehouse, connectionManager.AddFabricWarehouseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Fabric, connectionManager.AddFabricConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
