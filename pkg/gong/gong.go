@@ -133,7 +133,6 @@ func parseVersionOutput(output string) string {
 }
 
 func (g *Checker) downloadGong(ctx context.Context, destPath string) error {
-
 	var output io.Writer = os.Stdout
 	if printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
 		output = printer
