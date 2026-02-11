@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"path/filepath"
 	"testing"
@@ -2272,6 +2273,99 @@ func TestLoadAssetsFromPaths(t *testing.T) {
 				for _, name := range tt.expectedNames {
 					assert.Contains(t, assetNames, name)
 				}
+			}
+		})
+	}
+}
+
+func TestGenerateLogFileName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		runID          string
+		pipelineName   string
+		assets         []*pipeline.Asset
+		expectHash     bool
+		expectedPrefix string
+	}{
+		{
+			name:         "short name stays intact",
+			runID:        "2024_01_01_12_00_00",
+			pipelineName: "my-pipeline",
+			assets: []*pipeline.Asset{
+				{Name: "asset1"},
+				{Name: "asset2"},
+			},
+			expectHash:     false,
+			expectedPrefix: "2024_01_01_12_00_00__my-pipeline__asset1_asset2",
+		},
+		{
+			name:         "single asset",
+			runID:        "2024_01_01_12_00_00",
+			pipelineName: "test",
+			assets: []*pipeline.Asset{
+				{Name: "single_asset"},
+			},
+			expectHash:     false,
+			expectedPrefix: "2024_01_01_12_00_00__test__single_asset",
+		},
+		{
+			name:         "many assets triggers hash",
+			runID:        "2024_01_01_12_00_00",
+			pipelineName: "my-pipeline",
+			assets: func() []*pipeline.Asset {
+				assets := make([]*pipeline.Asset, 50)
+				for i := range 50 {
+					assets[i] = &pipeline.Asset{Name: fmt.Sprintf("very_long_asset_name_that_will_make_filename_too_long_%d", i)}
+				}
+				return assets
+			}(),
+			expectHash:     true,
+			expectedPrefix: "2024_01_01_12_00_00__my-pipeline__50_assets_",
+		},
+		{
+			name:         "long asset names trigger hash",
+			runID:        "2024_01_01_12_00_00",
+			pipelineName: "pace-data-export",
+			assets: []*pipeline.Asset{
+				{Name: "dashboard.ai_conversations"},
+				{Name: "dashboard.ai_credit_report"},
+				{Name: "dashboard.ai_reports"},
+				{Name: "dashboard.bookings"},
+				{Name: "dashboard.coach_report"},
+				{Name: "dashboard.booking_status"},
+				{Name: "dashboard.session_type_mapping"},
+				{Name: "dashboard.organization_programmes"},
+				{Name: "dashboard.organizations"},
+				{Name: "dashboard.page_views"},
+				{Name: "dashboard.performance_report"},
+				{Name: "raw.Users"},
+				{Name: "raw.Teams"},
+				{Name: "raw.Sessions"},
+				{Name: "raw.Programmes"},
+			},
+			expectHash:     true,
+			expectedPrefix: "2024_01_01_12_00_00__pace-data-export__15_assets_",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := generateLogFileName(tt.runID, tt.pipelineName, tt.assets)
+
+			// Check length is within limits
+			assert.LessOrEqual(t, len(result), 200, "Log filename should not exceed 200 characters")
+
+			if tt.expectHash {
+				// Should contain asset count and hash
+				assert.Contains(t, result, "_assets_", "Should contain '_assets_' when using hash")
+				assert.Greater(t, len(result), len(tt.expectedPrefix), "Should have hash suffix")
+			} else {
+				// Should match exactly
+				assert.Equal(t, tt.expectedPrefix, result)
 			}
 		})
 	}

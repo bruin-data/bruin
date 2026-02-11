@@ -36,7 +36,7 @@ var AvailablePythonVersions = map[string]bool{
 
 const (
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.14.130"
+	ingestrVersion          = "0.14.133"
 	sqlfluffVersion         = "3.4.1"
 )
 

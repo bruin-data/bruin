@@ -28,6 +28,10 @@ Notes:
 - Memory is measured in gibibytes (Gi) or mebibytes (Mi)
 - Values shown represent guaranteed resources allocated to your instance
 
+## How Instance Size Affects Concurrency
+
+Larger instances consume more of your tenant's resource pool. See [Concurrency & Resource Limits](/getting-started/concurrency) for details on the weighted-slot model.
+
 ## Custom Instance Types
 Bruin Cloud supports custom instance types. You can specify a custom instance type by setting the `instance` field to the name of the instance type you want to use. Talk to your account manager to get access to custom instance types.
 

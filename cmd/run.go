@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -587,7 +589,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:    "secrets-backend",
 				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws'",
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws', 'azure'",
 			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
@@ -969,6 +971,11 @@ func Run(isDebug *bool) *cli.Command {
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize AWS Secrets Manager client"))
 				}
+			case "azure":
+				connectionManager, err = secrets.NewAzureKeyVaultClientFromEnv(logger)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "failed to initialize Azure Key Vault client"))
+				}
 			default:
 				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
 			}
@@ -990,11 +997,7 @@ func Run(isDebug *bool) *cli.Command {
 				if pipelineInfo.RunningForAnAsset {
 					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
 				} else if len(filter.SelectedAssets) > 0 {
-					assetNames := make([]string, len(filter.SelectedAssets))
-					for i, asset := range filter.SelectedAssets {
-						assetNames[i] = asset.Name
-					}
-					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, strings.Join(assetNames, "_"))
+					logFileName = generateLogFileName(runID, foundPipeline.Name, filter.SelectedAssets)
 				}
 
 				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
@@ -1972,6 +1975,28 @@ func (c *clearFileWriter) Write(p []byte) (int, error) {
 	defer c.m.Unlock()
 	_, err := c.file.Write([]byte(Clean(string(p))))
 	return len(p), err
+}
+
+// generateLogFileName creates a log file name for multiple selected assets.
+// If the combined name would exceed filesystem limits (255 bytes), it uses a hash instead.
+func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) string {
+	const maxFileNameLength = 196 // 200 - 4 for ".log" extension
+
+	assetNames := make([]string, len(assets))
+	for i, asset := range assets {
+		assetNames[i] = asset.Name
+	}
+
+	// Try the full name first
+	fullName := fmt.Sprintf("%s__%s__%s", runID, pipelineName, strings.Join(assetNames, "_"))
+	if len(fullName) <= maxFileNameLength {
+		return fullName
+	}
+
+	// If too long, use a hash of the asset names with a count indicator
+	hash := sha256.Sum256([]byte(strings.Join(assetNames, "_")))
+	shortHash := hex.EncodeToString(hash[:8]) // 16 hex chars
+	return fmt.Sprintf("%s__%s__%d_assets_%s", runID, pipelineName, len(assets), shortHash)
 }
 
 func logOutput(logPath string) (func(), error) {

@@ -789,8 +789,10 @@ func (m *Manager) AddShopifyConnectionFromConfig(connection *config.ShopifyConne
 	m.mutex.Unlock()
 
 	client, err := shopify.NewClient(&shopify.Config{
-		APIKey: connection.APIKey,
-		URL:    connection.URL,
+		APIKey:       connection.APIKey,
+		URL:          connection.URL,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
 	})
 	if err != nil {
 		return err

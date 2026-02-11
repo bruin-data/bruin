@@ -91,6 +91,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Policies", link: "/getting-started/policies"},
                             {text: "Environments", link: "/getting-started/devenv"},
                             {text: "Variables", link: "/getting-started/pipeline-variables"},
+                            {text: "Concurrency", link: "/getting-started/concurrency"},
                             {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
                             {text: "Lakehouse Support", link: "/getting-started/lakehouse"},
                         ]

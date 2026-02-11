@@ -2,6 +2,7 @@ package gong
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,8 +20,10 @@ import (
 	"github.com/spf13/afero"
 )
 
+//go:embed version.txt
+var Version string
+
 const (
-	Version = "v0.1.3"
 	BaseURL = "https://storage.googleapis.com/gong-release"
 
 	binDir          = "bin"

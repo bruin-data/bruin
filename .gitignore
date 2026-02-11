@@ -162,3 +162,5 @@ test-glossary.yml
 .venv
 logs/queries
 *.py[cod]
+
+.devcontainer

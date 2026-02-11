@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
 
@@ -200,6 +202,119 @@ func TestAddLimitToQuery(t *testing.T) {
 			t.Parallel()
 			result := addLimitToQuery(tt.query, tt.limit, tt.conn, nil, "")
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFormatBigRatAsDecimal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "integer value",
+			input:    "42",
+			expected: "42",
+		},
+		{
+			name:     "terminating decimal",
+			input:    "32097247/500000",
+			expected: "64.194494",
+		},
+		{
+			name:     "negative terminating decimal",
+			input:    "-111/100",
+			expected: "-1.11",
+		},
+		{
+			name:     "trailing zeros are trimmed",
+			input:    "12500/1000",
+			expected: "12.5",
+		},
+		{
+			name:     "non-terminating decimal fallback",
+			input:    "1/3",
+			expected: "0.33333333333333333333333333333333333333",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rat, ok := new(big.Rat).SetString(tt.input)
+			require.True(t, ok)
+
+			assert.Equal(t, tt.expected, formatBigRatAsDecimal(rat))
+		})
+	}
+}
+
+func TestFormatQueryRowsForJSON(t *testing.T) {
+	t.Parallel()
+
+	decimalRat, ok := new(big.Rat).SetString("32097247/500000")
+	require.True(t, ok)
+
+	repeatingRat, ok := new(big.Rat).SetString("1/3")
+	require.True(t, ok)
+
+	input := [][]interface{}{
+		{"abc", decimalRat, 100},
+		{nil, repeatingRat, true},
+	}
+
+	formatted := formatQueryRowsForJSON(input)
+
+	require.Len(t, formatted, 2)
+	assert.Equal(t, json.Number("64.194494"), formatted[0][1])
+	assert.Equal(t, json.Number("0.33333333333333333333333333333333333333"), formatted[1][1])
+	assert.Nil(t, formatted[1][0])
+	assert.Equal(t, 100, formatted[0][2])
+	assert.Equal(t, true, formatted[1][2])
+
+	// Original result rows should stay untouched.
+	assert.Same(t, decimalRat, input[0][1])
+	assert.Same(t, repeatingRat, input[1][1])
+}
+
+func TestFormatQueryRowsForJSON_Marshal(t *testing.T) {
+	t.Parallel()
+
+	rat, ok := new(big.Rat).SetString("32097247/500000")
+	require.True(t, ok)
+
+	var nilRat *big.Rat
+
+	tests := []struct {
+		name     string
+		cell     interface{}
+		expected string
+	}{
+		{
+			name:     "big rat marshals as number",
+			cell:     rat,
+			expected: `[[64.194494]]`,
+		},
+		{
+			name:     "nil big rat marshals as null",
+			cell:     nilRat,
+			expected: `[[null]]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rows := formatQueryRowsForJSON([][]interface{}{{tt.cell}})
+
+			payload, err := json.Marshal(rows)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, string(payload))
 		})
 	}
 }
