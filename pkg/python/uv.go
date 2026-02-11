@@ -109,10 +109,14 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
 			}
 			// Use gong binary directly instead of ingestr
-			return u.Cmd.Run(ctx, repo, &CommandInstance{
+			err := u.Cmd.Run(ctx, repo, &CommandInstance{
 				Name: path,
 				Args: args,
 			})
+			if err == nil && ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return err
 		}
 	}
 
