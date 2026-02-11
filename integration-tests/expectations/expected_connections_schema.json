@@ -450,9 +450,9 @@
                     },
                     "type": "array"
                 },
-                "fabric_warehouse": {
+                "fabric": {
                     "items": {
-                        "$ref": "#/$defs/FabricWarehouseConnection"
+                        "$ref": "#/$defs/FabricConnection"
                     },
                     "type": "array"
                 },
@@ -1331,7 +1331,7 @@
                 "verify_certs"
             ]
         },
-        "FabricWarehouseConnection": {
+        "FabricConnection": {
             "properties": {
                 "name": {
                     "type": "string"

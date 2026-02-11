@@ -1,6 +1,6 @@
 /* @bruin
 name: bruin_test.products__RUN_ID__
-type: fw.sql
+type: fabric.sql
 
 materialization:
   type: table

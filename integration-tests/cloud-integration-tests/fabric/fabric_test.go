@@ -1,4 +1,4 @@
-package fabricwarehouse
+package fabric
 
 import (
 	"os"
@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFabricWarehouseWorkflows(t *testing.T) {
+func TestFabricWorkflows(t *testing.T) {
 	t.Parallel()
 
 	currentFolder, err := os.Getwd()
@@ -69,7 +69,7 @@ func TestFabricWarehouseWorkflows(t *testing.T) {
 					{
 						Name:    "ensure schema exists",
 						Command: binary,
-						Args: append(append([]string{"query"}, configFlags...), "--connection", "fabric_warehouse-default", "--query",
+						Args: append(append([]string{"query"}, configFlags...), "--connection", "fabric-default", "--query",
 							"IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'bruin_test') EXEC('CREATE SCHEMA bruin_test');"),
 						Env: []string{},
 						Expected: e2e.Output{
@@ -94,7 +94,7 @@ func TestFabricWarehouseWorkflows(t *testing.T) {
 					{
 						Name:    "query the products table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "fabric_warehouse-default", "--query", "SELECT product_id, product_name, CAST(price AS VARCHAR(20)) AS price, stock FROM bruin_test."+tableName+" ORDER BY product_id;", "--output", "csv"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "fabric-default", "--query", "SELECT product_id, product_name, CAST(price AS VARCHAR(20)) AS price, stock FROM bruin_test."+tableName+" ORDER BY product_id;", "--output", "csv"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,

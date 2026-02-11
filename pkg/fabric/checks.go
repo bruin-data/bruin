@@ -1,4 +1,4 @@
-package fabricwarehouse
+package fabric
 
 import (
 	"context"
