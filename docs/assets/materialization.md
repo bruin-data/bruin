@@ -485,7 +485,7 @@ bruin run --full-refresh path/to/your/product_catalog.sql
 
 This initial run creates:
 
-```sql
+```text
 ID | Name          | Price | _is_current | _valid_from         | _valid_until
 1  | Wireless Mouse| 29.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
 2  | USB Cable     | 12.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
@@ -500,7 +500,7 @@ bruin run path/to/your/product_catalog.sql
 
 The table becomes:
 
-```sql
+```text
 ID | Name          | Price | _is_current | _valid_from         | _valid_until
 1  | Wireless Mouse| 29.99 | false       | 2024-01-01 10:00:00| 2024-01-02 14:30:00
 1  | Wireless Mouse| 39.99 | true        | 2024-01-02 14:30:00| 9999-12-31 23:59:59
@@ -590,7 +590,7 @@ bruin run --full-refresh path/to/your/products.sql
 
 This initial run creates:
 
-```sql
+```text
 product_id | product_name | stock | _is_current | _valid_from         | _valid_until
 1          | Laptop       | 100   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
 2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
@@ -606,7 +606,7 @@ bruin run path/to/your/products.sql
 
 The table becomes:
 
-```sql
+```text
 product_id | product_name | stock | _is_current | _valid_from         | _valid_until
 1          | Laptop       | 100   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
 2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
