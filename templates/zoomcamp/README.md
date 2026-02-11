@@ -10,6 +10,8 @@ You'll learn to build a production-ready ELT pipeline that:
 
 This is a learn-by-doing experience with AI assistance available through Bruin MCP. Follow the comprehensive step-by-step tutorial section below.
 
+Please reach out to use via our [Slack Community](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-3oaskee9f-YbvwEEdMgQ1elmKzqmIHTg) to ask questions, share feedback, or report issues.
+
 ## Learning Goals
 
 - Understand how Bruin projects are structured (`pipeline/pipeline.yml` + `pipeline/assets/`)
