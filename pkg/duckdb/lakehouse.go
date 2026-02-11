@@ -37,7 +37,7 @@ func ValidateLakehouseConfig(lh *config.LakehouseConfig) error {
 
 func validateIcebergForDuckDB(lh config.LakehouseConfig) error {
 	if lh.Catalog.Type != config.CatalogTypeGlue {
-		return fmt.Errorf("DuckDB iceberg does not support catalog type: "%s" (supported: glue)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB iceberg does not support catalog type: '%s' (supported: glue)", lh.Catalog.Type)
 	}
 
 	if lh.Catalog.CatalogID == "" {
@@ -56,7 +56,7 @@ func validateIcebergForDuckDB(lh config.LakehouseConfig) error {
 
 func validateDuckLakeForDuckDB(lh config.LakehouseConfig) error {
 	if !slices.Contains(ducklakeSupportedCatalogTypes, lh.Catalog.Type) {
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: "%s" (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: '%s' (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
 	switch lh.Catalog.Type {
@@ -75,7 +75,7 @@ func validateDuckLakeForDuckDB(lh config.LakehouseConfig) error {
 			return fmt.Errorf("DuckDB ducklake with %s catalog requires path", lh.Catalog.Type)
 		}
 	case config.CatalogTypeGlue:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: "%s" (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: '%s' (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
 	if err := validateS3StorageForDuckDB(lh.Storage, "DuckDB ducklake"); err != nil {
@@ -159,6 +159,8 @@ func (l *LakehouseAttacher) getRequiredExtensions(lh config.LakehouseConfig) []s
 		extensions = append(extensions, "postgres")
 	case config.CatalogTypeSQLite:
 		extensions = append(extensions, "sqlite")
+	case config.CatalogTypeDuckDB:
+		// no extension required
 	}
 
 	return l.deduplicateExtensions(extensions)

@@ -133,7 +133,11 @@ type LakehouseConfig struct {
 	Storage StorageConfig   `yaml:"storage,omitempty" json:"storage,omitempty" mapstructure:"storage"`
 }
 
-func (lh LakehouseConfig) IsZero() bool {
+func (lh *LakehouseConfig) IsZero() bool {
+	if lh == nil {
+		return true
+	}
+
 	return lh.Format == "" && lh.Catalog.IsZero() && lh.Storage.IsZero()
 }
 
