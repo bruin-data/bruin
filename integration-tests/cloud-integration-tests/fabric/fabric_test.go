@@ -50,9 +50,9 @@ func TestFabricWorkflows(t *testing.T) {
 		workflow e2e.Workflow
 	}{
 		{
-			name: "fabric-warehouse-products-create-and-validate",
+			name: "fabric-products-create-and-validate",
 			workflow: e2e.Workflow{
-				Name: "fabric-warehouse-products-create-and-validate",
+				Name: "fabric-products-create-and-validate",
 				Steps: []e2e.Task{
 					{
 						Name:       "initialize git repository",

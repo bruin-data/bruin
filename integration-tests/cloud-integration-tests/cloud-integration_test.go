@@ -218,18 +218,18 @@ func TestCloudIntegration(t *testing.T) {
 		t.Parallel()
 
 		if !availablePlatforms["fabric"] {
-			t.Skip("Skipping Fabric Warehouse tests - no connection configured")
+			t.Skip("Skipping Fabric tests - no connection configured")
 			return
 		}
 
 		fabricDir := filepath.Join(currentFolder, "fabric")
-		require.DirExists(t, fabricDir, "Fabric Warehouse test directory should exist")
+		require.DirExists(t, fabricDir, "Fabric test directory should exist")
 
 		testFile := filepath.Join(fabricDir, "fabric_test.go")
-		require.FileExists(t, testFile, "Fabric Warehouse test file should exist")
+		require.FileExists(t, testFile, "Fabric test file should exist")
 
-		t.Logf("Fabric Warehouse platform is available - running integration tests")
+		t.Logf("Fabric platform is available - running integration tests")
 
-		runTestsInDirectory(t, fabricDir, "Fabric Warehouse")
+		runTestsInDirectory(t, fabricDir, "Fabric")
 	})
 }
