@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -30,7 +32,9 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
+	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -61,10 +65,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	LogsFolder      = "logs"
-	defaultGongPath = "/home/bruin/.local/bin/gong/gong"
-)
+const LogsFolder = "logs"
 
 var pythonCacheGitignorePatterns = []string{
 	"__pycache__/",
@@ -578,7 +579,6 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:   "gong-path",
 				Usage:  "path to the gong binary (when using --use-gong)",
-				Value:  defaultGongPath,
 				Hidden: true,
 			},
 			&cli.StringFlag{
@@ -589,7 +589,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:    "secrets-backend",
 				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws'",
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws', 'azure'",
 			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
@@ -638,17 +638,28 @@ func Run(isDebug *bool) *cli.Command {
 			useGong := c.Bool("use-gong")
 			gongPath := c.String("gong-path")
 
-			// When using gong, the path must exist and be executable
+			// When using gong, ensure binary is available
 			if useGong {
-				info, err := os.Stat(gongPath)
-				if err != nil {
-					if os.IsNotExist(err) {
-						return cli.Exit("gong binary not found at path: "+gongPath, 1)
+				if gongPath == "" {
+					// Auto-install gong if no custom path provided
+					gongChecker := &gong.Checker{}
+					installedPath, err := gongChecker.EnsureGongInstalled(ctx)
+					if err != nil {
+						return cli.Exit(fmt.Sprintf("failed to install gong: %v", err), 1)
 					}
-					return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", gongPath, err), 1)
-				}
-				if info.Mode()&0o111 == 0 {
-					return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", gongPath), 1)
+					gongPath = installedPath
+				} else {
+					// User provided custom path - verify it exists and is executable
+					info, err := os.Stat(gongPath)
+					if err != nil {
+						if os.IsNotExist(err) {
+							return cli.Exit("gong binary not found at path: "+gongPath, 1)
+						}
+						return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", gongPath, err), 1)
+					}
+					if info.Mode()&0o111 == 0 {
+						return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", gongPath), 1)
+					}
 				}
 			}
 
@@ -816,6 +827,41 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
+			// Auto-enable gong for CDC mode assets
+			if !runConfig.UseGong {
+				for _, asset := range pipelineInfo.Pipeline.Assets {
+					if asset.Type == pipeline.AssetTypeIngestr && asset.Parameters["cdc"] == "true" {
+						// CDC mode detected, enable gong
+						runConfig.UseGong = true
+
+						if gongPath == "" {
+							// Auto-install gong if no custom path provided
+							gongChecker := &gong.Checker{}
+							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx)
+							if gongErr != nil {
+								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to install gong: %v", gongErr), 1)
+							}
+							gongPath = installedPath
+						} else {
+							// User provided custom path - verify it exists and is executable
+							info, gongErr := os.Stat(gongPath)
+							if gongErr != nil {
+								if os.IsNotExist(gongErr) {
+									return cli.Exit("CDC mode detected but gong binary not found at path: "+gongPath+"\nPlease install gong or remove cdc: true from your asset.", 1)
+								}
+								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to access gong binary at path '%s': %v", gongPath, gongErr), 1)
+							}
+							if info.Mode()&0o111 == 0 {
+								return cli.Exit(fmt.Sprintf("CDC mode detected but gong binary at path '%s' is not executable", gongPath), 1)
+							}
+						}
+
+						runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath) //nolint
+						break
+					}
+				}
+			}
+
 			// Load assets from positional arguments
 			// This allows: bruin run asset1.sql asset2.sql asset3.sql
 			// Pipeline is inferred from the first asset file
@@ -925,6 +971,11 @@ func Run(isDebug *bool) *cli.Command {
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize AWS Secrets Manager client"))
 				}
+			case "azure":
+				connectionManager, err = secrets.NewAzureKeyVaultClientFromEnv(logger)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "failed to initialize Azure Key Vault client"))
+				}
 			default:
 				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
 			}
@@ -946,11 +997,7 @@ func Run(isDebug *bool) *cli.Command {
 				if pipelineInfo.RunningForAnAsset {
 					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
 				} else if len(filter.SelectedAssets) > 0 {
-					assetNames := make([]string, len(filter.SelectedAssets))
-					for i, asset := range filter.SelectedAssets {
-						assetNames[i] = asset.Name
-					}
-					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, strings.Join(assetNames, "_"))
+					logFileName = generateLogFileName(runID, foundPipeline.Name, filter.SelectedAssets)
 				}
 
 				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
@@ -1082,7 +1129,7 @@ func Run(isDebug *bool) *cli.Command {
 			results := s.Run(runCtx)
 			duration := time.Since(start)
 
-			if err := s.SavePipelineState(afero.NewOsFs(), runConfig, runID, statePath); err != nil {
+			if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
 				logger.Error("failed to save pipeline state", zap.Error(err))
 			}
 
@@ -1633,6 +1680,55 @@ func SetupExecutors(
 		}
 	}
 
+	//nolint: dupl
+	if s.WillRunTaskOfType(pipeline.AssetTypeFabricQuery) || s.WillRunTaskOfType(pipeline.AssetTypeFabricQueryLegacy) ||
+		estimateCustomCheckType == pipeline.AssetTypeFabricQuery || estimateCustomCheckType == pipeline.AssetTypeFabricQueryLegacy ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricSeed) || s.WillRunTaskOfType(pipeline.AssetTypeFabricSeedLegacy) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensorLegacy) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensorLegacy) {
+		fabricOperator := fabric.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+			Mat: fabric.NewMaterializer(fullRefresh),
+		})
+
+		fabricCheckRunner := fabric.NewColumnCheckOperator(conn)
+
+		fabricQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		fabricTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+
+		mainExecutors[pipeline.AssetTypeFabricQuery][scheduler.TaskInstanceTypeMain] = fabricOperator
+		mainExecutors[pipeline.AssetTypeFabricQuery][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQueryLegacy][scheduler.TaskInstanceTypeMain] = fabricOperator
+		mainExecutors[pipeline.AssetTypeFabricQueryLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQueryLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeFabricSeed][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricSeedLegacy][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeFabricSeedLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricSeedLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricQuerySensor][scheduler.TaskInstanceTypeMain] = fabricQuerySensor
+		mainExecutors[pipeline.AssetTypeFabricQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQuerySensorLegacy][scheduler.TaskInstanceTypeMain] = fabricQuerySensor
+		mainExecutors[pipeline.AssetTypeFabricQuerySensorLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQuerySensorLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricTableSensor][scheduler.TaskInstanceTypeMain] = fabricTableSensor
+		mainExecutors[pipeline.AssetTypeFabricTableSensor][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeMain] = fabricTableSensor
+		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		if estimateCustomCheckType == pipeline.AssetTypeFabricQuery || estimateCustomCheckType == pipeline.AssetTypeFabricQueryLegacy {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		}
+	}
+
 	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuery) || estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksTableSensor) {
@@ -1879,6 +1975,28 @@ func (c *clearFileWriter) Write(p []byte) (int, error) {
 	defer c.m.Unlock()
 	_, err := c.file.Write([]byte(Clean(string(p))))
 	return len(p), err
+}
+
+// generateLogFileName creates a log file name for multiple selected assets.
+// If the combined name would exceed filesystem limits (255 bytes), it uses a hash instead.
+func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) string {
+	const maxFileNameLength = 196 // 200 - 4 for ".log" extension
+
+	assetNames := make([]string, len(assets))
+	for i, asset := range assets {
+		assetNames[i] = asset.Name
+	}
+
+	// Try the full name first
+	fullName := fmt.Sprintf("%s__%s__%s", runID, pipelineName, strings.Join(assetNames, "_"))
+	if len(fullName) <= maxFileNameLength {
+		return fullName
+	}
+
+	// If too long, use a hash of the asset names with a count indicator
+	hash := sha256.Sum256([]byte(strings.Join(assetNames, "_")))
+	shortHash := hex.EncodeToString(hash[:8]) // 16 hex chars
+	return fmt.Sprintf("%s__%s__%d_assets_%s", runID, pipelineName, len(assets), shortHash)
 }
 
 func logOutput(logPath string) (func(), error) {

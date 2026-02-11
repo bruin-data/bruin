@@ -114,6 +114,51 @@ Or you can give direct commands like:
 
 The AI assistant will answer these questions using up-to-date Bruin documentation and provide you with accurate examples. It can also execute Bruin commands directly to help you connect to databases, run queries, perform ingestion workflows, and create complete data pipelines.
 
+## Best Practices for AI Agents
+
+### Use `agents.md` Files
+
+Add `agents.md` files to guide AI agents working in your repository:
+
+**Root level** - Keep it high-level:
+- What the project does
+- How to navigate the repo
+- Available connections and their access levels
+
+**Per-pipeline/domain** - Be specific:
+- What data lives here and its schema
+- Typical tasks the agent should handle
+- Constraints (read-only vs write, dev vs prod)
+
+### Document Pitfalls
+
+In each `agents.md`, list common mistakes:
+- Time zone handling (e.g., "all timestamps are UTC")
+- Data arrival delays (e.g., "15-minute sync lag")
+- Schema gotchas (e.g., "`customer_id` is NULL for guest checkouts")
+- Known data quality caveats
+
+### Use Custom Checks as Examples
+
+Point agents to existing custom checks instead of writing ad-hoc queries:
+```markdown
+| Question | Use This Check |
+|----------|----------------|
+| Is revenue valid? | `check_revenue_not_negative` |
+| Is data fresh? | `check_data_freshness` |
+```
+
+### Default to Dev Environments
+
+Configure your project so agents use dev by default:
+```yaml
+# pipeline.yml
+dev:
+  schema_prefix: dev_agent_
+```
+
+Make this explicit in `agents.md` so agents know dev is safe for experimentation and prod requires explicit access.
+
 ## Feedback
 
 We'd love to hear your feedback on Bruin MCP. Please [create an issue](https://github.com/bruin-data/bruin/issues/new) so that we can improve Bruin CLI & Bruin MCP.

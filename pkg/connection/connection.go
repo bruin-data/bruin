@@ -38,6 +38,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
+	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fireflies"
 	"github.com/bruin-data/bruin/pkg/fluxx"
@@ -112,6 +113,7 @@ type Manager struct {
 	Postgres             map[string]*postgres.Client
 	MsSQL                map[string]*mssql.DB
 	Databricks           map[string]*databricks.DB
+	Fabric               map[string]*fabric.DB
 	Mongo                map[string]*mongo.DB
 	Couchbase            map[string]*couchbase.DB
 	Cursor               map[string]*cursor.Client
@@ -563,6 +565,38 @@ func (m *Manager) AddSynapseSQLConnectionFromConfig(connection *config.SynapseCo
 	return nil
 }
 
+func (m *Manager) AddFabricConnectionFromConfig(connection *config.FabricConnection) error {
+	m.mutex.Lock()
+	if m.Fabric == nil {
+		m.Fabric = make(map[string]*fabric.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := fabric.NewDB(&fabric.Config{
+		Username:                  connection.Username,
+		Password:                  connection.Password,
+		Host:                      connection.Host,
+		Port:                      connection.Port,
+		Database:                  connection.Database,
+		Options:                   connection.Options,
+		UseAzureDefaultCredential: connection.UseAzureDefaultCredential,
+		ClientID:                  connection.ClientID,
+		ClientSecret:              connection.ClientSecret,
+		TenantID:                  connection.TenantID,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Fabric[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddDatabricksConnectionFromConfig(connection *config.DatabricksConnection) error {
 	m.mutex.Lock()
 	if m.Databricks == nil {
@@ -755,8 +789,10 @@ func (m *Manager) AddShopifyConnectionFromConfig(connection *config.ShopifyConne
 	m.mutex.Unlock()
 
 	client, err := shopify.NewClient(&shopify.Config{
-		APIKey: connection.APIKey,
-		URL:    connection.URL,
+		APIKey:       connection.APIKey,
+		URL:          connection.URL,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
 	})
 	if err != nil {
 		return err
@@ -1185,7 +1221,8 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	m.mutex.Unlock()
 
 	client, err := duck.NewClient(duck.Config{
-		Path: connection.Path,
+		Path:      connection.Path,
+		Lakehouse: connection.Lakehouse,
 	})
 	if err != nil {
 		return err
@@ -2656,8 +2693,9 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 		return connectionManager.AddRedshiftConnectionFromConfig(ctx, conn)
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Fabric, connectionManager.AddFabricConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)

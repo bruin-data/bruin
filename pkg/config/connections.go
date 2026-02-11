@@ -180,6 +180,24 @@ func (c SynapseConnection) GetName() string {
 	return c.Name
 }
 
+type FabricConnection struct {
+	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Host                      string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port                      int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
+	Database                  string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Username                  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password                  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Options                   string `yaml:"options,omitempty"  json:"options,omitempty" mapstructure:"options"`
+	UseAzureDefaultCredential bool   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
+	ClientID                  string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
+	TenantID                  string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+}
+
+func (c FabricConnection) GetName() string {
+	return c.Name
+}
+
 type DatabricksConnection struct {
 	Name         string `yaml:"name,omitempty"  json:"name" mapstructure:"name"`
 	Token        string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" jsonschema:"oneof_required=token"`
@@ -449,9 +467,11 @@ func (c AlliumConnection) GetName() string {
 }
 
 type ShopifyConnection struct {
-	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	URL    string `yaml:"url,omitempty" json:"url" mapstructure:"url"`
-	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	URL          string `yaml:"url,omitempty" json:"url" mapstructure:"url"`
+	APIKey       string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
 }
 
 func (c ShopifyConnection) GetName() string {
@@ -485,8 +505,9 @@ func (c AirtableConnection) GetName() string {
 }
 
 type DuckDBConnection struct {
-	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Path string `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+	Name      string           `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Path      string           `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+	Lakehouse *LakehouseConfig `yaml:"lakehouse,omitempty" json:"lakehouse,omitempty" mapstructure:"lakehouse"`
 }
 
 func (d DuckDBConnection) GetName() string {

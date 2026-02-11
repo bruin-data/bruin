@@ -130,3 +130,163 @@ name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
 ```
+
+
+## Lakehouse Support <Badge type="warning" text="beta" />
+
+DuckDB can query [Iceberg](https://duckdb.org/docs/extensions/iceberg) and [DuckLake](https://duckdb.org/docs/extensions/ducklake) tables through its native extensions. DuckLake supports DuckDB, SQLite, or Postgres catalogs with S3-backed storage.
+
+### Connection
+
+Add the `lakehouse` block to your DuckDB connection in `.bruin.yml`:
+
+```yaml
+connections:
+  duckdb:
+    - name: "example-conn"
+      path: "./path/to/duckdb.db"
+      lakehouse:
+        format: <iceberg|ducklake>
+        catalog:
+          type: <glue|postgres|duckdb|sqlite>
+          auth: { ... } # optional
+        storage:
+          type: <s3>
+          auth: { ... } # optional
+```
+
+<br>
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `format` | string | Yes | Table format: `iceberg` or `ducklake` |
+| `catalog` | object | Yes | Catalog configuration (Glue for Iceberg, DuckDB/SQLite/Postgres for DuckLake) |
+| `storage` | object | No | Storage configuration (required for DuckLake) |
+
+---
+### Supported Lakehouse Formats
+
+
+
+#### DuckLake
+
+| Catalog | S3 |
+|-------------------|----|
+| DuckDB | <span class="lh-check" aria-label="supported"></span> |
+| SQLite | <span class="lh-check" aria-label="supported"></span> |
+| Postgres | <span class="lh-check" aria-label="supported"></span> |
+| MySQL    | Planned |
+
+
+
+#### Iceberg
+
+| Catalog | S3 |
+|-------------------|----|
+| Glue | <span class="lh-check" aria-label="supported"></span> |
+
+
+For background, see DuckDB's [lakehouse format overview](https://duckdb.org/docs/stable/lakehouse_formats).
+
+---
+### Catalog Options
+For guidance, see DuckLake's [choosing a catalog database](https://ducklake.select/docs/stable/duckdb/usage/choosing_a_catalog_database).
+
+
+#### Glue
+
+```yaml
+catalog:
+  type: glue
+  catalog_id: "123456789012"
+  region: "us-east-1"
+  auth:
+    access_key: "${AWS_ACCESS_KEY_ID}"
+    secret_key: "${AWS_SECRET_ACCESS_KEY}"
+    session_token: "${AWS_SESSION_TOKEN}" # optional
+```
+
+#### Postgres
+
+
+```yaml
+catalog:
+  type: postgres
+  host: "localhost"
+  port: 5432 # optional - default: 5432
+  database: "ducklake_catalog"
+  auth:
+    username: "ducklake_user"
+    password: "ducklake_password"
+```
+
+#### DuckDB
+
+```yaml
+catalog:
+  type: duckdb
+  path: "metadata.ducklake"
+```
+
+`catalog.path` should point to the DuckLake metadata file.
+
+Note that if you are using DuckDB as your catalog database, you're limited to a single client.
+
+#### SQLite
+
+```yaml
+catalog:
+  type: sqlite
+  path: "metadata.sqlite"
+```
+
+
+---
+### Storage Options
+
+#### S3
+
+Bruin currently only supports explicit AWS credentials in the `auth` block.
+Session tokens are supported for temporary credentials (AWS STS).
+
+```yaml
+storage:
+  type: s3
+  path: "s3://my-ducklake-warehouse/path" # required for DuckLake, optional for Iceberg
+  region: "us-east-1"
+  auth:
+    access_key: "${AWS_ACCESS_KEY_ID}"
+    secret_key: "${AWS_SECRET_ACCESS_KEY}"
+    session_token: "${AWS_SESSION_TOKEN}" # optional
+```
+
+---
+### Usage
+
+Bruin makes the lakehouse catalog active for your session and ensures a default `main` schema is available (cannot create Iceberg on S3 schemas/tables, so they must already exist). You can query tables with or without a schema:
+
+```sql
+SELECT * FROM my_table;
+```
+
+You can also use the fully qualified path:
+
+```sql
+SELECT * FROM iceberg_catalog.main.my_table;
+```
+
+> [!NOTE]
+> Unqualified table names resolve to the `main` schema of the active catalog. Use `<schema>.<table>` to target non-main schemas.
+
+#### Example Asset
+
+```bruin-sql
+/* @bruin
+name: lakehouse_example
+type: duckdb.sql
+connection: example-conn
+@bruin */
+
+SELECT SUM(amount) as total_sales
+FROM orders;
+```

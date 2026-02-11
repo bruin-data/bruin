@@ -3,6 +3,7 @@ package ingestr
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -98,6 +99,35 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
 	}
 
+	// Handle CDC mode - transform PostgreSQL URI to CDC format and auto-set merge strategy
+	if asset.Parameters["cdc"] == "true" {
+		parsedURI, err := url.Parse(sourceURI)
+		if err != nil {
+			return fmt.Errorf("failed to parse source URI for CDC: %w", err)
+		}
+
+		parsedURI.Scheme = strings.ReplaceAll(parsedURI.Scheme, "postgresql", "postgres+cdc")
+
+		q := parsedURI.Query()
+		if pub := asset.Parameters["cdc_publication"]; pub != "" {
+			q.Set("publication", pub)
+		}
+		if slot := asset.Parameters["cdc_slot"]; slot != "" {
+			q.Set("slot", slot)
+		}
+		if mode := asset.Parameters["cdc_mode"]; mode != "" {
+			q.Set("mode", mode)
+		}
+		parsedURI.RawQuery = q.Encode()
+
+		sourceURI = parsedURI.String()
+
+		// Auto-set merge strategy for CDC if not already set
+		if _, exists := asset.Parameters["incremental_strategy"]; !exists {
+			asset.Parameters["incremental_strategy"] = "merge"
+		}
+	}
+
 	sourceTable, ok := asset.Parameters["source_table"]
 	if !ok {
 		return errors.New("source table not configured")
@@ -131,12 +161,18 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, []string{
+	baseArgs := []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
-		"--source-table",
-		sourceTable,
+	}
+
+	// Omit --source-table for CDC wildcard mode so ingestr replicates all tables
+	if !(asset.Parameters["cdc"] == "true" && sourceTable == "*") {
+		baseArgs = append(baseArgs, "--source-table", sourceTable)
+	}
+
+	baseArgs = append(baseArgs,
 		"--dest-uri",
 		destURI,
 		"--dest-table",
@@ -144,7 +180,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--yes",
 		"--progress",
 		"log",
-	}, &python.ColumnHintOptions{
+	)
+
+	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   false,
 		EnforceSchemaByDefault: false,
 	})

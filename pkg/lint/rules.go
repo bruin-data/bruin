@@ -295,13 +295,22 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Ingestr assets do not support the 'update_on_merge' field, the strategy used decide the update behavior",
 		})
 	}
+	if mode, exists := asset.Parameters["cdc_mode"]; exists && mode != "stream" && mode != "batch" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
+		})
+	}
 	if value, exists := asset.Parameters["incremental_strategy"]; exists && value == "merge" {
-		primaryKeys := asset.ColumnNamesWithPrimaryKey()
-		if len(primaryKeys) == 0 {
-			issues = append(issues, &Issue{
-				Task:        asset,
-				Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
-			})
+		// Skip PK validation for CDC mode - PKs are determined by the source
+		if asset.Parameters["cdc"] != "true" {
+			primaryKeys := asset.ColumnNamesWithPrimaryKey()
+			if len(primaryKeys) == 0 {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
+				})
+			}
 		}
 	}
 
