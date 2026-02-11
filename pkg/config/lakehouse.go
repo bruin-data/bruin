@@ -119,12 +119,12 @@ func (lh *LakehouseConfig) Validate() error {
 
 	// Validate catalog type if specified
 	if lh.Catalog == nil || !slices.Contains(supportedCatalogTypes, lh.Catalog.Type) {
-		return fmt.Errorf("empty or unsupported catalog type: (supported: glue, postgres, duckdb, sqlite)")
+		return errors.New("empty or unsupported catalog type: (supported: glue, postgres, duckdb, sqlite)")
 	}
 
 	// Validate storage type if specified
 	if lh.Storage == nil || !slices.Contains(supportedStorageTypes, lh.Storage.Type) {
-		return fmt.Errorf("empty or unsupported storage type: (supported: s3)")
+		return errors.New("empty or unsupported storage type: (supported: s3)")
 	}
 
 	return nil

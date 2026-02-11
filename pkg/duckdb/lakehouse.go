@@ -40,7 +40,7 @@ func validateIcebergForDuckDB(lh *config.LakehouseConfig) error {
 	}
 
 	if lh.Catalog.Type != config.CatalogTypeGlue {
-		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB iceberg does not support catalog type: "%s" (supported: glue)", lh.Catalog.Type)
 	}
 
 	if lh.Catalog.CatalogID == "" {
@@ -56,7 +56,7 @@ func validateDuckLakeForDuckDB(lh *config.LakehouseConfig) error {
 	}
 
 	if !slices.Contains(ducklakeSupportedCatalogTypes, lh.Catalog.Type) {
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: "%s" (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
 	switch lh.Catalog.Type {
@@ -79,7 +79,7 @@ func validateDuckLakeForDuckDB(lh *config.LakehouseConfig) error {
 			return errors.New("DuckDB ducklake with sqlite catalog requires path")
 		}
 	case config.CatalogTypeGlue:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: "%s" (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
 	if lh.Storage == nil {
@@ -243,6 +243,8 @@ func (l *LakehouseAttacher) generateCatalogSecret(name string, catalog *config.C
 		return l.generateGlueSecret(name, catalog)
 	case config.CatalogTypePostgres:
 		return l.generatePostgresSecret(name, catalog)
+	case config.CatalogTypeDuckDB, config.CatalogTypeSQLite:
+		return ""
 	default:
 		return ""
 	}
@@ -399,6 +401,8 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh *config.LakehouseConfig, a
 			"OVERRIDE_DATA_PATH true",
 		}
 		return "ATTACH 'ducklake:sqlite:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+	case config.CatalogTypeGlue:
+		return "", fmt.Errorf("unsupported catalog type for ducklake: %s", lh.Catalog.Type)
 	default:
 		return "", fmt.Errorf("unsupported catalog type for ducklake: %s", lh.Catalog.Type)
 	}
