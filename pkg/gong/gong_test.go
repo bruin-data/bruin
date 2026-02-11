@@ -10,7 +10,7 @@ import (
 func TestBuildDownloadURL(t *testing.T) {
 	t.Parallel()
 
-	url := BuildDownloadURL()
+	url := buildDownloadURL()
 
 	// URL should contain the base URL
 	assert.Contains(t, url, BaseURL)
@@ -80,7 +80,7 @@ func TestParseVersionOutput(t *testing.T) {
 func TestBuildDownloadURL_Format(t *testing.T) {
 	t.Parallel()
 
-	url := BuildDownloadURL()
+	url := buildDownloadURL()
 
 	// Verify the URL matches the expected pattern
 	// Format: {BaseURL}/releases/{Version}/{os}/gong_{arch}

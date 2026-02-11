@@ -41,6 +41,8 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 	g.mut.Lock()
 	defer g.mut.Unlock()
 
+	Version = strings.TrimSpace(Version)
+
 	m := user.NewConfigManager(afero.NewOsFs())
 	bruinHomeDirAbsPath, err := m.EnsureAndGetBruinHomeDir()
 	if err != nil {
@@ -83,8 +85,8 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 	return gongBinaryPath, nil
 }
 
-// BuildDownloadURL constructs the download URL for the gong binary based on OS and architecture.
-func BuildDownloadURL() string {
+// buildDownloadURL constructs the download URL for the gong binary based on OS and architecture.
+func buildDownloadURL() string {
 	osName := getOSName()
 	archName := getArchName()
 	return fmt.Sprintf("%s/releases/%s/%s/gong_%s", BaseURL, Version, osName, archName)
@@ -141,7 +143,7 @@ func (g *Checker) downloadGong(ctx context.Context, destPath string) error {
 	_, _ = fmt.Fprintf(output, "This is a one-time operation.\n")
 	_, _ = fmt.Fprintf(output, "\n")
 
-	downloadURL := BuildDownloadURL()
+	downloadURL := buildDownloadURL()
 	_, _ = fmt.Fprintf(output, "Downloading from %s\n", downloadURL)
 
 	client := &http.Client{
