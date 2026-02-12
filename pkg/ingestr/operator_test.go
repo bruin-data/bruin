@@ -268,12 +268,13 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 
 			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 			o := &BasicOperator{
 				conn:          &fetcher,
 				finder:        finder,
 				runner:        runner,
-				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "ingestr-test", "ingestr-test", nil),
+				jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
 			}
 
 			ti := scheduler.AssetInstance{
@@ -616,12 +617,13 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 
 			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 			o := &BasicOperator{
 				conn:          &fetcher,
 				finder:        finder,
 				runner:        runner,
-				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "ingestr-test", "ingestr-test", nil),
+				jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
 			}
 
 			ti := scheduler.AssetInstance{

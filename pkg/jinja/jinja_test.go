@@ -231,6 +231,7 @@ func TestJinjaRendererWithStartEndDate(t *testing.T) {
 	require.NoError(t, err)
 
 	endDate := time.Date(2022, 2, 4, 4, 0, 0, 948740170, time.UTC)
+	executionDate := time.Date(2022, 2, 4, 4, 0, 0, 948740170, time.UTC)
 
 	tests := []struct {
 		name    string
@@ -283,7 +284,7 @@ group by 1`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			receiver := NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id", nil)
+			receiver := NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "your-pipeline-name", "your-run-id", nil, "")
 			got, err := receiver.Render(tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -1240,6 +1241,7 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 
 	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	basePipeline := &pipeline.Pipeline{
 		Name: "test-pipeline",
@@ -1278,10 +1280,11 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 			ctx := t.Context()
 			ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, executionDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
 			ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, tt.fullRefresh)
 
-			baseRenderer := NewRendererWithStartEndDates(&startDate, &endDate, basePipeline.Name, "test-run-id", basePipeline.Variables.Value())
+			baseRenderer := NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, basePipeline.Name, "test-run-id", basePipeline.Variables.Value(), "")
 			clonedRenderer, err := baseRenderer.CloneForAsset(ctx, basePipeline, asset)
 			require.NoError(t, err)
 			require.NotNil(t, clonedRenderer)
@@ -1331,7 +1334,7 @@ func TestPythonEnvVariables_FullRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			envVars := PythonEnvVariables(&startDate, &endDate, "test-pipeline", "test-run-id", tt.fullRefresh)
+			envVars := PythonEnvVariables(&startDate, &endDate, nil, "test-pipeline", "test-run-id", tt.fullRefresh)
 
 			// Verify BRUIN_FULL_REFRESH is set correctly
 			require.Equal(t, tt.expectedFullRefreshEnvVar, envVars["BRUIN_FULL_REFRESH"])

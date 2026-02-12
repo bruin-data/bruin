@@ -194,7 +194,7 @@ func RenderDDL() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value(), macroContent)
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pl.Name, "your-run-id", pl.Variables.Value(), macroContent)
 			forAsset, err := renderer.CloneForAsset(runCtx, pl, asset)
 			if err != nil {
 				return err

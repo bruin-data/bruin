@@ -122,7 +122,7 @@ func Lint(isDebug *bool) *cli.Command {
 			fullRefresh := c.Bool("full-refresh")
 			lintCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, fullRefresh)
 
-			renderer := jinja.NewRendererWithStartEndDates(&defaultStartDate, &defaultEndDate, "<bruin-validation>", runID, nil)
+			renderer := jinja.NewRendererWithStartEndDates(&defaultStartDate, &defaultEndDate, &defaultExecutionDate, "<bruin-validation>", runID, nil)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			logger := makeLogger(*isDebug)
@@ -206,6 +206,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
 
 			// Create a pipeline finder that respects exclude paths

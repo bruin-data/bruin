@@ -453,9 +453,10 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 }
 
 var (
-	yesterday        = time.Now().AddDate(0, 0, -1)
-	defaultStartDate = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
-	defaultEndDate   = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+	yesterday            = time.Now().AddDate(0, 0, -1)
+	defaultStartDate     = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+	defaultEndDate       = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+	defaultExecutionDate = time.Now().UTC()
 
 	startDateFlag = &cli.StringFlag{
 		Name:        "start-date",
@@ -732,6 +733,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, applyIntervalModifiers)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 			runCtx = context.WithValue(runCtx, executor.KeyVerbose, c.Bool("verbose"))
@@ -819,7 +821,7 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, preview.Pipeline.Name, runID, nil, macroContent)
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, preview.Pipeline.Name, runID, nil, macroContent)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
@@ -927,12 +929,13 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Update renderer with the finalized start/end dates
-			renderer = jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pipelineInfo.Pipeline.Name, runID, nil, macroContent)
+			renderer = jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, runID, nil, macroContent)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			// Update context with the finalized dates
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 
 			// handle log files
 			executionStartLog := "Starting execution..."
@@ -1088,7 +1091,7 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1417,7 +1420,8 @@ func SetupExecutors(
 	s *scheduler.Scheduler,
 	conn config.ConnectionAndDetailsGetter,
 	startDate,
-	endDate time.Time,
+	endDate,
+	ExecutionDate time.Time,
 	pipelineName string,
 	runID string,
 	fullRefresh bool,
@@ -1437,7 +1441,7 @@ func SetupExecutors(
 		return nil, err
 	}
 
-	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &ExecutionDate, pipelineName, runID, fullRefresh)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		if usePipForPython {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
