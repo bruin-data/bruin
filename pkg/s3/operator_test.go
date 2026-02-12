@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"context"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -70,11 +69,11 @@ func TestWildcardToRegex(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		pattern  string
-		wantRe   string
-		match    []string
-		noMatch  []string
+		name    string
+		pattern string
+		wantRe  string
+		match   []string
+		noMatch []string
 	}{
 		{
 			name:    "simple_asterisk",
@@ -165,7 +164,7 @@ func TestKeySensor_RunTask_SkipMode(t *testing.T) {
 	t.Parallel()
 
 	ks := NewKeySensor(&mockConnectionGetter{}, "skip")
-	err := ks.RunTask(context.Background(), &pipeline.Pipeline{}, &pipeline.Asset{})
+	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{})
 	require.NoError(t, err)
 }
 
@@ -176,7 +175,7 @@ func TestKeySensor_RunTask_MissingBucketName(t *testing.T) {
 	asset := &pipeline.Asset{
 		Parameters: map[string]string{},
 	}
-	err := ks.RunTask(context.Background(), &pipeline.Pipeline{}, asset)
+	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bucket_name")
 }
@@ -190,7 +189,7 @@ func TestKeySensor_RunTask_MissingBucketKey(t *testing.T) {
 			"bucket_name": "my-bucket",
 		},
 	}
-	err := ks.RunTask(context.Background(), &pipeline.Pipeline{}, asset)
+	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bucket_key")
 }
@@ -209,7 +208,7 @@ func TestKeySensor_RunTask_ConnectionNotFound(t *testing.T) {
 			"bucket_key":  "path/to/file.csv",
 		},
 	}
-	err := ks.RunTask(context.Background(), &pipeline.Pipeline{}, asset)
+	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "does not exist")
 }
@@ -228,7 +227,7 @@ func TestKeySensor_RunTask_WrongConnectionType(t *testing.T) {
 			"bucket_key":  "path/to/file.csv",
 		},
 	}
-	err := ks.RunTask(context.Background(), &pipeline.Pipeline{}, asset)
+	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not an AWS/S3 connection")
 }
@@ -255,7 +254,7 @@ func TestKeySensor_RunTask_AwsConnectionUsesCorrectCredentials(t *testing.T) {
 
 	// This will fail at the S3 HeadObject call since we don't have a real AWS endpoint,
 	// but it should get past connection validation.
-	err := ks.RunTask(context.Background(), &pipeline.Pipeline{}, asset)
+	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	// The error should be from the S3 call, not from connection validation
 	assert.NotContains(t, err.Error(), "does not exist")
@@ -284,7 +283,7 @@ func TestKeySensor_RunTask_S3ConnectionUsesCorrectCredentials(t *testing.T) {
 
 	// This will fail at the S3 call since localhost:9000 isn't running,
 	// but it should get past connection validation.
-	err := ks.RunTask(context.Background(), &pipeline.Pipeline{}, asset)
+	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "does not exist")
 	assert.NotContains(t, err.Error(), "not an AWS/S3 connection")
