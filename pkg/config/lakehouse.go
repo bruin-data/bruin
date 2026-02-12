@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"slices"
 )
 
 type LakehouseFormat string
@@ -36,18 +37,16 @@ type CatalogAuth struct {
 	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
 }
 
-func (auth *CatalogAuth) IsAWS() bool {
-	if auth == nil {
-		return false
-	}
+func (auth CatalogAuth) IsAWS() bool {
 	return auth.AccessKey != "" && auth.SecretKey != ""
 }
 
-func (auth *CatalogAuth) IsPostgres() bool {
-	if auth == nil {
-		return false
-	}
+func (auth CatalogAuth) IsPostgres() bool {
 	return auth.Username != "" && auth.Password != ""
+}
+
+func (auth CatalogAuth) IsZero() bool {
+	return auth == (CatalogAuth{})
 }
 
 type CatalogConfig struct {
@@ -66,7 +65,18 @@ type CatalogConfig struct {
 	Database string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 
 	// Authentication
-	Auth *CatalogAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+	Auth CatalogAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+}
+
+func (c CatalogConfig) IsZero() bool {
+	return c.Type == "" &&
+		c.CatalogID == "" &&
+		c.Region == "" &&
+		c.Path == "" &&
+		c.Host == "" &&
+		c.Port == 0 &&
+		c.Database == "" &&
+		c.Auth.IsZero()
 }
 
 type StorageType string
@@ -76,6 +86,18 @@ const (
 	// Future: StorageTypeGCS, StorageTypeLocal.
 )
 
+var (
+	supportedCatalogTypes = []CatalogType{
+		CatalogTypeGlue,
+		CatalogTypePostgres,
+		CatalogTypeDuckDB,
+		CatalogTypeSQLite,
+	}
+	supportedStorageTypes = []StorageType{
+		StorageTypeS3,
+	}
+)
+
 type StorageAuth struct {
 	// AWS S3 credentials
 	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key"`
@@ -83,65 +105,64 @@ type StorageAuth struct {
 	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token"`
 }
 
-func (a *StorageAuth) IsS3() bool {
-	if a == nil {
-		return false
-	}
+func (a StorageAuth) IsS3() bool {
 	return a.AccessKey != "" && a.SecretKey != ""
 }
 
+func (a StorageAuth) IsZero() bool {
+	return a == (StorageAuth{})
+}
+
 type StorageConfig struct {
-	Type   StorageType  `yaml:"type" json:"type" mapstructure:"type"`
-	Path   string       `yaml:"path,omitempty" json:"path,omitempty" mapstructure:"path"`
-	Region string       `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
-	Auth   *StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+	Type   StorageType `yaml:"type" json:"type" mapstructure:"type"`
+	Path   string      `yaml:"path,omitempty" json:"path,omitempty" mapstructure:"path"`
+	Region string      `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+	Auth   StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+}
+
+func (s StorageConfig) IsZero() bool {
+	return s.Type == "" &&
+		s.Path == "" &&
+		s.Region == "" &&
+		s.Auth.IsZero()
 }
 
 type LakehouseConfig struct {
 	Format  LakehouseFormat `yaml:"format" json:"format" mapstructure:"format"`
-	Catalog *CatalogConfig  `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
-	Storage *StorageConfig  `yaml:"storage,omitempty" json:"storage,omitempty" mapstructure:"storage"`
+	Catalog CatalogConfig   `yaml:"catalog,omitempty" json:"catalog,omitempty" mapstructure:"catalog"`
+	Storage StorageConfig   `yaml:"storage,omitempty" json:"storage,omitempty" mapstructure:"storage"`
+}
+
+func (lh *LakehouseConfig) IsZero() bool {
+	if lh == nil {
+		return true
+	}
+
+	return lh.Format == "" && lh.Catalog.IsZero() && lh.Storage.IsZero()
 }
 
 // Validate performs basic structural validation of the LakehouseConfig (engine-agnostic).
 func (lh *LakehouseConfig) Validate() error {
+	if lh == nil {
+		return nil
+	}
+
 	if lh.Format == "" {
 		return errors.New("lakehouse format is required")
 	}
 
-	switch lh.Format {
-	case LakehouseFormatIceberg:
-		// valid format
-	case LakehouseFormatDuckLake:
-		// valid format
-	default:
+	if !slices.Contains([]LakehouseFormat{LakehouseFormatIceberg, LakehouseFormatDuckLake}, lh.Format) {
 		return fmt.Errorf("unsupported lakehouse format: %s (supported: iceberg, ducklake)", lh.Format)
 	}
 
 	// Validate catalog type if specified
-	if lh.Catalog != nil && lh.Catalog.Type != "" {
-		switch lh.Catalog.Type {
-		case CatalogTypeGlue:
-			// valid catalog type
-		case CatalogTypePostgres:
-			// valid catalog type
-		case CatalogTypeDuckDB:
-			// valid catalog type
-		case CatalogTypeSQLite:
-			// valid catalog type
-		default:
-			return fmt.Errorf("unsupported catalog type: %s (supported: glue, postgres, duckdb, sqlite)", lh.Catalog.Type)
-		}
+	if lh.Catalog.Type == "" || !slices.Contains(supportedCatalogTypes, lh.Catalog.Type) {
+		return errors.New("empty or unsupported catalog type: (supported: glue, postgres, duckdb, sqlite)")
 	}
 
 	// Validate storage type if specified
-	if lh.Storage != nil && lh.Storage.Type != "" {
-		switch lh.Storage.Type {
-		case StorageTypeS3:
-			// valid storage type
-		default:
-			return fmt.Errorf("unsupported storage type: %s (supported: s3)", lh.Storage.Type)
-		}
+	if lh.Storage.Type == "" || !slices.Contains(supportedStorageTypes, lh.Storage.Type) {
+		return errors.New("empty or unsupported storage type: (supported: s3)")
 	}
 
 	return nil

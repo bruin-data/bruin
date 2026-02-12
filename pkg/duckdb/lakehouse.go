@@ -17,53 +17,40 @@ func ValidateLakehouseConfig(lh *config.LakehouseConfig) error {
 	if err := lh.Validate(); err != nil {
 		return err
 	}
-	if lh.Format == config.LakehouseFormatIceberg {
-		return validateIcebergForDuckDB(lh)
-	}
-	if lh.Format == config.LakehouseFormatDuckLake {
-		return validateDuckLakeForDuckDB(lh)
-	}
 
-	return fmt.Errorf("DuckDB does not support lakehouse format: %s", lh.Format)
+	switch lh.Format {
+	case config.LakehouseFormatIceberg:
+		return validateIcebergForDuckDB(*lh)
+	case config.LakehouseFormatDuckLake:
+		return validateDuckLakeForDuckDB(*lh)
+	default:
+		return fmt.Errorf("DuckDB does not support lakehouse format: %s", lh.Format)
+	}
 }
 
-func validateIcebergForDuckDB(lh *config.LakehouseConfig) error {
-	if lh.Catalog == nil {
-		return errors.New("DuckDB iceberg requires catalog configuration")
+func validateIcebergForDuckDB(lh config.LakehouseConfig) error {
+	if lh.Catalog.Type != config.CatalogTypeGlue {
+		return fmt.Errorf("DuckDB iceberg does not support catalog type: '%s' (supported: glue)", lh.Catalog.Type)
 	}
 
-	if lh.Catalog.Type == "" {
-		return errors.New("DuckDB iceberg requires catalog type")
+	if lh.Catalog.CatalogID == "" {
+		return errors.New("DuckDB iceberg with glue catalog requires catalog_id")
+	}
+	if !lh.Catalog.Auth.IsAWS() {
+		return errors.New("DuckDB iceberg with glue catalog requires access_key and secret_key")
 	}
 
-	// supported catalog types and requirements
-	switch lh.Catalog.Type {
-	case config.CatalogTypeGlue:
-		if lh.Catalog.CatalogID == "" {
-			return errors.New("DuckDB iceberg with glue catalog requires catalog_id")
-		}
-	case config.CatalogTypePostgres:
-		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
-	case config.CatalogTypeDuckDB:
-		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
-	case config.CatalogTypeSQLite:
-		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
-	default:
-		return fmt.Errorf("DuckDB iceberg does not support catalog type: %s (supported: glue)", lh.Catalog.Type)
+	if lh.Storage.Type != config.StorageTypeS3 {
+		return fmt.Errorf("DuckDB iceberg does not support storage type: '%s' (supported: s3)", lh.Storage.Type)
+	}
+	if !lh.Storage.Auth.IsS3() {
+		return errors.New("DuckDB iceberg with s3 storage requires access_key and secret_key")
 	}
 
 	return nil
 }
 
-func validateDuckLakeForDuckDB(lh *config.LakehouseConfig) error {
-	if lh.Catalog == nil {
-		return errors.New("DuckDB ducklake requires catalog configuration")
-	}
-
-	if lh.Catalog.Type == "" {
-		return errors.New("DuckDB ducklake requires catalog type")
-	}
-
+func validateDuckLakeForDuckDB(lh config.LakehouseConfig) error {
 	switch lh.Catalog.Type {
 	case config.CatalogTypePostgres:
 		if lh.Catalog.Host == "" {
@@ -72,36 +59,25 @@ func validateDuckLakeForDuckDB(lh *config.LakehouseConfig) error {
 		if lh.Catalog.Database == "" {
 			return errors.New("DuckDB ducklake with postgres catalog requires database")
 		}
-		if lh.Catalog.Auth == nil || !lh.Catalog.Auth.IsPostgres() {
+		if !lh.Catalog.Auth.IsPostgres() {
 			return errors.New("DuckDB ducklake with postgres catalog requires username and password")
 		}
-	case config.CatalogTypeDuckDB:
+	case config.CatalogTypeDuckDB, config.CatalogTypeSQLite:
 		if lh.Catalog.Path == "" {
-			return errors.New("DuckDB ducklake with duckdb catalog requires path")
-		}
-	case config.CatalogTypeSQLite:
-		if lh.Catalog.Path == "" {
-			return errors.New("DuckDB ducklake with sqlite catalog requires path")
+			return fmt.Errorf("DuckDB ducklake with %s catalog requires path", lh.Catalog.Type)
 		}
 	case config.CatalogTypeGlue:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
-	default:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: %s (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: '%s' (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
-	if lh.Storage == nil {
-		return errors.New("DuckDB ducklake requires storage configuration")
+	if lh.Storage.Type != config.StorageTypeS3 {
+		return fmt.Errorf("DuckDB ducklake does not support storage type: '%s' (supported: s3)", lh.Storage.Type)
 	}
-	if lh.Storage.Type == "" {
-		return errors.New("DuckDB ducklake requires storage type")
+	if lh.Storage.Path == "" {
+		return errors.New("DuckDB ducklake with s3 storage requires path")
 	}
-	switch lh.Storage.Type {
-	case config.StorageTypeS3:
-		if lh.Storage.Path == "" {
-			return errors.New("DuckDB ducklake with s3 storage requires path")
-		}
-	default:
-		return fmt.Errorf("DuckDB ducklake does not support storage type: %s (supported: s3)", lh.Storage.Type)
+	if !lh.Storage.Auth.IsS3() {
+		return errors.New("DuckDB ducklake with s3 storage requires access_key and secret_key")
 	}
 
 	return nil
@@ -113,13 +89,18 @@ func NewLakehouseAttacher() *LakehouseAttacher {
 	return &LakehouseAttacher{}
 }
 
+type icebergAttachBuilder func(catalog config.CatalogConfig, alias string) (string, error)
+
+var icebergAttachBuilders = map[config.CatalogType]icebergAttachBuilder{
+	config.CatalogTypeGlue: buildIcebergGlueAttach,
+}
+
 func (l *LakehouseAttacher) GenerateAttachStatements(lh *config.LakehouseConfig, alias string) ([]string, error) {
 	if lh == nil {
 		return nil, nil
 	}
 
-	extensions := l.getRequiredExtensions(lh)
-
+	extensions := l.getRequiredExtensions(*lh)
 	statements := make([]string, 0, len(extensions)*2+3)
 
 	for _, ext := range extensions {
@@ -127,10 +108,10 @@ func (l *LakehouseAttacher) GenerateAttachStatements(lh *config.LakehouseConfig,
 		statements = append(statements, "LOAD "+ext)
 	}
 
-	secretStatements := l.generateSecretStatements(lh, alias)
+	secretStatements := l.generateSecretStatements(*lh, alias)
 	statements = append(statements, secretStatements...)
 
-	attachStmt, err := l.generateAttach(lh, alias)
+	attachStmt, err := l.generateAttach(*lh, alias)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ATTACH statement: %w", err)
 	}
@@ -141,7 +122,7 @@ func (l *LakehouseAttacher) GenerateAttachStatements(lh *config.LakehouseConfig,
 	return statements, nil
 }
 
-func (l *LakehouseAttacher) getRequiredExtensions(lh *config.LakehouseConfig) []string {
+func (l *LakehouseAttacher) getRequiredExtensions(lh config.LakehouseConfig) []string {
 	var extensions []string
 
 	if lh.Format == config.LakehouseFormatIceberg {
@@ -151,21 +132,19 @@ func (l *LakehouseAttacher) getRequiredExtensions(lh *config.LakehouseConfig) []
 		extensions = append(extensions, "ducklake")
 	}
 
-	if lh.Storage != nil && lh.Storage.Type == config.StorageTypeS3 {
-		extensions = append(extensions, "aws")
-		extensions = append(extensions, "httpfs")
+	if lh.Storage.Type == config.StorageTypeS3 {
+		extensions = append(extensions, "aws", "httpfs")
 	}
 
-	if lh.Catalog != nil && lh.Catalog.Type == config.CatalogTypeGlue {
-		if lh.Storage == nil || lh.Storage.Type != config.StorageTypeS3 {
-			extensions = append(extensions, "aws")
-		}
-	}
-	if lh.Catalog != nil && lh.Catalog.Type == config.CatalogTypePostgres {
+	switch lh.Catalog.Type {
+	case config.CatalogTypeGlue:
+		extensions = append(extensions, "aws")
+	case config.CatalogTypePostgres:
 		extensions = append(extensions, "postgres")
-	}
-	if lh.Catalog != nil && lh.Catalog.Type == config.CatalogTypeSQLite {
+	case config.CatalogTypeSQLite:
 		extensions = append(extensions, "sqlite")
+	case config.CatalogTypeDuckDB:
+		// no extension required
 	}
 
 	return l.deduplicateExtensions(extensions)
@@ -183,31 +162,27 @@ func (l *LakehouseAttacher) deduplicateExtensions(extensions []string) []string 
 	return result
 }
 
-func (l *LakehouseAttacher) generateSecretStatements(lh *config.LakehouseConfig, alias string) []string {
+func (l *LakehouseAttacher) generateSecretStatements(lh config.LakehouseConfig, alias string) []string {
 	var statements []string
 
-	// Storage
-	if lh.Storage != nil && lh.Storage.Auth != nil && lh.Storage.Auth.IsS3() {
+	if lh.Storage.Auth.IsS3() {
 		storageSecret := l.generateS3Secret(defaultSecretName(alias, "storage"), lh.Storage)
 		if storageSecret != "" {
 			statements = append(statements, storageSecret)
 		}
 	}
 
-	// Catalog
-	if lh.Catalog != nil && lh.Catalog.Auth != nil {
-		catalogSecret := l.generateCatalogSecret(defaultSecretName(alias, "catalog"), lh.Catalog)
-		if catalogSecret != "" {
-			statements = append(statements, catalogSecret)
-		}
+	catalogSecret := l.generateCatalogSecret(defaultSecretName(alias, "catalog"), lh.Catalog)
+	if catalogSecret != "" {
+		statements = append(statements, catalogSecret)
 	}
 
 	return statements
 }
 
-func (l *LakehouseAttacher) generateS3Secret(name string, storage *config.StorageConfig) string {
+func (l *LakehouseAttacher) generateS3Secret(name string, storage config.StorageConfig) string {
 	auth := storage.Auth
-	if auth.AccessKey == "" || auth.SecretKey == "" {
+	if !auth.IsS3() {
 		return ""
 	}
 
@@ -215,43 +190,41 @@ func (l *LakehouseAttacher) generateS3Secret(name string, storage *config.Storag
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE s3")
 	parts = append(parts, ",   PROVIDER config")
-	parts = append(parts, ",   KEY_ID "+dollarQuote(auth.AccessKey))
-	parts = append(parts, ",   SECRET "+dollarQuote(auth.SecretKey))
+	parts = append(parts, ",   KEY_ID "+quoteSQLStringLiteral(auth.AccessKey))
+	parts = append(parts, ",   SECRET "+quoteSQLStringLiteral(auth.SecretKey))
 
 	if auth.SessionToken != "" {
-		parts = append(parts, ",   SESSION_TOKEN "+dollarQuote(auth.SessionToken))
+		parts = append(parts, ",   SESSION_TOKEN "+quoteSQLStringLiteral(auth.SessionToken))
 	}
 	if storage.Region != "" {
-		parts = append(parts, ",   REGION "+dollarQuote(storage.Region))
+		parts = append(parts, ",   REGION "+quoteSQLStringLiteral(storage.Region))
 	}
 	scope := "s3://"
 	if storage.Path != "" {
 		scope = storage.Path
 	}
-	parts = append(parts, ",   SCOPE "+dollarQuote(scope))
+	parts = append(parts, ",   SCOPE "+quoteSQLStringLiteral(scope))
 
 	parts = append(parts, ")")
 	return strings.Join(parts, "\n")
 }
 
-func (l *LakehouseAttacher) generateCatalogSecret(name string, catalog *config.CatalogConfig) string {
+func (l *LakehouseAttacher) generateCatalogSecret(name string, catalog config.CatalogConfig) string {
 	switch catalog.Type {
 	case config.CatalogTypeGlue:
 		return l.generateGlueSecret(name, catalog)
 	case config.CatalogTypePostgres:
 		return l.generatePostgresSecret(name, catalog)
-	case config.CatalogTypeDuckDB:
-		return ""
-	case config.CatalogTypeSQLite:
+	case config.CatalogTypeDuckDB, config.CatalogTypeSQLite:
 		return ""
 	default:
 		return ""
 	}
 }
 
-func (l *LakehouseAttacher) generateGlueSecret(name string, catalog *config.CatalogConfig) string {
+func (l *LakehouseAttacher) generateGlueSecret(name string, catalog config.CatalogConfig) string {
 	auth := catalog.Auth
-	if auth == nil || !auth.IsAWS() {
+	if !auth.IsAWS() {
 		return ""
 	}
 
@@ -259,24 +232,21 @@ func (l *LakehouseAttacher) generateGlueSecret(name string, catalog *config.Cata
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE s3")
 	parts = append(parts, ",   PROVIDER config")
-	parts = append(parts, ",   KEY_ID "+dollarQuote(auth.AccessKey))
-	parts = append(parts, ",   SECRET "+dollarQuote(auth.SecretKey))
+	parts = append(parts, ",   KEY_ID "+quoteSQLStringLiteral(auth.AccessKey))
+	parts = append(parts, ",   SECRET "+quoteSQLStringLiteral(auth.SecretKey))
 	if auth.SessionToken != "" {
-		parts = append(parts, ",   SESSION_TOKEN "+dollarQuote(auth.SessionToken))
+		parts = append(parts, ",   SESSION_TOKEN "+quoteSQLStringLiteral(auth.SessionToken))
 	}
 	if catalog.Region != "" {
-		parts = append(parts, ",   REGION "+dollarQuote(catalog.Region))
+		parts = append(parts, ",   REGION "+quoteSQLStringLiteral(catalog.Region))
 	}
 	parts = append(parts, ")")
 	return strings.Join(parts, "\n")
 }
 
-func (l *LakehouseAttacher) generatePostgresSecret(name string, catalog *config.CatalogConfig) string {
+func (l *LakehouseAttacher) generatePostgresSecret(name string, catalog config.CatalogConfig) string {
 	auth := catalog.Auth
-	if auth == nil || !auth.IsPostgres() {
-		return ""
-	}
-	if catalog.Host == "" || catalog.Database == "" {
+	if !auth.IsPostgres() || catalog.Host == "" || catalog.Database == "" {
 		return ""
 	}
 
@@ -288,11 +258,11 @@ func (l *LakehouseAttacher) generatePostgresSecret(name string, catalog *config.
 	var parts []string
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE postgres")
-	parts = append(parts, ",   HOST "+dollarQuote(catalog.Host))
+	parts = append(parts, ",   HOST "+quoteSQLStringLiteral(catalog.Host))
 	parts = append(parts, ",   PORT "+strconv.Itoa(port))
-	parts = append(parts, ",   DATABASE "+dollarQuote(catalog.Database))
-	parts = append(parts, ",   USER "+dollarQuote(auth.Username))
-	parts = append(parts, ",   PASSWORD "+dollarQuote(auth.Password))
+	parts = append(parts, ",   DATABASE "+quoteSQLStringLiteral(catalog.Database))
+	parts = append(parts, ",   USER "+quoteSQLStringLiteral(auth.Username))
+	parts = append(parts, ",   PASSWORD "+quoteSQLStringLiteral(auth.Password))
 	parts = append(parts, ")")
 
 	return strings.Join(parts, "\n")
@@ -329,58 +299,38 @@ func sanitizeIdentifier(input string) string {
 	return b.String()
 }
 
-func (l *LakehouseAttacher) generateAttach(lh *config.LakehouseConfig, alias string) (string, error) {
-	if lh.Format == config.LakehouseFormatIceberg {
+func (l *LakehouseAttacher) generateAttach(lh config.LakehouseConfig, alias string) (string, error) {
+	switch lh.Format {
+	case config.LakehouseFormatIceberg:
 		return l.generateIcebergAttach(lh, alias)
-	}
-	if lh.Format == config.LakehouseFormatDuckLake {
+	case config.LakehouseFormatDuckLake:
 		return l.generateDuckLakeAttach(lh, alias)
-	}
-
-	return "", fmt.Errorf("unsupported lakehouse format: %s", lh.Format)
-}
-
-func (l *LakehouseAttacher) generateIcebergAttach(lh *config.LakehouseConfig, alias string) (string, error) {
-	if lh.Catalog == nil {
-		return "", errors.New("iceberg format requires catalog configuration")
-	}
-
-	var options []string
-	options = append(options, "TYPE 'iceberg'")
-
-	switch lh.Catalog.Type {
-	case config.CatalogTypeGlue:
-		// ATTACH '{catalog_id}' AS alias (TYPE 'iceberg', ENDPOINT_TYPE 'glue')
-		options = append(options, "ENDPOINT_TYPE 'glue'")
-		return "ATTACH '" + escapeSQL(lh.Catalog.CatalogID) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
-
-	case config.CatalogTypePostgres:
-		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
-	case config.CatalogTypeDuckDB:
-		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
-	case config.CatalogTypeSQLite:
-		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
 	default:
-		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
+		return "", fmt.Errorf("unsupported lakehouse format: %s", lh.Format)
 	}
 }
 
-func (l *LakehouseAttacher) generateDuckLakeAttach(lh *config.LakehouseConfig, alias string) (string, error) {
-	if lh.Catalog == nil {
-		return "", errors.New("ducklake format requires catalog configuration")
+func (l *LakehouseAttacher) generateIcebergAttach(lh config.LakehouseConfig, alias string) (string, error) {
+	buildAttach, ok := icebergAttachBuilders[lh.Catalog.Type]
+	if !ok {
+		return "", fmt.Errorf("unsupported catalog type for iceberg: %s", lh.Catalog.Type)
 	}
-	if lh.Storage == nil {
-		return "", errors.New("ducklake format requires storage configuration")
-	}
-	if lh.Storage.Path == "" {
-		return "", errors.New("ducklake format requires storage path")
-	}
+
+	return buildAttach(lh.Catalog, alias)
+}
+
+func buildIcebergGlueAttach(catalog config.CatalogConfig, alias string) (string, error) {
+	options := []string{"TYPE 'iceberg'", "ENDPOINT_TYPE 'glue'"}
+	return "ATTACH " + quoteSQLStringLiteral(catalog.CatalogID) + " AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+}
+
+func (l *LakehouseAttacher) generateDuckLakeAttach(lh config.LakehouseConfig, alias string) (string, error) {
 	switch lh.Catalog.Type {
 	case config.CatalogTypePostgres:
 		secretName := defaultSecretName(alias, "catalog")
 		options := []string{
-			"DATA_PATH " + dollarQuote(lh.Storage.Path),
-			"META_SECRET " + dollarQuote(secretName),
+			"DATA_PATH " + quoteSQLStringLiteral(lh.Storage.Path),
+			"META_SECRET " + quoteSQLStringLiteral(secretName),
 			"OVERRIDE_DATA_PATH true",
 		}
 		return "ATTACH 'ducklake:postgres:' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
@@ -391,10 +341,10 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh *config.LakehouseConfig, a
 		}
 		catalogPath = strings.TrimPrefix(catalogPath, "ducklake:")
 		options := []string{
-			"DATA_PATH " + dollarQuote(lh.Storage.Path),
+			"DATA_PATH " + quoteSQLStringLiteral(lh.Storage.Path),
 			"OVERRIDE_DATA_PATH true",
 		}
-		return "ATTACH 'ducklake:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+		return "ATTACH 'ducklake:" + escapeSQLStringLiteral(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
 	case config.CatalogTypeSQLite:
 		catalogPath := strings.TrimSpace(lh.Catalog.Path)
 		if catalogPath == "" {
@@ -403,10 +353,10 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh *config.LakehouseConfig, a
 		catalogPath = strings.TrimPrefix(catalogPath, "ducklake:")
 		catalogPath = strings.TrimPrefix(catalogPath, "sqlite:")
 		options := []string{
-			"DATA_PATH " + dollarQuote(lh.Storage.Path),
+			"DATA_PATH " + quoteSQLStringLiteral(lh.Storage.Path),
 			"OVERRIDE_DATA_PATH true",
 		}
-		return "ATTACH 'ducklake:sqlite:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+		return "ATTACH 'ducklake:sqlite:" + escapeSQLStringLiteral(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
 	case config.CatalogTypeGlue:
 		return "", fmt.Errorf("unsupported catalog type for ducklake: %s", lh.Catalog.Type)
 	default:
@@ -414,12 +364,12 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh *config.LakehouseConfig, a
 	}
 }
 
-// escapeSQL escapes single quotes in SQL strings.
-func escapeSQL(s string) string {
+// escapeSQLStringLiteral escapes single quotes in SQL string literals.
+func escapeSQLStringLiteral(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }
 
-// dollarQuote wraps a string in single quotes with SQL escaping.
-func dollarQuote(s string) string {
-	return "'" + escapeSQL(s) + "'"
+// quoteSQLStringLiteral wraps a string in single quotes with SQL string escaping.
+func quoteSQLStringLiteral(s string) string {
+	return "'" + escapeSQLStringLiteral(s) + "'"
 }
