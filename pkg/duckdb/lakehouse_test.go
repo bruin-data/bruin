@@ -958,7 +958,7 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 	}
 }
 
-func TestEscapeSQL(t *testing.T) {
+func TestEscapeSQLStringLiteral(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -974,12 +974,12 @@ func TestEscapeSQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, escapeSQL(tt.input))
+			assert.Equal(t, tt.want, escapeSQLStringLiteral(tt.input))
 		})
 	}
 }
 
-func TestDollarQuote(t *testing.T) {
+func TestQuoteSQLStringLiteral(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -996,7 +996,7 @@ func TestDollarQuote(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, dollarQuote(tt.input))
+			assert.Equal(t, tt.want, quoteSQLStringLiteral(tt.input))
 		})
 	}
 }

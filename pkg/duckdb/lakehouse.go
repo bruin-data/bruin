@@ -201,20 +201,20 @@ func (l *LakehouseAttacher) generateS3Secret(name string, storage config.Storage
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE s3")
 	parts = append(parts, ",   PROVIDER config")
-	parts = append(parts, ",   KEY_ID "+dollarQuote(auth.AccessKey))
-	parts = append(parts, ",   SECRET "+dollarQuote(auth.SecretKey))
+	parts = append(parts, ",   KEY_ID "+quoteSQLStringLiteral(auth.AccessKey))
+	parts = append(parts, ",   SECRET "+quoteSQLStringLiteral(auth.SecretKey))
 
 	if auth.SessionToken != "" {
-		parts = append(parts, ",   SESSION_TOKEN "+dollarQuote(auth.SessionToken))
+		parts = append(parts, ",   SESSION_TOKEN "+quoteSQLStringLiteral(auth.SessionToken))
 	}
 	if storage.Region != "" {
-		parts = append(parts, ",   REGION "+dollarQuote(storage.Region))
+		parts = append(parts, ",   REGION "+quoteSQLStringLiteral(storage.Region))
 	}
 	scope := "s3://"
 	if storage.Path != "" {
 		scope = storage.Path
 	}
-	parts = append(parts, ",   SCOPE "+dollarQuote(scope))
+	parts = append(parts, ",   SCOPE "+quoteSQLStringLiteral(scope))
 
 	parts = append(parts, ")")
 	return strings.Join(parts, "\n")
@@ -243,13 +243,13 @@ func (l *LakehouseAttacher) generateGlueSecret(name string, catalog config.Catal
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE s3")
 	parts = append(parts, ",   PROVIDER config")
-	parts = append(parts, ",   KEY_ID "+dollarQuote(auth.AccessKey))
-	parts = append(parts, ",   SECRET "+dollarQuote(auth.SecretKey))
+	parts = append(parts, ",   KEY_ID "+quoteSQLStringLiteral(auth.AccessKey))
+	parts = append(parts, ",   SECRET "+quoteSQLStringLiteral(auth.SecretKey))
 	if auth.SessionToken != "" {
-		parts = append(parts, ",   SESSION_TOKEN "+dollarQuote(auth.SessionToken))
+		parts = append(parts, ",   SESSION_TOKEN "+quoteSQLStringLiteral(auth.SessionToken))
 	}
 	if catalog.Region != "" {
-		parts = append(parts, ",   REGION "+dollarQuote(catalog.Region))
+		parts = append(parts, ",   REGION "+quoteSQLStringLiteral(catalog.Region))
 	}
 	parts = append(parts, ")")
 	return strings.Join(parts, "\n")
@@ -269,11 +269,11 @@ func (l *LakehouseAttacher) generatePostgresSecret(name string, catalog config.C
 	var parts []string
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE postgres")
-	parts = append(parts, ",   HOST "+dollarQuote(catalog.Host))
+	parts = append(parts, ",   HOST "+quoteSQLStringLiteral(catalog.Host))
 	parts = append(parts, ",   PORT "+strconv.Itoa(port))
-	parts = append(parts, ",   DATABASE "+dollarQuote(catalog.Database))
-	parts = append(parts, ",   USER "+dollarQuote(auth.Username))
-	parts = append(parts, ",   PASSWORD "+dollarQuote(auth.Password))
+	parts = append(parts, ",   DATABASE "+quoteSQLStringLiteral(catalog.Database))
+	parts = append(parts, ",   USER "+quoteSQLStringLiteral(auth.Username))
+	parts = append(parts, ",   PASSWORD "+quoteSQLStringLiteral(auth.Password))
 	parts = append(parts, ")")
 
 	return strings.Join(parts, "\n")
@@ -332,7 +332,7 @@ func (l *LakehouseAttacher) generateIcebergAttach(lh config.LakehouseConfig, ali
 
 func buildIcebergGlueAttach(catalog config.CatalogConfig, alias string) (string, error) {
 	options := []string{"TYPE 'iceberg'", "ENDPOINT_TYPE 'glue'"}
-	return "ATTACH " + dollarQuote(catalog.CatalogID) + " AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+	return "ATTACH " + quoteSQLStringLiteral(catalog.CatalogID) + " AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
 }
 
 func (l *LakehouseAttacher) generateDuckLakeAttach(lh config.LakehouseConfig, alias string) (string, error) {
@@ -340,8 +340,8 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh config.LakehouseConfig, al
 	case config.CatalogTypePostgres:
 		secretName := defaultSecretName(alias, "catalog")
 		options := []string{
-			"DATA_PATH " + dollarQuote(lh.Storage.Path),
-			"META_SECRET " + dollarQuote(secretName),
+			"DATA_PATH " + quoteSQLStringLiteral(lh.Storage.Path),
+			"META_SECRET " + quoteSQLStringLiteral(secretName),
 			"OVERRIDE_DATA_PATH true",
 		}
 		return "ATTACH 'ducklake:postgres:' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
@@ -352,10 +352,10 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh config.LakehouseConfig, al
 		}
 		catalogPath = strings.TrimPrefix(catalogPath, "ducklake:")
 		options := []string{
-			"DATA_PATH " + dollarQuote(lh.Storage.Path),
+			"DATA_PATH " + quoteSQLStringLiteral(lh.Storage.Path),
 			"OVERRIDE_DATA_PATH true",
 		}
-		return "ATTACH 'ducklake:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+		return "ATTACH 'ducklake:" + escapeSQLStringLiteral(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
 	case config.CatalogTypeSQLite:
 		catalogPath := strings.TrimSpace(lh.Catalog.Path)
 		if catalogPath == "" {
@@ -364,10 +364,10 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh config.LakehouseConfig, al
 		catalogPath = strings.TrimPrefix(catalogPath, "ducklake:")
 		catalogPath = strings.TrimPrefix(catalogPath, "sqlite:")
 		options := []string{
-			"DATA_PATH " + dollarQuote(lh.Storage.Path),
+			"DATA_PATH " + quoteSQLStringLiteral(lh.Storage.Path),
 			"OVERRIDE_DATA_PATH true",
 		}
-		return "ATTACH 'ducklake:sqlite:" + escapeSQL(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+		return "ATTACH 'ducklake:sqlite:" + escapeSQLStringLiteral(catalogPath) + "' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
 	case config.CatalogTypeGlue:
 		return "", fmt.Errorf("unsupported catalog type for ducklake: %s", lh.Catalog.Type)
 	default:
@@ -375,12 +375,12 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh config.LakehouseConfig, al
 	}
 }
 
-// escapeSQL escapes single quotes in SQL strings.
-func escapeSQL(s string) string {
+// escapeSQLStringLiteral escapes single quotes in SQL string literals.
+func escapeSQLStringLiteral(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }
 
-// dollarQuote wraps a string in single quotes with SQL escaping.
-func dollarQuote(s string) string {
-	return "'" + escapeSQL(s) + "'"
+// quoteSQLStringLiteral wraps a string in single quotes with SQL string escaping.
+func quoteSQLStringLiteral(s string) string {
+	return "'" + escapeSQLStringLiteral(s) + "'"
 }
