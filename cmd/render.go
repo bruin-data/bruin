@@ -29,6 +29,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/muesli/termenv"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -392,8 +393,13 @@ func highlightCode(code string, language string) string {
 	if (o.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
 		return code
 	}
+	style := "monokai"
+	if !termenv.HasDarkBackground() {
+		style = "github"
+	}
+
 	b := new(strings.Builder)
-	err = quick.Highlight(b, code, language, "terminal16m", "monokai")
+	err = quick.Highlight(b, code, language, "terminal16m", style)
 	if err != nil {
 		errorPrinter.Printf("Failed to highlight the query: %v\n", err.Error())
 		return code
