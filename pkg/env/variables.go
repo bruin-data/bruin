@@ -37,10 +37,13 @@ func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.A
 	if !ok {
 		return nil, errors.New("start date is required - please provide a valid date")
 	}
-
 	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 	if !ok {
 		return nil, errors.New("end date is required - please provide a valid date")
+	}
+	executionDate, ok := ctx.Value(pipeline.RunConfigExecutionDate).(time.Time)
+	if !ok {
+		return nil, errors.New("execution date is required - please provide a valid date")
 	}
 	runID, ok := ctx.Value(pipeline.RunConfigRunID).(string)
 	if !ok {
@@ -54,12 +57,7 @@ func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.A
 	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
 
-	var execTime *time.Time
-	if et, ok := ctx.Value(pipeline.RunConfigExecutionDate).(time.Time); ok {
-		execTime = &et
-	}
-
-	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, execTime, p.Name, runID, fullRefresh), nil
+	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, &executionDate, p.Name, runID, fullRefresh), nil
 }
 
 func envInjectVariables(env map[string]string, variables map[string]any) (map[string]string, error) {

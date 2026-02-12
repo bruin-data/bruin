@@ -298,7 +298,6 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	connectionName := c.String("connection")
 	s := c.String("start-date")
 	e := c.String("end-date")
-
 	logger := makeLogger(false)
 	startDate, endDate, err := ParseDate(s, e, logger)
 	if err != nil {

@@ -42,7 +42,7 @@ func MCPCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "mcp",
 		Usage:       "Start MCP server for Cursor IDE integration",
-		Description: "Runsstart_datetime a Model Context Protocol server to provide Bruin context to Cursor IDE",
+		Description: "Runs a Model Context Protocol server to provide Bruin context to Cursor IDE",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "debug",
