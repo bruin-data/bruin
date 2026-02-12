@@ -47,6 +47,7 @@ func TestQueryColumnsMatchColumnsPolicy(t *testing.T) { //nolint:paralleltest
 	// Set up context with required values for cloneForAsset
 	ctx := context.WithValue(context.Background(), pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)) //nolint:usetesting
 	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-123")
 	ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
 
@@ -281,6 +282,7 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolin
 	// Set up context with required values for cloneForAsset
 	ctx := context.WithValue(context.Background(), pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)) //nolint:usetesting
 	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-123")
 	ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
 

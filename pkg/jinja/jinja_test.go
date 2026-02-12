@@ -1205,6 +1205,7 @@ func TestRenderer_CloneForAsset_IntervalModifierTemplates(t *testing.T) {
 			ctx := t.Context()
 			ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, tt.startDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, tt.endDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, tt.startDate)
 			ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
 			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
 
