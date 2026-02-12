@@ -83,7 +83,7 @@ This module introduces Bruin as a unified data platform that combines **data ing
 - Bruin = ingestion + transformation + quality + orchestration in one tool
 - Handles pipeline orchestration similar to Airflow (dependency resolution, scheduling, retries)
 - "What if Airbyte, Airflow, dbt, and Great Expectations had a lovechild"
-- Runs locally, on VMs, or in CI/CD—no vendor lock-in
+- Runs locally, on VMs, or in CI/CD with no vendor lock-in
 - Apache-licensed open source
 
 ### 1.3 Bruin Design Principles (Key Takeaways)
@@ -123,7 +123,7 @@ curl -LsSf https://getbruin.com/install/cli | sh
 Verify installation: `bruin version`
 
 If your terminal prints `To use the installed binaries, please restart the shell`, do one of the following:
-- **Restart your terminal** (close + reopen) — simplest and most reliable
+- **Restart your terminal** (close + reopen) - simplest and most reliable
 - **Reload your shell**:
   - `exec $SHELL -l` (works for most shells)
   - zsh: `source ~/.zshrc`
@@ -140,17 +140,139 @@ Please refer to the doc page for more details:
 - https://getbruin.com/docs/bruin/vscode-extension/overview
 - https://getbruin.com/docs/bruin/getting-started/features#vs-code-extension
 
-### 2.2 Project Initialization
-- Initialize the zoomcamp template: `bruin init zoomcamp my-pipeline`
-- Explore the generated structure:
-  - `.bruin.yml` — environment and connection configuration
-  - `pipeline/pipeline.yml` — pipeline name, schedule, variables
-  - `pipeline/assets/` — where your SQL/Python assets live
-  - `pipeline/assets/**/requirements.txt` — Python dependencies (scoped to the nearest folder)
+### 2.2 Your First Pipeline with the Default Template
+
+Let's start by initializing a simple project to learn the basics before diving into the full NYC Taxi pipeline.
+
+**Initialize the default template:**
+```bash
+bruin init default my-first-pipeline
+cd my-first-pipeline
+```
+
+**Explore the generated structure:**
+```text
+my-first-pipeline/
+├── .bruin.yml              # Environment and connection configuration
+├── pipeline.yml            # Pipeline name, schedule, default connections
+└── assets/
+    ├── players.asset.yml   # Ingestr asset (data ingestion)
+    ├── player_stats.sql    # SQL asset with quality checks
+    └── my_python_asset.py  # Python asset
+```
+
+**Understanding the default template:**
+- **`players.asset.yml`**: An ingestr asset that loads chess player data into DuckDB
+- **`player_stats.sql`**: A SQL asset that transforms player data with quality checks
+- **`my_python_asset.py`**: A simple Python asset that prints a message
+
+**Key concepts from this template:**
+1. **Assets are the building blocks**: SQL, Python, or YAML files that represent data artifacts
+2. **Dependencies define execution order**: `player_stats.sql` depends on `players`, so Bruin runs `players` first
+3. **Quality checks are built-in**: `player_stats.sql` includes column checks (`not_null`, `unique`, `positive`)
+4. **Connections are configured once**: `.bruin.yml` defines connections, `pipeline.yml` sets defaults
 
 **Important**: Bruin CLI requires a git-initialized folder (uses git to detect project root); `bruin init` auto-initializes git if needed
 
-### 2.3 Configuration Files Deep Dive
+### 2.3 Bruin CLI Commands & VS Code Extension
+
+Now let's learn the essential commands and how to use the VS Code extension for a visual workflow.
+
+#### Essential CLI Commands
+
+The most common commands you'll use during development:
+
+| Command | Purpose |
+|---------|---------|
+| `bruin validate <path>` | Check syntax and dependencies without running (fast!) |
+| `bruin run <path>` | Execute pipeline or individual asset |
+| `bruin run --downstream` | Run asset and all downstream dependencies |
+| `bruin run --full-refresh` | Truncate and rebuild tables from scratch |
+| `bruin lineage <path>` | View asset dependencies (upstream/downstream) |
+| `bruin query --connection <conn> --query "..."` | Execute ad-hoc SQL queries |
+| `bruin connections list` | List configured connections |
+| `bruin connections ping <name>` | Test connection connectivity |
+
+**Try these commands with your default pipeline:**
+
+```bash
+# Validate the pipeline (catches errors before running)
+bruin validate .
+
+# Run the entire pipeline
+bruin run .
+
+# Run a single asset
+bruin run assets/my_python_asset.py
+
+# Run an asset with its downstream dependencies
+bruin run assets/players.asset.yml --downstream
+
+# Check pipeline lineage
+bruin lineage .
+
+# Query the resulting table
+bruin query --connection duckdb-default --query "SELECT * FROM dataset.player_stats"
+```
+
+**Expected output from `bruin run .`:**
+```
+Starting the pipeline execution...
+
+[18:42:58] Running:  my_python_asset
+[18:42:58] Running:  dataset.players
+[18:42:58] [my_python_asset] >> hello world
+[18:42:58] Finished: my_python_asset (191ms)
+⋮
+[18:43:04] Finished: dataset.player_stats:player_count:not_null (24ms)
+[18:43:04] Finished: dataset.player_stats:player_count:positive (33ms)
+
+==================================================
+
+PASS my_python_asset 
+PASS dataset.players 
+PASS dataset.player_stats .....
+
+bruin run completed successfully in 5.439s
+
+ ✓ Assets executed      3 succeeded
+ ✓ Quality checks       5 succeeded
+```
+
+#### VS Code Extension for Visual Workflow
+
+The Bruin VS Code extension provides a visual, interactive way to manage pipelines without memorizing CLI commands.
+
+**Key Features:**
+
+1. **Action Buttons**: Run and validate assets directly from the editor UI
+2. **Preview Panel**: Automatically shows rendered/compiled queries (Jinja resolved, materialization applied)
+3. **Syntax Highlighting**: Bruin asset definitions are highlighted for readability
+4. **Autocompletion & Snippets**: Type `!fullsqlasset` or `!fullpythonasset` to generate asset templates
+5. **Lineage Panel**: Visual graph showing how assets connect (bottom panel near terminal)
+6. **Query Preview Panel**: Run queries and see results without leaving VS Code
+7. **Database Browser**: Browse connections and table schemas from the Activity Bar
+
+**Running Assets from VS Code:**
+
+1. Open any asset file (`.sql`, `.py`, `.asset.yml`)
+2. Look for the Bruin action buttons in the editor toolbar
+3. Click **Run** to execute the asset or **Validate** to check syntax
+4. The **Preview** section in the side panel automatically shows the rendered/compiled version of your query (Jinja templates resolved, materialization applied)
+5. View execution results in the integrated terminal and Query Preview panel
+
+**Using Snippets:**
+
+- In a `.sql` file: Type `!fullsqlasset` → generates a complete SQL asset template
+- In a `.py` file: Type `!fullpythonasset` → generates a complete Python asset template
+
+**Lineage Panel:**
+
+- Located at the bottom of VS Code (near terminal)
+- Shows upstream (what the asset depends on) and downstream (what depends on the asset)
+- Helps understand impact of changes before running
+
+### 2.4 Configuration Files Deep Dive
 
 #### `.bruin.yml`
 - Defines environments (e.g., `default`, `production`)
@@ -165,11 +287,11 @@ Please refer to the doc page for more details:
 - `default_connections`: Platform-to-connection mappings
 - `variables`: User-defined variables with JSON Schema validation
 
-### 2.4 Connections
-- List connections: `bruin connections list`
-- Add a connection: `bruin connections add`
-- Test connectivity: `bruin connections ping <connection-name>`
-- Default connections reduce repetition across assets
+### 2.5 Connections
+
+Connections are configured in `.bruin.yml` and referenced in `pipeline.yml` or individual assets. Default connections reduce repetition: set them once in `pipeline.yml` and all assets of that type use them automatically.
+
+See the [Key Commands Reference](#key-commands-reference) for connection management commands.
 
 ---
 
@@ -194,29 +316,44 @@ Please refer to the doc page for more details:
 - Apply materialization strategies for incremental processing
 - Add quality checks and declare dependencies
 
-### 3.1 Pipeline Architecture
+### 3.1 Initialize the Zoomcamp Template
+
+Now that you understand the basics from Part 2, let's initialize the full NYC Taxi pipeline:
+
+```bash
+bruin init zoomcamp my-taxi-pipeline
+cd my-taxi-pipeline
+```
+
+The generated structure follows the layered architecture shown in the [Pipeline Skeleton](#pipeline-skeleton) section above. Key differences from the default template:
+- **Layered structure**: Assets organized into `ingestion/`, `staging/`, and `reports/` folders
+- **Real-world data source**: Fetches actual NYC taxi data from public APIs
+- **Pipeline variables**: Uses `taxi_types` variable to configure which taxi types to ingest
+- **Incremental strategies**: Uses `time_interval` materialization for efficient processing
+
+### 3.2 Pipeline Architecture
 - **Ingestion**: Extract raw data from external sources (Python assets, seed CSVs)
 - **Staging**: Clean, normalize, deduplicate, enrich (SQL assets)
 - **Reports**: Aggregate for dashboards and analytics (SQL assets)
-- Assets form a DAG—Bruin executes them in dependency order
+- Assets form a DAG, and Bruin executes them in dependency order
 
-### 3.2 Ingestion Layer
+### 3.3 Ingestion Layer
 - Python asset to fetch NYC Taxi data from the TLC public endpoint
 - Seed asset to load a static payment type lookup table from CSV
 - Use `append` strategy for raw ingestion (handle duplicates downstream)
 - Follow the TODO instructions in `pipeline/assets/ingestion/trips.py` and `pipeline/assets/ingestion/payment_lookup.asset.yml`
 
-### 3.3 Staging Layer
+### 3.4 Staging Layer
 - SQL asset to clean, deduplicate, and join with lookup to enrich raw trip data
 - Use `time_interval` strategy for incremental processing
 - Follow the TODO instructions in `pipeline/assets/staging/trips.sql`
 
-### 3.4 Reports Layer
+### 3.5 Reports Layer
 - SQL asset to aggregate staging data into analytics-ready metrics
 - Use `time_interval` strategy and same `incremental_key` as staging for consistency
 - Follow the TODO instructions in `pipeline/assets/reports/trips_report.sql`
 
-### 3.5 Running and Validating
+### 3.6 Running and Validating
 
 CLI Commands: https://getbruin.com/docs/bruin/commands/run
 
@@ -229,7 +366,7 @@ The `bruin validate` command performs static analysis on your pipeline without e
 - **Connection references**: Validates that referenced connections are defined
 - **Column definitions**: Checks column metadata syntax and types
 
-Run `validate` frequently during development to catch errors early—it's much faster than running the full pipeline.
+Run `validate` frequently during development to catch errors early. It's much faster than running the full pipeline.
 
 ```bash
 # Validate structure & definitions
@@ -262,10 +399,6 @@ bruin lineage ./pipeline/pipeline.yml
 ---
 
 ## Part 4: Data Engineering with AI Agent
-
-> **Data Availability Note**: NYC Taxi trip data is not available after November 2025. Use dates before December 2025 in your prompts.
->
-> **Development Tip**: Start with 1-3 months of data for faster iteration during development. Run a full backfill once your pipeline is complete.
 
 ### Learning Goals
 - Set up Bruin MCP to extend AI assistants with Bruin context
@@ -548,8 +681,8 @@ Bruin supports several materialization strategies. Choose based on your data cha
 | `delete+insert` | Similar to merge but delete-first approach | Deletes matching rows, then inserts |
 
 **For this NYC Taxi pipeline:**
-- **Ingestion layer**: Use `append` — raw data arrives, duplicates handled downstream
-- **Staging/Reports layers**: Use `time_interval` — allows re-processing specific date ranges without full refresh
+- **Ingestion layer**: Use `append` because raw data arrives and duplicates are handled downstream
+- **Staging/Reports layers**: Use `time_interval` to allow re-processing specific date ranges without full refresh
 
 Docs: https://getbruin.com/docs/bruin/assets/materialization
 
@@ -618,7 +751,7 @@ Since there's no unique ID per row in taxi data, you'll need a **composite key**
 
 ### Local Development
 
-- Always validate before running: `bruin validate ./pipeline/pipeline.yml`
-- Use `--full-refresh` for initial runs on new databases
-- Query tables directly to verify results: `bruin query --connection duckdb-default --query "..."`
-- Check lineage to understand impact of changes: `bruin lineage <asset>`
+- **Validate early and often** to catch errors before execution
+- **Use `--full-refresh`** for initial runs on new databases
+- **Query tables directly** to verify results after runs
+- **Check lineage** to understand the impact of changes before running
