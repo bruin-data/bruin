@@ -2338,3 +2338,52 @@ func TestSelectTablesToFetch(t *testing.T) {
 		})
 	}
 }
+
+func TestTruncateQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		query    string
+		expected string
+	}{
+		{
+			name:     "short query",
+			query:    "SELECT * FROM users",
+			expected: "SELECT * FROM users",
+		},
+		{
+			name:     "query with newlines",
+			query:    "SELECT\n  id,\n  name\nFROM users",
+			expected: "SELECT id, name FROM users",
+		},
+		{
+			name:     "query with extra whitespace",
+			query:    "SELECT    id,    name   FROM   users",
+			expected: "SELECT id, name FROM users",
+		},
+		{
+			name:     "long query gets truncated",
+			query:    "SELECT column1, column2, column3, column4, column5 FROM very_long_table_name WHERE some_condition = true AND another_condition = false",
+			expected: "SELECT column1, column2, column3, column4, column5 FROM very_long_table_name WHERE some_condition...",
+		},
+		{
+			name:     "exactly 100 characters",
+			query:    strings.Repeat("a", 100),
+			expected: strings.Repeat("a", 100),
+		},
+		{
+			name:     "101 characters gets truncated",
+			query:    strings.Repeat("a", 101),
+			expected: strings.Repeat("a", 97) + "...",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := truncateQuery(tt.query)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
