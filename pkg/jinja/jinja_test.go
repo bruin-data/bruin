@@ -284,7 +284,7 @@ group by 1`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			receiver := NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "your-pipeline-name", "your-run-id", nil, "")
+			receiver := NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, "your-pipeline-name", "your-run-id", nil)
 			got, err := receiver.Render(tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -1285,7 +1285,7 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
 			ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, tt.fullRefresh)
 
-			baseRenderer := NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, basePipeline.Name, "test-run-id", basePipeline.Variables.Value(), "")
+			baseRenderer := NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, basePipeline.Name, "test-run-id", basePipeline.Variables.Value())
 			clonedRenderer, err := baseRenderer.CloneForAsset(ctx, basePipeline, asset)
 			require.NoError(t, err)
 			require.NotNil(t, clonedRenderer)

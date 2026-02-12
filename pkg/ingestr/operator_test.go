@@ -624,7 +624,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 				conn:          &fetcher,
 				finder:        finder,
 				runner:        runner,
-				jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
+				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil),
 			}
 
 			ti := scheduler.AssetInstance{
