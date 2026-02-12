@@ -252,11 +252,8 @@ func TestKeySensor_RunTask_AwsConnectionUsesCorrectCredentials(t *testing.T) {
 		},
 	}
 
-	// This will fail at the S3 HeadObject call since we don't have a real AWS endpoint,
-	// but it should get past connection validation.
 	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
-	// The error should be from the S3 call, not from connection validation
 	assert.NotContains(t, err.Error(), "does not exist")
 	assert.NotContains(t, err.Error(), "not an AWS/S3 connection")
 }
@@ -281,15 +278,12 @@ func TestKeySensor_RunTask_S3ConnectionUsesCorrectCredentials(t *testing.T) {
 		},
 	}
 
-	// This will fail at the S3 call since localhost:9000 isn't running,
-	// but it should get past connection validation.
 	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "does not exist")
 	assert.NotContains(t, err.Error(), "not an AWS/S3 connection")
 }
 
-// mockConnectionGetter implements config.ConnectionAndDetailsGetter for testing.
 type mockConnectionGetter struct {
 	details any
 }
