@@ -1312,6 +1312,7 @@ func TestPythonEnvVariables_FullRefresh(t *testing.T) {
 
 	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
 		name                      string
@@ -1334,7 +1335,7 @@ func TestPythonEnvVariables_FullRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			envVars := PythonEnvVariables(&startDate, &endDate, nil, "test-pipeline", "test-run-id", tt.fullRefresh)
+			envVars := PythonEnvVariables(&startDate, &endDate, , "test-pipeline", "test-run-id", tt.fullRefresh)
 
 			// Verify BRUIN_FULL_REFRESH is set correctly
 			require.Equal(t, tt.expectedFullRefreshEnvVar, envVars["BRUIN_FULL_REFRESH"])
