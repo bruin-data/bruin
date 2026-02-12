@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/muesli/termenv"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
@@ -392,8 +393,13 @@ func highlightCode(code string, language string) string {
 	if (o.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
 		return code
 	}
+	style := "monokai"
+	if !termenv.HasDarkBackground() {
+		style = "pygments"
+	}
+
 	b := new(strings.Builder)
-	err = quick.Highlight(b, code, language, "terminal16m", "monokai")
+	err = quick.Highlight(b, code, language, "terminal16m", style)
 	if err != nil {
 		errorPrinter.Printf("Failed to highlight the query: %v\n", err.Error())
 		return code
