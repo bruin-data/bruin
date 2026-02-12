@@ -50,6 +50,7 @@ require (
 	github.com/kluctl/go-embed-python v0.0.0-3.13.1-20241219-1
 	github.com/manifoldco/promptui v0.9.0
 	github.com/microsoft/go-mssqldb v1.8.2
+	github.com/muesli/termenv v0.16.0
 	github.com/nikolalohinski/gonja/v2 v2.3.4
 	github.com/pashagolub/pgxmock/v3 v3.4.0
 	github.com/pkg/errors v0.9.1
@@ -294,7 +295,6 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nakabonne/nestif v0.3.1 // indirect
 	github.com/nishanths/exhaustive v0.12.0 // indirect
 	github.com/nishanths/predeclared v0.2.2 // indirect

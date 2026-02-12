@@ -17,6 +17,11 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 		errMsg  string
 	}{
 		{
+			name:    "nil config is valid",
+			lh:      nil,
+			wantErr: false,
+		},
+		{
 			name:    "empty format returns error",
 			lh:      &LakehouseConfig{},
 			wantErr: true,
@@ -31,64 +36,18 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			errMsg:  "unsupported lakehouse format",
 		},
 		{
-			name: "iceberg format is valid",
+			name: "missing catalog type fails",
 			lh: &LakehouseConfig{
 				Format: LakehouseFormatIceberg,
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsg:  "empty or unsupported catalog type",
 		},
 		{
-			name: "ducklake format is valid",
-			lh: &LakehouseConfig{
-				Format: LakehouseFormatDuckLake,
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid catalog type passes",
+			name: "unsupported catalog type fails",
 			lh: &LakehouseConfig{
 				Format: LakehouseFormatIceberg,
-				Catalog: &CatalogConfig{
-					Type: CatalogTypeGlue,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid postgres catalog type passes",
-			lh: &LakehouseConfig{
-				Format: LakehouseFormatDuckLake,
-				Catalog: &CatalogConfig{
-					Type: CatalogTypePostgres,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid duckdb catalog type passes",
-			lh: &LakehouseConfig{
-				Format: LakehouseFormatDuckLake,
-				Catalog: &CatalogConfig{
-					Type: CatalogTypeDuckDB,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid sqlite catalog type passes",
-			lh: &LakehouseConfig{
-				Format: LakehouseFormatDuckLake,
-				Catalog: &CatalogConfig{
-					Type: CatalogTypeSQLite,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "invalid catalog type fails",
-			lh: &LakehouseConfig{
-				Format: LakehouseFormatIceberg,
-				Catalog: &CatalogConfig{
+				Catalog: CatalogConfig{
 					Type: CatalogType("invalid"),
 				},
 			},
@@ -96,20 +55,24 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			errMsg:  "unsupported catalog type",
 		},
 		{
-			name: "valid storage type passes",
+			name: "missing storage type fails",
 			lh: &LakehouseConfig{
 				Format: LakehouseFormatIceberg,
-				Storage: &StorageConfig{
-					Type: StorageTypeS3,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeGlue,
 				},
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsg:  "empty or unsupported storage type",
 		},
 		{
-			name: "invalid storage type fails",
+			name: "unsupported storage type fails",
 			lh: &LakehouseConfig{
 				Format: LakehouseFormatIceberg,
-				Storage: &StorageConfig{
+				Catalog: CatalogConfig{
+					Type: CatalogTypeGlue,
+				},
+				Storage: StorageConfig{
 					Type: StorageType("invalid"),
 				},
 			},
@@ -117,23 +80,54 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			errMsg:  "unsupported storage type",
 		},
 		{
-			name: "empty catalog type is valid (engine-specific validation)",
-			lh: &LakehouseConfig{
-				Format:  LakehouseFormatIceberg,
-				Catalog: &CatalogConfig{},
-			},
-			wantErr: false,
-		},
-		{
 			name: "full config is valid",
 			lh: &LakehouseConfig{
 				Format: LakehouseFormatIceberg,
-				Catalog: &CatalogConfig{
+				Catalog: CatalogConfig{
 					Type:      CatalogTypeGlue,
 					CatalogID: "123456789012",
 					Region:    "us-east-1",
 				},
-				Storage: &StorageConfig{
+				Storage: StorageConfig{
+					Type: StorageTypeS3,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "ducklake with postgres catalog type is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypePostgres,
+				},
+				Storage: StorageConfig{
+					Type: StorageTypeS3,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "ducklake with duckdb catalog type is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeDuckDB,
+				},
+				Storage: StorageConfig{
+					Type: StorageTypeS3,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "ducklake with sqlite catalog type is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeSQLite,
+				},
+				Storage: StorageConfig{
 					Type: StorageTypeS3,
 				},
 			},
@@ -186,15 +180,14 @@ func TestCatalogAuth_IsAWS(t *testing.T) {
 
 	tests := []struct {
 		name string
-		auth *CatalogAuth
+		auth CatalogAuth
 		want bool
 	}{
-		{"nil auth", nil, false},
-		{"empty auth", &CatalogAuth{}, false},
-		{"with access and secret key", &CatalogAuth{AccessKey: "AKIA...", SecretKey: "secret"}, true},
-		{"only access key", &CatalogAuth{AccessKey: "AKIA..."}, false},
-		{"only secret key", &CatalogAuth{SecretKey: "secret"}, false},
-		{"postgres creds do not count as aws", &CatalogAuth{Username: "user", Password: "pass"}, false},
+		{"empty auth", CatalogAuth{}, false},
+		{"with access and secret key", CatalogAuth{AccessKey: "AKIA...", SecretKey: "secret"}, true},
+		{"only access key", CatalogAuth{AccessKey: "AKIA..."}, false},
+		{"only secret key", CatalogAuth{SecretKey: "secret"}, false},
+		{"postgres creds do not count as aws", CatalogAuth{Username: "user", Password: "pass"}, false},
 	}
 
 	for _, tt := range tests {
@@ -210,14 +203,13 @@ func TestCatalogAuth_IsPostgres(t *testing.T) {
 
 	tests := []struct {
 		name string
-		auth *CatalogAuth
+		auth CatalogAuth
 		want bool
 	}{
-		{"nil auth", nil, false},
-		{"empty auth", &CatalogAuth{}, false},
-		{"with username and password", &CatalogAuth{Username: "user", Password: "pass"}, true},
-		{"only username", &CatalogAuth{Username: "user"}, false},
-		{"only password", &CatalogAuth{Password: "pass"}, false},
+		{"empty auth", CatalogAuth{}, false},
+		{"with username and password", CatalogAuth{Username: "user", Password: "pass"}, true},
+		{"only username", CatalogAuth{Username: "user"}, false},
+		{"only password", CatalogAuth{Password: "pass"}, false},
 	}
 
 	for _, tt := range tests {
@@ -233,13 +225,12 @@ func TestStorageAuth_IsS3(t *testing.T) {
 
 	tests := []struct {
 		name string
-		auth *StorageAuth
+		auth StorageAuth
 		want bool
 	}{
-		{"nil auth", nil, false},
-		{"empty auth", &StorageAuth{}, false},
-		{"with access and secret key", &StorageAuth{AccessKey: "AKIA...", SecretKey: "secret"}, true},
-		{"only access key", &StorageAuth{AccessKey: "AKIA..."}, false},
+		{"empty auth", StorageAuth{}, false},
+		{"with access and secret key", StorageAuth{AccessKey: "AKIA...", SecretKey: "secret"}, true},
+		{"only access key", StorageAuth{AccessKey: "AKIA..."}, false},
 	}
 
 	for _, tt := range tests {

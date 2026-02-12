@@ -8,219 +8,227 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func validIcebergLakehouseConfig() *config.LakehouseConfig {
+	return &config.LakehouseConfig{
+		Format: config.LakehouseFormatIceberg,
+		Catalog: config.CatalogConfig{
+			Type:      config.CatalogTypeGlue,
+			CatalogID: "123456789012",
+			Auth: config.CatalogAuth{
+				AccessKey: "AKIAEXAMPLE",
+				SecretKey: "secret",
+			},
+		},
+		Storage: config.StorageConfig{
+			Type: config.StorageTypeS3,
+			Path: "s3://warehouse",
+			Auth: config.StorageAuth{
+				AccessKey: "AKIAEXAMPLE",
+				SecretKey: "secret",
+			},
+		},
+	}
+}
+
+func validDuckLakePostgresConfig() *config.LakehouseConfig {
+	return &config.LakehouseConfig{
+		Format: config.LakehouseFormatDuckLake,
+		Catalog: config.CatalogConfig{
+			Type:     config.CatalogTypePostgres,
+			Host:     "localhost",
+			Port:     5432,
+			Database: "ducklake_catalog",
+			Auth: config.CatalogAuth{
+				Username: "ducklake_user",
+				Password: "ducklake_password",
+			},
+		},
+		Storage: config.StorageConfig{
+			Type: config.StorageTypeS3,
+			Path: "s3://warehouse",
+			Auth: config.StorageAuth{
+				AccessKey: "AKIAEXAMPLE",
+				SecretKey: "secret",
+			},
+		},
+	}
+}
+
+func validDuckLakeDuckDBConfig() *config.LakehouseConfig {
+	cfg := validDuckLakePostgresConfig()
+	cfg.Catalog = config.CatalogConfig{
+		Type: config.CatalogTypeDuckDB,
+		Path: "metadata.ducklake",
+	}
+	return cfg
+}
+
+func validDuckLakeSQLiteConfig() *config.LakehouseConfig {
+	cfg := validDuckLakePostgresConfig()
+	cfg.Catalog = config.CatalogConfig{
+		Type: config.CatalogTypeSQLite,
+		Path: "metadata.sqlite",
+	}
+	return cfg
+}
+
 func TestValidateLakehouseConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
-		lh      *config.LakehouseConfig
+		build   func() *config.LakehouseConfig
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name:    "nil config is valid",
-			lh:      nil,
+			build:   func() *config.LakehouseConfig { return nil },
 			wantErr: false,
 		},
 		{
 			name:    "empty format fails generic validation",
-			lh:      &config.LakehouseConfig{},
+			build:   func() *config.LakehouseConfig { return &config.LakehouseConfig{} },
 			wantErr: true,
 			errMsg:  "lakehouse format is required",
 		},
-		// Iceberg validation
 		{
-			name: "iceberg without catalog fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatIceberg,
+			name: "iceberg missing catalog type fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Catalog.Type = ""
+				return cfg
 			},
 			wantErr: true,
-			errMsg:  "DuckDB iceberg requires catalog configuration",
+			errMsg:  "empty or unsupported catalog type",
 		},
 		{
-			name: "iceberg with empty catalog type fails",
-			lh: &config.LakehouseConfig{
-				Format:  config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{},
+			name: "iceberg missing storage type fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Storage.Type = ""
+				return cfg
 			},
 			wantErr: true,
-			errMsg:  "DuckDB iceberg requires catalog type",
-		},
-		{
-			name: "iceberg with glue but no catalog_id fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
-					Type: config.CatalogTypeGlue,
-				},
-			},
-			wantErr: true,
-			errMsg:  "DuckDB iceberg with glue catalog requires catalog_id",
-		},
-		{
-			name: "iceberg with glue and catalog_id passes",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
-					Type:      config.CatalogTypeGlue,
-					CatalogID: "123456789012",
-				},
-			},
-			wantErr: false,
+			errMsg:  "empty or unsupported storage type",
 		},
 		{
 			name: "iceberg with unsupported catalog type fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
-					Type: config.CatalogType("rest"),
-				},
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Catalog.Type = config.CatalogTypePostgres
+				return cfg
 			},
 			wantErr: true,
-			errMsg:  "unsupported catalog type",
-		},
-		// DuckLake validation
-		{
-			name: "ducklake without catalog fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-			},
-			wantErr: true,
-			errMsg:  "DuckDB ducklake requires catalog configuration",
+			errMsg:  "DuckDB iceberg does not support catalog type",
 		},
 		{
-			name: "ducklake without storage fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
-					Type:     config.CatalogTypePostgres,
-					Host:     "localhost",
-					Database: "ducklake_catalog",
-					Auth: &config.CatalogAuth{
-						Username: "ducklake_user",
-						Password: "ducklake_password",
-					},
-				},
+			name: "iceberg with glue but no catalog_id fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Catalog.CatalogID = ""
+				return cfg
 			},
 			wantErr: true,
-			errMsg:  "DuckDB ducklake requires storage configuration",
+			errMsg:  "requires catalog_id",
 		},
 		{
-			name: "ducklake with postgres missing credentials fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
-					Type:     config.CatalogTypePostgres,
-					Host:     "localhost",
-					Database: "ducklake_catalog",
-				},
-				Storage: &config.StorageConfig{
-					Type: config.StorageTypeS3,
-					Path: "s3://ducklake/warehouse",
-				},
+			name: "iceberg with glue but no catalog auth fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Catalog.Auth = config.CatalogAuth{}
+				return cfg
 			},
 			wantErr: true,
-			errMsg:  "DuckDB ducklake with postgres catalog requires username and password",
+			errMsg:  "with glue catalog requires access_key and secret_key",
 		},
 		{
-			name: "ducklake with s3 storage missing path fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
-					Type:     config.CatalogTypePostgres,
-					Host:     "localhost",
-					Database: "ducklake_catalog",
-					Auth: &config.CatalogAuth{
-						Username: "ducklake_user",
-						Password: "ducklake_password",
-					},
-				},
-				Storage: &config.StorageConfig{
-					Type: config.StorageTypeS3,
-				},
+			name: "iceberg with glue but no storage auth fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Storage.Auth = config.StorageAuth{}
+				return cfg
 			},
 			wantErr: true,
-			errMsg:  "DuckDB ducklake with s3 storage requires path",
+			errMsg:  "with s3 storage requires access_key and secret_key",
+		},
+		{
+			name: "iceberg with glue, s3 auth and no storage path passes",
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Storage.Path = ""
+				return cfg
+			},
+			wantErr: false,
+		},
+		{
+			name:    "iceberg with glue, s3 and auth passes",
+			build:   validIcebergLakehouseConfig,
+			wantErr: false,
+		},
+		{
+			name: "ducklake with unsupported catalog type fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakePostgresConfig()
+				cfg.Catalog.Type = config.CatalogTypeGlue
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "DuckDB ducklake does not support catalog type",
+		},
+		{
+			name: "ducklake postgres missing catalog auth fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakePostgresConfig()
+				cfg.Catalog.Auth = config.CatalogAuth{}
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "requires username and password",
 		},
 		{
 			name: "ducklake with duckdb missing path fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
-					Type: config.CatalogTypeDuckDB,
-				},
-				Storage: &config.StorageConfig{
-					Type: config.StorageTypeS3,
-					Path: "s3://ducklake/warehouse",
-				},
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakeDuckDBConfig()
+				cfg.Catalog.Path = ""
+				return cfg
 			},
 			wantErr: true,
-			errMsg:  "DuckDB ducklake with duckdb catalog requires path",
+			errMsg:  "requires path",
 		},
 		{
-			name: "ducklake with sqlite missing path fails",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
-					Type: config.CatalogTypeSQLite,
-				},
-				Storage: &config.StorageConfig{
-					Type: config.StorageTypeS3,
-					Path: "s3://ducklake/warehouse",
-				},
+			name: "ducklake with s3 storage missing auth fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakePostgresConfig()
+				cfg.Storage.Auth = config.StorageAuth{}
+				return cfg
 			},
 			wantErr: true,
-			errMsg:  "DuckDB ducklake with sqlite catalog requires path",
+			errMsg:  "with s3 storage requires access_key and secret_key",
 		},
 		{
-			name: "ducklake with postgres and s3 storage passes",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
-					Type:     config.CatalogTypePostgres,
-					Host:     "localhost",
-					Port:     5432,
-					Database: "ducklake_catalog",
-					Auth: &config.CatalogAuth{
-						Username: "ducklake_user",
-						Password: "ducklake_password",
-					},
-				},
-				Storage: &config.StorageConfig{
-					Type: config.StorageTypeS3,
-					Path: "s3://ducklake/warehouse",
-				},
+			name: "ducklake with s3 storage missing path fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakePostgresConfig()
+				cfg.Storage.Path = ""
+				return cfg
 			},
+			wantErr: true,
+			errMsg:  "with s3 storage requires path",
+		},
+		{
+			name:    "ducklake with postgres and s3 storage passes",
+			build:   validDuckLakePostgresConfig,
 			wantErr: false,
 		},
 		{
-			name: "ducklake with duckdb and s3 storage passes",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
-					Type: config.CatalogTypeDuckDB,
-					Path: "metadata.ducklake",
-				},
-				Storage: &config.StorageConfig{
-					Type: config.StorageTypeS3,
-					Path: "s3://ducklake/warehouse",
-				},
-			},
+			name:    "ducklake with duckdb catalog and s3 storage passes",
+			build:   validDuckLakeDuckDBConfig,
 			wantErr: false,
 		},
 		{
-			name: "ducklake with sqlite and s3 storage passes",
-			lh: &config.LakehouseConfig{
-				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
-					Type: config.CatalogTypeSQLite,
-					Path: "metadata.sqlite",
-				},
-				Storage: &config.StorageConfig{
-					Type: config.StorageTypeS3,
-					Path: "s3://ducklake/warehouse",
-				},
-			},
+			name:    "ducklake with sqlite catalog and s3 storage passes",
+			build:   validDuckLakeSQLiteConfig,
 			wantErr: false,
 		},
 	}
@@ -228,7 +236,7 @@ func TestValidateLakehouseConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := ValidateLakehouseConfig(tt.lh)
+			err := ValidateLakehouseConfig(tt.build())
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -252,10 +260,10 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 			name: "iceberg with glue and s3",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeGlue,
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type: config.StorageTypeS3,
 				},
 			},
@@ -265,7 +273,7 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 			name: "iceberg with glue only (no storage)",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeGlue,
 				},
 			},
@@ -275,10 +283,10 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 			name: "ducklake with postgres and s3",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypePostgres,
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type: config.StorageTypeS3,
 				},
 			},
@@ -288,11 +296,11 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 			name: "ducklake with duckdb and s3",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeDuckDB,
 					Path: "metadata.ducklake",
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type: config.StorageTypeS3,
 				},
 			},
@@ -302,11 +310,11 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 			name: "ducklake with sqlite and s3",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeSQLite,
 					Path: "metadata.sqlite",
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type: config.StorageTypeS3,
 				},
 			},
@@ -318,7 +326,7 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			attacher := NewLakehouseAttacher()
-			extensions := attacher.getRequiredExtensions(tt.lh)
+			extensions := attacher.getRequiredExtensions(*tt.lh)
 
 			for _, ext := range tt.wantExts {
 				assert.Contains(t, extensions, ext)
@@ -341,7 +349,7 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 			storage: &config.StorageConfig{
 				Type:   config.StorageTypeS3,
 				Region: "us-east-1",
-				Auth: &config.StorageAuth{
+				Auth: config.StorageAuth{
 					AccessKey: "AKIAIOSFODNN7EXAMPLE",
 					SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 				},
@@ -360,7 +368,7 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 			storage: &config.StorageConfig{
 				Type:   config.StorageTypeS3,
 				Region: "us-west-2",
-				Auth: &config.StorageAuth{
+				Auth: config.StorageAuth{
 					AccessKey:    "AKIAIOSFODNN7EXAMPLE",
 					SecretKey:    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 					SessionToken: "FwoGZXIvYXdzEBYaDPe...",
@@ -381,7 +389,7 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 			storage: &config.StorageConfig{
 				Type: config.StorageTypeS3,
 				Path: "s3://ducklake/warehouse",
-				Auth: &config.StorageAuth{
+				Auth: config.StorageAuth{
 					AccessKey: "AKIAIOSFODNN7EXAMPLE",
 					SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 				},
@@ -398,7 +406,7 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 			name: "s3 without credentials returns empty",
 			storage: &config.StorageConfig{
 				Type: config.StorageTypeS3,
-				Auth: &config.StorageAuth{},
+				Auth: config.StorageAuth{},
 			},
 			want: "",
 		},
@@ -407,7 +415,7 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := attacher.generateS3Secret("test_secret", tt.storage)
+			result := attacher.generateS3Secret("test_secret", *tt.storage)
 			assert.Equal(t, tt.want, result)
 		})
 	}
@@ -422,7 +430,7 @@ func TestLakehouseAttacher_GeneratePostgresSecret(t *testing.T) {
 		Host:     "localhost",
 		Port:     5432,
 		Database: "ducklake_catalog",
-		Auth: &config.CatalogAuth{
+		Auth: config.CatalogAuth{
 			Username: "ducklake_user",
 			Password: "ducklake_password",
 		},
@@ -437,7 +445,7 @@ func TestLakehouseAttacher_GeneratePostgresSecret(t *testing.T) {
 ,   PASSWORD 'ducklake_password'
 )`
 
-	result := attacher.generateCatalogSecret("test_secret", catalog)
+	result := attacher.generateCatalogSecret("test_secret", *catalog)
 	assert.Equal(t, want, result)
 }
 
@@ -448,7 +456,7 @@ func TestLakehouseAttacher_GenerateGlueSecret(t *testing.T) {
 	catalog := &config.CatalogConfig{
 		Type:   config.CatalogTypeGlue,
 		Region: "us-east-1",
-		Auth: &config.CatalogAuth{
+		Auth: config.CatalogAuth{
 			AccessKey: "AKIAIOSFODNN7EXAMPLE",
 			SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 		},
@@ -462,7 +470,7 @@ func TestLakehouseAttacher_GenerateGlueSecret(t *testing.T) {
 ,   REGION 'us-east-1'
 )`
 
-	result := attacher.generateGlueSecret("test_secret", catalog)
+	result := attacher.generateGlueSecret("test_secret", *catalog)
 	assert.Equal(t, want, result)
 }
 
@@ -481,7 +489,7 @@ func TestLakehouseAttacher_GenerateIcebergAttach(t *testing.T) {
 			name: "iceberg with glue catalog",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type:      config.CatalogTypeGlue,
 					CatalogID: "123456789012",
 					Region:    "us-east-1",
@@ -494,7 +502,7 @@ func TestLakehouseAttacher_GenerateIcebergAttach(t *testing.T) {
 			name: "iceberg with glue catalog no region",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type:      config.CatalogTypeGlue,
 					CatalogID: "123456789012",
 				},
@@ -515,7 +523,7 @@ func TestLakehouseAttacher_GenerateIcebergAttach(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := attacher.generateIcebergAttach(tt.lh, tt.alias)
+			result, err := attacher.generateIcebergAttach(*tt.lh, tt.alias)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -542,16 +550,16 @@ func TestLakehouseAttacher_GenerateDuckLakeAttach(t *testing.T) {
 			name: "postgres catalog",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type:     config.CatalogTypePostgres,
 					Host:     "localhost",
 					Database: "ducklake_catalog",
-					Auth: &config.CatalogAuth{
+					Auth: config.CatalogAuth{
 						Username: "ducklake_user",
 						Password: "ducklake_password",
 					},
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type: config.StorageTypeS3,
 					Path: "s3://ducklake/warehouse",
 				},
@@ -563,11 +571,11 @@ func TestLakehouseAttacher_GenerateDuckLakeAttach(t *testing.T) {
 			name: "duckdb catalog",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeDuckDB,
 					Path: "metadata.ducklake",
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type: config.StorageTypeS3,
 					Path: "s3://ducklake/warehouse",
 				},
@@ -579,11 +587,11 @@ func TestLakehouseAttacher_GenerateDuckLakeAttach(t *testing.T) {
 			name: "sqlite catalog",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeSQLite,
 					Path: "metadata.sqlite",
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type: config.StorageTypeS3,
 					Path: "s3://ducklake/warehouse",
 				},
@@ -595,11 +603,11 @@ func TestLakehouseAttacher_GenerateDuckLakeAttach(t *testing.T) {
 			name: "sqlite catalog with ducklake prefix",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeSQLite,
 					Path: "ducklake:sqlite:metadata.sqlite",
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type: config.StorageTypeS3,
 					Path: "s3://ducklake/warehouse",
 				},
@@ -612,7 +620,7 @@ func TestLakehouseAttacher_GenerateDuckLakeAttach(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := attacher.generateDuckLakeAttach(tt.lh, tt.alias)
+			result, err := attacher.generateDuckLakeAttach(*tt.lh, tt.alias)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, result)
 		})
@@ -642,15 +650,15 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 			name: "iceberg with glue, s3 storage and credentials",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type:      config.CatalogTypeGlue,
 					CatalogID: "123456789012",
 					Region:    "us-east-1",
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type:   config.StorageTypeS3,
 					Region: "us-east-1",
-					Auth: &config.StorageAuth{
+					Auth: config.StorageAuth{
 						AccessKey: "AKIAEXAMPLE",
 						SecretKey: "secretkey",
 					},
@@ -676,7 +684,7 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 			name: "iceberg with glue only (no storage auth)",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatIceberg,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type:      config.CatalogTypeGlue,
 					CatalogID: "123456789012",
 					Region:    "us-east-1",
@@ -698,20 +706,20 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 			name: "ducklake with postgres and s3 storage",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type:     config.CatalogTypePostgres,
 					Host:     "localhost",
 					Database: "ducklake_catalog",
-					Auth: &config.CatalogAuth{
+					Auth: config.CatalogAuth{
 						Username: "ducklake_user",
 						Password: "ducklake_password",
 					},
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type:   config.StorageTypeS3,
 					Path:   "s3://ducklake/warehouse",
 					Region: "us-east-1",
-					Auth: &config.StorageAuth{
+					Auth: config.StorageAuth{
 						AccessKey: "AKIAEXAMPLE",
 						SecretKey: "secretkey",
 					},
@@ -741,15 +749,15 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 			name: "ducklake with duckdb and s3 storage",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeDuckDB,
 					Path: "metadata.ducklake",
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type:   config.StorageTypeS3,
 					Path:   "s3://ducklake/warehouse",
 					Region: "us-east-1",
-					Auth: &config.StorageAuth{
+					Auth: config.StorageAuth{
 						AccessKey: "AKIAEXAMPLE",
 						SecretKey: "secretkey",
 					},
@@ -775,15 +783,15 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 			name: "ducklake with sqlite and s3 storage",
 			lh: &config.LakehouseConfig{
 				Format: config.LakehouseFormatDuckLake,
-				Catalog: &config.CatalogConfig{
+				Catalog: config.CatalogConfig{
 					Type: config.CatalogTypeSQLite,
 					Path: "metadata.sqlite",
 				},
-				Storage: &config.StorageConfig{
+				Storage: config.StorageConfig{
 					Type:   config.StorageTypeS3,
 					Path:   "s3://ducklake/warehouse",
 					Region: "us-east-1",
-					Auth: &config.StorageAuth{
+					Auth: config.StorageAuth{
 						AccessKey: "AKIAEXAMPLE",
 						SecretKey: "secretkey",
 					},
@@ -840,7 +848,7 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 	}
 }
 
-func TestEscapeSQL(t *testing.T) {
+func TestEscapeSQLStringLiteral(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -856,12 +864,12 @@ func TestEscapeSQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, escapeSQL(tt.input))
+			assert.Equal(t, tt.want, escapeSQLStringLiteral(tt.input))
 		})
 	}
 }
 
-func TestDollarQuote(t *testing.T) {
+func TestQuoteSQLStringLiteral(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -878,7 +886,7 @@ func TestDollarQuote(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, dollarQuote(tt.input))
+			assert.Equal(t, tt.want, quoteSQLStringLiteral(tt.input))
 		})
 	}
 }
