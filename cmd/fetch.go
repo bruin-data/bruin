@@ -307,7 +307,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	extractor := &query.WholeFileExtractor{
 		Fs: fs,
 		// note: we don't support variables for now
-		Renderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, "your-pipeline-name", "your-run-id", nil, ""),
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, "your-pipeline-name", "your-run-id", nil),
 	}
 
 	// Direct query mode (no asset path)
@@ -337,7 +337,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 		extractor = &query.WholeFileExtractor{
 			Fs: fs,
 			// note: we don't support variables for now
-			Renderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil, ""),
+			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 		}
 
 		newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
@@ -371,7 +371,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	extractor = &query.WholeFileExtractor{
 		Fs: fs,
 		// note: we don't support variables for now
-		Renderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil, ""),
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 	}
 	newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
 	if err != nil {
