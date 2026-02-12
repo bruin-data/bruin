@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
-	"github.com/muesli/termenv"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
@@ -30,6 +29,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/muesli/termenv"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -395,7 +395,7 @@ func highlightCode(code string, language string) string {
 	}
 	style := "monokai"
 	if !termenv.HasDarkBackground() {
-		style = "pygments"
+		style = "github"
 	}
 
 	b := new(strings.Builder)
