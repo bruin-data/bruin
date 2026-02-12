@@ -51,7 +51,7 @@ func validateIcebergForDuckDB(lh config.LakehouseConfig) error {
 		return fmt.Errorf("DuckDB iceberg does not support storage type: '%s' (supported: s3)", lh.Storage.Type)
 	}
 	if !lh.Storage.Auth.IsS3() {
-		return fmt.Errorf("DuckDB iceberg with s3 storage requires access_key and secret_key")
+		return errors.New("DuckDB iceberg with s3 storage requires access_key and secret_key")
 	}
 
 	return nil
@@ -81,15 +81,14 @@ func validateDuckLakeForDuckDB(lh config.LakehouseConfig) error {
 		return fmt.Errorf("DuckDB ducklake does not support catalog type: '%s' (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
-
 	if lh.Storage.Type != config.StorageTypeS3 {
 		return fmt.Errorf("DuckDB ducklake does not support storage type: '%s' (supported: s3)", lh.Storage.Type)
 	}
 	if lh.Storage.Path == "" {
-		return fmt.Errorf("DuckDB ducklake with s3 storage requires path")
+		return errors.New("DuckDB ducklake with s3 storage requires path")
 	}
 	if !lh.Storage.Auth.IsS3() {
-		return fmt.Errorf("DuckDB ducklake with s3 storage requires access_key and secret_key")
+		return errors.New("DuckDB ducklake with s3 storage requires access_key and secret_key")
 	}
 
 	return nil
