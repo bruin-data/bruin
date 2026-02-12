@@ -3,18 +3,11 @@ package duck
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
 )
-
-var ducklakeSupportedCatalogTypes = []config.CatalogType{
-	config.CatalogTypePostgres,
-	config.CatalogTypeDuckDB,
-	config.CatalogTypeSQLite,
-}
 
 // Validates the lakehouse config for DuckDB-specific requirements.
 func ValidateLakehouseConfig(lh *config.LakehouseConfig) error {
@@ -58,10 +51,6 @@ func validateIcebergForDuckDB(lh config.LakehouseConfig) error {
 }
 
 func validateDuckLakeForDuckDB(lh config.LakehouseConfig) error {
-	if !slices.Contains(ducklakeSupportedCatalogTypes, lh.Catalog.Type) {
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: '%s' (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
-	}
-
 	switch lh.Catalog.Type {
 	case config.CatalogTypePostgres:
 		if lh.Catalog.Host == "" {
