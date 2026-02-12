@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -19,6 +21,100 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 )
+
+func containsWildcard(key string) bool {
+	return strings.ContainsAny(key, "*{")
+}
+
+// TODO: Use a globbing library to reduce complexity and have support for more characters in glob expression.
+func extractPrefix(key string) string {
+	minIdx := len(key)
+	for _, ch := range []byte{'*', '{'} {
+		if idx := strings.IndexByte(key, ch); idx >= 0 && idx < minIdx {
+			minIdx = idx
+		}
+	}
+	prefix := key[:minIdx]
+	// Trim back to the last '/' to get a clean prefix boundary
+	if lastSlash := strings.LastIndex(prefix, "/"); lastSlash >= 0 {
+		return prefix[:lastSlash+1]
+	}
+	return prefix
+}
+
+// Supported patterns:
+//   - * matches any characters except /
+//   - {a,b,c} matches any of the comma-separated alternatives
+func wildcardToRegex(pattern string) string {
+	var b strings.Builder
+	b.WriteString("^")
+	i := 0
+	for i < len(pattern) {
+		ch := pattern[i]
+		switch ch {
+		case '*':
+			b.WriteString("[^/]*")
+			i++
+		case '{':
+			end := strings.IndexByte(pattern[i:], '}')
+			if end < 0 {
+				b.WriteString(regexp.QuoteMeta(string(ch)))
+				i++
+				continue
+			}
+			alternatives := pattern[i+1 : i+end]
+			parts := strings.Split(alternatives, ",")
+			b.WriteString("(")
+			for j, part := range parts {
+				if j > 0 {
+					b.WriteString("|")
+				}
+				part = strings.TrimSpace(part)
+				for _, c := range part {
+					if c == '*' {
+						b.WriteString("[^/]*")
+					} else {
+						b.WriteString(regexp.QuoteMeta(string(c)))
+					}
+				}
+			}
+			b.WriteString(")")
+			i += end + 1
+		default:
+			b.WriteString(regexp.QuoteMeta(string(ch)))
+			i++
+		}
+	}
+	b.WriteString("$")
+	return b.String()
+}
+
+func matchWildcard(ctx context.Context, client *s3.Client, bucket, key string) (bool, error) {
+	prefix := extractPrefix(key)
+	re, err := regexp.Compile(wildcardToRegex(key))
+	if err != nil {
+		return false, errors.Wrap(err, "failed to compile wildcard pattern")
+	}
+
+	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
+		Bucket: &bucket,
+		Prefix: &prefix,
+	})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return false, errors.Wrap(err, "failed to list objects")
+		}
+		for _, obj := range page.Contents {
+			if obj.Key != nil && re.MatchString(*obj.Key) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
 
 type KeySensor struct {
 	connection config.ConnectionAndDetailsGetter
@@ -61,12 +157,13 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		return errors.Errorf("connection '%s' does not exist", connName)
 	}
 
+	var secretKey, accessKey, region, endpointURL string
+
 	awsConn, ok := connDetails.(*config.AwsConnection)
-	var secretKey string
-	var accessKey string
 	if ok {
 		secretKey = awsConn.SecretKey
 		accessKey = awsConn.AccessKey
+		region = awsConn.Region
 	} else {
 		s3Conn, ok2 := connDetails.(*config.S3Connection)
 		if !ok2 {
@@ -74,6 +171,7 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		}
 		secretKey = s3Conn.SecretAccessKey
 		accessKey = s3Conn.AccessKeyID
+		endpointURL = s3Conn.EndpointURL
 	}
 
 	// Load base config without forcing region
@@ -86,31 +184,41 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		return errors.Wrap(err, "failed to load AWS config")
 	}
 
-	// If region is not set, discover it from the bucket
-	var region string
-	if awsConn != nil {
-		region = awsConn.Region
-	}
-	if region == "" {
-		tmpCfg := cfg
-		tmpCfg.Region = "us-east-1" // fallback for discovery
-		tmpS3 := s3.NewFromConfig(tmpCfg)
-
-		discoveredRegion, err := manager.GetBucketRegion(ctx, tmpS3, bucketName)
-		if err != nil {
-			return errors.Wrap(err, "failed to determine bucket region")
+	var s3Client *s3.Client
+	if endpointURL != "" {
+		// For S3-compatible services (MinIO, R2, etc.), use the custom endpoint
+		if region == "" {
+			region = "us-east-1"
 		}
-		region = discoveredRegion
-	}
+		cfg.Region = region
+		s3Client = s3.NewFromConfig(cfg, func(o *s3.Options) {
+			o.BaseEndpoint = &endpointURL
+			o.UsePathStyle = true
+		})
+	} else {
+		// For AWS S3, discover region if not set
+		if region == "" {
+			tmpCfg := cfg
+			tmpCfg.Region = "us-east-1" // fallback for discovery
+			tmpS3 := s3.NewFromConfig(tmpCfg)
 
-	// Rebuild config with correct region
-	cfg.Region = region
-	s3Client := s3.NewFromConfig(cfg)
+			discoveredRegion, err := manager.GetBucketRegion(ctx, tmpS3, bucketName)
+			if err != nil {
+				return errors.Wrap(err, "failed to determine bucket region")
+			}
+			region = discoveredRegion
+		}
+
+		cfg.Region = region
+		s3Client = s3.NewFromConfig(cfg)
+	}
 
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if printerExists {
 		fmt.Fprintln(printer, "Poking S3:", bucketName+"/"+bucketKey)
 	}
+
+	isWildcard := containsWildcard(bucketKey)
 
 	timeout := time.After(24 * time.Hour)
 	for {
@@ -118,6 +226,27 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		case <-timeout:
 			return errors.New("Sensor timed out after 24 hours")
 		default:
+			if isWildcard {
+				found, err := matchWildcard(ctx, s3Client, bucketName, bucketKey)
+				if err != nil {
+					return err
+				}
+				if found {
+					return nil
+				}
+
+				if ks.sensorMode == "once" || ks.sensorMode == "" {
+					return errors.New("Sensor didn't return the expected result")
+				}
+
+				pokeInterval := helpers.GetPokeInterval(ctx, t)
+				time.Sleep(time.Duration(pokeInterval) * time.Second)
+				if printerExists {
+					fmt.Fprintln(printer, "Info: No matching objects found, waiting for", pokeInterval, "seconds")
+				}
+				continue
+			}
+
 			_, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
 				Bucket: &bucketName,
 				Key:    &bucketKey,
