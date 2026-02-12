@@ -83,6 +83,67 @@ func generateAlterStatements(schemaComparison diff.SchemaComparisonResult, conn1
 	return generator.GenerateAlterStatements(&schemaComparison)
 }
 
+// estimateDiffCost estimates the cost of running a data-diff operation.
+func estimateDiffCost(ctx context.Context, conn1, conn2 any, table1Name, table2Name, _, _ string, table1Identifier, table2Identifier string, schemaOnly bool) (*diff.DiffCostEstimate, error) {
+	var estimate1, estimate2 *diff.TableDiffCostEstimate
+	var err1, err2 error
+	var wg conc.WaitGroup
+
+	// Try to estimate cost for table 1
+	wg.Go(func() {
+		if estimator, ok := conn1.(diff.CostEstimator); ok {
+			estimate1, err1 = estimator.EstimateTableDiffCost(ctx, table1Name, schemaOnly)
+			if estimate1 != nil {
+				estimate1.TableName = table1Identifier
+			}
+		} else {
+			estimate1 = &diff.TableDiffCostEstimate{
+				TableName:         table1Identifier,
+				Supported:         false,
+				UnsupportedReason: fmt.Sprintf("connection type %T does not support cost estimation", conn1),
+			}
+		}
+	})
+
+	// Try to estimate cost for table 2
+	wg.Go(func() {
+		if estimator, ok := conn2.(diff.CostEstimator); ok {
+			estimate2, err2 = estimator.EstimateTableDiffCost(ctx, table2Name, schemaOnly)
+			if estimate2 != nil {
+				estimate2.TableName = table2Identifier
+			}
+		} else {
+			estimate2 = &diff.TableDiffCostEstimate{
+				TableName:         table2Identifier,
+				Supported:         false,
+				UnsupportedReason: fmt.Sprintf("connection type %T does not support cost estimation", conn2),
+			}
+		}
+	})
+
+	wg.Wait()
+
+	if err1 != nil {
+		return nil, fmt.Errorf("failed to estimate cost for table '%s': %w", table1Identifier, err1)
+	}
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to estimate cost for table '%s': %w", table2Identifier, err2)
+	}
+
+	// Calculate totals
+	totalBytesProcessed := estimate1.TotalBytesProcessed + estimate2.TotalBytesProcessed
+	totalBytesBilled := estimate1.TotalBytesBilled + estimate2.TotalBytesBilled
+
+	result := &diff.DiffCostEstimate{
+		SourceTable:         estimate1,
+		TargetTable:         estimate2,
+		TotalBytesProcessed: totalBytesProcessed,
+		TotalBytesBilled:    totalBytesBilled,
+	}
+
+	return result, nil
+}
+
 // DataDiffCmd defines the 'data-diff' command.
 func DataDiffCmd() *cli.Command {
 	var connectionName string
@@ -94,6 +155,7 @@ func DataDiffCmd() *cli.Command {
 	var targetDialect string
 	var reverse bool
 	var outputFormat string
+	var dryRun bool
 
 	return &cli.Command{
 		Name:    "data-diff",
@@ -146,6 +208,11 @@ func DataDiffCmd() *cli.Command {
 				Usage:       "Output format: 'plain' (default) for human-readable tables, 'json' for machine-readable JSON",
 				Destination: &outputFormat,
 				Value:       "plain",
+			},
+			&cli.BoolFlag{
+				Name:        "dry-run",
+				Usage:       "Estimate the cost of the comparison without executing it (outputs JSON). Only supported for BigQuery connections.",
+				Destination: &dryRun,
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -237,6 +304,27 @@ func DataDiffCmd() *cli.Command {
 
 			if !ok2 {
 				return fmt.Errorf("connection type %T for '%s' does not support table summarization", conn2, conn2Name)
+			}
+
+			// Handle dry-run mode for cost estimation
+			if dryRun {
+				costEstimate, err := estimateDiffCost(ctx, conn1, conn2, table1Name, table2Name, conn1Name, conn2Name, table1Identifier, table2Identifier, !full)
+				if err != nil {
+					jsonErr := map[string]string{"error": fmt.Sprintf("failed to estimate cost: %v", err)}
+					jsonBytes, marshalErr := json.Marshal(jsonErr)
+					if marshalErr != nil {
+						return fmt.Errorf("failed to marshal JSON error output: %w", marshalErr)
+					}
+					fmt.Fprintln(c.Writer, string(jsonBytes))
+					return cli.Exit("", 1)
+				}
+
+				jsonBytes, err := json.MarshalIndent(costEstimate, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal cost estimate JSON: %w", err)
+				}
+				fmt.Fprintln(c.Writer, string(jsonBytes))
+				return nil
 			}
 
 			schemaComparison, err := compareTables(ctx, s1, s2, table1Name, table2Name, !full)
