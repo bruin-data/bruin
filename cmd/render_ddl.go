@@ -185,6 +185,7 @@ func RenderDDL() *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "your-run-id")
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 
 			// Load macros from the pipeline's macros directory

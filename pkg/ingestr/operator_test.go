@@ -343,6 +343,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t
 	ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
 	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC))
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
 
 	err := o.Run(ctx, &ti)
 	require.NoError(t, err)
