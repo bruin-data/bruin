@@ -26,7 +26,7 @@ func containsWildcard(key string) bool {
 	return strings.ContainsAny(key, "*{")
 }
 
-// TO DO: {Bahar} Use a globbing library to reduce complexity and have support for more characters in glob expression
+// TODO: Use a globbing library to reduce complexity and have support for more characters in glob expression.
 func extractPrefix(key string) string {
 	minIdx := len(key)
 	for _, ch := range []byte{'*', '{'} {
