@@ -8,6 +8,8 @@ Checkout our [Zoomcamp Project Prize](https://getbruin.com/zoomcamp-project) to 
 
 Please reach out to use via our [Slack Community](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-3oaskee9f-YbvwEEdMgQ1elmKzqmIHTg) to ask questions, share feedback, or report issues.
 
+Register for [Bruin Cloud](https://cloud.getbruin.com/register) to deploy your pipelines: registration is free (no credit card required) and includes complimentary credits to get started.
+
 ## Learning Goals
 
 
