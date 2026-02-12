@@ -1421,7 +1421,7 @@ func SetupExecutors(
 	conn config.ConnectionAndDetailsGetter,
 	startDate,
 	endDate,
-	ExecutionDate time.Time,
+	executionDate time.Time,
 	pipelineName string,
 	runID string,
 	fullRefresh bool,
@@ -1441,7 +1441,7 @@ func SetupExecutors(
 		return nil, err
 	}
 
-	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &ExecutionDate, pipelineName, runID, fullRefresh)
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		if usePipForPython {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
