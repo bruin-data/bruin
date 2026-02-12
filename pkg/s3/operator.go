@@ -22,13 +22,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-// containsWildcard returns true if the key contains glob pattern characters (* or {).
 func containsWildcard(key string) bool {
 	return strings.ContainsAny(key, "*{")
 }
 
-// extractPrefix returns the portion of the key before the first wildcard character.
-// This prefix is used with ListObjectsV2 to narrow down results.
 func extractPrefix(key string) string {
 	minIdx := len(key)
 	for _, ch := range []byte{'*', '{'} {
@@ -37,14 +34,13 @@ func extractPrefix(key string) string {
 		}
 	}
 	prefix := key[:minIdx]
-	// Trim back to the last '/' so we get a clean prefix boundary
+	// Trim back to the last '/' to get a clean prefix boundary
 	if lastSlash := strings.LastIndex(prefix, "/"); lastSlash >= 0 {
 		return prefix[:lastSlash+1]
 	}
 	return prefix
 }
 
-// wildcardToRegex converts a glob pattern to a regular expression.
 // Supported patterns:
 //   - * matches any characters except /
 //   - {a,b,c} matches any of the comma-separated alternatives
@@ -61,7 +57,6 @@ func wildcardToRegex(pattern string) string {
 		case '{':
 			end := strings.IndexByte(pattern[i:], '}')
 			if end < 0 {
-				// No closing brace, treat as literal
 				b.WriteString(regexp.QuoteMeta(string(ch)))
 				i++
 				continue
@@ -93,7 +88,6 @@ func wildcardToRegex(pattern string) string {
 	return b.String()
 }
 
-// lists objects with the extracted prefix and matches them against the glob pattern.
 func matchWildcard(ctx context.Context, client *s3.Client, bucket, key string) (bool, error) {
 	prefix := extractPrefix(key)
 	re, err := regexp.Compile(wildcardToRegex(key))
