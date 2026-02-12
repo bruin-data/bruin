@@ -1,6 +1,8 @@
 # Overview - End-to-End Data Platform
 
-This hands-on tutorial guides you through building a **complete NYC Taxi data pipeline** from scratch using Bruin—a unified CLI tool for data ingestion, transformation, and quality.
+This hands-on tutorial guides you through building a **complete NYC Taxi data pipeline** from scratch using Bruin - a unified CLI tool for data ingestion, transformation, orchestration, and governance.
+
+Checkout our [Zoomcamp Project Prize](https://getbruin.com/zoomcamp-project) to learn more about how you can win a free Claude subscription service.
 
 You'll learn to build a production-ready ELT pipeline that:
 - **Ingests** real NYC taxi trip data from public APIs using Python
@@ -130,23 +132,13 @@ If your terminal prints `To use the installed binaries, please restart the shell
 
 **Step 2: Install IDE Extension (VS Code, Cursor, etc.)**
 
+- Open VS Code or Cursor → Extensions
+- Search: "Bruin" (publisher: bruin)
+- Install, then reload VS Code
+
 Please refer to the doc page for more details:
-  - https://getbruin.com/docs/bruin/vscode-extension/overview
-  - https://getbruin.com/docs/bruin/getting-started/features#vs-code-extension
-
-1. Install the **Bruin VS Code extension**:
-   - Open VS Code → Extensions
-   - Search: "Bruin" (publisher: bruin)
-   - Install, then reload VS Code
-
-2. Open this template folder and run from the Bruin panel:
-   - Open `pipeline/pipeline.yml` or any asset file under `pipeline/assets/`
-   - Use the Bruin panel to run `validate`, `run`, and see rendered code
-   - To open the panel, click the Bruin logo in the top-right corner of the file
-
-3. Set run parameters when creating a run:
-   - **Start / end dates** for incremental windows
-   - **Custom variables** like `taxi_types=["yellow"]`
+- https://getbruin.com/docs/bruin/vscode-extension/overview
+- https://getbruin.com/docs/bruin/getting-started/features#vs-code-extension
 
 ### 2.2 Project Initialization
 - Initialize the zoomcamp template: `bruin init zoomcamp my-pipeline`
