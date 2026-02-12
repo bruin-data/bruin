@@ -83,7 +83,7 @@ func generateAlterStatements(schemaComparison diff.SchemaComparisonResult, conn1
 	return generator.GenerateAlterStatements(&schemaComparison)
 }
 
-// Estimates the cost of running a data-diff 
+// estimateDiffCost estimates the cost of running a data-diff operation.
 func estimateDiffCost(ctx context.Context, conn1, conn2 any, table1Name, table2Name, _, _ string, table1Identifier, table2Identifier string, schemaOnly bool) (*diff.DiffCostEstimate, error) {
 	var estimate1, estimate2 *diff.TableDiffCostEstimate
 	var err1, err2 error

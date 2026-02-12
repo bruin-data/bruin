@@ -1122,7 +1122,6 @@ func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	return stats, nil
 }
 
-
 // Estimates the cost of running a table diff operation without executing the queries.
 func (d *Client) EstimateTableDiffCost(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableDiffCostEstimate, error) {
 	result := &diff.TableDiffCostEstimate{
@@ -1209,12 +1208,12 @@ func (d *Client) EstimateTableDiffCost(ctx context.Context, tableName string, sc
 		case diff.CommonTypeJSON:
 			statsQuery = fmt.Sprintf(`SELECT COUNT(*), COUNTIF(%s IS NULL) FROM %s`,
 				columnName, "`"+tableName+"`")
-		default:
-			// Skip unknown types
+		case diff.CommonTypeBinary, diff.CommonTypeUnknown:
+			// Skip binary and unknown types
 			continue
 		}
 
-		estimate, err := d.estimateQueryCost(ctx, statsQuery, fmt.Sprintf("statistics:%s", columnName))
+		estimate, err := d.estimateQueryCost(ctx, statsQuery, "statistics:"+columnName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to estimate statistics query cost for column '%s': %w", columnName, err)
 		}

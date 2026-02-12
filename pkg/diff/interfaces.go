@@ -14,10 +14,10 @@ type CostEstimator interface {
 }
 
 type QueryCostEstimate struct {
-	QueryType      string `json:"queryType"`      
-	Query          string `json:"query"`          
-	BytesProcessed int64  `json:"bytesProcessed"` 
-	BytesBilled    int64  `json:"bytesBilled"`   
+	QueryType      string `json:"queryType"`
+	Query          string `json:"query"`
+	BytesProcessed int64  `json:"bytesProcessed"`
+	BytesBilled    int64  `json:"bytesBilled"`
 }
 
 type TableDiffCostEstimate struct {
