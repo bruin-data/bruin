@@ -158,6 +158,9 @@ The following environment variables are available in every R asset execution:
 | `BRUIN_END_DATE`        | The end date of the pipeline run in `YYYY-MM-DD` format (e.g. `2024-01-15`)                                       |
 | `BRUIN_END_DATETIME`    | The end date and time of the pipeline run in `YYYY-MM-DDThh:mm:ss` format (e.g. `2024-01-15T13:45:30`)            |
 | `BRUIN_END_TIMESTAMP`   | The end timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`)   |
+| `BRUIN_EXECUTION_DATE`      | The execution date of the pipeline run in `YYYY-MM-DD` format (e.g. `2024-01-15`)                                 |
+| `BRUIN_EXECUTION_DATETIME`  | The execution date and time of the pipeline run in `YYYY-MM-DDThh:mm:ss` format (e.g. `2024-01-15T13:45:30`)      |
+| `BRUIN_EXECUTION_TIMESTAMP` | The execution timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`) |
 | `BRUIN_RUN_ID`          | The unique identifier for the pipeline run                                                                        |
 | `BRUIN_PIPELINE`        | The name of the pipeline being executed                                                                           |
 | `BRUIN_FULL_REFRESH`    | Set to `1` when the pipeline is running with the `--full-refresh` flag, empty otherwise                           |

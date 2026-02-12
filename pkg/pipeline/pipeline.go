@@ -129,6 +129,7 @@ const (
 	RunConfigQueryAnnotations          = RunConfig("query-annotations")
 	RunConfigRunID                     = RunConfig("run-id")
 	RunConfigStartDate                 = RunConfig("start-date")
+	RunConfigExecutionDate             = RunConfig("execution-date")
 )
 
 var defaultMapping = map[string]string{

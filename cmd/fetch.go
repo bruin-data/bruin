@@ -307,7 +307,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	extractor := &query.WholeFileExtractor{
 		Fs: fs,
 		// note: we don't support variables for now
-		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id", nil),
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, "your-pipeline-name", "your-run-id", nil),
 	}
 
 	// Direct query mode (no asset path)
@@ -330,13 +330,14 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 		}
 		fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
+		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 		fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
 		// Auto-detect mode (both asset path and query)
 		extractor = &query.WholeFileExtractor{
 			Fs: fs,
 			// note: we don't support variables for now
-			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
+			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 		}
 
 		newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
@@ -364,12 +365,13 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 
 	fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
+	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 	fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
 	extractor = &query.WholeFileExtractor{
 		Fs: fs,
 		// note: we don't support variables for now
-		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 	}
 	newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
 	if err != nil {

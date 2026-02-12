@@ -307,6 +307,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 		// Add required context values for CloneForAsset to work with interval modifiers
 		ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Now().AddDate(0, 0, -1))
 		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Now())
+		ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Now())
 		ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
 
 		t.Run(tt.name, func(t *testing.T) {

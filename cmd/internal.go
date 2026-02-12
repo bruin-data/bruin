@@ -1367,7 +1367,7 @@ func AssetMetadata() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pp.Pipeline.Name, "asset-metadata-run", pp.Pipeline.Variables.Value(), macroContent)
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pp.Pipeline.Name, "asset-metadata-run", pp.Pipeline.Variables.Value(), macroContent)
 			whole := &query.WholeFileExtractor{Fs: afero.NewOsFs(), Renderer: renderer}
 			extractor, err := whole.CloneForAsset(ctx, pp.Pipeline, pp.Asset)
 			if err != nil {
