@@ -64,7 +64,7 @@ execute() {
       echo "extract" > "$_progress_file"
       (cd "${tmpdir}" && untar "${TARBALL}") > /dev/null 2>&1 || exit 1
       echo "install" > "$_progress_file"
-      test ! -d "${BINDIR}" && install -d "${BINDIR}"
+      if [ ! -d "${BINDIR}" ]; then install -d "${BINDIR}"; fi
       for binexe in $BINARIES; do
         if [ "$OS" = "windows" ]; then
           binexe="${binexe}.exe"
@@ -88,7 +88,7 @@ execute() {
       _install_exit=$?
     fi
     if [ "$_install_exit" -eq 0 ]; then
-      test ! -d "${BINDIR}" && install -d "${BINDIR}"
+      if [ ! -d "${BINDIR}" ]; then install -d "${BINDIR}"; fi
       for binexe in $BINARIES; do
         if [ "$OS" = "windows" ]; then
           binexe="${binexe}.exe"
