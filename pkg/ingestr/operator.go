@@ -407,7 +407,8 @@ func (o *SeedOperator) resolveSeedDestinationTableName(connectionName, destURI, 
 }
 
 func connectionNotFoundError(role, name string) error {
-	return errors.Errorf("%s connection '%s' not found.\nConfigure it under the correct environment in '.bruin.yml' at the repository root, or pass '--config-file' to use a different config path",
+	return errors.Errorf(
+		"%s connection '%s' not found.\nConfigure it in the active connection backend under the correct environment or secret name (default: '.bruin.yml' at repository root; override with '--config-file' or '--secrets-backend')",
 		role,
 		name,
 	)

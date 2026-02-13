@@ -939,8 +939,9 @@ func TestBasicOperator_Run_MissingSourceConnectionErrorIsActionable(t *testing.T
 	err := o.Run(t.Context(), &ti)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "source connection 'missing-source' not found")
-	require.Contains(t, err.Error(), "Configure it under the correct environment in '.bruin.yml' at the repository root")
+	require.Contains(t, err.Error(), "Configure it in the active connection backend under the correct environment or secret name")
 	require.Contains(t, err.Error(), "--config-file")
+	require.Contains(t, err.Error(), "--secrets-backend")
 }
 
 func TestBasicOperator_Run_MissingDestinationConnectionErrorIsActionable(t *testing.T) {
@@ -976,6 +977,7 @@ func TestBasicOperator_Run_MissingDestinationConnectionErrorIsActionable(t *test
 	err := o.Run(t.Context(), &ti)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "destination connection 'missing-destination' not found")
-	require.Contains(t, err.Error(), "Configure it under the correct environment in '.bruin.yml' at the repository root")
+	require.Contains(t, err.Error(), "Configure it in the active connection backend under the correct environment or secret name")
 	require.Contains(t, err.Error(), "--config-file")
+	require.Contains(t, err.Error(), "--secrets-backend")
 }
