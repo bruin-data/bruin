@@ -81,7 +81,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	sourceConnection := o.conn.GetConnection(sourceConnectionName)
 	if sourceConnection == nil {
-		return errors.Errorf("source connection %s not found", sourceConnectionName)
+		return connectionNotFoundError("source", sourceConnectionName)
 	}
 
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
@@ -145,7 +145,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	destConnection := o.conn.GetConnection(destConnectionName)
 	if destConnection == nil {
-		return errors.Errorf("destination connection %s not found", destConnectionName)
+		return connectionNotFoundError("destination", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
@@ -296,7 +296,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destConnection := o.conn.GetConnection(destConnectionName)
 	if destConnection == nil {
-		return errors.Errorf("destination connection %s not found", destConnectionName)
+		return connectionNotFoundError("destination", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
@@ -404,4 +404,11 @@ func (o *SeedOperator) resolveSeedDestinationTableName(connectionName, destURI, 
 	}
 
 	return tableName
+}
+
+func connectionNotFoundError(role, name string) error {
+	return errors.Errorf("%s connection '%s' not found.\nConfigure it under the correct environment in '.bruin.yml' at the repository root, or pass '--config-file' to use a different config path",
+		role,
+		name,
+	)
 }

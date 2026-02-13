@@ -39,7 +39,12 @@ func (m *mockFinder) Repo(path string) (*git.Repo, error) {
 }
 
 func (s simpleConnectionFetcher) GetConnection(name string) any {
-	return s.connections[name]
+	conn, ok := s.connections[name]
+	if !ok {
+		return nil
+	}
+
+	return conn
 }
 
 func (s simpleConnectionFetcher) GetConnectionDetails(name string) any {
@@ -899,4 +904,78 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestBasicOperator_Run_MissingSourceConnectionErrorIsActionable(t *testing.T) {
+	t.Parallel()
+
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+
+	o := &BasicOperator{
+		conn: &simpleConnectionFetcher{
+			connections: map[string]*mockConnection{
+				"bq": mockBq,
+			},
+		},
+		finder:        &mockFinder{},
+		runner:        &mockRunner{},
+		jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
+	}
+
+	ti := scheduler.AssetInstance{
+		Pipeline: &pipeline.Pipeline{},
+		Asset: &pipeline.Asset{
+			Name:       "asset-name",
+			Connection: "bq",
+			Parameters: map[string]string{
+				"source_connection": "missing-source",
+				"source_table":      "source-table",
+				"destination":       "bigquery",
+			},
+		},
+	}
+
+	err := o.Run(t.Context(), &ti)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "source connection 'missing-source' not found")
+	require.Contains(t, err.Error(), "Configure it under the correct environment in '.bruin.yml' at the repository root")
+	require.Contains(t, err.Error(), "--config-file")
+}
+
+func TestBasicOperator_Run_MissingDestinationConnectionErrorIsActionable(t *testing.T) {
+	t.Parallel()
+
+	mockSf := new(mockConnection)
+	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
+
+	o := &BasicOperator{
+		conn: &simpleConnectionFetcher{
+			connections: map[string]*mockConnection{
+				"sf": mockSf,
+			},
+		},
+		finder:        &mockFinder{},
+		runner:        &mockRunner{},
+		jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
+	}
+
+	ti := scheduler.AssetInstance{
+		Pipeline: &pipeline.Pipeline{},
+		Asset: &pipeline.Asset{
+			Name:       "asset-name",
+			Connection: "missing-destination",
+			Parameters: map[string]string{
+				"source_connection": "sf",
+				"source_table":      "source-table",
+				"destination":       "bigquery",
+			},
+		},
+	}
+
+	err := o.Run(t.Context(), &ti)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "destination connection 'missing-destination' not found")
+	require.Contains(t, err.Error(), "Configure it under the correct environment in '.bruin.yml' at the repository root")
+	require.Contains(t, err.Error(), "--config-file")
 }
