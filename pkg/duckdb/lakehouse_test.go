@@ -63,6 +63,21 @@ func validDuckLakeDuckDBConfig() *config.LakehouseConfig {
 	return cfg
 }
 
+func validDuckLakeMySQLConfig() *config.LakehouseConfig {
+	cfg := validDuckLakePostgresConfig()
+	cfg.Catalog = config.CatalogConfig{
+		Type:     config.CatalogTypeMySQL,
+		Host:     "localhost",
+		Port:     3306,
+		Database: "ducklake_catalog",
+		Auth: config.CatalogAuth{
+			Username: "ducklake_user",
+			Password: "ducklake_password",
+		},
+	}
+	return cfg
+}
+
 func validDuckLakeSQLiteConfig() *config.LakehouseConfig {
 	cfg := validDuckLakePostgresConfig()
 	cfg.Catalog = config.CatalogConfig{
@@ -187,6 +202,16 @@ func TestValidateLakehouseConfig(t *testing.T) {
 			errMsg:  "requires username and password",
 		},
 		{
+			name: "ducklake mysql missing catalog auth fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakeMySQLConfig()
+				cfg.Catalog.Auth = config.CatalogAuth{}
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "requires username and password",
+		},
+		{
 			name: "ducklake with duckdb missing path fails",
 			build: func() *config.LakehouseConfig {
 				cfg := validDuckLakeDuckDBConfig()
@@ -224,6 +249,11 @@ func TestValidateLakehouseConfig(t *testing.T) {
 		{
 			name:    "ducklake with duckdb catalog and s3 storage passes",
 			build:   validDuckLakeDuckDBConfig,
+			wantErr: false,
+		},
+		{
+			name:    "ducklake with mysql catalog and s3 storage passes",
+			build:   validDuckLakeMySQLConfig,
 			wantErr: false,
 		},
 		{
@@ -305,6 +335,25 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 				},
 			},
 			wantExts: []string{"ducklake", "aws", "httpfs"},
+		},
+		{
+			name: "ducklake with mysql and s3",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: config.CatalogConfig{
+					Type:     config.CatalogTypeMySQL,
+					Host:     "localhost",
+					Database: "ducklake_catalog",
+					Auth: config.CatalogAuth{
+						Username: "ducklake_user",
+						Password: "ducklake_password",
+					},
+				},
+				Storage: config.StorageConfig{
+					Type: config.StorageTypeS3,
+				},
+			},
+			wantExts: []string{"ducklake", "mysql", "aws", "httpfs"},
 		},
 		{
 			name: "ducklake with sqlite and s3",
@@ -449,6 +498,34 @@ func TestLakehouseAttacher_GeneratePostgresSecret(t *testing.T) {
 	assert.Equal(t, want, result)
 }
 
+func TestLakehouseAttacher_GenerateMySQLSecret(t *testing.T) {
+	t.Parallel()
+	attacher := NewLakehouseAttacher()
+
+	catalog := &config.CatalogConfig{
+		Type:     config.CatalogTypeMySQL,
+		Host:     "localhost",
+		Port:     3306,
+		Database: "ducklake_catalog",
+		Auth: config.CatalogAuth{
+			Username: "ducklake_user",
+			Password: "ducklake_password",
+		},
+	}
+
+	want := `CREATE OR REPLACE SECRET test_secret (
+    TYPE mysql
+,   HOST 'localhost'
+,   PORT 3306
+,   DATABASE 'ducklake_catalog'
+,   USER 'ducklake_user'
+,   PASSWORD 'ducklake_password'
+)`
+
+	result := attacher.generateCatalogSecret("test_secret", *catalog)
+	assert.Equal(t, want, result)
+}
+
 func TestLakehouseAttacher_GenerateGlueSecret(t *testing.T) {
 	t.Parallel()
 	attacher := NewLakehouseAttacher()
@@ -582,6 +659,27 @@ func TestLakehouseAttacher_GenerateDuckLakeAttach(t *testing.T) {
 			},
 			alias: "ducklake_catalog",
 			want:  "ATTACH 'ducklake:metadata.ducklake' AS ducklake_catalog (DATA_PATH 's3://ducklake/warehouse', OVERRIDE_DATA_PATH true)",
+		},
+		{
+			name: "mysql catalog",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: config.CatalogConfig{
+					Type:     config.CatalogTypeMySQL,
+					Host:     "localhost",
+					Database: "ducklake_catalog",
+					Auth: config.CatalogAuth{
+						Username: "ducklake_user",
+						Password: "ducklake_password",
+					},
+				},
+				Storage: config.StorageConfig{
+					Type: config.StorageTypeS3,
+					Path: "s3://ducklake/warehouse",
+				},
+			},
+			alias: "ducklake_catalog",
+			want:  "ATTACH 'ducklake:mysql:' AS ducklake_catalog (DATA_PATH 's3://ducklake/warehouse', META_SECRET 'bruin_ducklake_catalog_catalog', OVERRIDE_DATA_PATH true)",
 		},
 		{
 			name: "sqlite catalog",
@@ -778,6 +876,49 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 				"USE ducklake_catalog",
 			},
 			wantMinLen: 8,
+		},
+		{
+			name: "ducklake with mysql and s3 storage",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: config.CatalogConfig{
+					Type:     config.CatalogTypeMySQL,
+					Host:     "localhost",
+					Database: "ducklake_catalog",
+					Auth: config.CatalogAuth{
+						Username: "ducklake_user",
+						Password: "ducklake_password",
+					},
+				},
+				Storage: config.StorageConfig{
+					Type:   config.StorageTypeS3,
+					Path:   "s3://ducklake/warehouse",
+					Region: "us-east-1",
+					Auth: config.StorageAuth{
+						AccessKey: "AKIAEXAMPLE",
+						SecretKey: "secretkey",
+					},
+				},
+			},
+			alias: "ducklake_catalog",
+			wantContains: []string{
+				"INSTALL ducklake",
+				"LOAD ducklake",
+				"INSTALL mysql",
+				"LOAD mysql",
+				"INSTALL aws",
+				"LOAD aws",
+				"CREATE OR REPLACE SECRET",
+				"TYPE mysql",
+				"TYPE s3",
+				"ATTACH 'ducklake:mysql:' AS ducklake_catalog",
+				"DATA_PATH 's3://ducklake/warehouse'",
+				"META_SECRET 'bruin_ducklake_catalog_catalog'",
+				"OVERRIDE_DATA_PATH true",
+				"CREATE SCHEMA IF NOT EXISTS ducklake_catalog.main",
+				"USE ducklake_catalog",
+			},
+			wantMinLen: 10,
 		},
 		{
 			name: "ducklake with sqlite and s3 storage",

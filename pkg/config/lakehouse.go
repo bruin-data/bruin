@@ -21,6 +21,7 @@ const (
 
 	// DuckLake Specific.
 	CatalogTypePostgres CatalogType = "postgres"
+	CatalogTypeMySQL    CatalogType = "mysql"
 	CatalogTypeDuckDB   CatalogType = "duckdb"
 	CatalogTypeSQLite   CatalogType = "sqlite"
 	// Future: CatalogTypeRest.
@@ -32,7 +33,7 @@ type CatalogAuth struct {
 	SecretKey    string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key"`
 	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token"`
 
-	// Postgres credentials (for DuckLake)
+	// SQL catalog credentials (for DuckLake Postgres/MySQL)
 	Username string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
 	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
 }
@@ -42,6 +43,10 @@ func (auth CatalogAuth) IsAWS() bool {
 }
 
 func (auth CatalogAuth) IsPostgres() bool {
+	return auth.IsUsernamePassword()
+}
+
+func (auth CatalogAuth) IsUsernamePassword() bool {
 	return auth.Username != "" && auth.Password != ""
 }
 
@@ -90,6 +95,7 @@ var (
 	supportedCatalogTypes = []CatalogType{
 		CatalogTypeGlue,
 		CatalogTypePostgres,
+		CatalogTypeMySQL,
 		CatalogTypeDuckDB,
 		CatalogTypeSQLite,
 	}
@@ -157,7 +163,7 @@ func (lh *LakehouseConfig) Validate() error {
 
 	// Validate catalog type if specified
 	if lh.Catalog.Type == "" || !slices.Contains(supportedCatalogTypes, lh.Catalog.Type) {
-		return errors.New("empty or unsupported catalog type: (supported: glue, postgres, duckdb, sqlite)")
+		return errors.New("empty or unsupported catalog type: (supported: glue, postgres, mysql, duckdb, sqlite)")
 	}
 
 	// Validate storage type if specified

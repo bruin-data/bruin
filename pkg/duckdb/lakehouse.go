@@ -52,22 +52,22 @@ func validateIcebergForDuckDB(lh config.LakehouseConfig) error {
 
 func validateDuckLakeForDuckDB(lh config.LakehouseConfig) error {
 	switch lh.Catalog.Type {
-	case config.CatalogTypePostgres:
+	case config.CatalogTypePostgres, config.CatalogTypeMySQL:
 		if lh.Catalog.Host == "" {
-			return errors.New("DuckDB ducklake with postgres catalog requires host")
+			return fmt.Errorf("DuckDB ducklake with %s catalog requires host", lh.Catalog.Type)
 		}
 		if lh.Catalog.Database == "" {
-			return errors.New("DuckDB ducklake with postgres catalog requires database")
+			return fmt.Errorf("DuckDB ducklake with %s catalog requires database", lh.Catalog.Type)
 		}
-		if !lh.Catalog.Auth.IsPostgres() {
-			return errors.New("DuckDB ducklake with postgres catalog requires username and password")
+		if !lh.Catalog.Auth.IsUsernamePassword() {
+			return fmt.Errorf("DuckDB ducklake with %s catalog requires username and password", lh.Catalog.Type)
 		}
 	case config.CatalogTypeDuckDB, config.CatalogTypeSQLite:
 		if lh.Catalog.Path == "" {
 			return fmt.Errorf("DuckDB ducklake with %s catalog requires path", lh.Catalog.Type)
 		}
 	case config.CatalogTypeGlue:
-		return fmt.Errorf("DuckDB ducklake does not support catalog type: '%s' (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
+		return fmt.Errorf("DuckDB ducklake does not support catalog type: '%s' (supported: postgres, mysql, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
 	if lh.Storage.Type != config.StorageTypeS3 {
@@ -141,6 +141,8 @@ func (l *LakehouseAttacher) getRequiredExtensions(lh config.LakehouseConfig) []s
 		extensions = append(extensions, "aws")
 	case config.CatalogTypePostgres:
 		extensions = append(extensions, "postgres")
+	case config.CatalogTypeMySQL:
+		extensions = append(extensions, "mysql")
 	case config.CatalogTypeSQLite:
 		extensions = append(extensions, "sqlite")
 	case config.CatalogTypeDuckDB:
@@ -215,6 +217,8 @@ func (l *LakehouseAttacher) generateCatalogSecret(name string, catalog config.Ca
 		return l.generateGlueSecret(name, catalog)
 	case config.CatalogTypePostgres:
 		return l.generatePostgresSecret(name, catalog)
+	case config.CatalogTypeMySQL:
+		return l.generateMySQLSecret(name, catalog)
 	case config.CatalogTypeDuckDB, config.CatalogTypeSQLite:
 		return ""
 	default:
@@ -246,7 +250,7 @@ func (l *LakehouseAttacher) generateGlueSecret(name string, catalog config.Catal
 
 func (l *LakehouseAttacher) generatePostgresSecret(name string, catalog config.CatalogConfig) string {
 	auth := catalog.Auth
-	if !auth.IsPostgres() || catalog.Host == "" || catalog.Database == "" {
+	if !auth.IsUsernamePassword() || catalog.Host == "" || catalog.Database == "" {
 		return ""
 	}
 
@@ -258,6 +262,30 @@ func (l *LakehouseAttacher) generatePostgresSecret(name string, catalog config.C
 	var parts []string
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE postgres")
+	parts = append(parts, ",   HOST "+quoteSQLStringLiteral(catalog.Host))
+	parts = append(parts, ",   PORT "+strconv.Itoa(port))
+	parts = append(parts, ",   DATABASE "+quoteSQLStringLiteral(catalog.Database))
+	parts = append(parts, ",   USER "+quoteSQLStringLiteral(auth.Username))
+	parts = append(parts, ",   PASSWORD "+quoteSQLStringLiteral(auth.Password))
+	parts = append(parts, ")")
+
+	return strings.Join(parts, "\n")
+}
+
+func (l *LakehouseAttacher) generateMySQLSecret(name string, catalog config.CatalogConfig) string {
+	auth := catalog.Auth
+	if !auth.IsUsernamePassword() || catalog.Host == "" || catalog.Database == "" {
+		return ""
+	}
+
+	port := catalog.Port
+	if port == 0 {
+		port = 3306
+	}
+
+	var parts []string
+	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
+	parts = append(parts, "    TYPE mysql")
 	parts = append(parts, ",   HOST "+quoteSQLStringLiteral(catalog.Host))
 	parts = append(parts, ",   PORT "+strconv.Itoa(port))
 	parts = append(parts, ",   DATABASE "+quoteSQLStringLiteral(catalog.Database))
@@ -334,6 +362,14 @@ func (l *LakehouseAttacher) generateDuckLakeAttach(lh config.LakehouseConfig, al
 			"OVERRIDE_DATA_PATH true",
 		}
 		return "ATTACH 'ducklake:postgres:' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
+	case config.CatalogTypeMySQL:
+		secretName := defaultSecretName(alias, "catalog")
+		options := []string{
+			"DATA_PATH " + quoteSQLStringLiteral(lh.Storage.Path),
+			"META_SECRET " + quoteSQLStringLiteral(secretName),
+			"OVERRIDE_DATA_PATH true",
+		}
+		return "ATTACH 'ducklake:mysql:' AS " + alias + " (" + strings.Join(options, ", ") + ")", nil
 	case config.CatalogTypeDuckDB:
 		catalogPath := strings.TrimSpace(lh.Catalog.Path)
 		if catalogPath == "" {

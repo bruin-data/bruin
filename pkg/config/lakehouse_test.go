@@ -121,6 +121,19 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "ducklake with mysql catalog type is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeMySQL,
+				},
+				Storage: StorageConfig{
+					Type: StorageTypeS3,
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "ducklake with sqlite catalog type is valid",
 			lh: &LakehouseConfig{
 				Format: LakehouseFormatDuckLake,
@@ -162,6 +175,7 @@ func TestTypeConstants(t *testing.T) {
 		{"lakehouse format ducklake", LakehouseFormat("ducklake"), LakehouseFormatDuckLake},
 		{"catalog type", CatalogType("glue"), CatalogTypeGlue},
 		{"catalog type postgres", CatalogType("postgres"), CatalogTypePostgres},
+		{"catalog type mysql", CatalogType("mysql"), CatalogTypeMySQL},
 		{"catalog type duckdb", CatalogType("duckdb"), CatalogTypeDuckDB},
 		{"catalog type sqlite", CatalogType("sqlite"), CatalogTypeSQLite},
 		{"storage type", StorageType("s3"), StorageTypeS3},
