@@ -411,7 +411,7 @@ func connectionNotFoundError(ctx context.Context, role, name string) error {
 
 	if secretsBackend != "" {
 		return errors.Errorf(
-			"%s connection '%s' not found.\nConfigure it in the '%s' secrets backend under the correct secret name, or switch backend with '--secrets-backend'",
+			"%s connection '%s' not found.\nconfigure it in the '%s' secrets backend under the correct secret name, or switch backend with '--secrets-backend'",
 			role,
 			name,
 			secretsBackend,
@@ -419,7 +419,7 @@ func connectionNotFoundError(ctx context.Context, role, name string) error {
 	}
 
 	return errors.Errorf(
-		"%s connection '%s' not found.\nConfigure it under the correct environment in '.bruin.yml' at the repository root, or pass '--config-file' to use a different config path",
+		"%s connection '%s' not found.\nconfigure it under the correct environment in '.bruin.yml' at the repository root, or pass '--config-file' to use a different config path",
 		role,
 		name,
 	)

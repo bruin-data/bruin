@@ -927,7 +927,7 @@ func TestBasicOperator_Run_MissingConnectionErrorIsActionable(t *testing.T) {
 			sourceConnection: "missing-source",
 			expectedParts: []string{
 				"source connection 'missing-source' not found",
-				"Configure it under the correct environment in '.bruin.yml' at the repository root",
+				"configure it under the correct environment in '.bruin.yml' at the repository root",
 				"--config-file",
 			},
 		},
@@ -940,7 +940,7 @@ func TestBasicOperator_Run_MissingConnectionErrorIsActionable(t *testing.T) {
 			sourceConnection: "sf",
 			expectedParts: []string{
 				"destination connection 'missing-destination' not found",
-				"Configure it under the correct environment in '.bruin.yml' at the repository root",
+				"configure it under the correct environment in '.bruin.yml' at the repository root",
 				"--config-file",
 			},
 		},
@@ -954,7 +954,7 @@ func TestBasicOperator_Run_MissingConnectionErrorIsActionable(t *testing.T) {
 			secretsBackend:   "vault",
 			expectedParts: []string{
 				"source connection 'missing-source' not found",
-				"Configure it in the 'vault' secrets backend",
+				"configure it in the 'vault' secrets backend",
 				"--secrets-backend",
 			},
 			notExpectedParts: []string{
