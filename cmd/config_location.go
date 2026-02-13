@@ -23,12 +23,16 @@ func validateDefaultConfigFileLocation(fs afero.Fs, repoRootPath, inputPath stri
 		return fmt.Errorf("failed to resolve input path '%s': %w", inputPath, err)
 	}
 
+	// Make sure searching starts from a directory:
+	// - if input is a directory, use it directly
+	// - if input is a file or missing path, use its parent directory
 	startPath := inputAbs
 	info, statErr := fs.Stat(startPath)
 	if statErr != nil || !info.IsDir() {
 		startPath = filepath.Dir(startPath)
 	}
 
+	// Collect all default config files between the start location and repo root.
 	foundConfigPaths, err := findConfigFilesBetween(fs, startPath, repoRootAbs, defaultConfigFileName)
 	if err != nil {
 		return err
@@ -38,6 +42,7 @@ func validateDefaultConfigFileLocation(fs afero.Fs, repoRootPath, inputPath stri
 		return nil
 	}
 
+	// A single config in repo root is the expected default layout.
 	rootConfigPath := filepath.Join(repoRootAbs, defaultConfigFileName)
 	rootConfigDisplay := displayPathFromRepoRoot(repoRootAbs, rootConfigPath)
 	hasRootConfig := slices.Contains(foundConfigPaths, rootConfigPath)
@@ -64,6 +69,7 @@ func validateDefaultConfigFileLocation(fs afero.Fs, repoRootPath, inputPath stri
 		foundDisplayPaths = append(foundDisplayPaths, displayPathFromRepoRoot(repoRootAbs, foundPath))
 	}
 
+	// Multiple matches are ambiguous unless user picks one via --config-file.
 	return fmt.Errorf(
 		"found multiple '%s' files for this run:\n  - %s\nBruin expects a single '%s' at repository root '%s'.\nkeep only '%s' at root, move/remove the others, or pass --config-file to choose one explicitly",
 		defaultConfigFileName,
@@ -79,6 +85,7 @@ func findConfigFilesBetween(fs afero.Fs, startPath, repoRootPath, configFileName
 	foundConfigPaths := make([]string, 0, 2)
 
 	for {
+		// Check this directory first, then move one level up.
 		configPath := filepath.Join(currentPath, configFileName)
 		exists, err := afero.Exists(fs, configPath)
 		if err != nil {
@@ -92,6 +99,7 @@ func findConfigFilesBetween(fs afero.Fs, startPath, repoRootPath, configFileName
 			break
 		}
 
+		// Stop once we reach filesystem root (parent == self).
 		parentPath := filepath.Dir(currentPath)
 		if samePath(parentPath, currentPath) {
 			break
