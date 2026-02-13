@@ -2,13 +2,14 @@
 
 This hands-on tutorial guides you through building a **complete NYC Taxi data pipeline** from scratch using Bruin - a unified CLI tool for data ingestion, transformation, orchestration, and governance.
 
-Video tutorials can be found in this [YouTube playlist](https://www.youtube.com/playlist?list=PLnRr-L-cuxO4lUUdkXV5YPHT5ZEcEeXQD).
-
 Checkout our [Zoomcamp Project Prize](https://getbruin.com/zoomcamp-project) to learn more about how you can win a free Claude subscription service.
 
 Please reach out to use via our [Slack Community](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-3oaskee9f-YbvwEEdMgQ1elmKzqmIHTg) to ask questions, share feedback, or report issues.
 
 Register for [Bruin Cloud](https://cloud.getbruin.com/register) to deploy your pipelines: registration is free (no credit card required) and includes complimentary credits to get started.
+
+### YouTube Video Tutorial Playlist
+[![Video Tutorials Playlist](https://img.youtube.com/vi/f6vg7lGqZx0/hqdefault.jpg)](https://www.youtube.com/playlist?list=PLnRr-L-cuxO4lUUdkXV5YPHT5ZEcEeXQD)
 
 ## Learning Goals
 
@@ -66,6 +67,9 @@ This module introduces Bruin as a unified data platform that combines **data ing
 
 ## Part 1: What is a Data Platform?
 
+### Video Tutorial
+[![Part 1: What is a Data Platform?](https://img.youtube.com/vi/f6vg7lGqZx0/hqdefault.jpg)](https://youtu.be/f6vg7lGqZx0)
+
 ### Learning Goals
 - Understand what a data platform is and why you need one
 - Learn how Bruin fits into the modern data stack
@@ -102,6 +106,9 @@ This module introduces Bruin as a unified data platform that combines **data ing
 ---
 
 ## Part 2: Setting Up Your First Bruin Project
+
+### Video Tutorial
+[![Part 2: Setting Up Your First Bruin Project](https://img.youtube.com/vi/JJwHKSidX_c/hqdefault.jpg)](https://youtu.be/JJwHKSidX_c)
 
 ### Learning Goals
 - Install Bruin CLI
@@ -295,6 +302,9 @@ See the [Key Commands Reference](#key-commands-reference) for connection managem
 ---
 
 ## Part 3: End-to-End NYC Taxi ELT Pipeline
+
+### Video Tutorial
+[![Part 3: End-to-End NYC Taxi ELT Pipeline](https://img.youtube.com/vi/q0k_iz9kWsI/hqdefault.jpg)](https://youtu.be/q0k_iz9kWsI)
 
 > **Data Availability Note**: NYC Taxi & Limousine Commission (TLC) trip data is not available after November 2025. When selecting date ranges for your pipeline, use dates before December 2025.
 >
