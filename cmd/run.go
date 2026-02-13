@@ -703,6 +703,11 @@ func Run(isDebug *bool) *cli.Command {
 			configFilePath := runConfig.ConfigFilePath
 			if configFilePath == "" {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+				err = validateDefaultConfigFileLocation(afero.NewOsFs(), repoRoot.Path, inputPath)
+				if err != nil {
+					errorPrinter.Printf("%v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 			if err != nil {
