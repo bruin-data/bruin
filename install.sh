@@ -45,39 +45,62 @@ parse_args() {
 # out preventing half-done work
 execute() {
   tmpdir=$(mktemp -d)
-  _progress_file="${tmpdir}/.progress"
-  _download_file="${tmpdir}/${TARBALL}"
-  echo "download" > "$_progress_file"
   log_debug "downloading files into ${tmpdir}"
-
-  # Get expected file size for real download progress
-  _total_size=$(curl -sLI "${TARBALL_URL}" 2>/dev/null | grep -i content-length | tail -1 | tr -d '\r' | awk '{print $2}')
-  _total_size=${_total_size:-0}
-  log_debug "expected download size: ${_total_size} bytes"
 
   echo ""
 
-  # Run download, extract, and install in background
-  (
-    http_download "${_download_file}" "${TARBALL_URL}" > /dev/null 2>&1 || exit 1
-    echo "extract" > "$_progress_file"
-    (cd "${tmpdir}" && untar "${TARBALL}") > /dev/null 2>&1 || exit 1
-    echo "install" > "$_progress_file"
-    test ! -d "${BINDIR}" && install -d "${BINDIR}"
-    for binexe in $BINARIES; do
-      if [ "$OS" = "windows" ]; then
-        binexe="${binexe}.exe"
-      fi
-      install "${tmpdir}/${binexe}" "${BINDIR}/" || exit 1
-    done
-  ) &
-  _install_pid=$!
-  _spinner "$_install_pid" "Installing bruin ${VERSION}..." "$_progress_file" "$_download_file" "$_total_size"
-  wait "$_install_pid"
-  _install_exit=$?
+  if test -t 1; then
+    # Interactive terminal: use spinner with real download progress
+    _progress_file="${tmpdir}/.progress"
+    _download_file="${tmpdir}/${TARBALL}"
+    echo "download" > "$_progress_file"
+
+    _total_size=$(curl -sLI "${TARBALL_URL}" 2>/dev/null | grep -i content-length | tail -1 | tr -d '\r' | awk '{print $2}')
+    _total_size=${_total_size:-0}
+    log_debug "expected download size: ${_total_size} bytes"
+
+    (
+      http_download "${_download_file}" "${TARBALL_URL}" > /dev/null 2>&1 || exit 1
+      echo "extract" > "$_progress_file"
+      (cd "${tmpdir}" && untar "${TARBALL}") > /dev/null 2>&1 || exit 1
+      echo "install" > "$_progress_file"
+      test ! -d "${BINDIR}" && install -d "${BINDIR}"
+      for binexe in $BINARIES; do
+        if [ "$OS" = "windows" ]; then
+          binexe="${binexe}.exe"
+        fi
+        install "${tmpdir}/${binexe}" "${BINDIR}/" || exit 1
+      done
+    ) &
+    _install_pid=$!
+    _spinner "$_install_pid" "Installing bruin ${VERSION}..." "$_progress_file" "$_download_file" "$_total_size"
+    wait "$_install_pid"
+    _install_exit=$?
+  else
+    # Non-interactive (CI): run synchronously with simple log messages
+    log_info "downloading bruin ${VERSION}..."
+    http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
+    _install_exit=$?
+    if [ "$_install_exit" -eq 0 ]; then
+      log_info "extracting..."
+      srcdir="${tmpdir}"
+      (cd "${tmpdir}" && untar "${TARBALL}")
+      _install_exit=$?
+    fi
+    if [ "$_install_exit" -eq 0 ]; then
+      test ! -d "${BINDIR}" && install -d "${BINDIR}"
+      for binexe in $BINARIES; do
+        if [ "$OS" = "windows" ]; then
+          binexe="${binexe}.exe"
+        fi
+        install "${srcdir}/${binexe}" "${BINDIR}/"
+        _install_exit=$?
+      done
+    fi
+  fi
   rm -rf "${tmpdir}"
 
-  if [ $_install_exit -ne 0 ]; then
+  if [ "$_install_exit" -ne 0 ]; then
     printf "\r  [${RED}x${RESET}] Failed to install bruin %s     \n" "${VERSION}" >&2
     return 1
   fi
@@ -119,7 +142,14 @@ execute() {
 
   echo ""
   echo "  ${GREEN}bruin ${VERSION} has been installed successfully!${RESET}"
-  echo "  ${YELLOW}Please restart your shell or run: source ~/.${current_shell}rc${RESET}"
+  case "$current_shell" in
+    fish)
+      echo "  ${YELLOW}Please restart your shell or run: source ~/.config/fish/config.fish${RESET}"
+      ;;
+    *)
+      echo "  ${YELLOW}Please restart your shell or run: source ~/.${current_shell}rc${RESET}"
+      ;;
+  esac
   echo ""
 }
 
@@ -259,7 +289,7 @@ _spinner() {
         ;;
       *)
         # During download, compute from actual file size
-        if [ -n "$_sp_total_size" ] && [ "$_sp_total_size" -gt 0 ] 2>/dev/null && [ -f "$_sp_download_file" ]; then
+        if [ "${_sp_total_size:-0}" -gt 0 ] 2>/dev/null && [ -f "$_sp_download_file" ]; then
           _sp_current=$(_file_size "$_sp_download_file")
           _sp_current=${_sp_current:-0}
           _sp_pct=$(( _sp_current * 80 / _sp_total_size ))
