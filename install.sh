@@ -44,27 +44,46 @@ parse_args() {
 # network, either nothing will happen or will syntax error
 # out preventing half-done work
 execute() {
-  
   tmpdir=$(mktemp -d)
+  _progress_file="${tmpdir}/.progress"
+  _download_file="${tmpdir}/${TARBALL}"
+  echo "download" > "$_progress_file"
   log_debug "downloading files into ${tmpdir}"
-  http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
-  srcdir="${tmpdir}"
-  (cd "${tmpdir}" && untar "${TARBALL}")
 
-  test ! -d "${BINDIR}" && install -d "${BINDIR}"
-  log_debug "installing to ${BINDIR}"
-  for binexe in $BINARIES; do
-    if [ "$OS" = "windows" ]; then
-      binexe="${binexe}.exe"
-    fi
-    install "${srcdir}/${binexe}" "${BINDIR}/"
-    echo "  ${binexe}"
-    log_debug "installed ${BINDIR}/${binexe}"
-  done
+  # Get expected file size for real download progress
+  _total_size=$(curl -sLI "${TARBALL_URL}" 2>/dev/null | grep -i content-length | tail -1 | tr -d '\r' | awk '{print $2}')
+  _total_size=${_total_size:-0}
+  log_debug "expected download size: ${_total_size} bytes"
+
+  echo ""
+
+  # Run download, extract, and install in background
+  (
+    http_download "${_download_file}" "${TARBALL_URL}" > /dev/null 2>&1 || exit 1
+    echo "extract" > "$_progress_file"
+    (cd "${tmpdir}" && untar "${TARBALL}") > /dev/null 2>&1 || exit 1
+    echo "install" > "$_progress_file"
+    test ! -d "${BINDIR}" && install -d "${BINDIR}"
+    for binexe in $BINARIES; do
+      if [ "$OS" = "windows" ]; then
+        binexe="${binexe}.exe"
+      fi
+      install "${tmpdir}/${binexe}" "${BINDIR}/" || exit 1
+    done
+  ) &
+  _install_pid=$!
+  _spinner "$_install_pid" "Installing bruin ${VERSION}..." "$_progress_file" "$_download_file" "$_total_size"
+  wait "$_install_pid"
+  _install_exit=$?
   rm -rf "${tmpdir}"
-  
 
+  if [ $_install_exit -ne 0 ]; then
+    printf "\r  [${RED}x${RESET}] Failed to install bruin %s     \n" "${VERSION}" >&2
+    return 1
+  fi
+  printf "\r  [${GREEN}+${RESET}] bruin %s installed to %s     \n" "${VERSION}" "${BINDIR}" >&2
 
+  # Configure PATH
   current_shell=$(basename "$SHELL")
 
   case "$current_shell" in
@@ -74,7 +93,6 @@ execute() {
       if ! grep -q "export PATH=\"\$PATH:${BINDIR}\"" "$HOME/.${current_shell}rc"; then
         echo "$export_command" >> "$HOME/.${current_shell}rc"
       fi
-      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -82,16 +100,13 @@ execute() {
       if ! grep -q "export PATH=\"\$PATH:${BINDIR}\"" "$HOME/.zshrc"; then
         echo "$export_command" >> "$HOME/.zshrc"
       fi
-      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
-      
       if ! grep -q "set -gx PATH \$PATH ${BINDIR}" "$HOME/.config/fish/config.fish" 2>/dev/null; then
         echo "$export_command" >> "$HOME/.config/fish/config.fish"
       fi
-      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -101,7 +116,11 @@ execute() {
       log_info "#   $export_command"
       ;;
   esac
-  
+
+  echo ""
+  echo "  ${GREEN}bruin ${VERSION} has been installed successfully!${RESET}"
+  echo "  ${YELLOW}Please restart your shell or run: source ~/.${current_shell}rc${RESET}"
+  echo ""
 }
 
 
@@ -210,6 +229,50 @@ if test -t 1; then
         CYAN="$(tput setaf 6)"
     fi
 fi
+
+_file_size() {
+  wc -c < "$1" 2>/dev/null | tr -d ' '
+}
+
+_spinner() {
+  _sp_pid=$1
+  _sp_msg=$2
+  _sp_progress_file=$3
+  _sp_download_file=$4
+  _sp_total_size=$5
+  _sp_i=0
+  while kill -0 "$_sp_pid" 2>/dev/null; do
+    _sp_i=$(( (_sp_i + 1) % 4 ))
+    case $_sp_i in
+      0) _sp_char='-' ;;
+      1) _sp_char='/' ;;
+      2) _sp_char='|' ;;
+      3) _sp_char='\' ;;
+    esac
+    _sp_phase=$(cat "$_sp_progress_file" 2>/dev/null)
+    case "$_sp_phase" in
+      extract)
+        _sp_pct=85
+        ;;
+      install)
+        _sp_pct=95
+        ;;
+      *)
+        # During download, compute from actual file size
+        if [ -n "$_sp_total_size" ] && [ "$_sp_total_size" -gt 0 ] 2>/dev/null && [ -f "$_sp_download_file" ]; then
+          _sp_current=$(_file_size "$_sp_download_file")
+          _sp_current=${_sp_current:-0}
+          _sp_pct=$(( _sp_current * 80 / _sp_total_size ))
+          if [ "$_sp_pct" -gt 80 ]; then _sp_pct=80; fi
+        else
+          _sp_pct=0
+        fi
+        ;;
+    esac
+    printf "\r  [${CYAN}%s${RESET}] %s ${CYAN}%s%%${RESET} " "$_sp_char" "$_sp_msg" "$_sp_pct" >&2
+    sleep 0.1
+  done
+}
 
 log_tag() {
   case $1 in
@@ -321,16 +384,15 @@ http_download_curl() {
   source_url=$2
   header=$3
   if [ -z "$header" ]; then
-    log_debug "Executing: curl  -sL -o \"$local_file\" \"$source_url\""
-    code=$(curl  -sL -o "$local_file" "$source_url")
+    log_debug "Executing: curl -sfL -o \"$local_file\" \"$source_url\""
+    curl -sfL -o "$local_file" "$source_url"
   else
-    log_debug "Executing: curl  -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
-    code=$(curl  -sL -H "$header" -o "$local_file" "$source_url")
+    log_debug "Executing: curl -sfL -H \"$header\" -o \"$local_file\" \"$source_url\""
+    curl -sfL -H "$header" -o "$local_file" "$source_url"
   fi
-  log_debug "http_download_curl received HTTP status $code, return code $?"
   if [ $? -ne 0 ]; then
     log_err "Failed to download from $source_url"
-    return 1  # Return 1 for failure
+    return 1
   fi
   return 0
 }
