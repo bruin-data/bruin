@@ -906,78 +906,111 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	}
 }
 
-func TestBasicOperator_Run_MissingSourceConnectionErrorIsActionable(t *testing.T) {
+func TestBasicOperator_Run_MissingConnectionErrorIsActionable(t *testing.T) {
 	t.Parallel()
 
-	mockBq := new(mockConnection)
-	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
-
-	o := &BasicOperator{
-		conn: &simpleConnectionFetcher{
-			connections: map[string]*mockConnection{
-				"bq": mockBq,
+	tests := []struct {
+		name             string
+		connections      map[string]string
+		assetConnection  string
+		sourceConnection string
+		secretsBackend   string
+		expectedParts    []string
+		notExpectedParts []string
+	}{
+		{
+			name: "missing source connection uses .bruin.yml guidance",
+			connections: map[string]string{
+				"bq": "bigquery://uri-here",
+			},
+			assetConnection:  "bq",
+			sourceConnection: "missing-source",
+			expectedParts: []string{
+				"source connection 'missing-source' not found",
+				"Configure it under the correct environment in '.bruin.yml' at the repository root",
+				"--config-file",
 			},
 		},
-		finder:        &mockFinder{},
-		runner:        &mockRunner{},
-		jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
-	}
-
-	ti := scheduler.AssetInstance{
-		Pipeline: &pipeline.Pipeline{},
-		Asset: &pipeline.Asset{
-			Name:       "asset-name",
-			Connection: "bq",
-			Parameters: map[string]string{
-				"source_connection": "missing-source",
-				"source_table":      "source-table",
-				"destination":       "bigquery",
+		{
+			name: "missing destination connection uses .bruin.yml guidance",
+			connections: map[string]string{
+				"sf": "snowflake://uri-here",
+			},
+			assetConnection:  "missing-destination",
+			sourceConnection: "sf",
+			expectedParts: []string{
+				"destination connection 'missing-destination' not found",
+				"Configure it under the correct environment in '.bruin.yml' at the repository root",
+				"--config-file",
 			},
 		},
-	}
-
-	err := o.Run(t.Context(), &ti)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "source connection 'missing-source' not found")
-	require.Contains(t, err.Error(), "Configure it in the active connection backend under the correct environment or secret name")
-	require.Contains(t, err.Error(), "--config-file")
-	require.Contains(t, err.Error(), "--secrets-backend")
-}
-
-func TestBasicOperator_Run_MissingDestinationConnectionErrorIsActionable(t *testing.T) {
-	t.Parallel()
-
-	mockSf := new(mockConnection)
-	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
-
-	o := &BasicOperator{
-		conn: &simpleConnectionFetcher{
-			connections: map[string]*mockConnection{
-				"sf": mockSf,
+		{
+			name: "missing source connection uses secrets backend guidance",
+			connections: map[string]string{
+				"bq": "bigquery://uri-here",
 			},
-		},
-		finder:        &mockFinder{},
-		runner:        &mockRunner{},
-		jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
-	}
-
-	ti := scheduler.AssetInstance{
-		Pipeline: &pipeline.Pipeline{},
-		Asset: &pipeline.Asset{
-			Name:       "asset-name",
-			Connection: "missing-destination",
-			Parameters: map[string]string{
-				"source_connection": "sf",
-				"source_table":      "source-table",
-				"destination":       "bigquery",
+			assetConnection:  "bq",
+			sourceConnection: "missing-source",
+			secretsBackend:   "vault",
+			expectedParts: []string{
+				"source connection 'missing-source' not found",
+				"Configure it in the 'vault' secrets backend",
+				"--secrets-backend",
+			},
+			notExpectedParts: []string{
+				".bruin.yml",
 			},
 		},
 	}
 
-	err := o.Run(t.Context(), &ti)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "destination connection 'missing-destination' not found")
-	require.Contains(t, err.Error(), "Configure it in the active connection backend under the correct environment or secret name")
-	require.Contains(t, err.Error(), "--config-file")
-	require.Contains(t, err.Error(), "--secrets-backend")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			connectionMap := make(map[string]*mockConnection, len(tt.connections))
+			for name, uri := range tt.connections {
+				conn := new(mockConnection)
+				conn.On("GetIngestrURI").Return(uri, nil)
+				connectionMap[name] = conn
+			}
+
+			o := &BasicOperator{
+				conn: &simpleConnectionFetcher{
+					connections: connectionMap,
+				},
+				finder:        &mockFinder{},
+				runner:        &mockRunner{},
+				jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
+			}
+
+			ti := scheduler.AssetInstance{
+				Pipeline: &pipeline.Pipeline{},
+				Asset: &pipeline.Asset{
+					Name:       "asset-name",
+					Connection: tt.assetConnection,
+					Parameters: map[string]string{
+						"source_connection": tt.sourceConnection,
+						"source_table":      "source-table",
+						"destination":       "bigquery",
+					},
+				},
+			}
+
+			ctx := t.Context()
+			if tt.secretsBackend != "" {
+				ctx = context.WithValue(ctx, config.SecretsBackendContextKey, tt.secretsBackend)
+			}
+
+			err := o.Run(ctx, &ti)
+			require.Error(t, err)
+
+			for _, expected := range tt.expectedParts {
+				require.Contains(t, err.Error(), expected)
+			}
+
+			for _, notExpected := range tt.notExpectedParts {
+				require.NotContains(t, err.Error(), notExpected)
+			}
+		})
+	}
 }

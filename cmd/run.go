@@ -755,6 +755,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigQueryAnnotations, runConfig.Annotations)
+			runCtx = context.WithValue(runCtx, config.SecretsBackendContextKey, c.String("secrets-backend"))
 
 			preview, err := GetPipeline(runCtx, inputPath, runConfig, logger, pipeline.WithOnlyPipeline())
 			if err != nil {
