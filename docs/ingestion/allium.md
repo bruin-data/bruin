@@ -7,12 +7,15 @@ Bruin supports Allium as a source for [Ingestr assets](/assets/ingestr), and you
 In order to set up Allium connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. You need the `api_key` for authentication.
 
 To get your Allium API credentials:
+
 1. Sign up for an Allium account at [allium.so](https://allium.so/)
 2. Navigate to your account settings
 3. Generate an API key
 4. Find your query ID from the Allium explorer interface
 
 Follow the steps below to correctly set up Allium as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -55,12 +58,12 @@ parameters:
 |-------|----|---------|--------------| ------- |
 | `query:<query_id>` | - | - | replace | Allium source uses query IDs as table identifiers. Format must be `query:abc123def456` where the query ID is from your Allium explorer. |
 
-
-
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/allium_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Allium query into your Postgres database.
 
 ## Notes

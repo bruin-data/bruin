@@ -1,6 +1,7 @@
 # Custom Checks
 
 While Bruin supports a [handful of built-in quality checks](./available_checks.md), they have a shortcoming:
+
 - quality checks are not always within the scope of a single column
 - some checks are specific to the business, and custom logic is needed
 
@@ -9,6 +10,7 @@ Due to these reasons, Bruin supports defining custom quality checks using SQL. Y
 ## Definition Schema
 
 You can define custom quality checks under a key called `custom_checks`:
+
 ```bruin-sql
 /* @bruin
 
@@ -33,6 +35,7 @@ GROUP BY 1
 > Non-blocking checks are useful for long-running or expensive quality checks. It means the downstream assets will not be waiting for this quality check to finish.
 
 There are a few fields to configure the check behavior:
+
 - `name`: required, give a name to the check.
 - `query`: required, the query to run as the quality check
 - `description`: optional, add a longer description if needed using Markdown.
@@ -42,9 +45,10 @@ There are a few fields to configure the check behavior:
   Bruin will automatically wrap the query with `SELECT count(*) FROM (<query>)`.
 - `blocking`: optional, whether the test should block running downstreams, default `true`.
 
-## Examples:
+## Examples
 
 ### Simple check
+
 ```bruin-sql
 /* @bruin
 name: dataset.player_stats
@@ -65,6 +69,7 @@ GROUP BY 1
 ```
 
 ### Run non-blocking checks
+
 ```bruin-sql
 /* @bruin
 name: dataset.player_stats
@@ -84,10 +89,12 @@ SELECT name, count(*)
 FROM dataset.players
 GROUP BY 1
 ```
+
 > [!INFO]
 > Non-blocking checks are useful for long-running or expensive quality checks. It means the downstream assets will not be waiting for this quality check to finish.
 
 ### Specific value to expect
+
 ```bruin-sql
 /* @bruin
 name: dataset.player_stats
@@ -108,6 +115,7 @@ GROUP BY 1
 ```
 
 ### Count-based check
+
 ```bruin-sql
 /* @bruin
 name: dataset.player_stats

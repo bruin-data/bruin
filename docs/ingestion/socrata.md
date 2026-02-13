@@ -1,4 +1,5 @@
 # Socrata
+
 [Socrata](https://dev.socrata.com/) is an open data platform used by governments and organizations to publish and share public datasets. The platform powers thousands of open data portals worldwide, including data.gov and many city, state, and federal government sites.
 
 Bruin supports Socrata as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from any Socrata-powered open data portal into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Socrata as a source for [Ingestr assets](/assets/ingestr), and yo
 In order to set up Socrata connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `domain` and `app_token`. Optionally, you can provide `username` and `password` for accessing private datasets.
 
 Follow the steps below to correctly set up Socrata as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -57,7 +60,9 @@ Socrata source allows ingesting datasets by specifying their dataset ID as the s
 | `<dataset_id>` | `:id` | user-defined | replace/merge | Loads all records from the specified Socrata dataset. Uses `replace` by default, or `merge` when incremental key is specified. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/socrata_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Socrata dataset into your Postgres database.

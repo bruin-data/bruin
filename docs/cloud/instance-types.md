@@ -24,6 +24,7 @@ The following instance types are available in Bruin Cloud:
 By default, Bruin Cloud will use the `b1.nano` instance type.
 
 Notes:
+
 - CPU is measured in cores (1000m = 1 core)
 - Memory is measured in gibibytes (Gi) or mebibytes (Mi)
 - Values shown represent guaranteed resources allocated to your instance
@@ -33,6 +34,5 @@ Notes:
 Larger instances consume more of your tenant's resource pool. See [Concurrency & Resource Limits](/getting-started/concurrency) for details on the weighted-slot model.
 
 ## Custom Instance Types
+
 Bruin Cloud supports custom instance types. You can specify a custom instance type by setting the `instance` field to the name of the instance type you want to use. Talk to your account manager to get access to custom instance types.
-
-

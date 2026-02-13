@@ -3,9 +3,11 @@
 This pipeline is a simple example of a Bruin pipeline that copies data from Shopify to DuckDB. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes two sample assets already:
+
 - `raw.shopify`: A simple ingestr asset that copies a table from Shopify to DuckDB
 
 ## Setup
+
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
@@ -44,7 +46,9 @@ environments:
 ```
 
 ## Running the pipeline
+
 Bruin CLI can run the whole pipeline or any task with the downstreams:
+
 ```shell
 bruin run assets/shopify.asset.yml
 ```
@@ -89,6 +93,7 @@ You can optionally pass a `--downstream` flag to run the task with all of its do
 That's it, good luck!
 
 - Balance Table
+
 ```yaml
 name: shopify_raw.balance
 type: ingestr
@@ -103,6 +108,7 @@ parameters:
 ```
 
 - Transactions Table
+
 ```yaml
 name: shopify_raw.transactions
 type: ingestr

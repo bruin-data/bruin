@@ -1,4 +1,5 @@
 # Facebook Ads
+
 Facebook Ads is the advertising platform that helps users to create targeted ads on Facebook, Instagram and Messenger.
 
 Bruin supports Facebook Ads as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Facebook Ads into your data warehouse.
@@ -7,7 +8,10 @@ In order to set up Facebook Ads connection, you need to add a configuration item
 
 Follow the steps below to correctly set up Facebook Ads as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to Facebook Ads, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
 ```yaml
@@ -17,10 +21,12 @@ connections:
       access_token: "YOUR_FACEBOOK_ACCESS_TOKEN"
       account_id: "YOUR_ACCOUNT_ID"  # optional
 ```
+
 - `access_token` (required): Access token associated with Business Facebook App.
 - `account_id` (optional): Account ID associated with Ad manager. Can also be specified in the table name (e.g., `campaigns:1234567890`).
 
 ### Step 2: Create an asset file for data ingestion
+
 To ingest data from Facebook Ads, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., facebook_ads_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
@@ -43,7 +49,6 @@ parameters:
 ## Available Source Tables
 
 Facebook Ads source allows ingesting the following sources into separate tables:
-
 
 | Table           | PK | Inc Key | Inc Strategy | Details                                                                                                                                        |
 | --------------- | ----------- | --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -355,11 +360,11 @@ parameters:
 ---
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/facebook_ads_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Facebook Ads table into your Postgres database.
 
-
 <img width="962" alt="facebooksads" src="https://github.com/user-attachments/assets/7476fb59-8885-4c76-95d4-f150cac2d423">
-

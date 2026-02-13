@@ -1,4 +1,5 @@
 # InfluxDB
+
 [InfluxDB](https://www.influxdata.com/) is a time series database optimized for storing high throughput metrics.
 
 Bruin supports InfluxDB as a source for [Ingestr assets](/assets/ingestr). You can ingest data from InfluxDB into your data platform.
@@ -7,7 +8,10 @@ To set up a InfluxDB connection, add a configuration item in the `.bruin.yml` fi
 
 Follow these steps to set up InfluxDB and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to the .bruin.yml file
+
 ```yaml
 connections:
   influxdb:
@@ -17,6 +21,7 @@ connections:
       org: my-org
       bucket: my-ingestr-bucket
 ```
+
 - `host`: The host address of the database server.
 - `port`: The port number the database server is listening on. If you do not specify a port, the default is 8086 for self-hosted InfluxDB and 443 for InfluxDB Cloud.
 - `token`: Authentication token.
@@ -24,9 +29,10 @@ connections:
 - `bucket`: Bucket that stores the measurements.
 - `secure`: Optional. Use HTTPS when true (default) or HTTP when false.
 
-
 ### Step 2: Create an asset file for data ingestion
+
 Create an [asset configuration](/assets/ingestr#asset-structure) file (e.g., `influxDB_ingestion.yml`) inside the assets folder with the following content:
+
 ```yaml
 name: public.influxdb
 type: ingestr
@@ -38,6 +44,7 @@ parameters:
 
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Always `ingestr` for InfluxDB.
 - `source_connection`: The InfluxDB connection name defined in `.bruin.yml`.
@@ -45,9 +52,11 @@ parameters:
 - `destination`: The destination connection name.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/influxDB_ingestion.yml
 ```
+
 Running this command ingests data from InfluxDB into your Postgres database.
 
 <img alt="InfluxDB" src="./media/influxdb_ingestion.png">

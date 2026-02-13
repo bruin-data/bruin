@@ -1,4 +1,5 @@
 # Solidgate
+
 [Solidgate](https://solidgate.com/) is a one-stop payment processing platform that ensures seamless online purchases and streamlined payment infrastructure.
 
 ingestr supports Solidgate as a source.
@@ -8,6 +9,8 @@ Bruin supports Solidgate as a source for [Ingestr assets](/assets/ingestr), and 
 In order to set up Solidgate connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `public_key` and `secret_key` . For details on how to obtain these credentials, please refer [here](https://docs.solidgate.com/payments/integrate/access-to-api/#retrieve-your-credentials).
 
 Follow the steps below to correctly set up Solidgate as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -20,6 +23,7 @@ connections:
           secret_key: "api_sk_test"
           public_key: "api_pk_test"
 ```
+
 - `public_key`: The public API key used to identify the account.
 - `secret_key`: The secret API key used to authenticate requests to the Solidgate API.
 
@@ -55,10 +59,11 @@ parameters:
 | `financial_entries` | id | created_at | merge | Provides a detailed transaction-level breakdown of financial records |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/Solidgate_ingestion.yml
 ```
-As a result of this command, Bruin will ingest data from the given Solidgate table into your Postgres database.
 
+As a result of this command, Bruin will ingest data from the given Solidgate table into your Postgres database.
 
 <img alt="solidgate" src="./media/solidgate_ingestion.png">

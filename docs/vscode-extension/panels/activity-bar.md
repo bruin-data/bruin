@@ -9,15 +9,18 @@ The Activity Bar is located on the left side of VS Code, alongside other VS Code
 ## Functionality
 
 ### Database Browsing
+
 - **Environment Grouping**: Databases are grouped by environment to avoid confusion with duplicates and provide clear organization
 - **Connection Hierarchy**: Browse through your configured connections and their database structures
 - **Table Exploration**: Navigate through databases, schemas, and tables to understand your data landscape
 
 ### Table Details
+
 - **Schema Information**: View detailed information about table structures, including column names, types, and constraints
 - **Metadata Access**: Access table metadata and properties directly from the browser interface
 
 ### Query Preview Integration
+
 - **Direct Query Access**: Preview queries for specific tables or data sources
 - **Seamless Integration**: Connect directly with the Query Preview Panel for immediate query execution and result viewing
 
@@ -28,7 +31,6 @@ The Activity Bar is located on the left side of VS Code, alongside other VS Code
 3. **Navigate Databases**: Click through databases and schemas to find the tables you need
 4. **View Table Details**: Click on individual tables to see their structure and metadata
 5. **Preview Data**: Use the integrated query preview functionality to examine table contents
-
 
 ## Benefits
 

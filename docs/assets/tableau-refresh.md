@@ -35,6 +35,7 @@ connections:
 ```
 
 **Parameters:**
+
 - `name`: A unique name for this connection
 - `host`: Your Tableau Server hostname (without https://)
 - `site_id`: The site identifier (content URL) for your Tableau site

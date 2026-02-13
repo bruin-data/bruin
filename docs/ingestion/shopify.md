@@ -1,4 +1,5 @@
 # Shopify
+
 [Shopify](https://www.Shopify.com/) is a comprehensive e-commerce platform that enables individuals and businesses to create online stores.
 
 Bruin supports Shopify as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Shopify into your data warehouse.
@@ -7,7 +8,10 @@ In order to set up Shopify connection, you need to add a configuration item in t
 
 Follow the steps below to correctly set up Shopify as a data source and run ingestion:
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To ingest data from Shopify, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., shopify_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
@@ -19,6 +23,7 @@ To ingest data from Shopify, you need to create an [asset configuration](/assets
           client_id: your_client_id
           client_secret: your_client_secret
 ```
+
 - `api_key`: the API key used for authentication with Shopify
 - `client_id`: the OAuth client ID for your Shopify app (optional)
 - `client_secret`: the OAuth client secret for your Shopify app (optional)
@@ -36,6 +41,7 @@ parameters:
 
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. It will be always ingestr type for Shopify.
 - `connection`: This is the destination connection.
@@ -57,9 +63,11 @@ parameters:
 | price_rules | id | updated_at | merge | DEPRECATED - Use discounts table instead |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/shopify_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Shopify table into your Postgres database.
 
 <img width="1217" alt="shopify" src="https://github.com/user-attachments/assets/0fe4b3e9-e9b8-4967-b892-4dc539683155">

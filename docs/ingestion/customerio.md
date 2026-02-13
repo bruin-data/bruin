@@ -1,4 +1,5 @@
 # Customer.io
+
 [Customer.io](https://customer.io/) is a customer engagement platform that enables businesses to send automated messages across email, push, SMS, and more.
 
 Bruin supports Customer.io as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Customer.io into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Customer.io as a source for [Ingestr assets](/assets/ingestr), an
 To set up a Customer.io connection, you need to have a Customer.io API key. For more information, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/customerio.html)
 
 Follow the steps below to correctly set up Customer.io as a data source and run ingestion:
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -18,6 +21,7 @@ To connect to Customer.io, you need to add a configuration item to the connectio
           api_key: "YOUR_CUSTOMERIO_API_KEY"
           region: "us"
 ```
+
 - `api_key`: The API key used for authentication with the Customer.io API.
 - `region`: The region of your Customer.io account. Must be either `us` (default) or `eu`.
 
@@ -79,7 +83,9 @@ parameters:
 | workspaces | – | – | replace | Retrieves workspaces in your account. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run ingestr.customerio.asset.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Customer.io table into your Postgres database.

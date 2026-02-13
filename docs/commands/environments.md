@@ -3,7 +3,8 @@
 The `environments` command allows you to manage environments defined in the `.bruin.yml` configuration file.
 It supports listing all available environments in the current Git repository and creating new ones.
 
-### Usage
+## Usage
+
 ```bash
 bruin environments [subcommand]
 ```
@@ -75,11 +76,13 @@ bruin environments clone --target test --output json
 ### Examples
 
 Clone the default environment:
+
 ```bash
 bruin environments clone --target staging
 ```
 
 Clone a specific environment with a schema prefix:
+
 ```bash
 bruin environments clone --source production --target dev --schema-prefix dev_
 ```

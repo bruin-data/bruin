@@ -1,0 +1,17 @@
+{
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD024": false,
+    "MD033": false,
+    "MD041": false,
+    "MD059": false,
+    "MD060": false
+  },
+  "globs": [
+    "docs/**/*.md",
+    "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md"
+  ]
+}

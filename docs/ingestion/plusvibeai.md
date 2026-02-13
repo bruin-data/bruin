@@ -13,6 +13,7 @@ Plus Vibe AI connections are defined using the following properties:
 - `workspace_id`: Your workspace ID (required)
 
 :::code-group
+
 ```yaml [connections.yml]
 connections:
   plusvibeai:
@@ -20,11 +21,13 @@ connections:
       api_key: "your_api_key"
       workspace_id: "your_workspace_id"
 ```
+
 :::
 
 You can also use environment variables in your connections.yml by using the `&#123;&#123; env_var("ENV_VAR_NAME") &#125;&#125;` syntax.
 
 For example:
+
 ```yaml
 connections:
   plusvibeai:
@@ -61,8 +64,7 @@ The source preserves nested objects as JSON columns to maintain data structure i
 
 ## Notes
 
-- **Authentication**: Get your API key from https://app.plusvibe.ai/v2/settings/api-access/
+- **Authentication**: Get your API key from <https://app.plusvibe.ai/v2/settings/api-access/>
 - **Incremental Loading**: Supported for all tables using their respective timestamp fields
 - **Rate Limiting**: Plus Vibe AI API has a rate limit of 5 requests per second. The source automatically handles rate limiting with exponential backoff and retry logic
 - **Pagination**: The emails endpoint uses cursor-based pagination with `page_trail` parameter, while other endpoints use standard offset-based pagination
-

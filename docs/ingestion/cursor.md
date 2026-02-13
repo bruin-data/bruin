@@ -8,6 +8,8 @@ In order to set up Cursor connection, you need to add a configuration item in th
 
 Follow the steps below to correctly set up Cursor as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
 
 To connect to Cursor, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
@@ -53,9 +55,11 @@ parameters:
 | `filtered_usage_events` | - | - | replace | Detailed usage events with timestamps, models, token usage, and costs. Supports optional date filtering |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/cursor_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Cursor table into your Postgres database.
 
 ## Notes
@@ -63,4 +67,3 @@ As a result of this command, Bruin will ingest data from the given Cursor table 
 - **Authentication**: The Cursor API uses API key authentication.
 - **Date Range Limit**: The `daily_usage_data` and `filtered_usage_events` endpoints have a 30-day limit per request. If you need more than 30 days of historical data, make multiple requests with different date ranges.
 - **Date Filtering**: `daily_usage_data` and `filtered_usage_events` tables support optional date filtering. When dates are provided, only data within that range is fetched. When dates are omitted, the API returns default data (typically last 30 days).
-

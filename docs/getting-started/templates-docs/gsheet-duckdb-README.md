@@ -3,13 +3,15 @@
 This pipeline is a simple example of a Bruin pipeline that copies data from GSheet to DuckDB. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes two sample assets already:
+
 - `gsheet_raw.customers`: A simple ingestr asset that copies a table from GSheet to DuckDB
 
 ## Setup
 
-Example Sheet: https://docs.google.com/spreadsheets/d/1p40qR9t6DM5a1IskTkqEX9eZYZmBeILzUX_AdMkg__A/edit?usp=sharing
+Example Sheet: <https://docs.google.com/spreadsheets/d/1p40qR9t6DM5a1IskTkqEX9eZYZmBeILzUX_AdMkg__A/edit?usp=sharing>
 
 ## Setup
+
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/ingestion/google_sheets.html).
 Here's a sample `.bruin.yml` file:
 
@@ -30,7 +32,6 @@ environments:
 
 Bruin CLI can run the whole pipeline or any task with the downstreams:
 
-
 ```shell
 ❯ bruin run ./templates/gsheet-duckdb/                                                       (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
@@ -46,7 +47,6 @@ Executed 1 assets in 9.656s
 ```
 
 You can also run a single task:
-
 
 ```shell
 ❯ bruin run ./templates/gsheet-duckdb/                                                       (bruin) 

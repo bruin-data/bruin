@@ -1,4 +1,5 @@
 # Adjust
+
 [Adjust](https://www.adjust.com/) is a mobile marketing analytics platform that provides solutions for measuring and optimizing campaigns, as well as protecting user data.
 
 Bruin supports Adjust as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Adjust into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Adjust as a source for [Ingestr assets](/assets/ingestr), and you
 In order to set up Adjust connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `api_key`. For details on how to obtain these credentials, please refer [here](https://dev.adjust.com/en/api/rs-api/authentication/).
 
 Follow the steps below to correctly set up Adjust as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -17,6 +20,7 @@ To connect to Adjust, you need to add a configuration item to the connections se
         - name: "my_adjust"
           api_key: "abc123"
 ```
+
 - `api_key`: The API key for the Adjust account.
 - `lookback_days`: Optional. The number of days to go back from the given start date for data. Defaults to 30 days. To know more about it, please refer [here](https://getbruin.com/docs/ingestr/supported-sources/adjust.html#lookback-days)
 
@@ -52,7 +56,9 @@ parameters:
 | `custom` | id | created | merge | Retrieves custom data based on the dimensions and metrics specified. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/adjust_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Adjust table into your Postgres database.

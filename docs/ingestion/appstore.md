@@ -1,11 +1,14 @@
 # Apple AppStore
+
 The [AppStore](https://appstore.com/) is an app marketplace developed and maintained by Apple, for mobile apps on its iOS and iPadOS operating systems. The store allows users to browse and download approved apps developed within Apple's iOS SDK. Apps can be downloaded on the iPhone, iPod Touch, or iPad, and some can be transferred to the Apple Watch smartwatch or 4th-generation or newer Apple TVs as extensions of iPhone apps.
 
 Bruin supports AppStore as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest analytics, sales and performance data into your data warehouse.
 
-In order to set up AppStore connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. 
+In order to set up AppStore connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
 Follow the steps below to correctly set up AppStore as a data source and run ingestion:
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -49,11 +52,11 @@ parameters:
   destination: postgres
 ```
 
-- name: The name of the asset.
-- type: Specifies the type of the asset. It will be always ingestr type for AppStore.
-- connection: This is the destination connection.
-- source_connection: The name of the AppStore connection defined in .bruin.yml.
-- source_table: The name of the table in AppStore Connect API that you want to ingest. The table is of the form `<kind>:<app_id>[,<app_id>]`. Where `kind` is a report type and `<app_id>` is the ID of your app. Multiple App IDs can be specified by delimiting them with a comma.
+* name: The name of the asset.
+* type: Specifies the type of the asset. It will be always ingestr type for AppStore.
+* connection: This is the destination connection.
+* source_connection: The name of the AppStore connection defined in .bruin.yml.
+* source_table: The name of the table in AppStore Connect API that you want to ingest. The table is of the form `<kind>:<app_id>[,<app_id>]`. Where `kind` is a report type and `<app_id>` is the ID of your app. Multiple App IDs can be specified by delimiting them with a comma.
 
 ## Available Source Tables
 
@@ -67,7 +70,9 @@ parameters:
 | app-crashes-expanded | [App Name,App Version,Build,Date,Device,Platform,Release Type,Territory] | processing_date | merge | App crash analytics including crash counts, device information, and version details. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/appstore_integration.asset.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given AppStore report into your Postgres database.

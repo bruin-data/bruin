@@ -6,7 +6,6 @@ Bruin supports Oracle Database for cataloging, lineage tracking, database import
 
 Oracle Database requires a connection configuration, which can be added to `connections` in the `.bruin.yml` file complying with the following schema:
 
-
 ### Required Configuration
 
 To connect to Oracle Database, you need the following required parameters:
@@ -73,6 +72,7 @@ bruin import database --connection oracle-default path/to/your/pipeline
 ```
 
 This will:
+
 - Connect to your Oracle database
 - Scan all accessible schemas and tables (excluding system schemas)
 - Create corresponding asset definition files in your pipeline's `assets/` folder
@@ -97,7 +97,6 @@ Defines Oracle SQL assets for documentation and query preview purposes. Currentl
 - Defining data quality checks and validation rules
 - Setting up custom checks for entire assets
 - Organizing assets with metadata for better discoverability
-
 
 #### Example: Document a query with column descriptions
 
@@ -189,7 +188,6 @@ When you define dependencies between your Oracle assets, you can visualize the l
 
 ![Oracle Asset Lineage](/oracle-lineage.png)
 
-
 In this diagram, you can see that `hr.employees` depends on both `hr.departments` and `hr.jobs` assets, which is defined in the `depends` section of the asset configuration. The VSCode extension provides this visual representation to help you understand data flow and relationships between your Oracle tables and views.
 
 ## Ingesting Data from Oracle
@@ -232,6 +230,7 @@ columns:
 ```
 
 In this example:
+
 - The `incremental_strategy: merge` ensures that existing records are updated based on the primary key
 - The `incremental_key: updated_at` tells ingestr to only load records that have been updated since the last run
 - The `primary_key` column definition is used by ingestr to identify unique records during merge operations

@@ -125,11 +125,13 @@ When you run Bruin with `--secrets-backend doppler`:
 ### Environment Variables Not Set
 
 If you see an error like:
-```
+
+```bash
 failed to initialize doppler client: BRUIN_DOPPLER_TOKEN env variable not set
 ```
 
 Make sure all three required environment variables are set:
+
 ```bash
 echo $BRUIN_DOPPLER_TOKEN
 echo $BRUIN_DOPPLER_PROJECT
@@ -139,11 +141,13 @@ echo $BRUIN_DOPPLER_CONFIG
 ### Secret Not Found
 
 If you see an error like:
-```
+
+```bash
 secret 'my-connection' not found in Doppler
 ```
 
 Verify that:
+
 1. The secret exists in Doppler with the exact name used in your pipeline
 2. The secret is in the correct project and config
 3. Your Doppler token has access to read the secret
@@ -151,11 +155,13 @@ Verify that:
 ### Invalid Secret Format
 
 If you see an error like:
-```
+
+```bash
 failed to parse secret as JSON
 ```
 
 Verify that:
+
 1. The secret value in Doppler is valid JSON
 2. The JSON includes both `type` and `details` fields
 3. The `type` value matches a supported connection type

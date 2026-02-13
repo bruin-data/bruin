@@ -1,7 +1,9 @@
 # Snowflake Assets
+
 Bruin supports Snowflake as a data platform.
 
 ## Connection
+
 In order to set up a Snowflake connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
 
 There's 2 different ways to fill it in
@@ -88,6 +90,7 @@ SET RSA_PUBLIC_KEY='your_public_key_here';
 ```
 
 #### Step 3: Verify
+
 ```sql
 DESC USER your_snowflake_username;
 ```
@@ -111,17 +114,16 @@ In your `.bruin.yml` file, update the Snowflake connection configuration to incl
                   private_key_path: /Users/johndoe/rsa_key.pem
 ```
 
-
 For more details on how to set up key-based authentication, see [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair).
-
 
 ## Snowflake Assets
 
 ### `sf.sql`
+
 Runs a materialized Snowflake asset or a Snowflake script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
-
 #### Example: Create a table using table materialization
+
 ```bruin-sql
 /* @bruin
 name: events.install
@@ -136,6 +138,7 @@ where event_name = "install"
 ```
 
 #### Example: Run a Snowflake script
+
 ```bruin-sql
 /* @bruin
 name: events.install
@@ -168,7 +171,6 @@ join marketing.attribution as a
 
 Sensors are a special type of assets that are used to wait on certain external signals.
 
-
 Checks if a table exists in Snowflake, runs by default every 30 seconds until this table is available.
 
 ```yaml
@@ -178,13 +180,13 @@ parameters:
     table: string
     poke_interval: int (optional)
 ```
-**Parameters**:
-- `table`: In `database_id.schema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id` is provided, the database will be taken from the database configuration in the `.bruin.yml`. 
-- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
 
+**Parameters**:
+
+- `table`: In `database_id.schema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id` is provided, the database will be taken from the database configuration in the `.bruin.yml`.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 ### `sf.sensor.query`
-
 
 Checks if a query returns any results in Snowflake, runs by default every 30 seconds until this query returns any results.
 
@@ -197,11 +199,14 @@ parameters:
 ```
 
 **Parameters:**
+
 - `query`: Query you expect to return any results
-- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
+
 Checks if the data available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: sf.sensor.query
@@ -210,7 +215,9 @@ parameters:
 ```
 
 #### Example: Streaming upstream table
+
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: sf.sensor.query
@@ -219,9 +226,11 @@ parameters:
 ```
 
 ### `sf.seed`
+
 `sf.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Snowflake database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Snowflake database.
 
 You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: sf.seed
@@ -231,15 +240,16 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
-
-####  Examples: Load csv into a Snowflake database
+#### Examples: Load csv into a Snowflake database
 
 The examples below show how to load a CSV into a Snowflake database.
+
 ```yaml
 name: dashboard.hello
 type: sf.seed

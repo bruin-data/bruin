@@ -95,22 +95,27 @@ All variables are accessible in SQL, `seed`, `sensor`, and `ingestr` assets via 
 
 In Python assets, variables are exposed under `BRUIN_VARS` environment variable. When a pipeline defines no variables, this environment variable contains `{}`.
 ::: code-group
+
 ```sql [asset.sql]
 SELECT * FROM events
 WHERE user_id IN ({{ ','.join(var.users) }})
 ```
+
 :::
 
 ::: code-group
+
 ```python [asset.py]
 import os, json
 vars = json.loads(os.environ["BRUIN_VARS"])
 print(vars["env"])
 ```
+
 :::
 Sensor and ingestr assets, defined as YAML files, can embed variables in the same way:
 
 ::: code-group
+
 ```yaml [sensor.asset.yml]
 name: wait_for_table
 type: bq.sensor.query
@@ -120,8 +125,10 @@ parameters:
     from `{{ var.table }}`
     where load_time > {{ start_datetime }}
 ```
+
 :::
 ::: code-group
+
 ```yaml [ingestr.asset.yml]
 name: public.rates
 type: ingestr
@@ -130,14 +137,17 @@ parameters:
   source_table: '{{ var.bucket }}/rates.csv'
   destination: postgres
 ```
+
 :::
 
 ::: info NOTE
 For YAML-style assets, variables can only be used in the value context of `parameter` field.
 :::
+
 ## Example
 
 ::: code-group
+
 ```yaml [pipeline.yml]
 name: experimentation
 variables:
@@ -172,9 +182,11 @@ variables:
     default:
       email: ["enterprise_newsletter"]
 ```
+
 :::
 
 ::: code-group
+
 ```bruin-sql [asset.sql]
 /* @bruin
 name: analytics.cohort_plan
@@ -195,9 +207,11 @@ WHERE channel NOT IN (
   FROM UNNEST({{ var.channel_overrides.email | tojson }}) AS value
 );
 ```
+
 :::
 
 When run with the defaults above, Bruin renders the SQL with the array of structs expanded and the overridden email templates filtered out:
+
 ```sql
 SELECT
   cohort.name,

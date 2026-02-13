@@ -19,12 +19,10 @@ Sensors allow you to do a couple of things:
 
 > [!NOTE]
 > Sensors are useful when your pipelines run on a schedule, rather than manual `bruin run` executions. You can control how sensors are executed via the `--sensor-mode` flag in `bruin run` command.
-
 > [!WARNING]
 > Bruin CLI supports working sensor implementations for some platforms such as BigQuery or Snowflake, but not all. [Bruin Cloud](https://getbruin.com) supports all sensors, and we are working on adding support for more platforms in Bruin CLI.
 
 Sensors are a crucial part of integrating Bruin with external systems, and we are always happy to improve our sensor coverage.
-
 
 ### Poking Interval
 
@@ -65,6 +63,7 @@ parameters:
 This asset will wait until the query returns any result.
 
 ### Adding quality checks
+
 Sensors also support quality checks. You can use them to validate the external data once the sensor succeeds.
 
 ```yaml
@@ -81,8 +80,3 @@ columns:
 ```
 
 The snippet above ensures the `raw.external_asset` table exposes a `count` column and that the values are positive. The sensor waits until the query returns true, and then the quality check validates the data before downstream assets run.
-
-
-
-
-

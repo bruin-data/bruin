@@ -14,6 +14,7 @@ connections:
     - name: 'my-pulse'
       token: 'your_token_here'
 ```
+
 - `token`: The API token used for authentication with the Internet Society Pulse API.
 
 ## Step 2: Create an asset file for data ingestion
@@ -30,6 +31,7 @@ parameters:
   source_table: 'https:US'
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Set to `ingestr` to use the ingestr data pipeline.
 - `connection`: The destination connection (e.g., `postgres`).
@@ -38,15 +40,16 @@ parameters:
 
 ## Step 3: [Run](/commands/run) asset to ingest data
 
-```
+```bash
 bruin run assets/pulse_ingestion.asset.yml
 ```
+
 This command will ingest data from the specified Internet Society Pulse metric into your destination database.
 
 ## Supported Metrics and Tables
 
 | Metric | Description | Country Support | Additional Options | PK | Inc Key | Inc Strategy |
-|--------|-------------|-----------------|-------------------|----|---------|--------------| 
+|--------|-------------|-----------------|-------------------|----|---------|--------------|
 | dnssec_adoption | DNSSEC adoption metrics for specific domains | No | Domain name | date | date | merge |
 | dnssec_tld_adoption | DNSSEC adoption metrics for top-level domains | Yes | Country code | date | date | merge |
 | dnssec_validation | DNSSEC validation metrics | Yes | Country code | date | date | merge |
@@ -77,9 +80,9 @@ parameters:
 ```
 
 ## Notes
+
 - You must obtain your API token from the Internet Society Pulse platform.
 - The `source_table` parameter uses a colon-separated syntax for metric, options, and country codes (e.g., `https:topsites:US`).
 - Country codes should follow the ISO 3166-1 alpha-2 format (e.g., US, GB, DE).
 
 For more details and advanced usage, see the [official documentation](https://pulse.internetsociety.org/api/docs).
-

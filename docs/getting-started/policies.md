@@ -6,6 +6,7 @@ This document explains how to define, configure, and use custom linting policies
 
 > [!NOTE]
 > For the purpose of this document, a `resource` means either an `asset` or a `pipeline`.
+>
 ## Quick Start
 
 1. Create a `policy.yml` file in your project root.
@@ -30,7 +31,7 @@ rulesets:
 To verify that your assets satisfy your policies, you can run:
 
 ```sh
-$ bruin validate /path/to/pipelines
+bruin validate /path/to/pipelines
 ```
 
 > [!tip]
@@ -41,6 +42,7 @@ $ bruin validate /path/to/pipelines
 A **ruleset** groups one or more rules together and specifies which resources they apply to, based on selectors.
 
 Each ruleset must include:
+
 - **name**: A unique name for the ruleset.
 - **selector** (optional): One or more predicates to select the applicable resources.
 - **rules**: List of rule names (built-in or custom) to apply.
@@ -49,7 +51,6 @@ If a **selector** is not specified, the ruleset applies to **all resources**.
 
 >[!NOTE]
 > Names be must alphanumeric or use dashes (`-`). This applies to both `rulesets` and `rules`.
-
 
 ### Selector Predicates
 
@@ -70,7 +71,7 @@ If multiple selectors are specified within a ruleset, **all selectors must match
 
 If no selectors are defined for a ruleset, **the ruleset applies to all resources**. Some selectors only work with certain
 rule targets. For instance `tag` selector only works for rules that [target](#targets) assets. Pipeline level rules will just ignore
-this selector. 
+this selector.
 
 > [!TIP]
 > If your ruleset only contains asset selectors, but uses `pipeline` rules, then those pipeline rules will apply to all pipelines. Make sure to define a `pipeline` or `path` selector if you don't intend for that to happen.
@@ -89,6 +90,7 @@ rulesets:
 ```
 
 In this example:
+
 - `production` applies **only** to resources that match both:
   - path regex `.*/prod/.*`
   - and have a tag matching `critical`.
@@ -98,7 +100,8 @@ In this example:
 Custom lint rules are defined inside the `custom_rules` section of `policy.yml`.
 
 Each rule must include:
-- **name**: A unique name for the rule. 
+
+- **name**: A unique name for the rule.
 - **description**: A human-readable description of the rule.
 - **criteria**: An [expr](https://expr-lang.org/) boolean expression. If the expression evalutes to `true` then the resource passes validation.
 
@@ -114,10 +117,12 @@ custom_rules:
 ### Targets
 
 Custom rules can have an optional `target` attribute that defines what resource the rule acts on. Valid values are:
+
 - `asset` (default)
 - `pipeline`
 
-**Example**
+### Example
+
 ```yaml
 custom_rules:
 
@@ -142,13 +147,13 @@ ruleset:
 
 `criteria` has the following variables available for use in your expressions:
 
-| Name | Target | 
-| ---  | --- | 
-| asset | `asset` | 
+| Name | Target |
+| ---  | --- |
+| asset | `asset` |
 | pipeline | `asset`, `pipeline` |
 
 ::: warning
-The variables exposed here are direct Go structs, therefore it is recommended to check the latest version of these given structs. 
+The variables exposed here are direct Go structs, therefore it is recommended to check the latest version of these given structs.
 
 In the future we will create dedicated schemas for custom rules with standards around them.
 :::
@@ -264,7 +269,6 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
   </tbody>
 </table>
 
-
 You can directly reference these rules in `rulesets[*].rules`.
 
 ## Full Example
@@ -291,7 +295,6 @@ rulesets:
     rules:
       - asset-name-is-lowercase
 ```
-
 
 ## Further Reading
 

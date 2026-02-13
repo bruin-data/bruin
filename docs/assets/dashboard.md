@@ -21,6 +21,7 @@ Bruin supports the following dashboard tools as assets:
 - Tableau: `tableau`
 
 ## Definition Schema
+
 Dashboard assets are defined using the extension `{asset_name}.asset.yml`. Here is an example of the schema:
 
 ```yaml
@@ -41,96 +42,108 @@ tags:
 ## Supported Dashboard Tools
 
 ### Amazon QuickSight
+
 ```yaml
 name: myschema.asset_name
 type: quicksight
 ```
 
 ### Apache Superset
+
 ```yaml
 name: myschema.asset_name
 type: superset
 ```
 
 ### Domo
+
 ```yaml
 name: myschema.asset_name
 type: domo
 ```
 
 ### Good Data
+
 ```yaml
 name: myschema.asset_name
 type: gooddata
 ```
 
 ### Grafana
+
 ```yaml
 name: myschema.asset_name
 type: grafana
 ```
 
 ### Looker
+
 ```yaml
 name: myschema.asset_name
 type: looker
 ```
 
 ### Looker Studio
+
 ```yaml
 name: myschema.asset_name
 type: looker_studio
 ```
 
 ### Metabase
+
 ```yaml
 name: myschema.asset_name
 type: metabase
 ```
 
 ### Mode BI
+
 ```yaml
 name: myschema.asset_name
 type: modebi
 ```
 
 ### Power BI
+
 ```yaml
 name: myschema.asset_name
 type: powerbi
 ```
 
 ### Qlik Sense
+
 ```yaml
 name: myschema.asset_name
 type: qliksense
 ```
 
 ### Qlik View
+
 ```yaml
 name: myschema.asset_name
 type: qlikview
 ```
 
 ### Redash
+
 ```yaml
 name: myschema.asset_name
 type: redash
 ```
 
 ### Sisense
+
 ```yaml
 name: myschema.asset_name
 type: sisense
 ```
 
 ### Tableau
+
 Tableau assets allow you to both define and refresh Tableau dashboards, workbooks, and worksheets. Please see the [Tableau assets](./tableau-refresh) for more information.
 
 ```yaml
 name: myschema.asset_name
 type: tableau
 ```
-
-
-

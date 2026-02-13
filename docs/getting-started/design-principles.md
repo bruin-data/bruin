@@ -1,11 +1,12 @@
 # Design Principles
 
 Bruin is an opinionated data framework, which contains:
+
 - various open-source components,
   - [Bruin CLI](https://github.com/bruin-data/bruin)
   - [ingestr](https://github.com/bruin-data/ingestr)
   - [Bruin VS Code extension](https://github.com/bruin-data/bruin-vscode)
-- a framework to build scalable data products, both in terms of data size as well as the _data team size_ 
+- a framework to build scalable data products, both in terms of data size as well as the _data team size_
 - and a managed data platform as a service, [Bruin Cloud](https://getbruin.com),
 
 Below is a living list of design principles that outlines the vision behind Bruin, both as an open-source product as well as a business.

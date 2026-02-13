@@ -13,6 +13,7 @@ This command is used to execute a Bruin pipeline or a specific asset within a pi
 ```bash
 bruin run [FLAGS] [optional path to the pipeline/asset]
 ```
+
 <img alt="Bruin - init" src="/chesspipeline.gif" style="margin: 10px;" />
 
 <style>
@@ -57,11 +58,9 @@ table td:first-child {
 | `--var` | []str | - | Override pipeline [variables](/getting-started/pipeline-variables.md) with custom values. |
 | `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. **BigQuery only.** |
 
-
-
 ### Continue from the last failed asset
 
-If you want to continue from the last failed asset, you can use the `--continue` flag. This will run the pipeline/asset from the last failed asset. Bruin will automatically retrieve all the flags used in the last run. 
+If you want to continue from the last failed asset, you can use the `--continue` flag. This will run the pipeline/asset from the last failed asset. Bruin will automatically retrieve all the flags used in the last run.
 
 ```bash
 bruin run --continue 
@@ -71,94 +70,115 @@ bruin run --continue
 > This will only work if the pipeline structure is not changed. If the pipeline structure has changed in any way, including asset dependencies, you will need to run the pipeline/asset from the beginning. This is to ensure that the pipeline/asset is run in the correct order.
 
 ### Focused Runs: Filtering by Tags and Execution Types
+
 As detailed in the flag section above, the  `--tag`, `--downstream`, `--exclude-tag`, and `--only` flags provide powerful ways to filter and control which assets and execution steps in your pipeline are executed. These flags can also be combined to fine-tune pipeline runs, allowing you to execute specific subsets of assets based on tags, include their downstream dependencies, and restrict execution to certain execution types.
 
 Let's explore how combining these flags enables highly targeted pipeline execution scenarios:
 
-
 ### Combining Tags and Execution Types
+
 Using `--tag` with `--only` restricts the execution steps to specific types for the assets filtered by the given tag. For example:
+
 ```bash
 bruin run --tag quality_tag --only checks
 ```
+
 This runs only the `checks` execution step for the assets tagged with `quality_tag` while excluding other execution types.
 
 ### Combining Exclude Tag and Execution Types
+
 Using `--exclude-tag` with `--only` allows you to run specific execution types while excluding assets with certain tags. For example:
+
 ```bash
 bruin run --exclude-tag quality_tag --only checks
 ```
+
 This runs the `checks` execution step for all assets EXCEPT those tagged with `quality_tag`. This is useful when you want to skip certain assets while running specific execution types.
 
 ### Combining Tag and Exclude-Tag
+
 Using `--tag` with `--exclude-tag` allows you to include specific assets and then exclude certain ones based on another tag. For example:
+
 ```bash
 bruin run --tag important_tag --exclude-tag quality_tag
 ```
+
 This command will run assets tagged with `important_tag` but will exclude those that also have the `quality_tag`. This is useful for focusing on a subset of assets while excluding others that meet certain criteria.
 
-
 ### Combining Downstream and Other Filtering Flags
+
 The `--downstream` flag can be used when running a single asset. You can combine it with other flags like `--exclude-tag` and `--only` to refine execution. For example:
 
 - **Using `--downstream` with `--exclude-tag`:**
+
   ```bash
   bruin run --downstream --exclude-tag quality_tag
   ```
+
   This command will run a single asset and exclude any assets tagged with `quality_tag`.
 
 - **Using `--downstream` with `--only`:**
+
   ```bash
   bruin run --downstream --only checks
   ```
+
   This command will run only the `checks` execution step for a single asset, allowing you to focus on specific execution types.
 
 These combinations provide flexibility in managing task execution by allowing you to exclude certain assets or focus on specific task types while using the `--downstream` flag.
 
-
-
 ## Examples
+
 Run the pipeline from the current directory:
+
 ```bash
 bruin run
 ```
 
 Run the pipeline from a file:
+
 ```bash
 bruin run ./pipelines/project1/pipeline.yml
 ```
 
 Run a specific asset:
+
 ```bash
 bruin run ./pipelines/project1/assets/my_asset.sql
 ```
 
 Run the pipeline with a specific environment:
+
 ```bash
 bruin run --environment dev
 ```
 
 Run the pipeline with a specific start and end date:
+
 ```bash
 bruin run --start-date 2024-01-01 --end-date 2024-01-31
 ```
 
 Run the assets in the pipeline that contain a specific tag:
+
 ```bash
 bruin run --tag my_tag
 ```
 
 Run only the quality checks:
+
 ```bash
 bruin run --only checks
 ```
 
 Run only the main execution step and not the quality checks:
+
 ```bash
 bruin run --only main
 ```
 
 Run with full refresh to reprocess all historical data:
+
 ```bash
 bruin run --full-refresh
 ```
@@ -167,21 +187,23 @@ bruin run --full-refresh
 > You can protect specific assets from being dropped during full refresh by setting `refresh_restricted: true` in the asset definition. See [Materialization](../assets/materialization.md#full-refresh-and-refresh_restricted) for more details.
 
 Run with default query annotations:
+
 ```bash
 bruin run path/to/your/asset.sql --query-annotations default
 ```
 
 Run with custom JSON annotations:
+
 ```bash
 bruin run path/to/your/asset.sql --query-annotations '{"environment":"prod","team":"data","version":"1.2"}'
 ```
-
 
 ## Metadata Push
 
 Metadata push is a feature that allows you to push metadata to the destination database/data catalog if supported. Currently, we support BigQuery and Postgres as the catalog.
 
 There are two ways to push metadata:
+
 1. You can set the `--push-metadata` flag to `true` when running the pipeline/asset.
 2. You can fill out the `metadata_push` dictionary in the pipeline/asset definition.
 
@@ -213,6 +235,7 @@ bruin run --secrets-backend doppler
 ```
 
 Or set via environment variable:
+
 ```bash
 export BRUIN_SECRETS_BACKEND=doppler
 bruin run
@@ -229,16 +252,10 @@ bruin run --secrets-backend vault
 ```
 
 Or set via environment variable:
+
 ```bash
 export BRUIN_SECRETS_BACKEND=vault
 bruin run
 ```
 
 For more details on configuring Vault, see the [Vault secrets documentation](/secrets/vault).
-
-
-
-
-
-
-

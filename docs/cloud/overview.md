@@ -3,6 +3,7 @@
 [Bruin Cloud](https://github.com/bruin-data/bruin) is a cloud platform that offers a managed environment for Bruin pipelines.
 
 It includes:
+
 - a built-in data catalog
 - serverless environment for all transformations
 - cost & usage reporting

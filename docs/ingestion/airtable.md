@@ -1,4 +1,5 @@
 # Airtable
+
 [Airtable](https://www.airtable.com/) is a cloud-based platform that combines spreadsheet and database functionalities, designed for data management and collaboration.
 
 Bruin supports Airtable as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Airtable into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Airtable as a source for [Ingestr assets](/assets/ingestr), and y
 In order to set up Airtable connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `base_id` and `access_token`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/airtable#setup-guide).
 
 Follow the steps below to correctly set up Airtable as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -51,10 +54,11 @@ parameters:
 | `<base_id>/<table_name>`   | -  | -       | replace      | Airtable tables are used in the format of base ID and table name (example: `appXYZ/employee`). |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/airtable_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Airtable table into your Postgres database.
 
 <img width="1108" alt="airtable" src="https://github.com/user-attachments/assets/56db541a-7c3a-41c5-82fe-8db03b2f4b21">
-

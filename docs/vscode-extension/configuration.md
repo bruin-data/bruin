@@ -5,8 +5,9 @@ You can configure the Bruin VS Code extension to suit your preferences, adjustin
 ### Folding Behavior
 
 Choose whether Bruin sections are folded or expanded by default when opening an asset. Adjust this in the extension settings under `Bruin > Default Folding State`. The options are:
-  - **Folded**: All Bruin sections will be collapsed by default.
-  - **Expanded**: All Bruin sections will be open by default.
+
+- **Folded**: All Bruin sections will be collapsed by default.
+- **Expanded**: All Bruin sections will be open by default.
 
 This feature helps you focus on relevant sections, keeping the rest of the code minimized.
 
@@ -17,6 +18,7 @@ Set your preferred path separator in the extension settings under `Bruin > Path 
 ### Additional Settings
 
 #### Checkbox Settings
+
 The extension provides checkbox settings to control default enabled/disabled states for various features:
 
 - **Apply Interval Modifiers**: Controls the default state of the `--apply-interval-modifiers` flag
@@ -24,6 +26,7 @@ The extension provides checkbox settings to control default enabled/disabled sta
 - **Auto-save Materialization**: Control whether materialization changes are auto-saved
 
 #### Exclude Tags
+
 - **Default Exclude Tag**: Set a default tag input to exclude assets with specific tags from being validated
 - This helps filter out assets during validation processes based on their tags
 
@@ -38,6 +41,5 @@ To access and modify the Bruin extension settings:
    - **Default Folding State** and **Path Separator**
    - **Checkbox Settings** for feature defaults
    - **Exclude Tags** for validation filtering
-
 
 ![Extension Config](../public/vscode-extension/extension-config.png)

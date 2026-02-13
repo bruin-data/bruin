@@ -18,16 +18,15 @@ The field `path` is the only one you need and it can point to an existing databa
 > [!WARNING]
 > DuckDB does not allow concurrency between different processes, which means other clients should not be connected to the database while Bruin is running.
 
-
 ## Assets
 
 DuckDB assets should use the type `duckdb.sql` and if you specify a connection it must be of the `duckdb` type.
 For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
-
 ### Examples
 
 Create a view with orders per country
+
 ```bruin-sql
 /* @bruin
 name: orders_per_country
@@ -43,6 +42,7 @@ GROUP BY country
 ```
 
 Materialize new customers per region and append them to an existing table
+
 ```bruin-sql
 /* @bruin
 name: new_customers_per_region
@@ -70,11 +70,13 @@ parameters:
 ```
 
 **Parameters**:
+
 - `query`: Query you expect to return any results
 
 #### Example: Partitioned upstream table
 
 Checks if the data available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: duckdb.sensor.query
@@ -85,6 +87,7 @@ parameters:
 #### Example: Streaming upstream table
 
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: duckdb.sensor.query
@@ -92,11 +95,12 @@ parameters:
     query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
 ```
 
-
 ### `duckdb.seed`
+
 `duckdb.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your DuckDB database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the DuckDB database.
 
 You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: duckdb.seed
@@ -106,15 +110,16 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
-
-####  Examples: Load csv into a Duckdb database
+#### Examples: Load csv into a Duckdb database
 
 The examples below show how to load a CSV into a DuckDB database.
+
 ```yaml
 name: dashboard.hello
 type: duckdb.seed

@@ -1,4 +1,5 @@
 # Slack
+
 [slack](https://slack.com/) is a messaging platform for teams and organizations where they can collaborate, share ideas and information.
 
 Bruin supports Slack as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Slack into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Slack as a source for [Ingestr assets](/assets/ingestr), and you 
 In order to set up Slack connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/slack#setup-guide).
 
 Follow the steps below to correctly set up Slack as a data source and run ingestion:
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -50,7 +53,9 @@ parameters:
 | `access_logs` | user_id | - | append | Retrieves access logs |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/slack_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Slack table into your Postgres database.

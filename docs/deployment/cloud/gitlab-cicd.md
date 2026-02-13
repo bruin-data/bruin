@@ -9,6 +9,7 @@ This guide shows you how to deploy and run Bruin pipelines automatically using G
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - A GitLab repository with your Bruin project
 - Access to configure GitLab CI/CD in your repository
 - Credentials for your data platforms (stored as GitLab CI/CD Variables)
@@ -309,6 +310,7 @@ deploy_prod:
 ```
 
 Create separate CI/CD variables for each environment:
+
 - `BRUIN_CONFIG_DEV` (Type: File)
 - `BRUIN_CONFIG_STAGING` (Type: File)
 - `BRUIN_CONFIG_PROD` (Type: File, Protected)

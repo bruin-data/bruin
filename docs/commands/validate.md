@@ -1,6 +1,6 @@
 # `validate` Command
 
-The `validate` command checks the Bruin pipeline configurations for all pipelines in a specified directory or validates a single asset. 
+The `validate` command checks the Bruin pipeline configurations for all pipelines in a specified directory or validates a single asset.
 It ensures that the configurations meet specific requirements and are properly configured for the selected environment.
 
 ## Usage
@@ -8,6 +8,7 @@ It ensures that the configurations meet specific requirements and are properly c
 ```bash
 bruin validate [path to pipelines] [flags]
 ```
+
 <img alt="Bruin - validate" src="/validate.gif" style="margin: 10px;" />
 
 **Arguments:**
@@ -30,13 +31,14 @@ Defaults to the current directory (".") if not provided.
 | `--exclude-paths`        |            | Excludes the given paths from the folders that are searched during validation. |
 | `--full-refresh`         |            | Validate with full refresh mode enabled.                                     |
 
-
 ### Dry-run Validation
+
 One of the beneficial features of the `validate` command is the ability to perform a dry-run validation on the destination data platform. This means, effectively Bruin runs a dry-run version of the query to ensure that the query is valid and can be executed on the destination data platform. This gives a very strong peace of mind in terms of the accuracy of the queries from a syntactical and semantical perspective, and also ensures that the query can be executed on the destination data platform.
 
 Dry-run is automatically enabled for BigQuery and Snowflake.
 
 However, there are also scenarios where dry-run is not the best suited tool:
+
 - Dry-run requires all the tables/views to be there, which means if you are running validation on a table that you haven't created yet, it'll fail.
 - Due to the same reason, dry-run will also fail if you are adding a new column to a table and its upstream, but you haven't created them in the destination yet.
 
@@ -56,7 +58,6 @@ bruin validate
 bruin validate --output json
 
 ```
-
 
 **3. Validate a specific asset:**
 

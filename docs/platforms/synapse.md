@@ -6,13 +6,17 @@ Bruin supports Azure Synapse as a data platform, which means you can use it to b
 > I'll be honest with you: Synapse is the least used platform in the list, so there might be rough edges. If you run into any issues, please let us know by opening an issue on [GitHub](https://github.com/bruin-data/bruin/issues).
 
 ## Connection
+
 Synapse connection is configured the same way as Microsoft SQL Server connection, check [SQL Server connection](mssql.md#connection) for more details.
 
 ## Synapse Assets
+
 ### `synapse.sql`
+
 Runs a materialized Synapse asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a view using view materialization
+
 ```bruin-sql
 /* @bruin
 name: customer_data.view
@@ -27,6 +31,7 @@ where active = 1
 ```
 
 #### Example: Run a Synapse SQL script
+
 ```bruin-sql
 /* @bruin
 name: orders_summary
@@ -66,9 +71,11 @@ parameters:
     table: string
     poke_interval: int (optional)
 ```
+
 **Parameters**:
+
 - `table`: `schema_id.table_id` or (for default schema `dbo`) `table_id` format.
-- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 ### `synapse.sensor.query`
 
@@ -83,12 +90,14 @@ parameters:
 ```
 
 **Parameters**:
+
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
 
 Checks if the data available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: synapse.sensor.query
@@ -99,6 +108,7 @@ parameters:
 #### Example: Streaming upstream table
 
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: synapse.sensor.query
@@ -107,9 +117,11 @@ parameters:
 ```
 
 ### `synapse.seed`
+
 `synapse.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Synapse database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Synapse database.
 
 You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: synapse.seed
@@ -119,15 +131,16 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
-
-####  Examples: Load csv into a Synapse database
+#### Examples: Load csv into a Synapse database
 
 The examples below show how to load a CSV into a Synapse database.
+
 ```yaml
 name: dashboard.hello
 type: synapse.seed

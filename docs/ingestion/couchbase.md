@@ -1,4 +1,5 @@
 # Couchbase
+
 Couchbase is a distributed NoSQL cloud database that delivers unmatched performance, scalability, and flexibility for building modern applications.
 
 Bruin supports Couchbase as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Couchbase into your data warehouse.
@@ -7,8 +8,12 @@ In order to set up Couchbase connection, you need to add a configuration item in
 
 Follow the steps below to correctly set up Couchbase as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to Couchbase, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
+
 ```yaml
     connections:
       couchbase:
@@ -19,6 +24,7 @@ To connect to Couchbase, you need to add a configuration item to the connections
           bucket: "mybucket"
           ssl: false
 ```
+
 - `name`: The name to identify this Couchbase connection
 - `username`: The Couchbase username with access to the cluster
 - `password`: The password for the specified username
@@ -27,6 +33,7 @@ To connect to Couchbase, you need to add a configuration item to the connections
 - `ssl`: (Optional) Set to true for Couchbase Capella (cloud) deployments, false or omit for Couchbase Server (self-hosted/on-premises)
 
 For Couchbase Capella (cloud) deployments:
+
 ```yaml
     connections:
       couchbase:
@@ -55,6 +62,7 @@ parameters:
 ```
 
 For default scope and collection:
+
 ```yaml
 name: public.couchbase
 type: ingestr
@@ -68,6 +76,7 @@ parameters:
 ```
 
 When bucket is specified in connection config:
+
 ```yaml
 name: public.couchbase
 type: ingestr
@@ -87,7 +96,9 @@ parameters:
 - `source_table`: The table/collection in Couchbase. Format can be either `bucket.scope.collection` or `scope.collection` (when bucket is in connection config).
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/couchbase_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Couchbase collection into your Postgres database.

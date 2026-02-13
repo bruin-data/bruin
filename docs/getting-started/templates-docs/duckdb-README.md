@@ -1,14 +1,14 @@
 # Bruin - DuckDB Template
 
-This pipeline is a simple example of a Bruin pipeline for DuckDB, 
-featuring `example.sql`—a SQL asset that creates a table with sample data and enforces schema constraints 
+This pipeline is a simple example of a Bruin pipeline for DuckDB,
+featuring `example.sql`—a SQL asset that creates a table with sample data and enforces schema constraints
 like `not_null`, `unique`, and `primary_key`.
 
 ## Setup
+
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
 
 Here's a sample `.bruin.yml` file:
-
 
 ```yaml
 environments:

@@ -1,24 +1,26 @@
 
-
 # Tabs Overview
+
 These tabs give you direct access to view and manage details of the currently open Bruin asset.
 
 ## 1. General
+
 This tab provides a comprehensive view of your asset, allowing you to manage key information and execute actions directly from the UI.
 
 - **Pipeline & Asset Name**: Displays the current pipeline and asset names. The asset name can be updated from the UI.
 - **Pipeline Schedule & Asset Type**: Displays the current pipeline schedule and asset type as tags.
 - **Description**: View or edit the asset’s description to document its purpose.
 - **Environment Dropdown**: Seamlessly switch between environments (e.g., `development`, `production`).
-- **Date Inputs**: 
-    - Customize the date/time for runs directly within the UI. 
-    - A refresh button allows synchronization with the pipeline schedule.
-    - *Note*: The time is specified in `UTC`.
+- **Date Inputs**:
+  - Customize the date/time for runs directly within the UI.
+  - A refresh button allows synchronization with the pipeline schedule.
+  - *Note*: The time is specified in `UTC`.
 - **SQL Preview**: Displays a preview of the SQL query related to the asset for quick inspection.
 
 ![Bruin Side Panel](../../../public/vscode-extension/panels/side-panel/asset-details-tab-new.gif)
 
 ## 2. Columns
+
 - Lists the columns associated with the asset.
 - *Each column shows*:
   - **Primary Key**: Whether the column is a primary key.
@@ -37,6 +39,7 @@ This tab provides a comprehensive view of your asset, allowing you to manage key
   - **Manage Quality Checks**: Add or remove quality checks.
 
 ### Fill from DB
+
 The Columns tab includes a "Fill from DB" feature that allows you to automatically populate column information from your database:
 
 - **Auto-populate Columns**: Retrieve column definitions directly from the connected database
@@ -52,10 +55,12 @@ The Details tab lets you configure asset metadata and database settings. It has 
 ### Basic Information
 
 #### Owner Management
+
 - Click to edit owner with inline editing
 - Changes auto-save
 
 #### Tags Management
+
 - Add/remove tags with inline editing
 - Tags display as visual badges
 - Changes update immediately
@@ -63,48 +68,60 @@ The Details tab lets you configure asset metadata and database settings. It has 
 ### Advanced Settings
 
 #### Interval Modifiers
+
 Set start/end intervals with units:
+
 - **Start**: Beginning of the interval
 - **End**: End of the interval  
 - **Units**: months, days, hours, minutes, seconds
 
 #### Partitioning
+
 - Searchable dropdown to select partition columns
 - Manual entry for expressions like `date(col_name)`
 - Shows selected partition columns
 
 #### Clustering
+
 - Multi-select dropdown for cluster columns
 - Checkboxes for easy selection
 
 ### Dependencies
 
 #### Current Dependencies
+
 - List of existing dependencies
 - Type indicators (Pipeline/External)
 - Dependency counts
 
 #### Dependency Mode
+
 - Toggle between "full" and "symbolic" modes
 - Tooltips explain each mode
 
 #### Pipeline Dependencies
+
 - Searchable dropdown to find pipeline assets
 - Multi-select support
 
 #### External Dependencies
+
 - Text input for external dependencies
 
 #### Fill from Query
+
 - Auto-populate dependencies from SQL analysis
 
 ### Materialization
 
 #### Materialization Type
+
 - Radio buttons: None/Table/View
 
 #### Strategy Selection
+
 Dropdown with strategies:
+
 - **Create+Replace**: Drop and recreate table
 - **Delete+Insert**: Delete existing data, insert new records
 - **Append**: Add new rows without modifying existing
@@ -115,18 +132,21 @@ Dropdown with strategies:
 - **SCD2 by Column**: Slowly Changing Dimension Type 2 by column
 
 #### Advanced Options
+
 - **Incremental Key**: Text input for incremental key column
 - **Time Granularity**: Dropdown for date/timestamp granularity
 
 ### Interface Features
 
 #### Collapsible Sections
+
 - Expandable sections with chevron indicators
 - Remembers collapsed/expanded state
 
 ![Details Tab](../../../public/vscode-extension/panels/side-panel/details-tab.gif)
 
 ## 4. Custom Checks
+
 The Custom Checks tab allows you to manage custom checks for your assets directly from the UI.
 
 ### How to Use
@@ -156,9 +176,11 @@ The Custom Checks tab allows you to manage custom checks for your assets directl
 ![Custom Checks Tab](../../../public/vscode-extension/panels/side-panel/custom-checks-tab.gif)
 
 ## 5. Settings
+
 The Settings tab has two main sections:
 
 ### a. Bruin CLI Management
+
 - **Install & Update**: Easily install or update the Bruin CLI directly from the UI.
 - **Quick Documentation Access**: A dedicated button redirects you to the Bruin documentation for reference.
 - **Version Details & Debugging**: A chevron down arrow expands to reveal:
@@ -170,6 +192,7 @@ The Settings tab has two main sections:
 ![Bruin Settings Tab](../../../public/vscode-extension/panels/side-panel/settings-tab.png)
 
 ### b. Connection and Environment Management
+
 - You can manage your connections, and environments, including:
   - **Add Environment**: Enter the name to add a new environment. This will display a new connection list with an empty connection, allowing you to add a new connection to this environment.
   - **Delete/Update Environment**: Inline edit existing environment name or delete the environment.
@@ -180,4 +203,3 @@ The Settings tab has two main sections:
   - **Test Connection**: This allows you to test your connection directly from the UI. Unsupported connections will display a message indicating they cannot be tested.
 
 ![Bruin Connections Manager](../../../public/vscode-extension/panels/side-panel/manage-connections.gif)
-

@@ -1,7 +1,9 @@
 # Trino
+
 Bruin supports Trino as a distributed SQL query engine.
 
 ## Connection
+
 In order to set up a Trino connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
 
 ```yaml
@@ -19,12 +21,14 @@ In order to set up a Trino connection, you need to add a configuration item to `
 ## Trino Assets
 
 ### `trino.sql`
+
 Runs a materialized Trino asset or a Trino script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page. For information about materialization strategies, see the [Materialization](../assets/materialization.md) page.
 
 > [!IMPORTANT]
 > Use a single SQL statement per `trino.sql` asset. Multi-statement queires are not supported by Trino.
 
 #### Example: Create a table using table materialization
+
 ```bruin-sql
 /* @bruin
 name: hive.events.install
@@ -39,6 +43,7 @@ WHERE event_name = 'install'
 ```
 
 #### Example: Run a Trino script
+
 ```bruin-sql
 /* @bruin
 name: hive.events.install
@@ -64,11 +69,14 @@ parameters:
 ```
 
 **Parameters:**
+
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
+
 Checks if the data available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: trino.sensor.query
@@ -77,7 +85,9 @@ parameters:
 ```
 
 #### Example: Streaming upstream table
+
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: trino.sensor.query

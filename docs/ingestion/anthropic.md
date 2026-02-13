@@ -18,17 +18,20 @@ Anthropic connections are defined using the following properties:
 - `api_key`: Your Anthropic Admin API key (must start with `sk-ant-admin...`) (required)
 
 :::code-group
+
 ```yaml [connections.yml]
 connections:
   anthropic:
     - name: "my_anthropic"
       api_key: "sk-ant-admin-..."
 ```
+
 :::
 
 You can also use environment variables in your connections.yml by using the `&#123;&#123; env_var("ENV_VAR_NAME") &#125;&#125;` syntax.
 
 For example:
+
 ```yaml
 connections:
   anthropic:
@@ -55,15 +58,19 @@ Anthropic assets will be ingested to your data warehouse as defined in the `dest
 ## Asset-Specific Configuration
 
 ### Claude Code Usage
+
 The `claude_code_usage` table supports incremental loading based on the `date` field. This data helps you analyze developer productivity and monitor Claude Code adoption.
 
 ### Usage Report
+
 The `usage_report` table contains detailed token usage metrics from the Messages API, aggregated by time bucket, workspace, API key, model, and service tier. Supports date range filtering.
 
 ### Cost Report
+
 The `cost_report` table contains aggregated cost data broken down by workspace and cost description. Supports date range filtering.
 
 ### Organization Data
+
 Tables like `organization`, `workspaces`, `api_keys`, `invites`, `users`, and `workspace_members` use full refresh mode as they represent current state data.
 
 ## Notes

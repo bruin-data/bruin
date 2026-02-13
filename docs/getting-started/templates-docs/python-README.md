@@ -3,6 +3,7 @@
 This pipeline is a simple example of a Bruin pipeline. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes three Python assets that uses the same dependencies, but with 3 different versions of Python:
+
 - 3.11
 - 3.12
 - 3.13
@@ -10,12 +11,14 @@ The pipeline includes three Python assets that uses the same dependencies, but w
 This pipeline is a good example of Bruin's Python execution abilities.
 
 A couple of remarks:
+
 - All of these assets are executed in isolated environments.
 - All of the assets have separate `requirements.txt` files, which may contain different dependencies.
 
 ## Running the pipeline
 
 Run the following command:
+
 ```shell
 bruin run .
 ```

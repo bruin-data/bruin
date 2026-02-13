@@ -157,7 +157,7 @@ schedule: "@daily"
 schedule: "0 0 * * *"
 ```
 
-* **Type:** `String`
+- **Type:** `String`
 
 | Value       | Description                               |
 |-------------|-------------------------------------------|
@@ -327,6 +327,7 @@ default:
 - **Default:** `0` (no delay)
 
 **Special values:**
+
 - `0`: No delay between retries (default behavior)
 - `> 0`: Wait the specified number of seconds before retrying
 - `-1`: Disable retry delays (same as `0`)
