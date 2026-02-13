@@ -208,7 +208,8 @@ type Environment struct {
 type EnvContextKey string
 
 const (
-	EnvironmentContextKey EnvContextKey = "environment"
+	EnvironmentContextKey    EnvContextKey = "environment"
+	SecretsBackendContextKey EnvContextKey = "secrets_backend"
 )
 
 type Config struct {
