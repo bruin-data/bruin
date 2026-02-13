@@ -24,8 +24,8 @@ For more guidance, see DuckLake's [choosing a catalog database](https://ducklake
 | DuckDB| <span class="lh-check" aria-label="supported"></span> |
 | SQLite | <span class="lh-check" aria-label="supported"></span> |
 | Postgres| <span class="lh-check" aria-label="supported"></span> |
-| MySQL    | Planned |
 
+MySQL catalogs are currently not supported for DuckLake in Bruin due to limitations in the DuckDB MySQL connector and incomplete MySQL support in the DuckLake DuckDB extension.
 
 
 #### Iceberg
