@@ -49,8 +49,16 @@ execute() {
 
   echo ""
 
+  _use_spinner=false
   if test -t 1; then
-    # Interactive terminal: use spinner with real download progress
+    case "$(uname_os)" in
+      windows|mingw*|msys*|cygwin*) _use_spinner=false ;;
+      *) _use_spinner=true ;;
+    esac
+  fi
+
+  if [ "$_use_spinner" = "true" ]; then
+    # Interactive unix terminal: use spinner with real download progress
     _progress_file="${tmpdir}/.progress"
     _download_file="${tmpdir}/${TARBALL}"
     echo "download" > "$_progress_file"
@@ -77,26 +85,21 @@ execute() {
     wait "$_install_pid"
     _install_exit=$?
   else
-    # Non-interactive (CI): run synchronously with simple log messages
+    # Non-interactive or Windows: run synchronously
     log_info "downloading bruin ${VERSION}..."
     http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
-    _install_exit=$?
-    if [ "$_install_exit" -eq 0 ]; then
-      log_info "extracting..."
-      srcdir="${tmpdir}"
-      (cd "${tmpdir}" && untar "${TARBALL}")
-      _install_exit=$?
-    fi
-    if [ "$_install_exit" -eq 0 ]; then
-      if [ ! -d "${BINDIR}" ]; then install -d "${BINDIR}"; fi
-      for binexe in $BINARIES; do
-        if [ "$OS" = "windows" ] || [ "$OS" = "Windows" ]; then
-          binexe="${binexe}.exe"
-        fi
-        install "${srcdir}/${binexe}" "${BINDIR}/"
-        _install_exit=$?
-      done
-    fi
+    srcdir="${tmpdir}"
+    (cd "${tmpdir}" && untar "${TARBALL}")
+    if [ ! -d "${BINDIR}" ]; then install -d "${BINDIR}"; fi
+    log_debug "installing to ${BINDIR}"
+    for binexe in $BINARIES; do
+      if [ "$OS" = "windows" ] || [ "$OS" = "Windows" ]; then
+        binexe="${binexe}.exe"
+      fi
+      install "${srcdir}/${binexe}" "${BINDIR}/"
+      log_debug "installed ${BINDIR}/${binexe}"
+    done
+    _install_exit=0
   fi
   rm -rf "${tmpdir}"
 
