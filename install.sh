@@ -417,15 +417,16 @@ http_download_curl() {
   source_url=$2
   header=$3
   if [ -z "$header" ]; then
-    log_debug "Executing: curl -sfL -o \"$local_file\" \"$source_url\""
-    curl -sfL -o "$local_file" "$source_url"
+    log_debug "Executing: curl  -sL -o \"$local_file\" \"$source_url\""
+    code=$(curl  -sL -o "$local_file" "$source_url")
   else
-    log_debug "Executing: curl -sfL -H \"$header\" -o \"$local_file\" \"$source_url\""
-    curl -sfL -H "$header" -o "$local_file" "$source_url"
+    log_debug "Executing: curl  -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
+    code=$(curl  -sL -H "$header" -o "$local_file" "$source_url")
   fi
+  log_debug "http_download_curl received HTTP status $code, return code $?"
   if [ $? -ne 0 ]; then
     log_err "Failed to download from $source_url"
-    return 1
+    return 1  # Return 1 for failure
   fi
   return 0
 }
