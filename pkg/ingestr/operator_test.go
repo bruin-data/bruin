@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -37,7 +38,12 @@ func (m *mockFinder) Repo(path string) (*git.Repo, error) {
 }
 
 func (s simpleConnectionFetcher) GetConnection(name string) any {
-	return s.connections[name]
+	conn, ok := s.connections[name]
+	if !ok {
+		return nil
+	}
+
+	return conn
 }
 
 type mockRunner struct {
@@ -636,6 +642,115 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 
 			err := o.Run(ctx, &ti)
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestBasicOperator_Run_MissingConnectionErrorIsActionable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		connections      map[string]string
+		assetConnection  string
+		sourceConnection string
+		secretsBackend   string
+		expectedParts    []string
+		notExpectedParts []string
+	}{
+		{
+			name: "missing source connection uses .bruin.yml guidance",
+			connections: map[string]string{
+				"bq": "bigquery://uri-here",
+			},
+			assetConnection:  "bq",
+			sourceConnection: "missing-source",
+			expectedParts: []string{
+				"source connection 'missing-source' not found",
+				"configure it under the correct environment in '.bruin.yml' at the repository root",
+				"--config-file",
+			},
+		},
+		{
+			name: "missing destination connection uses .bruin.yml guidance",
+			connections: map[string]string{
+				"sf": "snowflake://uri-here",
+			},
+			assetConnection:  "missing-destination",
+			sourceConnection: "sf",
+			expectedParts: []string{
+				"destination connection 'missing-destination' not found",
+				"configure it under the correct environment in '.bruin.yml' at the repository root",
+				"--config-file",
+			},
+		},
+		{
+			name: "missing source connection uses secrets backend guidance",
+			connections: map[string]string{
+				"bq": "bigquery://uri-here",
+			},
+			assetConnection:  "bq",
+			sourceConnection: "missing-source",
+			secretsBackend:   "vault",
+			expectedParts: []string{
+				"source connection 'missing-source' not found",
+				"configure it in the 'vault' secrets backend",
+				"--secrets-backend",
+			},
+			notExpectedParts: []string{
+				".bruin.yml",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			connectionMap := make(map[string]*mockConnection, len(tt.connections))
+			for name, uri := range tt.connections {
+				conn := new(mockConnection)
+				conn.On("GetIngestrURI").Return(uri, nil)
+				connectionMap[name] = conn
+			}
+
+			o := &BasicOperator{
+				conn: &simpleConnectionFetcher{
+					connections: connectionMap,
+				},
+				finder:        &mockFinder{},
+				runner:        &mockRunner{},
+				jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
+			}
+
+			ti := scheduler.AssetInstance{
+				Pipeline: &pipeline.Pipeline{},
+				Asset: &pipeline.Asset{
+					Name:       "asset-name",
+					Connection: tt.assetConnection,
+					Parameters: map[string]string{
+						"source_connection": tt.sourceConnection,
+						"source_table":      "source-table",
+						"destination":       "bigquery",
+					},
+				},
+			}
+
+			ctx := t.Context()
+			if tt.secretsBackend != "" {
+				ctx = context.WithValue(ctx, config.SecretsBackendContextKey, tt.secretsBackend)
+			}
+
+			err := o.Run(ctx, &ti)
+			require.Error(t, err)
+
+			for _, expected := range tt.expectedParts {
+				require.Contains(t, err.Error(), expected)
+			}
+
+			for _, notExpected := range tt.notExpectedParts {
+				require.NotContains(t, err.Error(), notExpected)
+			}
 		})
 	}
 }
