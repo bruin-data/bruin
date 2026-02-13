@@ -66,7 +66,7 @@ execute() {
       echo "install" > "$_progress_file"
       if [ ! -d "${BINDIR}" ]; then install -d "${BINDIR}"; fi
       for binexe in $BINARIES; do
-        if [ "$OS" = "windows" ]; then
+        if [ "$OS" = "windows" ] || [ "$OS" = "Windows" ]; then
           binexe="${binexe}.exe"
         fi
         install "${tmpdir}/${binexe}" "${BINDIR}/" || exit 1
@@ -90,7 +90,7 @@ execute() {
     if [ "$_install_exit" -eq 0 ]; then
       if [ ! -d "${BINDIR}" ]; then install -d "${BINDIR}"; fi
       for binexe in $BINARIES; do
-        if [ "$OS" = "windows" ]; then
+        if [ "$OS" = "windows" ] || [ "$OS" = "Windows" ]; then
           binexe="${binexe}.exe"
         fi
         install "${srcdir}/${binexe}" "${BINDIR}/"
