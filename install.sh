@@ -47,18 +47,20 @@ execute() {
   tmpdir=$(mktemp -d)
   log_debug "downloading files into ${tmpdir}"
 
-  echo ""
-
-  _use_spinner=false
+  _use_fancy=false
   if test -t 1; then
     case "$(uname_os)" in
-      windows|mingw*|msys*|cygwin*) _use_spinner=false ;;
-      *) _use_spinner=true ;;
+      windows|mingw*|msys*|cygwin*) _use_fancy=false ;;
+      *) _use_fancy=true ;;
     esac
   fi
 
-  if [ "$_use_spinner" = "true" ]; then
-    # Interactive unix terminal: use spinner with real download progress
+  if [ "$_use_fancy" = "true" ]; then
+    # Interactive unix terminal: show upgrade-style visuals
+    _bruin_banner
+    _print_header "Installing bruin"
+    _print_step "Found version: ${BOLD}${VERSION}${RESET} for ${OS}/${ARCH}"
+
     _progress_file="${tmpdir}/.progress"
     _download_file="${tmpdir}/${TARBALL}"
     echo "download" > "$_progress_file"
@@ -81,11 +83,24 @@ execute() {
       done
     ) &
     _install_pid=$!
-    _spinner "$_install_pid" "Installing bruin ${VERSION}..." "$_progress_file" "$_download_file" "$_total_size"
+    _download_progress "$_install_pid" "$_download_file" "$_total_size" "$_progress_file"
     wait "$_install_pid"
     _install_exit=$?
+
+    rm -rf "${tmpdir}"
+
+    if [ "$_install_exit" -ne 0 ]; then
+      printf "\r  %s  %s\n" "|" "${RED}Failed to install bruin ${VERSION}${RESET}" >&2
+      printf "  %s\n" "|"
+      _print_footer "${RED}Installation failed${RESET}"
+      return 1
+    fi
+
+    printf "  %s\n" "|"
+    _print_success "bruin ${VERSION} installed successfully!"
+
   else
-    # Non-interactive or Windows: run synchronously
+    # Non-interactive or Windows: run synchronously with plain output
     log_info "downloading bruin ${VERSION}..."
     http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
     srcdir="${tmpdir}"
@@ -100,14 +115,15 @@ execute() {
       log_debug "installed ${BINDIR}/${binexe}"
     done
     _install_exit=0
-  fi
-  rm -rf "${tmpdir}"
 
-  if [ "$_install_exit" -ne 0 ]; then
-    printf "\r  [${RED}x${RESET}] Failed to install bruin %s     \n" "${VERSION}" >&2
-    return 1
+    rm -rf "${tmpdir}"
+
+    if [ "$_install_exit" -ne 0 ]; then
+      log_err "Failed to install bruin ${VERSION}"
+      return 1
+    fi
+    log_info "bruin ${VERSION} installed to ${BINDIR}"
   fi
-  printf "\r  [${GREEN}+${RESET}] bruin %s installed to %s     \n" "${VERSION}" "${BINDIR}" >&2
 
   # Configure PATH
   current_shell=$(basename "$SHELL")
@@ -143,17 +159,28 @@ execute() {
       ;;
   esac
 
-  echo ""
-  echo "  ${GREEN}bruin ${VERSION} has been installed successfully!${RESET}"
-  case "$current_shell" in
-    fish)
-      echo "  ${YELLOW}Please restart your shell or run: source ~/.config/fish/config.fish${RESET}"
-      ;;
-    *)
-      echo "  ${YELLOW}Please restart your shell or run: source ~/.${current_shell}rc${RESET}"
-      ;;
-  esac
-  echo ""
+  if [ "$_use_fancy" = "true" ]; then
+    case "$current_shell" in
+      fish)
+        _print_footer "Please restart your shell or run: ${YELLOW}source ~/.config/fish/config.fish${RESET}"
+        ;;
+      *)
+        _print_footer "Please restart your shell or run: ${YELLOW}source ~/.${current_shell}rc${RESET}"
+        ;;
+    esac
+  else
+    echo ""
+    echo "  bruin ${VERSION} has been installed successfully!"
+    case "$current_shell" in
+      fish)
+        echo "  Please restart your shell or run: source ~/.config/fish/config.fish"
+        ;;
+      *)
+        echo "  Please restart your shell or run: source ~/.${current_shell}rc"
+        ;;
+    esac
+    echo ""
+  fi
 }
 
 
@@ -263,46 +290,94 @@ if test -t 1; then
     fi
 fi
 
+CORAL="${RED}"
+BOLD=""
+FAINT=""
+if test -t 1 && test -n "$RESET"; then
+  BOLD="$(tput bold)"
+  FAINT="$(tput dim 2>/dev/null)" || FAINT=""
+fi
+
+_bruin_banner() {
+  printf "\n"
+  printf "  %s\n" "${CORAL}  _               _${RESET}"
+  printf "  %s\n" "${CORAL} | |__  _ __ _   _ _ _ __${RESET}"
+  printf "  %s\n" "${CORAL} | '_ \\| '__| | | | | '_ \\${RESET}"
+  printf "  %s\n" "${CORAL} | |_) | |  | |_| | | | | |${RESET}"
+  printf "  %s\n" "${CORAL} |_.__/|_|   \\__,_|_|_| |_|${RESET}"
+  printf "\n"
+}
+
+_print_header() {
+  printf "  %s  %s%s%s\n" "+" "$BOLD" "$1" "$RESET"
+  printf "  %s\n" "|"
+}
+
+_print_step() {
+  printf "  %s  %s\n" "${CORAL}*${RESET}" "$1"
+  printf "  %s\n" "|"
+}
+
+_print_progress() {
+  printf "\r  %s  %s" "|" "$1"
+}
+
+_print_success() {
+  printf "  %s  %s\n" "${GREEN}<>${RESET}" "${GREEN}$1${RESET}"
+  printf "  %s\n" "|"
+}
+
+_print_footer() {
+  printf "  %s  %s\n" "+" "$1"
+  printf "\n"
+}
+
 _file_size() {
   wc -c < "$1" 2>/dev/null | tr -d ' '
 }
 
-_spinner() {
-  _sp_pid=$1
-  _sp_msg=$2
-  _sp_progress_file=$3
-  _sp_download_file=$4
-  _sp_total_size=$5
-  _sp_i=0
-  while kill -0 "$_sp_pid" 2>/dev/null; do
-    _sp_i=$(( (_sp_i + 1) % 4 ))
-    case $_sp_i in
-      0) _sp_char='-' ;;
-      1) _sp_char='/' ;;
-      2) _sp_char='|' ;;
-      3) _sp_char='\' ;;
-    esac
-    _sp_phase=$(cat "$_sp_progress_file" 2>/dev/null)
-    case "$_sp_phase" in
+_format_mb() {
+  awk "BEGIN {printf \"%.1f\", $1 / 1048576}"
+}
+
+_download_progress() {
+  _dp_pid=$1
+  _dp_download_file=$2
+  _dp_total_size=$3
+  _dp_phase_file=$4
+  while kill -0 "$_dp_pid" 2>/dev/null; do
+    _dp_phase=$(cat "$_dp_phase_file" 2>/dev/null)
+    case "$_dp_phase" in
       extract)
-        _sp_pct=85
-        ;;
-      install)
-        _sp_pct=95
+        printf "\r  %s  Extracting archive...                              \n" "|"
+        # Wait for install phase
+        while kill -0 "$_dp_pid" 2>/dev/null; do
+          _dp_phase2=$(cat "$_dp_phase_file" 2>/dev/null)
+          if [ "$_dp_phase2" = "install" ]; then
+            printf "  %s  Installing to %s...\n" "|" "${FAINT}${BINDIR}${RESET}"
+            break
+          fi
+          sleep 0.1
+        done
+        # Wait for completion
+        while kill -0 "$_dp_pid" 2>/dev/null; do
+          sleep 0.1
+        done
+        break
         ;;
       *)
-        # During download, compute from actual file size
-        if [ "${_sp_total_size:-0}" -gt 0 ] 2>/dev/null && [ -f "$_sp_download_file" ]; then
-          _sp_current=$(_file_size "$_sp_download_file")
-          _sp_current=${_sp_current:-0}
-          _sp_pct=$(( _sp_current * 80 / _sp_total_size ))
-          if [ "$_sp_pct" -gt 80 ]; then _sp_pct=80; fi
-        else
-          _sp_pct=0
+        # During download, show MB progress
+        if [ "${_dp_total_size:-0}" -gt 0 ] 2>/dev/null && [ -f "$_dp_download_file" ]; then
+          _dp_current=$(_file_size "$_dp_download_file")
+          _dp_current=${_dp_current:-0}
+          _dp_current_mb=$(_format_mb "$_dp_current")
+          _dp_total_mb=$(_format_mb "$_dp_total_size")
+          _dp_pct=$(( _dp_current * 100 / _dp_total_size ))
+          if [ "$_dp_pct" -gt 100 ]; then _dp_pct=100; fi
+          printf "\r  %s  Downloading: %s MB / %s MB (%s%%)" "|" "$_dp_current_mb" "$_dp_total_mb" "$_dp_pct"
         fi
         ;;
     esac
-    printf "\r  [${CYAN}%s${RESET}] %s ${CYAN}%s%%${RESET} " "$_sp_char" "$_sp_msg" "$_sp_pct" >&2
     sleep 0.1
   done
 }
