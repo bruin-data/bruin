@@ -157,6 +157,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("destination uri is empty, which means the connection is not configured correctly")
 	}
 
+	if strings.HasPrefix(destURI, "clickhouse://") {
+		destURI = applyClickHouseEngineParams(destURI, asset.Parameters)
+	}
+
 	destTable := asset.Name
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
@@ -207,6 +211,32 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
+}
+
+func applyClickHouseEngineParams(destURI string, params map[string]string) string {
+	parsedURI, err := url.Parse(destURI)
+	if err != nil {
+		return destURI
+	}
+
+	q := parsedURI.Query()
+
+	if engine, exists := params["engine"]; exists && engine != "" {
+		q.Set("engine", engine)
+	}
+
+	for key, value := range params {
+		key = strings.TrimSpace(key)
+		if strings.HasPrefix(key, "engine.") && value != "" {
+			q.Set(
+				key,
+				strings.TrimSpace(value),
+			)
+		}
+	}
+
+	parsedURI.RawQuery = q.Encode()
+	return parsedURI.String()
 }
 
 func NewSeedOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*SeedOperator, error) {
