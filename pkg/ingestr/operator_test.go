@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -23,7 +24,8 @@ func (m *mockConnection) GetIngestrURI() (string, error) {
 }
 
 type simpleConnectionFetcher struct {
-	connections map[string]*mockConnection
+	connections       map[string]*mockConnection
+	connectionDetails map[string]any
 }
 
 var repo = &git.Repo{
@@ -38,6 +40,13 @@ func (m *mockFinder) Repo(path string) (*git.Repo, error) {
 
 func (s simpleConnectionFetcher) GetConnection(name string) any {
 	return s.connections[name]
+}
+
+func (s simpleConnectionFetcher) GetConnectionDetails(name string) any {
+	if s.connectionDetails == nil {
+		return nil
+	}
+	return s.connectionDetails[name]
 }
 
 type mockRunner struct {
@@ -468,12 +477,21 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
 	mockDuck := new(mockConnection)
 	mockDuck.On("GetIngestrURI").Return("duckdb:////some/path", nil)
+	mockAthena := new(mockConnection)
+	mockAthena.On("GetIngestrURI").Return("athena://?bucket=s3://bucket/path&region_name=us-west-2", nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
-			"bq":   mockBq,
-			"sf":   mockSf,
-			"duck": mockDuck,
+			"bq":     mockBq,
+			"sf":     mockSf,
+			"duck":   mockDuck,
+			"athena": mockAthena,
+		},
+		connectionDetails: map[string]any{
+			"athena": &config.AthenaConnection{
+				Name:     "athena",
+				Database: "analytics",
+			},
 		},
 	}
 
@@ -550,6 +568,31 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				"id:bigint,load_date:timestamp,percent:double",
 			},
 		},
+		{
+			name: "athena seed infers database from connection details",
+			asset: &pipeline.Asset{
+				Name:       "events",
+				Connection: "athena",
+				Type:       pipeline.AssetTypeAthenaSeed,
+				Parameters: map[string]string{
+					"path": "seed.csv",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri",
+				"csv://seed.csv",
+				"--source-table",
+				"seed.raw",
+				"--dest-uri",
+				"athena://?bucket=s3://bucket/path&region_name=us-west-2",
+				"--dest-table",
+				"analytics.events",
+				"--yes",
+				"--progress",
+				"log",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -573,6 +616,110 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 
 			err := o.Run(ctx, &ti)
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestSeedOperator_ResolveSeedDestinationTableName(t *testing.T) {
+	t.Parallel()
+
+	fetcher := simpleConnectionFetcher{
+		connectionDetails: map[string]any{
+			"athena": &config.AthenaConnection{
+				Name:     "athena",
+				Database: "analytics",
+			},
+			"pg": &config.PostgresConnection{
+				Name:   "pg",
+				Schema: "mart",
+			},
+			"rs": &config.RedshiftConnection{
+				Name:   "rs",
+				Schema: "warehouse",
+			},
+			"sf": &config.SnowflakeConnection{
+				Name:   "sf",
+				Schema: "RAW",
+			},
+			"ch": &config.ClickHouseConnection{
+				Name:     "ch",
+				Database: "events",
+			},
+		},
+	}
+
+	o := &SeedOperator{conn: &fetcher}
+
+	tests := []struct {
+		name           string
+		connectionName string
+		destURI        string
+		tableName      string
+		want           string
+	}{
+		{
+			name:           "athena table gets default database from connection",
+			connectionName: "athena",
+			destURI:        "athena://?bucket=s3://bucket/path",
+			tableName:      "events",
+			want:           "analytics.events",
+		},
+		{
+			name:           "athena falls back to default database when details are missing",
+			connectionName: "missing-athena",
+			destURI:        "athena://?bucket=s3://bucket/path",
+			tableName:      "events",
+			want:           "default.events",
+		},
+		{
+			name:           "postgresql table gets schema from connection",
+			connectionName: "pg",
+			destURI:        "postgresql://user:pass@localhost:5432/db",
+			tableName:      "users",
+			want:           "mart.users",
+		},
+		{
+			name:           "redshift table gets schema from connection",
+			connectionName: "rs",
+			destURI:        "redshift://user:pass@localhost:5439/db",
+			tableName:      "orders",
+			want:           "warehouse.orders",
+		},
+		{
+			name:           "snowflake table gets schema from connection",
+			connectionName: "sf",
+			destURI:        "snowflake://user:pass@account/db",
+			tableName:      "customers",
+			want:           "RAW.customers",
+		},
+		{
+			name:           "clickhouse table gets database from connection",
+			connectionName: "ch",
+			destURI:        "clickhouse://user:pass@localhost:9000",
+			tableName:      "sessions",
+			want:           "events.sessions",
+		},
+		{
+			name:           "already qualified table name is unchanged",
+			connectionName: "pg",
+			destURI:        "postgresql://user:pass@localhost:5432/db",
+			tableName:      "mart.users",
+			want:           "mart.users",
+		},
+		{
+			name:           "unsupported destination keeps table name unchanged",
+			connectionName: "bq",
+			destURI:        "bigquery://project",
+			tableName:      "events",
+			want:           "events",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := o.resolveSeedDestinationTableName(tt.connectionName, tt.destURI, tt.tableName)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -307,7 +307,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("destination uri is empty, which means the destination connection is not configured correctly")
 	}
 
-	destTable := asset.Name
+	destTable := o.resolveSeedDestinationTableName(destConnectionName, destURI, asset.Name)
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
@@ -339,4 +339,69 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
+}
+
+func (o *SeedOperator) resolveSeedDestinationTableName(connectionName, destURI, tableName string) string {
+	if tableName == "" || strings.Contains(tableName, ".") {
+		return tableName
+	}
+
+	parsedURI, err := url.Parse(destURI)
+	if err != nil {
+		return tableName
+	}
+
+	detailsGetter, ok := o.conn.(config.ConnectionDetailsGetter)
+	if !ok {
+		switch parsedURI.Scheme {
+		case "athena", "clickhouse":
+			return "default." + tableName
+		default:
+			return tableName
+		}
+	}
+
+	details := detailsGetter.GetConnectionDetails(connectionName)
+	if details == nil {
+		switch parsedURI.Scheme {
+		case "athena", "clickhouse":
+			return "default." + tableName
+		default:
+			return tableName
+		}
+	}
+
+	switch parsedURI.Scheme {
+	case "athena":
+		database := "default"
+		athenaConn, ok := details.(*config.AthenaConnection)
+		if ok && athenaConn != nil && athenaConn.Database != "" {
+			database = athenaConn.Database
+		}
+		return database + "." + tableName
+	case "postgresql":
+		pgConn, ok := details.(*config.PostgresConnection)
+		if ok && pgConn != nil && pgConn.Schema != "" {
+			return pgConn.Schema + "." + tableName
+		}
+	case "redshift":
+		redshiftConn, ok := details.(*config.RedshiftConnection)
+		if ok && redshiftConn != nil && redshiftConn.Schema != "" {
+			return redshiftConn.Schema + "." + tableName
+		}
+	case "snowflake":
+		snowflakeConn, ok := details.(*config.SnowflakeConnection)
+		if ok && snowflakeConn != nil && snowflakeConn.Schema != "" {
+			return snowflakeConn.Schema + "." + tableName
+		}
+	case "clickhouse":
+		database := "default"
+		clickhouseConn, ok := details.(*config.ClickHouseConnection)
+		if ok && clickhouseConn != nil && clickhouseConn.Database != "" {
+			database = clickhouseConn.Database
+		}
+		return database + "." + tableName
+	}
+
+	return tableName
 }
