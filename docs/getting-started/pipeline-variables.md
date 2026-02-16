@@ -1,8 +1,15 @@
 # Variables
 
-Bruin lets you parameterize your pipelines with custom variables. These variables are defined in `pipeline.yml` using [JSON Schema](https://json-schema.org/) and are available in your assets during execution.
+> [!TIP]
+> For a comprehensive overview of variables in Bruin, see [Core Concepts: Variables](/core-concepts/variables).
 
-## Defining variables
+Variables are dynamic values provided during execution and injected into your asset code. They enable parameterized pipelines—processing data for specific date ranges, customer segments, or configurations without modifying code.
+
+There are two types of variables:
+- **[Built-in Variables](#built-in-variables)**: Automatically provided by Bruin (dates, pipeline info, run IDs)
+- **[Custom Variables](#custom-variables)**: User-defined variables specified at the asset or pipeline level using [JSON Schema](https://json-schema.org/)
+
+## Custom Variables
 
 Add a `variables` section to your `pipeline.yml` and describe each variable with JSON Schema keywords. Every variable must provide a `default` value so Bruin can render assets without command line overrides.
 

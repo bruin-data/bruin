@@ -173,7 +173,7 @@ The following environment variables are available in every R asset execution:
 
 ### Pipeline
 
-Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your R asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [pipeline variables](/getting-started/pipeline-variables) for more information on how to define and override them.
+Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your R asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [Variables](/core-concepts/variables) for more information on how to define and override them.
 
 Here's an example:
 

@@ -63,11 +63,11 @@ This will create a new Bruin project with a DuckDB database as a starting point.
 
 You can
 
-- [read more about credentials](/getting-started/credentials) for your data warehouse or other sources,
+- [read more about environments and credentials](/core-concepts/environments) for your data warehouse or other sources,
 - you can [programmatically add connections](/commands/connections#add-connection),
 - you can use our [VS Code / Cursor extension](/vscode-extension/overview) to add connections.
 
-Bruin allows you to use different environments for your projects. You can [read more about environments](/getting-started/devenv) to learn more.
+Bruin allows you to use different environments for your projects. You can [read more about environments](/core-concepts/environments) to learn more.
 
 ## Usage
 
@@ -91,7 +91,7 @@ A common task when dealing with changes in data pipelines is to compare data bet
 
 Thankfully, Bruin CLI already supports:
 
-- [development environments](/getting-started/devenv)
+- [environments](/core-concepts/environments)
 - [data-diff](/commands/data-diff) command
 
 Using the Bruin MCP server, you can build new data models while ensuring that the data is correct and up-to-date using AI.

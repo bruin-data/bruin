@@ -1,7 +1,4 @@
-# Pipeline
-
-> [!TIP]
-> This page has moved! For the latest pipeline documentation, see [Pipeline Definition](/pipelines/definition).
+# Pipeline Definition
 
 ## Overview
 
@@ -132,7 +129,7 @@ variables:
 
 ### Name
 
-Give your pipeline a clear, human-friendly name. It appears in UIs, logs, and tooling , keep it decriptive.
+Give your pipeline a clear, human-friendly name. It appears in UIs, logs, and tooling—keep it descriptive.
 
 Example:
 
@@ -142,7 +139,7 @@ name: analytics-daily
 
 ---
 
-### **Schedule**
+### Schedule
 
 Defines **how often** your pipeline should execute.
 This setting is used by your orchestrator (for example, Bruin Cloud or an external scheduler) to automatically trigger
@@ -198,8 +195,7 @@ default_connections:
 
 - **Type:** `Object (map[string]string)`
 - **Default:** `{}`
-- Notes: Keys correspond to supported platforms. Keep it short here and see docs/platforms/ for details on
-  platform-specific connections.
+- Notes: Keys correspond to supported platforms. See [Data Platforms](/platforms/bigquery) for details on platform-specific connections.
 
 ### Tags
 
@@ -358,10 +354,8 @@ See also: [Concurrency & Resource Limits](/getting-started/concurrency).
 
 ### Default (pipeline-level defaults)
 
-Set sensible defaults for all assets in the pipeline so you don’t repeat yourself. Override at the asset level only when
+Set sensible defaults for all assets in the pipeline so you don't repeat yourself. Override at the asset level only when
 a task needs something different.
-
-See also: [Defaults](/pipelines/definition#default-pipeline-level-defaults).
 
 Example:
 
@@ -450,6 +444,6 @@ Variable schema fields (subset):
 
 | Field   | Type   | Required | Notes                                                                                   |
 |---------|--------|----------|-----------------------------------------------------------------------------------------|
-| type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array, null. See [variables type reference](/core-concepts/variables#custom-variables) for details and examples. |
+| type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array, null. See [Variables](/core-concepts/variables#custom-variables) for details and examples. |
 | default | any    | yes      | REQUIRED. Must be present; used as the variable value unless overridden                 |
-| enum    | Array  | no       | Restrict values to a fixed list (e.g. `enum: ["self_serve", "enterprise", "partner"]`). See [variables documentation](/core-concepts/variables#custom-variables) for more JSON Schema keywords you can use. |
+| enum    | Array  | no       | Restrict values to a fixed list (e.g. `enum: ["self_serve", "enterprise", "partner"]`). See [Variables documentation](/core-concepts/variables#custom-variables) for more JSON Schema keywords you can use. |

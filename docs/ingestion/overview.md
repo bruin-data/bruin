@@ -26,7 +26,7 @@ parameters:
 
 The interesting part is in the `parameters` list:
 
-- `source_connection`: the [connection](../getting-started/concepts.md#connection) that defines the source platform
+- `source_connection`: the [connection](/core-concepts/connections) that defines the source platform
 - `source_table`: the table name for that source on [ingestr](https://getbruin.com/docs/ingestr/supported-sources/shopify.html)
 - `destination`: the destination you'd like to load the data on
 

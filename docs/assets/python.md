@@ -156,7 +156,7 @@ The following environment variables are available in every Python asset executio
 
 ### Pipeline
 
-Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your python asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [pipeline variables](/getting-started/pipeline-variables) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/getting-started/pipeline-variables#supported-json-schema-keywords).
+Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your python asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [Variables](/core-concepts/variables) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/core-concepts/variables#custom-variables).
 
 Here's a short example:
 ::: code-group

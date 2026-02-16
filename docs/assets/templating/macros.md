@@ -465,7 +465,7 @@ AND region = '{{ region }}'
 :::
 
 > [!TIP]
-> The pipeline snippet above showcases array enums and numeric bounds. For additional JSON Schema keywords you can mix into macros-driven workflows—including nested objects and nullable values—refer to the [pipeline variables keyword reference](/getting-started/pipeline-variables#supported-json-schema-keywords).
+> The pipeline snippet above showcases array enums and numeric bounds. For additional JSON Schema keywords you can mix into macros-driven workflows—including nested objects and nullable values—refer to the [Variables keyword reference](/core-concepts/variables#custom-variables).
 
 ### Dynamic Column Generation
 
@@ -715,5 +715,5 @@ SELECT 1
 
 - [Templating](./templating.md) - Learn about Jinja templating basics
 - [Filters](./filters.md) - Use filters to transform variables
-- [Pipeline Variables](/getting-started/pipeline-variables) - Define custom variables
+- [Variables](/core-concepts/variables) - Define custom variables
 - [SQL Assets](../sql.md) - Learn about SQL assets in Bruin

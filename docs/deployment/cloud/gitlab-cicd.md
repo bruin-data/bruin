@@ -613,4 +613,4 @@ reporting:
 - [GitLab CI/CD Documentation](https://docs.gitlab.com/ee/ci/)
 - [Bruin Docker Images](https://github.com/bruin-data/bruin/pkgs/container/bruin)
 - [Bruin CLI Documentation](/)
-- [Credentials Management](/getting-started/credentials)
+- [Environments & Credentials](/core-concepts/environments)

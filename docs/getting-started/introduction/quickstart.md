@@ -263,4 +263,4 @@ bruin run assets/my_r_asset.r
 
 ## Next steps
 
-You have created your first pipeline, ingested data from a new source, explored the sample assets, and ran quality checks. You are ready to dig deeper. Jump into the [Concepts](../concepts.md) to learn more about the underlying concepts Bruin uses for your data pipelines.
+You have created your first pipeline, ingested data from a new source, explored the sample assets, and ran quality checks. You are ready to dig deeper. Jump into the [Core Concepts](/core-concepts/overview) to learn more about the underlying concepts Bruin uses for your data pipelines.

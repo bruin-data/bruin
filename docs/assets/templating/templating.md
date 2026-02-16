@@ -40,7 +40,7 @@ GROUP BY 1,2
 :::
 
 > [!TIP]
-> Need enumerations, numeric bounds, or nested structures for your variables? Consult the [JSON Schema keyword reference](/getting-started/pipeline-variables#supported-json-schema-keywords) for the full list of `type` values and examples of arrays-of-objects and object-of-arrays patterns you can reuse in templated SQL.
+> Need enumerations, numeric bounds, or nested structures for your variables? Consult the [Variables documentation](/core-concepts/variables#custom-variables) for the full list of `type` values and examples of arrays-of-objects and object-of-arrays patterns you can reuse in templated SQL.
 
 This will render into the following SQL query:
 
@@ -76,7 +76,7 @@ Bruin injects various variables by default:
 | `execution_datetime` | The execution date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-01T15:30:00" |
 | `execution_timestamp` | The execution timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-01T15:30:00.000000Z07:00" |
 | `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
-| `run_id` | The unique identifier for the current [pipeline run](../../getting-started/concepts.md#pipeline-run) | `run_1234567890` |
+| `run_id` | The unique identifier for the current pipeline run | `run_1234567890` |
 | `full_refresh` | Boolean indicating whether the `--full-refresh` flag was used | `True` or `False` |
 
 You can use these variables in your SQL queries by referencing them with the `{{ }}` syntax:
@@ -182,4 +182,4 @@ You can read more about [Jinja conditionals](https://jinja.palletsprojects.com/e
 
 ## Custom variables
 
-You can define your own variables and use them across your Assets. See [variables](/getting-started/pipeline-variables) for more information.
+You can define your own variables and use them across your Assets. See [Variables](/core-concepts/variables) for more information.

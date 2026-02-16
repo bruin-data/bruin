@@ -460,4 +460,4 @@ For production stability, pin to a specific version:
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [Setup Bruin Action](https://github.com/marketplace/actions/setup-bruin)
 - [Bruin CLI Documentation](/)
-- [Credentials Management](/getting-started/credentials)
+- [Environments & Credentials](/core-concepts/environments)
