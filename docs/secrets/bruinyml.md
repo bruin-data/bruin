@@ -1,17 +1,12 @@
 # .bruin.yml Reference
 
-The `.bruin.yml` file is the central configuration file for Bruin pipelines. It stores all credentials, connection details, and environment configurations needed to run your data pipelines.
+The `.bruin.yml` file is the central configuration file for Bruin pipelines. It stores all credentials, connection details, and environment configurations needed to run your data pipelines. The file is automatically created when you run any `bruin` command the first time in a project, and it is automatically added to `.gitignore`.
 
-`.bruin.yml` is the default secrets backend. To use it, simply place the file at the root of your project. You can also specify a different location using the `--config-file /path/to/.bruin.yml`
-
-## Overview
-
-- **Location**: Project root directory
-- **Version Control**: Automatically added to `.gitignore` (not committed to repositories)
-- **Creation**: Created automatically on first `bruin validate` or `bruin run`
-- **Override**: Use `--config-file` flag or `BRUIN_CONFIG_FILE` environment variable
+`.bruin.yml` file is expected to be in the root of your Git repo. You can specify a different location using the `--config-file /path/to/.bruin.yml`
 
 ## File Structure
+
+The file is a YAML file with the following structure:
 
 ```yaml
 default_environment: <environment_name>
@@ -88,8 +83,6 @@ connections:
 ```
 
 Common use cases include API keys, passwords, and other secrets that don't fit a specific connection type.
-
----
 
 ## Connection Types
 
