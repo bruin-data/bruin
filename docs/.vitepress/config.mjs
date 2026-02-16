@@ -319,7 +319,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 collapsed: false,
                 items: [
                     {text: "Overview", link: "/secrets/overview"},
-                    {text: "Hashicorp Vault", link: "/secrets/vault"}
+                    {text: "File Backend (.bruin.yml)", link: "/secrets/bruinyml"},
+                    {text: "Hashicorp Vault", link: "/secrets/vault"},
+                    {text: "Doppler", link: "/secrets/doppler"},
+                    {text: "AWS Secrets Manager", link: "/secrets/aws-secrets-manager"},
                 ]
             },
             {
