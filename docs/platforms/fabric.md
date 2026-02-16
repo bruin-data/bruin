@@ -13,7 +13,7 @@ environments:
     connections:
       fabric:
         - name: fabric-default
-          host: your-workspace.datawarehouse.fabric.microsoft.com
+          host: sql-endpoint-guid.datawarehouse.fabric.microsoft.com
           port: 1433
           database: your_warehouse
           use_azure_default_credential: true
@@ -32,7 +32,7 @@ environments:
     connections:
       fabric:
         - name: fabric-sp
-          host: your-workspace.datawarehouse.fabric.microsoft.com
+          host: sql-endpoint-guid.datawarehouse.fabric.microsoft.com
           port: 1433
           database: your_warehouse
           client_id: "<app id>"
@@ -48,7 +48,7 @@ environments:
     connections:
       fabric:
         - name: fabric-sql
-          host: your-workspace.datawarehouse.fabric.microsoft.com
+          host: sql-endpoint-guid.datawarehouse.fabric.microsoft.com
           port: 1433
           database: your_warehouse
           username: "<username>"
