@@ -74,6 +74,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	for {
 		select {
 		case <-timeout:
+			if printerExists {
+				fmt.Fprint(printer, "Sensor timed out after 24 hours")
+			}
 			return errors.New("Sensor timed out after 24 hours")
 		default:
 			if querier, ok := conn.(interface {
