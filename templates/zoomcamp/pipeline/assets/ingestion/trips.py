@@ -12,6 +12,9 @@ type: python
 # Example: python:3.11
 image: TODO_SET_PYTHON_IMAGE
 
+# TODO: Set the connection.
+connection: duckdb-default
+
 # TODO: Choose materialization (optional, but recommended).
 # Bruin feature: Python materialization lets you return a DataFrame (or list[dict]) and Bruin loads it into your destination.
 # This is usually the easiest way to build ingestion assets in Bruin.

@@ -408,6 +408,9 @@ bruin lineage ./pipeline/pipeline.yml
 
 ## Part 4: Data Engineering with AI Agent
 
+### Video Tutorial
+[![Part 4: Data Engineering with AI Agent](https://img.youtube.com/vi/224xH7h8OaQ/hqdefault.jpg)](https://youtu.be/224xH7h8OaQ)
+
 ### Learning Goals
 - Set up Bruin MCP to extend AI assistants with Bruin context
 - Use an AI agent to build the entire end-to-end pipeline
