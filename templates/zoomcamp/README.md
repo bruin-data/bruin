@@ -213,8 +213,8 @@ bruin run assets/my_python_asset.py
 # Run an asset with its downstream dependencies
 bruin run assets/players.asset.yml --downstream
 
-# Check pipeline lineage
-bruin lineage .
+# Show the lineage for a specific asset
+bruin lineage assets/players.asset.yml
 
 # Query the resulting table
 bruin query --connection duckdb-default --query "SELECT * FROM dataset.player_stats"
@@ -401,7 +401,7 @@ bruin query --connection duckdb-default --query "SELECT COUNT(*) FROM ingestion.
 duckdb duckdb.db -ui
 
 # Check lineage to understand asset dependencies
-bruin lineage ./pipeline/pipeline.yml
+bruin lineage ./pipeline/assets/ingestion/trips.py
 ```
 
 ---
