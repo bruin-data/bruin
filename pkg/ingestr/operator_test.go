@@ -48,6 +48,91 @@ func (m *mockRunner) RunIngestr(ctx context.Context, args, extraPackages []strin
 	return m.Called(ctx, args, extraPackages, repo).Error(0)
 }
 
+func TestApplyClickHouseEngineParams(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		uri    string
+		params map[string]string
+		want   string
+	}{
+		{
+			name:   "no engine params",
+			uri:    "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{},
+			want:   "clickhouse://user:pass@localhost:9000",
+		},
+		{
+			name: "engine only",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine": "merge_tree",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree",
+		},
+		{
+			name: "engine with settings",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine":                   "merge_tree",
+				"engine.index_granularity": "8125",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree&engine.index_granularity=8125",
+		},
+		{
+			name: "engine settings without engine",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine.index_granularity": "8125",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine.index_granularity=8125",
+		},
+		{
+			name: "preserves existing query params",
+			uri:  "clickhouse://user:pass@localhost:9000?http_port=8123",
+			params: map[string]string{
+				"engine": "merge_tree",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree&http_port=8123",
+		},
+		{
+			name: "empty engine value is ignored",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine": "",
+			},
+			want: "clickhouse://user:pass@localhost:9000",
+		},
+		{
+			name: "empty engine setting value is ignored",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine.index_granularity": "",
+			},
+			want: "clickhouse://user:pass@localhost:9000",
+		},
+		{
+			name: "non-engine params are not added",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"source_connection": "sf",
+				"source_table":      "some_table",
+				"engine":            "merge_tree",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := applyClickHouseEngineParams(tt.uri, tt.params)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	t.Parallel()
 
@@ -57,12 +142,15 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
 	mockDuck := new(mockConnection)
 	mockDuck.On("GetIngestrURI").Return("duckdb:////some/path", nil)
+	mockCh := new(mockConnection)
+	mockCh.On("GetIngestrURI").Return("clickhouse://user:pass@localhost:9000", nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
 			"bq":   mockBq,
 			"sf":   mockSf,
 			"duck": mockDuck,
+			"ch":   mockCh,
 		},
 	}
 
@@ -75,6 +163,28 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 		want          []string
 		extraPackages []string
 	}{
+		{
+			name: "clickhouse dest with engine params",
+			asset: &pipeline.Asset{
+				Name:       "public.table",
+				Connection: "ch",
+				Parameters: map[string]string{
+					"source_connection":        "sf",
+					"source_table":             "source-table",
+					"engine":                   "merge_tree",
+					"engine.index_granularity": "8125",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "snowflake://uri-here",
+				"--source-table", "source-table",
+				"--dest-uri", "clickhouse://user:pass@localhost:9000?engine=merge_tree&engine.index_granularity=8125",
+				"--dest-table", "public.table",
+				"--yes",
+				"--progress", "log",
+			},
+		},
 		{
 			name: "create+replace, basic scenario",
 			asset: &pipeline.Asset{

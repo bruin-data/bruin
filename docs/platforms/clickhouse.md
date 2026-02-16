@@ -38,6 +38,27 @@ parameters:
 
 In this case, the Clickhouse database is `publicDB`. Please ensure that the necessary permissions are granted to the user. For more details on obtaining credentials and setting up permissions, you can refer to this [guide](https://dlthub.com/docs/dlt-ecosystem/destinations/clickhouse#2-setup-clickhouse-database)
 
+### Engine Settings
+
+You can configure the ClickHouse table engine and its settings via the `parameters` block. Use `engine` to set the table engine and `engine.<setting>` to pass engine-specific settings.
+
+```yaml
+name: publicDB.events
+type: ingestr
+
+parameters:
+  source_connection: stripe-default
+  source_table: 'events'
+  destination: clickhouse
+  engine: merge_tree
+  engine.index_granularity: 8125
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `engine` | The ClickHouse table engine to use (e.g. `merge_tree`, `replicated_merge_tree`). |
+| `engine.<setting>` | Engine-specific settings passed directly to ClickHouse (e.g. `engine.index_granularity`). |
+
 ## Clickhouse Assets
 
 ### `clickhouse.sql`
