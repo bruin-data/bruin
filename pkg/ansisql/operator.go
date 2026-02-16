@@ -192,7 +192,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		select {
 		case <-timeout:
 			if printerExists {
-				fmt.Fprint(printer, "Sensor timed out after 24 hours")
+				fmt.Fprintln(printer, "Sensor timed out after 24 hours")
 			}
 			return errors.New("Sensor timed out after 24 hours")
 
