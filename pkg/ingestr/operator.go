@@ -81,7 +81,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	sourceConnection := o.conn.GetConnection(sourceConnectionName)
 	if sourceConnection == nil {
-		return errors.Errorf("source connection %s not found", sourceConnectionName)
+		return connectionNotFoundError(ctx, "source", sourceConnectionName)
 	}
 
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
@@ -145,7 +145,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	destConnection := o.conn.GetConnection(destConnectionName)
 	if destConnection == nil {
-		return errors.Errorf("destination connection %s not found", destConnectionName)
+		return connectionNotFoundError(ctx, "destination", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
@@ -296,7 +296,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destConnection := o.conn.GetConnection(destConnectionName)
 	if destConnection == nil {
-		return errors.Errorf("destination connection %s not found", destConnectionName)
+		return connectionNotFoundError(ctx, "destination", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
@@ -339,4 +339,24 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
+}
+
+func connectionNotFoundError(ctx context.Context, role, name string) error {
+	secretsBackend, _ := ctx.Value(config.SecretsBackendContextKey).(string)
+	secretsBackend = strings.TrimSpace(secretsBackend)
+
+	if secretsBackend != "" {
+		return errors.Errorf(
+			"%s connection '%s' not found.\nconfigure it in the '%s' secrets backend under the correct secret name, or switch backend with '--secrets-backend'",
+			role,
+			name,
+			secretsBackend,
+		)
+	}
+
+	return errors.Errorf(
+		"%s connection '%s' not found.\nconfigure it under the correct environment in '.bruin.yml' at the repository root, or pass '--config-file' to use a different config path",
+		role,
+		name,
+	)
 }
