@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -530,13 +531,30 @@ func ValidateScriptAssetHooksUnsupported(ctx context.Context, p *pipeline.Pipeli
 	if asset.Hooks.IsZero() {
 		return issues, nil
 	}
+	if hooksOnlyFromPipelineDefaults(asset, p) {
+		return issues, nil
+	}
+
+	assetTypeLabel := "Python"
+	if asset.Type == pipeline.AssetTypeR {
+		assetTypeLabel = "R"
+	}
 
 	issues = append(issues, &Issue{
 		Task:        asset,
-		Description: "Hooks are currently supported only for SQL assets. Hooks defined on Python/R assets are ignored during execution.",
+		Description: fmt.Sprintf("Hooks are currently supported only for SQL assets. Hooks defined on %s assets are ignored during execution.", assetTypeLabel),
 	})
 
 	return issues, nil
+}
+
+func hooksOnlyFromPipelineDefaults(asset *pipeline.Asset, p *pipeline.Pipeline) bool {
+	if asset == nil || p == nil || p.DefaultValues == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(asset.Hooks.Pre, p.DefaultValues.Hooks.Pre) &&
+		reflect.DeepEqual(asset.Hooks.Post, p.DefaultValues.Hooks.Post)
 }
 
 func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

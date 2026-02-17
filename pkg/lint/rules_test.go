@@ -2715,6 +2715,7 @@ func TestValidateScriptAssetHooksUnsupported(t *testing.T) {
 	tests := []struct {
 		name      string
 		asset     *pipeline.Asset
+		defaults  *pipeline.DefaultValues
 		wantIssue bool
 	}{
 		{
@@ -2758,6 +2759,24 @@ func TestValidateScriptAssetHooksUnsupported(t *testing.T) {
 			},
 			wantIssue: false,
 		},
+		{
+			name: "script asset with only default-inherited hooks does not return warning",
+			asset: &pipeline.Asset{
+				Name: "py_asset",
+				Type: pipeline.AssetTypePython,
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select default pre"}},
+					Post: []pipeline.Hook{{Query: "select default post"}},
+				},
+			},
+			defaults: &pipeline.DefaultValues{
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select default pre"}},
+					Post: []pipeline.Hook{{Query: "select default post"}},
+				},
+			},
+			wantIssue: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2765,7 +2784,8 @@ func TestValidateScriptAssetHooksUnsupported(t *testing.T) {
 			t.Parallel()
 
 			p := &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{tt.asset},
+				Assets:        []*pipeline.Asset{tt.asset},
+				DefaultValues: tt.defaults,
 			}
 
 			got, err := ValidateScriptAssetHooksUnsupported(t.Context(), p, tt.asset)
@@ -2778,7 +2798,11 @@ func TestValidateScriptAssetHooksUnsupported(t *testing.T) {
 
 			require.Len(t, got, 1)
 			assert.Equal(t, tt.asset, got[0].Task)
-			assert.Equal(t, "Hooks are currently supported only for SQL assets. Hooks defined on Python/R assets are ignored during execution.", got[0].Description)
+			expectedType := "Python"
+			if tt.asset.Type == pipeline.AssetTypeR {
+				expectedType = "R"
+			}
+			assert.Equal(t, fmt.Sprintf("Hooks are currently supported only for SQL assets. Hooks defined on %s assets are ignored during execution.", expectedType), got[0].Description)
 		})
 	}
 }
