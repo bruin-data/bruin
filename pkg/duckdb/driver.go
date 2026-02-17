@@ -54,7 +54,7 @@ func ensureDriverInstalledInternal(ctx context.Context) error {
 	cmd.Stderr = nil
 	_ = cmd.Run()
 
-	cmd = exec.CommandContext(ctx, uvPath, "tool", "run", "--no-config", "dbc", "install", "duckdb")
+	cmd = exec.CommandContext(ctx, uvPath, "tool", "run", "--no-config", "dbc", "install", "--level", "user", "duckdb")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
