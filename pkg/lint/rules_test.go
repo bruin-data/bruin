@@ -2709,6 +2709,80 @@ func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
 	}
 }
 
+func TestValidateScriptAssetHooksUnsupported(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		asset     *pipeline.Asset
+		wantIssue bool
+	}{
+		{
+			name: "python asset with hooks returns warning",
+			asset: &pipeline.Asset{
+				Name: "py_asset",
+				Type: pipeline.AssetTypePython,
+				Hooks: pipeline.Hooks{
+					Pre: []pipeline.Hook{{Query: "select 1"}},
+				},
+			},
+			wantIssue: true,
+		},
+		{
+			name: "r asset with hooks returns warning",
+			asset: &pipeline.Asset{
+				Name: "r_asset",
+				Type: pipeline.AssetTypeR,
+				Hooks: pipeline.Hooks{
+					Post: []pipeline.Hook{{Query: "select 2"}},
+				},
+			},
+			wantIssue: true,
+		},
+		{
+			name: "python asset without hooks does not return warning",
+			asset: &pipeline.Asset{
+				Name: "py_asset",
+				Type: pipeline.AssetTypePython,
+			},
+			wantIssue: false,
+		},
+		{
+			name: "sql asset with hooks does not return warning",
+			asset: &pipeline.Asset{
+				Name: "sql_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Hooks: pipeline.Hooks{
+					Pre: []pipeline.Hook{{Query: "select 1"}},
+				},
+			},
+			wantIssue: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{tt.asset},
+			}
+
+			got, err := ValidateScriptAssetHooksUnsupported(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+
+			if !tt.wantIssue {
+				assert.Empty(t, got)
+				return
+			}
+
+			require.Len(t, got, 1)
+			assert.Equal(t, tt.asset, got[0].Task)
+			assert.Equal(t, "Hooks are currently supported only for SQL assets. Hooks defined on Python/R assets are ignored during execution.", got[0].Description)
+		})
+	}
+}
+
 func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 	t.Parallel()
 

@@ -520,6 +520,25 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 	return issues, nil
 }
 
+func ValidateScriptAssetHooksUnsupported(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if asset.Type != pipeline.AssetTypePython && asset.Type != pipeline.AssetTypeR {
+		return issues, nil
+	}
+
+	if asset.Hooks.IsZero() {
+		return issues, nil
+	}
+
+	issues = append(issues, &Issue{
+		Task:        asset,
+		Description: "Hooks are currently supported only for SQL assets. Hooks defined on Python/R assets are ignored during execution.",
+	})
+
+	return issues, nil
+}
+
 func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if strings.HasSuffix(string(asset.Type), ".seed") {
