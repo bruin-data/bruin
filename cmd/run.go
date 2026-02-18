@@ -63,6 +63,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"github.com/xlab/treeprint"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
 const LogsFolder = "logs"
@@ -613,6 +614,11 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:  "skip initial pipeline analysis logs for this run",
 				Hidden: true,
 			},
+			&cli.BoolFlag{
+				Name:    "interactive",
+				Aliases: []string{"i"},
+				Usage:   "use an interactive TUI that shows live progress of asset execution",
+			},
 			&cli.StringSliceFlag{
 				Name:    "var",
 				Usage:   "override pipeline variables with custom values",
@@ -995,6 +1001,20 @@ func Run(isDebug *bool) *cli.Command {
 				pipelineInfo.RunDownstreamTasks = true
 			}
 
+			// Use the interactive TUI only when explicitly requested via --interactive flag
+			noColor := c.Bool("no-color")
+			minimalLogs := c.Bool("minimal-logs")
+			useTUI := c.Bool("interactive") &&
+				term.IsTerminal(int(os.Stdout.Fd())) &&
+				runConfig.Output != "json" &&
+				!noColor
+
+			// Save the real terminal fd BEFORE logOutput replaces os.Stdout
+			var realTerminal *os.File
+			if useTUI {
+				realTerminal = os.Stdout
+			}
+
 			if !runConfig.NoLogFile {
 				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
 				if pipelineInfo.RunningForAnAsset {
@@ -1009,7 +1029,13 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				fn, err2 := logOutput(logPath)
+				// In TUI mode, worker output goes to log file only (TUI handles terminal display).
+				// In legacy mode, worker output goes to both terminal and log file.
+				var termWriter io.Writer
+				if useTUI {
+					termWriter = io.Discard
+				}
+				fn, err2 := logOutput(logPath, termWriter)
 				if err2 != nil {
 					errorPrinter.Printf("Failed to create log file: %v\n", err2)
 					return cli.Exit("", 1)
@@ -1063,7 +1089,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			sendTelemetry(s, c)
-			if !c.Bool("minimal-logs") {
+			if !minimalLogs && !useTUI {
 				infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
 				infoPrinter.Printf("\n%s\n\n", executionStartLog)
 			}
@@ -1099,14 +1125,8 @@ func Run(isDebug *bool) *cli.Command {
 			formatOpts := executor.FormattingOptions{
 				DoNotLogTimestamp: c.Bool("no-timestamp"),
 				DoNotLogTaskName:  preview.RunningForAnAsset,
-				NoColor:           c.Bool("no-color"),
-				MinimalLogs:       c.Bool("minimal-logs"),
-			}
-
-			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
-			if err != nil {
-				errorPrinter.Printf("Failed to create executor: %v\n", err)
-				return cli.Exit("", 1)
+				NoColor:           noColor,
+				MinimalLogs:       minimalLogs,
 			}
 
 			// Create a context with timeout
@@ -1119,57 +1139,130 @@ func Run(isDebug *bool) *cli.Command {
 			defer cancel()
 
 			// Check ADC credentials for BigQuery connections used by pending assets
-			// This ensures credentials are available before any tasks begin running
 			pendingAssets := getPendingAssets(s)
 			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, pendingAssets, connectionManager); err != nil {
 				errorPrinter.Printf("Failed to verify BigQuery ADC credentials: %v\n", err)
 				return cli.Exit("", 1)
 			}
 
-			ex.Start(exeCtx, s.WorkQueue, s.Results)
+			if useTUI {
+				// === TUI mode ===
+				tui := NewTUIRenderer(realTerminal, s, foundPipeline.Name)
 
-			start := time.Now()
-			results := s.Run(runCtx)
-			duration := time.Since(start)
+				// Register scheduler status change callback
+				s.SetOnStatusChange(func(event scheduler.StatusChangeEvent) {
+					tui.OnStatusChange(event)
+				})
 
-			if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
-				logger.Error("failed to save pipeline state", zap.Error(err))
-			}
-
-			errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
-			for _, res := range results {
-				if res.Error != nil {
-					errorsInTaskResults = append(errorsInTaskResults, res)
-				}
-			}
-
-			if len(errorsInTaskResults) > 0 {
-				if singleCheckID != "" {
-					printSingleCheckError(errorsInTaskResults[0])
+				// Wire worker callbacks for precise timing
+				formatOpts.TUIMode = true
+				// In TUI mode, worker output goes to os.Stdout which is either:
+				// - the pipe (when log file enabled) -> goes to log file only
+				// - the real terminal (when --no-log-file) -> use io.Discard to avoid interference
+				if runConfig.NoLogFile {
+					formatOpts.LogOnlyWriter = io.Discard
 				} else {
-					if c.Bool("minimal-logs") {
-						summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
-						printErrorsMinimal(errorsInTaskResults)
-					} else {
-						printExecutionSummary(results, s, duration, len(results))
-						printErrorsInResults(errorsInTaskResults, s)
+					formatOpts.LogOnlyWriter = os.Stdout
+				}
+				formatOpts.OnTaskStart = func(inst scheduler.TaskInstance) {
+					tui.OnTaskStarted(inst)
+				}
+				formatOpts.OnTaskEnd = func(inst scheduler.TaskInstance, err error, dur time.Duration) {
+					tui.OnTaskEnded(inst, err, dur)
+				}
+
+				ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
+				if err != nil {
+					errorPrinter.Printf("Failed to create executor: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				tui.Start()
+				defer tui.Stop()
+
+				ex.Start(exeCtx, s.WorkQueue, s.Results)
+
+				start := time.Now()
+				results := s.Run(runCtx)
+				duration := time.Since(start)
+
+				tui.Stop()
+
+				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
+					logger.Error("failed to save pipeline state", zap.Error(err))
+				}
+
+				errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
+				for _, res := range results {
+					if res.Error != nil {
+						errorsInTaskResults = append(errorsInTaskResults, res)
 					}
 				}
-				return cli.Exit("", 1)
-			}
 
-			// Print single check success if running a single check
-			if singleCheckID != "" && len(results) > 0 {
-				printSingleCheckSuccess(results[0])
-				return nil
-			}
+				// Print summary to real terminal
+				printTUISummary(realTerminal, results, s, duration, foundPipeline.Name)
+				if len(errorsInTaskResults) > 0 {
+					printTUIErrors(realTerminal, errorsInTaskResults, s)
+				}
 
-			// Print execution summary (unless minimal-logs is enabled)
-			minimalLogs := c.Bool("minimal-logs")
-			if minimalLogs {
-				summaryPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
-			} else {
+				// Also print summary to piped stdout (for log file)
 				printExecutionSummary(results, s, duration, len(results))
+				if len(errorsInTaskResults) > 0 {
+					printErrorsInResults(errorsInTaskResults, s)
+					return cli.Exit("", 1)
+				}
+			} else {
+				// === Legacy mode (unchanged) ===
+				ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
+				if err != nil {
+					errorPrinter.Printf("Failed to create executor: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				ex.Start(exeCtx, s.WorkQueue, s.Results)
+
+				start := time.Now()
+				results := s.Run(runCtx)
+				duration := time.Since(start)
+
+				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
+					logger.Error("failed to save pipeline state", zap.Error(err))
+				}
+
+				errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
+				for _, res := range results {
+					if res.Error != nil {
+						errorsInTaskResults = append(errorsInTaskResults, res)
+					}
+				}
+
+				if len(errorsInTaskResults) > 0 {
+					if singleCheckID != "" {
+						printSingleCheckError(errorsInTaskResults[0])
+					} else {
+						if minimalLogs {
+							summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
+							printErrorsMinimal(errorsInTaskResults)
+						} else {
+							printExecutionSummary(results, s, duration, len(results))
+							printErrorsInResults(errorsInTaskResults, s)
+						}
+					}
+					return cli.Exit("", 1)
+				}
+
+				// Print single check success if running a single check
+				if singleCheckID != "" && len(results) > 0 {
+					printSingleCheckSuccess(results[0])
+					return nil
+				}
+
+				// Print execution summary (unless minimal-logs is enabled)
+				if minimalLogs {
+					summaryPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
+				} else {
+					printExecutionSummary(results, s, duration, len(results))
+				}
 			}
 			return nil
 		},
@@ -2003,7 +2096,9 @@ func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) s
 	return fmt.Sprintf("%s__%s__%d_assets_%s", runID, pipelineName, len(assets), shortHash)
 }
 
-func logOutput(logPath string) (func(), error) {
+// logOutput sets up log file piping. terminalWriter controls where terminal output goes:
+// nil = os.Stdout (real terminal, legacy behavior), io.Discard = log file only (TUI mode).
+func logOutput(logPath string, terminalWriter io.Writer) (func(), error) {
 	err := os.MkdirAll(filepath.Dir(logPath), 0o755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create log directory")
@@ -2016,7 +2111,10 @@ func logOutput(logPath string) (func(), error) {
 	}
 
 	// save existing stdout | MultiWriter writes to saved stdout and file
-	mw := io.MultiWriter(os.Stdout, &clearFileWriter{f, sync.Mutex{}})
+	if terminalWriter == nil {
+		terminalWriter = os.Stdout
+	}
+	mw := io.MultiWriter(terminalWriter, &clearFileWriter{f, sync.Mutex{}})
 
 	// get pipe reader and writer | writes to pipe writer come out pipe reader
 	r, w, err := os.Pipe()
