@@ -412,22 +412,35 @@ func (s *Scheduler) MarkByTag(tag string, status TaskInstanceStatus, downstream 
 }
 
 func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceStatus, downstream bool) {
+	s.markTaskInstanceRecursive(instance, status, downstream, make(map[TaskInstance]bool))
+}
+
+func (s *Scheduler) markTaskInstanceRecursive(instance TaskInstance, status TaskInstanceStatus, downstream bool, visited map[TaskInstance]bool) {
+	if visited[instance] {
+		return
+	}
+	visited[instance] = true
+
 	instance.MarkAs(status)
 	if !downstream {
 		return
 	}
 
-	downstreams := instance.GetDownstream()
-	if len(downstreams) == 0 {
-		return
-	}
-
-	for _, d := range downstreams {
-		s.MarkTaskInstance(d, status, downstream)
+	for _, d := range instance.GetDownstream() {
+		s.markTaskInstanceRecursive(d, status, downstream, visited)
 	}
 }
 
 func (s *Scheduler) MarkTaskInstanceIfNotSkipped(instance TaskInstance, status TaskInstanceStatus, markDownstream bool) {
+	s.markTaskInstanceIfNotSkippedRecursive(instance, status, markDownstream, make(map[TaskInstance]bool))
+}
+
+func (s *Scheduler) markTaskInstanceIfNotSkippedRecursive(instance TaskInstance, status TaskInstanceStatus, markDownstream bool, visited map[TaskInstance]bool) {
+	if visited[instance] {
+		return
+	}
+	visited[instance] = true
+
 	if instance.GetStatus() == Skipped {
 		return
 	}
@@ -436,13 +449,8 @@ func (s *Scheduler) MarkTaskInstanceIfNotSkipped(instance TaskInstance, status T
 		return
 	}
 
-	downstreams := instance.GetDownstream()
-	if len(downstreams) == 0 {
-		return
-	}
-
-	for _, d := range downstreams {
-		s.MarkTaskInstanceIfNotSkipped(d, status, markDownstream)
+	for _, d := range instance.GetDownstream() {
+		s.markTaskInstanceIfNotSkippedRecursive(d, status, markDownstream, visited)
 	}
 }
 
