@@ -102,8 +102,6 @@ type worker struct {
 
 func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstance, results chan<- *scheduler.TaskExecutionResult) {
 	for task := range taskChannel {
-		// Mark as Running so status is tracked
-		task.MarkAs(scheduler.Running)
 		if w.formatOpts.OnTaskStart != nil {
 			func() {
 				defer func() { recover() }() //nolint:errcheck
