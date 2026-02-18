@@ -154,10 +154,10 @@ venv
 logs/runs
 logs/exports
 .claude
+!.claude/commands/
 bruin
 
 __debug_bin*
-.claude
 test-glossary.yml
 .venv
 logs/queries
