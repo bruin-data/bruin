@@ -128,14 +128,14 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
 				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
 					Return(nil, assert.AnError)
 
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.repo == repo &&
-						ec.module == "path.to.module" &&
+						ec.module == testModule &&
 						ec.requirementsTxt == "" &&
 						ec.dependencyConfig != nil &&
 						ec.dependencyConfig.Type == DependencyTypeNone
@@ -152,14 +152,14 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
 				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
 					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
 
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.repo == repo &&
-						ec.module == "path.to.module" &&
+						ec.module == testModule &&
 						ec.requirementsTxt == "" &&
 						ec.dependencyConfig.Type == DependencyTypeNone &&
 						ec.envVariables["BRUIN_ASSET"] == "my-asset"
@@ -176,7 +176,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
 				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
 					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
@@ -190,7 +190,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.repo == repo &&
-						ec.module == "path.to.module" &&
+						ec.module == testModule &&
 						ec.requirementsTxt == "" &&
 						ec.dependencyConfig.Type == DependencyTypeNone &&
 						ec.envVariables["key1_injected"] == "value1" &&
@@ -208,7 +208,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
 				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
 					Return(&DependencyConfig{
@@ -219,7 +219,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.repo == repo &&
-						ec.module == "path.to.module" &&
+						ec.module == testModule &&
 						ec.requirementsTxt == "/path/to/requirements.txt" &&
 						ec.dependencyConfig.Type == DependencyTypeRequirementsTxt &&
 						ec.envVariables["BRUIN_ASSET"] == "my-asset"
@@ -236,7 +236,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
 				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
 					Return(&DependencyConfig{
@@ -247,7 +247,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.repo == repo &&
-						ec.module == "path.to.module" &&
+						ec.module == testModule &&
 						ec.requirementsTxt == "" &&
 						ec.dependencyConfig.Type == DependencyTypePyproject &&
 						ec.dependencyConfig.PyprojectPath == "/path/to/pyproject.toml"

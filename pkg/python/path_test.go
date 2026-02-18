@@ -1,6 +1,7 @@
 package python
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -247,8 +248,8 @@ func TestFindPyprojectTomlInPath(t *testing.T) {
 			},
 			want: "",
 			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
-				_, ok := err.(*NoPyprojectFoundError)
-				return ok
+				var target *NoPyprojectFoundError
+				return errors.As(err, &target)
 			},
 		},
 	}
