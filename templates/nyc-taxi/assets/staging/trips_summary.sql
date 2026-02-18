@@ -140,7 +140,6 @@ normalized_trips AS ( -- Normalize column names from raw data (cast, coalesce, r
     improvement_surcharge,
     total_amount,
     congestion_surcharge,
-    airport_fee,
     taxi_type,
     extracted_at,
   FROM raw.trips_raw
