@@ -1464,11 +1464,13 @@ type LockDependenciesResult struct {
 	RequirementsPath string
 	PythonVersion    string
 	InputPath        string
+	DependencyType   python.DependencyType
+	ProjectRoot      string
 }
 
-// FindRequirementsPath finds the requirements.txt path for the given input.
-// It handles both direct requirements.txt files and Python assets.
-func (l *LockDependenciesCommand) FindRequirementsPath(inputPath string) (*LockDependenciesResult, error) {
+// FindDependencyPath finds the dependency configuration for the given input.
+// It handles direct requirements.txt files, pyproject.toml projects, and Python assets.
+func (l *LockDependenciesCommand) FindDependencyPath(inputPath string) (*LockDependenciesResult, error) {
 	// Get absolute path
 	absolutePath, err := filepath.Abs(inputPath)
 	if err != nil {
@@ -1481,53 +1483,67 @@ func (l *LockDependenciesCommand) FindRequirementsPath(inputPath string) (*LockD
 		return nil, errors2.Wrap(err, "failed to find repository")
 	}
 
-	var requirementsTxt string
-
 	// Check if input is a requirements.txt file directly
 	if strings.HasSuffix(inputPath, "requirements.txt") {
-		requirementsTxt = absolutePath
-	} else {
-		// Parse the asset
-		asset, err := l.builder.CreateAssetFromFile(absolutePath, nil)
-		if err != nil {
-			return nil, errors2.Wrap(err, "failed to parse asset")
-		}
+		return &LockDependenciesResult{
+			RequirementsPath: absolutePath,
+			InputPath:        absolutePath,
+			DependencyType:   python.DependencyTypeRequirementsTxt,
+			ProjectRoot:      filepath.Dir(absolutePath),
+		}, nil
+	}
 
-		if asset == nil {
-			return nil, errors2.New("file is not a valid asset")
-		}
+	// Check if input is a pyproject.toml file directly
+	if strings.HasSuffix(inputPath, "pyproject.toml") {
+		return &LockDependenciesResult{
+			InputPath:      absolutePath,
+			DependencyType: python.DependencyTypePyproject,
+			ProjectRoot:    filepath.Dir(absolutePath),
+		}, nil
+	}
 
-		// Check if asset is a Python asset
-		if asset.Type != pipeline.AssetTypePython && !strings.HasSuffix(asset.ExecutableFile.Path, ".py") {
-			return nil, errors2.New("asset is not a Python asset")
-		}
+	// Parse the asset
+	asset, err := l.builder.CreateAssetFromFile(absolutePath, nil)
+	if err != nil {
+		return nil, errors2.Wrap(err, "failed to parse asset")
+	}
 
-		// Find requirements.txt
-		moduleFinder := &python.ModulePathFinder{}
-		requirementsTxt, err = moduleFinder.FindRequirementsTxtInPath(repo.Path, &asset.ExecutableFile)
-		if err != nil {
-			var noReqsError *python.NoRequirementsFoundError
-			if errors.As(err, &noReqsError) {
-				return nil, errors2.New("no requirements.txt found for this asset")
-			}
-			return nil, errors2.Wrap(err, "failed to find requirements.txt")
-		}
+	if asset == nil {
+		return nil, errors2.New("file is not a valid asset")
+	}
+
+	// Check if asset is a Python asset
+	if asset.Type != pipeline.AssetTypePython && !strings.HasSuffix(asset.ExecutableFile.Path, ".py") {
+		return nil, errors2.New("asset is not a Python asset")
+	}
+
+	// Find dependency configuration
+	moduleFinder := &python.ModulePathFinder{}
+	depConfig, err := moduleFinder.FindDependencyConfig(repo.Path, &asset.ExecutableFile)
+	if err != nil {
+		return nil, errors2.Wrap(err, "failed to find dependency configuration")
+	}
+
+	if depConfig.Type == python.DependencyTypeNone {
+		return nil, errors2.New("no dependency configuration found for this asset (no requirements.txt or pyproject.toml)")
 	}
 
 	return &LockDependenciesResult{
-		RequirementsPath: requirementsTxt,
+		RequirementsPath: depConfig.RequirementsTxt,
 		InputPath:        absolutePath,
+		DependencyType:   depConfig.Type,
+		ProjectRoot:      depConfig.ProjectRoot,
 	}, nil
 }
 
 // LockAssetDependencies returns a CLI command that locks Python dependencies for an asset.
-// It finds the asset's requirements file, creates/uses a uv environment, and updates the
-// requirements file with locked versions using uv pip compile.
+// It finds the asset's dependency configuration and locks versions using either
+// uv pip compile (for requirements.txt) or uv lock (for pyproject.toml).
 func LockAssetDependencies() *cli.Command {
 	return &cli.Command{
 		Name:      "lock-asset-dependencies",
 		Usage:     "Lock Python dependencies for a Bruin asset using uv",
-		ArgsUsage: "[path to the asset definition or requirements.txt]",
+		ArgsUsage: "[path to the asset definition, requirements.txt, or pyproject.toml]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "python-version",
@@ -1560,25 +1576,18 @@ func LockAssetDependencies() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Use the refactored command to find requirements path
+			// Find dependency configuration
 			cmd := &LockDependenciesCommand{
 				builder: DefaultPipelineBuilder,
 			}
 
-			result, err := cmd.FindRequirementsPath(assetPath)
+			result, err := cmd.FindDependencyPath(assetPath)
 			if err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)
 			}
 
 			result.PythonVersion = pythonVersion
-
-			// Find the git repo for working directory
-			repo, err := git.FindRepoFromPath(result.InputPath)
-			if err != nil {
-				printErrorJSON(errors2.Wrap(err, "failed to find repository"))
-				return cli.Exit("", 1)
-			}
 
 			// Ensure uv is installed
 			uvChecker := &uv.Checker{}
@@ -1588,36 +1597,66 @@ func LockAssetDependencies() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Run uv pip compile to lock dependencies
-			// uv pip compile requirements.txt -o requirements.txt --python-version X.Y --no-header
-			execCmd := exec.CommandContext(ctx, uvBinaryPath, "pip", "compile", result.RequirementsPath, "-o", result.RequirementsPath, "--python-version", pythonVersion, "--quiet", "--no-header") //nolint:gosec
-			execCmd.Dir = repo.Path
+			var execCmd *exec.Cmd
+			switch result.DependencyType { //nolint:exhaustive
+			case python.DependencyTypePyproject:
+				// uv lock --python <version>
+				execCmd = exec.CommandContext(ctx, uvBinaryPath, "lock", "--python", pythonVersion) //nolint:gosec
+				execCmd.Dir = result.ProjectRoot
+
+			case python.DependencyTypeRequirementsTxt:
+				// uv pip compile requirements.txt -o requirements.txt --python-version X.Y --no-header
+				execCmd = exec.CommandContext(ctx, uvBinaryPath, "pip", "compile", result.RequirementsPath, "-o", result.RequirementsPath, "--python-version", pythonVersion, "--quiet", "--no-header") //nolint:gosec
+				execCmd.Dir = result.ProjectRoot
+
+			default:
+				printErrorJSON(errors2.New("no supported dependency configuration found"))
+				return cli.Exit("", 1)
+			}
+
 			execCmd.Stdout = os.Stdout
 			execCmd.Stderr = os.Stderr
 
 			err = execCmd.Run()
 			if err != nil {
-				printErrorJSON(errors2.Wrap(err, "failed to lock dependencies with uv pip compile"))
+				if result.DependencyType == python.DependencyTypePyproject {
+					printErrorJSON(errors2.Wrap(err, "failed to lock dependencies with uv lock"))
+				} else {
+					printErrorJSON(errors2.Wrap(err, "failed to lock dependencies with uv pip compile"))
+				}
 				return cli.Exit("", 1)
 			}
 
 			// Output result
 			switch output {
 			case outputFormatPlain:
-				fmt.Printf("Successfully locked dependencies in %s\n", result.RequirementsPath)
+				if result.DependencyType == python.DependencyTypePyproject {
+					fmt.Printf("Successfully locked dependencies in %s\n", filepath.Join(result.ProjectRoot, "uv.lock"))
+				} else {
+					fmt.Printf("Successfully locked dependencies in %s\n", result.RequirementsPath)
+				}
 			case "json":
 				type jsonResponse struct {
-					RequirementsPath string `json:"requirements_path"`
+					RequirementsPath string `json:"requirements_path,omitempty"`
+					LockFilePath     string `json:"lock_file_path,omitempty"`
 					PythonVersion    string `json:"python_version"`
 					AssetPath        string `json:"asset_path"`
+					DependencyType   string `json:"dependency_type"`
 					Success          bool   `json:"success"`
 				}
 
 				finalOutput := jsonResponse{
-					RequirementsPath: result.RequirementsPath,
-					PythonVersion:    pythonVersion,
-					AssetPath:        result.InputPath,
-					Success:          true,
+					PythonVersion: pythonVersion,
+					AssetPath:     result.InputPath,
+					Success:       true,
+				}
+
+				if result.DependencyType == python.DependencyTypePyproject {
+					finalOutput.DependencyType = "pyproject"
+					finalOutput.LockFilePath = filepath.Join(result.ProjectRoot, "uv.lock")
+				} else {
+					finalOutput.DependencyType = "requirements_txt"
+					finalOutput.RequirementsPath = result.RequirementsPath
 				}
 
 				jsonData, err := json.Marshal(finalOutput)

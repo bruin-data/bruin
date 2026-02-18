@@ -567,6 +567,40 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "python-pyproject-run",
+			task: e2e.Task{
+				Name:    "python-pyproject-run",
+				Command: binary,
+				Args: []string{
+					"run",
+					filepath.Join(currentFolder, "test-pipelines/python-pyproject/assets/check_deps.py"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+		},
+		{
+			name: "python-pyproject-nested-run",
+			task: e2e.Task{
+				Name:    "python-pyproject-nested-run",
+				Command: binary,
+				Args: []string{
+					"run",
+					filepath.Join(currentFolder, "test-pipelines/python-pyproject/assets/nested/check_nested_deps.py"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+		},
+		{
 			name: "python-variable-injection",
 			task: e2e.Task{
 				Name:    "python-variable-injection",

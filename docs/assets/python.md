@@ -42,9 +42,65 @@ def materialize():
     return df
 ```
 
-## Dependency resolution
+## Dependency Management
 
-Python assets are searching for the closest `requirements.txt` file in the file tree and creates a virtual environment for that file.
+Bruin supports two ways of managing Python dependencies:
+
+1. **`pyproject.toml` with `uv.lock`** (recommended)
+2. **`requirements.txt`** (legacy)
+
+Bruin searches for dependency files by walking up the directory tree from the asset's location to the repository root. If both `requirements.txt` and `pyproject.toml` exist in the same search path, `requirements.txt` takes priority for backward compatibility.
+
+### Using `pyproject.toml` (Recommended)
+
+The recommended way to manage dependencies is with a standard `pyproject.toml` file. This gives you access to `uv`'s full dependency resolution, including lockfile support via `uv.lock`.
+
+```text
+my-pipeline/
+    assets/
+        fetch_data.py
+    pyproject.toml
+    uv.lock
+    pipeline.yml
+```
+
+A minimal `pyproject.toml` looks like this:
+
+```toml
+[project]
+name = "my-pipeline"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.0.0",
+    "requests>=2.28.0",
+]
+```
+
+When Bruin finds a `pyproject.toml`, it runs `uv run` from the project directory, which automatically:
+- Installs dependencies defined in `pyproject.toml`
+- Uses `uv.lock` for reproducible builds if present
+- Syncs the project environment before running your asset
+
+#### Locking dependencies
+
+You can lock your dependencies to ensure reproducible builds across environments:
+
+```shell
+bruin internal lock-asset-dependencies assets/fetch_data.py
+```
+
+When a `pyproject.toml` is detected, this runs `uv lock` in the project directory, generating or updating the `uv.lock` file. You should commit `uv.lock` to version control.
+
+You can also run `uv lock` directly from the project directory:
+
+```shell
+cd my-pipeline && uv lock
+```
+
+### Using `requirements.txt`
+
+You can also manage dependencies with `requirements.txt` files. Bruin searches for the closest `requirements.txt` file by walking up the directory tree from the asset's location.
 
 For example, assume you have a file tree such as:
 
@@ -63,9 +119,27 @@ For example, assume you have a file tree such as:
 * requirements.txt
 ```
 
-- When Bruin runs `test.py`, it will use the `folder1/folder2/requirements.txt` in `folder2`, since they are in the same folder.  
-- For `test2.py`, since there is no `requirements.txt` in the same folder, Bruin goes up one level in the tree and finds `folder1/requirements.txt`.  
-- Similarly, `requirements.txt` in the main folder used for `test3.py` since none of `folder6`, `folder5` and `folder4` have any `requirements.txt` files.
+- When Bruin runs `test.py`, it will use `folder1/folder2/requirements.txt`, since they are in the same folder.
+- For `test2.py`, since there is no `requirements.txt` in the same folder, Bruin goes up one level in the tree and finds `folder1/requirements.txt`.
+- Similarly, `requirements.txt` in the main folder is used for `test3.py` since none of `folder6`, `folder5` and `folder4` have any `requirements.txt` files.
+
+#### Locking dependencies
+
+You can lock `requirements.txt` dependencies using:
+
+```shell
+bruin internal lock-asset-dependencies assets/test.py
+```
+
+This runs `uv pip compile` to resolve and pin all dependency versions in-place.
+
+### Resolution priority
+
+When both `requirements.txt` and `pyproject.toml` exist in the search path, Bruin uses the following priority:
+
+1. **`requirements.txt`** — checked first for backward compatibility
+2. **`pyproject.toml`** — used if no `requirements.txt` is found
+3. **No dependencies** — if neither file is found, the asset runs without dependency installation
 
 ## Python versions
 
