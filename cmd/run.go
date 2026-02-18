@@ -1001,9 +1001,10 @@ func Run(isDebug *bool) *cli.Command {
 				pipelineInfo.RunDownstreamTasks = true
 			}
 
-			// Use the interactive TUI only when explicitly requested via --interactive flag
 			noColor := c.Bool("no-color")
 			minimalLogs := c.Bool("minimal-logs")
+
+			// Use the interactive TUI only when explicitly requested via --interactive flag
 			useTUI := c.Bool("interactive") &&
 				term.IsTerminal(int(os.Stdout.Fd())) &&
 				runConfig.Output != "json" &&
@@ -1186,8 +1187,6 @@ func Run(isDebug *bool) *cli.Command {
 				results := s.Run(runCtx)
 				duration := time.Since(start)
 
-				tui.Stop()
-
 				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))
 				}
@@ -1202,7 +1201,7 @@ func Run(isDebug *bool) *cli.Command {
 				// Print summary to real terminal
 				printTUISummary(realTerminal, results, s, duration, foundPipeline.Name)
 				if len(errorsInTaskResults) > 0 {
-					printTUIErrors(realTerminal, errorsInTaskResults, s)
+					printTUIErrors(realTerminal, errorsInTaskResults)
 				}
 
 				// Also print summary to piped stdout (for log file)

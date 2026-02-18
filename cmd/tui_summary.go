@@ -79,7 +79,7 @@ func printTUISummary(w io.Writer, results []*scheduler.TaskExecutionResult, s *s
 }
 
 // printTUIErrors writes error details to the given writer for failed tasks.
-func printTUIErrors(w io.Writer, errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
+func printTUIErrors(w io.Writer, errorsInTaskResults []*scheduler.TaskExecutionResult) {
 	if len(errorsInTaskResults) == 0 {
 		return
 	}

@@ -90,6 +90,8 @@ func (t *TUIRenderer) initFromScheduler(s *scheduler.Scheduler) {
 				name:   inst.GetHumanID(),
 				status: inst.GetStatus(),
 			})
+		case scheduler.TaskInstanceTypeMetadataPush:
+			// metadata push tasks are not displayed in the TUI
 		}
 	}
 }
@@ -116,6 +118,8 @@ func (t *TUIRenderer) OnStatusChange(event scheduler.StatusChangeEvent) {
 				break
 			}
 		}
+	case scheduler.TaskInstanceTypeMetadataPush:
+		// metadata push tasks are not displayed in the TUI
 	}
 }
 
@@ -213,7 +217,7 @@ func (t *TUIRenderer) render() {
 
 func (t *TUIRenderer) clearLastRender() {
 	if t.lastLines > 0 {
-		for i := 0; i < t.lastLines; i++ {
+		for range t.lastLines {
 			fmt.Fprint(t.terminal, "\033[A\033[2K")
 		}
 		fmt.Fprint(t.terminal, "\r")
@@ -334,6 +338,7 @@ func (t *TUIRenderer) renderAssetRow(row *assetRow, width int) string {
 		displayName = color.New(color.FgYellow).Sprint(name)
 	case scheduler.Pending, scheduler.Queued:
 		displayName = dimText(name)
+	case scheduler.Succeeded, scheduler.Skipped:
 	}
 
 	// Pad name to align durations
@@ -357,7 +362,7 @@ func (t *TUIRenderer) renderChecks(checks []*checkRow) string {
 			sb.WriteString(color.New(color.FgYellow).Sprint("~"))
 		case scheduler.UpstreamFailed:
 			sb.WriteString(color.New(color.FgYellow).Sprint("U"))
-		default:
+		case scheduler.Pending, scheduler.Queued, scheduler.Skipped:
 			sb.WriteString(dimText("."))
 		}
 	}
@@ -380,6 +385,8 @@ func (t *TUIRenderer) countMainTerminal() int {
 		switch row.status {
 		case scheduler.Succeeded, scheduler.Failed, scheduler.UpstreamFailed, scheduler.Skipped:
 			count++
+		case scheduler.Pending, scheduler.Queued, scheduler.Running:
+			// not terminal
 		}
 	}
 	return count
@@ -412,11 +419,10 @@ func statusPriority(s scheduler.TaskInstanceStatus) int {
 		return 3
 	case scheduler.UpstreamFailed:
 		return 4
-	case scheduler.Succeeded:
+	case scheduler.Succeeded, scheduler.Skipped:
 		return 5
-	default:
-		return 6
 	}
+	return 6
 }
 
 func statusIcon(s scheduler.TaskInstanceStatus) string {
@@ -431,9 +437,10 @@ func statusIcon(s scheduler.TaskInstanceStatus) string {
 		return color.New(color.FgYellow).Sprint("↑")
 	case scheduler.Pending, scheduler.Queued:
 		return dimText("○")
-	default:
-		return " "
+	case scheduler.Skipped:
+		return dimText("-")
 	}
+	return " "
 }
 
 func dimText(s string) string {

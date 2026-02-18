@@ -105,7 +105,10 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		// Mark as Running so status is tracked
 		task.MarkAs(scheduler.Running)
 		if w.formatOpts.OnTaskStart != nil {
-			w.formatOpts.OnTaskStart(task)
+			func() {
+				defer func() { recover() }() //nolint:errcheck
+				w.formatOpts.OnTaskStart(task)
+			}()
 		}
 
 		if !w.formatOpts.TUIMode {
@@ -151,7 +154,10 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		duration := time.Since(start)
 
 		if w.formatOpts.OnTaskEnd != nil {
-			w.formatOpts.OnTaskEnd(task, err, duration)
+			func() {
+				defer func() { recover() }() //nolint:errcheck
+				w.formatOpts.OnTaskEnd(task, err, duration)
+			}()
 		}
 
 		if !w.formatOpts.TUIMode {
