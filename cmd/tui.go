@@ -183,8 +183,10 @@ func (t *TUIRenderer) Stop() {
 	close(t.done)
 	t.ticker.Stop()
 
-	// Clear the last rendered frame
+	// Clear the last rendered frame under lock (lastLines is shared state)
+	t.mu.Lock()
 	t.clearLastRender()
+	t.mu.Unlock()
 
 	// Show cursor
 	fmt.Fprint(t.terminal, "\033[?25h")
@@ -217,7 +219,11 @@ func (t *TUIRenderer) render() {
 
 func (t *TUIRenderer) clearLastRender() {
 	if t.lastLines > 0 {
-		for range t.lastLines {
+		// Clamp to terminal height so we don't move cursor past the top of screen
+		// if the terminal was resized smaller between renders.
+		_, h := t.getTerminalSize()
+		lines := min(t.lastLines, h-1)
+		for range lines {
 			fmt.Fprint(t.terminal, "\033[A\033[2K")
 		}
 		fmt.Fprint(t.terminal, "\r")
