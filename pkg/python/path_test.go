@@ -184,3 +184,188 @@ func TestFindRequirementsTxt(t *testing.T) {
 		})
 	}
 }
+
+func TestFindPyprojectTomlInPath(t *testing.T) {
+	t.Parallel()
+
+	abs := func(path string) string {
+		absPath, err := filepath.Abs(path)
+		assert.NoError(t, err)
+		return absPath
+	}
+
+	type args struct {
+		repoPath   string
+		executable *pipeline.ExecutableFile
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "pyproject.toml next to script",
+			args: args{
+				repoPath: abs("./testdata/pyproject_locked"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/pyproject_locked/main.py"),
+				},
+			},
+			want:    abs("./testdata/pyproject_locked/pyproject.toml"),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "pyproject.toml without lockfile",
+			args: args{
+				repoPath: abs("./testdata/pyproject_no_lock"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/pyproject_no_lock/main.py"),
+				},
+			},
+			want:    abs("./testdata/pyproject_no_lock/pyproject.toml"),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "pyproject.toml found in parent directory",
+			args: args{
+				repoPath: abs("./testdata/pyproject_nested"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/pyproject_nested/subdir/main.py"),
+				},
+			},
+			want:    abs("./testdata/pyproject_nested/pyproject.toml"),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "no pyproject.toml found",
+			args: args{
+				repoPath: abs("./testdata/reqfinder"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/reqfinder/main.py"),
+				},
+			},
+			want: "",
+			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				_, ok := err.(*NoPyprojectFoundError)
+				return ok
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			finder := &ModulePathFinder{}
+			got, err := finder.FindPyprojectTomlInPath(tt.args.repoPath, tt.args.executable)
+
+			tt.wantErr(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestFindDependencyConfig(t *testing.T) {
+	t.Parallel()
+
+	abs := func(path string) string {
+		absPath, err := filepath.Abs(path)
+		assert.NoError(t, err)
+		return absPath
+	}
+
+	type args struct {
+		repoPath   string
+		executable *pipeline.ExecutableFile
+	}
+	tests := []struct {
+		name     string
+		args     args
+		wantType DependencyType
+		wantErr  bool
+	}{
+		{
+			name: "requirements.txt takes priority over pyproject.toml",
+			args: args{
+				repoPath: abs("./testdata/mixed_deps"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/mixed_deps/main.py"),
+				},
+			},
+			wantType: DependencyTypeRequirementsTxt,
+			wantErr:  false,
+		},
+		{
+			name: "pyproject.toml returns pyproject type (UV handles lockfile)",
+			args: args{
+				repoPath: abs("./testdata/pyproject_locked"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/pyproject_locked/main.py"),
+				},
+			},
+			wantType: DependencyTypePyproject,
+			wantErr:  false,
+		},
+		{
+			name: "pyproject.toml without lockfile returns pyproject type",
+			args: args{
+				repoPath: abs("./testdata/pyproject_no_lock"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/pyproject_no_lock/main.py"),
+				},
+			},
+			wantType: DependencyTypePyproject,
+			wantErr:  false,
+		},
+		{
+			name: "no dependency files returns none type",
+			args: args{
+				repoPath: abs("./testdata/reqfinder"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/reqfinder/main.py"),
+				},
+			},
+			wantType: DependencyTypeNone,
+			wantErr:  false,
+		},
+		{
+			name: "requirements.txt in subdirectory",
+			args: args{
+				repoPath: abs("./testdata/reqfinder"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/reqfinder/dir1/dir2/dir3/main.py"),
+				},
+			},
+			wantType: DependencyTypeRequirementsTxt,
+			wantErr:  false,
+		},
+		{
+			name: "pyproject.toml found in parent directory",
+			args: args{
+				repoPath: abs("./testdata/pyproject_nested"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/pyproject_nested/subdir/main.py"),
+				},
+			},
+			wantType: DependencyTypePyproject,
+			wantErr:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			finder := &ModulePathFinder{}
+			got, err := finder.FindDependencyConfig(tt.args.repoPath, tt.args.executable)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.Equal(t, tt.wantType, got.Type)
+		})
+	}
+}

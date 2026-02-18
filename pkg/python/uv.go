@@ -149,6 +149,12 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 }
 
 func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
+	// Check for pyproject.toml-based dependencies first
+	if execCtx.dependencyConfig != nil && execCtx.dependencyConfig.Type == DependencyTypePyproject {
+		return u.runWithPyproject(ctx, execCtx, pythonVersion)
+	}
+
+	// Fall back to requirements.txt or no dependencies (existing behavior)
 	flags := []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
 	if execCtx.requirementsTxt != "" {
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
@@ -163,6 +169,59 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 	}
 
 	return u.Cmd.Run(ctx, execCtx.repo, noDependencyCommand)
+}
+
+// runWithPyproject runs a Python module with dependencies from pyproject.toml.
+// UV will automatically detect and use uv.lock if present in the project directory.
+func (u *UvPythonRunner) runWithPyproject(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
+	depConfig := execCtx.dependencyConfig
+
+	// When using pyproject.toml, UV expects to run from the project directory
+	projectRepo := &git.Repo{
+		Path: depConfig.ProjectRoot,
+	}
+
+	// Calculate module path relative to project root
+	modulePath := u.calculateModuleFromProjectRoot(execCtx, depConfig.ProjectRoot)
+
+	// Build command: uv run --python <version> --module <module>
+	// UV will automatically use uv.lock if present
+	flags := []string{"run", "--python", pythonVersion, "--module", modulePath}
+
+	command := &CommandInstance{
+		Name:    u.binaryFullPath,
+		Args:    flags,
+		EnvVars: execCtx.envVariables,
+	}
+
+	return u.Cmd.Run(ctx, projectRepo, command)
+}
+
+// calculateModuleFromProjectRoot calculates the module path relative to the project root.
+// This handles cases where pyproject.toml is in a subdirectory of the repo.
+func (u *UvPythonRunner) calculateModuleFromProjectRoot(execCtx *executionContext, projectRoot string) string {
+	// If the project root is the same as repo root, use existing module
+	if projectRoot == execCtx.repo.Path {
+		return execCtx.module
+	}
+
+	// Otherwise, the module path needs to be relative to project root
+	// Example:
+	//   repo: /path/to/repo
+	//   projectRoot: /path/to/repo/python_project
+	//   original module: python_project.src.main
+	//   new module: src.main
+	relPath, err := filepath.Rel(execCtx.repo.Path, projectRoot)
+	if err != nil {
+		return execCtx.module // fallback
+	}
+
+	prefix := strings.ReplaceAll(relPath, string(os.PathSeparator), ".") + "."
+	if strings.HasPrefix(execCtx.module, prefix) {
+		return strings.TrimPrefix(execCtx.module, prefix)
+	}
+
+	return execCtx.module
 }
 
 func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
@@ -197,14 +256,25 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return fmt.Errorf("failed to write to temp file: %w", err)
 	}
 
-	flags := []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
-	if execCtx.requirementsTxt != "" {
-		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
+	// Determine which dependency method to use
+	var flags []string
+	var runRepo *git.Repo
+
+	if execCtx.dependencyConfig != nil && execCtx.dependencyConfig.Type == DependencyTypePyproject {
+		// Use pyproject.toml - UV will automatically use uv.lock if present
+		runRepo = &git.Repo{Path: execCtx.dependencyConfig.ProjectRoot}
+		flags = []string{"run", "--python", pythonVersion, tempPyScript.Name()}
+	} else {
+		// Fall back to requirements.txt or no dependencies
+		runRepo = execCtx.repo
+		flags = []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
+		if execCtx.requirementsTxt != "" {
+			flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
+		}
+		flags = append(flags, tempPyScript.Name())
 	}
 
-	flags = append(flags, tempPyScript.Name())
-
-	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
+	err = u.Cmd.Run(ctx, runRepo, &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,

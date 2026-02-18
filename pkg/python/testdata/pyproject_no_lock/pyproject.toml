@@ -1,0 +1,6 @@
+[project]
+name = "test-project-no-lock"
+version = "0.1.0"
+dependencies = [
+    "pandas>=2.0.0",
+]

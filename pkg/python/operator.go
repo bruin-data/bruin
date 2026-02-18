@@ -25,6 +25,10 @@ type executionContext struct {
 	module          string
 	requirementsTxt string
 
+	// dependencyConfig holds the full dependency configuration including
+	// pyproject.toml and uv.lock support for uv-based workflows.
+	dependencyConfig *DependencyConfig
+
 	envVariables map[string]string
 	pipeline     *pipeline.Pipeline
 	asset        *pipeline.Asset
@@ -33,6 +37,7 @@ type executionContext struct {
 type modulePathFinder interface {
 	FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error)
 	FindRequirementsTxtInPath(path string, executable *pipeline.ExecutableFile) (string, error)
+	FindDependencyConfig(path string, executable *pipeline.ExecutableFile) (*DependencyConfig, error)
 }
 
 type repoFinder interface {
@@ -129,15 +134,28 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 
 	logger.Debugf("using module path: %s", module)
 
-	requirementsTxt, err := o.module.FindRequirementsTxtInPath(repo.Path, &t.ExecutableFile)
+	// Find dependency configuration (supports requirements.txt, pyproject.toml, and uv.lock)
+	depConfig, err := o.module.FindDependencyConfig(repo.Path, &t.ExecutableFile)
 	if err != nil {
-		var noReqsError *NoRequirementsFoundError
-		switch {
-		case !errors.As(err, &noReqsError):
-			return errors.Wrap(err, "failed to find requirements.txt")
-		default:
-			//
-		}
+		logger.Debugf("failed to find dependency config: %v", err)
+		// Non-fatal: continue without dependencies
+		depConfig = &DependencyConfig{Type: DependencyTypeNone}
+	}
+
+	// Extract requirementsTxt for backward compatibility
+	var requirementsTxt string
+	if depConfig != nil && depConfig.Type == DependencyTypeRequirementsTxt {
+		requirementsTxt = depConfig.RequirementsTxt
+	}
+
+	// Log which dependency method is being used
+	switch depConfig.Type {
+	case DependencyTypePyproject:
+		logger.Debugf("using pyproject.toml from %s", depConfig.ProjectRoot)
+	case DependencyTypeRequirementsTxt:
+		logger.Debugf("using requirements.txt from %s", depConfig.RequirementsTxt)
+	case DependencyTypeNone:
+		logger.Debugf("no dependency configuration found, running without dependencies")
 	}
 
 	// Create a copy of environment variables to avoid race conditions when multiple goroutines
@@ -196,12 +214,13 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 
 	err = o.runner.Run(ctx, &executionContext{
-		repo:            repo,
-		module:          module,
-		requirementsTxt: requirementsTxt,
-		pipeline:        p,
-		asset:           t,
-		envVariables:    envVariables,
+		repo:             repo,
+		module:           module,
+		requirementsTxt:  requirementsTxt,
+		dependencyConfig: depConfig,
+		pipeline:         p,
+		asset:            t,
+		envVariables:     envVariables,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to execute Python script")
