@@ -98,12 +98,12 @@ format: lint-python
 	wait
 
 lint-python:
-	pip install sqlglot ruff
+	uv pip install --system sqlglot
 	@echo "$(OK_COLOR)==> Running Python formatting with ruff...$(NO_COLOR)"
-	@ruff format ./pythonsrc
+	@uvx ruff format ./pythonsrc
 
 	@echo "$(OK_COLOR)==> Running Python linting with ruff...$(NO_COLOR)"
-	@ruff check --fix ./pythonsrc
+	@uvx ruff check --fix ./pythonsrc
 
 refresh-integration-expectations: build
 	@echo "$(OK_COLOR)==> Refreshing integration expectations...$(NO_COLOR)"
