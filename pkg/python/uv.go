@@ -171,8 +171,18 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 	return u.Cmd.Run(ctx, execCtx.repo, noDependencyCommand)
 }
 
+// lockPyprojectDeps runs `uv lock` in the project directory to ensure uv.lock is up to date.
+func (u *UvPythonRunner) lockPyprojectDeps(ctx context.Context, projectRepo *git.Repo, pythonVersion string) error {
+	lockCmd := &CommandInstance{
+		Name: u.binaryFullPath,
+		Args: []string{"lock", "--python", pythonVersion},
+	}
+
+	return u.Cmd.Run(ctx, projectRepo, lockCmd)
+}
+
 // runWithPyproject runs a Python module with dependencies from pyproject.toml.
-// UV will automatically detect and use uv.lock if present in the project directory.
+// It first locks the dependencies, then runs the module.
 func (u *UvPythonRunner) runWithPyproject(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
 	depConfig := execCtx.dependencyConfig
 
@@ -181,11 +191,15 @@ func (u *UvPythonRunner) runWithPyproject(ctx context.Context, execCtx *executio
 		Path: depConfig.ProjectRoot,
 	}
 
+	// Lock dependencies before running
+	if err := u.lockPyprojectDeps(ctx, projectRepo, pythonVersion); err != nil {
+		return errors.Wrap(err, "failed to lock pyproject.toml dependencies")
+	}
+
 	// Calculate module path relative to project root
 	modulePath := u.calculateModuleFromProjectRoot(execCtx, depConfig.ProjectRoot)
 
 	// Build command: uv run --python <version> --module <module>
-	// UV will automatically use uv.lock if present
 	flags := []string{"run", "--python", pythonVersion, "--module", modulePath}
 
 	command := &CommandInstance{
@@ -261,8 +275,11 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	var runRepo *git.Repo
 
 	if execCtx.dependencyConfig != nil && execCtx.dependencyConfig.Type == DependencyTypePyproject {
-		// Use pyproject.toml - UV will automatically use uv.lock if present
+		// Use pyproject.toml - lock dependencies first, then run
 		runRepo = &git.Repo{Path: execCtx.dependencyConfig.ProjectRoot}
+		if err := u.lockPyprojectDeps(ctx, runRepo, pythonVersion); err != nil {
+			return errors.Wrap(err, "failed to lock pyproject.toml dependencies")
+		}
 		flags = []string{"run", "--python", pythonVersion, tempPyScript.Name()}
 	} else {
 		// Fall back to requirements.txt or no dependencies
