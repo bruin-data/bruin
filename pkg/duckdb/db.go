@@ -130,6 +130,10 @@ type connection interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) Row
 }
 
+type adbcFallbackConnection interface {
+	SelectWithSchemaViaADBC(ctx context.Context, query string) (*query.QueryResult, error)
+}
+
 // sqlxWrapper wraps *sqlx.DB to implement the connection interface.
 // This is needed because *sqlx.DB returns *sql.Rows but our interface returns Rows.
 type sqlxWrapper struct {
@@ -152,6 +156,32 @@ func (w *sqlxWrapper) ExecContext(ctx context.Context, sql string, arguments ...
 //nolint:ireturn
 func (w *sqlxWrapper) QueryRowContext(ctx context.Context, query string, args ...any) Row {
 	return w.db.QueryRowContext(ctx, query, args...)
+}
+
+const adbcSQLDriverUnsupportedTypeError = "not yet implemented populating from columns of type"
+
+// The ADBC database/sql bridge returns this error for Arrow complex types (LIST/STRUCT/MAP).
+func isADBCSQLDriverUnsupportedTypeError(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), adbcSQLDriverUnsupportedTypeError)
+}
+
+// Retry through core ADBC only for the known sqldriver complex-type decoding gap.
+func (c *Client) trySelectWithADBCFallback(ctx context.Context, queryString string, queryErr error) (*query.QueryResult, bool, error) {
+	if !isADBCSQLDriverUnsupportedTypeError(queryErr) {
+		return nil, false, nil
+	}
+
+	fallbackConn, ok := c.connection.(adbcFallbackConnection)
+	if !ok {
+		return nil, false, nil
+	}
+
+	result, err := fallbackConn.SelectWithSchemaViaADBC(ctx, queryString)
+	if err != nil {
+		return nil, true, errors.Join(queryErr, fmt.Errorf("adbc core fallback failed: %w", err))
+	}
+
+	return result, true, nil
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
@@ -197,6 +227,12 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	rows, err := c.connection.QueryContext(ctx, query.String())
 	if err != nil {
+		if fallbackResult, usedFallback, fallbackErr := c.trySelectWithADBCFallback(ctx, query.String(), err); usedFallback {
+			if fallbackErr != nil {
+				return nil, fallbackErr
+			}
+			return fallbackResult.Rows, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -227,6 +263,12 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 		// Scan the result into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
+			if fallbackResult, usedFallback, fallbackErr := c.trySelectWithADBCFallback(ctx, query.String(), err); usedFallback {
+				if fallbackErr != nil {
+					return nil, fallbackErr
+				}
+				return fallbackResult.Rows, nil
+			}
 			return nil, err
 		}
 
@@ -247,6 +289,12 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 
 	rows, err := c.connection.QueryContext(ctx, queryObject.String())
 	if err != nil {
+		if fallbackResult, usedFallback, fallbackErr := c.trySelectWithADBCFallback(ctx, queryObject.String(), err); usedFallback {
+			if fallbackErr != nil {
+				return nil, fallbackErr
+			}
+			return fallbackResult, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -288,6 +336,12 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 
 		// Scan the result into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
+			if fallbackResult, usedFallback, fallbackErr := c.trySelectWithADBCFallback(ctx, queryObject.String(), err); usedFallback {
+				if fallbackErr != nil {
+					return nil, fallbackErr
+				}
+				return fallbackResult, nil
+			}
 			return nil, err
 		}
 

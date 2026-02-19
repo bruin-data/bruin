@@ -1,6 +1,8 @@
 package duck
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -11,6 +13,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type fallbackMockConnection struct {
+	queryErr       error
+	fallbackResult *query.QueryResult
+	fallbackErr    error
+	fallbackCalled bool
+}
+
+func (m *fallbackMockConnection) QueryContext(_ context.Context, _ string, _ ...any) (Rows, error) {
+	return nil, m.queryErr
+}
+
+func (m *fallbackMockConnection) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, nil
+}
+
+func (m *fallbackMockConnection) QueryRowContext(_ context.Context, _ string, _ ...any) Row {
+	return &errorRow{err: nil}
+}
+
+func (m *fallbackMockConnection) SelectWithSchemaViaADBC(_ context.Context, _ string) (*query.QueryResult, error) {
+	m.fallbackCalled = true
+	return m.fallbackResult, m.fallbackErr
+}
 
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
@@ -201,6 +227,67 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestDB_SelectWithSchema_UsesADBCCoreFallbackForUnsupportedComplexTypes(t *testing.T) {
+	t.Parallel()
+
+	expected := &query.QueryResult{
+		Columns:     []string{"name", "tags"},
+		ColumnTypes: []string{"VARCHAR", "LIST"},
+		Rows: [][]interface{}{
+			{"users", []interface{}{"a", "b"}},
+		},
+	}
+
+	conn := &fallbackMockConnection{
+		queryErr:       errors.New("Not Implemented: not yet implemented populating from columns of type list<l: utf8, nullable>"),
+		fallbackResult: expected,
+	}
+	client := Client{connection: conn, config: Config{Path: "some/path.db"}}
+
+	result, err := client.SelectWithSchema(t.Context(), &query.Query{Query: "SHOW;"})
+	require.NoError(t, err)
+	require.True(t, conn.fallbackCalled)
+	assert.Equal(t, expected, result)
+}
+
+func TestDB_SelectWithSchema_DoesNotFallbackForUnrelatedErrors(t *testing.T) {
+	t.Parallel()
+
+	conn := &fallbackMockConnection{
+		queryErr: errors.New("connection is closed"),
+	}
+	client := Client{connection: conn, config: Config{Path: "some/path.db"}}
+
+	result, err := client.SelectWithSchema(t.Context(), &query.Query{Query: "SHOW;"})
+	require.Error(t, err)
+	require.False(t, conn.fallbackCalled)
+	assert.Nil(t, result)
+	assert.Equal(t, "connection is closed", err.Error())
+}
+
+func TestDB_Select_UsesADBCCoreFallbackForUnsupportedComplexTypes(t *testing.T) {
+	t.Parallel()
+
+	fallback := &query.QueryResult{
+		Columns:     []string{"name", "tags"},
+		ColumnTypes: []string{"VARCHAR", "LIST"},
+		Rows: [][]interface{}{
+			{"users", []interface{}{"a", "b"}},
+		},
+	}
+
+	conn := &fallbackMockConnection{
+		queryErr:       errors.New("Not Implemented: not yet implemented populating from columns of type list<l: utf8, nullable>"),
+		fallbackResult: fallback,
+	}
+	client := Client{connection: conn, config: Config{Path: "some/path.db"}}
+
+	rows, err := client.Select(t.Context(), &query.Query{Query: "SHOW;"})
+	require.NoError(t, err)
+	require.True(t, conn.fallbackCalled)
+	assert.Equal(t, fallback.Rows, rows)
 }
 
 func TestClient_GetDatabaseSummary(t *testing.T) {

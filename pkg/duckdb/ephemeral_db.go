@@ -6,8 +6,17 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"time"
+
+	"github.com/apache/arrow-adbc/go/adbc"
+	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/decimal128"
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 type EphemeralConnection struct {
@@ -72,6 +81,258 @@ func (e *EphemeralConnection) execLakehouseStatement(ctx context.Context, db *sq
 		return fmt.Errorf("failed to execute lakehouse statement: %w", err)
 	}
 	return nil
+}
+
+// Opens a direct core-ADBC connection (bypassing database/sql sqldriver).
+// This path is used as a fallback when sqldriver cannot decode complex Arrow types.
+func (e *EphemeralConnection) openADBCConnection(ctx context.Context) (adbc.Database, adbc.Connection, error) {
+	driverManager := &drivermgr.Driver{}
+
+	db, err := driverManager.NewDatabase(map[string]string{
+		"driver": "duckdb",
+		"path":   e.config.ToDBConnectionURI(),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	conn, err := db.Open(ctx)
+	if err != nil {
+		_ = db.Close()
+		return nil, nil, err
+	}
+
+	if err := e.setupLakehouseADBC(ctx, conn); err != nil {
+		_ = conn.Close()
+		_ = db.Close()
+		return nil, nil, err
+	}
+
+	return db, conn, nil
+}
+
+// Applies the same lakehouse attach setup used in the standard sql-based path.
+func (e *EphemeralConnection) setupLakehouseADBC(ctx context.Context, conn adbc.Connection) error {
+	cfg, ok := e.config.(Config)
+	if !ok || !cfg.HasLakehouse() {
+		return nil
+	}
+
+	attacher := NewLakehouseAttacher()
+	if err := ValidateLakehouseConfig(cfg.Lakehouse); err != nil {
+		return fmt.Errorf("invalid lakehouse config: %w", err)
+	}
+
+	statements, err := attacher.GenerateAttachStatements(cfg.Lakehouse, cfg.GetLakehouseAlias())
+	if err != nil {
+		return fmt.Errorf("failed to generate lakehouse statements: %w", err)
+	}
+
+	for _, stmt := range statements {
+		if err := e.execLakehouseStatementADBC(ctx, conn, stmt); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Executes a single attach/init statement through core ADBC.
+func (e *EphemeralConnection) execLakehouseStatementADBC(ctx context.Context, conn adbc.Connection, stmt string) error {
+	statement, err := conn.NewStatement()
+	if err != nil {
+		return fmt.Errorf("failed to execute lakehouse statement: %w", err)
+	}
+	defer statement.Close()
+
+	if err := statement.SetSqlQuery(stmt); err != nil {
+		return fmt.Errorf("failed to execute lakehouse statement: %w", err)
+	}
+
+	if _, err := statement.ExecuteUpdate(ctx); err != nil {
+		return fmt.Errorf("failed to execute lakehouse statement: %w", err)
+	}
+
+	return nil
+}
+
+// Executes a query via core ADBC and converts Arrow records into QueryResult.
+func (e *EphemeralConnection) SelectWithSchemaViaADBC(ctx context.Context, queryString string) (*query.QueryResult, error) {
+	db, conn, err := e.openADBCConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	defer conn.Close()
+
+	stmt, err := conn.NewStatement()
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	if err := stmt.SetSqlQuery(queryString); err != nil {
+		return nil, err
+	}
+
+	recordReader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer recordReader.Release()
+
+	return convertRecordReaderToQueryResult(recordReader)
+}
+
+// Materializes the full RecordReader into Bruin's query result shape.
+func convertRecordReaderToQueryResult(recordReader array.RecordReader) (*query.QueryResult, error) {
+	schema := recordReader.Schema()
+	fields := schema.Fields()
+
+	result := &query.QueryResult{
+		Columns:     make([]string, len(fields)),
+		ColumnTypes: make([]string, len(fields)),
+		Rows:        make([][]interface{}, 0),
+	}
+
+	for i, field := range fields {
+		result.Columns[i] = field.Name
+		result.ColumnTypes[i] = normalizeTypeName(field.Type.String())
+	}
+
+	for recordReader.Next() {
+		record := recordReader.Record()
+		columns := record.Columns()
+
+		for rowIdx := 0; rowIdx < int(record.NumRows()); rowIdx++ {
+			row := make([]interface{}, len(columns))
+			for colIdx, col := range columns {
+				value, err := recordValueFromArrowArray(col, rowIdx)
+				if err != nil {
+					return nil, err
+				}
+				row[colIdx] = value
+			}
+			result.Rows = append(result.Rows, row)
+		}
+	}
+
+	if err := recordReader.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// Converts a single Arrow cell to a Go value that is safe for output/logging.
+func recordValueFromArrowArray(col arrow.Array, rowIdx int) (interface{}, error) {
+	if col.IsNull(rowIdx) {
+		return nil, nil
+	}
+
+	if colUnion, ok := col.(array.Union); ok {
+		col = colUnion.Field(colUnion.ChildID(rowIdx))
+	}
+
+	switch typed := col.(type) {
+	case *array.Boolean:
+		return typed.Value(rowIdx), nil
+	case *array.Int8:
+		return typed.Value(rowIdx), nil
+	case *array.Uint8:
+		return typed.Value(rowIdx), nil
+	case *array.Int16:
+		return typed.Value(rowIdx), nil
+	case *array.Uint16:
+		return typed.Value(rowIdx), nil
+	case *array.Int32:
+		return typed.Value(rowIdx), nil
+	case *array.Uint32:
+		return typed.Value(rowIdx), nil
+	case *array.Int64:
+		return typed.Value(rowIdx), nil
+	case *array.Uint64:
+		return typed.Value(rowIdx), nil
+	case *array.Float32:
+		return typed.Value(rowIdx), nil
+	case *array.Float64:
+		return typed.Value(rowIdx), nil
+	case *array.String:
+		return copyString(typed.Value(rowIdx)), nil
+	case *array.LargeString:
+		return copyString(typed.Value(rowIdx)), nil
+	case *array.Binary:
+		value := typed.Value(rowIdx)
+		copied := make([]byte, len(value))
+		copy(copied, value)
+		return copied, nil
+	case *array.LargeBinary:
+		value := typed.Value(rowIdx)
+		copied := make([]byte, len(value))
+		copy(copied, value)
+		return copied, nil
+	case *array.Date32:
+		return typed.Value(rowIdx).ToTime().Format(time.RFC3339), nil
+	case *array.Date64:
+		return typed.Value(rowIdx).ToTime().Format(time.RFC3339), nil
+	case *array.Time32:
+		timeType := typed.DataType().(*arrow.Time32Type)
+		return typed.Value(rowIdx).ToTime(timeType.Unit).Format(time.RFC3339), nil
+	case *array.Time64:
+		timeType := typed.DataType().(*arrow.Time64Type)
+		return typed.Value(rowIdx).ToTime(timeType.Unit).Format(time.RFC3339), nil
+	case *array.Timestamp:
+		timestampType := typed.DataType().(*arrow.TimestampType)
+		return typed.Value(rowIdx).ToTime(timestampType.Unit).Format(time.RFC3339), nil
+	case *array.Decimal128:
+		decimalType := typed.DataType().(*arrow.Decimal128Type)
+		return convertDecimal128WithScale(typed.Value(rowIdx), int64(decimalType.Scale)), nil
+	}
+
+	// For complex types, Arrow arrays expose marshaled values (JSON-compatible).
+	if marshaler, ok := col.(interface{ GetOneForMarshal(int) interface{} }); ok {
+		return normalizeMarshaledArrowValue(marshaler.GetOneForMarshal(rowIdx)), nil
+	}
+
+	if valueStringer, ok := col.(interface{ ValueStr(int) string }); ok {
+		return copyString(valueStringer.ValueStr(rowIdx)), nil
+	}
+
+	return nil, fmt.Errorf("unsupported arrow type in adbc fallback: %s", col.DataType().String())
+}
+
+// Recursively converts marshaled Arrow values into plain Go values.
+func normalizeMarshaledArrowValue(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case nil:
+		return nil
+	case json.RawMessage:
+		var decoded interface{}
+		if err := json.Unmarshal(typed, &decoded); err != nil {
+			return copyString(string(typed))
+		}
+		return normalizeMarshaledArrowValue(decoded)
+	case map[string]interface{}:
+		normalized := make(map[string]interface{}, len(typed))
+		for key, nested := range typed {
+			normalized[key] = normalizeMarshaledArrowValue(nested)
+		}
+		return normalized
+	case []interface{}:
+		normalized := make([]interface{}, len(typed))
+		for i, nested := range typed {
+			normalized[i] = normalizeMarshaledArrowValue(nested)
+		}
+		return normalized
+	default:
+		return typed
+	}
+}
+
+// Keeps decimal handling consistent with the existing sql-based conversion path.
+func convertDecimal128WithScale(value decimal128.Num, scale int64) float64 {
+	floatValue := value.ToFloat64(int32(scale))
+	return roundToScale(floatValue, scale)
 }
 
 //nolint:ireturn
