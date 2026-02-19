@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -109,119 +108,79 @@ func (s TaskTypeStats) SuccessRate() float64 {
 	return float64(s.Succeeded) / float64(s.Total) * 100
 }
 
-func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
-	// Group results by asset
-	assetResults := make(map[string]map[string]*scheduler.TaskExecutionResult)
-	assetOrder := make([]string, 0)
-
-	for _, result := range results {
-		assetName := result.Instance.GetAsset().Name
-		if _, exists := assetResults[assetName]; !exists {
-			assetResults[assetName] = make(map[string]*scheduler.TaskExecutionResult)
-			assetOrder = append(assetOrder, assetName)
-		}
-
-		switch instance := result.Instance.(type) {
-		case *scheduler.AssetInstance:
-			assetResults[assetName]["main"] = result
-		case *scheduler.ColumnCheckInstance:
-			key := fmt.Sprintf("column:%s:%s", instance.Column.Name, instance.Check.Name)
-			assetResults[assetName][key] = result
-		case *scheduler.CustomCheckInstance:
-			key := "custom:" + instance.Check.Name
-			assetResults[assetName][key] = result
+func getOrderedPendingAssetInfos(s *scheduler.Scheduler, pipelineDir string) []executor.AssetInfo {
+	pending := s.GetTaskInstancesByStatus(scheduler.Pending)
+	seen := make(map[string]bool)
+	infos := make([]executor.AssetInfo, 0)
+	for _, t := range pending {
+		asset := t.GetAsset()
+		if !seen[asset.Name] {
+			seen[asset.Name] = true
+			infos = append(infos, executor.AssetInfo{
+				Name:        asset.Name,
+				Group:       executor.AssetGroup(asset, pipelineDir),
+				ChecksTotal: asset.CheckCount(),
+			})
 		}
 	}
+	return infos
+}
 
-	// Only add upstream failed assets (skip the "skipped" ones entirely)
-	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
+func printRunParams(p *pipeline.Pipeline, s *scheduler.Scheduler, startDate, endDate time.Time, rc *scheduler.RunConfig) {
+	assetCount := s.GetAssetCountWithTasksPending()
 
-	for _, task := range upstreamFailedTasks {
-		assetName := task.GetAsset().Name
-		if _, exists := assetResults[assetName]; !exists {
-			assetResults[assetName] = make(map[string]*scheduler.TaskExecutionResult)
-			assetOrder = append(assetOrder, assetName)
-		}
+	labelColor := color.New(color.Faint)
+	valueColor := color.New(color.FgWhite)
 
-		// Create a fake result for upstream failed task
-		upstreamFailedResult := &scheduler.TaskExecutionResult{
-			Instance: task,
-			Error:    nil, // We'll use nil to indicate upstream failed
-		}
+	fmt.Printf("%s  %s\n",
+		labelColor.Sprint("Pipeline"),
+		valueColor.Sprintf("%s (%d assets)", p.Name, assetCount))
 
-		switch instance := task.(type) {
-		case *scheduler.AssetInstance:
-			assetResults[assetName]["main"] = upstreamFailedResult
-		case *scheduler.ColumnCheckInstance:
-			key := fmt.Sprintf("column:%s:%s", instance.Column.Name, instance.Check.Name)
-			assetResults[assetName][key] = upstreamFailedResult
-		case *scheduler.CustomCheckInstance:
-			key := "custom:" + instance.Check.Name
-			assetResults[assetName][key] = upstreamFailedResult
-		}
+	fmt.Printf("%s  %s → %s\n",
+		labelColor.Sprint("Interval"),
+		valueColor.Sprint(startDate.Format("2006-01-02 15:04:05")),
+		valueColor.Sprint(endDate.Format("2006-01-02 15:04:05")))
+
+	var flags []string
+	if rc.FullRefresh {
+		flags = append(flags, "full-refresh")
+	}
+	if rc.ApplyIntervalModifiers {
+		flags = append(flags, "interval-modifiers")
+	}
+	if rc.PushMetadata {
+		flags = append(flags, "push-metadata")
+	}
+	if rc.Downstream {
+		flags = append(flags, "downstream")
+	}
+	if rc.Tag != "" {
+		flags = append(flags, fmt.Sprintf("tag:%s", rc.Tag))
+	}
+	if rc.ExcludeTag != "" {
+		flags = append(flags, fmt.Sprintf("exclude:%s", rc.ExcludeTag))
+	}
+	if rc.Environment != "" {
+		flags = append(flags, fmt.Sprintf("env:%s", rc.Environment))
 	}
 
-	if len(assetOrder) == 0 {
-		return
+	if len(flags) > 0 {
+		fmt.Printf("%s     %s\n",
+			labelColor.Sprint("Flags"),
+			valueColor.Sprint(strings.Join(flags, ", ")))
 	}
+}
 
-	fmt.Println("\n" + strings.Repeat("=", 50) + "\n")
-
-	for _, assetName := range assetOrder {
-		results := assetResults[assetName]
-		mainResult := results["main"]
-
-		// Asset name with status
-		var assetStatus string
-		var assetColor *color.Color
-
-		if mainResult == nil { // nolint:gocritic
-			// Asset not executed
-			assetStatus = "SKIP"
-			assetColor = color.New(color.Faint)
-		} else if mainResult.Error == nil {
-			// Check if this is upstream failed
-			_, isUpstreamFailed := find(upstreamFailedTasks, mainResult.Instance)
-
-			if isUpstreamFailed {
-				assetStatus = "UPSTREAM FAILED"
-				assetColor = color.New(color.FgYellow)
-			} else {
-				assetStatus = "PASS"
-				assetColor = color.New(color.FgGreen)
-			}
-		} else {
-			assetStatus = "FAIL"
-			assetColor = color.New(color.FgRed)
-		}
-
-		fmt.Printf("%s %s ", assetColor.Sprint(assetStatus), assetName)
-
-		// Print dots for quality checks
-		checkCount := 0
-		for key, result := range results {
-			if key == "main" {
-				continue
-			}
-
-			checkCount++
-			if result == nil { // nolint:gocritic
-				fmt.Print(faint("."))
-			} else if result.Error == nil {
-				// Check if upstream failed
-				_, isUpstreamFailed := find(upstreamFailedTasks, result.Instance)
-
-				if isUpstreamFailed {
-					fmt.Print(color.New(color.FgYellow).Sprint("U"))
-				} else {
-					fmt.Print(color.New(color.FgGreen).Sprint("."))
-				}
-			} else {
-				fmt.Print(color.New(color.FgRed).Sprint("F"))
-			}
-		}
-
-		fmt.Println()
+func printCompletionLine(duration time.Duration, hasFailures bool) {
+	fmt.Println()
+	if hasFailures {
+		summaryPrinter.Printf("Completed with %s in %s\n",
+			color.New(color.FgRed).Sprint("failures"),
+			color.New(color.Faint).Sprint(duration.Truncate(time.Millisecond).String()))
+	} else {
+		summaryPrinter.Printf("Completed %s in %s\n",
+			color.New(color.FgGreen).Sprint("successfully"),
+			color.New(color.Faint).Sprint(duration.Truncate(time.Millisecond).String()))
 	}
 }
 
@@ -232,107 +191,6 @@ func find(slice []scheduler.TaskInstance, item scheduler.TaskInstance) (int, boo
 		}
 	}
 	return -1, false
-}
-
-func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler, duration time.Duration, _ int) {
-	summary := analyzeResults(results, s)
-	summary.Duration = duration
-
-	// Print execution table first
-	printExecutionTable(results, s)
-
-	// Determine overall status
-	hasFailures := summary.FailedTasks > 0
-
-	// Header with status and task count
-	if hasFailures {
-		summaryPrinter.Printf("\n\nbruin run completed with %s in %s\n\n",
-			color.New(color.FgRed).Sprint("failures"),
-			duration.Truncate(time.Millisecond).String())
-	} else {
-		summaryPrinter.Printf("\n\nbruin run completed %s in %s\n\n",
-			color.New(color.FgGreen).Sprint("successfully"),
-			duration.Truncate(time.Millisecond).String())
-	}
-
-	// Assets executed (only actual assets, not including quality checks)
-	if summary.Assets.HasAny() {
-		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 {
-			summaryPrinter.Printf(" %s Assets executed      %s\n",
-				color.New(color.FgRed).Sprint("✗"),
-				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped))
-		} else {
-			summaryPrinter.Printf(" %s Assets executed      %s\n",
-				color.New(color.FgGreen).Sprint("✓"),
-				color.New(color.FgGreen).Sprintf("%d succeeded", summary.Assets.Succeeded))
-		}
-	}
-
-	// Quality checks
-	totalChecks := summary.ColumnChecks.Total + summary.CustomChecks.Total
-	totalCheckFailures := summary.ColumnChecks.Failed + summary.CustomChecks.Failed
-	totalCheckSkipped := summary.ColumnChecks.Skipped + summary.CustomChecks.Skipped
-	if totalChecks > 0 {
-		if totalCheckFailures > 0 || totalCheckSkipped > 0 {
-			summaryPrinter.Printf(" %s Quality checks       %s\n",
-				color.New(color.FgRed).Sprint("✗"),
-				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped))
-		} else {
-			summaryPrinter.Printf(" %s Quality checks       %s\n",
-				color.New(color.FgGreen).Sprint("✓"),
-				color.New(color.FgGreen).Sprintf("%d succeeded", summary.ColumnChecks.Succeeded+summary.CustomChecks.Succeeded))
-		}
-	}
-
-	// Metadata push
-	if summary.MetadataPush.HasAny() {
-		metadataExecuted := summary.MetadataPush.Succeeded + summary.MetadataPush.Failed
-		if summary.MetadataPush.Failed > 0 {
-			summaryPrinter.Printf(" %s Metadata pushed      %s\n",
-				color.New(color.FgRed).Sprint("✗"),
-				formatCount(metadataExecuted, summary.MetadataPush.Failed))
-		} else {
-			summaryPrinter.Printf(" %s Metadata pushed      %d\n",
-				color.New(color.FgGreen).Sprint("✓"), metadataExecuted)
-		}
-	}
-}
-
-func formatCount(total, failed int) string {
-	if failed == 0 {
-		return strconv.Itoa(total)
-	}
-	succeeded := total - failed
-	return fmt.Sprintf("%s / %s",
-		color.New(color.FgRed).Sprintf("%d failed", failed),
-		color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
-}
-
-func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) string {
-	succeeded := total - failed - failedDueToChecks - skipped
-
-	var parts []string
-	if failed > 0 {
-		parts = append(parts, color.New(color.FgRed).Sprintf("%d failed", failed))
-	}
-	if failedDueToChecks > 0 {
-		parts = append(parts, color.New(color.FgYellow).Sprintf("%d failed due to checks", failedDueToChecks))
-	}
-	if succeeded > 0 {
-		parts = append(parts, color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
-	}
-	if skipped > 0 {
-		parts = append(parts, color.New(color.Faint).Sprintf("%d skipped", skipped))
-	}
-
-	if len(parts) == 0 {
-		return "0"
-	}
-	if len(parts) == 1 && failed == 0 && failedDueToChecks == 0 && skipped == 0 {
-		return strconv.Itoa(succeeded)
-	}
-
-	return strings.Join(parts, " / ")
 }
 
 func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) ExecutionSummary {
@@ -933,21 +791,6 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 
 			// handle log files
-			executionStartLog := "Starting execution..."
-			if !c.Bool("minimal-logs") {
-				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
-
-				if pipelineInfo.RunningForAnAsset {
-					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-				} else if len(filter.SelectedAssets) > 0 {
-					assetNames := make([]string, len(filter.SelectedAssets))
-					for i, asset := range filter.SelectedAssets {
-						assetNames[i] = asset.Name
-					}
-					infoPrinter.Printf("Running selected assets: %s\n", strings.Join(assetNames, ", "))
-				}
-				executionStartLog = "Starting the pipeline execution..."
-			}
 
 			var connectionManager config.ConnectionAndDetailsGetter
 			var errs []error
@@ -1057,10 +900,6 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			sendTelemetry(s, c)
-			if !c.Bool("minimal-logs") {
-				infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
-				infoPrinter.Printf("\n%s\n\n", executionStartLog)
-			}
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
 					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
@@ -1120,11 +959,37 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			useLiveDisplay := !c.Bool("minimal-logs") && singleCheckID == ""
+			var display *executor.LiveDisplay
+			if useLiveDisplay {
+				printRunParams(pipelineInfo.Pipeline, s, startDate, endDate, runConfig)
+				fmt.Println()
+
+				pipelineDir := filepath.Dir(pipelineInfo.Pipeline.DefinitionFile.Path)
+				assetInfos := getOrderedPendingAssetInfos(s, pipelineDir)
+				display = executor.NewLiveDisplay(assetInfos, c.Bool("no-color"))
+				ex.SetDisplay(display)
+				display.Start()
+			}
+
 			ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 			start := time.Now()
 			results := s.Run(runCtx)
 			duration := time.Since(start)
+
+			if display != nil {
+				upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
+				seen := make(map[string]bool)
+				for _, t := range upstreamFailedTasks {
+					name := t.GetAsset().Name
+					if !seen[name] {
+						seen[name] = true
+						display.MarkUpstreamFailed(name)
+					}
+				}
+				display.Stop()
+			}
 
 			if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
 				logger.Error("failed to save pipeline state", zap.Error(err))
@@ -1145,25 +1010,23 @@ func Run(isDebug *bool) *cli.Command {
 						summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
 						printErrorsMinimal(errorsInTaskResults)
 					} else {
-						printExecutionSummary(results, s, duration, len(results))
+						printCompletionLine(duration, true)
 						printErrorsInResults(errorsInTaskResults, s)
 					}
 				}
 				return cli.Exit("", 1)
 			}
 
-			// Print single check success if running a single check
 			if singleCheckID != "" && len(results) > 0 {
 				printSingleCheckSuccess(results[0])
 				return nil
 			}
 
-			// Print execution summary (unless minimal-logs is enabled)
 			minimalLogs := c.Bool("minimal-logs")
 			if minimalLogs {
 				summaryPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
 			} else {
-				printExecutionSummary(results, s, duration, len(results))
+				printCompletionLine(duration, false)
 			}
 			return nil
 		},
