@@ -183,6 +183,12 @@ func (t *TUIRenderer) Stop() {
 	close(t.done)
 	t.ticker.Stop()
 
+	// Do one final render so the last frame reflects the actual completed state.
+	// Without this, the last visible frame may show stale info (e.g. a fast asset
+	// still marked as "running") because the 100ms ticker never got a chance to fire
+	// between the task completing and the run finishing.
+	t.render()
+
 	// Clear the last rendered frame under lock (lastLines is shared state)
 	t.mu.Lock()
 	t.clearLastRender()

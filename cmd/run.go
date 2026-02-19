@@ -1179,13 +1179,17 @@ func Run(isDebug *bool) *cli.Command {
 				}
 
 				tui.Start()
-				defer tui.Stop()
+				defer tui.Stop() // safety net for early returns / panics
 
 				ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 				start := time.Now()
 				results := s.Run(runCtx)
 				duration := time.Since(start)
+
+				// Stop the TUI before printing the summary so the render loop
+				// cannot overwrite terminal output written by printTUISummary.
+				tui.Stop()
 
 				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))
