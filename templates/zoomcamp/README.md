@@ -10,6 +10,7 @@ Register for [Bruin Cloud](https://cloud.getbruin.com/register) to deploy your p
 
 ### YouTube Video Tutorial Playlist
 [![Video Tutorials Playlist](https://img.youtube.com/vi/f6vg7lGqZx0/hqdefault.jpg)](https://www.youtube.com/playlist?list=PLnRr-L-cuxO4lUUdkXV5YPHT5ZEcEeXQD)
+[![Bruin Core Concepts Playlist](https://img.youtube.com/vi/f6vg7lGqZx0/hqdefault.jpg)](https://www.youtube.com/playlist?list=PLnRr-L-cuxO72ws5jYS8oyKMWs-AosgdP)
 
 ## Learning Goals
 
