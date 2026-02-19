@@ -27,7 +27,7 @@ environments:
       postgres:
         - name: "postgres-main"
           username: "bruin_user"
-          password: "${POSTGRES_PASSWORD}"
+          password: "super_secret"
           host: "db.example.com"
           port: 5432
           database: "analytics"
@@ -35,9 +35,12 @@ environments:
       # Ingestion source connection
       shopify:
         - name: "shopify-default"
-          api_key: "${SHOPIFY_API_KEY}"
+          api_key: "shpca_abc123"
           store_name: "my-store"
 ```
+
+> [!NOTE]
+> You can reference environment variables in connection fields using `${VAR_NAME}` placeholders, which are expanded at runtime.
 
 ## Connection Names
 

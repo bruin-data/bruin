@@ -61,7 +61,7 @@ Assets consist of a **definition** (metadata) and **content** (the actual query 
 Variables are dynamic values provided during execution and injected into your asset code. There are two types:
 
 - **[Built-in Variables](/core-concepts/variables#built-in-variables)**: Automatically injected by Bruin (e.g., `start_date`, `end_date`, `pipeline`, `run_id`)
-- **[Custom Variables](/core-concepts/variables#custom-variables)**: User-defined variables specified at the asset or pipeline level
+- **[Custom Variables](/core-concepts/variables#custom-variables)**: User-defined variables specified in `pipeline.yml`
 
 Variables enable parameterized pipelines—for example, processing data for specific date ranges or customer segments without modifying code.
 

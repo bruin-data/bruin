@@ -25,7 +25,7 @@ environments:
           value: "https://hooks.slack.com/..."
 ```
 
-Access these in your Python assets via environment variables:
+Access these in your Python and R assets via environment variables:
 
 ```python
 """@bruin
@@ -42,7 +42,7 @@ api_key = os.environ["MY_API_KEY"]
 
 ## Injecting Secrets into Assets
 
-To inject secrets into an asset, specify them in the asset definition:
+To inject secrets into an asset, specify them in the asset definition. Secret mappings are exposed as environment variables for Python and R assets (they are not available in the SQL/Jinja context):
 
 ```python
 """@bruin
@@ -59,7 +59,7 @@ api_key = os.environ["MY_API_KEY"]
 webhook = os.environ["WEBHOOK_URL"]  # Injected with a different name
 ```
 
-The `inject_as` field allows you to rename the environment variable.
+The `inject_as` field allows you to rename the environment variable. If a secret key points to a non-generic connection, Bruin injects the connection details as a JSON string.
 
 ## Pipeline-Level Secrets
 
@@ -85,8 +85,11 @@ For production environments, Bruin supports external secret management solutions
 | HashiCorp Vault | [Vault Integration](/secrets/vault) |
 | Doppler | [Doppler Integration](/secrets/doppler) |
 | AWS Secrets Manager | [AWS Secrets Manager](/secrets/aws-secrets-manager) |
+| Azure Key Vault | `--secrets-backend azure` |
 
 ### Using an External Provider
+
+Supported values for `--secrets-backend` (and `BRUIN_SECRETS_BACKEND`) are `vault`, `doppler`, `aws`, and `azure`.
 
 Specify the secrets backend when running:
 
@@ -96,6 +99,12 @@ bruin run --secrets-backend doppler
 
 # Use Vault
 bruin run --secrets-backend vault
+
+# Use AWS Secrets Manager
+bruin run --secrets-backend aws
+
+# Use Azure Key Vault
+bruin run --secrets-backend azure
 ```
 
 Or set via environment variable:
@@ -107,7 +116,7 @@ bruin run
 
 ## Environment Variables in .bruin.yml
 
-Reference system environment variables in your `.bruin.yml` configuration:
+Reference system environment variables in your `.bruin.yml` connection configuration. This example uses literal values for clarity:
 
 ```yaml
 environments:
@@ -115,10 +124,13 @@ environments:
     connections:
       postgres:
         - name: my_postgres
-          username: ${POSTGRES_USERNAME}
-          password: ${POSTGRES_PASSWORD}
-          host: ${POSTGRES_HOST}
+          username: "bruin_user"
+          password: "super_secret"
+          host: "db.example.com"
 ```
+
+> [!NOTE]
+> You can reference environment variables in connection fields using `${VAR_NAME}` placeholders, which are expanded at runtime.
 
 Environment variables are expanded at runtime, allowing you to:
 

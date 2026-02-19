@@ -7,7 +7,7 @@ Variables are dynamic values provided during execution and injected into your as
 There are two types of variables in Bruin:
 
 - **[Built-in Variables](#built-in-variables)**: Automatically provided by Bruin (dates, pipeline info, run IDs)
-- **[Custom Variables](#custom-variables)**: User-defined variables specified at the asset or pipeline level
+- **[Custom Variables](#custom-variables)**: User-defined variables specified at the pipeline level
 
 ## Referencing Variables in Assets
 
@@ -28,9 +28,9 @@ WHERE order_date >= '{{ start_date }}'
   AND segment = '{{ var.target_segment }}'
 ```
 
-### Python Assets
+### Python and R Assets
 
-Built-in variables are exposed as environment variables (e.g., `BRUIN_START_DATE`). Custom variables are available in the `BRUIN_VARS` environment variable as a JSON string:
+Built-in variables are exposed as environment variables (for example, `BRUIN_START_DATE`, `BRUIN_PIPELINE`, `BRUIN_FULL_REFRESH`, `BRUIN_ASSET`, `BRUIN_THIS`). Custom variables are available in the `BRUIN_VARS` environment variable as a JSON string:
 
 ```python
 """@bruin
@@ -43,11 +43,16 @@ import json
 # Built-in variables
 start_date = os.environ["BRUIN_START_DATE"]
 end_date = os.environ["BRUIN_END_DATE"]
+pipeline_name = os.environ["BRUIN_PIPELINE"]
+asset_name = os.environ["BRUIN_ASSET"]
+full_refresh = os.environ.get("BRUIN_FULL_REFRESH") == "1"
 
 # Custom variables
 vars = json.loads(os.environ.get("BRUIN_VARS", "{}"))
 segment = vars.get("target_segment", "default")
 ```
+
+Other built-in environment variables include `BRUIN_START_DATETIME`, `BRUIN_START_TIMESTAMP`, `BRUIN_END_DATE`, `BRUIN_END_DATETIME`, `BRUIN_END_TIMESTAMP`, `BRUIN_EXECUTION_DATE`, `BRUIN_EXECUTION_DATETIME`, `BRUIN_EXECUTION_TIMESTAMP`, and `BRUIN_RUN_ID`.
 
 ### YAML Assets (Sensor, Ingestr)
 
@@ -68,21 +73,25 @@ parameters:
 
 ## Built-in Variables
 
-Bruin automatically injects these variables into every asset execution:
+Bruin automatically injects these variables into the Jinja context for templated assets (SQL, YAML `parameters`, and other templated fields):
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `start_date` | Start date in YYYY-MM-DD format | `"2023-12-01"` |
+| `start_date_nodash` | Start date in YYYYMMDD format | `"20231201"` |
 | `start_datetime` | Start date and time in YYYY-MM-DDThh:mm:ss format | `"2023-12-01T15:30:00"` |
-| `start_timestamp` | Start timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | `"2023-12-01T15:30:00.000000+07:00"` |
+| `start_timestamp` | Start timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | `"2023-12-01T15:30:00.000000Z"` |
 | `end_date` | End date in YYYY-MM-DD format | `"2023-12-02"` |
+| `end_date_nodash` | End date in YYYYMMDD format | `"20231202"` |
 | `end_datetime` | End date and time in YYYY-MM-DDThh:mm:ss format | `"2023-12-02T15:30:00"` |
-| `end_timestamp` | End timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | `"2023-12-02T15:30:00.000000Z07:00"` |
+| `end_timestamp` | End timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | `"2023-12-02T15:30:00.000000Z"` |
 | `execution_date` | Execution date in YYYY-MM-DD format | `"2023-12-01"` |
+| `execution_date_nodash` | Execution date in YYYYMMDD format | `"20231201"` |
 | `execution_datetime` | Execution date and time in YYYY-MM-DDThh:mm:ss format | `"2023-12-01T15:30:00"` |
-| `execution_timestamp` | Execution timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | `"2023-12-01T15:30:00.000000Z07:00"` |
+| `execution_timestamp` | Execution timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | `"2023-12-01T15:30:00.000000Z"` |
 | `pipeline` | Name of the currently executing pipeline | `"my_pipeline"` |
 | `run_id` | Unique identifier for the current pipeline run | `"run_1234567890"` |
+| `full_refresh` | Whether the run is a full refresh | `true` |
 
 ### Using Built-in Variables in SQL
 
@@ -149,7 +158,7 @@ variables:
 
 ### Supported JSON Schema Keywords
 
-Bruin follows the [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) specification:
+Bruin accepts [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords in variable definitions. At parse time, it currently enforces that each variable has a `default` value; full schema validation is not yet enforced.
 
 | `type` value | Description | Example default |
 |--------------|-------------|-----------------|
@@ -235,14 +244,14 @@ WHERE channel NOT IN (
 Override variable values using the `--var` flag during `bruin run`:
 
 ```bash
-# Override a simple variable
-bruin run --var env=prod
+# Override a simple string variable (use JSON quoting)
+bruin run --var env='"prod"'
 
 # Override with JSON for complex types
 bruin run --var '{"users": ["alice", "charlie"]}'
 
 # Multiple overrides
-bruin run --var target_segment=self_serve --var forecast_horizon_days=60
+bruin run --var target_segment='"self_serve"' --var forecast_horizon_days=60
 ```
 
 ## Related Topics

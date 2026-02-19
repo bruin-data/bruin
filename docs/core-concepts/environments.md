@@ -35,8 +35,8 @@ environments:
     connections:
       postgres:
         - name: "postgres-staging"
-          username: "${STAGING_POSTGRES_USER}"
-          password: "${STAGING_POSTGRES_PASSWORD}"
+          username: "STAGING_POSTGRES_USER"
+          password: "STAGING_POSTGRES_PASSWORD"
           host: "staging-db.example.com"
           port: 5432
           database: "analytics"
@@ -45,8 +45,8 @@ environments:
     connections:
       postgres:
         - name: "postgres-prod"
-          username: "${PROD_POSTGRES_USER}"
-          password: "${PROD_POSTGRES_PASSWORD}"
+          username: "PROD_POSTGRES_USER"
+          password: "PROD_POSTGRES_PASSWORD"
           host: "prod-db.example.com"
           port: 5432
           database: "analytics"
@@ -87,7 +87,7 @@ bruin run --environment production
 
 ### Environment Variables
 
-You can reference environment variables in your configuration using `${VAR_NAME}` syntax:
+Use environment variables to keep credentials out of `.bruin.yml`. This example uses literal values for clarity:
 
 ```yaml
 environments:
@@ -95,14 +95,15 @@ environments:
     connections:
       postgres:
         - name: my_postgres
-          username: ${POSTGRES_USERNAME}
-          password: ${POSTGRES_PASSWORD}
-          host: ${POSTGRES_HOST}
-          port: ${POSTGRES_PORT}
-          database: ${POSTGRES_DATABASE}
+          username: "bruin_user"
+          password: "super_secret"
+          host: "db.example.com"
+          port: 5432
+          database: "analytics"
 ```
 
-Environment variables are expanded at runtime, not when the file is parsed.
+> [!NOTE]
+> You can reference environment variables in connection fields using `${VAR_NAME}` placeholders, which are expanded at runtime (not when the file is parsed).
 
 ## Local vs Cloud
 
@@ -126,7 +127,7 @@ See the [Deployment](/deployment/vm-deployment) documentation for platform-speci
 
 ## Schema-Based Environments
 
-For scenarios where separate databases are impractical, Bruin supports schema-based environments. This automatically prefixes schema names to isolate environments within the same database.
+For scenarios where separate databases are impractical, Bruin supports schema-based environments. This automatically prefixes schema names to isolate environments within the same database. If the prefix does not end with `_`, Bruin appends it for you.
 
 ```yaml
 environments:
