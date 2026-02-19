@@ -164,3 +164,6 @@ logs/queries
 *.py[cod]
 
 .devcontainer
+
+# Rust build artifacts
+rust/polyglot-ffi/target/

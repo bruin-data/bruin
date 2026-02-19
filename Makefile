@@ -141,6 +141,48 @@ validate-links:
 	fi
 	@python3 scripts/validate_links.py . || (echo "$(ERROR_COLOR)Link validation found broken links. Please fix them.$(NO_COLOR)" && exit 1)
 
+# ── Rust polyglot-sql FFI library ─────────────────────────────────────
+RUST_FFI_DIR=rust/polyglot-ffi
+RUST_LIB_DIR=pkg/rustparser/lib
+
+# Rust cross-compilation targets
+RUST_TARGETS=x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu \
+             x86_64-apple-darwin aarch64-apple-darwin \
+             x86_64-pc-windows-gnu
+
+# Map Rust targets to Go OS/arch directories
+rust-target-dir = $(if $(filter x86_64-unknown-linux-gnu,$1),linux-amd64,\
+	$(if $(filter aarch64-unknown-linux-gnu,$1),linux-arm64,\
+	$(if $(filter x86_64-apple-darwin,$1),darwin-amd64,\
+	$(if $(filter aarch64-apple-darwin,$1),darwin-arm64,\
+	$(if $(filter x86_64-pc-windows-gnu,$1),windows-amd64,unknown)))))
+
+build-rust:
+	@echo "$(OK_COLOR)==> Building Rust polyglot-sql FFI library (native)...$(NO_COLOR)"
+	@cd $(RUST_FFI_DIR) && cargo build --release
+	@mkdir -p $(RUST_LIB_DIR)/$(shell $(call rust-target-dir,$(shell rustc -vV | sed -n 's/^host: //p')))
+	@cp $(RUST_FFI_DIR)/target/release/libpolyglot_ffi.a \
+		$(RUST_LIB_DIR)/$(shell $(call rust-target-dir,$(shell rustc -vV | sed -n 's/^host: //p')))/
+
+build-rust-all:
+	@echo "$(OK_COLOR)==> Building Rust polyglot-sql FFI library for all targets...$(NO_COLOR)"
+	@for target in $(RUST_TARGETS); do \
+		echo "  Building for $$target..."; \
+		cd $(RUST_FFI_DIR) && cargo build --release --target $$target && cd ../..; \
+		dir=$$(echo $$target | sed \
+			-e 's/x86_64-unknown-linux-gnu/linux-amd64/' \
+			-e 's/aarch64-unknown-linux-gnu/linux-arm64/' \
+			-e 's/x86_64-apple-darwin/darwin-amd64/' \
+			-e 's/aarch64-apple-darwin/darwin-arm64/' \
+			-e 's/x86_64-pc-windows-gnu/windows-amd64/'); \
+		mkdir -p $(RUST_LIB_DIR)/$$dir; \
+		cp $(RUST_FFI_DIR)/target/$$target/release/libpolyglot_ffi.a $(RUST_LIB_DIR)/$$dir/; \
+	done
+
+test-rust:
+	@echo "$(OK_COLOR)==> Running Rust FFI tests...$(NO_COLOR)"
+	@cd $(RUST_FFI_DIR) && cargo test
+
 # sometimes vendoring doesn't move the precompiled library
 duck-db-static-lib:
 	@mkdir vendor/github.com/marcboeker/go-duckdb/deps || true

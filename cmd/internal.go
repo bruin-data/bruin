@@ -55,6 +55,7 @@ func Internal() *cli.Command {
 			AssetMetadata(),
 			IngestrSources(),
 			LockAssetDependencies(),
+			ParseSQLRust(),
 		},
 	}
 }
