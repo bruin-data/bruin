@@ -3,8 +3,9 @@ package python
 import (
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func TestIsPythonMaterializationStrategySupported(t *testing.T) {
@@ -37,10 +38,10 @@ func TestTranslateBruinStrategyToIngestr(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		strategy     pipeline.MaterializationStrategy
-		wantIngestr  string
-		wantExists   bool
+		name        string
+		strategy    pipeline.MaterializationStrategy
+		wantIngestr string
+		wantExists  bool
 	}{
 		{name: "create+replace maps to replace", strategy: pipeline.MaterializationStrategyCreateReplace, wantIngestr: "replace", wantExists: true},
 		{name: "append maps to append", strategy: pipeline.MaterializationStrategyAppend, wantIngestr: "append", wantExists: true},
