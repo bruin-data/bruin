@@ -26,14 +26,20 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/pkg/errors"
 	gosnowflake "github.com/snowflakedb/gosnowflake"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/term"
 )
 
 const (
-	outputFormatPlain = "plain"
+	outputFormatPlain      = "plain"
+	defaultQueryTableWidth = 120
+	minQueryColumnWidth    = 8
+	maxQueryColumnWidth    = 48
+	columnPaddingWidth     = 3
 )
 
 type ppInfo struct {
@@ -525,8 +531,64 @@ func printTable(columnNames []string, rows [][]interface{}) {
 		t.AppendRow(rowData)
 	}
 
-	t.SetStyle(table.StyleLight)
+	tableWidth := queryTableOutputWidth()
+	style := table.StyleLight
+	style.Size.WidthMax = tableWidth
+	t.SetStyle(style)
+
+	columnWidth := queryTableColumnWidth(tableWidth, len(columnNames))
+	columnConfigs := make([]table.ColumnConfig, len(columnNames))
+	for i := range columnNames {
+		columnConfigs[i] = table.ColumnConfig{
+			Number:           i + 1,
+			WidthMax:         columnWidth,
+			WidthMaxEnforcer: snipWithEllipsis,
+		}
+	}
+	t.SetColumnConfigs(columnConfigs)
+
 	t.Render()
+}
+
+// queryTableOutputWidth returns terminal width when available, otherwise a safe default.
+func queryTableOutputWidth() int {
+	fd := int(os.Stdout.Fd())
+	if !term.IsTerminal(fd) {
+		return defaultQueryTableWidth
+	}
+
+	width, _, err := term.GetSize(fd)
+	if err != nil || width <= 0 {
+		return defaultQueryTableWidth
+	}
+
+	return width
+}
+
+// queryTableColumnWidth keeps each column readable while preventing very wide cells.
+func queryTableColumnWidth(tableWidth, columnCount int) int {
+	if columnCount <= 0 {
+		return minQueryColumnWidth
+	}
+
+	availableWidth := tableWidth - (columnCount+1)*columnPaddingWidth
+	if availableWidth <= 0 {
+		return minQueryColumnWidth
+	}
+
+	columnWidth := availableWidth / columnCount
+	if columnWidth < minQueryColumnWidth {
+		return minQueryColumnWidth
+	}
+	if columnWidth > maxQueryColumnWidth {
+		return maxQueryColumnWidth
+	}
+
+	return columnWidth
+}
+
+func snipWithEllipsis(value string, maxLen int) string {
+	return text.Snip(value, maxLen, "...")
 }
 
 func handleError(output string, err error) error {
