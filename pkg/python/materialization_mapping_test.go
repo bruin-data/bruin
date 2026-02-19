@@ -3,9 +3,8 @@ package python
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsPythonMaterializationStrategySupported(t *testing.T) {
