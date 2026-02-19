@@ -85,6 +85,8 @@ func (e *EphemeralConnection) execLakehouseStatement(ctx context.Context, db *sq
 
 // Opens a direct core-ADBC connection (bypassing database/sql sqldriver).
 // This path is used as a fallback when sqldriver cannot decode complex Arrow types.
+//
+//nolint:ireturn // adbc.Database/adbc.Connection are interface contracts from external ADBC API.
 func (e *EphemeralConnection) openADBCConnection(ctx context.Context) (adbc.Database, adbc.Connection, error) {
 	driverManager := &drivermgr.Driver{}
 
@@ -201,10 +203,10 @@ func convertRecordReaderToQueryResult(recordReader array.RecordReader) (*query.Q
 	}
 
 	for recordReader.Next() {
-		record := recordReader.Record()
+		record := recordReader.RecordBatch()
 		columns := record.Columns()
 
-		for rowIdx := 0; rowIdx < int(record.NumRows()); rowIdx++ {
+		for rowIdx := range int(record.NumRows()) {
 			row := make([]interface{}, len(columns))
 			for colIdx, col := range columns {
 				value, err := recordValueFromArrowArray(col, rowIdx)
@@ -290,11 +292,11 @@ func recordValueFromArrowArray(col arrow.Array, rowIdx int) (interface{}, error)
 	}
 
 	// For complex types, Arrow arrays expose marshaled values (JSON-compatible).
-	if marshaler, ok := col.(interface{ GetOneForMarshal(int) interface{} }); ok {
+	if marshaler, ok := col.(interface{ GetOneForMarshal(i int) interface{} }); ok {
 		return normalizeMarshaledArrowValue(marshaler.GetOneForMarshal(rowIdx)), nil
 	}
 
-	if valueStringer, ok := col.(interface{ ValueStr(int) string }); ok {
+	if valueStringer, ok := col.(interface{ ValueStr(i int) string }); ok {
 		return copyString(valueStringer.ValueStr(rowIdx)), nil
 	}
 

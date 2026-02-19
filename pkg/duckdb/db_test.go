@@ -21,6 +21,7 @@ type fallbackMockConnection struct {
 	fallbackCalled bool
 }
 
+//nolint:ireturn // mock must satisfy connection interface that returns custom Rows interface.
 func (m *fallbackMockConnection) QueryContext(_ context.Context, _ string, _ ...any) (Rows, error) {
 	return nil, m.queryErr
 }
@@ -29,6 +30,7 @@ func (m *fallbackMockConnection) ExecContext(_ context.Context, _ string, _ ...a
 	return nil, nil
 }
 
+//nolint:ireturn // mock must satisfy connection interface that returns custom Row interface.
 func (m *fallbackMockConnection) QueryRowContext(_ context.Context, _ string, _ ...any) Row {
 	return &errorRow{err: nil}
 }
