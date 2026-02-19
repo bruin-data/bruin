@@ -45,6 +45,10 @@ type FormattingOptions struct {
 	DoNotLogTaskName  bool
 	NoColor           bool
 	MinimalLogs       bool
+	TUIMode           bool                                               // suppress Running/Finished lines; TUI handles display
+	LogOnlyWriter     io.Writer                                          // in TUI mode, worker output goes here (log file) instead of os.Stdout
+	OnTaskStart       func(scheduler.TaskInstance)                       // called when worker begins executing a task
+	OnTaskEnd         func(scheduler.TaskInstance, error, time.Duration) // called when worker finishes a task
 }
 
 type Concurrent struct {
@@ -98,29 +102,43 @@ type worker struct {
 
 func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstance, results chan<- *scheduler.TaskExecutionResult) {
 	for task := range taskChannel {
-		w.printLock.Lock()
+		if w.formatOpts.OnTaskStart != nil {
+			func() {
+				defer func() { recover() }() //nolint:errcheck
+				w.formatOpts.OnTaskStart(task)
+			}()
+		}
 
-		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
-		if w.formatOpts.NoColor {
-			w.printer = plainColor
-		}
-		runningPrinter := w.printer
-		if !w.formatOpts.NoColor {
-			runningPrinter = color.New(color.Faint)
-		}
-		if !w.formatOpts.MinimalLogs {
-			if w.formatOpts.DoNotLogTimestamp {
-				fmt.Printf("%s\n", runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
-			} else {
-				fmt.Printf("%s %s\n", timestampStr, runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+		if !w.formatOpts.TUIMode {
+			w.printLock.Lock()
+			timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
+			if w.formatOpts.NoColor {
+				w.printer = plainColor
 			}
+			runningPrinter := w.printer
+			if !w.formatOpts.NoColor {
+				runningPrinter = color.New(color.Faint)
+			}
+			if !w.formatOpts.MinimalLogs {
+				if w.formatOpts.DoNotLogTimestamp {
+					fmt.Printf("%s\n", runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+				} else {
+					fmt.Printf("%s %s\n", timestampStr, runningPrinter.Sprintf("Running:  %s", task.GetHumanID()))
+				}
+			}
+			w.printLock.Unlock()
 		}
-		w.printLock.Unlock()
 
 		start := time.Now()
 
+		// In TUI mode, redirect worker output to log-only writer
+		outputWriter := io.Writer(os.Stdout)
+		if w.formatOpts.TUIMode && w.formatOpts.LogOnlyWriter != nil {
+			outputWriter = w.formatOpts.LogOnlyWriter
+		}
+
 		printer := &workerWriter{
-			w:                 os.Stdout,
+			w:                 outputWriter,
 			task:              task.GetAsset(),
 			sprintfFunc:       w.printer.SprintfFunc(),
 			DoNotLogTimestamp: w.formatOpts.DoNotLogTimestamp,
@@ -132,32 +150,43 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		err := w.executor.RunSingleTask(executionCtx, task)
 
 		duration := time.Since(start)
-		durationString := fmt.Sprintf("(%s)", duration.Truncate(time.Millisecond).String())
-		w.printLock.Lock()
 
-		printerInstance := w.printer
-		if !w.formatOpts.NoColor {
+		if w.formatOpts.OnTaskEnd != nil {
+			func() {
+				defer func() { recover() }() //nolint:errcheck
+				w.formatOpts.OnTaskEnd(task, err, duration)
+			}()
+		}
+
+		if !w.formatOpts.TUIMode {
+			durationString := fmt.Sprintf("(%s)", duration.Truncate(time.Millisecond).String())
+			w.printLock.Lock()
+
+			printerInstance := w.printer
+			if !w.formatOpts.NoColor {
+				if err != nil {
+					printerInstance = redColor
+				} else {
+					printerInstance = greenColor
+				}
+			}
+
+			res := "Finished"
 			if err != nil {
-				printerInstance = redColor
-			} else {
-				printerInstance = greenColor
+				res = "Failed"
 			}
+
+			if !w.formatOpts.MinimalLogs {
+				if w.formatOpts.DoNotLogTimestamp {
+					fmt.Printf("%s\n", printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+				} else {
+					timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
+					fmt.Printf("%s %s\n", timestampStr, printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+				}
+			}
+			w.printLock.Unlock()
 		}
 
-		res := "Finished"
-		if err != nil {
-			res = "Failed"
-		}
-
-		if !w.formatOpts.MinimalLogs {
-			if w.formatOpts.DoNotLogTimestamp {
-				fmt.Printf("%s\n", printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
-			} else {
-				timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
-				fmt.Printf("%s %s\n", timestampStr, printerInstance.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
-			}
-		}
-		w.printLock.Unlock()
 		results <- &scheduler.TaskExecutionResult{
 			Instance: task,
 			Error:    err,

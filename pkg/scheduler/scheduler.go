@@ -305,6 +305,13 @@ func (i InstancesByType) AddDownstreamByType(instanceType TaskInstanceType, down
 	}
 }
 
+// StatusChangeEvent is emitted when a task instance's status changes.
+type StatusChangeEvent struct {
+	Instance  TaskInstance
+	OldStatus TaskInstanceStatus
+	NewStatus TaskInstanceStatus
+}
+
 type Scheduler struct {
 	logger           logger.Logger
 	taskScheduleLock sync.Mutex
@@ -316,7 +323,18 @@ type Scheduler struct {
 	WorkQueue chan TaskInstance
 	Results   chan *TaskExecutionResult
 
-	runID string
+	runID          string
+	onStatusChange func(StatusChangeEvent)
+}
+
+// SetOnStatusChange registers a callback that fires whenever a task instance status changes.
+func (s *Scheduler) SetOnStatusChange(fn func(StatusChangeEvent)) {
+	s.onStatusChange = fn
+}
+
+// GetTaskInstances returns all task instances for read-only access (e.g. TUI initialization).
+func (s *Scheduler) GetTaskInstances() []TaskInstance {
+	return s.taskInstances
 }
 
 // GetAssetCountWithTasksPending returns the number of assets that have tasks (wether checks, main or metadata pushes) pending.
@@ -412,7 +430,11 @@ func (s *Scheduler) MarkByTag(tag string, status TaskInstanceStatus, downstream 
 }
 
 func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceStatus, downstream bool) {
+	oldStatus := instance.GetStatus()
 	instance.MarkAs(status)
+	if s.onStatusChange != nil && oldStatus != status {
+		s.onStatusChange(StatusChangeEvent{Instance: instance, OldStatus: oldStatus, NewStatus: status})
+	}
 	if !downstream {
 		return
 	}
@@ -431,7 +453,11 @@ func (s *Scheduler) MarkTaskInstanceIfNotSkipped(instance TaskInstance, status T
 	if instance.GetStatus() == Skipped {
 		return
 	}
+	oldStatus := instance.GetStatus()
 	instance.MarkAs(status)
+	if s.onStatusChange != nil && oldStatus != status {
+		s.onStatusChange(StatusChangeEvent{Instance: instance, OldStatus: oldStatus, NewStatus: status})
+	}
 	if !markDownstream {
 		return
 	}
@@ -704,7 +730,11 @@ func (s *Scheduler) Tick(result *TaskExecutionResult) bool {
 	}
 
 	for _, task := range tasks {
+		oldStatus := task.GetStatus()
 		task.MarkAs(Queued)
+		if s.onStatusChange != nil && oldStatus != Queued {
+			s.onStatusChange(StatusChangeEvent{Instance: task, OldStatus: oldStatus, NewStatus: Queued})
+		}
 		s.WorkQueue <- task
 	}
 
