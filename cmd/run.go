@@ -429,8 +429,14 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 		assetName := t.GetAsset().Name
 		if !upstreamFailedAssets[assetName] {
 			upstreamFailedAssets[assetName] = true
-			summary.Assets.Total++
-			summary.Assets.Skipped++
+			// Only add to asset counts if this asset wasn't already counted
+			// from the executed results. An asset whose main task failed will
+			// have its checks marked UpstreamFailed, but the asset itself was
+			// already counted as failed above — don't double-count it as skipped.
+			if !assetNames[assetName] {
+				summary.Assets.Total++
+				summary.Assets.Skipped++
+			}
 		}
 
 		// Also count individual check tasks as skipped

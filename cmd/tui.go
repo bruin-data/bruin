@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"strings"
@@ -28,6 +29,7 @@ type TUIRenderer struct {
 	done      chan struct{}
 	stopped   bool
 	lastLines int // lines rendered in the last frame (for clearing)
+	frame     int // animation frame counter for shimmer effect
 }
 
 type assetRow struct {
@@ -214,6 +216,8 @@ func (t *TUIRenderer) render() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	t.frame++
+
 	width, height := t.getTerminalSize()
 	output := t.buildOutput(width, height)
 
@@ -345,7 +349,7 @@ func (t *TUIRenderer) renderAssetRow(row *assetRow, width int) string {
 	case scheduler.Failed:
 		displayName = color.New(color.FgRed).Sprint(name)
 	case scheduler.Running:
-		displayName = color.New(color.FgWhite).Sprint(name)
+		displayName = shimmerText(name, t.frame)
 	case scheduler.UpstreamFailed:
 		displayName = color.New(color.FgYellow).Sprint(name)
 	case scheduler.Pending, scheduler.Queued:
@@ -469,6 +473,45 @@ func fmtDuration(d time.Duration) string {
 	m := int(d.Minutes())
 	s := int(d.Seconds()) % 60
 	return fmt.Sprintf("%dm%02ds", m, s)
+}
+
+// shimmerText renders text with a moving bright highlight sweeping left-to-right,
+// similar to the Claude Code progress shimmer. Characters near the wave peak are
+// bright white; characters far from it fade to a dim gray.
+func shimmerText(text string, frame int) string {
+	runes := []rune(text)
+	n := len(runes)
+	if n == 0 {
+		return text
+	}
+
+	const (
+		waveWidth = 10.0 // how many characters the bright spot spans
+		baseGray  = 90   // dim gray baseline (0-255)
+		peakGray  = 255  // bright white peak
+		halfWidth = waveWidth / 2.0
+	)
+
+	// The wave center sweeps from left to right then wraps around.
+	// Multiply frame by 2 so the shimmer moves faster (2 chars per tick).
+	cycleLen := n + int(waveWidth*2)
+	waveCenter := float64((frame*2)%cycleLen) - waveWidth
+
+	var sb strings.Builder
+	sb.Grow(n * 22) // rough estimate for ANSI escape overhead per char
+	for i, ch := range runes {
+		dist := math.Abs(float64(i) - waveCenter)
+		// Gaussian-ish falloff: exp(-0.5 * (dist/sigma)^2)
+		ratio := dist / halfWidth
+		brightness := math.Exp(-0.5 * ratio * ratio)
+		gray := baseGray + int(float64(peakGray-baseGray)*brightness)
+		if gray > peakGray {
+			gray = peakGray
+		}
+		fmt.Fprintf(&sb, "\033[38;2;%d;%d;%dm%c", gray, gray, gray, ch)
+	}
+	sb.WriteString("\033[0m")
+	return sb.String()
 }
 
 // stripAnsi removes ANSI escape codes for length calculation.
