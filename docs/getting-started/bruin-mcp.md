@@ -35,6 +35,23 @@ To use Bruin MCP in Cursor IDE, go to Cursor Settings > MCP & Integrations > Add
 }
 ```
 
+### VS Code
+
+To use Bruin MCP in VS Code, create a `.vscode/mcp.json` file in your project folder with the following configuration:
+
+```json
+{
+  "servers": {
+    "bruin": {
+      "command": "bruin",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+After creating the file, restart VS Code or reload the window. You can verify the MCP server is connected by checking the MCP servers list in VS Code.
+
 ### Codex CLI
 
 To use Bruin MCP in Codex CLI, add the following configuration to your `~/.codex/config.toml` file:
@@ -98,7 +115,7 @@ Using the Bruin MCP server, you can build new data models while ensuring that th
 
 ## And more
 
-Once MCP setup is complete, you can ask questions in Cursor IDE or Claude Code like:
+Once MCP setup is complete, you can ask questions in Cursor IDE, VS Code, or Claude Code like:
 
 - "How do I create a BigQuery asset in Bruin?"
 - "How is a pipeline.yml file configured in Bruin?"

@@ -1,6 +1,6 @@
 # Cloud MCP
 
-This guide shows how to connect **Cursor**, **Claude Code** and **Codex** to the **Bruin Cloud MCP** so your AI assistant can securely call Bruin Cloud tools (for example: listing pipelines, inspecting runs, or triggering actions) directly from chat.
+This guide shows how to connect **Cursor**, **VS Code**, **Claude Code** and **Codex** to the **Bruin Cloud MCP** so your AI assistant can securely call Bruin Cloud tools (for example: listing pipelines, inspecting runs, or triggering actions) directly from chat.
 
 ## Setup
 
@@ -36,6 +36,26 @@ Edit the **`.cursor/mcp.json`** file and add your token.
 ```
 
 Restart Cursor (or reload the window) so it picks up the MCP config.
+
+## VS Code
+
+Create a `.vscode/mcp.json` file in your project folder with the following configuration:
+
+```json
+{
+  "servers": {
+    "bruin_cloud": {
+      "type": "http",
+      "url": "https://cloud.getbruin.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+Restart VS Code (or reload the window) so it picks up the MCP config.
 
 ## Claude Code
 
@@ -97,5 +117,6 @@ Once the Bruin Cloud MCP server is connected, you can ask in natural language, f
 - **401 Unauthorized:** Missing or invalid Bearer token. Check that the token is correct and not expired.
 - **403 Forbidden / “Insufficient token permissions”:** Token does not have the `mcp:token` ability. Create a new token with MCP permission.
 - **Cursor, tools not showing:** Ensure `.cursor/mcp.json` is valid JSON and restart Cursor.
+- **VS Code, tools not showing:** Ensure `.vscode/mcp.json` is valid JSON and restart VS Code.
 - **Claude Code, server not found:** Run `claude mcp list` to confirm the server is configured; use `claude mcp get bruin_cloud` to check its URL and headers.
 - **Codex CLI, tools not available:** Ensure `~/.codex/config.toml` is valid toml and restart Codex CLI.
