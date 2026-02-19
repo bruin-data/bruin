@@ -231,8 +231,8 @@ func (u *UvPythonRunner) calculateModuleFromProjectRoot(execCtx *executionContex
 	}
 
 	prefix := strings.ReplaceAll(relPath, string(os.PathSeparator), ".") + "."
-	if strings.HasPrefix(execCtx.module, prefix) {
-		return strings.TrimPrefix(execCtx.module, prefix)
+	if strings.HasPrefix(strings.ToLower(execCtx.module), strings.ToLower(prefix)) {
+		return execCtx.module[len(prefix):]
 	}
 
 	return execCtx.module
@@ -263,7 +263,12 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}(tempPyScript)
 
 	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", strings.ReplaceAll(execCtx.repo.Path, "\\", "\\\\"))
-	arrowScript = strings.ReplaceAll(arrowScript, "$MODULE_PATH", execCtx.module)
+	// Use adjusted module path for pyproject-based execution
+	modulePath := execCtx.module
+	if execCtx.dependencyConfig != nil && execCtx.dependencyConfig.Type == DependencyTypePyproject {
+		modulePath = u.calculateModuleFromProjectRoot(execCtx, execCtx.dependencyConfig.ProjectRoot)
+	}
+	arrowScript = strings.ReplaceAll(arrowScript, "$MODULE_PATH", modulePath)
 	arrowScript = strings.ReplaceAll(arrowScript, "$ARROW_FILE_PATH", strings.ReplaceAll(arrowFilePath, "\\", "\\\\"))
 
 	if _, err := io.WriteString(tempPyScript, arrowScript); err != nil {
