@@ -2169,6 +2169,147 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "run_pipeline_with_scd2_by_column_incremental_key",
+			workflow: e2e.Workflow{
+				Name: "run_pipeline_with_scd2_by_column_incremental_key",
+				Steps: []e2e.Task{
+					{
+						Name:    "scd2-col-ik-01a: create test directory",
+						Command: "mkdir",
+						Args:    []string{"-p", filepath.Join(tempdir, "test-scd2-by-column-incremental-key")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "scd2-col-ik-01b: initialize git repository",
+						Command:    "git",
+						Args:       []string{"init"},
+						WorkingDir: filepath.Join(tempdir, "test-scd2-by-column-incremental-key"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:       "scd2-col-ik-01c: copy pipeline files",
+						Command:    "cp",
+						Args:       []string{"-a", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-incremental-key-pipeline"), "."},
+						WorkingDir: filepath.Join(tempdir, "test-scd2-by-column-incremental-key"),
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-02: run pipeline with full refresh",
+						Command: binary,
+						Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-column-incremental-key", filepath.Join(tempdir, "test-scd2-by-column-incremental-key/scd2-by-column-incremental-key-pipeline")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-03: query the initial table",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-incremental-key-pipeline/expectations/scd2_by_col_ik_expected_initial.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-04a: copy products_incremental_key_updated_01.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_incremental_key_updated_01.sql"), filepath.Join(tempdir, "test-scd2-by-column-incremental-key/scd2-by-column-incremental-key-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-04b: run pipeline with updated products",
+						Command: binary,
+						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-column-incremental-key", filepath.Join(tempdir, "test-scd2-by-column-incremental-key/scd2-by-column-incremental-key-pipeline")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-05: query the updated table 01",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-incremental-key-pipeline/expectations/scd2_by_col_ik_expected_updated_01.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-06a: copy products_incremental_key_updated_02.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_incremental_key_updated_02.sql"), filepath.Join(tempdir, "test-scd2-by-column-incremental-key/scd2-by-column-incremental-key-pipeline/assets/products.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-06b: run pipeline with updated products 02",
+						Command: binary,
+						Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-column-incremental-key", filepath.Join(tempdir, "test-scd2-by-column-incremental-key/scd2-by-column-incremental-key-pipeline")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-07: query the updated table 02",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-incremental-key-pipeline/expectations/scd2_by_col_ik_expected_updated_02.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "start_date_flags_workflow",
 			workflow: e2e.Workflow{
 				Name: "start_date_flags_workflow",

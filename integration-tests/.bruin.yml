@@ -244,6 +244,12 @@ environments:
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
 
+  env-scd2-by-column-incremental-key:
+    connections:
+      duckdb:
+        - name: "duckdb-scd2-by-column-incremental-key"
+          path: "duckdb-files/scd2-by-column-incremental-key.db"
+
   env-duckdb-decimal:
     connections:
       duckdb:

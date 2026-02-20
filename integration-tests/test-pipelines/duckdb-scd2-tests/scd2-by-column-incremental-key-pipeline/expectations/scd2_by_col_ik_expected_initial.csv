@@ -1,0 +1,4 @@
+product_id,product_name,price,_is_current,_valid_from
+1,Laptop,999.99,true,2024-01-15 10:00:00
+2,Mouse,29.99,true,2024-01-15 10:00:00
+3,Keyboard,79.99,true,2024-01-15 10:00:00
