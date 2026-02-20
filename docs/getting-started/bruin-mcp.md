@@ -63,6 +63,10 @@ There are two ways to set up Bruin MCP in VS Code:
 }
 ```
 
+:::tip
+If you already have other MCP servers configured, merge the `bruin` entry into your existing `servers` object rather than replacing the entire file.
+:::
+
 3. Restart your IDE.
 
 #### Option 2: Add from Command Palette
