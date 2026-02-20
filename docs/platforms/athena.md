@@ -196,3 +196,73 @@ type: athena.sensor.query
 parameters:
     query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
 ```
+
+### `athena.source`
+
+Defines Athena source assets for documenting existing tables and views in your Athena database. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing Athena tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing Athena table
+
+```yaml
+name: analytics.website_events
+type: athena.source
+description: "Raw website event data collected from tracking pixels"
+connection: athena-default
+
+tags:
+  - analytics
+  - raw-data
+  - events
+domains:
+  - web-analytics
+
+meta:
+  business_owner: "Analytics Team"
+  data_steward: "analytics@company.com"
+  refresh_frequency: "real-time"
+
+depends:
+  - analytics.users
+  - analytics.sessions
+
+columns:
+  - name: event_id
+    type: "string"
+    description: "Unique identifier for each event"
+
+  - name: user_id
+    type: "string"
+    description: "Identifier of the user who triggered the event"
+
+  - name: event_type
+    type: "string"
+    description: "Type of event (page_view, click, form_submit, etc.)"
+
+  - name: event_timestamp
+    type: "timestamp"
+    description: "Timestamp when the event occurred"
+
+  - name: page_url
+    type: "string"
+    description: "URL of the page where the event occurred"
+```
+
+## Ingesting Data from Athena
+
+While the `athena.sql` and `athena.source` asset types are useful for documentation and lineage, you can use [Ingestr assets](../assets/ingestr.md) to move data from Athena to other data warehouse platforms.
+
+### Example: Ingest Athena table to BigQuery
+
+```yaml
+name: raw.website_events
+type: ingestr
+parameters:
+  source_connection: athena-default
+  source_table: analytics.website_events
+  destination: bigquery
+```
