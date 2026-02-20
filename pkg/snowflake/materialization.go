@@ -216,10 +216,6 @@ func buildPKConditions(primaryKeys []string, leftAlias, rightAlias string) []str
 }
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
-	return buildSCD2ByColumnQueryWithTimestamp(asset, query, "CURRENT_TIMESTAMP()")
-}
-
-func buildSCD2ByColumnQueryWithTimestamp(asset *pipeline.Asset, query, timestampExpr string) (string, error) {
 	query = strings.TrimRight(query, ";")
 	var (
 		primaryKeys  = make([]string, 0, 4)
@@ -227,6 +223,8 @@ func buildSCD2ByColumnQueryWithTimestamp(asset *pipeline.Asset, query, timestamp
 		insertCols   = make([]string, 0, 12)
 		insertValues = make([]string, 0, 12)
 	)
+
+	incrementalKey := asset.Materialization.IncrementalKey
 
 	for _, col := range asset.Columns {
 		if col.PrimaryKey {
@@ -250,15 +248,79 @@ func buildSCD2ByColumnQueryWithTimestamp(asset *pipeline.Asset, query, timestamp
 	}
 
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "$current_scd2_ts", "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
 
 	tbl := asset.Name
+
+	if incrementalKey != "" {
+		validFromExpr := fmt.Sprintf("CAST(source.%s AS TIMESTAMP)", incrementalKey)
+		insertValues = append(insertValues, validFromExpr, "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
+
+		queryStr := fmt.Sprintf(`
+BEGIN TRANSACTION;
+
+-- Step 1: Update expired records that are no longer in source
+UPDATE %s AS target
+SET _valid_until = CURRENT_TIMESTAMP(), _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND NOT EXISTS (
+    SELECT 1 FROM (%s) AS source 
+    WHERE %s
+  );
+
+-- Step 2: Update existing records that have changes
+UPDATE %s AS target
+SET _valid_until = (SELECT CAST(source.%s AS TIMESTAMP) FROM (%s) AS source WHERE %s LIMIT 1), _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND EXISTS (
+    SELECT 1 FROM (%s) AS source
+    WHERE %s AND (%s)
+  );
+
+-- Step 3: Insert new records and new versions of changed records
+INSERT INTO %s (%s)
+SELECT %s
+FROM (%s) AS source
+WHERE NOT EXISTS (
+  SELECT 1 FROM %s AS target 
+  WHERE %s AND target._is_current = TRUE
+)
+OR EXISTS (
+  SELECT 1 FROM %s AS target
+  WHERE %s AND target._is_current = FALSE AND target._valid_until = CAST(source.%s AS TIMESTAMP)
+);
+
+COMMIT;`,
+			tbl,
+			strings.TrimSpace(query),
+			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+			tbl,
+			incrementalKey,
+			strings.TrimSpace(query),
+			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+			strings.TrimSpace(query),
+			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+			strings.Join(compareConds, " OR "),
+			tbl,
+			strings.Join(insertCols, ", "),
+			strings.Join(insertValues, ", "),
+			strings.TrimSpace(query),
+			tbl,
+			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+			tbl,
+			strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+			incrementalKey,
+		)
+
+		return strings.TrimSpace(queryStr), nil
+	}
+
+	insertValues = append(insertValues, "$current_scd2_ts", "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
 
 	queryStr := fmt.Sprintf(`
 BEGIN TRANSACTION;
 
 -- Capture timestamp once for consistency across all operations
-SET current_scd2_ts = %s;
+SET current_scd2_ts = CURRENT_TIMESTAMP();
 
 -- Step 1: Update expired records that are no longer in source
 UPDATE %s AS target
@@ -292,7 +354,6 @@ OR EXISTS (
 );
 
 COMMIT;`,
-		timestampExpr,
 		tbl,
 		strings.TrimSpace(query),
 		strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
@@ -329,10 +390,15 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		clusterByClause = fmt.Sprintf("CLUSTER BY (_is_current, %s)", cluster)
 	}
 
+	validFromExpr := "CURRENT_TIMESTAMP()"
+	if asset.Materialization.IncrementalKey != "" {
+		validFromExpr = fmt.Sprintf("CAST(%s AS TIMESTAMP)", asset.Materialization.IncrementalKey)
+	}
+
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s %s AS
 SELECT
-  CURRENT_TIMESTAMP() AS _valid_from,
+  %s AS _valid_from,
   src.*,
   TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,
   TRUE AS _is_current
@@ -341,6 +407,7 @@ FROM (
 ) AS src`,
 		tbl,
 		clusterByClause,
+		validFromExpr,
 		strings.TrimSpace(query),
 	)
 

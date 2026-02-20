@@ -646,6 +646,82 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"SELECT id, name, price from source_table\n" +
 				") AS src",
 		},
+		{
+			name: "scd2_by_column_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "updated_at", Type: "timestamp"},
+				},
+			},
+			query: "SELECT id, col1, col2, updated_at from source_table",
+			want: "BEGIN TRANSACTION;\n\n" +
+				"-- Step 1: Update expired records that are no longer in source\n" +
+				"UPDATE my.asset AS target\n" +
+				"SET _valid_until = CURRENT_TIMESTAMP(), _is_current = FALSE\n" +
+				"WHERE target._is_current = TRUE\n" +
+				"  AND NOT EXISTS (\n" +
+				"    SELECT 1 FROM (SELECT id, col1, col2, updated_at from source_table) AS source \n" +
+				"    WHERE target.id = source.id\n" +
+				"  );\n\n" +
+				"-- Step 2: Update existing records that have changes\n" +
+				"UPDATE my.asset AS target\n" +
+				"SET _valid_until = (SELECT CAST(source.updated_at AS TIMESTAMP) FROM (SELECT id, col1, col2, updated_at from source_table) AS source WHERE target.id = source.id LIMIT 1), _is_current = FALSE\n" +
+				"WHERE target._is_current = TRUE\n" +
+				"  AND EXISTS (\n" +
+				"    SELECT 1 FROM (SELECT id, col1, col2, updated_at from source_table) AS source\n" +
+				"    WHERE target.id = source.id AND (target.col1 != source.col1 OR target.col2 != source.col2 OR target.updated_at != source.updated_at)\n" +
+				"  );\n\n" +
+				"-- Step 3: Insert new records and new versions of changed records\n" +
+				"INSERT INTO my.asset (id, col1, col2, updated_at, _valid_from, _valid_until, _is_current)\n" +
+				"SELECT source.id, source.col1, source.col2, source.updated_at, CAST(source.updated_at AS TIMESTAMP), TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
+				"FROM (SELECT id, col1, col2, updated_at from source_table) AS source\n" +
+				"WHERE NOT EXISTS (\n" +
+				"  SELECT 1 FROM my.asset AS target \n" +
+				"  WHERE target.id = source.id AND target._is_current = TRUE\n" +
+				")\n" +
+				"OR EXISTS (\n" +
+				"  SELECT 1 FROM my.asset AS target\n" +
+				"  WHERE target.id = source.id AND target._is_current = FALSE AND target._valid_until = CAST(source.updated_at AS TIMESTAMP)\n" +
+				");\n\n" +
+				"COMMIT;",
+		},
+		{
+			name: "scd2_full_refresh_by_column_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price, updated_at from source_table",
+			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
+				"SELECT\n" +
+				"  CAST(updated_at AS TIMESTAMP) AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, name, price, updated_at from source_table\n" +
+				") AS src",
+		},
 	}
 
 	for _, tt := range tests {

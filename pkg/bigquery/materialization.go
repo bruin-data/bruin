@@ -352,6 +352,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		insertValues     = make([]string, 0, 12)
 	)
 
+	incrementalKey := asset.Materialization.IncrementalKey
+
 	for _, col := range asset.Columns {
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
@@ -374,8 +376,17 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
 			asset.Materialization.Strategy)
 	}
+
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "CURRENT_TIMESTAMP()", "TIMESTAMP('9999-12-31')", "TRUE")
+
+	validFromExpr := "CURRENT_TIMESTAMP()"
+	validUntilUpdateExpr := "CURRENT_TIMESTAMP()"
+	if incrementalKey != "" {
+		validFromExpr = fmt.Sprintf("CAST(source.%s AS TIMESTAMP)", incrementalKey)
+		validUntilUpdateExpr = fmt.Sprintf("CAST(source.%s AS TIMESTAMP)", incrementalKey)
+	}
+	insertValues = append(insertValues, validFromExpr, "TIMESTAMP('9999-12-31')", "TRUE")
+
 	pkList := strings.Join(primaryKeys, ", ")
 	for i, pk := range primaryKeys {
 		primaryKeys[i] = fmt.Sprintf("target.%[1]s = source.%[1]s", pk)
@@ -406,7 +417,7 @@ WHEN MATCHED AND (
     %s
 ) THEN
   UPDATE SET
-    target._valid_until = CURRENT_TIMESTAMP(),
+    target._valid_until = %s,
     target._is_current  = FALSE
 
 WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
@@ -425,6 +436,7 @@ WHEN NOT MATCHED BY TARGET THEN
 		whereCondition,
 		onCondition,
 		strings.Join(compareConds, " OR "),
+		validUntilUpdateExpr,
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
 	)
@@ -506,12 +518,17 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		clusterClause = "CLUSTER BY _is_current, " + cluster
 	}
 
+	validFromExpr := "CURRENT_TIMESTAMP()"
+	if asset.Materialization.IncrementalKey != "" {
+		validFromExpr = fmt.Sprintf("CAST (%s AS TIMESTAMP)", asset.Materialization.IncrementalKey)
+	}
+
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s
 %s
 %s AS
 SELECT
-  CURRENT_TIMESTAMP() AS _valid_from,
+  %s AS _valid_from,
   src.*,
   TIMESTAMP('9999-12-31') AS _valid_until,
   TRUE                    AS _is_current
@@ -521,6 +538,7 @@ FROM (
 		tbl,
 		partitionClause,
 		clusterClause,
+		validFromExpr,
 		strings.TrimSpace(query),
 	)
 

@@ -237,6 +237,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		nonPKCols   = make([]string, 0, 12)
 	)
 
+	incrementalKey := asset.Materialization.IncrementalKey
+
 	for _, col := range asset.Columns {
 		switch col.Name {
 		case "_is_current", "_valid_from", "_valid_until":
@@ -261,7 +263,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
-	// Build join conditions for primary keys
 	onConds := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
 		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
@@ -284,25 +285,28 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		changeCondition = strings.Join(changeConditions, " OR ")
 	}
 
-	// Build user column list for SELECTs
 	userColList := strings.Join(userCols, ", ")
 	allCols := append([]string{}, userCols...)
 	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
 	allColList := strings.Join(allCols, ", ")
 
-	// to_keep SELECT
 	toKeepSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
 		toKeepSelectCols = append(toKeepSelectCols, "t."+col)
 	}
 
-	// to_insert SELECT
 	toInsertSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
 		toInsertSelectCols = append(toInsertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
 	}
 
-	// Build the SQL using array formatting
+	validFromExpr := "(SELECT now FROM time_now)"
+	validUntilUpdateExpr := "(SELECT now FROM time_now)"
+	if incrementalKey != "" {
+		validFromExpr = fmt.Sprintf("CAST(s.%s AS TIMESTAMP)", incrementalKey)
+		validUntilUpdateExpr = fmt.Sprintf("CAST(s.%s AS TIMESTAMP)", incrementalKey)
+	}
+
 	sqlLines := []string{
 		fmt.Sprintf("CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS", tempTableName, location, tempTableName, partitionBy),
 		"WITH",
@@ -329,7 +333,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		fmt.Sprintf("\tSELECT %s,", strings.Join(toKeepSelectCols, ", ")),
 		"\tt._valid_from,",
 		"\t\tCASE",
-		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN (SELECT now FROM time_now)", changeCondition),
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN %s", changeCondition, validUntilUpdateExpr),
 		"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)",
 		"\t\t\tELSE t._valid_until",
 		"\t\tEND AS _valid_until,",
@@ -344,7 +348,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		"--new/updated rows from source",
 		"to_insert AS (",
 		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
-		"\t(SELECT now FROM time_now) AS _valid_from,",
+		fmt.Sprintf("\t%s AS _valid_from,", validFromExpr),
 		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
 		"\tTRUE AS _is_current",
 		"\tFROM source s",
@@ -355,7 +359,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		"UNION ALL",
 		fmt.Sprintf("SELECT %s FROM to_insert;", allColList),
 	}
-	// Join all lines into a single string
 	createQuery := strings.Join(sqlLines, "\n")
 	return []string{
 		strings.TrimSpace(createQuery),
@@ -374,7 +377,6 @@ func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query, location string)
 	if asset.Materialization.PartitionBy != "" {
 		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
 	} else {
-		// Default partitioning for SCD2 by column
 		partitionBy = ", partitioning = ARRAY['_valid_from']"
 	}
 
@@ -385,10 +387,15 @@ func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query, location string)
 		srcCols[i] = "src." + col.Name
 	}
 
+	validFromExpr := "CURRENT_TIMESTAMP"
+	if asset.Materialization.IncrementalKey != "" {
+		validFromExpr = fmt.Sprintf("CAST(src.%s AS TIMESTAMP)", asset.Materialization.IncrementalKey)
+	}
+
 	createQuery := fmt.Sprintf(
 		"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS\n"+
 			"SELECT %s,\n"+
-			"CURRENT_TIMESTAMP AS _valid_from,\n"+
+			"%s AS _valid_from,\n"+
 			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
 			"TRUE AS _is_current\n"+
 			"FROM (%s\n"+
@@ -398,6 +405,7 @@ func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query, location string)
 		tempTableName,
 		partitionBy,
 		strings.Join(srcCols, ", "),
+		validFromExpr,
 		strings.TrimSpace(query),
 	)
 
