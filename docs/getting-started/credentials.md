@@ -1,7 +1,7 @@
 # Credentials
 
 > [!TIP]
-> This page provides credential configuration examples. For a comprehensive guide on managing environments, connections, and secrets, see [Core Concepts: Environments](/core-concepts/environments).
+> This page provides credential configuration examples. For a comprehensive guide on managing your project, environments, connections, and secrets, see [Core Concepts: Project](/core-concepts/project).
 
 Bruin allows you to store all of your credentials in a non-versioned file called `.bruin.yml`. This file is not checked into your version control system and is not shared with your team.
 

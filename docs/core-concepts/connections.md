@@ -1,6 +1,6 @@
 # Connections
 
-Connections are sets of credentials that enable Bruin to communicate with external platforms. They are configured within [environments](/core-concepts/environments) in your `.bruin.yml` file.
+Connections are sets of credentials that enable Bruin to communicate with external platforms. They are configured within your [project's](/core-concepts/project) `.bruin.yml` file.
 
 ## Overview
 
@@ -117,6 +117,6 @@ bruin connections ping gcp-prod
 
 ## Related Topics
 
-- [Environments](/core-concepts/environments) - Configure multiple environments
+- [Project](/core-concepts/project) - Configure your project and environments
 - [Secrets](/core-concepts/secrets) - Manage custom credentials
 - [.bruin.yml Reference](/secrets/bruinyml) - Complete configuration reference

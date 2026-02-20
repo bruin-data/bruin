@@ -147,6 +147,6 @@ Environment variables are expanded at runtime, allowing you to:
 
 ## Related Topics
 
-- [Environments](/core-concepts/environments) - Configure multiple environments
+- [Project](/core-concepts/project) - Configure your project and environments
 - [Connections](/core-concepts/connections) - Built-in platform connections
 - [.bruin.yml Reference](/secrets/bruinyml) - Complete configuration reference
