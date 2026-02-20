@@ -11,6 +11,7 @@ var BruinToIngestrStrategyMap = map[pipeline.MaterializationStrategy]string{
 	pipeline.MaterializationStrategyAppend:        "append",
 	pipeline.MaterializationStrategyMerge:         "merge",
 	pipeline.MaterializationStrategyDeleteInsert:  "delete+insert",
+	pipeline.MaterializationStrategyTimeInterval:  "delete+insert",
 }
 
 // SupportedPythonMaterializationStrategies lists all materialization strategies supported by Python assets.
@@ -19,6 +20,7 @@ var SupportedPythonMaterializationStrategies = []pipeline.MaterializationStrateg
 	pipeline.MaterializationStrategyAppend,
 	pipeline.MaterializationStrategyMerge,
 	pipeline.MaterializationStrategyDeleteInsert,
+	pipeline.MaterializationStrategyTimeInterval,
 }
 
 // IsPythonMaterializationStrategySupported checks if a given strategy is supported for Python assets.
