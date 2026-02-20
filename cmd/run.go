@@ -429,8 +429,14 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 		assetName := t.GetAsset().Name
 		if !upstreamFailedAssets[assetName] {
 			upstreamFailedAssets[assetName] = true
-			summary.Assets.Total++
-			summary.Assets.Skipped++
+			// Only add to asset counts if this asset wasn't already counted
+			// from the executed results. An asset whose main task failed will
+			// have its checks marked UpstreamFailed, but the asset itself was
+			// already counted as failed above — don't double-count it as skipped.
+			if !assetNames[assetName] {
+				summary.Assets.Total++
+				summary.Assets.Skipped++
+			}
 		}
 
 		// Also count individual check tasks as skipped
@@ -1179,13 +1185,17 @@ func Run(isDebug *bool) *cli.Command {
 				}
 
 				tui.Start()
-				defer tui.Stop()
+				defer tui.Stop() // safety net for early returns / panics
 
 				ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 				start := time.Now()
 				results := s.Run(runCtx)
 				duration := time.Since(start)
+
+				// Stop the TUI before printing the summary so the render loop
+				// cannot overwrite terminal output written by printTUISummary.
+				tui.Stop()
 
 				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))

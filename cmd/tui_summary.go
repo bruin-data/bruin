@@ -37,11 +37,34 @@ func printTUISummary(w io.Writer, results []*scheduler.TaskExecutionResult, s *s
 		}
 	}
 
+	// Compact per-asset list when the count is small
+	assetList := collectAssetResults(results, s)
+	if len(assetList) > 0 {
+		fmt.Fprintln(w)
+		for _, a := range assetList {
+			icon := color.New(color.FgGreen).Sprint("✓")
+			nameStr := dimText(a.name)
+			switch {
+			case a.failed:
+				icon = color.New(color.FgRed).Sprint("✗")
+				nameStr = color.New(color.FgRed).Sprint(a.name)
+			case a.checkFailed:
+				icon = color.New(color.FgYellow).Sprint("!")
+				nameStr = color.New(color.FgYellow).Sprint(a.name)
+			case a.upstreamFailed:
+				icon = color.New(color.FgYellow).Sprint("↑")
+				nameStr = color.New(color.FgYellow).Sprint(a.name)
+			}
+			fmt.Fprintf(w, "    %s %s\n", icon, nameStr)
+		}
+	}
+
 	// Quality checks
 	totalChecks := summary.ColumnChecks.Total + summary.CustomChecks.Total
 	totalCheckFailures := summary.ColumnChecks.Failed + summary.CustomChecks.Failed
 	totalCheckSkipped := summary.ColumnChecks.Skipped + summary.CustomChecks.Skipped
 	if totalChecks > 0 {
+		fmt.Fprintln(w)
 		if totalCheckFailures > 0 || totalCheckSkipped > 0 {
 			fmt.Fprintf(w, "  %s Quality checks       %s\n",
 				color.New(color.FgRed).Sprint("✗"),
@@ -76,6 +99,52 @@ func printTUISummary(w io.Writer, results []*scheduler.TaskExecutionResult, s *s
 		fmt.Fprintf(w, "\n  %s\n\n",
 			color.New(color.FgGreen, color.Bold).Sprint("Run completed successfully"))
 	}
+}
+
+type assetResult struct {
+	name           string
+	failed         bool // main execution failed
+	checkFailed    bool // main ok but checks failed
+	upstreamFailed bool
+}
+
+// collectAssetResults extracts a per-asset summary from the execution results,
+// preserving insertion order.
+func collectAssetResults(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) []assetResult {
+	seen := make(map[string]int) // name -> index in slice
+	var out []assetResult
+
+	for _, res := range results {
+		name := res.Instance.GetAsset().Name
+		idx, exists := seen[name]
+		if !exists {
+			idx = len(out)
+			seen[name] = idx
+			out = append(out, assetResult{name: name})
+		}
+
+		switch res.Instance.(type) {
+		case *scheduler.AssetInstance:
+			if res.Error != nil {
+				out[idx].failed = true
+			}
+		case *scheduler.ColumnCheckInstance, *scheduler.CustomCheckInstance:
+			if res.Error != nil {
+				out[idx].checkFailed = true
+			}
+		}
+	}
+
+	// Also include upstream-failed assets that never ran
+	for _, inst := range s.GetTaskInstancesByStatus(scheduler.UpstreamFailed) {
+		name := inst.GetAsset().Name
+		if _, exists := seen[name]; !exists {
+			seen[name] = len(out)
+			out = append(out, assetResult{name: name, upstreamFailed: true})
+		}
+	}
+
+	return out
 }
 
 // printTUIErrors writes error details to the given writer for failed tasks.

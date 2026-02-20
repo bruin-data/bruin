@@ -1910,6 +1910,303 @@ func TestAnalyzeResults(t *testing.T) {
 	}
 }
 
+// helperFindInstances returns task instances for a given asset name, optionally filtered by type.
+func helperFindInstances(s *scheduler.Scheduler, assetName string, instType *scheduler.TaskInstanceType) []scheduler.TaskInstance {
+	instances := s.GetTaskInstances()
+	out := make([]scheduler.TaskInstance, 0, len(instances))
+	for _, inst := range instances {
+		if inst.GetAsset().Name != assetName {
+			continue
+		}
+		if instType != nil && inst.GetType() != *instType {
+			continue
+		}
+		out = append(out, inst)
+	}
+	return out
+}
+
+func TestAnalyzeResults_MultiAssetWithUpstreamFailure(t *testing.T) {
+	t.Parallel()
+
+	// Build a 3-asset pipeline: A -> B (has checks) -> C (has checks)
+	// Simulates the nyc-taxi scenario where B fails and C becomes upstream-failed.
+	assetA := &pipeline.Asset{Name: "assetA", Type: pipeline.AssetTypeBigqueryQuery}
+	assetB := &pipeline.Asset{
+		Name:      "assetB",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "assetA"}},
+		Columns: []pipeline.Column{
+			{Name: "col1", Type: "STRING", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+		},
+		CustomChecks: []pipeline.CustomCheck{{Name: "row_count"}},
+	}
+	assetC := &pipeline.Asset{
+		Name:      "assetC",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "assetB"}},
+		Columns: []pipeline.Column{
+			{Name: "id", Type: "INT", Checks: []pipeline.ColumnCheck{{Name: "unique"}}},
+		},
+	}
+	p := &pipeline.Pipeline{
+		Name:   "test-pipeline",
+		Assets: []*pipeline.Asset{assetA, assetB, assetC},
+	}
+
+	tests := []struct {
+		name string
+		// setup receives the scheduler and returns the results slice representing
+		// tasks that the executor actually ran.
+		setup func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult
+
+		wantAssets  TaskTypeStats
+		wantColumn  TaskTypeStats
+		wantCustom  TaskTypeStats
+		wantSkipped int
+	}{
+		{
+			name: "all succeed",
+			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
+				var results []*scheduler.TaskExecutionResult
+				for _, inst := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+					results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
+				}
+				return results
+			},
+			wantAssets: TaskTypeStats{Total: 3, Succeeded: 3},
+			wantColumn: TaskTypeStats{Total: 2, Succeeded: 2},
+			wantCustom: TaskTypeStats{Total: 1, Succeeded: 1},
+		},
+		{
+			name: "B fails - C and its checks are upstream-failed",
+			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
+				var results []*scheduler.TaskExecutionResult
+
+				// A succeeds (main task only, no checks)
+				for _, inst := range helperFindInstances(s, "assetA", nil) {
+					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+					results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
+				}
+
+				// B main task fails
+				mainType := scheduler.TaskInstanceTypeMain
+				for _, inst := range helperFindInstances(s, "assetB", &mainType) {
+					s.MarkTaskInstance(inst, scheduler.Failed, false)
+					results = append(results, &scheduler.TaskExecutionResult{
+						Instance: inst,
+						Error:    errors.New("query failed"),
+					})
+				}
+
+				// B's checks become upstream-failed (main task failed)
+				checkTypes := []scheduler.TaskInstanceType{
+					scheduler.TaskInstanceTypeColumnCheck,
+					scheduler.TaskInstanceTypeCustomCheck,
+				}
+				for _, ct := range checkTypes {
+					for _, inst := range helperFindInstances(s, "assetB", &ct) {
+						s.MarkTaskInstance(inst, scheduler.UpstreamFailed, false)
+					}
+				}
+
+				// C and its checks become upstream-failed (B failed)
+				for _, inst := range helperFindInstances(s, "assetC", nil) {
+					s.MarkTaskInstance(inst, scheduler.UpstreamFailed, false)
+				}
+
+				return results
+			},
+			// B should be counted ONCE as failed, not also as skipped.
+			// C should be counted once as skipped.
+			wantAssets: TaskTypeStats{Total: 3, Succeeded: 1, Failed: 1, Skipped: 1},
+			wantColumn: TaskTypeStats{Total: 2, Skipped: 2}, // B's check + C's check
+			wantCustom: TaskTypeStats{Total: 1, Skipped: 1}, // B's custom check
+		},
+		{
+			name: "B succeeds but check fails - C unaffected",
+			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
+				var results []*scheduler.TaskExecutionResult
+				for _, inst := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+					assetName := inst.GetAsset().Name
+					instType := inst.GetType()
+
+					// B's column check fails, everything else succeeds
+					var err error
+					if assetName == "assetB" && instType == scheduler.TaskInstanceTypeColumnCheck {
+						err = errors.New("check failed")
+					}
+
+					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+					if err != nil {
+						// Mark the specific check as failed
+						s.MarkTaskInstance(inst, scheduler.Failed, false)
+					}
+
+					results = append(results, &scheduler.TaskExecutionResult{Instance: inst, Error: err})
+				}
+				return results
+			},
+			wantAssets: TaskTypeStats{Total: 3, Succeeded: 2, FailedDueToChecks: 1},
+			wantColumn: TaskTypeStats{Total: 2, Succeeded: 1, Failed: 1},
+			wantCustom: TaskTypeStats{Total: 1, Succeeded: 1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+			results := tt.setup(s)
+			summary := analyzeResults(results, s)
+
+			assert.Equal(t, tt.wantAssets.Total, summary.Assets.Total, "assets total")
+			assert.Equal(t, tt.wantAssets.Succeeded, summary.Assets.Succeeded, "assets succeeded")
+			assert.Equal(t, tt.wantAssets.Failed, summary.Assets.Failed, "assets failed")
+			assert.Equal(t, tt.wantAssets.FailedDueToChecks, summary.Assets.FailedDueToChecks, "assets failed due to checks")
+			assert.Equal(t, tt.wantAssets.Skipped, summary.Assets.Skipped, "assets skipped")
+
+			assert.Equal(t, tt.wantColumn.Total, summary.ColumnChecks.Total, "column checks total")
+			assert.Equal(t, tt.wantColumn.Succeeded, summary.ColumnChecks.Succeeded, "column checks succeeded")
+			assert.Equal(t, tt.wantColumn.Failed, summary.ColumnChecks.Failed, "column checks failed")
+			assert.Equal(t, tt.wantColumn.Skipped, summary.ColumnChecks.Skipped, "column checks skipped")
+
+			assert.Equal(t, tt.wantCustom.Total, summary.CustomChecks.Total, "custom checks total")
+			assert.Equal(t, tt.wantCustom.Succeeded, summary.CustomChecks.Succeeded, "custom checks succeeded")
+			assert.Equal(t, tt.wantCustom.Failed, summary.CustomChecks.Failed, "custom checks failed")
+			assert.Equal(t, tt.wantCustom.Skipped, summary.CustomChecks.Skipped, "custom checks skipped")
+		})
+	}
+}
+
+func TestCollectAssetResults(t *testing.T) {
+	t.Parallel()
+
+	assetA := &pipeline.Asset{Name: "assetA", Type: pipeline.AssetTypeBigqueryQuery}
+	assetB := &pipeline.Asset{
+		Name:      "assetB",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "assetA"}},
+		Columns: []pipeline.Column{
+			{Name: "col1", Type: "STRING", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+		},
+	}
+	assetC := &pipeline.Asset{
+		Name:      "assetC",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "assetB"}},
+	}
+	p := &pipeline.Pipeline{
+		Name:   "test-pipeline",
+		Assets: []*pipeline.Asset{assetA, assetB, assetC},
+	}
+
+	tests := []struct {
+		name  string
+		setup func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult
+		want  []assetResult
+	}{
+		{
+			name: "all succeed - no upstream failed",
+			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
+				var results []*scheduler.TaskExecutionResult
+				for _, inst := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+					results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
+				}
+				return results
+			},
+			want: []assetResult{
+				{name: "assetA"},
+				{name: "assetB"},
+				{name: "assetC"},
+			},
+		},
+		{
+			name: "B fails - C is upstream-failed and appears in list",
+			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
+				var results []*scheduler.TaskExecutionResult
+
+				// A succeeds
+				for _, inst := range helperFindInstances(s, "assetA", nil) {
+					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+					results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
+				}
+
+				// B main fails
+				mainType := scheduler.TaskInstanceTypeMain
+				for _, inst := range helperFindInstances(s, "assetB", &mainType) {
+					s.MarkTaskInstance(inst, scheduler.Failed, false)
+					results = append(results, &scheduler.TaskExecutionResult{
+						Instance: inst,
+						Error:    errors.New("fail"),
+					})
+				}
+
+				// B checks upstream-failed
+				colType := scheduler.TaskInstanceTypeColumnCheck
+				for _, inst := range helperFindInstances(s, "assetB", &colType) {
+					s.MarkTaskInstance(inst, scheduler.UpstreamFailed, false)
+				}
+
+				// C upstream-failed
+				for _, inst := range helperFindInstances(s, "assetC", nil) {
+					s.MarkTaskInstance(inst, scheduler.UpstreamFailed, false)
+				}
+
+				return results
+			},
+			want: []assetResult{
+				{name: "assetA"},
+				{name: "assetB", failed: true},
+				{name: "assetC", upstreamFailed: true},
+			},
+		},
+		{
+			name: "B check fails - B marked as checkFailed",
+			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
+				var results []*scheduler.TaskExecutionResult
+				for _, inst := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+					var err error
+					if inst.GetAsset().Name == "assetB" && inst.GetType() == scheduler.TaskInstanceTypeColumnCheck {
+						err = errors.New("check failed")
+						s.MarkTaskInstance(inst, scheduler.Failed, false)
+					} else {
+						s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+					}
+					results = append(results, &scheduler.TaskExecutionResult{Instance: inst, Error: err})
+				}
+				return results
+			},
+			want: []assetResult{
+				{name: "assetA"},
+				{name: "assetB", checkFailed: true},
+				{name: "assetC"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+			results := tt.setup(s)
+			got := collectAssetResults(results, s)
+
+			require.Len(t, got, len(tt.want), "asset count")
+			for i, w := range tt.want {
+				assert.Equal(t, w.name, got[i].name, "asset[%d] name", i)
+				assert.Equal(t, w.failed, got[i].failed, "asset[%d] failed", i)
+				assert.Equal(t, w.checkFailed, got[i].checkFailed, "asset[%d] checkFailed", i)
+				assert.Equal(t, w.upstreamFailed, got[i].upstreamFailed, "asset[%d] upstreamFailed", i)
+			}
+		})
+	}
+}
+
 func TestValidateDateRange(t *testing.T) {
 	t.Parallel()
 
