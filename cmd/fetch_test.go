@@ -318,3 +318,77 @@ func TestFormatQueryRowsForJSON_Marshal(t *testing.T) {
 		})
 	}
 }
+
+func TestQueryTableColumnWidth(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		tableWidth  int
+		columnCount int
+		expected    int
+	}{
+		{
+			name:        "uses minimum when column count is invalid",
+			tableWidth:  120,
+			columnCount: 0,
+			expected:    minQueryColumnWidth,
+		},
+		{
+			name:        "uses minimum when width is too small",
+			tableWidth:  12,
+			columnCount: 3,
+			expected:    minQueryColumnWidth,
+		},
+		{
+			name:        "uses computed width in normal case",
+			tableWidth:  120,
+			columnCount: 6,
+			expected:    16,
+		},
+		{
+			name:        "caps at maximum width",
+			tableWidth:  500,
+			columnCount: 2,
+			expected:    maxQueryColumnWidth,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, queryTableColumnWidth(tt.tableWidth, tt.columnCount))
+		})
+	}
+}
+
+func TestSnipWithEllipsis(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		value    string
+		maxLen   int
+		expected string
+	}{
+		{
+			name:     "returns unchanged when value fits",
+			value:    "hello",
+			maxLen:   10,
+			expected: "hello",
+		},
+		{
+			name:     "truncates with ellipsis when value is longer",
+			value:    "abcdefghijklmnop",
+			maxLen:   8,
+			expected: "abcde...",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, snipWithEllipsis(tt.value, tt.maxLen))
+		})
+	}
+}
