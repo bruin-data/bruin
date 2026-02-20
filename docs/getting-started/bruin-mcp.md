@@ -20,20 +20,43 @@ To use Bruin MCP in Claude Code, run the following command in your terminal:
 claude mcp add bruin -- bruin mcp
 ```
 
-### Cursor IDE & Cursor CLI
+### Cursor IDE & VS Code
 
-To use Bruin MCP in Cursor IDE, go to Cursor Settings > MCP & Integrations > Add Custom MCP, then add the following configuration to the configuration file:
+There are two ways to set up Bruin MCP in Cursor IDE or VS Code:
+
+#### Option 1: Edit the mcp.json file
+
+1. Locate the `mcp.json` file:
+   - **macOS**: `~/.cursor/mcp.json` (Cursor) or `~/.vscode/mcp.json` (VS Code)
+   - **Windows**: `%APPDATA%\Cursor\mcp.json` (Cursor) or `%APPDATA%\Code\mcp.json` (VS Code)
+   - **Linux**: `~/.config/Cursor/mcp.json` (Cursor) or `~/.config/Code/mcp.json` (VS Code)
+
+2. Add the following configuration to the file:
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "bruin": {
+      "type": "stdio",
       "command": "bruin",
-      "args": ["mcp"]
+      "args": [
+        "mcp"
+      ]
     }
-  }
+  },
+  "inputs": []
 }
 ```
+
+3. Restart your IDE.
+
+#### Option 2: Add from Command Palette
+
+1. Open the Command Palette with `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux).
+2. Type "Add MCP" and select the option to add a new MCP server.
+3. Select **Command (stdio)** as the server type.
+4. Enter `bruin mcp` as the command.
+5. Restart your IDE.
 
 ### Codex CLI
 
