@@ -1,0 +1,4 @@
+name: scd2-incremental-key-pipe
+
+default_connections:
+  duckdb: "duckdb-scd2-by-column-incremental-key"

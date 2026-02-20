@@ -851,6 +851,35 @@ func TestBuildSCD2Query(t *testing.T) {
 				"SELECT id, name, status, created_at from source_table\n" +
 				") AS src;",
 		},
+		{
+			name: "scd2_by_column_full_refresh_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "name"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, updated_at from source_table",
+			want: "CREATE OR REPLACE TABLE `my.asset`\n" +
+				"PARTITION BY DATE(_valid_from)\n" +
+				"CLUSTER BY _is_current, id AS\n" +
+				"SELECT\n" +
+				"  CAST (updated_at AS TIMESTAMP) AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TIMESTAMP('9999-12-31') AS _valid_until,\n" +
+				"  TRUE                    AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, name, updated_at from source_table\n" +
+				") AS src;",
+		},
 	}
 
 	for _, tt := range tests {
@@ -989,6 +1018,53 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
 				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP(), TIMESTAMP('9999-12-31'), TRUE);",
+		},
+		{
+			name: "scd2_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "name"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			query: "SELECT id, name, updated_at from source_table",
+			want: "MERGE INTO `my.asset` AS target\n" +
+				"USING (\n" +
+				"  WITH s1 AS (\n" +
+				"    SELECT id, name, updated_at from source_table\n" +
+				"  )\n" +
+				"  SELECT *, TRUE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  UNION ALL\n" +
+				"  SELECT s1.*, FALSE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  JOIN   `my.asset` AS t1 USING (id)\n" +
+				"  WHERE  (t1.name != s1.name OR t1.updated_at != s1.updated_at) AND t1._is_current\n" +
+				") AS source\n" +
+				"ON  target.id = source.id AND target._is_current AND source._is_current\n" +
+				"\n" +
+				"WHEN MATCHED AND (\n" +
+				"    target.name != source.name OR target.updated_at != source.updated_at\n" +
+				") THEN\n" +
+				"  UPDATE SET\n" +
+				"    target._valid_until = CAST(source.updated_at AS TIMESTAMP),\n" +
+				"    target._is_current  = FALSE\n" +
+				"\n" +
+				"WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n" +
+				"  UPDATE SET \n" +
+				"    target._valid_until = CURRENT_TIMESTAMP(),\n" +
+				"    target._is_current  = FALSE\n" +
+				"\n\n" +
+				"WHEN NOT MATCHED BY TARGET THEN\n" +
+				"  INSERT (id, name, updated_at, _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.id, source.name, source.updated_at, CAST(source.updated_at AS TIMESTAMP), TIMESTAMP('9999-12-31'), TRUE);",
 		},
 	}
 

@@ -420,6 +420,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 
+	incrementalKey := asset.Materialization.IncrementalKey
+
 	var (
 		columnNames             = make([]string, 0, len(asset.Columns))
 		primaryKeys             = make([]string, 0, len(asset.Columns))
@@ -478,6 +480,13 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 
 	tempTableName := "__bruin_scd2_col_tmp_" + helpers.PrefixGenerator()
 
+	validFromExpr := "@current_scd2_ts"
+	validUntilUpdateExpr := "@current_scd2_ts"
+	if incrementalKey != "" {
+		validFromExpr = fmt.Sprintf("CAST(source.%s AS DATETIME)", incrementalKey)
+		validUntilUpdateExpr = fmt.Sprintf("CAST(source.%s AS DATETIME)", incrementalKey)
+	}
+
 	queries := []string{
 		"START TRANSACTION",
 		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
@@ -485,12 +494,13 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		"SET @current_scd2_ts = CURRENT_TIMESTAMP",
 		fmt.Sprintf("UPDATE %s AS target LEFT JOIN %s AS source ON %s SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND source.%s IS NULL",
 			asset.Name, tempTableName, joinCondition, firstPK),
-		fmt.Sprintf("UPDATE %s AS target JOIN %s AS source ON %s SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND (%s)",
-			asset.Name, tempTableName, joinCondition, changeCondition),
-		fmt.Sprintf("INSERT INTO %s (%s)\nSELECT %s, @current_scd2_ts, '9999-12-31 23:59:59', TRUE\nFROM %s AS source\nLEFT JOIN %s AS current ON %s AND current._is_current = TRUE\nWHERE current.%s IS NULL OR (%s)",
+		fmt.Sprintf("UPDATE %s AS target JOIN %s AS source ON %s SET target._valid_until = %s, target._is_current = FALSE WHERE target._is_current = TRUE AND (%s)",
+			asset.Name, tempTableName, joinCondition, validUntilUpdateExpr, changeCondition),
+		fmt.Sprintf("INSERT INTO %s (%s)\nSELECT %s, %s, '9999-12-31 23:59:59', TRUE\nFROM %s AS source\nLEFT JOIN %s AS current ON %s AND current._is_current = TRUE\nWHERE current.%s IS NULL OR (%s)",
 			asset.Name,
 			insertList,
 			selectClause,
+			validFromExpr,
 			tempTableName,
 			asset.Name,
 			currentJoinCondition,
@@ -524,11 +534,16 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		selectCols = append(selectCols, "src."+col.Name)
 	}
 
+	validFromExpr := "CURRENT_TIMESTAMP"
+	if asset.Materialization.IncrementalKey != "" {
+		validFromExpr = fmt.Sprintf("CAST(src.%s AS DATETIME)", asset.Materialization.IncrementalKey)
+	}
+
 	return fmt.Sprintf(`DROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 SELECT
   %s,
-  CURRENT_TIMESTAMP AS _valid_from,
+  %s AS _valid_from,
   '9999-12-31 23:59:59' AS _valid_until,
   TRUE AS _is_current
 FROM (
@@ -537,6 +552,7 @@ FROM (
 		asset.Name,
 		asset.Name,
 		strings.Join(selectCols, ",\n  "),
+		validFromExpr,
 		query,
 	), nil
 }

@@ -435,9 +435,27 @@ When changes are detected in non-primary key columns:
 
 **Automatically added columns:**
 
-- `_valid_from`: TIMESTAMP when the record version became active (set to `CURRENT_TIMESTAMP()`)
-- `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records)
+- `_valid_from`: TIMESTAMP when the record version became active (defaults to `CURRENT_TIMESTAMP()`, or uses `incremental_key` value if specified)
+- `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records, or uses `incremental_key` value when a record is expired due to changes)
 - `_is_current`: BOOLEAN indicating if this is the current version of the record
+
+**Optional: Using `incremental_key` for timestamps:**
+
+By default, `_valid_from` and `_valid_until` are set using `CURRENT_TIMESTAMP()`. However, if your source data has a column that indicates when changes actually occurred (e.g., an `updated_at` timestamp), you can specify it using the `incremental_key` option:
+
+```yaml
+materialization:
+  type: table
+  strategy: scd2_by_column
+  incremental_key: updated_at
+```
+
+When `incremental_key` is specified:
+- `_valid_from` for new/updated records will be set to the value of the `incremental_key` column
+- `_valid_until` for records being expired (due to changes) will be set to the value of the `incremental_key` column from the new record
+- Records expiring because they're no longer in the source data will still use `CURRENT_TIMESTAMP()` for `_valid_until`
+
+This is useful when you want the SCD2 timeline to reflect the actual business timestamps from your source data rather than the processing time.
 
 **NOTE:***
 
@@ -474,6 +492,43 @@ SELECT 2 AS ID, 'USB Cable' AS Name, 12.99 AS Price
 UNION ALL
 SELECT 3 AS ID, 'Keyboard' AS Name, 89.99 AS Price
 ```
+
+**Example with `incremental_key`:**
+
+When you want `_valid_from` and `_valid_until` to reflect actual business timestamps instead of processing time:
+
+```bruin-sql
+/* @bruin
+name: test.product_catalog
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: scd2_by_column
+  incremental_key: updated_at
+
+columns:
+  - name: ID
+    type: INTEGER
+    description: "Unique identifier for Product"
+    primary_key: true
+  - name: Name
+    type: VARCHAR
+    description: "Name of the Product"
+  - name: Price
+    type: FLOAT
+    description: "Price of the Product"
+  - name: updated_at
+    type: TIMESTAMP
+    description: "When the product was last modified in the source system"
+@bruin */
+
+SELECT 1 AS ID, 'Wireless Mouse' AS Name, 29.99 AS Price, TIMESTAMP '2024-01-15 10:30:00' AS updated_at
+UNION ALL
+SELECT 2 AS ID, 'USB Cable' AS Name, 12.99 AS Price, TIMESTAMP '2024-01-14 14:00:00' AS updated_at
+```
+
+In this case, `_valid_from` will be set to the `updated_at` value from each record, preserving the actual business timeline of when changes occurred.
 
 **Example behavior:**
 
@@ -628,9 +683,9 @@ Notice how:
 | Aspect | scd2_by_column | scd2_by_time |
 |--------|----------------|--------------|
 | **Change Detection** | Automatically detects changes in any non-primary key column | Based on time values in the incremental_key column |
-| **_valid_from Value** | Set to `CURRENT_TIMESTAMP()` when change is processed | Derived from the incremental_key column value |
-| **Use Case** | When you want to track any column changes regardless of when they occurred | When your source data has reliable timestamps indicating when changes happened |
-| **Configuration** | Only requires primary_key columns | Requires both primary_key columns and incremental_key |
+| **_valid_from Value** | Set to `CURRENT_TIMESTAMP()` by default, or uses `incremental_key` value if specified | Always derived from the incremental_key column value |
+| **Use Case** | When you want to track any column changes; optionally use `incremental_key` for business timestamps | When your source data has reliable timestamps indicating when changes happened |
+| **Configuration** | Only requires primary_key columns; `incremental_key` is optional | Requires both primary_key columns and incremental_key |
 
 > [!WARNING]
 > SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift, MySQL, DuckDB, and Databricks.

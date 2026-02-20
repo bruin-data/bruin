@@ -233,10 +233,15 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) ([]string
 
 	query = strings.TrimSuffix(query, ";")
 
+	validFromExpr := "CURRENT_TIMESTAMP()"
+	if asset.Materialization.IncrementalKey != "" {
+		validFromExpr = asset.Materialization.IncrementalKey
+	}
+
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s AS
 SELECT
-  CURRENT_TIMESTAMP() AS _valid_from,
+  %s AS _valid_from,
   src.*,
   TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,
   TRUE AS _is_current
@@ -244,6 +249,7 @@ FROM (
 %s
 ) AS src`,
 		asset.Name,
+		validFromExpr,
 		strings.TrimSpace(query),
 	)
 
@@ -290,6 +296,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) ([]string, erro
 			asset.Materialization.Strategy)
 	}
 
+	incrementalKey := asset.Materialization.IncrementalKey
+
 	var (
 		compareConds     = make([]string, 0, len(asset.Columns)-len(primaryKeys))
 		compareCondsS1T1 = make([]string, 0, len(asset.Columns)-len(primaryKeys))
@@ -314,12 +322,17 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) ([]string, erro
 	}
 
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "CURRENT_TIMESTAMP()", "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
 
-	// Build USING clause for join
+	validFromExpr := "CURRENT_TIMESTAMP()"
+	validUntilUpdateExpr := "CURRENT_TIMESTAMP()"
+	if incrementalKey != "" {
+		validFromExpr = "source." + incrementalKey
+		validUntilUpdateExpr = "source." + incrementalKey
+	}
+	insertValues = append(insertValues, validFromExpr, "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
+
 	pkListUsing := strings.Join(primaryKeys, ", ")
 
-	// Build ON condition for MERGE
 	onConditions := make([]string, 0, len(primaryKeys)+1)
 	for _, pk := range primaryKeys {
 		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
@@ -357,7 +370,7 @@ WHEN MATCHED AND (
     %s
 ) THEN
   UPDATE SET
-    _valid_until = CURRENT_TIMESTAMP(),
+    _valid_until = %s,
     _is_current  = FALSE
 
 WHEN NOT MATCHED THEN
@@ -375,6 +388,7 @@ WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
 		whereCondition,
 		onCondition,
 		matchedCondition,
+		validUntilUpdateExpr,
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
 	)

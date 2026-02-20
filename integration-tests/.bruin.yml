@@ -11,6 +11,8 @@ environments:
           path: "duckdb-files/scd2-by-column.db"
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
+        - name: "duckdb-scd2-by-column-incremental-key"
+          path: "duckdb-files/scd2-by-column-incremental-key.db"
         - name: "duckdb-start-date-flags"
           path: "duckdb-files/start-date-flags.db"
         - name: "duckdb-mat-test"
@@ -243,6 +245,12 @@ environments:
       duckdb:
         - name: "duckdb-scd2-by-time"
           path: "duckdb-files/scd2-by-time.db"
+
+  env-scd2-by-column-incremental-key:
+    connections:
+      duckdb:
+        - name: "duckdb-scd2-by-column-incremental-key"
+          path: "duckdb-files/scd2-by-column-incremental-key.db"
 
   env-duckdb-decimal:
     connections:

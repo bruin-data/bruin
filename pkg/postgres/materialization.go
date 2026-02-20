@@ -327,12 +327,17 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
 	}
 
+	validFromExpr := "CURRENT_TIMESTAMP"
+	if asset.Materialization.IncrementalKey != "" {
+		validFromExpr = QuoteIdentifier(asset.Materialization.IncrementalKey)
+	}
+
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 SELECT
-  CURRENT_TIMESTAMP AS _valid_from,
+  %s AS _valid_from,
   src.*,
   %s AS _valid_until,
   TRUE AS _is_current
@@ -342,6 +347,7 @@ FROM (
 COMMIT;`,
 		QuoteIdentifier(asset.Name),
 		QuoteIdentifier(asset.Name),
+		validFromExpr,
 		validuntil,
 		strings.TrimSpace(query),
 	)
@@ -404,6 +410,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		insertValues     = make([]string, 0, 12)
 	)
 
+	incrementalKey := asset.Materialization.IncrementalKey
+
 	for _, col := range asset.Columns {
 		quotedColName := QuoteIdentifier(col.Name)
 		if col.PrimaryKey {
@@ -413,12 +421,10 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		case "_is_current", "_valid_from", "_valid_until":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
-		// For Postgres, use lowercase unquoted identifiers to match stored column names
 		lowerColName := strings.ToLower(col.Name)
 		insertCols = append(insertCols, lowerColName)
 		insertValues = append(insertValues, "source."+lowerColName)
 		if !col.PrimaryKey {
-			// For Postgres, use lowercase unquoted identifiers in WHERE/ON clauses to match stored column names
 			compareConds = append(compareConds,
 				fmt.Sprintf("target.%s != source.%s", lowerColName, lowerColName))
 			compareCondsS1T1 = append(compareCondsS1T1,
@@ -430,11 +436,18 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
 			asset.Materialization.Strategy)
 	}
-	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "CURRENT_TIMESTAMP", "'9999-12-31 00:00:00'::TIMESTAMP", "TRUE")
 
-	// For Postgres USING clause, we need lowercase unquoted identifiers
-	// Postgres stores unquoted identifiers as lowercase, so USING needs to match that
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+
+	validFromExpr := "CURRENT_TIMESTAMP"
+	validUntilUpdateExpr := "CURRENT_TIMESTAMP"
+	if incrementalKey != "" {
+		lowerIncrementalKey := strings.ToLower(incrementalKey)
+		validFromExpr = "source." + lowerIncrementalKey
+		validUntilUpdateExpr = "source." + lowerIncrementalKey
+	}
+	insertValues = append(insertValues, validFromExpr, "'9999-12-31 00:00:00'::TIMESTAMP", "TRUE")
+
 	pkListForUsing := make([]string, 0, len(primaryKeys))
 	for _, col := range asset.Columns {
 		if col.PrimaryKey {
@@ -443,8 +456,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 	pkListUsing := strings.Join(pkListForUsing, ", ")
 
-	// Build ON condition for MERGE
-	// For Postgres, use lowercase unquoted identifiers in ON clauses to match stored column names
 	onConditions := make([]string, 0, len(primaryKeys)+1)
 	for _, col := range asset.Columns {
 		if col.PrimaryKey {
@@ -485,7 +496,7 @@ WHEN MATCHED AND (
     %s
 ) THEN
   UPDATE SET
-    _valid_until = CURRENT_TIMESTAMP,
+    _valid_until = %s,
     _is_current  = FALSE
 
 WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
@@ -503,6 +514,7 @@ WHEN NOT MATCHED BY TARGET THEN
 		whereCondition,
 		onCondition,
 		matchedCondition,
+		validUntilUpdateExpr,
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
 	)
@@ -636,6 +648,8 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 		insertValues = make([]string, 0, 12)
 	)
 
+	incrementalKey := asset.Materialization.IncrementalKey
+
 	for _, col := range asset.Columns {
 		quotedColName := QuoteIdentifier(col.Name)
 		if col.PrimaryKey {
@@ -657,10 +671,16 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
 			asset.Materialization.Strategy)
 	}
-	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "(SELECT session_timestamp FROM _ts)", "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
 
-	// Build ON condition for MERGE
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+
+	validFromExpr := "(SELECT session_timestamp FROM _ts)"
+	if incrementalKey != "" {
+		quotedIncrementalKey := QuoteIdentifier(incrementalKey)
+		validFromExpr = "source." + quotedIncrementalKey
+	}
+	insertValues = append(insertValues, validFromExpr, "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
+
 	onConditions := make([]string, 0, len(primaryKeys))
 	for _, pk := range primaryKeys {
 		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
@@ -676,10 +696,39 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 		matchedCondition = "FALSE"
 	}
 
-	// Step 1: Create temp table with new data
-	// Step 2: Update existing records that changed
-	// Step 3: Insert new/changed records
-	// Step 4: Update records not in source (expired)
+	var updateExistsExpr string
+	if incrementalKey != "" {
+		quotedIncrementalKey := QuoteIdentifier(incrementalKey)
+		updateExistsExpr = fmt.Sprintf(`UPDATE %s AS target
+SET _valid_until = (SELECT %s FROM %s AS source WHERE %s LIMIT 1), _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND EXISTS (
+    SELECT 1 FROM %s AS source
+    WHERE %s AND (%s)
+  )`,
+			QuoteIdentifier(asset.Name),
+			"source."+quotedIncrementalKey,
+			tempTableName,
+			onCondition,
+			tempTableName,
+			onCondition,
+			matchedCondition,
+		)
+	} else {
+		updateExistsExpr = fmt.Sprintf(`UPDATE %s AS target
+SET _valid_until = (SELECT session_timestamp FROM _ts), _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND EXISTS (
+    SELECT 1 FROM %s AS source
+    WHERE %s AND (%s)
+  )`,
+			QuoteIdentifier(asset.Name),
+			tempTableName,
+			onCondition,
+			matchedCondition,
+		)
+	}
+
 	queryStr := fmt.Sprintf(`
 BEGIN TRANSACTION;
 
@@ -692,13 +741,7 @@ CREATE TEMP TABLE %s AS
 SELECT *, TRUE AS _is_current FROM (%s) AS src;
 
 -- Update existing records that have changes
-UPDATE %s AS target
-SET _valid_until = (SELECT session_timestamp FROM _ts), _is_current = FALSE
-WHERE target._is_current = TRUE
-  AND EXISTS (
-    SELECT 1 FROM %s AS source
-    WHERE %s AND (%s)
-  );
+%s;
 
 -- Update records that are no longer in source (expired)
 UPDATE %s AS target
@@ -722,10 +765,7 @@ DROP TABLE %s;
 COMMIT;`,
 		tempTableName,
 		strings.TrimSpace(query),
-		QuoteIdentifier(asset.Name),
-		tempTableName,
-		onCondition,
-		matchedCondition,
+		updateExistsExpr,
 		QuoteIdentifier(asset.Name),
 		tempTableName,
 		onCondition,
