@@ -7,6 +7,7 @@ Bruin supports Databricks as a data platform.
 ## Connection
 
 Bruin supports two authentication methods for Databricks:
+
 - **Personal Access Token (PAT)**: Simple token-based authentication
 - **OAuth M2M (Machine-to-Machine)**: Service principal authentication using OAuth 2.0
 
@@ -38,7 +39,7 @@ The HTTP path is the connection endpoint for your SQL Warehouse. To retrieve it:
 4. Under the "Connection details" section, locate the **"HTTP path"** field
 5. Copy the HTTP path value. It should look something like: `/sql/1.0/warehouses/3748325bf498i274`
 
-> 
+>
 > If you have multiple warehouses, make sure to use the correct path for the warehouse you want to connect to.
 
 #### Step 3: Retrieve host (Workspace URL)
@@ -48,7 +49,7 @@ The host is your Databricks workspace URL. You can find it in several ways:
 - Method 1: Browser address bar
 
     The host URL is visible in your browser's address bar when you're logged into Databricks.
-    
+
     It should look like: `{workspace-name}.cloud.databricks.com` or `{workspace-name}.azuredatabricks.net` (for Azure)
 
 - Method 2: From the SQL Warehouse connection details
@@ -57,7 +58,7 @@ The host is your Databricks workspace URL. You can find it in several ways:
 
 #### Step 4: Enter port, catalog and schema
 
-Databricks APIs and SQL warehouse endpoints use 443 (HTTPS). So port will usually be 443. The catalog and schema can be found under the section "Catalog" in the bar on the left. 
+Databricks APIs and SQL warehouse endpoints use 443 (HTTPS). So port will usually be 443. The catalog and schema can be found under the section "Catalog" in the bar on the left.
 
 The Databricks configuration in `.bruin.yml` should like something like this:
 
@@ -109,9 +110,11 @@ For more details on OAuth M2M authentication, see the [Databricks documentation]
 ## Databricks Assets
 
 ### `databricks.sql`
+
 Runs a materialized Databricks asset or a Databricks SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a table using table materialization
+
 ```bruin-sql
 /* @bruin
 name: events.install
@@ -126,6 +129,7 @@ where event_name = "install"
 ```
 
 #### Example: Run a script
+
 ```bruin-sql
 /* @bruin
 name: events.install
@@ -167,13 +171,13 @@ parameters:
 ```
 
 **Parameters**:
+
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 ### `databricks.sensor.table`
 
 Sensors are a special type of assets that are used to wait on certain external signals.
-
 
 Checks if a table exists in Databricks, runs by default every 30 seconds until this table is available.
 
@@ -184,14 +188,16 @@ parameters:
     table: string
     poke_interval: int (optional)
 ```
-**Parameters**:
-- `table`: `schema_id.table_id`.
-- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
 
+**Parameters**:
+
+- `table`: `schema_id.table_id`.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
 
 Checks if the data available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: databricks.sensor.query
@@ -202,6 +208,7 @@ parameters:
 #### Example: Streaming upstream table
 
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: databricks.sensor.query
@@ -209,11 +216,12 @@ parameters:
     query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
 ```
 
-
 ### `databricks.seed`
+
 `databricks.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Databricks database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Databricks database.
 
-You can define seed assets in a file ending with `.yaml`:
+You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: databricks.seed
@@ -223,15 +231,16 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
-
-####  Examples: Load csv into a Databricks database
+#### Examples: Load csv into a Databricks database
 
 The examples below show how to load a CSV into a Databricks database.
+
 ```yaml
 name: dashboard.hello
 type: databricks.seed

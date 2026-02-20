@@ -1777,6 +1777,86 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErrMessage: "",
 			wantErr:        assert.NoError,
 		},
+		{
+			name: "CDC ingestr asset with merge strategy but no primary key should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "CDC ingestr asset with cdc_mode stream should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_mode":             "stream",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "CDC ingestr asset with cdc_mode batch should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_mode":             "batch",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "CDC ingestr asset with invalid cdc_mode should fail",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_mode":             "invalid",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "Invalid 'cdc_mode' value: must be 'stream' or 'batch'",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "CDC ingestr asset with publication and slot params should pass",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"cdc":                  "true",
+					"cdc_publication":      "my_publication",
+					"cdc_slot":             "my_slot",
+					"incremental_strategy": "merge",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

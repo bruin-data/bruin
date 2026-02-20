@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -23,7 +24,8 @@ func (m *mockConnection) GetIngestrURI() (string, error) {
 }
 
 type simpleConnectionFetcher struct {
-	connections map[string]*mockConnection
+	connections       map[string]*mockConnection
+	connectionDetails map[string]any
 }
 
 var repo = &git.Repo{
@@ -40,12 +42,104 @@ func (s simpleConnectionFetcher) GetConnection(name string) any {
 	return s.connections[name]
 }
 
+func (s simpleConnectionFetcher) GetConnectionDetails(name string) any {
+	if s.connectionDetails == nil {
+		return nil
+	}
+	return s.connectionDetails[name]
+}
+
 type mockRunner struct {
 	mock.Mock
 }
 
 func (m *mockRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
 	return m.Called(ctx, args, extraPackages, repo).Error(0)
+}
+
+func TestApplyClickHouseEngineParams(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		uri    string
+		params map[string]string
+		want   string
+	}{
+		{
+			name:   "no engine params",
+			uri:    "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{},
+			want:   "clickhouse://user:pass@localhost:9000",
+		},
+		{
+			name: "engine only",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine": "merge_tree",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree",
+		},
+		{
+			name: "engine with settings",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine":                   "merge_tree",
+				"engine.index_granularity": "8125",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree&engine.index_granularity=8125",
+		},
+		{
+			name: "engine settings without engine",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine.index_granularity": "8125",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine.index_granularity=8125",
+		},
+		{
+			name: "preserves existing query params",
+			uri:  "clickhouse://user:pass@localhost:9000?http_port=8123",
+			params: map[string]string{
+				"engine": "merge_tree",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree&http_port=8123",
+		},
+		{
+			name: "empty engine value is ignored",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine": "",
+			},
+			want: "clickhouse://user:pass@localhost:9000",
+		},
+		{
+			name: "empty engine setting value is ignored",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"engine.index_granularity": "",
+			},
+			want: "clickhouse://user:pass@localhost:9000",
+		},
+		{
+			name: "non-engine params are not added",
+			uri:  "clickhouse://user:pass@localhost:9000",
+			params: map[string]string{
+				"source_connection": "sf",
+				"source_table":      "some_table",
+				"engine":            "merge_tree",
+			},
+			want: "clickhouse://user:pass@localhost:9000?engine=merge_tree",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := applyClickHouseEngineParams(tt.uri, tt.params)
+			require.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
@@ -57,12 +151,15 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
 	mockDuck := new(mockConnection)
 	mockDuck.On("GetIngestrURI").Return("duckdb:////some/path", nil)
+	mockCh := new(mockConnection)
+	mockCh.On("GetIngestrURI").Return("clickhouse://user:pass@localhost:9000", nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
 			"bq":   mockBq,
 			"sf":   mockSf,
 			"duck": mockDuck,
+			"ch":   mockCh,
 		},
 	}
 
@@ -75,6 +172,28 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 		want          []string
 		extraPackages []string
 	}{
+		{
+			name: "clickhouse dest with engine params",
+			asset: &pipeline.Asset{
+				Name:       "public.table",
+				Connection: "ch",
+				Parameters: map[string]string{
+					"source_connection":        "sf",
+					"source_table":             "source-table",
+					"engine":                   "merge_tree",
+					"engine.index_granularity": "8125",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "snowflake://uri-here",
+				"--source-table", "source-table",
+				"--dest-uri", "clickhouse://user:pass@localhost:9000?engine=merge_tree&engine.index_granularity=8125",
+				"--dest-table", "public.table",
+				"--yes",
+				"--progress", "log",
+			},
+		},
 		{
 			name: "create+replace, basic scenario",
 			asset: &pipeline.Asset{
@@ -268,12 +387,13 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 
 			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 			o := &BasicOperator{
 				conn:          &fetcher,
 				finder:        finder,
 				runner:        runner,
-				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "ingestr-test", "ingestr-test", nil),
+				jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
 			}
 
 			ti := scheduler.AssetInstance{
@@ -342,6 +462,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t
 	ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
 	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC))
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
 
 	err := o.Run(ctx, &ti)
 	require.NoError(t, err)
@@ -356,12 +477,21 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
 	mockDuck := new(mockConnection)
 	mockDuck.On("GetIngestrURI").Return("duckdb:////some/path", nil)
+	mockAthena := new(mockConnection)
+	mockAthena.On("GetIngestrURI").Return("athena://?bucket=s3://bucket/path&region_name=us-west-2", nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
-			"bq":   mockBq,
-			"sf":   mockSf,
-			"duck": mockDuck,
+			"bq":     mockBq,
+			"sf":     mockSf,
+			"duck":   mockDuck,
+			"athena": mockAthena,
+		},
+		connectionDetails: map[string]any{
+			"athena": &config.AthenaConnection{
+				Name:     "athena",
+				Database: "analytics",
+			},
 		},
 	}
 
@@ -438,6 +568,31 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				"id:bigint,load_date:timestamp,percent:double",
 			},
 		},
+		{
+			name: "athena seed infers database from connection details",
+			asset: &pipeline.Asset{
+				Name:       "events",
+				Connection: "athena",
+				Type:       pipeline.AssetTypeAthenaSeed,
+				Parameters: map[string]string{
+					"path": "seed.csv",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri",
+				"csv://seed.csv",
+				"--source-table",
+				"seed.raw",
+				"--dest-uri",
+				"athena://?bucket=s3://bucket/path&region_name=us-west-2",
+				"--dest-table",
+				"analytics.events",
+				"--yes",
+				"--progress",
+				"log",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -458,6 +613,283 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 			}
 
 			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+
+			err := o.Run(ctx, &ti)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestSeedOperator_ResolveSeedDestinationTableName(t *testing.T) {
+	t.Parallel()
+
+	fetcher := simpleConnectionFetcher{
+		connectionDetails: map[string]any{
+			"athena": &config.AthenaConnection{
+				Name:     "athena",
+				Database: "analytics",
+			},
+			"pg": &config.PostgresConnection{
+				Name:   "pg",
+				Schema: "mart",
+			},
+			"rs": &config.RedshiftConnection{
+				Name:   "rs",
+				Schema: "warehouse",
+			},
+			"sf": &config.SnowflakeConnection{
+				Name:   "sf",
+				Schema: "RAW",
+			},
+			"ch": &config.ClickHouseConnection{
+				Name:     "ch",
+				Database: "events",
+			},
+		},
+	}
+
+	o := &SeedOperator{conn: &fetcher}
+
+	tests := []struct {
+		name           string
+		connectionName string
+		destURI        string
+		tableName      string
+		want           string
+	}{
+		{
+			name:           "athena table gets default database from connection",
+			connectionName: "athena",
+			destURI:        "athena://?bucket=s3://bucket/path",
+			tableName:      "events",
+			want:           "analytics.events",
+		},
+		{
+			name:           "athena falls back to default database when details are missing",
+			connectionName: "missing-athena",
+			destURI:        "athena://?bucket=s3://bucket/path",
+			tableName:      "events",
+			want:           "default.events",
+		},
+		{
+			name:           "postgresql table gets schema from connection",
+			connectionName: "pg",
+			destURI:        "postgresql://user:pass@localhost:5432/db",
+			tableName:      "users",
+			want:           "mart.users",
+		},
+		{
+			name:           "redshift table gets schema from connection",
+			connectionName: "rs",
+			destURI:        "redshift://user:pass@localhost:5439/db",
+			tableName:      "orders",
+			want:           "warehouse.orders",
+		},
+		{
+			name:           "snowflake table gets schema from connection",
+			connectionName: "sf",
+			destURI:        "snowflake://user:pass@account/db",
+			tableName:      "customers",
+			want:           "RAW.customers",
+		},
+		{
+			name:           "clickhouse table gets database from connection",
+			connectionName: "ch",
+			destURI:        "clickhouse://user:pass@localhost:9000",
+			tableName:      "sessions",
+			want:           "events.sessions",
+		},
+		{
+			name:           "already qualified table name is unchanged",
+			connectionName: "pg",
+			destURI:        "postgresql://user:pass@localhost:5432/db",
+			tableName:      "mart.users",
+			want:           "mart.users",
+		},
+		{
+			name:           "unsupported destination keeps table name unchanged",
+			connectionName: "bq",
+			destURI:        "bigquery://project",
+			tableName:      "events",
+			want:           "events",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := o.resolveSeedDestinationTableName(tt.connectionName, tt.destURI, tt.tableName)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestBasicOperator_CDCMode(t *testing.T) {
+	t.Parallel()
+
+	mockPg := new(mockConnection)
+	mockPg.On("GetIngestrURI").Return("postgresql://user:pass@localhost:5432/db", nil)
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+
+	fetcher := simpleConnectionFetcher{
+		connections: map[string]*mockConnection{
+			"pg": mockPg,
+			"bq": mockBq,
+		},
+	}
+
+	finder := new(mockFinder)
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []string
+	}{
+		{
+			name: "CDC mode transforms URI and auto-sets merge strategy",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"cdc":               "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "CDC mode with publication and slot params",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset-with-params",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"cdc":               "true",
+					"cdc_publication":   "my_publication",
+					"cdc_slot":          "my_slot",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db?publication=my_publication&slot=my_slot",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset-with-params",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "CDC wildcard source_table omits --source-table flag",
+			asset: &pipeline.Asset{
+				Name:       "cdc-wildcard-asset",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "pg",
+					"source_table":      "*",
+					"destination":       "bigquery",
+					"cdc":               "true",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-wildcard-asset",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "CDC mode with cdc_mode stream",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset-stream-mode",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "pg",
+					"source_table":      "public.users",
+					"destination":       "bigquery",
+					"cdc":               "true",
+					"cdc_mode":          "stream",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db?mode=stream",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset-stream-mode",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+			},
+		},
+		{
+			name: "CDC mode with explicit incremental strategy",
+			asset: &pipeline.Asset{
+				Name:       "cdc-asset-explicit-strategy",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection":    "pg",
+					"source_table":         "public.users",
+					"destination":          "bigquery",
+					"cdc":                  "true",
+					"incremental_strategy": "append",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "postgres+cdc://user:pass@localhost:5432/db",
+				"--source-table", "public.users",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "cdc-asset-explicit-strategy",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "append",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runner := new(mockRunner)
+			runner.On("RunIngestr", mock.Anything, tt.want, []string(nil), repo).Return(nil)
+
+			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+			o := &BasicOperator{
+				conn:          &fetcher,
+				finder:        finder,
+				runner:        runner,
+				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil),
+			}
+
+			ti := scheduler.AssetInstance{
+				Pipeline: &pipeline.Pipeline{},
+				Asset:    tt.asset,
+			}
+
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 
 			err := o.Run(ctx, &ti)
 			require.NoError(t, err)

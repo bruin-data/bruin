@@ -1,8 +1,9 @@
 # `data-diff` Command
 
-The `data-diff` command compares data between two tables from the same or different data sources. It provides comprehensive schema comparison, statistical analysis, and data profiling to help identify differences between datasets across environments or sources.
+The `data-diff` command compares data between two tables from the same or different data sources. By default, it performs a fast schema-only comparison. Use the `--full` flag to include detailed statistical analysis and data profiling.
 
 This command is particularly useful for:
+
 - Comparing tables between development, staging, and production environments
 - Validating data migrations and ETL processes
 - Monitoring data drift between different data sources
@@ -38,7 +39,7 @@ table td:first-child {
 | `--connection`, `-c` | str | - | Name of the default connection to use when connection is not specified in table arguments |
 | `--tolerance`, `-t` | float | `0.001` | Tolerance percentage for considering values equal. Values with percentage difference below this threshold are considered equal |
 | `--config-file` | str | `.bruin.yml` | Optional path to the `.bruin.yml` configuration file . Other [secret backends](../secrets/overview.md) can be used.|
-| `--schema-only` | bool | `false` | Compare only table schemas without analyzing row counts or column distributions |
+| `--full` | bool | `false` | Include detailed row counts and column statistics analysis in addition to schema comparison |
 | `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
 | `--target-dialect` | str | auto-detect | Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, generic). Auto-detected from connection types if not specified |
 | `--reverse` | bool | `false` | Reverse the direction of ALTER statements (transform Table1 to match Table2 instead of Table2 to match Table1) |
@@ -50,30 +51,34 @@ Tables can be specified in two formats:
 1. **With connection prefix:** `connection_name:table_name`
    - Example: `prod_db:users`, `staging_bq:events`
 
-2. **Without connection prefix:** `table_name` 
+2. **Without connection prefix:** `table_name`
    - Requires the `--connection` flag to specify the default connection
    - Example: `users` (when using `--connection prod_db`)
 
 ## What Gets Compared
 
-The `data-diff` command performs a comprehensive comparison that includes:
+### Schema Comparison (Default)
 
-### Schema Comparison
+By default, the `data-diff` command performs a fast schema-only comparison that includes:
+
 - **Column names and types:** Identifies missing, extra, and mismatched columns
 - **Data type compatibility:** Checks if different types are comparable (e.g., `VARCHAR` vs `STRING`)
 - **Nullability constraints:** Compares nullable/not-null settings
 - **Uniqueness constraints:** Compares unique/non-unique settings
 
-### Statistical Analysis
-For each column that exists in both tables, the command provides detailed statistics based on the column's data type:
+### Statistical Analysis (with `--full` flag)
+
+When using the `--full` flag, the command also provides detailed statistics for each column based on its data type:
 
 #### Numerical Columns
+
 - Row count and null count
 - Fill rate (percentage of non-null values)
 - Min, Max, Average, Sum values
 - Standard deviation
 
 #### String Columns  
+
 - Row count and null count
 - Fill rate (percentage of non-null values)
 - Distinct value count
@@ -81,21 +86,25 @@ For each column that exists in both tables, the command provides detailed statis
 - Min, Max, and Average string lengths
 
 #### Boolean Columns
+
 - Row count and null count
 - Fill rate (percentage of non-null values)  
 - True and False counts
 
 #### DateTime Columns
+
 - Row count and null count
 - Fill rate (percentage of non-null values)
 - Distinct value count
 - Earliest and Latest dates
 
 #### JSON Columns
+
 - Row count and null count
 - Fill rate (percentage of non-null values)
 
 ### Difference Calculation
+
 - **Absolute differences:** Raw numeric differences between values
 - **Percentage differences:** Relative changes as percentages
 - **Tolerance handling:** Values within the specified tolerance are considered equal
@@ -118,21 +127,25 @@ The command generates several detailed tables:
 When schema differences are detected, the command automatically generates ALTER TABLE SQL statements to synchronize the schemas. These statements are output to stdout (separate from the comparison tables which go to stderr), making it easy to capture and review them.
 
 The generated statements can:
+
 - Add missing columns
 - Change column data types
 - Modify column nullability
 - Be combined into a single ALTER TABLE statement where the database dialect supports it
 
 **Direction of Changes:**
+
 - By default, statements transform Table2 to match Table1
 - Use `--reverse` to transform Table1 to match Table2 instead
 
 **Dialect Detection:**
+
 - If both connections are the same type (e.g., both PostgreSQL), uses that dialect
 - If connections are different types, uses the second table's dialect
 - Can be overridden with `--target-dialect` flag
 
 **Supported Dialects:**
+
 - PostgreSQL (`postgresql`)
 - Snowflake (`snowflake`)
 - BigQuery (`bigquery`)
@@ -144,11 +157,13 @@ The generated statements can:
 ### Basic Usage
 
 Compare two tables using explicit connection names:
+
 ```bash
 bruin data-diff prod_db:users staging_db:users
 ```
 
 Compare tables using a default connection:
+
 ```bash
 bruin data-diff --connection my_db users_v1 users_v2
 ```
@@ -156,6 +171,7 @@ bruin data-diff --connection my_db users_v1 users_v2
 ### Cross-Environment Comparison
 
 Compare the same table across different environments:
+
 ```bash
 bruin data-diff prod_bq:analytics.users dev_bq:analytics.users
 ```
@@ -163,6 +179,7 @@ bruin data-diff prod_bq:analytics.users dev_bq:analytics.users
 ### Custom Tolerance
 
 Use a higher tolerance for considering values equal (useful for floating-point comparisons):
+
 ```bash
 bruin data-diff --tolerance 0.1 prod_db:metrics staging_db:metrics
 ```
@@ -170,6 +187,7 @@ bruin data-diff --tolerance 0.1 prod_db:metrics staging_db:metrics
 ### Custom Config File
 
 Specify a different configuration file:
+
 ```bash
 bruin data-diff --config-file /path/to/custom/.bruin.yml prod:table1 staging:table2
 ```
@@ -177,11 +195,13 @@ bruin data-diff --config-file /path/to/custom/.bruin.yml prod:table1 staging:tab
 ### Generating ALTER TABLE Statements
 
 Compare schemas and generate SQL statements to synchronize them:
+
 ```bash
 bruin data-diff prod_db:users staging_db:users
 ```
 
 Output (stdout):
+
 ```sql
 -- ALTER TABLE statements to synchronize schemas:
 ALTER TABLE "users"
@@ -196,6 +216,7 @@ Columns that only exist in the table being modified are now automatically droppe
 ### Capturing ALTER Statements
 
 Since ALTER statements are sent to stdout, you can easily capture them:
+
 ```bash
 bruin data-diff prod:users staging:users > schema_sync.sql
 ```
@@ -205,6 +226,7 @@ The comparison tables will still be displayed on stderr, while the SQL goes to t
 ### Reversing ALTER Direction
 
 By default, statements modify Table2 to match Table1. To reverse this:
+
 ```bash
 bruin data-diff --reverse prod:users staging:users
 ```
@@ -214,20 +236,21 @@ This will generate statements to modify `prod:users` instead of `staging:users`.
 ### Specifying SQL Dialect
 
 Override auto-detection and specify the target dialect explicitly:
+
 ```bash
 bruin data-diff --target-dialect postgresql prod_duck:users staging_bq:users
 ```
 
 This generates PostgreSQL-compatible ALTER statements even when comparing DuckDB and BigQuery tables.
 
-### Schema-Only Comparison
+### Full Comparison with Statistics
 
-Compare only table schemas without statistical analysis:
+Include detailed row counts and column statistics analysis:
 ```bash
-bruin data-diff --schema-only prod:large_table staging:large_table
+bruin data-diff --full prod:large_table staging:large_table
 ```
 
-This is faster for large tables when you only need schema differences.
+By default, data-diff performs a fast schema-only comparison. Use `--full` when you need detailed statistical analysis of the data.
 
 ## Supported Data Platforms
 
@@ -271,25 +294,32 @@ For optimal results, use one of the fully supported data platforms listed above.
 ## Use Cases
 
 ### Data Migration Validation
+
 ```bash
 # Compare source and target after migration
 bruin data-diff source_db:customer_data target_db:customer_data
 ```
 
 ### Environment Consistency Checks
-If you are comparing different environments, you can use the `--schema-only` flag to only compare the schema of the tables and not the data.
+
+By default, data-diff performs a fast schema-only comparison, which is ideal for checking environment consistency:
 ```bash
-# Ensure staging matches production structure
-bruin data-diff --schema-only prod:important_table staging:important_table --tolerance 0.01
+# Ensure staging matches production structure (schema-only by default)
+bruin data-diff prod:important_table staging:important_table
+
+# Include full statistics analysis if needed
+bruin data-diff --full prod:important_table staging:important_table --tolerance 0.01
 ```
 
 ### ETL Process Monitoring  
+
 ```bash
 # Compare before and after transformation
 bruin data-diff raw_data:events processed_data:events_cleaned
 ```
 
 ### Data Quality Monitoring
+
 ```bash
 # Check for unexpected changes in data distribution
 bruin data-diff yesterday_snapshot:metrics today_snapshot:metrics
@@ -298,21 +328,25 @@ bruin data-diff yesterday_snapshot:metrics today_snapshot:metrics
 ## Troubleshooting
 
 ### Error: "connection type does not support table summarization"
+
 The specified connection type doesn't support the required table analysis features.
 
 If you'd like to see another platform supported, feel free to open an issue on our [GitHub repository](https://github.com/bruin-data/bruin/issues).
 
 ### Error: "incorrect number of arguments"
+
 The command requires exactly two table arguments.
 
 Verify you've provided both table identifiers.
 
 ### Error: "connection not specified for table"
+
 Table identifier doesn't include a connection prefix and no default connection was set.
 
 Either use the format `connection:table` or add the `--connection` flag.
 
 ### Error: "failed to get connection"
+
 The specified connection name doesn't exist in your configuration.
 
 Check your `.bruin.yml` or other [secrets backend](../secrets/overview.md) file for available connections.

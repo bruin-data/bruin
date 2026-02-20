@@ -1,6 +1,7 @@
 # Bruin - Gorgias to Bigquery Template
 
 This pipeline is a simple example of a Bruin pipeline that copies data from Gorgias to BigQuery. It copies data from the following resources:
+
 - `customers`
 - `tickets`
 - `ticket_messages`
@@ -10,6 +11,7 @@ This pipeline is a simple example of a Bruin pipeline that copies data from Gorg
 > Gorgias has very strict rate limits as of the time of building this pipeline, 2 req/s. This means that we cannot extract data from Gorgias in parallel, therefore all of these steps here are built to run sequentially. This is not a problem for small datasets, but it can be a bottleneck for larger datasets.
 
 ## Setup
+
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/ingestion/gorgias).
 
 Here's a sample `.bruin.yml` file:
@@ -47,7 +49,7 @@ Starting the pipeline execution...
 [2023-03-16T18:25:16Z] [worker-4] [hello] >> Hello, world!
 [2023-03-16T18:25:16Z] [worker-4] Completed: hello (116ms)
 
-Executed 2 tasks in 1.798s
+Executed 2 assets in 1.798s
 ```
 
 You can also run a single task:
@@ -64,7 +66,7 @@ Starting the pipeline execution...
 [2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
 
 
-Executed 1 tasks in 103ms
+Executed 1 assets in 103ms
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.

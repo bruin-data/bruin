@@ -1,8 +1,15 @@
 # Variables
 
-Bruin lets you parameterize your pipelines with custom variables. These variables are defined in `pipeline.yml` using [JSON Schema](https://json-schema.org/) and are available in your assets during execution.
+> [!TIP]
+> For a comprehensive overview of variables in Bruin, see [Core Concepts: Variables](/core-concepts/variables).
 
-## Defining variables
+Variables are dynamic values provided during execution and injected into your asset code. They enable parameterized pipelines—processing data for specific date ranges, customer segments, or configurations without modifying code.
+
+There are two types of variables:
+- **[Built-in Variables](#built-in-variables)**: Automatically provided by Bruin (dates, pipeline info, run IDs)
+- **[Custom Variables](#custom-variables)**: User-defined variables specified at the asset or pipeline level using [JSON Schema](https://json-schema.org/)
+
+## Custom Variables
 
 Add a `variables` section to your `pipeline.yml` and describe each variable with JSON Schema keywords. Every variable must provide a `default` value so Bruin can render assets without command line overrides.
 
@@ -95,22 +102,27 @@ All variables are accessible in SQL, `seed`, `sensor`, and `ingestr` assets via 
 
 In Python assets, variables are exposed under `BRUIN_VARS` environment variable. When a pipeline defines no variables, this environment variable contains `{}`.
 ::: code-group
+
 ```sql [asset.sql]
 SELECT * FROM events
 WHERE user_id IN ({{ ','.join(var.users) }})
 ```
+
 :::
 
 ::: code-group
+
 ```python [asset.py]
 import os, json
 vars = json.loads(os.environ["BRUIN_VARS"])
 print(vars["env"])
 ```
+
 :::
 Sensor and ingestr assets, defined as YAML files, can embed variables in the same way:
 
 ::: code-group
+
 ```yaml [sensor.asset.yml]
 name: wait_for_table
 type: bq.sensor.query
@@ -120,8 +132,10 @@ parameters:
     from `{{ var.table }}`
     where load_time > {{ start_datetime }}
 ```
+
 :::
 ::: code-group
+
 ```yaml [ingestr.asset.yml]
 name: public.rates
 type: ingestr
@@ -130,14 +144,17 @@ parameters:
   source_table: '{{ var.bucket }}/rates.csv'
   destination: postgres
 ```
+
 :::
 
 ::: info NOTE
 For YAML-style assets, variables can only be used in the value context of `parameter` field.
 :::
+
 ## Example
 
 ::: code-group
+
 ```yaml [pipeline.yml]
 name: experimentation
 variables:
@@ -172,9 +189,11 @@ variables:
     default:
       email: ["enterprise_newsletter"]
 ```
+
 :::
 
 ::: code-group
+
 ```bruin-sql [asset.sql]
 /* @bruin
 name: analytics.cohort_plan
@@ -195,9 +214,11 @@ WHERE channel NOT IN (
   FROM UNNEST({{ var.channel_overrides.email | tojson }}) AS value
 );
 ```
+
 :::
 
 When run with the defaults above, Bruin renders the SQL with the array of structs expanded and the overridden email templates filtered out:
+
 ```sql
 SELECT
   cohort.name,
@@ -226,6 +247,9 @@ Bruin injects several variables automatically:
 | `end_date` | The end date in YYYY-MM-DD format | "2023-12-02" |
 | `end_datetime` | The end date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-02T15:30:00" |
 | `end_timestamp` | The end timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-02T15:30:00.000000Z07:00" |
+| `execution_date` | The execution date in YYYY-MM-DD format | "2023-12-01" |
+| `execution_datetime` | The execution date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-01T15:30:00" |
+| `execution_timestamp` | The execution timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-01T15:30:00.000000Z07:00" |
 | `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
 | `run_id` | The unique identifier for the current pipeline run | `run_1234567890` |
 

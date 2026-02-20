@@ -1,5 +1,8 @@
 # Pipeline
 
+> [!TIP]
+> This page has moved! For the latest pipeline documentation, see [Pipeline Definition](/pipelines/definition).
+
 ## Overview
 
 A pipeline is a group of assets that are executed together in the right order.
@@ -157,7 +160,7 @@ schedule: "@daily"
 schedule: "0 0 * * *"
 ```
 
-* **Type:** `String`
+- **Type:** `String`
 
 | Value       | Description                               |
 |-------------|-------------------------------------------|
@@ -300,7 +303,7 @@ Fields:
 
 ### Retries
 
-Control resilience to transient failures by retrying tasks/runs a limited number of times. Increase for flaky
+Control resilience to transient failures by retrying assets/runs a limited number of times. Increase for flaky
 networks/services; keep low to surface real issues.
 
 Example:
@@ -314,7 +317,7 @@ retries: 2
 
 ### Rerun Cooldown
 
-Set a delay (in seconds) between retry attempts for failed tasks. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. When deploying to Airflow, this is automatically translated to `retries_delay` for compatibility.
+Set a delay (in seconds) between retry attempts for failed assets. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. When deploying to Airflow, this is automatically translated to `retries_delay` for compatibility.
 
 Example:
 
@@ -327,6 +330,7 @@ default:
 - **Default:** `0` (no delay)
 
 **Special values:**
+
 - `0`: No delay between retries (default behavior)
 - `> 0`: Wait the specified number of seconds before retrying
 - `-1`: Disable retry delays (same as `0`)
@@ -350,12 +354,14 @@ concurrency: 4
 > [!WARNING]
 > Setting concurrency too high can overload downstream systems. Tune based on your warehouse/engine capacity.
 
+See also: [Concurrency & Resource Limits](/getting-started/concurrency).
+
 ### Default (pipeline-level defaults)
 
 Set sensible defaults for all assets in the pipeline so you don’t repeat yourself. Override at the asset level only when
 a task needs something different.
 
-See also: [Defaults](/getting-started/concepts#defaults).
+See also: [Defaults](/pipelines/definition#default-pipeline-level-defaults).
 
 Example:
 
@@ -394,7 +400,7 @@ Secrets item:
 Define pipeline-scoped parameters with safe defaults so you can change behavior without editing code.
 Great for steering business logic (e.g., targeting a customer segment) or tuning data science parameters (e.g., forecast horizons).
 
-See also: [Variables](/getting-started/pipeline-variables).
+See also: [Variables](/core-concepts/variables).
 
 Example:
 
@@ -444,7 +450,6 @@ Variable schema fields (subset):
 
 | Field   | Type   | Required | Notes                                                                                   |
 |---------|--------|----------|-----------------------------------------------------------------------------------------|
-| type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array, null. See [variables type reference](/getting-started/pipeline-variables#supported-json-schema-keywords) for details and examples. |
+| type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array, null. See [variables type reference](/core-concepts/variables#custom-variables) for details and examples. |
 | default | any    | yes      | REQUIRED. Must be present; used as the variable value unless overridden                 |
-| enum    | Array  | no       | Restrict values to a fixed list (e.g. `enum: ["self_serve", "enterprise", "partner"]`). See [variables documentation](/getting-started/pipeline-variables#supported-json-schema-keywords) for more JSON Schema keywords you can use. |
-
+| enum    | Array  | no       | Restrict values to a fixed list (e.g. `enum: ["self_serve", "enterprise", "partner"]`). See [variables documentation](/core-concepts/variables#custom-variables) for more JSON Schema keywords you can use. |

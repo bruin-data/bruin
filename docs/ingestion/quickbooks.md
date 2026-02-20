@@ -1,4 +1,5 @@
 # QuickBooks
+
 [QuickBooks](https://quickbooks.intuit.com/) is an accounting software package developed by Intuit.
 
 Bruin supports QuickBooks as a source for [Ingestr assets](/assets/ingestr), so you can ingest data from QuickBooks into your data warehouse.
@@ -7,7 +8,10 @@ To connect to QuickBooks you must add a configuration item to the `.bruin.yml` f
 
 Follow the steps below to correctly set up QuickBooks as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 Add the connection configuration to the connections section of `.bruin.yml`:
 
 ```yaml
@@ -28,6 +32,7 @@ connections:
 - `environment`: Optional environment name, either production or sandbox. Defaults to production.
 
 ### Step 2: Create an asset file for data ingestion
+
 Create an [asset configuration](/assets/ingestr#asset-structure) file to define the data flow:
 
 ```yaml
@@ -51,10 +56,12 @@ parameters:
 | accounts  | id | lastupdatedtime | merge       | Retrieves details of accounts.|
 | vendors   | id | lastupdatedtime | merge       | Retrieves vendor records.    |
 | payments  | id | lastupdatedtime | merge       | Retrieves payments recorded. |
+
 - `destination`: name of the destination connection.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/quickbooks_asset.yml
 ```
 

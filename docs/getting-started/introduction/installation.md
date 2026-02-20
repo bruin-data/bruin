@@ -3,20 +3,24 @@ outline: deep
 ---
 
 # Installation
+
 Bruin has two high-level components that makes it work the best:
+
 - a command-line interface (CLI) application: [Bruin CLI](https://github.com/bruin-data/bruin)
 - a Visual Studio Code extension: [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=bruin.bruin)
 
 We recommend installing both of these components to make the most of the Bruin experience.
 
 ## Prerequisites
+
 Bruin requires a few components to be installed:
+
 - [Git](https://git-scm.com/downloads)
 - [Visual Studio Code](https://code.visualstudio.com/download): optional, but highly recommended
 
 In addition, there are some optional components:
-- [DuckDB](https://duckdb.org/docs/installation/): optional, useful for the tutorials in this documentation
 
+- [DuckDB](https://duckdb.org/docs/installation/): optional, useful for the tutorials in this documentation
 
 ## Bruin CLI
 
@@ -36,10 +40,8 @@ wget -qO- https://getbruin.com/install/cli | sh
 
 > [!NOTE]
 > The Homebrew installation method is **deprecated**. If you previously installed Bruin using `brew`, uninstall it first before running the `curl` command.
-
 > [!IMPORTANT]
 > If you are on Windows, make sure to run the command in the [Git Bash](https://git-scm.com/downloads/win) or [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) terminal.
-
 
 ## Bruin VSCode Extension
 
@@ -52,12 +54,11 @@ wget -qO- https://getbruin.com/install/cli | sh
 
 5. **Check Bruin CLI Installation**:
     - When you click the **Bruin Launch** button, the extension checks if Bruin CLI is installed.
-   - If the CLI is **not installed**, a message will appear in the **Settings** tab with a button to install it.
-    
+    - If the CLI is **not installed**, a message will appear in the **Settings** tab with a button to install it.
+
 ![Install Bruin CLI](../../public/vscode-extension/install-cli.png)
 
 That's it, you are ready to roll with Bruin.
-
 
 ## Troubleshooting
 

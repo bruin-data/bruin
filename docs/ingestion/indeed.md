@@ -1,4 +1,5 @@
 # Indeed
+
 [Indeed](https://www.indeed.com/) is a job search and advertising platform that enables employers to post jobs and manage sponsored job campaigns.
 
 Bruin supports Indeed as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Indeed into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Indeed as a source for [Ingestr assets](/assets/ingestr), and you
 In order to set up Indeed connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You will need `client_id`, `client_secret`, and `employer_id`. For details on how to obtain these credentials, please refer to the [Indeed API documentation](https://docs.indeed.com/api/sponsored-jobs-api/sponsored-jobs-api-reference).
 
 Follow the steps below to correctly set up Indeed as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -19,6 +22,7 @@ To connect to Indeed, you need to add a configuration item to the connections se
           client_secret: "your_client_secret"
           employer_id: "your_employer_id"
 ```
+
 - `name`: The name of the connection
 - `client_id`: OAuth client ID for Indeed API authentication
 - `client_secret`: OAuth client secret for Indeed API authentication
@@ -39,6 +43,7 @@ parameters:
 
   destination: postgres
 ```
+
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
@@ -74,7 +79,9 @@ parameters:
 ```
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/indeed_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Indeed table into your Postgres database.

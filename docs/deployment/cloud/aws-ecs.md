@@ -9,6 +9,7 @@ This guide shows you how to run Bruin pipelines using AWS ECS (Elastic Container
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - An AWS account with appropriate permissions
 - AWS CLI installed and configured
 - Docker installed
@@ -755,6 +756,7 @@ aws iam attach-role-policy \
 ### Network Issues
 
 Verify:
+
 - Subnets have route to internet (NAT Gateway or Internet Gateway)
 - Security group allows outbound traffic
 - Task has public IP if accessing internet directly

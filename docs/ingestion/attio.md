@@ -1,4 +1,5 @@
 # Attio
+
 [Attio](https://attio.com/) is an AI-native CRM platform that helps companies build, scale, and grow their business.
 
 Bruin supports Attio as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Attio into your data warehouse.
@@ -7,7 +8,10 @@ In order to set up Attio connection, you need to add a configuration item in the
 
 Follow the steps below to correctly set up Attio as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
+
 To connect to Attio, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
 ```yaml
@@ -15,9 +19,11 @@ To connect to Attio, you need to add a configuration item to the connections sec
     - name: "attio"
       api_key: "key_123"
 ```
+
 - `api_key`: the API key used for authentication with the Attio API
 
 ### Step 2: Create an asset file for data ingestion
+
 To ingest data from Attio, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., Attio_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
@@ -49,10 +55,11 @@ parameters:
 | `all_list_entries:{object_api_slug}` | - | - | replace | Fetches all the lists for an object, and then fetches all the entries from that list. For example: all_list_entries:companies. Full reload on each run. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/attio_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Attio table into your Postgres database.
 
 <img alt="Pipedrive" src="./media/attio_ingestion.png">
-

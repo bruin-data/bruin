@@ -83,18 +83,21 @@ func NewRendererWithMacros(context Context, macroContent string) *Renderer {
 	}
 }
 
-func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]string {
+func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]string {
 	vars := map[string]string{
-		"BRUIN_START_DATE":      startDate.Format("2006-01-02"),
-		"BRUIN_START_DATETIME":  startDate.Format("2006-01-02T15:04:05"),
-		"BRUIN_START_TIMESTAMP": startDate.Format("2006-01-02T15:04:05.000000Z07:00"),
-		"BRUIN_END_DATE":        endDate.Format("2006-01-02"),
-		"BRUIN_END_DATETIME":    endDate.Format("2006-01-02T15:04:05"),
-		"BRUIN_END_TIMESTAMP":   endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
-		"BRUIN_RUN_ID":          runID,
-		"BRUIN_PIPELINE":        pipelineName,
-		"BRUIN_FULL_REFRESH":    "",
-		"PYTHONUNBUFFERED":      "1",
+		"BRUIN_START_DATE":          startDate.Format("2006-01-02"),
+		"BRUIN_START_DATETIME":      startDate.Format("2006-01-02T15:04:05"),
+		"BRUIN_START_TIMESTAMP":     startDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"BRUIN_END_DATE":            endDate.Format("2006-01-02"),
+		"BRUIN_END_DATETIME":        endDate.Format("2006-01-02T15:04:05"),
+		"BRUIN_END_TIMESTAMP":       endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"BRUIN_EXECUTION_DATE":      executionDate.Format("2006-01-02"),
+		"BRUIN_EXECUTION_DATETIME":  executionDate.Format("2006-01-02T15:04:05"),
+		"BRUIN_EXECUTION_TIMESTAMP": executionDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"BRUIN_RUN_ID":              runID,
+		"BRUIN_PIPELINE":            pipelineName,
+		"BRUIN_FULL_REFRESH":        "",
+		"PYTHONUNBUFFERED":          "1",
 	}
 
 	if fullRefresh {
@@ -104,8 +107,8 @@ func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID strin
 	return vars
 }
 
-func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string, vars Context) *Renderer {
-	ctx := defaultContext(startDate, endDate, pipelineName, runID, false)
+func NewRendererWithStartEndDates(startDate, endDate, executionDate *time.Time, pipelineName, runID string, vars Context) *Renderer {
+	ctx := defaultContext(startDate, endDate, executionDate, pipelineName, runID, false)
 	ctx["var"] = vars
 	return &Renderer{
 		context:         exec.NewContext(ctx),
@@ -115,8 +118,8 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, r
 }
 
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
-func NewRendererWithStartEndDatesAndMacros(startDate, endDate *time.Time, pipelineName, runID string, vars Context, macroContent string) *Renderer {
-	ctx := defaultContext(startDate, endDate, pipelineName, runID, false)
+func NewRendererWithStartEndDatesAndMacros(startDate, endDate, executionDate *time.Time, pipelineName, runID string, vars Context, macroContent string) *Renderer {
+	ctx := defaultContext(startDate, endDate, executionDate, pipelineName, runID, false)
 	ctx["var"] = vars
 	return &Renderer{
 		context:         exec.NewContext(ctx),
@@ -125,19 +128,23 @@ func NewRendererWithStartEndDatesAndMacros(startDate, endDate *time.Time, pipeli
 	}
 }
 
-func defaultContext(startDate, endDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]any {
+func defaultContext(startDate, endDate, executionDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]any {
 	return map[string]any{
-		"start_date":        startDate.Format("2006-01-02"),
-		"start_date_nodash": startDate.Format("20060102"),
-		"start_datetime":    startDate.Format("2006-01-02T15:04:05"),
-		"start_timestamp":   startDate.Format("2006-01-02T15:04:05.000000Z07:00"),
-		"end_date":          endDate.Format("2006-01-02"),
-		"end_date_nodash":   endDate.Format("20060102"),
-		"end_datetime":      endDate.Format("2006-01-02T15:04:05"),
-		"end_timestamp":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
-		"pipeline":          pipelineName,
-		"run_id":            runID,
-		"full_refresh":      fullRefresh,
+		"start_date":            startDate.Format("2006-01-02"),
+		"start_date_nodash":     startDate.Format("20060102"),
+		"start_datetime":        startDate.Format("2006-01-02T15:04:05"),
+		"start_timestamp":       startDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"end_date":              endDate.Format("2006-01-02"),
+		"end_date_nodash":       endDate.Format("20060102"),
+		"end_datetime":          endDate.Format("2006-01-02T15:04:05"),
+		"end_timestamp":         endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"execution_date":        executionDate.Format("2006-01-02"),
+		"execution_date_nodash": executionDate.Format("20060102"),
+		"execution_datetime":    executionDate.Format("2006-01-02T15:04:05"),
+		"execution_timestamp":   executionDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"pipeline":              pipelineName,
+		"run_id":                runID,
+		"full_refresh":          fullRefresh,
 	}
 }
 
@@ -145,7 +152,8 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
-	ctx := defaultContext(&startDate, &endDate, pipelineName, runID, false)
+	now := time.Now().UTC()
+	ctx := defaultContext(&startDate, &endDate, &now, pipelineName, runID, false)
 	ctx["var"] = nil
 	return &Renderer{
 		context:         exec.NewContext(ctx),
@@ -226,6 +234,11 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		return r, nil
 	}
 
+	executionDate, ok := ctx.Value(pipeline.RunConfigExecutionDate).(time.Time)
+	if !ok {
+		return r, nil
+	}
+
 	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 
 	// If full-refresh and asset has a start_date, use that instead
@@ -238,7 +251,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
-		tempContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
+		tempContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
 		tempContext["this"] = asset.Name
 		tempContext["var"] = pipe.Variables.Value()
 		tempRenderer := &Renderer{
@@ -259,7 +272,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		endDate = pipeline.ModifyDate(endDate, resolvedEndModifier)
 	}
 
-	jinjaContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
+	jinjaContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
 	jinjaContext["this"] = asset.Name
 	jinjaContext["var"] = pipe.Variables.Value()
 

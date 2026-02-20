@@ -1,11 +1,16 @@
 # Concepts
 
+> [!TIP]
+> This content has been reorganized. See [Core Concepts](/core-concepts/overview) for an updated guide to Bruin's features and concepts.
+
 Bruin has a few simple concepts that enable you to make the most out of it.
 
 ## Asset
+
 Anything that carries value that is derived from data is an asset from our perspective.
 
 In more concrete terms, an asset can be:
+
 - a table/view in your database
 - a file in S3 / GCS
 - a machine learning model
@@ -45,21 +50,27 @@ select 1 as one
 union all
 select 2 as one
 ```
+
 ### Building Blocks
+
 An asset consists of two primary components:
+
 - definition: the metadata that enables Bruin to learn about the asset and its metadata
 - content: the actual query/logic that creates the asset
 
-The details on the asset definition can be seen [here](../assets/definition-schema.md).
+The details on the asset definition can be seen [here](/assets/definition-schema).
 
 ## Pipeline
 
-A pipeline is a group of assets that are executed together in the right order. 
+A pipeline is a group of assets that are executed together in the right order.
 For instance, if you have an asset that ingests data from an API, and another one that creates another table from the ingested data, you have a pipeline.
 Asset executions occur on a pipeline level.
 
+For complete pipeline documentation, see [Pipeline Definition](/pipelines/definition).
+
 A pipeline is defined with a `pipeline.yml` file, and all the assets need to be under a folder called `assets` next to this file:
-```
+
+```text
 - my-pipeline/
   ├─ pipeline.yml
   └─ assets/
@@ -68,6 +79,7 @@ A pipeline is defined with a `pipeline.yml` file, and all the assets need to be 
 ```
 
 Here's an example `pipeline.yml`:
+
 ```yaml
 name: bruin-init
 schedule: daily # relevant for Bruin Cloud deployments
@@ -78,38 +90,45 @@ default_connections:
 ```
 
 ## Pipeline Run
+
 When you run a pipeline, you create a "pipeline run". A pipeline run contains one or more asset instances that are executed in a given time with a specific configuration.
 
 You can run a pipeline in the folder `my-pipeline` with the following command:
+
 ```shell
 bruin run my-pipeline
 ```
 
 ## Asset Instance
-An asset instance is a single execution of an asset at a given time. 
+
+An asset instance is a single execution of an asset at a given time.
 For instance, if you have a Python asset and you run it, Bruin creates an asset instance that executes your code.
 
 Asset instance is an internal concept, although it is relevant to understand since actual executions are based on asset instances.
 
 You can run an asset with the following command:
+
 ```shell
 bruin run /path/to/the/asset/file.sql
 ```
 
 ## Connection
-A connection is a set of credentials that enable Bruin to communicate with an external platform. 
 
-Platform specific connections have specific schemas, and "generic" connections are built as key-value pairs to inject secrets into your assets from outside. 
+A connection is a set of credentials that enable Bruin to communicate with an external platform.
 
-Connections are defined in the `.bruin.yml` file locally, although other [secrets backends](../secrets/overview.md) can be used. A connection has a name and the credentials.
+For complete connection documentation, see [Core Concepts: Connections](/core-concepts/connections).
+
+Platform specific connections have specific schemas, and "generic" connections are built as key-value pairs to inject secrets into your assets from outside.
+
+Connections are defined in the `.bruin.yml` file locally, although other [secrets backends](/secrets/overview) can be used. A connection has a name and the credentials.
 
 When you run a pipeline, Bruin will find this file in the repo root, parse the connections there, build client objects internally to interact with these external platforms and then run your assets.
 
 > [!INFO]
 > The first time you run `bruin validate` or `bruin run`, Bruin will create an empty `.bruin.yml` file and add it to `.gitignore` automatically.
 
-
 ## Default Connections
+
 Default connections are top-level defaults that reduces repetition by stating what connections to use on types of assets.
 For instance, a pipeline might have SQL queries that run on Google BigQuery or Snowflake, and based on the type of an asset Bruin picks the appropriate connection.
 
@@ -138,7 +157,8 @@ default:
       - query: "SET my_var = 0"
 ```
 
-For more details, see [pipeline defaults](./pipeline.md#default-pipeline-level-defaults) and the template example [here](https://github.com/bruin-data/bruin/blob/main/templates/chess/pipeline.yml).
+For more details, see [pipeline defaults](/pipelines/definition#default-pipeline-level-defaults) and the template example [here](https://github.com/bruin-data/bruin/blob/main/templates/chess/pipeline.yml).
 
 ## Sensors
+
 Sensors are a special type of assets that are used to wait on certain external signals. Sensors are useful to wait on external signals such as a table being created in an external database, or a file being uploaded to S3. A common usecase for sensors is when there are datasets/files/tables that are created by a separate process and you need to wait for them to be created before running your assets.

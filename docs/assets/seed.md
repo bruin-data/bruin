@@ -1,7 +1,9 @@
 # Seed Assets
+
 Seeds are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your data platform. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the destination platform accurately.
 
-You can define seed assets in a file ending with `.asset.yaml`:
+You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: duckdb.seed
@@ -31,10 +33,12 @@ When using a URL path, column validation is skipped during `bruin validate`. Col
 URL-based seeds work with all supported platforms (DuckDB, BigQuery, Snowflake, PostgreSQL, etc.). The URL must be publicly accessible without authentication.
 :::
 
-##  Examples
+## Examples
+
 The examples below show how to load a CSV into a DuckDB & BigQuery database.
 
 ### Simplest: Load csv into a Duckdb
+
 ```yaml
 name: dashboard.hello
 type: duckdb.seed
@@ -44,6 +48,7 @@ parameters:
 ```
 
 Example CSV:
+
 ```csv
 name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
@@ -53,6 +58,7 @@ B,LinkedIn,SDE 2,2024-01-01
 This operation will load the CSV into a table called `seed.raw` in the DuckDB database.
 
 ### Adding quality checks
+
 You can attach quality checks to seed assets the same way you do for other assets.
 
 ```yaml
@@ -73,6 +79,7 @@ columns:
 The example above ensures that the `name` column contains unique and non-null values after the CSV is loaded.
 
 ### Loading from a URL
+
 You can load data directly from a public URL:
 
 ```yaml
@@ -86,6 +93,7 @@ parameters:
 This will download the CSV from the URL and load it into the database at runtime.
 
 ### Enforcing column types
+
 By default, seed assets enforce the column types defined in the `columns` section. This ensures your destination table has the correct schema.
 
 ```yaml
@@ -110,6 +118,7 @@ columns:
 When columns are defined, Bruin passes type hints to ingestr, ensuring the destination table uses the specified types rather than inferring them from the CSV content.
 
 ### Disabling schema enforcement
+
 If you prefer to let ingestr infer column types from the CSV content, you can disable schema enforcement:
 
 ```yaml

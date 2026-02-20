@@ -5,6 +5,7 @@ We simplify the creation of pipelines through the use of **templates**. Template
 ## What are templates?
 
 Templates in Bruin are blueprints for initializing new pipelines. They:
+
 - define the structure and essential files for a pipeline.
 - contain boilerplate code and configurations tailored to specific use cases.
 - allow users to quickly set up pipelines without starting from scratch.

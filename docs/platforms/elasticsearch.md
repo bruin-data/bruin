@@ -24,6 +24,7 @@ connections:
 ```
 
 **Parameters**:
+
 - `username`: Elasticsearch username (optional for local instances without authentication)
 - `password`: Elasticsearch password (optional for local instances without authentication)
 - `host`: Elasticsearch host (e.g., `localhost` or `cluster.cloud.es.io`)
@@ -99,6 +100,7 @@ parameters:
 ```
 
 This configuration will:
+
 1. Extract ads data from Snapchat Ads using the `my-snapchatads` connection
 2. Load the data into the `ads` index in your Elasticsearch cluster
 3. Use the default Elasticsearch connection (`elasticsearch-default`) from your pipeline configuration
@@ -109,6 +111,7 @@ This configuration will:
 ## Index Naming
 
 The `destination_table` parameter specifies the Elasticsearch index name where data will be loaded. Index names in Elasticsearch:
+
 - Must be lowercase
 - Cannot contain spaces or special characters like `\`, `/`, `*`, `?`, `"`, `<`, `>`, `|`, `,`, `#`
 - Cannot start with `-`, `_`, `+`

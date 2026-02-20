@@ -29,6 +29,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/muesli/termenv"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -221,6 +222,7 @@ func Render() *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "your-run-id")
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 
 			// Load macros from the pipeline's macros directory
@@ -230,7 +232,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value(), macroContent)
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pl.Name, "your-run-id", pl.Variables.Value(), macroContent)
 			forAsset, err := renderer.CloneForAsset(runCtx, pl, asset)
 			if err != nil {
 				return err
@@ -392,8 +394,13 @@ func highlightCode(code string, language string) string {
 	if (o.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
 		return code
 	}
+	style := "monokai"
+	if !termenv.HasDarkBackground() {
+		style = "github"
+	}
+
 	b := new(strings.Builder)
-	err = quick.Highlight(b, code, language, "terminal16m", "monokai")
+	err = quick.Highlight(b, code, language, "terminal16m", style)
 	if err != nil {
 		errorPrinter.Printf("Failed to highlight the query: %v\n", err.Error())
 		return code
@@ -438,7 +445,8 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) (queryExtractor, error) {
 	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
 	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, p.Name, "your-run-id", p.Variables.Value())
+	now := time.Now().UTC()
+	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, &now, p.Name, "your-run-id", p.Variables.Value())
 
 	renderer, err := newRenderer.CloneForAsset(context.Background(), p, t)
 	if err != nil {

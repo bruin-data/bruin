@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -30,7 +32,9 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
+	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -59,12 +63,10 @@ import (
 	"github.com/urfave/cli/v3"
 	"github.com/xlab/treeprint"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
-const (
-	LogsFolder      = "logs"
-	defaultGongPath = "/home/bruin/.local/bin/gong/gong"
-)
+const LogsFolder = "logs"
 
 var pythonCacheGitignorePatterns = []string{
 	"__pycache__/",
@@ -452,9 +454,10 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 }
 
 var (
-	yesterday        = time.Now().AddDate(0, 0, -1)
-	defaultStartDate = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
-	defaultEndDate   = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+	yesterday            = time.Now().AddDate(0, 0, -1)
+	defaultStartDate     = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+	defaultEndDate       = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+	defaultExecutionDate = time.Now().UTC()
 
 	startDateFlag = &cli.StringFlag{
 		Name:        "start-date",
@@ -576,6 +579,11 @@ func Run(isDebug *bool) *cli.Command {
 				Hidden: true,
 			},
 			&cli.StringFlag{
+				Name:   "gong-path",
+				Usage:  "path to the gong binary (when using --use-gong)",
+				Hidden: true,
+			},
+			&cli.StringFlag{
 				Name:    "config-file",
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
@@ -583,7 +591,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:    "secrets-backend",
 				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
-				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws'",
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws', 'azure'",
 			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
@@ -605,6 +613,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:   "minimal-logs",
 				Usage:  "skip initial pipeline analysis logs for this run",
 				Hidden: true,
+			},
+			&cli.BoolFlag{
+				Name:    "interactive",
+				Aliases: []string{"i"},
+				Usage:   "use an interactive TUI that shows live progress of asset execution",
 			},
 			&cli.StringSliceFlag{
 				Name:    "var",
@@ -630,18 +643,30 @@ func Run(isDebug *bool) *cli.Command {
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
 			useGong := c.Bool("use-gong")
+			gongPath := c.String("gong-path")
 
-			// When using gong, the path must exist and be executable
+			// When using gong, ensure binary is available
 			if useGong {
-				info, err := os.Stat(defaultGongPath)
-				if err != nil {
-					if os.IsNotExist(err) {
-						return cli.Exit("gong binary not found at path: "+defaultGongPath, 1)
+				if gongPath == "" {
+					// Auto-install gong if no custom path provided
+					gongChecker := &gong.Checker{}
+					installedPath, err := gongChecker.EnsureGongInstalled(ctx)
+					if err != nil {
+						return cli.Exit(fmt.Sprintf("failed to install gong: %v", err), 1)
 					}
-					return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", defaultGongPath, err), 1)
-				}
-				if info.Mode()&0o111 == 0 {
-					return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", defaultGongPath), 1)
+					gongPath = installedPath
+				} else {
+					// User provided custom path - verify it exists and is executable
+					info, err := os.Stat(gongPath)
+					if err != nil {
+						if os.IsNotExist(err) {
+							return cli.Exit("gong binary not found at path: "+gongPath, 1)
+						}
+						return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", gongPath, err), 1)
+					}
+					if info.Mode()&0o111 == 0 {
+						return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", gongPath), 1)
+					}
 				}
 			}
 
@@ -714,6 +739,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, applyIntervalModifiers)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 			runCtx = context.WithValue(runCtx, executor.KeyVerbose, c.Bool("verbose"))
@@ -791,7 +817,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			// Set gong context after --continue restores RunConfig to ensure consistency
 			if runConfig.UseGong {
-				runCtx = context.WithValue(runCtx, python.CtxGongPath, defaultGongPath)
+				runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath)
 			}
 
 			// Load macros from the pipeline's macros directory
@@ -801,12 +827,47 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, preview.Pipeline.Name, runID, nil, macroContent)
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, preview.Pipeline.Name, runID, nil, macroContent)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
 			if err != nil {
 				return err
+			}
+
+			// Auto-enable gong for CDC mode assets
+			if !runConfig.UseGong {
+				for _, asset := range pipelineInfo.Pipeline.Assets {
+					if asset.Type == pipeline.AssetTypeIngestr && asset.Parameters["cdc"] == "true" {
+						// CDC mode detected, enable gong
+						runConfig.UseGong = true
+
+						if gongPath == "" {
+							// Auto-install gong if no custom path provided
+							gongChecker := &gong.Checker{}
+							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx)
+							if gongErr != nil {
+								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to install gong: %v", gongErr), 1)
+							}
+							gongPath = installedPath
+						} else {
+							// User provided custom path - verify it exists and is executable
+							info, gongErr := os.Stat(gongPath)
+							if gongErr != nil {
+								if os.IsNotExist(gongErr) {
+									return cli.Exit("CDC mode detected but gong binary not found at path: "+gongPath+"\nPlease install gong or remove cdc: true from your asset.", 1)
+								}
+								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to access gong binary at path '%s': %v", gongPath, gongErr), 1)
+							}
+							if info.Mode()&0o111 == 0 {
+								return cli.Exit(fmt.Sprintf("CDC mode detected but gong binary at path '%s' is not executable", gongPath), 1)
+							}
+						}
+
+						runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath) //nolint
+						break
+					}
+				}
 			}
 
 			// Load assets from positional arguments
@@ -874,12 +935,13 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Update renderer with the finalized start/end dates
-			renderer = jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pipelineInfo.Pipeline.Name, runID, nil, macroContent)
+			renderer = jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, runID, nil, macroContent)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			// Update context with the finalized dates
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 
 			// handle log files
 			executionStartLog := "Starting execution..."
@@ -918,6 +980,11 @@ func Run(isDebug *bool) *cli.Command {
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize AWS Secrets Manager client"))
 				}
+			case "azure":
+				connectionManager, err = secrets.NewAzureKeyVaultClientFromEnv(logger)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "failed to initialize Azure Key Vault client"))
+				}
 			default:
 				connectionManager, errs = connection.NewManagerFromConfigWithContext(ctx, cm)
 			}
@@ -934,16 +1001,27 @@ func Run(isDebug *bool) *cli.Command {
 				pipelineInfo.RunDownstreamTasks = true
 			}
 
+			noColor := c.Bool("no-color")
+			minimalLogs := c.Bool("minimal-logs")
+
+			// Use the interactive TUI only when explicitly requested via --interactive flag
+			useTUI := c.Bool("interactive") &&
+				term.IsTerminal(int(os.Stdout.Fd())) &&
+				runConfig.Output != "json" &&
+				!noColor
+
+			// Save the real terminal fd BEFORE logOutput replaces os.Stdout
+			var realTerminal *os.File
+			if useTUI {
+				realTerminal = os.Stdout
+			}
+
 			if !runConfig.NoLogFile {
 				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
 				if pipelineInfo.RunningForAnAsset {
 					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
 				} else if len(filter.SelectedAssets) > 0 {
-					assetNames := make([]string, len(filter.SelectedAssets))
-					for i, asset := range filter.SelectedAssets {
-						assetNames[i] = asset.Name
-					}
-					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, strings.Join(assetNames, "_"))
+					logFileName = generateLogFileName(runID, foundPipeline.Name, filter.SelectedAssets)
 				}
 
 				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
@@ -952,7 +1030,13 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				fn, err2 := logOutput(logPath)
+				// In TUI mode, worker output goes to log file only (TUI handles terminal display).
+				// In legacy mode, worker output goes to both terminal and log file.
+				var termWriter io.Writer
+				if useTUI {
+					termWriter = io.Discard
+				}
+				fn, err2 := logOutput(logPath, termWriter)
 				if err2 != nil {
 					errorPrinter.Printf("Failed to create log file: %v\n", err2)
 					return cli.Exit("", 1)
@@ -1006,7 +1090,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			sendTelemetry(s, c)
-			if !c.Bool("minimal-logs") {
+			if !minimalLogs && !useTUI {
 				infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
 				infoPrinter.Printf("\n%s\n\n", executionStartLog)
 			}
@@ -1034,7 +1118,7 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1042,14 +1126,8 @@ func Run(isDebug *bool) *cli.Command {
 			formatOpts := executor.FormattingOptions{
 				DoNotLogTimestamp: c.Bool("no-timestamp"),
 				DoNotLogTaskName:  preview.RunningForAnAsset,
-				NoColor:           c.Bool("no-color"),
-				MinimalLogs:       c.Bool("minimal-logs"),
-			}
-
-			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
-			if err != nil {
-				errorPrinter.Printf("Failed to create executor: %v\n", err)
-				return cli.Exit("", 1)
+				NoColor:           noColor,
+				MinimalLogs:       minimalLogs,
 			}
 
 			// Create a context with timeout
@@ -1062,57 +1140,128 @@ func Run(isDebug *bool) *cli.Command {
 			defer cancel()
 
 			// Check ADC credentials for BigQuery connections used by pending assets
-			// This ensures credentials are available before any tasks begin running
 			pendingAssets := getPendingAssets(s)
 			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, pendingAssets, connectionManager); err != nil {
 				errorPrinter.Printf("Failed to verify BigQuery ADC credentials: %v\n", err)
 				return cli.Exit("", 1)
 			}
 
-			ex.Start(exeCtx, s.WorkQueue, s.Results)
+			if useTUI {
+				// === TUI mode ===
+				tui := NewTUIRenderer(realTerminal, s, foundPipeline.Name)
 
-			start := time.Now()
-			results := s.Run(runCtx)
-			duration := time.Since(start)
+				// Register scheduler status change callback
+				s.SetOnStatusChange(func(event scheduler.StatusChangeEvent) {
+					tui.OnStatusChange(event)
+				})
 
-			if err := s.SavePipelineState(afero.NewOsFs(), runConfig, runID, statePath); err != nil {
-				logger.Error("failed to save pipeline state", zap.Error(err))
-			}
-
-			errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
-			for _, res := range results {
-				if res.Error != nil {
-					errorsInTaskResults = append(errorsInTaskResults, res)
-				}
-			}
-
-			if len(errorsInTaskResults) > 0 {
-				if singleCheckID != "" {
-					printSingleCheckError(errorsInTaskResults[0])
+				// Wire worker callbacks for precise timing
+				formatOpts.TUIMode = true
+				// In TUI mode, worker output goes to os.Stdout which is either:
+				// - the pipe (when log file enabled) -> goes to log file only
+				// - the real terminal (when --no-log-file) -> use io.Discard to avoid interference
+				if runConfig.NoLogFile {
+					formatOpts.LogOnlyWriter = io.Discard
 				} else {
-					if c.Bool("minimal-logs") {
-						summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
-						printErrorsMinimal(errorsInTaskResults)
-					} else {
-						printExecutionSummary(results, s, duration, len(results))
-						printErrorsInResults(errorsInTaskResults, s)
+					formatOpts.LogOnlyWriter = os.Stdout
+				}
+				formatOpts.OnTaskStart = func(inst scheduler.TaskInstance) {
+					tui.OnTaskStarted(inst)
+				}
+				formatOpts.OnTaskEnd = func(inst scheduler.TaskInstance, err error, dur time.Duration) {
+					tui.OnTaskEnded(inst, err, dur)
+				}
+
+				ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
+				if err != nil {
+					errorPrinter.Printf("Failed to create executor: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				tui.Start()
+				defer tui.Stop()
+
+				ex.Start(exeCtx, s.WorkQueue, s.Results)
+
+				start := time.Now()
+				results := s.Run(runCtx)
+				duration := time.Since(start)
+
+				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
+					logger.Error("failed to save pipeline state", zap.Error(err))
+				}
+
+				errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
+				for _, res := range results {
+					if res.Error != nil {
+						errorsInTaskResults = append(errorsInTaskResults, res)
 					}
 				}
-				return cli.Exit("", 1)
-			}
 
-			// Print single check success if running a single check
-			if singleCheckID != "" && len(results) > 0 {
-				printSingleCheckSuccess(results[0])
-				return nil
-			}
+				// Print summary to real terminal
+				printTUISummary(realTerminal, results, s, duration, foundPipeline.Name)
+				if len(errorsInTaskResults) > 0 {
+					printTUIErrors(realTerminal, errorsInTaskResults)
+				}
 
-			// Print execution summary (unless minimal-logs is enabled)
-			minimalLogs := c.Bool("minimal-logs")
-			if minimalLogs {
-				summaryPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
-			} else {
+				// Also print summary to piped stdout (for log file)
 				printExecutionSummary(results, s, duration, len(results))
+				if len(errorsInTaskResults) > 0 {
+					printErrorsInResults(errorsInTaskResults, s)
+					return cli.Exit("", 1)
+				}
+			} else {
+				// === Legacy mode (unchanged) ===
+				ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
+				if err != nil {
+					errorPrinter.Printf("Failed to create executor: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				ex.Start(exeCtx, s.WorkQueue, s.Results)
+
+				start := time.Now()
+				results := s.Run(runCtx)
+				duration := time.Since(start)
+
+				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
+					logger.Error("failed to save pipeline state", zap.Error(err))
+				}
+
+				errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
+				for _, res := range results {
+					if res.Error != nil {
+						errorsInTaskResults = append(errorsInTaskResults, res)
+					}
+				}
+
+				if len(errorsInTaskResults) > 0 {
+					if singleCheckID != "" {
+						printSingleCheckError(errorsInTaskResults[0])
+					} else {
+						if minimalLogs {
+							summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
+							printErrorsMinimal(errorsInTaskResults)
+						} else {
+							printExecutionSummary(results, s, duration, len(results))
+							printErrorsInResults(errorsInTaskResults, s)
+						}
+					}
+					return cli.Exit("", 1)
+				}
+
+				// Print single check success if running a single check
+				if singleCheckID != "" && len(results) > 0 {
+					printSingleCheckSuccess(results[0])
+					return nil
+				}
+
+				// Print execution summary (unless minimal-logs is enabled)
+				if minimalLogs {
+					summaryPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
+				} else {
+					printExecutionSummary(results, s, duration, len(results))
+				}
 			}
 			return nil
 		},
@@ -1363,7 +1512,8 @@ func SetupExecutors(
 	s *scheduler.Scheduler,
 	conn config.ConnectionAndDetailsGetter,
 	startDate,
-	endDate time.Time,
+	endDate,
+	executionDate time.Time,
 	pipelineName string,
 	runID string,
 	fullRefresh bool,
@@ -1383,7 +1533,7 @@ func SetupExecutors(
 		return nil, err
 	}
 
-	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		if usePipForPython {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
@@ -1622,6 +1772,55 @@ func SetupExecutors(
 		// we set the Python runners to run the checks on MsSQL
 		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		}
+	}
+
+	//nolint: dupl
+	if s.WillRunTaskOfType(pipeline.AssetTypeFabricQuery) || s.WillRunTaskOfType(pipeline.AssetTypeFabricQueryLegacy) ||
+		estimateCustomCheckType == pipeline.AssetTypeFabricQuery || estimateCustomCheckType == pipeline.AssetTypeFabricQueryLegacy ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricSeed) || s.WillRunTaskOfType(pipeline.AssetTypeFabricSeedLegacy) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensorLegacy) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensorLegacy) {
+		fabricOperator := fabric.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+			Mat: fabric.NewMaterializer(fullRefresh),
+		})
+
+		fabricCheckRunner := fabric.NewColumnCheckOperator(conn)
+
+		fabricQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		fabricTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+
+		mainExecutors[pipeline.AssetTypeFabricQuery][scheduler.TaskInstanceTypeMain] = fabricOperator
+		mainExecutors[pipeline.AssetTypeFabricQuery][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQueryLegacy][scheduler.TaskInstanceTypeMain] = fabricOperator
+		mainExecutors[pipeline.AssetTypeFabricQueryLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQueryLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeFabricSeed][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricSeedLegacy][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeFabricSeedLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricSeedLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricQuerySensor][scheduler.TaskInstanceTypeMain] = fabricQuerySensor
+		mainExecutors[pipeline.AssetTypeFabricQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQuerySensorLegacy][scheduler.TaskInstanceTypeMain] = fabricQuerySensor
+		mainExecutors[pipeline.AssetTypeFabricQuerySensorLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricQuerySensorLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeFabricTableSensor][scheduler.TaskInstanceTypeMain] = fabricTableSensor
+		mainExecutors[pipeline.AssetTypeFabricTableSensor][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeMain] = fabricTableSensor
+		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
+		mainExecutors[pipeline.AssetTypeFabricTableSensorLegacy][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		if estimateCustomCheckType == pipeline.AssetTypeFabricQuery || estimateCustomCheckType == pipeline.AssetTypeFabricQueryLegacy {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = fabricCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
@@ -1874,7 +2073,31 @@ func (c *clearFileWriter) Write(p []byte) (int, error) {
 	return len(p), err
 }
 
-func logOutput(logPath string) (func(), error) {
+// generateLogFileName creates a log file name for multiple selected assets.
+// If the combined name would exceed filesystem limits (255 bytes), it uses a hash instead.
+func generateLogFileName(runID, pipelineName string, assets []*pipeline.Asset) string {
+	const maxFileNameLength = 196 // 200 - 4 for ".log" extension
+
+	assetNames := make([]string, len(assets))
+	for i, asset := range assets {
+		assetNames[i] = asset.Name
+	}
+
+	// Try the full name first
+	fullName := fmt.Sprintf("%s__%s__%s", runID, pipelineName, strings.Join(assetNames, "_"))
+	if len(fullName) <= maxFileNameLength {
+		return fullName
+	}
+
+	// If too long, use a hash of the asset names with a count indicator
+	hash := sha256.Sum256([]byte(strings.Join(assetNames, "_")))
+	shortHash := hex.EncodeToString(hash[:8]) // 16 hex chars
+	return fmt.Sprintf("%s__%s__%d_assets_%s", runID, pipelineName, len(assets), shortHash)
+}
+
+// logOutput sets up log file piping. terminalWriter controls where terminal output goes:
+// nil = os.Stdout (real terminal, legacy behavior), io.Discard = log file only (TUI mode).
+func logOutput(logPath string, terminalWriter io.Writer) (func(), error) {
 	err := os.MkdirAll(filepath.Dir(logPath), 0o755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create log directory")
@@ -1887,7 +2110,10 @@ func logOutput(logPath string) (func(), error) {
 	}
 
 	// save existing stdout | MultiWriter writes to saved stdout and file
-	mw := io.MultiWriter(os.Stdout, &clearFileWriter{f, sync.Mutex{}})
+	if terminalWriter == nil {
+		terminalWriter = os.Stdout
+	}
+	mw := io.MultiWriter(terminalWriter, &clearFileWriter{f, sync.Mutex{}})
 
 	// get pipe reader and writer | writes to pipe writer come out pipe reader
 	r, w, err := os.Pipe()

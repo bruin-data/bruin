@@ -19,7 +19,6 @@ The pipeline includes the following SQL assets located in the `assets/` folder:
 
 ---
 
-
 ## Running the pipeline
 
 Bruin CLI can run the whole pipeline or any task with the downstreams:
@@ -42,7 +41,7 @@ Starting the pipeline execution...
 [2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
 
 
-Executed 1 tasks in 103ms
+Executed 1 assets in 103ms
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.

@@ -36,7 +36,7 @@ var AvailablePythonVersions = map[string]bool{
 
 const (
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.14.125"
+	ingestrVersion          = "0.14.138"
 	sqlfluffVersion         = "3.4.1"
 )
 
@@ -109,10 +109,14 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
 			}
 			// Use gong binary directly instead of ingestr
-			return u.Cmd.Run(ctx, repo, &CommandInstance{
+			err := u.Cmd.Run(ctx, repo, &CommandInstance{
 				Name: path,
 				Args: args,
 			})
+			if err == nil && ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return err
 		}
 	}
 
@@ -274,6 +278,10 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
 
+	// Compute extra packages based on destination URI (e.g., pyodbc for MSSQL)
+	var extraPackages []string
+	extraPackages = AddExtraPackages(destURI, "", extraPackages)
+
 	if strings.HasPrefix(destURI, "duckdb://") {
 		if dbURIGetter, ok := destConnectionInst.(interface{ GetDBConnectionURI() string }); ok {
 			duck.LockDatabase(dbURIGetter.GetDBConnectionURI())
@@ -283,7 +291,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: u.ingestrInstallCmd(ctx, nil),
+		Args: u.ingestrInstallCmd(ctx, extraPackages),
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")

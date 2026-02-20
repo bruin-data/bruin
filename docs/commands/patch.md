@@ -15,6 +15,7 @@ Updates the dependencies of assets based on their SQL queries. This command anal
 | `--output [format]`  | `-o`  | Specifies the output type, possible values: `plain`, `json`. Default: `plain` |
 
 **Example:**
+
 ```bash
 # Update dependencies for a single asset
 bruin patch fill-asset-dependencies path/to/asset.yml
@@ -24,6 +25,7 @@ bruin patch fill-asset-dependencies path/to/pipeline
 ```
 
 **Example output (JSON):**
+
 ```json
 {
     "status": "success",
@@ -46,6 +48,7 @@ Retrieves column metadata from the database and updates the asset's column defin
 | `--environment`      | `-e`  | Target environment name as defined in .bruin.yml                            |
 
 **Example:**
+
 ```bash
 # Update columns for a single asset
 bruin patch fill-columns-from-db path/to/asset.yml 
@@ -55,6 +58,7 @@ bruin patch fill-columns-from-db path/to/pipeline
 ```
 
 **Example output (JSON):**
+
 ```json
 {
     "status": "partial",
@@ -66,11 +70,13 @@ bruin patch fill-columns-from-db path/to/pipeline
 ```
 
 **Status values:**
+
 - `success`: All assets were successfully updated
 - `partial`: Some assets were updated, some failed or were skipped
 - `failed`: All assets failed to update
 - `skipped`: No assets needed updates
 
 **Notes:**
+
 - Column names are compared case-insensitively to prevent duplicates
 - Existing column metadata (descriptions, checks, etc.) is preserved

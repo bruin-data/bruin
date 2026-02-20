@@ -10,9 +10,11 @@ WHERE dt BETWEEN '{{ start_date |  date_format('%Y-%m-%d') }}'
 ```
 
 ## Default Filters
+
 Bruin CLI supports various default filters supported by Jinja, you can see the [list here](https://github.com/NikolaLohinski/gonja/blob/master/docs/filters.md).
 
 ## Date Filters
+
 ### `add_years`
 
 Adds the given number of years to the date.
@@ -30,7 +32,6 @@ Adds the given number of months to the date.
 ```jinja
 {{ end_datetime | add_months(3) }}
 ```
-
 
 ### `add_days`
 
@@ -113,7 +114,6 @@ Truncates the given date to the start of the hour (XX:00:00).
 > [!CAUTION]
 > The `date_add` filter is deprecated. Please use the `add_days` filter instead for better compatibility and consistency.
 
-
 Adds given number of days to the date.
 
 ```jinja
@@ -122,7 +122,7 @@ Adds given number of days to the date.
 
 For a given datetime `2022-02-07T04:00:00.948740Z`, this results in the following string:
 
-```
+```text
 2022-02-10T04:00:00.948740Z
 ```
 
@@ -138,9 +138,8 @@ Formats the date according to the given format string.
 
 For a given datetime `2022-02-07T04:00:00.948740Z`, this results in the following string:
 
-```
+```text
 2022-02-07
 ```
 
 The format given here follows Python date formatting rules, you can see the [list here](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes).
-

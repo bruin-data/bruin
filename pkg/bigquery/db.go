@@ -1095,7 +1095,7 @@ func (d *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName s
 
 func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName string) (*diff.JSONStatistics, error) {
 	statsQuery := fmt.Sprintf(`
-		SELECT 
+		SELECT
 			COUNT(*) as count_val,
 			COUNTIF(%s IS NULL) as null_count
 		FROM %s`,
@@ -1121,6 +1121,145 @@ func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	}
 
 	return stats, nil
+}
+
+// Estimates the cost of running a table diff operation without executing the queries.
+func (d *Client) EstimateTableDiffCost(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableDiffCostEstimate, error) {
+	result := &diff.TableDiffCostEstimate{
+		TableName: tableName,
+		Queries:   make([]*diff.QueryCostEstimate, 0),
+		Supported: true,
+	}
+
+	// Parse table name to get dataset reference
+	tableComponents := strings.Split(tableName, ".")
+	var datasetRef string
+	var targetTable string
+
+	switch len(tableComponents) {
+	case 2:
+		datasetRef = fmt.Sprintf("%s.%s", d.config.ProjectID, tableComponents[0])
+		targetTable = tableComponents[1]
+	case 3:
+		datasetRef = fmt.Sprintf("%s.%s", tableComponents[0], tableComponents[1])
+		targetTable = tableComponents[2]
+	default:
+		return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
+	}
+
+	schemaQuery := buildSchemaQuery(datasetRef, targetTable)
+	result.Queries = append(result.Queries, &diff.QueryCostEstimate{
+		QueryType:      "schema",
+		Query:          truncateQuery(schemaQuery),
+		BytesProcessed: 0, // INFORMATION_SCHEMA queries are free
+		BytesBilled:    0,
+	})
+
+	if schemaOnly {
+		// In schema-only mode, we only run the schema query
+		return result, nil
+	}
+
+	// 2. Row count query - dry run to estimate cost
+	countQuery := fmt.Sprintf("SELECT COUNT(*) as row_count FROM `%s`", tableName)
+	countEstimate, err := d.estimateQueryCost(ctx, countQuery, "rowCount")
+	if err != nil {
+		return nil, fmt.Errorf("failed to estimate row count query cost: %w", err)
+	}
+	result.Queries = append(result.Queries, countEstimate)
+
+	// 3. Get schema to determine column types (this is free since we're querying INFORMATION_SCHEMA)
+	schemaResult, err := d.Select(ctx, &query.Query{Query: schemaQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schema for cost estimation: %w", err)
+	}
+
+	// 4. For each column, estimate the statistics query cost
+	for _, row := range schemaResult {
+		if len(row) < 2 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		normalizedType := d.typeMapper.MapType(dataType)
+		var statsQuery string
+
+		switch normalizedType {
+		case diff.CommonTypeNumeric:
+			statsQuery = fmt.Sprintf(`SELECT MIN(%s), MAX(%s), AVG(%s), SUM(%s), COUNT(%s), COUNTIF(%s IS NULL), STDDEV(%s) FROM %s`,
+				columnName, columnName, columnName, columnName, columnName, columnName, columnName, "`"+tableName+"`")
+		case diff.CommonTypeString:
+			statsQuery = fmt.Sprintf(`SELECT MIN(LENGTH(%s)), MAX(LENGTH(%s)), AVG(LENGTH(%s)), COUNT(DISTINCT %s), COUNT(*), COUNTIF(%s IS NULL), COUNTIF(%s = '') FROM %s`,
+				columnName, columnName, columnName, columnName, columnName, columnName, "`"+tableName+"`")
+		case diff.CommonTypeBoolean:
+			statsQuery = fmt.Sprintf(`SELECT COUNTIF(%s = true), COUNTIF(%s = false), COUNT(*), COUNTIF(%s IS NULL) FROM %s`,
+				columnName, columnName, columnName, "`"+tableName+"`")
+		case diff.CommonTypeDateTime:
+			statsQuery = fmt.Sprintf(`SELECT MIN(%s), MAX(%s), COUNT(DISTINCT %s), COUNT(*), COUNTIF(%s IS NULL) FROM %s`,
+				columnName, columnName, columnName, columnName, "`"+tableName+"`")
+		case diff.CommonTypeJSON:
+			statsQuery = fmt.Sprintf(`SELECT COUNT(*), COUNTIF(%s IS NULL) FROM %s`,
+				columnName, "`"+tableName+"`")
+		case diff.CommonTypeBinary, diff.CommonTypeUnknown:
+			// Skip binary and unknown types
+			continue
+		}
+
+		estimate, err := d.estimateQueryCost(ctx, statsQuery, "statistics:"+columnName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to estimate statistics query cost for column '%s': %w", columnName, err)
+		}
+		result.Queries = append(result.Queries, estimate)
+	}
+
+	// Calculate totals
+	for _, q := range result.Queries {
+		result.TotalBytesProcessed += q.BytesProcessed
+		result.TotalBytesBilled += q.BytesBilled
+	}
+
+	return result, nil
+}
+
+// estimateQueryCost runs a dry-run for a query and returns the bytes estimate.
+func (d *Client) estimateQueryCost(ctx context.Context, queryStr string, queryType string) (*diff.QueryCostEstimate, error) {
+	stats, err := d.QueryDryRun(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return nil, err
+	}
+
+	bytesProcessed := stats.TotalBytesProcessed
+	// BigQuery has a minimum billing of 10 MB per query
+	bytesBilled := bytesProcessed
+	if bytesBilled < 10*1024*1024 && bytesBilled > 0 {
+		bytesBilled = 10 * 1024 * 1024
+	}
+
+	return &diff.QueryCostEstimate{
+		QueryType:      queryType,
+		Query:          truncateQuery(queryStr),
+		BytesProcessed: bytesProcessed,
+		BytesBilled:    bytesBilled,
+	}, nil
+}
+
+// truncateQuery truncates a query string for display purposes.
+func truncateQuery(q string) string {
+	// Remove extra whitespace and newlines
+	q = strings.Join(strings.Fields(q), " ")
+	if len(q) > 100 {
+		return q[:97] + "..."
+	}
+	return q
 }
 
 // tableMetadataResult holds the result of fetching table metadata.
@@ -1304,13 +1443,8 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		Schemas: []*ansisql.DBSchema{},
 	}
 
-	// Phase 1: Collect all datasets and their table names (fast, no metadata fetching)
-	type datasetInfo struct {
-		name       string
-		tableNames []string
-	}
-	var datasets []datasetInfo
-
+	// Phase 1: Collect all dataset names first
+	var datasetNames []string
 	datasetsIter := d.client.Datasets(ctx)
 	for {
 		ds, err := datasetsIter.Next()
@@ -1320,21 +1454,49 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to list BigQuery datasets: %w", err)
 		}
+		datasetNames = append(datasetNames, ds.DatasetID)
+	}
 
-		var tableNames []string
-		tables := ds.Tables(ctx)
-		for {
-			t, err := tables.Next()
-			if errors.Is(err, iterator.Done) {
-				break
-			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to list tables in dataset %s: %w", ds.DatasetID, err)
-			}
-			tableNames = append(tableNames, t.TableID)
-		}
+	// Phase 2: Fetch table names for each dataset in parallel
+	type datasetInfo struct {
+		name       string
+		tableNames []string
+	}
+	datasets := make([]datasetInfo, len(datasetNames))
+	var listErrs []error
+	var listMu sync.Mutex
 
-		datasets = append(datasets, datasetInfo{name: ds.DatasetID, tableNames: tableNames})
+	listWorkers := max(runtime.NumCPU(), 8) * 5
+	listPool := pool.New().WithMaxGoroutines(listWorkers)
+
+	for i, dsName := range datasetNames {
+		listPool.Go(func() {
+			var tableNames []string
+			tables := d.client.Dataset(dsName).Tables(ctx)
+			for {
+				t, err := tables.Next()
+				if errors.Is(err, iterator.Done) {
+					break
+				}
+				if err != nil {
+					listMu.Lock()
+					listErrs = append(listErrs, fmt.Errorf("failed to list tables in dataset %s: %w", dsName, err))
+					listMu.Unlock()
+					return
+				}
+				tableNames = append(tableNames, t.TableID)
+			}
+
+			listMu.Lock()
+			datasets[i] = datasetInfo{name: dsName, tableNames: tableNames}
+			listMu.Unlock()
+		})
+	}
+
+	listPool.Wait()
+
+	if len(listErrs) > 0 {
+		return nil, listErrs[0]
 	}
 
 	// Phase 2: For each dataset, determine which tables need metadata (skip older shards)
@@ -1370,7 +1532,7 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	mu := sync.Mutex{}
 	var errs []error
 
-	workers := max(runtime.NumCPU(), 8)
+	workers := max(runtime.NumCPU(), 8) * 5
 	p := pool.New().WithMaxGoroutines(workers)
 
 	for _, job := range jobs {
@@ -1428,30 +1590,46 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 		Schemas: []*ansisql.DBSchema{},
 	}
 
-	// Phase 1: Collect all table names for each requested schema (fast, no metadata fetching)
+	// Phase 1: Fetch table names for each requested schema in parallel
 	type datasetInfo struct {
 		name       string
 		tableNames []string
 	}
-	datasets := make([]datasetInfo, 0, len(schemas))
+	datasets := make([]datasetInfo, len(schemas))
+	var listErrs []error
+	var listMu sync.Mutex
 
-	for _, schemaName := range schemas {
-		ds := d.client.Dataset(schemaName)
-		var tableNames []string
+	listWorkers := max(runtime.NumCPU(), 8) * 5
+	listPool := pool.New().WithMaxGoroutines(listWorkers)
 
-		tables := ds.Tables(ctx)
-		for {
-			t, err := tables.Next()
-			if errors.Is(err, iterator.Done) {
-				break
+	for i, schemaName := range schemas {
+		listPool.Go(func() {
+			var tableNames []string
+			tables := d.client.Dataset(schemaName).Tables(ctx)
+			for {
+				t, err := tables.Next()
+				if errors.Is(err, iterator.Done) {
+					break
+				}
+				if err != nil {
+					listMu.Lock()
+					listErrs = append(listErrs, fmt.Errorf("failed to list tables in dataset %s: %w", schemaName, err))
+					listMu.Unlock()
+					return
+				}
+				tableNames = append(tableNames, t.TableID)
 			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to list tables in dataset %s: %w", schemaName, err)
-			}
-			tableNames = append(tableNames, t.TableID)
-		}
 
-		datasets = append(datasets, datasetInfo{name: schemaName, tableNames: tableNames})
+			listMu.Lock()
+			datasets[i] = datasetInfo{name: schemaName, tableNames: tableNames}
+			listMu.Unlock()
+		})
+	}
+
+	listPool.Wait()
+
+	if len(listErrs) > 0 {
+		return nil, listErrs[0]
 	}
 
 	// Phase 2: For each dataset, determine which tables need metadata (skip older shards)
@@ -1486,7 +1664,7 @@ func (d *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemas []str
 	mu := sync.Mutex{}
 	var errs []error
 
-	workers := max(runtime.NumCPU(), 8)
+	workers := max(runtime.NumCPU(), 8) * 5
 	p := pool.New().WithMaxGoroutines(workers)
 
 	for _, job := range jobs {

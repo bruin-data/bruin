@@ -44,6 +44,7 @@ func TestSetupVariables(t *testing.T) {
 				ctx := t.Context()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
 				return ctx
@@ -55,16 +56,19 @@ func TestSetupVariables(t *testing.T) {
 				},
 			},
 			expectedEnv: map[string]string{
-				"BRUIN_START_DATE":      "2024-01-02",
-				"BRUIN_START_DATETIME":  "2024-01-02T00:00:00",
-				"BRUIN_START_TIMESTAMP": "2024-01-02T00:00:00.000000Z",
-				"BRUIN_END_DATE":        "2024-01-02",
-				"BRUIN_END_DATETIME":    "2024-01-02T00:00:00",
-				"BRUIN_END_TIMESTAMP":   "2024-01-02T00:00:00.000000Z",
-				"BRUIN_PIPELINE":        "test-pipeline",
-				"BRUIN_RUN_ID":          "test-run",
-				"BRUIN_FULL_REFRESH":    "1",
-				"BRUIN_VARS":            "{}",
+				"BRUIN_START_DATE":          "2024-01-02",
+				"BRUIN_START_DATETIME":      "2024-01-02T00:00:00",
+				"BRUIN_START_TIMESTAMP":     "2024-01-02T00:00:00.000000Z",
+				"BRUIN_END_DATE":            "2024-01-02",
+				"BRUIN_END_DATETIME":        "2024-01-02T00:00:00",
+				"BRUIN_END_TIMESTAMP":       "2024-01-02T00:00:00.000000Z",
+				"BRUIN_EXECUTION_DATE":      "2024-01-01",
+				"BRUIN_EXECUTION_DATETIME":  "2024-01-01T00:00:00",
+				"BRUIN_EXECUTION_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
+				"BRUIN_PIPELINE":            "test-pipeline",
+				"BRUIN_RUN_ID":              "test-run",
+				"BRUIN_FULL_REFRESH":        "1",
+				"BRUIN_VARS":                "{}",
 			},
 		},
 		{
@@ -73,6 +77,7 @@ func TestSetupVariables(t *testing.T) {
 				ctx := t.Context()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
 				return ctx
@@ -84,16 +89,19 @@ func TestSetupVariables(t *testing.T) {
 				},
 			},
 			expectedEnv: map[string]string{
-				"BRUIN_START_DATE":      "2024-01-01",
-				"BRUIN_START_DATETIME":  "2024-01-01T12:00:00",
-				"BRUIN_START_TIMESTAMP": "2024-01-01T12:00:00.000000Z",
-				"BRUIN_END_DATE":        "2024-01-01",
-				"BRUIN_END_DATETIME":    "2024-01-01T12:00:00",
-				"BRUIN_END_TIMESTAMP":   "2024-01-01T12:00:00.000000Z",
-				"BRUIN_PIPELINE":        "test-pipeline",
-				"BRUIN_RUN_ID":          "test-run",
-				"BRUIN_FULL_REFRESH":    "1",
-				"BRUIN_VARS":            "{}",
+				"BRUIN_START_DATE":          "2024-01-01",
+				"BRUIN_START_DATETIME":      "2024-01-01T12:00:00",
+				"BRUIN_START_TIMESTAMP":     "2024-01-01T12:00:00.000000Z",
+				"BRUIN_END_DATE":            "2024-01-01",
+				"BRUIN_END_DATETIME":        "2024-01-01T12:00:00",
+				"BRUIN_END_TIMESTAMP":       "2024-01-01T12:00:00.000000Z",
+				"BRUIN_EXECUTION_DATE":      "2024-01-01",
+				"BRUIN_EXECUTION_DATETIME":  "2024-01-01T10:00:00",
+				"BRUIN_EXECUTION_TIMESTAMP": "2024-01-01T10:00:00.000000Z",
+				"BRUIN_PIPELINE":            "test-pipeline",
+				"BRUIN_RUN_ID":              "test-run",
+				"BRUIN_FULL_REFRESH":        "1",
+				"BRUIN_VARS":                "{}",
 			},
 		},
 		{
@@ -142,6 +150,7 @@ func TestSetupVariables(t *testing.T) {
 				ctx := t.Context()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
 				return ctx
@@ -174,15 +183,18 @@ func TestSetupVariables(t *testing.T) {
 				"BRUIN_RUN_ID":          "test-run",
 			},
 			expectedEnv: map[string]string{
-				"BRUIN_START_DATE":      "2024-01-01",
-				"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
-				"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
-				"BRUIN_END_DATE":        "2024-01-02",
-				"BRUIN_END_DATETIME":    "2024-01-02T00:00:00",
-				"BRUIN_END_TIMESTAMP":   "2024-01-02T00:00:00.000000Z",
-				"BRUIN_PIPELINE":        "test-pipeline",
-				"BRUIN_RUN_ID":          "test-run",
-				"BRUIN_VARS":            `{"env":"dev","users":["alice","bob","charlie"]}`,
+				"BRUIN_START_DATE":          "2024-01-01",
+				"BRUIN_START_DATETIME":      "2024-01-01T00:00:00",
+				"BRUIN_START_TIMESTAMP":     "2024-01-01T00:00:00.000000Z",
+				"BRUIN_END_DATE":            "2024-01-02",
+				"BRUIN_END_DATETIME":        "2024-01-02T00:00:00",
+				"BRUIN_END_TIMESTAMP":       "2024-01-02T00:00:00.000000Z",
+				"BRUIN_EXECUTION_DATE":      "2024-01-01",
+				"BRUIN_EXECUTION_DATETIME":  "2024-01-01T00:00:00",
+				"BRUIN_EXECUTION_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
+				"BRUIN_PIPELINE":            "test-pipeline",
+				"BRUIN_RUN_ID":              "test-run",
+				"BRUIN_VARS":                `{"env":"dev","users":["alice","bob","charlie"]}`,
 			},
 		},
 	}

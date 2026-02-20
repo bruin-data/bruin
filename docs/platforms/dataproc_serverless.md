@@ -119,7 +119,8 @@ Advanced Spark users often package core logic into reusable libraries to improve
 Bruin has seamless support for PySpark modules.
 
 For this example, let's assume this is how your Bruin pipeline is structured:
-```
+
+```text
 acme_pipeline/
 ├── assets
 │   └── main.py
@@ -131,6 +132,7 @@ acme_pipeline/
 Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `sanitize` that takes in a Spark DataFrame and sanitizes its columns (a common operation in Data Analytics).
 
 ::: code-group
+
 ```python [acme_pipeline/lib/core.py]
 from pyspark.sql import DataFrame
 
@@ -140,10 +142,12 @@ def sanitize(df: DataFrame):
   """
   ...
 ```
+
 :::
 
 You can now import this package in your PySpark assets.
 ::: code-group
+
 ```bruin-python [acme_pipeline/assets/main.py]
 """ @bruin
 name: raw.transaction
@@ -161,6 +165,7 @@ if __name__ == "__main__":
   session.stop()
 
 ```
+
 :::
 
 Bruin internally sets the [`PYTHONPATH`](https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH) to the root of your pipeline. So you'll always have to use the fully qualified package name to import any internal packages.
@@ -170,6 +175,7 @@ Bruin internally sets the [`PYTHONPATH`](https://docs.python.org/3/using/cmdline
 PySpark assets require `workspace` to be configured in your `dataproc_serverless` connection. Workspace is a GCS path that is used by Bruin as working storage for jobs that run on Dataproc Serverless.
 
 Bruin uses this GCS path for:
+
 * Staging your entrypoint file.
 * Uploading bundled dependencies (context.zip).
 
@@ -247,14 +253,14 @@ parameters:
 
 The service account used for authentication requires the following IAM roles:
 
-- **Dataproc Editor** (`roles/dataproc.editor`): To create and manage batch jobs
-- **Storage Object Admin** (`roles/storage.objectAdmin`): To upload files to the workspace bucket
-- **Logs Viewer** (`roles/logging.viewer`): To stream job logs
+* **Dataproc Editor** (`roles/dataproc.editor`): To create and manage batch jobs
+* **Storage Object Admin** (`roles/storage.objectAdmin`): To upload files to the workspace bucket
+* **Logs Viewer** (`roles/logging.viewer`): To stream job logs
 
 Additional roles may be required depending on optional features:
 
-- If using `kms_key`: **Cloud KMS CryptoKey Encrypter/Decrypter** (`roles/cloudkms.cryptoKeyEncrypterDecrypter`)
-- If using `metastore_service`: **Dataproc Metastore Editor** (`roles/metastore.editor`)
+* If using `kms_key`: **Cloud KMS CryptoKey Encrypter/Decrypter** (`roles/cloudkms.cryptoKeyEncrypterDecrypter`)
+* If using `metastore_service`: **Dataproc Metastore Editor** (`roles/metastore.editor`)
 
 If using `execution_role`, that service account needs appropriate permissions to access data sources and destinations used by your Spark jobs.
 

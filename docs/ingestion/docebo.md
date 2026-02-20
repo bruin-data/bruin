@@ -7,6 +7,7 @@ Bruin supports Docebo as a source for [Ingestr assets](/assets/ingestr), enablin
 ## Connection
 
 To configure a Docebo connection, you need:
+
 - **Base URL**: Your Docebo instance URL (e.g., `https://yourcompany.docebosaas.com`)
 - **Client ID**: OAuth2 client ID from your Docebo OAuth application
 - **Client Secret**: OAuth2 client secret from your Docebo OAuth application
@@ -125,11 +126,13 @@ columns:
 ## Troubleshooting
 
 ### Authentication Issues
+
 - Verify that your base URL is correct and includes the protocol (https://)
 - Ensure your OAuth client has the correct permissions
 - Check that your username and password are valid
 
 ### Data Access Issues
+
 - Verify that your OAuth application has the necessary scopes
 - Check that the user account has permissions to access the requested data
 - Ensure the table name is spelled correctly (case-sensitive)

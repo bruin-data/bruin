@@ -157,6 +157,7 @@ func (w *sqlxWrapper) QueryRowContext(ctx context.Context, query string, args ..
 func NewClient(c DuckDBConfig) (*Client, error) {
 	LockDatabase(c.ToDBConnectionURI())
 	defer UnlockDatabase(c.ToDBConnectionURI())
+
 	conn, err := NewEphemeralConnection(c)
 	if err != nil {
 		return nil, err

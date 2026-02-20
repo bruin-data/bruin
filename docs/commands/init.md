@@ -43,7 +43,7 @@ When you run `bruin init`, it:
 
 Every initialized pipeline follows this convention:
 
-```
+```text
 my-pipeline/
 ├─ pipeline.yml        # Defines the pipeline metadata
 └─ assets/             # Contains all assets for this pipeline
@@ -79,24 +79,23 @@ If the selected template contains its own `.bruin.yml`, Bruin merges:
 into the existing `.bruin.yml` at your project root.
 This ensures shared environments (like `dev`, `prod`, etc.) stay consistent across pipelines.
 
-
 ## Arguments
 
 ### `template`
 
 Name of the template to use. If omitted, an interactive selector appears.
 
-- **Type:** `string`
-- **Default:** `default`
-- **Required:** `false`
+* **Type:** `string`
+* **Default:** `default`
+* **Required:** `false`
 
 ### `folder`
 
 Name of the folder where the pipeline will be created.
 
-- **Type:** `string`
-- **Default:** `bruin-pipeline` (when using default template), template name (when using other templates)
-- **Required:** `false`
+* **Type:** `string`
+* **Default:** `bruin-pipeline` (when using default template), template name (when using other templates)
+* **Required:** `false`
 
 ## Flags
 
@@ -104,8 +103,8 @@ Name of the folder where the pipeline will be created.
 
 Initialize the pipeline directly in the current folder, instead of creating a `bruin/` directory.
 
-- **Type:** `boolean`
-- **Default:** `false`
+* **Type:** `boolean`
+* **Default:** `false`
 
 ## Example Output
 
@@ -136,11 +135,10 @@ You can run the following commands to get started:
 ``` bash
 bruin init shopify-bigquery
 ```
-#### Output:
 
+#### Output
 
 <img alt="Bruin - clean" src="/init.gif" style="margin: 10px;" />
-
 
 ## Notes
 

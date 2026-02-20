@@ -1,4 +1,5 @@
 # Freshdesk
+
 [Freshdesk](https://www.freshdesk.com/) is a cloud-based customer service platform that helps businesses manage customer support via multiple channels including email, phone, websites, and social media.
 
 Bruin supports Freshdesk as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Freshdesk into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Freshdesk as a source for [Ingestr assets](/assets/ingestr), and 
 In order to set up Freshdesk connection, you need to add a configuration item to `connections` in the `.bruin.yml` file and in `asset` file.
 
 Follow the steps below to correctly set up Freshdesk as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 

@@ -5,6 +5,7 @@ Macros are reusable pieces of Jinja code that allow you to define SQL patterns o
 ## Why Use Macros?
 
 Macros are useful when you find yourself:
+
 - Writing the same SQL patterns repeatedly across multiple assets
 - Building complex queries that could be simplified with reusable components
 - Maintaining consistency in how certain operations are performed
@@ -16,7 +17,7 @@ Macros are useful when you find yourself:
 
 To use macros in your pipeline, create a `macros/` folder at the root of your pipeline directory:
 
-```
+```text
 my-pipeline/
 ├── pipeline.yml
 ├── macros/
@@ -61,6 +62,7 @@ SELECT * FROM {{ table_name }}
 ```
 
 Usage in an asset:
+
 ```bruin-sql
 /* @bruin
 name: my_asset
@@ -93,6 +95,7 @@ LIMIT {{ n }}
 ```
 
 Usage:
+
 ```bruin-sql
 -- Uses default n=10
 {{ top_n('sales', 'revenue') }}
@@ -109,6 +112,7 @@ Once defined in your `macros/` folder, macros can be used in any SQL asset by ca
 
 ::: tip Example
 `macros/aggregations.sql`
+
 ```jinja
 {% macro count_by(table, column) -%}
 SELECT
@@ -121,6 +125,7 @@ ORDER BY count DESC
 ```
 
 `assets/country_summary.sql`
+
 ```bruin-sql
 /* @bruin
 name: country_summary
@@ -132,9 +137,11 @@ materialization:
 
 {{ count_by('customers', 'country') }}
 ```
+
 :::
 
 This renders to:
+
 ```sql
 SELECT
     country,
@@ -179,6 +186,7 @@ WHERE country = '{{ country }}'
 ### Aggregation Patterns
 
 #### Count By Column
+
 ```jinja
 {% macro count_by(table, column, order_by='count') -%}
 SELECT
@@ -191,11 +199,13 @@ ORDER BY {{ order_by }} DESC
 ```
 
 Usage:
+
 ```bruin-sql
 {{ count_by('orders', 'customer_id') }}
 ```
 
 #### Sum By Column
+
 ```jinja
 {% macro sum_by(table, group_column, sum_column) -%}
 SELECT
@@ -208,6 +218,7 @@ ORDER BY total DESC
 ```
 
 Usage:
+
 ```bruin-sql
 {{ sum_by('orders', 'customer_id', 'order_amount') }}
 ```
@@ -215,6 +226,7 @@ Usage:
 ### Filtering Patterns
 
 #### Recent Records
+
 ```jinja
 {% macro recent_records(table, date_column, days=7) -%}
 SELECT *
@@ -224,6 +236,7 @@ WHERE {{ date_column }} >= CURRENT_DATE - INTERVAL '{{ days }} days'
 ```
 
 Usage:
+
 ```bruin-sql
 -- Get orders from last 7 days (default)
 {{ recent_records('orders', 'order_date') }}
@@ -233,6 +246,7 @@ Usage:
 ```
 
 #### Filter Null Values
+
 ```jinja
 {% macro filter_null(table, columns) -%}
 SELECT *
@@ -245,11 +259,13 @@ WHERE {% for col in columns %}
 ```
 
 Usage:
+
 ```bruin-sql
 {{ filter_null('customers', ['email', 'phone', 'address']) }}
 ```
 
 Renders to:
+
 ```sql
 SELECT *
 FROM customers
@@ -259,6 +275,7 @@ WHERE email IS NOT NULL
 ```
 
 #### Filter by List of Values
+
 ```jinja
 {% macro in_list(table, column, values) -%}
 SELECT *
@@ -273,6 +290,7 @@ WHERE {{ column }} IN (
 ```
 
 Usage:
+
 ```bruin-sql
 {{ in_list('orders', 'status', ['pending', 'processing', 'shipped']) }}
 ```
@@ -280,6 +298,7 @@ Usage:
 ### Transformation Patterns
 
 #### Deduplicate Records
+
 ```jinja
 {% macro deduplicate(table, partition_column, order_column) -%}
 SELECT * FROM (
@@ -295,12 +314,14 @@ WHERE rn = 1
 ```
 
 Usage:
+
 ```bruin-sql
 -- Keep most recent record for each customer
 {{ deduplicate('customer_events', 'customer_id', 'event_timestamp') }}
 ```
 
 #### Generate Surrogate Key
+
 ```jinja
 {% macro generate_surrogate_key(columns) -%}
 MD5(CONCAT_WS('||',
@@ -313,6 +334,7 @@ MD5(CONCAT_WS('||',
 ```
 
 Usage:
+
 ```bruin-sql
 SELECT
     {{ generate_surrogate_key(['customer_id', 'order_id']) }},
@@ -321,6 +343,7 @@ FROM orders
 ```
 
 #### Safe Division
+
 ```jinja
 {% macro safe_divide(numerator, denominator, default=0) -%}
 CASE
@@ -332,6 +355,7 @@ END
 ```
 
 Usage:
+
 ```bruin-sql
 SELECT
     product_id,
@@ -349,6 +373,7 @@ Macros can call other macros, allowing you to build more complex functionality:
 
 ::: tip Example
 `macros/base.sql`
+
 ```jinja
 {% macro date_range_filter(table, date_column, start_date, end_date) -%}
 SELECT *
@@ -359,6 +384,7 @@ WHERE {{ date_column }} >= '{{ start_date }}'
 ```
 
 `macros/aggregations.sql`
+
 ```jinja
 {% macro daily_summary(table, date_column, start_date, end_date) -%}
 WITH filtered AS (
@@ -375,6 +401,7 @@ ORDER BY day
 ```
 
 `assets/daily_orders.sql`
+
 ```bruin-sql
 /* @bruin
 name: daily_orders
@@ -383,6 +410,7 @@ type: duckdb.sql
 
 {{ daily_summary('orders', 'created_at', start_date, end_date) }}
 ```
+
 :::
 
 ### Using Macros with Pipeline Variables
@@ -391,6 +419,7 @@ Combine macros with pipeline variables for powerful parameterization:
 
 ::: tip Example
 `pipeline.yml`
+
 ```yaml
 name: sales_pipeline
 variables:
@@ -409,6 +438,7 @@ variables:
 ```
 
 `macros/filters.sql`
+
 ```jinja
 {% macro revenue_filter(table, min_amount) -%}
 SELECT *
@@ -418,6 +448,7 @@ WHERE revenue >= {{ min_amount }}
 ```
 
 `assets/regional_sales.sql`
+
 ```bruin-sql
 /* @bruin
 name: regional_sales
@@ -430,10 +461,11 @@ AND region = '{{ region }}'
 {% if not loop.last %}UNION ALL{% endif %}
 {% endfor %}
 ```
+
 :::
 
 > [!TIP]
-> The pipeline snippet above showcases array enums and numeric bounds. For additional JSON Schema keywords you can mix into macros-driven workflows—including nested objects and nullable values—refer to the [pipeline variables keyword reference](/getting-started/pipeline-variables#supported-json-schema-keywords).
+> The pipeline snippet above showcases array enums and numeric bounds. For additional JSON Schema keywords you can mix into macros-driven workflows—including nested objects and nullable values—refer to the [Variables keyword reference](/core-concepts/variables#custom-variables).
 
 ### Dynamic Column Generation
 
@@ -449,6 +481,7 @@ SUM(CASE WHEN days_since_start <= {{ day }} THEN revenue ELSE 0 END) AS revenue_
 ```
 
 Usage:
+
 ```bruin-sql
 SELECT
     cohort_date,
@@ -462,7 +495,8 @@ GROUP BY cohort_date
 Here's a full example showing how to structure and use macros in a pipeline:
 
 ::: tip Complete Example
-```
+
+```text
 sales-pipeline/
 ├── pipeline.yml
 ├── macros/
@@ -474,6 +508,7 @@ sales-pipeline/
 ```
 
 `pipeline.yml`
+
 ```yaml
 name: sales_pipeline
 default_connections:
@@ -481,6 +516,7 @@ default_connections:
 ```
 
 `macros/aggregations.sql`
+
 ```jinja
 {% macro count_by(table, column) -%}
 SELECT
@@ -502,6 +538,7 @@ ORDER BY total DESC
 ```
 
 `macros/filters.sql`
+
 ```jinja
 {% macro date_range(table, date_column, start_date, end_date) -%}
 SELECT *
@@ -512,6 +549,7 @@ WHERE {{ date_column }} >= '{{ start_date }}'
 ```
 
 `assets/daily_sales.sql`
+
 ```bruin-sql
 /* @bruin
 name: daily_sales
@@ -528,6 +566,7 @@ WITH filtered_orders AS (
 ```
 
 `assets/top_customers.sql`
+
 ```bruin-sql
 /* @bruin
 name: top_customers
@@ -543,9 +582,11 @@ depends:
 {{ sum_by('raw_orders', 'customer_id', 'order_amount') }}
 LIMIT 100
 ```
+
 :::
 
 To see the rendered output:
+
 ```bash
 bruin render assets/daily_sales.sql
 ```
@@ -599,6 +640,7 @@ Everything inside `{% raw %}` ... `{% endraw %}` is treated as literal text, all
 ### Testing
 
 - **Test with `bruin render`**: Always preview the rendered output
+
 ```bash
 bruin render assets/my_asset.sql
 ```
@@ -629,6 +671,7 @@ bruin render assets/my_asset.sql --output json
 ### Check Macro Loading
 
 If your macros aren't working:
+
 1. Verify the `macros/` folder is at the pipeline root
 2. Ensure macro files end with `.sql`
 3. Check for syntax errors in macro definitions
@@ -637,6 +680,7 @@ If your macros aren't working:
 ### Common Issues
 
 **Extra whitespace in output**: Use `{%-` and `-%}` to control whitespace
+
 ```jinja
 {# Good: strips whitespace #}
 {% macro my_macro() -%}
@@ -654,12 +698,14 @@ SELECT 1
 ## When to Use Macros
 
 **Use macros when:**
+
 - You repeat the same SQL pattern in multiple assets
 - You want to standardize certain operations across your pipeline
 - You need to abstract away complexity
 - You want to make your queries more readable
 
 **Don't use macros when:**
+
 - The pattern is only used once
 - The macro would be more complex than the inline code
 - You need very dynamic behavior better suited to Python
@@ -669,5 +715,5 @@ SELECT 1
 
 - [Templating](./templating.md) - Learn about Jinja templating basics
 - [Filters](./filters.md) - Use filters to transform variables
-- [Pipeline Variables](/getting-started/pipeline-variables) - Define custom variables
+- [Variables](/core-concepts/variables) - Define custom variables
 - [SQL Assets](../sql.md) - Learn about SQL assets in Bruin

@@ -1,6 +1,7 @@
 # Python Assets
 
 Bruin takes the Python data development experience to the next level:
+
 - Bruin runs assets in isolated environments: mix and match Python versions & dependencies
 - It installs & manages Python versions automatically, so you don't have to have anything installed
 - You can return dataframes and it uploads them to your destination
@@ -42,10 +43,12 @@ def materialize():
 ```
 
 ## Dependency resolution
+
 Python assets are searching for the closest `requirements.txt` file in the file tree and creates a virtual environment for that file.
 
 For example, assume you have a file tree such as:
-```
+
+```text
 * folder1/
     * folder2/
         * test.py
@@ -60,14 +63,16 @@ For example, assume you have a file tree such as:
 * requirements.txt
 ```
 
-* When Bruin runs `test.py`, it will use the `folder1/folder2/requirements.txt` in `folder2`, since they are in the same folder.  
-* For `test2.py`, since there is no `requirements.txt` in the same folder, Bruin goes up one level in the tree and finds `folder1/requirements.txt`.  
-* Similarly, `requirements.txt` in the main folder used for `test3.py` since none of `folder6`, `folder5` and `folder4` have any `requirements.txt` files.
+- When Bruin runs `test.py`, it will use the `folder1/folder2/requirements.txt` in `folder2`, since they are in the same folder.  
+- For `test2.py`, since there is no `requirements.txt` in the same folder, Bruin goes up one level in the tree and finds `folder1/requirements.txt`.  
+- Similarly, `requirements.txt` in the main folder used for `test3.py` since none of `folder6`, `folder5` and `folder4` have any `requirements.txt` files.
 
 ## Python versions
+
 Bruin supports various Python versions in the same pipeline, all running in isolated environments. The resolved dependencies will be installed correctly for the corresponding Python version without impacting each other.
 
 You can define Python versions using the `image` key:
+
 ```bruin-python
 """@bruin
 name: tier1.my_custom_api
@@ -87,6 +92,7 @@ The injected secret is a JSON representation of the connection model.
 This is useful for API keys, passwords, and other sensitive information.
 
 ::: code-group
+
 ```bruin-python [secret.py]
 """@bruin
 name: tier1.my_custom_api
@@ -99,11 +105,13 @@ import os
 my_secret = os.environ["connection_name"]
 # Use your secret in your code
 ```
+
 :::
 
 By default, secrets are injected as environment variables using the key name. If you want to inject a secret under a different environment variable name, you can use the `inject_as` field:
 
 ::: code-group
+
 ```bruin-python [secret_renamed.py]
 """@bruin
 name: tier1.my_custom_api
@@ -117,12 +125,13 @@ import os
 my_secret = os.environ["creds"] #[!code warning]
 # Use your secret in your code
 ```
+
 :::
 
 This allows you to map a secret key to any environment variable name you prefer inside your Python code.  
 
-
 ## Environment Variables
+
 Bruin introduces a set of environment variables by default to every Python asset.
 
 ### Builtin
@@ -137,6 +146,9 @@ The following environment variables are available in every Python asset executio
 | `BRUIN_END_DATE`        | The end date of the pipeline run in `YYYY-MM-DD` format (e.g. `2024-01-15`)                                       |
 | `BRUIN_END_DATETIME`    | The end date and time of the pipeline run in `YYYY-MM-DDThh:mm:ss` format (e.g. `2024-01-15T13:45:30`)            |
 | `BRUIN_END_TIMESTAMP`   | The end timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`)   |
+| `BRUIN_EXECUTION_DATE`      | The execution date of the pipeline run in `YYYY-MM-DD` format (e.g. `2024-01-15`)                                 |
+| `BRUIN_EXECUTION_DATETIME`  | The execution date and time of the pipeline run in `YYYY-MM-DDThh:mm:ss` format (e.g. `2024-01-15T13:45:30`)      |
+| `BRUIN_EXECUTION_TIMESTAMP` | The execution timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`) |
 | `BRUIN_RUN_ID`          | The unique identifier for the pipeline run                                                                        |
 | `BRUIN_PIPELINE`        | The name of the pipeline being executed                                                                           |
 | `BRUIN_FULL_REFRESH`    | Set to `1` when the pipeline is running with the `--full-refresh` flag, empty otherwise                           |
@@ -144,10 +156,11 @@ The following environment variables are available in every Python asset executio
 
 ### Pipeline
 
-Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your python asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [pipeline variables](/getting-started/pipeline-variables) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/getting-started/pipeline-variables#supported-json-schema-keywords).
+Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your python asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [Variables](/core-concepts/variables) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/core-concepts/variables#custom-variables).
 
 Here's a short example:
 ::: code-group
+
 ```yaml [pipeline.yml]
 name: pipeline-with-variables
 variables:
@@ -184,9 +197,11 @@ variables:
         weight: 0.4
         channels: ["webinar", "email"]
 ```
+
 :::
 
 ::: code-group
+
 ```bruin-python [asset.py]
 """ @bruin
 name: inspect_segments
@@ -205,18 +220,19 @@ for cohort in vars["experiment_cohorts"]:
     # enterprise_baseline 0.6 ['email', 'customer_success']
     # partner_campaign 0.4 ['webinar', 'email']
 ```
+
 :::
 
 ::: tip
 You can override the value of variables at runtime using `--var` [flag](/assets/templating/templating#overriding-variables).
 :::
 
-
 ## Materialization
 
 Bruin runs regular Python scripts by default; however, quite often teams need to load data into a destination from their Python scripts. Bruin supports materializing the data returned by a Python script into a data warehouse.
 
 The requirements to get this working is:
+
 - define a `materialization` config in the asset definition
 - have a function called `materialize` in your Python script that returns a pandas/polars dataframe or a list of dicts.
 
@@ -254,6 +270,7 @@ def materialize(**kwargs):
 ### Under the hood
 
 Bruin uses Apache Arrow under the hood to keep the returned data efficiently, and uses [ingestr](https://github.com/bruin-data/ingestr) to upload the data to the destination. The workflow goes like this:
+
 - install the asset dependencies using `uv`
 - run the `materialize` function of the asset
 - save the returned data into a temporary file using Arrow memory-mapped files
@@ -340,9 +357,10 @@ def materialize():
 
 Bruin will use the annotations to build the column-lineage dependency across all of your assets, including those extracted from SQL automatically.
 
-
 ## Examples
+
 ### Print hello world
+
 ```bruin-python
 """ @bruin
 name: hello_world
@@ -352,6 +370,7 @@ print("Hello World!")
 ```
 
 ### Ingest data to BigQuery via an API manually
+
 ```bruin-python
 """ @bruin
 name: raw_data.currency_rates

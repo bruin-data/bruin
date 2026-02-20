@@ -29,7 +29,7 @@ FROM debian:trixie-slim
 
 ARG GCS_BUCKET_NAME=gong-release
 ARG GCS_PREFIX=releases
-ARG RELEASE_TAG=v0.1.0
+ARG GONG_VERSION
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -39,6 +39,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     binutils \
     python3-dev \
+    unixodbc \
+    libodbc2 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -49,14 +51,18 @@ RUN chown -R bruin:bruin /home/bruin
 USER bruin
 
 # Create necessary directories for bruin user
-RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/bin/gong /home/bruin/.local/share
+RUN mkdir -p /home/bruin/.local/bin /home/bruin/.bruin/bin /home/bruin/.local/share
 
 # Copy the built binary from builder stage
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
+ENV GONG_PATH="/home/bruin/.bruin/bin"
+
+# Obtain the gong version required
+COPY --from=builder /src/pkg/gong/version.txt gong_version.txt
+
 # Download gong binaries from GCS (public bucket via HTTPS). Optional: build continues if not found.
-USER root
-RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
+RUN SELECTED_RELEASE="${GONG_VERSION:-$(cat gong_version.txt)}" && \
     if [ -z "${SELECTED_RELEASE}" ]; then \
         echo "No release tag provided, downloading latest..." && \
         curl -fsSL "https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" -o /tmp/latest.txt && \
@@ -69,15 +75,12 @@ RUN SELECTED_RELEASE="${RELEASE_TAG}" && \
     GONG_BINARY_NAME="gong_${TARGETARCH}" && \
     GONG_URL="https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
     echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_URL}..." && \
-    (curl -fsSL "${GONG_URL}" -o /home/bruin/.local/bin/gong/gong && \
-     chmod +x /home/bruin/.local/bin/gong/gong && \
-     chown bruin:bruin /home/bruin/.local/bin/gong/gong && \
+    (curl -fsSL "${GONG_URL}" -o ${GONG_PATH}/gong && \
+     chmod +x ${GONG_PATH}/gong && \
      echo "Gong binaries downloaded successfully") || \
     echo "Gong binary not available for ${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}, skipping"
 
-USER bruin
-
-ENV PATH="/home/bruin/.local/bin:/home/bruin/.local/bin/gong:${PATH}"
+ENV PATH="/home/bruin/.local/bin:${GONG_PATH}:/home/bruin/.bruin/bin:${PATH}"
 ENV CC="/usr/bin/gcc"
 ENV CFLAGS="-I/usr/include"
 ENV LDFLAGS="-L/usr/lib"

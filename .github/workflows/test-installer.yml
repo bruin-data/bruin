@@ -25,11 +25,12 @@ jobs:
 
 
   test-install-windows:
-    runs-on: depot-windows-latest
+    runs-on: windows-latest
     steps:
+      - uses: actions/checkout@v3
       - name: Use install script
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
       - name: Run bruin version
         shell: bash
-        run: /c/Users/runneradmin/.local/bin/bruin.exe version
+        run: ~/.local/bin/bruin.exe version

@@ -730,6 +730,13 @@ func TestLoadFromFile(t *testing.T) {
 					EmployerID:   "test-employer-id",
 				},
 			},
+			CustomerIo: []CustomerIoConnection{
+				{
+					Name:   "customerio-1",
+					APIKey: "test-api-key",
+					Region: "us",
+				},
+			},
 		},
 	}
 

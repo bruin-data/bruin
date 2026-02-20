@@ -13,7 +13,8 @@ Since `start_date` and `end_date` parameters are automatically passed to your as
 You can do more complex stuff such as looping over a list of values, or using conditional logic. Here's an example of a SQL asset that loops over a list of days and dynamically generates column names.
 ::: tip Example
 `pipeline.yaml`
-```yaml 
+
+```yaml
 name: sql-pipeline
 variables:
   days:
@@ -22,6 +23,7 @@ variables:
 ```
 
 `asset.sql`
+
 ```sql
 SELECT
     conversion_date,
@@ -34,10 +36,11 @@ SELECT
 FROM user_cohorts
 GROUP BY 1,2
 ```
+
 :::
 
 > [!TIP]
-> Need enumerations, numeric bounds, or nested structures for your variables? Consult the [JSON Schema keyword reference](/getting-started/pipeline-variables#supported-json-schema-keywords) for the full list of `type` values and examples of arrays-of-objects and object-of-arrays patterns you can reuse in templated SQL.
+> Need enumerations, numeric bounds, or nested structures for your variables? Consult the [Variables documentation](/core-concepts/variables#custom-variables) for the full list of `type` values and examples of arrays-of-objects and object-of-arrays patterns you can reuse in templated SQL.
 
 This will render into the following SQL query:
 
@@ -54,11 +57,13 @@ SELECT
 FROM user_cohorts
 GROUP BY 1,2
 ```
+
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
 
 ## Builtin variables
 
 Bruin injects various variables by default:
+
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `start_date` | The start date in YYYY-MM-DD format | "2023-12-01" |
@@ -67,17 +72,22 @@ Bruin injects various variables by default:
 | `end_date` | The end date in YYYY-MM-DD format | "2023-12-02" |
 | `end_datetime` | The end date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-02T15:30:00" |
 | `end_timestamp` | The end timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-02T15:30:00.000000Z07:00" |
+| `execution_date` | The execution date in YYYY-MM-DD format | "2023-12-01" |
+| `execution_datetime` | The execution date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-01T15:30:00" |
+| `execution_timestamp` | The execution timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-01T15:30:00.000000Z07:00" |
 | `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
-| `run_id` | The unique identifier for the current [pipeline run](../../getting-started/concepts.md#pipeline-run) | `run_1234567890` |
+| `run_id` | The unique identifier for the current pipeline run | `run_1234567890` |
 | `full_refresh` | Boolean indicating whether the `--full-refresh` flag was used | `True` or `False` |
 
 You can use these variables in your SQL queries by referencing them with the `{{ }}` syntax:
+
 ```sql
 SELECT * FROM my_table
 WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 ```
 
 The `full_refresh` variable is particularly useful for implementing different logic based on whether a full refresh is being performed:
+
 ```sql
 SELECT * FROM my_table
 {% if full_refresh %}
@@ -104,6 +114,7 @@ Jinja templating allows you to write conditional logic in your SQL queries using
 One of the most common use cases for conditional rendering is handling full refresh versus incremental loads. The `full_refresh` variable allows you to write a single asset definition that behaves differently depending on whether you run it with the `--full-refresh` flag.
 
 ::: tip Example: Different Date Ranges
+
 ```sql
 SELECT
     order_id,
@@ -120,6 +131,7 @@ When you run this asset normally, it will process data from the `start_date` (ty
 You can also use conditional rendering for more complex scenarios:
 
 ::: tip Example: Different Aggregation Logic
+
 ```sql
 {% if full_refresh %}
 -- Full refresh: rebuild the entire aggregation table
@@ -169,4 +181,5 @@ WHERE event_date = '{{ start_date }}'
 You can read more about [Jinja conditionals](https://jinja.palletsprojects.com/en/3.1.x/templates/#if) in the official Jinja documentation.
 
 ## Custom variables
-You can define your own variables and use them across your Assets. See [variables](/getting-started/pipeline-variables) for more information.
+
+You can define your own variables and use them across your Assets. See [Variables](/core-concepts/variables) for more information.

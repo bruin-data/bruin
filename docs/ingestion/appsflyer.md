@@ -1,4 +1,5 @@
 # Appsflyer
+
 [Appsflyer](https://www.appsflyer.com/) is a mobile marketing analytics and attribution platform that helps businesses track, measure, and optimize their app marketing efforts across various channels.
 
 Bruin supports Appsflyer as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Appsflyer into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Appsflyer as a source for [Ingestr assets](/assets/ingestr), and 
 In order to set up an Appsflyer connection, you need to add a configuration item to `connections` in the `.bruin.yml` file and in `asset` file. You need the `api_key`. For more information on how to get these credentials check the Appsflyer section in [Ingestr documentation](https://getbruin.com/docs/ingestr/getting-started/quickstart.html)
 
 Follow the steps below to correctly set up Appsflyer as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -51,7 +54,9 @@ parameters:
 | `custom:<dimensions>:<metrics>` | Retrieves data for custom tables, which can be specified by the user. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/appsflyer_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Appsflyer table into your Postgres database.

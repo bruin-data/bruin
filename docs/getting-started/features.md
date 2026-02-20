@@ -1,10 +1,14 @@
 # Features
 
+> [!TIP]
+> This content has been reorganized. See [Core Concepts](/core-concepts/overview) for an updated guide to Bruin's features and concepts.
+
 Bruin is feature-packed and built to cover the majority needs of a data team, while staying extensible.
 
 ## Data ingestion
 
 Bruin has built-in data ingestion capabilities, utilizing [ingestr](https://github.com/bruin-data/ingestr) internally. The basic idea is simple:
+
 - you have data sources
 - each source may have one or more tables/streams
 - you want to load these to a destination data platform
@@ -32,6 +36,7 @@ parameters:
 ```
 
 ## Data transformation
+
 Bruin supports SQL, Python & R data transformations natively.
 
 Naturally, after you ingest the data into your data warehouse/lake, you'll want to transform this data. This transformation can be a simple SQL query, or a more complicated logic written in Python or R. Bruin supports SQL, Python & R natively across [many data platforms](/#supported-platforms).
@@ -74,7 +79,7 @@ SELECT
     COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS white_wins,
     COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS black_wins,
     COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END) AS white_games,
-    COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END) AS black_games,
+    COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END) AS black_games
 FROM chess_playground.profiles p
 LEFT JOIN game_results g
        ON p.aid IN (g.white_aid, g.black_aid)
@@ -83,7 +88,9 @@ ORDER BY total_games DESC
 ```
 
 ### Running Python
+
 Bruin takes the Python data development experience to the next level:
+
 - Bruin runs assets in isolated environments: mix and match Python versions & dependencies
 - It installs & manages Python versions automatically, so you don't have to have anything installed
 - You can return dataframes and it uploads them to your destination
@@ -162,6 +169,7 @@ GROUP BY 1,2
 ```
 
 ## Secrets management
+
 Bruin allows you to define all of your credentials in a gitignored file called `.bruin.yml`, and it takes care of injecting secrets into your assets as environment variables automatically. You can define multiple environments, run the same asset against your staging or prod environments.
 
 ```bruin-python
@@ -192,6 +200,7 @@ Bruin focuses on enabling independent teams designing independent data products.
 In order to align on different teams on building on a shared language, Bruin has a feature called "[glossary](../getting-started/glossary.md)".
 
 Glossaries allow:
+
 - defining a shared language across teams/projects/pipelines
 - reducing repetition for documentation and metadata
 

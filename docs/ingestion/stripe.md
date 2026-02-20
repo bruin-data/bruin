@@ -1,4 +1,5 @@
 # Stripe
+
 [Stripe](https://stripe.com/) is a technology company that builds economic infrastructure for the internet, providing payment processing software and APIs for e-commerce websites and mobile applications.
 
 Bruin supports Stripe as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Stripe into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Stripe as a source for [Ingestr assets](/assets/ingestr), and you
 In order to set up Stripe connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/stripe#grab-credentials).
 
 Follow the steps below to correctly set up Stripe as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -17,6 +20,7 @@ connections:
         - name: 'my-stripe'
           api_key: 'test_123'
 ```
+
 - `api_key`: the API key used for authentication with the Stripe API
 
 ### Step 2: Create an asset file for data ingestion
@@ -82,13 +86,12 @@ parameters:
 | transfer | id | created | merge | Records transfers between Stripe accounts. |
 | webhook_endpoint | id | created | merge | Contains webhook endpoint configurations for receiving event notifications. |
 
-
 ### Step 3: [Run](/commands/run) asset to ingest data
-```     
+
+```bash
 bruin run assets/stripe_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Stripe table into your Postgres database.
-
-
 
 <img width="1088" alt="stripe" src="https://github.com/user-attachments/assets/7133763d-91cb-4882-bb82-02617024b5dc">

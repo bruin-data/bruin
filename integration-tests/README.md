@@ -53,7 +53,7 @@ ENABLE_PARALLEL=1 make integration-test-light
 
 Each test pipeline in `test-pipelines/` should follow a standard structure:
 
-```
+```text
 test-pipelines/
 ├── pipeline-name/
 │   ├── pipeline.yml          # Pipeline configuration
@@ -83,4 +83,34 @@ Each test runs in isolation with:
 
 3. **Ingestr Tests Failing**: Rerun tests. If that doesn't help, verify Ingestr is properly configured if running ingestr tests
 
+## Cloud Integration Tests
 
+Cloud integration tests live under `integration-tests/cloud-integration-tests/` and run only when a matching
+connection is present in `integration-tests/cloud-integration-tests/.bruin.cloud.yml`.
+
+### Fabric Warehouse
+
+Add a local config file with a Fabric connection (no credentials are committed):
+
+```yaml
+default_environment: default
+environments:
+  default:
+    connections:
+      fabric:
+        - name: fabric-default
+          host: sql-endpoint-guid.datawarehouse.fabric.microsoft.com
+          port: 1433
+          database: your_warehouse
+          use_azure_default_credential: true
+```
+
+Then run the cloud integration suite:
+
+```bash
+make build
+go test ./integration-tests/cloud-integration-tests -run Fabric -v
+```
+
+If the Fabric connection is missing, the tests are skipped.
+An example config is available at `integration-tests/cloud-integration-tests/.bruin.cloud.yml.example`.

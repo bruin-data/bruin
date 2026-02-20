@@ -15,6 +15,7 @@ Bruin supports connecting to MotherDuck databases using your MotherDuck token.
 ```
 
 **Parameters**:
+
 - `token`: Your MotherDuck authentication token (required)
 - `database`: The specific database to connect to in your MotherDuck account (optional)
 
@@ -32,6 +33,7 @@ For detailed parameters, you can check [Definition Schema](../assets/definition-
 ### Examples
 
 Create a view with orders per country using MotherDuck:
+
 ```bruin-sql
 /* @bruin
 name: orders_per_country
@@ -48,6 +50,7 @@ GROUP BY country
 ```
 
 Materialize new customers per region and append them to an existing table:
+
 ```bruin-sql
 /* @bruin
 name: new_customers_per_region
@@ -77,11 +80,13 @@ parameters:
 ```
 
 **Parameters**:
+
 - `query`: Query you expect to return any results
 
 #### Example: Partitioned upstream table
 
 Checks if the data is available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: duckdb.sensor.query
@@ -93,6 +98,7 @@ parameters:
 #### Example: Streaming upstream table
 
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: duckdb.sensor.query
@@ -105,7 +111,8 @@ parameters:
 
 `duckdb.seed` assets work seamlessly with MotherDuck connections. This asset type is used to represent CSV files that contain data prepared outside of your pipeline that will be loaded into your MotherDuck database.
 
-You can define seed assets in a file ending with `.yaml`:
+You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: duckdb.seed
@@ -116,6 +123,7 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into MotherDuck. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
@@ -124,6 +132,7 @@ parameters:
 #### Examples: Load CSV into MotherDuck database
 
 The example below shows how to load a CSV into a MotherDuck database.
+
 ```yaml
 name: dashboard.hello
 type: duckdb.seed

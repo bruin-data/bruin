@@ -1,35 +1,37 @@
 # Ingestr Assets
+
 [Ingestr](https://github.com/bruin-data/ingestr) is a CLI tool that allows you to easily move data between platforms. Bruin supports `ingestr` natively as an asset type.
 
 Using Ingestr, you can move data from:
+
 * your production databases like:
-    * MSSQL
-    * MySQL
-    * Oracle
+  * MSSQL
+  * MySQL
+  * Oracle
 * your daily tools like:
-    * Notion
-    * Google Sheets
-    * Airtable
+  * Notion
+  * Google Sheets
+  * Airtable
 * from other platforms such as:
-    * Hubspot
-    * Salesforce
-    * Google Analytics
-    * Facebook Ads
-    * Google Ads
+  * Hubspot
+  * Salesforce
+  * Google Analytics
+  * Facebook Ads
+  * Google Ads
 
 to your data warehouses:
-* Google BigQuery 
-* Snowflake 
-* AWS Redshift 
-* Azure Synapse 
-* Postgres 
+
+* Google BigQuery
+* Snowflake
+* AWS Redshift
+* Azure Synapse
+* Postgres
 
 > [!INFO]
 > You can read more about the capabilities of ingestr [in its documentation](https://getbruin.com/docs/ingestr/).
 
-
-
 ## Asset Structure
+
 ```yaml
 name: string
 type: ingestr
@@ -44,7 +46,7 @@ parameters:
   incremental_strategy: replace | append | merge | delete+insert
   incremental_key: string
   sql_backend: pyarrow | sqlalchemy
-  loader_file_format: jsonl | csv | parquet]
+  loader_file_format: jsonl | csv | parquet
   enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
 ```
 
@@ -84,10 +86,12 @@ Pipeline run options propagate to ingestr automatically:
 * When a run defines an interval start or end date, Bruin appends `--interval-start` and `--interval-end` with the resolved timestamps (including interval modifiers, when enabled).
 * Running with `--full-refresh` adds the `--full-refresh` flag to Ingestr.
 
-##  Examples
+## Examples
+
 The examples below show how to use the `ingestr` asset type in your pipeline. Feel free to change them as you wish according to your needs.
 
 ### Copy a table from MySQL to BigQuery
+
 ```yaml
 name: raw.transactions
 type: ingestr
@@ -98,7 +102,9 @@ parameters:
 ```
 
 ### Copy a table from Microsoft SQL Server to Snowflake incrementally
+
 This example shows how to use `updated_at` column to incrementally load the data from Microsoft SQL Server to Snowflake.
+
 ```yaml
 name: raw.transactions
 type: ingestr
@@ -111,6 +117,7 @@ parameters:
 ```
 
 ### Copy data from Google Sheets to Snowflake
+
 This example shows how to copy data from Google Sheets into your Snowflake database
 
 ```yaml
@@ -124,6 +131,7 @@ parameters:
 ```
 
 ### Enforce schema with column types
+
 This example shows how to use `enforce_schema` to ensure the destination table has the correct column types. This is useful when the source system's type inference doesn't match your requirements.
 
 ```yaml

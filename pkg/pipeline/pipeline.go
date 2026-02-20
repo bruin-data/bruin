@@ -72,6 +72,14 @@ const (
 	AssetTypeMsSQLSeed                 = AssetType("ms.seed")
 	AssetTypeMsSQLSource               = AssetType("ms.source")
 	AssetTypeMsSQLTableSensor          = AssetType("ms.sensor.table")
+	AssetTypeFabricQuery               = AssetType("fabric.sql")
+	AssetTypeFabricQuerySensor         = AssetType("fabric.sensor.query")
+	AssetTypeFabricSeed                = AssetType("fabric.seed")
+	AssetTypeFabricTableSensor         = AssetType("fabric.sensor.table")
+	AssetTypeFabricQueryLegacy         = AssetType("fw.sql")
+	AssetTypeFabricQuerySensorLegacy   = AssetType("fw.sensor.query")
+	AssetTypeFabricSeedLegacy          = AssetType("fw.seed")
+	AssetTypeFabricTableSensorLegacy   = AssetType("fw.sensor.table")
 	AssetTypeMySQLQuery                = AssetType("my.sql")
 	AssetTypeMySQLQuerySensor          = AssetType("my.sensor.query")
 	AssetTypeMySQLSeed                 = AssetType("my.seed")
@@ -121,6 +129,7 @@ const (
 	RunConfigQueryAnnotations          = RunConfig("query-annotations")
 	RunConfigRunID                     = RunConfig("run-id")
 	RunConfigStartDate                 = RunConfig("start-date")
+	RunConfigExecutionDate             = RunConfig("execution-date")
 )
 
 var defaultMapping = map[string]string{
@@ -134,6 +143,7 @@ var defaultMapping = map[string]string{
 	"mssql":                 "mssql-default",
 	"databricks":            "databricks-default",
 	"synapse":               "synapse-default",
+	"fabric":                "fabric-default",
 	"mongo":                 "mongo-default",
 	"mysql":                 "mysql-default",
 	"notion":                "notion-default",
@@ -613,6 +623,14 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMsSQLQuerySensor:          "mssql",
 	AssetTypeMsSQLTableSensor:          "mssql",
 	AssetTypeMsSQLSource:               "mssql",
+	AssetTypeFabricQuery:               "fabric",
+	AssetTypeFabricSeed:                "fabric",
+	AssetTypeFabricQuerySensor:         "fabric",
+	AssetTypeFabricTableSensor:         "fabric",
+	AssetTypeFabricQueryLegacy:         "fabric",
+	AssetTypeFabricSeedLegacy:          "fabric",
+	AssetTypeFabricQuerySensorLegacy:   "fabric",
+	AssetTypeFabricTableSensorLegacy:   "fabric",
 	AssetTypeDatabricksQuery:           "databricks",
 	AssetTypeDatabricksSeed:            "databricks",
 	AssetTypeDatabricksQuerySensor:     "databricks",
@@ -1658,15 +1676,17 @@ func (p *Pipeline) WipeContentOfAssets() {
 
 func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) AssetType {
 	taskTypeCounts := map[AssetType]int{
-		AssetTypeBigqueryQuery:   0,
-		AssetTypeSnowflakeQuery:  0,
-		AssetTypePostgresQuery:   0,
-		AssetTypeMsSQLQuery:      0,
-		AssetTypeDatabricksQuery: 0,
-		AssetTypeRedshiftQuery:   0,
-		AssetTypeSynapseQuery:    0,
-		AssetTypeAthenaQuery:     0,
-		AssetTypeDuckDBQuery:     0,
+		AssetTypeBigqueryQuery:     0,
+		AssetTypeSnowflakeQuery:    0,
+		AssetTypePostgresQuery:     0,
+		AssetTypeMsSQLQuery:        0,
+		AssetTypeDatabricksQuery:   0,
+		AssetTypeRedshiftQuery:     0,
+		AssetTypeSynapseQuery:      0,
+		AssetTypeFabricQuery:       0,
+		AssetTypeFabricQueryLegacy: 0,
+		AssetTypeAthenaQuery:       0,
+		AssetTypeDuckDBQuery:       0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone
@@ -2260,18 +2280,20 @@ func (b *Builder) fillGlossaryStuff(ctx context.Context, asset *Asset, foundPipe
 
 func (a *Asset) IsSQLAsset() bool {
 	sqlAssetTypes := map[AssetType]bool{
-		AssetTypeBigqueryQuery:   true,
-		AssetTypeSnowflakeQuery:  true,
-		AssetTypePostgresQuery:   true,
-		AssetTypeRedshiftQuery:   true,
-		AssetTypeMsSQLQuery:      true,
-		AssetTypeDatabricksQuery: true,
-		AssetTypeSynapseQuery:    true,
-		AssetTypeAthenaQuery:     true,
-		AssetTypeDuckDBQuery:     true,
-		AssetTypeClickHouse:      true,
-		AssetTypeTrinoQuery:      true,
-		AssetTypeOracleQuery:     true,
+		AssetTypeBigqueryQuery:     true,
+		AssetTypeSnowflakeQuery:    true,
+		AssetTypePostgresQuery:     true,
+		AssetTypeRedshiftQuery:     true,
+		AssetTypeMsSQLQuery:        true,
+		AssetTypeDatabricksQuery:   true,
+		AssetTypeSynapseQuery:      true,
+		AssetTypeFabricQuery:       true,
+		AssetTypeFabricQueryLegacy: true,
+		AssetTypeAthenaQuery:       true,
+		AssetTypeDuckDBQuery:       true,
+		AssetTypeClickHouse:        true,
+		AssetTypeTrinoQuery:        true,
+		AssetTypeOracleQuery:       true,
 	}
 
 	return sqlAssetTypes[a.Type]

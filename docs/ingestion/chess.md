@@ -1,4 +1,5 @@
 # Chess
+
 [chess](https://www.chess.com/) is an online platform offering chess games, tournaments, lessons, and more.
 
 Bruin supports Chess as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Chess into your data warehouse.
@@ -6,6 +7,8 @@ Bruin supports Chess as a source for [Ingestr assets](/assets/ingestr), and you 
 In order to set up Chess connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
 Follow the steps below to correctly set up Chess as a data source and run ingestion.
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -19,6 +22,7 @@ To connect to Chess, you need to add a configuration item to the connections sec
             - "MagnusCarlsen"
             - "Hikaru"
 ```
+
 - `players`: A list of players usernames for which you want to fetch data.
 
 ### Step 2: Create an asset file for data ingestion
@@ -52,9 +56,11 @@ parameters:
 | archives  | -  | -       | replace      | Retrieves the URLs to game archives for specified players.     |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/chess_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Chess table into your Postgres database.
 
 <img width="1161" alt="chess" src="https://github.com/user-attachments/assets/12418c5b-5483-46fb-9bb3-998e112d8030">

@@ -13,6 +13,7 @@ Bruin provides the following checks to validate assets, ensuring that asset data
 - [**Max**](#max)
 
 You can find a detailed description of each check below.
+
 ## Accepted values
 
 This check will verify that the value of the column will be one of the accepted values
@@ -26,7 +27,9 @@ columns:
       - name: accepted_values
         value: [1, 3, 5, 7, 9]
 ```
+
 ## Negative
+
 This check will verify that the values of the column are all negative
 
 ```yaml
@@ -37,8 +40,11 @@ columns:
     checks:
       - name: negative
 ```
+
 ## Non-Negative
+
 This check will verify that the values of the column are all non negative (positive or zero)
+
 ```yaml
 columns:
   - name: one
@@ -49,7 +55,9 @@ columns:
 ```
 
 ## Not-Null
+
 This check will verify that none of the values of the checked column are null.
+
 ```yaml
 columns:
   - name: one
@@ -58,7 +66,9 @@ columns:
     checks:
       - name: not_null
 ```
+
 ## Pattern
+
 The `pattern` quality check ensures that the values of the column match a specified regular expression.
 
 > [!WARNING]
@@ -74,7 +84,6 @@ columns:
           value: "^[A-Z][a-z]*$"
 ```
 
-
 ## Positive
 
 This check will verify that the values of the column are all positive, i.e. greater than zero.
@@ -87,7 +96,6 @@ columns:
     checks:
       - name: positive
 ```
-
 
 ## Unique
 
@@ -103,6 +111,7 @@ columns:
 ```
 
 ## Min
+
 This check ensures that all values in the column are greater than or equal to the specified minimum threshold.
 
 ```yaml
@@ -125,6 +134,7 @@ checks:
 ```
 
 ## Max
+
 This check ensures that all values in the column are less than or equal to the specified maximum threshold.
 
 ```yaml

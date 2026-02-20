@@ -9,6 +9,7 @@ This guide walks you through deploying Bruin on Ubuntu-based virtual machines (A
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - An Ubuntu server (18.04 or later recommended)
 - SSH access to the server with sudo privileges
 - Git installed on the server
@@ -154,7 +155,7 @@ Cron is a time-based job scheduler in Unix-like operating systems. You'll use it
 
 Cron uses the following format:
 
-```
+```text
 * * * * * command-to-execute
 │ │ │ │ │
 │ │ │ │ └─── Day of week (0-7, Sunday = 0 or 7)
@@ -165,6 +166,7 @@ Cron uses the following format:
 ```
 
 Examples:
+
 - `0 * * * *` - Every hour at minute 0
 - `0 9 * * *` - Every day at 9:00 AM
 - `*/15 * * * *` - Every 15 minutes
@@ -188,6 +190,7 @@ Add a cron job to run your pipeline. Here's an example that runs daily at 3:00 A
 ```
 
 **Important notes:**
+
 - Use absolute paths for both the Bruin executable and your project directory
 - Replace `username` with your actual username
 - The `>> /home/username/logs/bruin.log 2>&1` redirects output to a log file
@@ -247,7 +250,7 @@ sudo nano /etc/logrotate.d/bruin
 
 Add the following configuration:
 
-```
+```text
 /home/username/logs/*.log {
     daily
     missingok
@@ -259,6 +262,7 @@ Add the following configuration:
 ```
 
 This configuration:
+
 - Rotates logs daily
 - Keeps 14 days of logs
 - Compresses old logs
@@ -400,16 +404,19 @@ Then follow all the installation steps as the `bruin` user.
 ### Cron Job Not Running
 
 1. Check if cron service is running:
+
 ```bash
 sudo systemctl status cron
 ```
 
-2. Check cron logs:
+1. Check cron logs:
+
 ```bash
 grep CRON /var/log/syslog
 ```
 
-3. Verify your crontab:
+1. Verify your crontab:
+
 ```bash
 crontab -l
 ```
@@ -462,7 +469,8 @@ export HOME="/home/username"
 Here's a complete example for a production deployment:
 
 ### Directory Structure
-```
+
+```text
 /home/bruin/
 ├── projects/
 │   └── analytics-pipeline/
@@ -478,6 +486,7 @@ Here's a complete example for a production deployment:
 ```
 
 ### Crontab
+
 ```bash
 # Pull and run ingestion pipeline every 6 hours
 0 */6 * * * /home/bruin/scripts/run-ingestion.sh
@@ -487,6 +496,7 @@ Here's a complete example for a production deployment:
 ```
 
 ### run-analytics.sh
+
 ```bash
 #!/bin/bash
 
@@ -522,4 +532,4 @@ echo "=== Completed successfully at $(date) ===" >> "$LOG_FILE"
 
 - [Bruin CLI Documentation](/)
 - [Bruin Commands](/commands/run)
-- [Credentials Management](/getting-started/credentials)
+- [Environments & Credentials](/core-concepts/environments)

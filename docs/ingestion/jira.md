@@ -1,12 +1,14 @@
 # Jira
-[Jira](https://www.atlassian.com/software/jira) is a proprietary issue tracking product developed by Atlassian that allows bug tracking and agile project management.
 
+[Jira](https://www.atlassian.com/software/jira) is a proprietary issue tracking product developed by Atlassian that allows bug tracking and agile project management.
 
 Bruin supports Jira as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Jira into your data warehouse.
 
 In order to set up Jira connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
 Follow the steps below to correctly set up Jira as a data source and run ingestion:
+
+## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -43,11 +45,11 @@ parameters:
   destination: postgres
 ```
 
-- name: The name of the asset.
-- type: Specifies the type of the asset. It will be always ingestr type for Jira.
-- connection: This is the destination connection.
-- source_connection: The name of the Jira connection defined in .bruin.yml.
-- source_table: The name of the data table in Jira you want to ingest.
+* name: The name of the asset.
+* type: Specifies the type of the asset. It will be always ingestr type for Jira.
+* connection: This is the destination connection.
+* source_connection: The name of the Jira connection defined in .bruin.yml.
+* source_table: The name of the data table in Jira you want to ingest.
 
 ## Available Source Tables
 
@@ -66,9 +68,11 @@ parameters:
 | `issue_changelogs` | - | - | replace | Fetches changelog history for all issues across all projects. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/jira_integration.asset.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Jira table into your Postgres database.
 
 ## Incremental Loading

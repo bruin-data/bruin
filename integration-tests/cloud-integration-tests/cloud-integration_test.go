@@ -27,6 +27,7 @@ var platformConnectionMap = map[string]string{
 	"redshift":   "redshift",
 	"athena":     "athena",
 	"databricks": "databricks",
+	"fabric":     "fabric",
 }
 
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {
@@ -211,5 +212,24 @@ func TestCloudIntegration(t *testing.T) {
 		t.Logf("Databricks platform is available - running integration tests")
 
 		runTestsInDirectory(t, databricksDir, "Databricks")
+	})
+
+	t.Run("Fabric", func(t *testing.T) {
+		t.Parallel()
+
+		if !availablePlatforms["fabric"] {
+			t.Skip("Skipping Fabric tests - no connection configured")
+			return
+		}
+
+		fabricDir := filepath.Join(currentFolder, "fabric")
+		require.DirExists(t, fabricDir, "Fabric test directory should exist")
+
+		testFile := filepath.Join(fabricDir, "fabric_test.go")
+		require.FileExists(t, testFile, "Fabric test file should exist")
+
+		t.Logf("Fabric platform is available - running integration tests")
+
+		runTestsInDirectory(t, fabricDir, "Fabric")
 	})
 }

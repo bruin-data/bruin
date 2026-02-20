@@ -3,6 +3,7 @@ package ingestr
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -98,6 +99,35 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
 	}
 
+	// Handle CDC mode - transform PostgreSQL URI to CDC format and auto-set merge strategy
+	if asset.Parameters["cdc"] == "true" {
+		parsedURI, err := url.Parse(sourceURI)
+		if err != nil {
+			return fmt.Errorf("failed to parse source URI for CDC: %w", err)
+		}
+
+		parsedURI.Scheme = strings.ReplaceAll(parsedURI.Scheme, "postgresql", "postgres+cdc")
+
+		q := parsedURI.Query()
+		if pub := asset.Parameters["cdc_publication"]; pub != "" {
+			q.Set("publication", pub)
+		}
+		if slot := asset.Parameters["cdc_slot"]; slot != "" {
+			q.Set("slot", slot)
+		}
+		if mode := asset.Parameters["cdc_mode"]; mode != "" {
+			q.Set("mode", mode)
+		}
+		parsedURI.RawQuery = q.Encode()
+
+		sourceURI = parsedURI.String()
+
+		// Auto-set merge strategy for CDC if not already set
+		if _, exists := asset.Parameters["incremental_strategy"]; !exists {
+			asset.Parameters["incremental_strategy"] = "merge"
+		}
+	}
+
 	sourceTable, ok := asset.Parameters["source_table"]
 	if !ok {
 		return errors.New("source table not configured")
@@ -127,16 +157,26 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("destination uri is empty, which means the connection is not configured correctly")
 	}
 
+	if strings.HasPrefix(destURI, "clickhouse://") {
+		destURI = applyClickHouseEngineParams(destURI, asset.Parameters)
+	}
+
 	destTable := asset.Name
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, []string{
+	baseArgs := []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
-		"--source-table",
-		sourceTable,
+	}
+
+	// Omit --source-table for CDC wildcard mode so ingestr replicates all tables
+	if !(asset.Parameters["cdc"] == "true" && sourceTable == "*") {
+		baseArgs = append(baseArgs, "--source-table", sourceTable)
+	}
+
+	baseArgs = append(baseArgs,
 		"--dest-uri",
 		destURI,
 		"--dest-table",
@@ -144,7 +184,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--yes",
 		"--progress",
 		"log",
-	}, &python.ColumnHintOptions{
+	)
+
+	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   false,
 		EnforceSchemaByDefault: false,
 	})
@@ -169,6 +211,32 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
+}
+
+func applyClickHouseEngineParams(destURI string, params map[string]string) string {
+	parsedURI, err := url.Parse(destURI)
+	if err != nil {
+		return destURI
+	}
+
+	q := parsedURI.Query()
+
+	if engine, exists := params["engine"]; exists && engine != "" {
+		q.Set("engine", engine)
+	}
+
+	for key, value := range params {
+		key = strings.TrimSpace(key)
+		if strings.HasPrefix(key, "engine.") && value != "" {
+			q.Set(
+				key,
+				strings.TrimSpace(value),
+			)
+		}
+	}
+
+	parsedURI.RawQuery = q.Encode()
+	return parsedURI.String()
 }
 
 func NewSeedOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*SeedOperator, error) {
@@ -239,7 +307,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("destination uri is empty, which means the destination connection is not configured correctly")
 	}
 
-	destTable := asset.Name
+	destTable := o.resolveSeedDestinationTableName(destConnectionName, destURI, asset.Name)
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
@@ -271,4 +339,69 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
+}
+
+func (o *SeedOperator) resolveSeedDestinationTableName(connectionName, destURI, tableName string) string {
+	if tableName == "" || strings.Contains(tableName, ".") {
+		return tableName
+	}
+
+	parsedURI, err := url.Parse(destURI)
+	if err != nil {
+		return tableName
+	}
+
+	detailsGetter, ok := o.conn.(config.ConnectionDetailsGetter)
+	if !ok {
+		switch parsedURI.Scheme {
+		case "athena", "clickhouse":
+			return "default." + tableName
+		default:
+			return tableName
+		}
+	}
+
+	details := detailsGetter.GetConnectionDetails(connectionName)
+	if details == nil {
+		switch parsedURI.Scheme {
+		case "athena", "clickhouse":
+			return "default." + tableName
+		default:
+			return tableName
+		}
+	}
+
+	switch parsedURI.Scheme {
+	case "athena":
+		database := "default"
+		athenaConn, ok := details.(*config.AthenaConnection)
+		if ok && athenaConn != nil && athenaConn.Database != "" {
+			database = athenaConn.Database
+		}
+		return database + "." + tableName
+	case "postgresql":
+		pgConn, ok := details.(*config.PostgresConnection)
+		if ok && pgConn != nil && pgConn.Schema != "" {
+			return pgConn.Schema + "." + tableName
+		}
+	case "redshift":
+		redshiftConn, ok := details.(*config.RedshiftConnection)
+		if ok && redshiftConn != nil && redshiftConn.Schema != "" {
+			return redshiftConn.Schema + "." + tableName
+		}
+	case "snowflake":
+		snowflakeConn, ok := details.(*config.SnowflakeConnection)
+		if ok && snowflakeConn != nil && snowflakeConn.Schema != "" {
+			return snowflakeConn.Schema + "." + tableName
+		}
+	case "clickhouse":
+		database := "default"
+		clickhouseConn, ok := details.(*config.ClickHouseConnection)
+		if ok && clickhouseConn != nil && clickhouseConn.Database != "" {
+			database = clickhouseConn.Database
+		}
+		return database + "." + tableName
+	}
+
+	return tableName
 }

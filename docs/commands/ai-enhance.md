@@ -11,21 +11,25 @@ Before using this command, you need to install one of the supported AI CLI tools
 Claude Code is the default and recommended AI provider. Install it using one of these methods:
 
 **macOS, Linux, WSL (Recommended):**
+
 ```bash
 curl -fsSL https://claude.ai/install.sh | bash
 ```
 
 **Homebrew (macOS):**
+
 ```bash
 brew install --cask claude-code
 ```
 
 **Windows PowerShell:**
+
 ```powershell
 irm https://claude.ai/install.ps1 | iex
 ```
 
 After installation, authenticate by running `claude` and following the prompts. You can verify your installation with:
+
 ```bash
 claude doctor
 ```
@@ -69,7 +73,7 @@ bruin ai enhance [path to asset] [flags]
 
 The `ai enhance` command runs a 4-step process to intelligently enhance your asset:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 1: Fill Columns    →  Fetch schema from database         │
 │  Step 2: AI Enhancement  →  Generate descriptions & checks     │
@@ -79,10 +83,13 @@ The `ai enhance` command runs a 4-step process to intelligently enhance your ass
 ```
 
 ### Step 1: Fill Columns from Database
+
 The command first retrieves column metadata from your database and adds any missing columns to the asset definition. This ensures the AI has complete schema information to work with.
 
 ### Step 2: AI Enhancement
+
 The selected AI provider analyzes your asset file and adds:
+
 - **Descriptions**: Meaningful descriptions for assets and columns based on their names and context
 - **Quality Checks**: Appropriate data quality checks based on column names, types, and statistics
 - **Tags**: Relevant tags based on the asset's purpose and domain
@@ -90,9 +97,11 @@ The selected AI provider analyzes your asset file and adds:
 If your asset is connected to a database, the command pre-fetches table statistics (row counts, null counts, distinct values, min/max, etc.) to make data-driven decisions about which quality checks to add.
 
 ### Step 3: Format
+
 The enhanced asset file is automatically formatted to ensure consistent styling.
 
 ### Step 4: Validate
+
 The modified asset is validated using Bruin's validation rules. If validation fails, the original file is automatically restored to prevent corrupted assets.
 
 ## Examples
@@ -158,7 +167,7 @@ bruin ai enhance assets/orders.sql --debug
 
 When running in plain mode, the command shows progress and a diff of changes:
 
-```
+```plaintext
 Step 1/4: Filling columns from database...
   Columns updated from database schema.
 Step 2/4: Enhancing asset with AI...

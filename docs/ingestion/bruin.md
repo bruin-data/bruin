@@ -8,6 +8,8 @@ In order to set up a Bruin Cloud connection, you need to add a configuration ite
 
 Follow the steps below to correctly set up Bruin Cloud as a data source and run ingestion.
 
+## Configuration
+
 ### Step 1: Add a connection to .bruin.yml file
 
 To connect to Bruin Cloud, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
@@ -18,6 +20,7 @@ To connect to Bruin Cloud, you need to add a configuration item to the connectio
         - name: "my-bruin"
           api_token: "your_api_token_here"
 ```
+
 - `api_token`: The API token used for authentication with the Bruin API.
 
 ### How to get your API token
@@ -58,7 +61,9 @@ parameters:
 | assets    | -  | -       | replace      | Contains information about your data assets including metadata and configuration. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
-```
+
+```bash
 bruin run assets/bruin_ingestion.yml
 ```
+
 As a result of this command, Bruin will ingest data from the given Bruin Cloud table into your Postgres database.

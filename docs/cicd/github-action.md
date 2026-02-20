@@ -1,16 +1,17 @@
 # GitHub Actions
 
-The [`bruin-data/setup-bruin@main`](https://github.com/marketplace/actions/setup-bruin) action is used to set up the Bruin environment in your GitHub Actions workflow. This action ensures that all necessary dependencies and configurations are in place for your Bruin tasks to run smoothly.
+The [`bruin-data/setup-bruin@main`](https://github.com/marketplace/actions/setup-bruin) action is used to set up the Bruin environment in your GitHub Actions workflow. This action ensures that all necessary dependencies and configurations are in place for your Bruin assets to run smoothly.
 
 ```yaml
 - uses: bruin-data/setup-bruin@main
 ```
 
-### Parameters
+## Parameters
+
 - **version** (optional): Specify the version of Bruin to install. If not provided, the latest version will be used.
 
-
 ## Setting Up GitHub Actions
+
 1. Create a `.github/workflows` directory in your repository.
 2. Inside that directory, create a YAML file (e.g., `ci.yml`) to define your workflow.
 
@@ -33,4 +34,3 @@ jobs:
     - run: bruin validate ./bruin-pipeline/
       name: Validate Pipeline
 ```
-

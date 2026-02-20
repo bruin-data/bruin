@@ -92,7 +92,7 @@ https://getbruin.com/docs/bruin/getting-started/bruin-mcp.html
 ## Pipeline Structure
 
 ### Directory Layout
-```
+```text
 nyc-taxi/
 ├── .bruin.yml
 ├── pipeline.yml

@@ -185,6 +185,7 @@ func RenderDDL() *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "your-run-id")
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 
 			// Load macros from the pipeline's macros directory
@@ -194,7 +195,7 @@ func RenderDDL() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value(), macroContent)
+			renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pl.Name, "your-run-id", pl.Variables.Value(), macroContent)
 			forAsset, err := renderer.CloneForAsset(runCtx, pl, asset)
 			if err != nil {
 				return err

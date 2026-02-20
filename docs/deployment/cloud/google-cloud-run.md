@@ -9,6 +9,7 @@ This guide shows you how to run Bruin pipelines using Google Cloud Run Jobs. Thi
 ## Prerequisites
 
 Before you begin, ensure you have:
+
 - A Google Cloud Platform (GCP) project
 - `gcloud` CLI installed and configured
 - Docker installed
@@ -541,6 +542,7 @@ gcloud run jobs update bruin-pipeline \
 ### VPC Connection Issues
 
 Ensure:
+
 - VPC connector is properly configured
 - VPC connector has connectivity to required resources
 - Job has appropriate VPC egress settings

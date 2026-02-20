@@ -1,6 +1,6 @@
 # Connections
 
-Bruin has various commands to handle connections via its CLI. 
+Bruin has various commands to handle connections via its CLI.
 
 Bruin CLI offers convenience methods to manage connections when using `.bruin.yml` as our [secrets backend](../secrets/overview.md).
 
@@ -13,7 +13,8 @@ bruin connections list
 ```
 
 The output will look like this:
-```
+
+```plaintext
 Environment: default
 +---------+-----------+
 | TYPE    | NAME      |
@@ -29,7 +30,6 @@ Environment: someother
 | generic | MY_SECRET |
 +---------+-----------+
 ```
-
 
 ### Flags
 
@@ -47,7 +47,7 @@ bruin connections add --env someother --type generic --name MY_SECRET --credenti
 
 This will add the connection to the `.bruin.yml` file and the connection will be available in the given environment.
 
-The parameter after `--credentials` is the value of the connection in JSON format, as you would write it in the `.bruin.yml` file. For further reference, you can check the [Connections section](../getting-started/concepts.md#connection) of the documentation.
+The parameter after `--credentials` is the value of the connection in JSON format, as you would write it in the `.bruin.yml` file. For further reference, you can check the [Connections](/core-concepts/connections) documentation.
 
 ### Flags
 
@@ -55,12 +55,11 @@ The parameter after `--credentials` is the value of the connection in JSON forma
 |------|------|---------|-------------|
 | `--config-file` | str | - | The path to the .bruin.yml file. |
 
-
-
 > [!INFO]
 > This command is meant to be used programmatically rather than human beings, since the `credentials` parameter is in JSON format.
 
 ### Example: a GCP connection
+
 ```bash
 bruin connections add \
     --env default \
@@ -70,6 +69,7 @@ bruin connections add \
 ```
 
 ### Example: a generic secret
+
 ```bash
 bruin connections add \
     --env staging \
@@ -77,7 +77,6 @@ bruin connections add \
     --name MY_SECRET \
     --credentials '{"value": "secret-password"}'
 ```
-
 
 ## Delete Connection
 
@@ -99,17 +98,17 @@ bruin connections delete --env staging --name MY_SECRET <path-to-repo>
 |------|------|---------|-------------|
 | `--config-file` | str | - | The path to the .bruin.yml file. |
 
-
-
 ### Example
 
 Delete a connection named "my-connection" from the "production" environment:
-```
+
+```bash
 bruin connections delete -e staging -n test-connection -o json
 ```
 
 ## Test Connection
-To test if a connection is valid, you can use the test command. 
+
+To test if a connection is valid, you can use the test command.
 This command runs a simple validation check for the connection.
 
 ```bash
@@ -124,20 +123,22 @@ If no environment flag (`--env`) is provided, the default environment from our `
 |------|------|---------|-------------|
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
 
-
 ### Examples
 
 Test a connection in the default environment:
+
 ```bash
 bruin connections test --name my-bigquery-conn
 ```
 
 Test a connection in a specific environment:
+
 ```bash
 bruin connections test --name my-snowflake-conn --env production
 ```
 
 You can also get the output in JSON format:
+
 ```bash
 bruin connections test --name my-postgres-conn --env staging --output json
 ```

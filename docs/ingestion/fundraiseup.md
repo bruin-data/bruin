@@ -12,17 +12,20 @@ FundraiseUp connections are defined using the following properties:
 - `api_key`: Your FundraiseUp API key (required)
 
 :::code-group
+
 ```yaml [connections.yml]
 connections:
   fundraiseup:
     - name: "my_fundraiseup"
       api_key: "your_api_key"
 ```
+
 :::
 
 You can also use environment variables in your connections.yml by using the `&#123;&#123; env_var("ENV_VAR_NAME") &#125;&#125;` syntax.
 
 For example:
+
 ```yaml
 connections:
   fundraiseup:
@@ -52,4 +55,3 @@ All FundraiseUp assets use the full refresh strategy (replace) as incremental lo
 - **Incremental Loading**: The FundraiseUp source does not support incremental loading. All data is fetched with a full refresh (replace strategy).
 - **Date Filtering**: The API does not support date filtering for any of the endpoints.
 - **Permissions**: The `fundraisers` endpoint may return a 403 Forbidden error if your API key doesn't have the required permissions. Contact FundraiseUp support to enable access if needed.
-

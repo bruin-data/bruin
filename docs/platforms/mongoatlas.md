@@ -22,6 +22,7 @@ To set up a MongoDB Atlas connection, you need to add a configuration item to `c
 ```
 
 **Parameters**:
+
 - `username`: MongoDB Atlas database username
 - `password`: MongoDB Atlas database password
 - `host`: MongoDB Atlas cluster hostname (e.g., `cluster0.example.mongodb.net`)
@@ -51,5 +52,6 @@ parameters:
 ```
 
 This configuration will:
+
 1. Extract data from the `public.users` table in PostgreSQL
 2. Load the data into the `users` collection in your MongoDB Atlas database

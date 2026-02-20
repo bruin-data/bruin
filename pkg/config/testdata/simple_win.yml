@@ -454,6 +454,10 @@ environments:
           client_id: "test-client-id"
           client_secret: "test-client-secret"
           employer_id: "test-employer-id"
+      customerio:
+        - name: "customerio-1"
+          api_key: "test-api-key"
+          region: "us"
 
   prod:
     connections:

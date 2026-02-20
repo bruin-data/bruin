@@ -83,19 +83,36 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         ],
                     },
                     {
-                        text: "Features",
-                        link: "/getting-started/features",
+                        text: "Core Concepts",
+                        link: "/core-concepts/overview",
                         items: [
-                            {text: "Pipeline", link: "/getting-started/pipeline"},
-                            {text: "Glossary", link: "/getting-started/glossary"},
-                            {text: "Policies", link: "/getting-started/policies"},
-                            {text: "Environments", link: "/getting-started/devenv"},
-                            {text: "Variables", link: "/getting-started/pipeline-variables"},
-                            {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
-                        ]
+                            {
+                                text: "Environments",
+                                link: "/core-concepts/environments",
+                                items: [
+                                    {text: "Connections", link: "/core-concepts/connections"},
+                                    {text: "Secrets", link: "/core-concepts/secrets"},
+                                ],
+                            },
+                            {text: "Pipeline", link: "/pipelines/definition"},
+                            {text: "Asset", link: "/assets/definition-schema"},
+                            {
+                                text: "Variables",
+                                link: "/core-concepts/variables",
+                                items: [
+                                    {text: "Built-in Variables", link: "/core-concepts/variables#built-in-variables"},
+                                    {text: "Custom Variables", link: "/core-concepts/variables#custom-variables"},
+                                ],
+                            },
+                            {text: "Commands", link: "/commands/overview"},
+                        ],
                     },
-                    {text: "Concepts", link: "/getting-started/concepts"},
                     {text: "Design Principles", link: "/getting-started/design-principles"},
+                    {text: "Glossary", link: "/getting-started/glossary"},
+                    {text: "Policies", link: "/getting-started/policies"},
+                    {text: "Concurrency", link: "/getting-started/concurrency"},
+                    {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
+                    {text: "Lakehouse Support", link: "/getting-started/lakehouse"},
 
                     {
                         text: "Templates",
@@ -165,6 +182,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Oracle", link: "/platforms/oracle"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
                     {text: "Microsoft SQL Server", link: "/platforms/mssql"},
+                    {text: "Microsoft Fabric", link: "/platforms/fabric"},
                     {text: "MySQL", link: "/platforms/mysql"},
                     {text: "Postgres", link: "/platforms/postgres"},
                     {text: "Redshift", link: "/platforms/redshift"},
@@ -175,6 +193,16 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
                     {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                     {text: "GCP Dataproc Serverless", link: "/platforms/dataproc_serverless"},
+                ],
+            },
+            {
+                text: "Pipelines",
+                collapsed: false,
+                items: [
+                    {text: "Definition", link: "/pipelines/definition"},
+                    {text: "Scheduling", link: "/pipelines/definition#schedule"},
+                    {text: "Default Connections", link: "/pipelines/definition#default-connections"},
+                    {text: "Pipeline Defaults", link: "/pipelines/definition#default-pipeline-level-defaults"},
                 ],
             },
             {
@@ -196,7 +224,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
-                    {text: "Credentials", link: "/getting-started/credentials"},
                     {text: "Interval Modifiers", link: "/assets/interval-modifiers"},
                     {text: "Materialization", link: "/assets/materialization"},
                     {
@@ -232,6 +259,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "ClickUp", link: "/ingestion/clickup"},
                             {text: "Couchbase", link: "/ingestion/couchbase"},
                             {text: "Cursor", link: "/ingestion/cursor"},
+                            {text: "Customer.io", link: "/ingestion/customerio"},
                             {text: "DB2", link: "/ingestion/db2"},
                             {text: "Docebo", link: "/ingestion/docebo"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb"},
@@ -315,7 +343,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 collapsed: false,
                 items: [
                     {text: "Overview", link: "/secrets/overview"},
-                    {text: "Hashicorp Vault", link: "/secrets/vault"}
+                    {text: "File Backend (.bruin.yml)", link: "/secrets/bruinyml"},
+                    {text: "Hashicorp Vault", link: "/secrets/vault"},
+                    {text: "Doppler", link: "/secrets/doppler"},
+                    {text: "AWS Secrets Manager", link: "/secrets/aws-secrets-manager"},
                 ]
             },
             {
@@ -356,9 +387,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             },
             {
                 text: "Commands",
+                link: "/commands/overview",
                 collapsed: false,
                 items: [
-                    {text: "AI Enhance", link: "/commands/ai-enhance"},
+                    {text: "Overview", link: "/commands/overview"},
+                    {text: "Run", link: "/commands/run"},
+                    {text: "Validate", link: "/commands/validate"},
                     {text: "Init", link: "/commands/init"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections"},
@@ -369,9 +403,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Lineage", link: "/commands/lineage"},
                     {text: "Patch", link: "/commands/patch"},
                     {text: "Render", link: "/commands/render"},
-                    {text: "Run", link: "/commands/run"},
                     {text: "Query", link: "/commands/query"},
-                    {text: "Validate", link: "/commands/validate"},
+                    {text: "AI Enhance", link: "/commands/ai-enhance"},
                 ],
 
             },
@@ -385,6 +418,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "dbt Projects", link: "/cloud/dbt"},
                     {text: "Notifications", link: "/cloud/notifications"},
                     {text: "Instance Types", link: "/cloud/instance-types"},
+                    {text: "Cloud MCP", link: "/cloud/mcp-setup"},
                 ],
             },
         ],

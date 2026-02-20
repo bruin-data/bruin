@@ -408,3 +408,134 @@ func TestAlterStatementsWithRealConfig(t *testing.T) {
 		assert.Contains(t, statementsOverride[0], "`test_target`", "Should use BigQuery backtick syntax")
 	})
 }
+
+// TestSchemaOnlyVsFullComparison tests that schema-only mode (default) skips statistics
+// while full mode (--full flag) includes detailed column statistics.
+func TestSchemaOnlyVsFullComparison(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	// Ensure ADBC driver is installed before running tests
+	if err := duck.EnsureADBCDriverInstalled(t.Context()); err != nil {
+		t.Skipf("skipping test: ADBC DuckDB driver not available: %v", err)
+	}
+
+	t.Parallel()
+
+	t.Run("schema-only mode skips column statistics", func(t *testing.T) {
+		t.Parallel()
+		ctx := t.Context()
+
+		tmpDir := t.TempDir()
+		dbPath := filepath.Join(tmpDir, "test_schema_only.db")
+
+		db := openTestDuckDB(t, dbPath)
+		defer db.Close()
+
+		// Create tables with data
+		execTestDuckDB(t, db, `
+			CREATE TABLE products_a (
+				id INTEGER PRIMARY KEY,
+				name VARCHAR(100),
+				price DECIMAL(10,2)
+			)
+		`)
+
+		execTestDuckDB(t, db, `
+			CREATE TABLE products_b (
+				id INTEGER PRIMARY KEY,
+				name VARCHAR(100),
+				price DECIMAL(10,2)
+			)
+		`)
+
+		// Insert test data
+		execTestDuckDB(t, db, `INSERT INTO products_a VALUES (1, 'Widget', 9.99), (2, 'Gadget', 19.99)`)
+		execTestDuckDB(t, db, `INSERT INTO products_b VALUES (1, 'Widget', 9.99), (2, 'Gadget', 29.99)`)
+
+		config := &duck.Config{Path: dbPath}
+		client, err := duck.NewClient(config)
+		require.NoError(t, err)
+
+		// Compare with schemaOnly=true (default behavior, no --full flag)
+		result, err := compareTables(ctx, client, client, "products_a", "products_b", true)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		// Schema should be detected
+		require.NotNil(t, result.Table1)
+		require.NotNil(t, result.Table1.Table)
+		require.NotEmpty(t, result.Table1.Table.Columns, "Should have columns in schema")
+
+		// But column statistics should be nil in schema-only mode
+		for _, col := range result.Table1.Table.Columns {
+			assert.Nil(t, col.Stats, "Column %s should not have statistics in schema-only mode", col.Name)
+		}
+		for _, col := range result.Table2.Table.Columns {
+			assert.Nil(t, col.Stats, "Column %s should not have statistics in schema-only mode", col.Name)
+		}
+
+		// Row count should be 0 in schema-only mode
+		assert.Equal(t, int64(0), result.Table1.RowCount, "Row count should be 0 in schema-only mode")
+		assert.Equal(t, int64(0), result.Table2.RowCount, "Row count should be 0 in schema-only mode")
+	})
+
+	t.Run("full mode includes column statistics", func(t *testing.T) {
+		t.Parallel()
+		ctx := t.Context()
+
+		tmpDir := t.TempDir()
+		dbPath := filepath.Join(tmpDir, "test_full_mode.db")
+
+		db := openTestDuckDB(t, dbPath)
+		defer db.Close()
+
+		// Create tables with string columns (avoids integer stats conversion issues in DuckDB)
+		execTestDuckDB(t, db, `
+			CREATE TABLE inventory_a (
+				item_name VARCHAR(100),
+				category VARCHAR(50)
+			)
+		`)
+
+		execTestDuckDB(t, db, `
+			CREATE TABLE inventory_b (
+				item_name VARCHAR(100),
+				category VARCHAR(50)
+			)
+		`)
+
+		// Insert test data
+		execTestDuckDB(t, db, `INSERT INTO inventory_a VALUES ('Apples', 'Fruit'), ('Oranges', 'Fruit')`)
+		execTestDuckDB(t, db, `INSERT INTO inventory_b VALUES ('Apples', 'Fruit'), ('Bananas', 'Fruit')`)
+
+		config := &duck.Config{Path: dbPath}
+		client, err := duck.NewClient(config)
+		require.NoError(t, err)
+
+		// Compare with schemaOnly=false (--full flag behavior)
+		result, err := compareTables(ctx, client, client, "inventory_a", "inventory_b", false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		// Schema should be detected
+		require.NotNil(t, result.Table1)
+		require.NotNil(t, result.Table1.Table)
+		require.NotEmpty(t, result.Table1.Table.Columns, "Should have columns in schema")
+
+		// Column statistics should be populated in full mode
+		hasStats := false
+		for _, col := range result.Table1.Table.Columns {
+			if col.Stats != nil {
+				hasStats = true
+				break
+			}
+		}
+		assert.True(t, hasStats, "At least one column should have statistics in full mode")
+
+		// Row count should be populated in full mode
+		assert.Equal(t, int64(2), result.Table1.RowCount, "Row count should be 2 in full mode")
+		assert.Equal(t, int64(2), result.Table2.RowCount, "Row count should be 2 in full mode")
+	})
+}

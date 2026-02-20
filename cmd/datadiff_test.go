@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -534,5 +535,102 @@ func TestGenerateAlterStatements(t *testing.T) {
 		assert.Contains(t, allStatements, `"employees_temp"`)
 		assert.Contains(t, allStatements, "ADD COLUMN")
 		assert.Contains(t, allStatements, "ALTER COLUMN")
+	})
+}
+
+// mockCostEstimator implements diff.CostEstimator for testing.
+type mockCostEstimator struct {
+	estimate *diff.TableDiffCostEstimate
+	err      error
+}
+
+func (m *mockCostEstimator) EstimateTableDiffCost(_ context.Context, tableName string, _ bool) (*diff.TableDiffCostEstimate, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	result := *m.estimate
+	result.TableName = tableName
+	return &result, nil
+}
+
+// mockNonCostEstimator is a type that doesn't implement CostEstimator.
+type mockNonCostEstimator struct{}
+
+func TestEstimateDiffCost(t *testing.T) {
+	t.Parallel()
+
+	t.Run("both connections support cost estimation", func(t *testing.T) {
+		t.Parallel()
+		conn1 := &mockCostEstimator{
+			estimate: &diff.TableDiffCostEstimate{
+				TotalBytesProcessed: 1000000,
+				TotalBytesBilled:    10485760, // 10MB minimum
+				Supported:           true,
+				Queries: []*diff.QueryCostEstimate{
+					{QueryType: "schema", BytesProcessed: 0},
+					{QueryType: "rowCount", BytesProcessed: 1000000},
+				},
+			},
+		}
+		conn2 := &mockCostEstimator{
+			estimate: &diff.TableDiffCostEstimate{
+				TotalBytesProcessed: 2000000,
+				TotalBytesBilled:    10485760,
+				Supported:           true,
+				Queries: []*diff.QueryCostEstimate{
+					{QueryType: "schema", BytesProcessed: 0},
+					{QueryType: "rowCount", BytesProcessed: 2000000},
+				},
+			},
+		}
+
+		result, err := estimateDiffCost(t.Context(), conn1, conn2, "table1", "table2", "conn1", "conn2", "conn1:table1", "conn2:table2", true)
+
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, int64(3000000), result.TotalBytesProcessed)
+		assert.Equal(t, int64(20971520), result.TotalBytesBilled)
+		assert.Equal(t, "conn1:table1", result.SourceTable.TableName)
+		assert.Equal(t, "conn2:table2", result.TargetTable.TableName)
+		assert.True(t, result.SourceTable.Supported)
+		assert.True(t, result.TargetTable.Supported)
+	})
+
+	t.Run("connection does not support cost estimation", func(t *testing.T) {
+		t.Parallel()
+		conn1 := &mockCostEstimator{
+			estimate: &diff.TableDiffCostEstimate{
+				TotalBytesProcessed: 1000000,
+				TotalBytesBilled:    10485760,
+				Supported:           true,
+			},
+		}
+		conn2 := &mockNonCostEstimator{}
+
+		result, err := estimateDiffCost(t.Context(), conn1, conn2, "table1", "table2", "conn1", "conn2", "conn1:table1", "conn2:table2", true)
+
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.True(t, result.SourceTable.Supported)
+		assert.False(t, result.TargetTable.Supported)
+		assert.Contains(t, result.TargetTable.UnsupportedReason, "does not support cost estimation")
+	})
+
+	t.Run("cost estimation error", func(t *testing.T) {
+		t.Parallel()
+		conn1 := &mockCostEstimator{
+			err: assert.AnError,
+		}
+		conn2 := &mockCostEstimator{
+			estimate: &diff.TableDiffCostEstimate{
+				Supported: true,
+			},
+		}
+
+		result, err := estimateDiffCost(t.Context(), conn1, conn2, "table1", "table2", "conn1", "conn2", "conn1:table1", "conn2:table2", true)
+
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "failed to estimate cost for table")
 	})
 }

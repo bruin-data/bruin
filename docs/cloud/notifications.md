@@ -10,6 +10,7 @@ Notifications are always defined on a pipeline level, inside the `pipeline.yml` 
 > You need to create a Slack connection in Bruin Cloud before you can use Slack notifications. You can do this by navigating to the `Connections` tab in the Bruin Cloud UI.
 
 Adding Slack notifications is just a few lines of code:
+
 ```yaml
 notifications:
   slack:
@@ -29,6 +30,7 @@ notifications:
 ```
 
 The full spec for Slack notifications is like this:
+
 ```yaml
 notifications:
   slack:
@@ -45,6 +47,7 @@ notifications:
 A Microsoft Teams webhook can be configured per channel, which means you can send notifications to multiple channels by adding separate connections.
 
 The full spec for Microsoft Teams notifications is like this:
+
 ```yaml
 notifications:
   ms_teams:
@@ -61,6 +64,7 @@ notifications:
 A Discord webhook can be configured per channel, which means you can send notifications to multiple channels by adding separate connections.
 
 The full spec for Discord notifications is like this:
+
 ```yaml
 notifications:
   discord:
@@ -77,6 +81,7 @@ notifications:
 Webhook notifications are generic and can target any HTTP endpoint you configure via a connection.
 
 The full spec for Webhook notifications is like this:
+
 ```yaml
 notifications:
   webhook:
@@ -86,6 +91,7 @@ notifications:
 ```
 
 Details:
+
 - Method: POST
 - Auth: Basic Auth (configure username/password in the Webhook connection)
 - Body: JSON
@@ -94,6 +100,7 @@ Details:
 Example payloads
 
 Success
+
 ```json
 {
   "pipeline": "daily_orders",
@@ -106,6 +113,7 @@ Success
 ```
 
 Column check failure
+
 ```json
 {
   "pipeline": "daily_orders",

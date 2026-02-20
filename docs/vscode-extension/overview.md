@@ -1,9 +1,8 @@
 # Bruin VS Code Extension
 
-The Bruin VS Code extension complements the Bruin CLI by offering a more visual and interactive approach to managing data pipelines. Integrated directly into VS Code, it simplifies tasks like building, managing, and deploying pipelines, making it easier for developers to interact with their projects.
+The Bruin VS Code extension complements the Bruin CLI by offering a more visual and interactive approach to managing data pipelines. Integrated directly into VS Code, it simplifies workflows like building, managing, and deploying pipelines, making it easier for developers to interact with their projects.
 
 ![Bruin Action Buttons](/vscode-extension/render-asset.gif)
-
 
 ## Syntax highlighting
 
@@ -24,16 +23,14 @@ The VS Code extension includes a built-in lineage panel that allows you to get a
 ![Lineage Overview](../public/vscode-extension/panels/lineage-panel/lineage-overview.png)
 
 ## Rendered Jinja queries
+
 Bruin supports [Jinja](../assets/templating/templating) out of the box, and while Jinja is powerful, it is often tricky to understand the resulting query. The VS Code extension includes a built-in query renderer, which shows you the rendered version of the query, not just for Jinja but also [materialized](../assets/materialization.md) versions of any query.
 
 ![Bruin Action Buttons](/vscode-extension/render-asset.gif)
 
-
-
 ## Local data catalog
 
 The VS Code extension visualizes Bruin definitions, including asset & column documentation. This means that you can simply view an asset file, and on the right side you can see all the relevant details about an asset, its columns, quality checks, and lineage.
-
 
 ## Bruin CLI integration
 
@@ -42,6 +39,7 @@ The VS Code extension gives a visual way of working with Bruin pipelines. It int
 ![CLI Integration](../public/vscode-extension/action-buttons.gif)
 
 ## Real-time updates and feedback
+
 The extension automatically runs things in the background and shows you feedback immediately as you type or change things.
 
 ![Real-Time Feedback](../public/vscode-extension/real-time-feedback.gif)

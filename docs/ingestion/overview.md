@@ -1,6 +1,7 @@
 # Data Ingestion
 
 Bruin has built-in data ingestion capabilities thanks to [ingestr](https://github.com/bruin-data/ingestr). The basic idea is simple:
+
 - you have data sources
 - each source may have one or more tables/streams
   - e.g. for Shopify, you have customers, orders, products, each being separate tables.
@@ -24,16 +25,19 @@ parameters:
 ```
 
 The interesting part is in the `parameters` list:
-- `source_connection`: the [connection](../getting-started/concepts.md#connection) that defines the source platform
+
+- `source_connection`: the [connection](/core-concepts/connections) that defines the source platform
 - `source_table`: the table name for that source on [ingestr](https://getbruin.com/docs/ingestr/supported-sources/shopify.html)
 - `destination`: the destination you'd like to load the data on
 
 Effectively, this asset will run `ingestr` in the background and load the data to your data warehouse.
 
 ## Examples
+
 There are various combinations of sources and destinations, but below are a few examples for common scenarios.
 
 ### Load data from Postgres -> BigQuery
+
 ```yaml
 name: raw.customers
 type: ingestr
@@ -44,6 +48,7 @@ parameters:
 ```
 
 ### Shopify Orders -> Snowflake
+
 ```yaml
 name: raw.orders
 type: ingestr
@@ -54,6 +59,7 @@ parameters:
 ```
 
 ### Kafka -> BigQuery
+
 ```yaml
 name: raw.topic1
 type: ingestr
@@ -62,4 +68,3 @@ parameters:
   source_table: topic1
   destination: bigquery
 ```
-

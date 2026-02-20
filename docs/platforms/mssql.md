@@ -5,8 +5,8 @@ Bruin supports Microsoft SQL Server as a data platform.
 > [!NOTE]
 > We tend to use "MS SQL" interchangeably to refer to Microsoft SQL Server, apologies for any confusion.
 
-
 ## Connection
+
 In order to set up a SQL Server connection in Bruin, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
 
 ```yaml
@@ -38,6 +38,7 @@ The `options` field allows you to customize the connection behavior with additio
 #### Default Behavior (No Options)
 
 When `options` is not specified, these defaults are applied:
+
 - `TrustServerCertificate=true` - Trust self-signed certificates
 - `encrypt=disable` - Disable encryption (suitable for local/Docker)
 - `app name=Bruin CLI` - Application identifier
@@ -45,6 +46,7 @@ When `options` is not specified, these defaults are applied:
 #### Common Use Cases
 
 **Production with Full Encryption:**
+
 ```yaml
 connections:
   mssql:
@@ -58,6 +60,7 @@ connections:
 ```
 
 **Azure SQL Database:**
+
 ```yaml
 connections:
   mssql:
@@ -71,6 +74,7 @@ connections:
 ```
 
 **Local Development (Explicit):**
+
 ```yaml
 connections:
   mssql:
@@ -84,6 +88,7 @@ connections:
 ```
 
 **Custom Connection Timeout:**
+
 ```yaml
 connections:
   mssql:
@@ -112,14 +117,16 @@ Common SQL Server connection string parameters:
 
 For a complete list of available parameters, see the [go-mssqldb documentation](https://github.com/microsoft/go-mssqldb?tab=readme-ov-file#connection-parameters-and-dsn).
 
-
 ## SQL Server Assets
 
 ### `ms.sql`
+
 Runs a materialized SQL Server asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Examples
+
 Run an MS SQL script to generate sales report
+
 ```bruin-sql
 /* @bruin
 name: sales_report
@@ -159,11 +166,11 @@ parameters:
     table: string
     poke_interval: int (optional)
 ```
+
 **Parameters**:
+
 - `table`: `schema_id.table_id` or (for default schema `dbo`) `table_id` format.
-- `poke_interval`: The interval between retries in seconds (default 30 seconds). 
-
-
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 ### `ms.sensor.query`
 
@@ -178,12 +185,14 @@ parameters:
 ```
 
 **Parameters**:
+
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
 #### Example: Partitioned upstream table
 
 Checks if the data available in upstream table for end date of the run.
+
 ```yaml
 name: analytics_123456789.events
 type: ms.sensor.query
@@ -194,6 +203,7 @@ parameters:
 #### Example: Streaming upstream table
 
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+
 ```yaml
 name: analytics_123456789.events
 type: ms.sensor.query
@@ -202,9 +212,11 @@ parameters:
 ```
 
 ### `ms.seed`
+
 `ms.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your MSSQL database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the MSSQL database.
 
-You can define seed assets in a file ending with `.yaml`:
+You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
+
 ```yaml
 name: dashboard.hello
 type: ms.seed
@@ -214,15 +226,16 @@ parameters:
 ```
 
 **Parameters**:
+
 - `path`: The path to the CSV file that will be loaded into the data platform. This can be a relative file path (relative to the asset definition file) or an HTTP/HTTPS URL to a publicly accessible CSV file.
 
 > [!WARNING]
 > When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime.
 
-
-####  Examples: Load csv into a MSSQL database
+#### Examples: Load csv into a MSSQL database
 
 The examples below show how to load a CSV into an MSSQL database.
+
 ```yaml
 name: dashboard.hello
 type: ms.seed
