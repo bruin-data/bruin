@@ -205,7 +205,7 @@ func normalize(s string) string {
 	return strings.Join(out, "\n")
 }
 
-func TestLockDependenciesCommand_FindRequirementsPath(t *testing.T) {
+func TestLockDependenciesCommand_FindDependencyPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -255,41 +255,41 @@ func TestLockDependenciesCommand_FindRequirementsPath(t *testing.T) {
 				builder: DefaultPipelineBuilder,
 			}
 
-			result, err := cmd.FindRequirementsPath(tt.inputPath)
+			result, err := cmd.FindDependencyPath(tt.inputPath)
 
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("FindRequirementsPath() expected error, got nil")
+					t.Errorf("FindDependencyPath() expected error, got nil")
 					return
 				}
 				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
-					t.Errorf("FindRequirementsPath() error = %v, want error containing %q", err, tt.wantErrContain)
+					t.Errorf("FindDependencyPath() error = %v, want error containing %q", err, tt.wantErrContain)
 				}
 				return
 			}
 
 			if err != nil {
-				t.Errorf("FindRequirementsPath() unexpected error: %v", err)
+				t.Errorf("FindDependencyPath() unexpected error: %v", err)
 				return
 			}
 
 			if result == nil {
-				t.Error("FindRequirementsPath() returned nil result")
+				t.Error("FindDependencyPath() returned nil result")
 				return
 			}
 
 			if tt.wantReqSuffix != "" && !strings.HasSuffix(result.RequirementsPath, tt.wantReqSuffix) {
-				t.Errorf("FindRequirementsPath() RequirementsPath = %v, want suffix %v", result.RequirementsPath, tt.wantReqSuffix)
+				t.Errorf("FindDependencyPath() RequirementsPath = %v, want suffix %v", result.RequirementsPath, tt.wantReqSuffix)
 			}
 
 			if result.InputPath == "" {
-				t.Error("FindRequirementsPath() InputPath should not be empty")
+				t.Error("FindDependencyPath() InputPath should not be empty")
 			}
 		})
 	}
 }
 
-func TestLockDependenciesCommand_FindRequirementsPath_PythonAssetWithoutRequirements(t *testing.T) {
+func TestLockDependenciesCommand_FindDependencyPath_PythonAssetWithoutDependencies(t *testing.T) {
 	t.Parallel()
 
 	// Create a temp directory with a Python asset but no requirements.txt
@@ -317,13 +317,13 @@ print("hello")
 		builder: DefaultPipelineBuilder,
 	}
 
-	_, err := cmd.FindRequirementsPath(pyPath)
+	_, err := cmd.FindDependencyPath(pyPath)
 	if err == nil {
-		t.Error("FindRequirementsPath() expected error for Python asset without requirements.txt, got nil")
+		t.Error("FindDependencyPath() expected error for Python asset without dependencies, got nil")
 		return
 	}
 
-	if !strings.Contains(err.Error(), "no requirements.txt found") {
-		t.Errorf("FindRequirementsPath() error = %v, want error containing 'no requirements.txt found'", err)
+	if !strings.Contains(err.Error(), "no dependency configuration found") {
+		t.Errorf("FindDependencyPath() error = %v, want error containing 'no dependency configuration found'", err)
 	}
 }

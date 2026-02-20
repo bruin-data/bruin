@@ -1,0 +1,6 @@
+[project]
+name = "test-mixed"
+version = "0.1.0"
+dependencies = [
+    "numpy>=1.24.0",
+]

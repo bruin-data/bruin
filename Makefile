@@ -20,7 +20,7 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud validate-links
+.PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud validate-links tools-update
 all: clean deps test build
 
 deps: 
@@ -96,6 +96,12 @@ format: lint-python
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
 	go tool golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
 	wait
+
+tools-update:
+	go get github.com/daixiang0/gci@latest
+	go get github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go get mvdan.cc/gofumpt@latest
+	@go mod tidy
 
 lint-python:
 	uv pip install --system sqlglot
