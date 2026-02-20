@@ -955,7 +955,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, col1, col2, updated_at, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.col1, source.col2, source.updated_at, source.updated_at, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);",
+				"  VALUES (source.id, source.col1, source.col2, source.updated_at, source.updated_at, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);", //nolint:dupword
 		},
 		{
 			name: "scd2_full_refresh_by_column_with_incremental_key",
@@ -1547,6 +1547,7 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"  \\);\n\n" +
 				"-- Insert new records and new versions of changed records\n" +
 				"INSERT INTO \"my\"\\.\"asset\" \\(\"id\", \"col1\", \"col2\", \"updated_at\", _valid_from, _valid_until, _is_current\\)\n" +
+				//nolint:dupword
 				"SELECT source\\.\"id\", source\\.\"col1\", source\\.\"col2\", source\\.\"updated_at\", source\\.\"updated_at\", TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
 				"FROM __bruin_scd2_tmp_.+ AS source\n" +
 				"WHERE NOT EXISTS \\(\n" +

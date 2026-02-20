@@ -655,7 +655,7 @@ func TestMaterializer_Render(t *testing.T) {
 				"WHEN NOT MATCHED THEN",
 				"WHEN NOT MATCHED BY SOURCE AND target\\._is_current = TRUE THEN",
 				"INSERT \\(ID, Name, updated_at, _valid_from, _valid_until, _is_current\\)",
-				"VALUES \\(source\\.ID, source\\.Name, source\\.updated_at, source\\.updated_at, TIMESTAMP '9999-12-31 00:00:00', TRUE\\)",
+				"VALUES \\(source\\.ID, source\\.Name, source\\.updated_at, source\\.updated_at, TIMESTAMP '9999-12-31 00:00:00', TRUE\\)", //nolint:dupword
 			},
 		},
 		{
