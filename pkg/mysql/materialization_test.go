@@ -438,6 +438,66 @@ COMMIT;$`),
 				") AS src;",
 		},
 		{
+			name: "scd2 by column incremental with incremental_key",
+			asset: &pipeline.Asset{
+				Name: "analytics.history",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR(50)"},
+					{Name: "updated_at", Type: "DATETIME"},
+				},
+			},
+			query: "SELECT id, name, updated_at FROM source",
+			wantTemplate: "START TRANSACTION;\n" +
+				"DROP TEMPORARY TABLE IF EXISTS %[1]s;\n" +
+				"CREATE TEMPORARY TABLE %[1]s AS SELECT id, name, updated_at FROM source;\n" +
+				"SET @current_scd2_ts = CURRENT_TIMESTAMP;\n" +
+				"UPDATE analytics.history AS target LEFT JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = @current_scd2_ts, target._is_current = FALSE WHERE target._is_current = TRUE AND source.id IS NULL;\n" +
+				"UPDATE analytics.history AS target JOIN %[1]s AS source ON target.id = source.id SET target._valid_until = CAST(source.updated_at AS DATETIME), target._is_current = FALSE WHERE target._is_current = TRUE AND (NOT (target.name <=> source.name) OR NOT (target.updated_at <=> source.updated_at));\n" +
+				"INSERT INTO analytics.history (id, name, updated_at, _valid_from, _valid_until, _is_current)\n" +
+				"SELECT source.id, source.name, source.updated_at, CAST(source.updated_at AS DATETIME), '9999-12-31 23:59:59', TRUE\n" +
+				"FROM %[1]s AS source\n" +
+				"LEFT JOIN analytics.history AS current ON current.id = source.id AND current._is_current = TRUE\n" +
+				"WHERE current.id IS NULL OR (NOT (current.name <=> source.name) OR NOT (current.updated_at <=> source.updated_at));\n" +
+				"DROP TEMPORARY TABLE IF EXISTS %[1]s;\n" +
+				"COMMIT;",
+		},
+		{
+			name: "scd2 by column full refresh with incremental_key",
+			asset: &pipeline.Asset{
+				Name: "analytics.history",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR(50)"},
+					{Name: "updated_at", Type: "DATETIME"},
+				},
+			},
+			query:       "SELECT id, name, updated_at FROM source",
+			fullRefresh: true,
+			wantExact: "DROP TABLE IF EXISTS analytics.history;\n" +
+				"CREATE TABLE analytics.history AS\n" +
+				"SELECT\n" +
+				"  src.id,\n" +
+				"  src.name,\n" +
+				"  src.updated_at,\n" +
+				"  CAST(src.updated_at AS DATETIME) AS _valid_from,\n" +
+				"  '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, name, updated_at FROM source\n" +
+				") AS src;",
+		},
+		{
 			name: "unsupported view strategy",
 			asset: &pipeline.Asset{
 				Name: "analytics.daily_orders",
