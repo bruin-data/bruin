@@ -372,9 +372,10 @@ func (s *Scheduler) MarkAll(status TaskInstanceStatus) {
 
 func (s *Scheduler) MarkAsset(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) {
 	instancesByType := s.taskNameMap[task.Name]
+	visited := make(map[TaskInstance]struct{})
 	for _, instance := range instancesByType {
 		for _, i := range instance {
-			s.MarkTaskInstance(i, status, downstream)
+			s.markTaskInstance(i, status, downstream, visited)
 		}
 	}
 }
@@ -415,6 +416,7 @@ func (s *Scheduler) MarkCheckInstancesByID(checkID string, asset *pipeline.Asset
 }
 
 func (s *Scheduler) MarkByTag(tag string, status TaskInstanceStatus, downstream bool) {
+	visited := make(map[TaskInstance]struct{})
 	for _, instance := range s.taskInstances {
 		asset := instance.GetAsset()
 		if len(asset.Tags) == 0 {
@@ -425,11 +427,20 @@ func (s *Scheduler) MarkByTag(tag string, status TaskInstanceStatus, downstream 
 			continue
 		}
 
-		s.MarkTaskInstance(instance, status, downstream)
+		s.markTaskInstance(instance, status, downstream, visited)
 	}
 }
 
 func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceStatus, downstream bool) {
+	s.markTaskInstance(instance, status, downstream, make(map[TaskInstance]struct{}))
+}
+
+func (s *Scheduler) markTaskInstance(instance TaskInstance, status TaskInstanceStatus, downstream bool, visited map[TaskInstance]struct{}) {
+	if _, seen := visited[instance]; seen {
+		return
+	}
+	visited[instance] = struct{}{}
+
 	oldStatus := instance.GetStatus()
 	instance.MarkAs(status)
 	if s.onStatusChange != nil && oldStatus != status {
@@ -445,11 +456,20 @@ func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceS
 	}
 
 	for _, d := range downstreams {
-		s.MarkTaskInstance(d, status, downstream)
+		s.markTaskInstance(d, status, downstream, visited)
 	}
 }
 
 func (s *Scheduler) MarkTaskInstanceIfNotSkipped(instance TaskInstance, status TaskInstanceStatus, markDownstream bool) {
+	s.markTaskInstanceIfNotSkipped(instance, status, markDownstream, make(map[TaskInstance]struct{}))
+}
+
+func (s *Scheduler) markTaskInstanceIfNotSkipped(instance TaskInstance, status TaskInstanceStatus, markDownstream bool, visited map[TaskInstance]struct{}) {
+	if _, seen := visited[instance]; seen {
+		return
+	}
+	visited[instance] = struct{}{}
+
 	if instance.GetStatus() == Skipped {
 		return
 	}
@@ -468,7 +488,7 @@ func (s *Scheduler) MarkTaskInstanceIfNotSkipped(instance TaskInstance, status T
 	}
 
 	for _, d := range downstreams {
-		s.MarkTaskInstanceIfNotSkipped(d, status, markDownstream)
+		s.markTaskInstanceIfNotSkipped(d, status, markDownstream, visited)
 	}
 }
 

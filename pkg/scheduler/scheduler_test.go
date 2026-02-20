@@ -407,6 +407,83 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 	assert.True(t, finished)
 }
 
+func TestScheduler_MarkAssetWithCycleDownstreamDoesNotLoop(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{
+				Name: "task1",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task2"},
+				},
+			},
+			{
+				Name: "task2",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task1"},
+				},
+			},
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+	s.MarkAll(Skipped)
+
+	done := make(chan struct{})
+	go func() {
+		s.MarkAsset(p.Assets[0], Pending, true)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("marking downstream tasks did not finish; possible cycle in recursion")
+	}
+
+	assert.Equal(t, 2, s.InstanceCountByStatus(Pending))
+}
+
+func TestScheduler_MarkTaskInstanceIfNotSkippedWithCycleDoesNotLoop(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{
+				Name: "task1",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task2"},
+				},
+			},
+			{
+				Name: "task2",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task1"},
+				},
+			},
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+	mainTask1 := s.taskNameMap["task1"][TaskInstanceTypeMain][0]
+
+	done := make(chan struct{})
+	go func() {
+		s.markTaskInstanceFailedWithDownstream(mainTask1)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("marking failed downstream tasks did not finish; possible cycle in recursion")
+	}
+
+	assert.Equal(t, 1, s.InstanceCountByStatus(Failed))
+	assert.Equal(t, 1, s.InstanceCountByStatus(UpstreamFailed))
+}
+
 func Test_GetAssetCountWithTasksPending(t *testing.T) {
 	t.Parallel()
 

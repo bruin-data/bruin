@@ -1219,6 +1219,51 @@ func TestParseDate(t *testing.T) {
 	}
 }
 
+func TestApplyAllFilters_CyclicDownstreamDoesNotLoop(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Name: "TestPipeline",
+		Assets: []*pipeline.Asset{
+			{
+				Name: "Task1",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "Task2"},
+				},
+			},
+			{
+				Name: "Task2",
+				Type: pipeline.AssetTypePython,
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "Task1"},
+				},
+			},
+		},
+		MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+	}
+
+	filter := &Filter{
+		SingleTask:        p.Assets[0],
+		IncludeDownstream: true,
+	}
+
+	s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+	done := make(chan error, 1)
+	go func() {
+		done <- ApplyAllFilters(t.Context(), filter, s, p)
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("ApplyAllFilters did not finish with a cyclic downstream selection")
+	}
+
+	assert.Equal(t, 2, s.InstanceCountByStatus(scheduler.Pending))
+}
+
 func TestValidation(t *testing.T) {
 	t.Parallel()
 	logger := zaptest.NewLogger(t).Sugar()
