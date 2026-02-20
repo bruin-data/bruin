@@ -179,7 +179,7 @@ type importWarning struct {
 func runImport(ctx context.Context, pipelinePath, connectionName, schema string, schemas []string, fillColumns bool, environment, configFile string) error {
 	fs := afero.NewOsFs()
 
-	conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
+	_, conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
 	if err != nil {
 		return errors2.Wrap(err, "failed to get database connection")
 	}
@@ -1334,7 +1334,7 @@ func runScheduledQueriesImport(ctx context.Context, pipelinePath, connectionName
 	fs := afero.NewOsFs()
 
 	// Get BigQuery connection
-	conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
+	_, conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
 	if err != nil {
 		return errors2.Wrap(err, "failed to get BigQuery connection")
 	}
