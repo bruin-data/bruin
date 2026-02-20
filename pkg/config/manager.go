@@ -129,6 +129,7 @@ type ConnectionGetter interface {
 
 type ConnectionDetailsGetter interface {
 	GetConnectionDetails(name string) any
+	GetConnectionType(name string) string
 }
 
 type ConnectionAndDetailsGetter interface {

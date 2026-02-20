@@ -49,10 +49,15 @@ type mockSecretFinder struct {
 
 func (m *mockSecretFinder) GetConnection(name string) any {
 	args := m.Called(name)
-	return args.String(0)
+	return args.Get(0)
 }
 
 func (m *mockSecretFinder) GetConnectionDetails(name string) any {
+	args := m.Called(name)
+	return args.Get(0)
+}
+
+func (m *mockSecretFinder) GetConnectionType(name string) string {
 	args := m.Called(name)
 	return args.String(0)
 }
@@ -176,12 +181,14 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
 					Return("", &NoRequirementsFoundError{})
 
-				msf.On("GetConnection", "key1").Return(config.GenericConnection{
+				msf.On("GetConnectionDetails", "key1").Return(&config.GenericConnection{
 					Value: "value1",
 				})
-				msf.On("GetConnection", "key2").Return(config.GenericConnection{
+				msf.On("GetConnectionDetails", "key2").Return(&config.GenericConnection{
 					Value: "value2",
 				})
+				msf.On("GetConnectionType", "key1").Return("generic")
+				msf.On("GetConnectionType", "key2").Return("generic")
 
 				runner.On("Run", mock.Anything, &executionContext{
 					repo:            repo,
@@ -189,15 +196,16 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					requirementsTxt: "",
 					asset:           assetWithSecrets,
 					envVariables: map[string]string{
-						"key1_injected":         "value1",
-						"key2":                  "value2",
-						"BRUIN_ASSET":           "my-asset",
-						"BRUIN_START_DATE":      "2024-01-01",
-						"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
-						"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
-						"BRUIN_END_DATE":        "2024-01-01",
-						"BRUIN_END_DATETIME":    "2024-01-01T00:00:00",
-						"BRUIN_END_TIMESTAMP":   "2024-01-01T00:00:00.000000Z",
+						"key1_injected":          "value1",
+						"key2":                   "value2",
+						"BRUIN_ASSET":            "my-asset",
+						"BRUIN_START_DATE":       "2024-01-01",
+						"BRUIN_START_DATETIME":   "2024-01-01T00:00:00",
+						"BRUIN_START_TIMESTAMP":  "2024-01-01T00:00:00.000000Z",
+						"BRUIN_END_DATE":         "2024-01-01",
+						"BRUIN_END_DATETIME":     "2024-01-01T00:00:00",
+						"BRUIN_END_TIMESTAMP":    "2024-01-01T00:00:00.000000Z",
+						"BRUIN_CONNECTION_TYPES": `{"key1_injected":"generic","key2":"generic"}`,
 					},
 				}).
 					Return(assert.AnError)

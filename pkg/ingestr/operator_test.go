@@ -49,6 +49,10 @@ func (s simpleConnectionFetcher) GetConnectionDetails(name string) any {
 	return s.connectionDetails[name]
 }
 
+func (s simpleConnectionFetcher) GetConnectionType(name string) string {
+	return ""
+}
+
 type mockRunner struct {
 	mock.Mock
 }

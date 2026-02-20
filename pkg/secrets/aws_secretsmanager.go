@@ -127,6 +127,14 @@ func (c *AWSSecretsManagerClient) GetConnectionDetails(name string) any {
 	return deets
 }
 
+func (c *AWSSecretsManagerClient) GetConnectionType(name string) string {
+	manager, err := c.getAWSSecretsManager(name)
+	if err != nil {
+		return ""
+	}
+	return manager.GetConnectionType(name)
+}
+
 func (c *AWSSecretsManagerClient) getAWSSecretsManager(name string) (config.ConnectionAndDetailsGetter, error) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
