@@ -302,7 +302,12 @@ func TestClient_GetDatabaseSummary(t *testing.T) {
     t.table_schema,
     t.table_name,
     t.table_type,
-    v.view_definition
+    v.view_definition,
+    t.create_time,
+    t.update_time,
+    t.table_rows,
+    t.data_length,
+    t.table_comment
 FROM
     information_schema.tables t
 LEFT JOIN
@@ -311,10 +316,10 @@ WHERE
     t.table_type IN \('BASE TABLE', 'VIEW'\)
     AND t.table_schema NOT IN \('information_schema', 'performance_schema', 'mysql', 'sys'\)
 ORDER BY t.table_schema, t.table_name;`).
-					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition"}).
-						AddRow("schema1", "table1", "BASE TABLE", nil).
-						AddRow("schema1", "table2", "BASE TABLE", nil).
-						AddRow("schema2", "table1", "BASE TABLE", nil))
+					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition", "create_time", "update_time", "table_rows", "data_length", "table_comment"}).
+						AddRow("schema1", "table1", "BASE TABLE", nil, nil, nil, nil, nil, nil).
+						AddRow("schema1", "table2", "BASE TABLE", nil, nil, nil, nil, nil, nil).
+						AddRow("schema2", "table1", "BASE TABLE", nil, nil, nil, nil, nil, nil))
 			},
 			want: &ansisql.DBDatabase{
 				Name: "mysql",
@@ -342,7 +347,12 @@ ORDER BY t.table_schema, t.table_name;`).
     t.table_schema,
     t.table_name,
     t.table_type,
-    v.view_definition
+    v.view_definition,
+    t.create_time,
+    t.update_time,
+    t.table_rows,
+    t.data_length,
+    t.table_comment
 FROM
     information_schema.tables t
 LEFT JOIN

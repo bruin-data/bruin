@@ -808,7 +808,13 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
     t.table_schema,
     t.table_name,
     t.table_type,
-    v.view_definition
+    v.view_definition,
+    t.created,
+    t.last_altered,
+    t.row_count,
+    t.bytes,
+    t.comment,
+    t.table_owner
 FROM
     TESTDB.INFORMATION_SCHEMA.TABLES t
 LEFT JOIN
@@ -817,10 +823,10 @@ WHERE
     t.table_type IN \('BASE TABLE', 'VIEW'\)
 AND t.table_schema != 'INFORMATION_SCHEMA'
 ORDER BY t.table_schema, t.table_name;`).
-					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition"}).
-						AddRow("SCHEMA1", "TABLE1", "BASE TABLE", nil).
-						AddRow("SCHEMA1", "TABLE2", "BASE TABLE", nil).
-						AddRow("SCHEMA2", "TABLE1", "BASE TABLE", nil))
+					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition", "created", "last_altered", "row_count", "bytes", "comment", "table_owner"}).
+						AddRow("SCHEMA1", "TABLE1", "BASE TABLE", nil, nil, nil, nil, nil, nil, nil).
+						AddRow("SCHEMA1", "TABLE2", "BASE TABLE", nil, nil, nil, nil, nil, nil, nil).
+						AddRow("SCHEMA2", "TABLE1", "BASE TABLE", nil, nil, nil, nil, nil, nil, nil))
 			},
 			want: &ansisql.DBDatabase{
 				Name: "TESTDB",
@@ -848,7 +854,13 @@ ORDER BY t.table_schema, t.table_name;`).
     t.table_schema,
     t.table_name,
     t.table_type,
-    v.view_definition
+    v.view_definition,
+    t.created,
+    t.last_altered,
+    t.row_count,
+    t.bytes,
+    t.comment,
+    t.table_owner
 FROM
     TESTDB.INFORMATION_SCHEMA.TABLES t
 LEFT JOIN
@@ -857,9 +869,9 @@ WHERE
     t.table_type IN \('BASE TABLE', 'VIEW'\)
 AND t.table_schema != 'INFORMATION_SCHEMA'
 ORDER BY t.table_schema, t.table_name;`).
-					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition"}).
-						AddRow("PUBLIC", "USERS", "BASE TABLE", nil).
-						AddRow("PUBLIC", "ACTIVE_USERS", "VIEW", "SELECT * FROM USERS WHERE ACTIVE = TRUE"))
+					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name", "table_type", "view_definition", "created", "last_altered", "row_count", "bytes", "comment", "table_owner"}).
+						AddRow("PUBLIC", "USERS", "BASE TABLE", nil, nil, nil, nil, nil, nil, nil).
+						AddRow("PUBLIC", "ACTIVE_USERS", "VIEW", "SELECT * FROM USERS WHERE ACTIVE = TRUE", nil, nil, nil, nil, nil, nil))
 			},
 			want: &ansisql.DBDatabase{
 				Name: "TESTDB",
@@ -881,7 +893,13 @@ ORDER BY t.table_schema, t.table_name;`).
     t.table_schema,
     t.table_name,
     t.table_type,
-    v.view_definition
+    v.view_definition,
+    t.created,
+    t.last_altered,
+    t.row_count,
+    t.bytes,
+    t.comment,
+    t.table_owner
 FROM
     TESTDB.INFORMATION_SCHEMA.TABLES t
 LEFT JOIN

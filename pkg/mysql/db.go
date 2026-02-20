@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -209,7 +210,12 @@ SELECT
     t.table_schema,
     t.table_name,
     t.table_type,
-    v.view_definition
+    v.view_definition,
+    t.create_time,
+    t.update_time,
+    t.table_rows,
+    t.data_length,
+    t.table_comment
 FROM
     information_schema.tables t
 LEFT JOIN
@@ -232,7 +238,7 @@ ORDER BY t.table_schema, t.table_name;
 	schemas := make(map[string]*ansisql.DBSchema)
 
 	for _, row := range result {
-		if len(row) != 4 {
+		if len(row) < 4 {
 			continue
 		}
 
@@ -252,6 +258,54 @@ ORDER BY t.table_schema, t.table_name;
 		if row[3] != nil {
 			if vd, ok := row[3].(string); ok {
 				viewDefinition = vd
+			}
+		}
+
+		// Extract additional metadata
+		var createdAt, lastModified *time.Time
+		if len(row) > 4 && row[4] != nil {
+			if t, ok := row[4].(time.Time); ok {
+				createdAt = &t
+			}
+		}
+		if len(row) > 5 && row[5] != nil {
+			if t, ok := row[5].(time.Time); ok {
+				lastModified = &t
+			}
+		}
+
+		var rowCount *int64
+		if len(row) > 6 && row[6] != nil {
+			switch v := row[6].(type) {
+			case int64:
+				rowCount = &v
+			case float64:
+				rc := int64(v)
+				rowCount = &rc
+			case uint64:
+				rc := int64(v)
+				rowCount = &rc
+			}
+		}
+
+		var sizeBytes *int64
+		if len(row) > 7 && row[7] != nil {
+			switch v := row[7].(type) {
+			case int64:
+				sizeBytes = &v
+			case float64:
+				sb := int64(v)
+				sizeBytes = &sb
+			case uint64:
+				sb := int64(v)
+				sizeBytes = &sb
+			}
+		}
+
+		var tableComment string
+		if len(row) > 8 && row[8] != nil {
+			if c, ok := row[8].(string); ok {
+				tableComment = c
 			}
 		}
 
@@ -278,6 +332,11 @@ ORDER BY t.table_schema, t.table_name;
 			Type:           dbTableType,
 			ViewDefinition: viewDefinition,
 			Columns:        []*ansisql.DBColumn{}, // Initialize empty columns array
+			CreatedAt:      createdAt,
+			LastModified:   lastModified,
+			RowCount:       rowCount,
+			SizeBytes:      sizeBytes,
+			Description:    tableComment,
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
 	}

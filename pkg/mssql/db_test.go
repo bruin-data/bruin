@@ -124,22 +124,37 @@ SELECT
     t.TABLE_SCHEMA,
     t.TABLE_NAME,
     t.TABLE_TYPE,
-    v.VIEW_DEFINITION
+    v.VIEW_DEFINITION,
+    o.create_date,
+    o.modify_date,
+    CAST(p.rows AS BIGINT) as row_count,
+    CAST(SUM(a.total_pages) * 8 * 1024 AS BIGINT) as size_bytes,
+    CAST(ep.value AS NVARCHAR(MAX)) as table_comment
 FROM
     INFORMATION_SCHEMA.TABLES t
 LEFT JOIN
     INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
+LEFT JOIN
+    sys.objects o ON o.name = t.TABLE_NAME AND SCHEMA_NAME(o.schema_id) = t.TABLE_SCHEMA
+LEFT JOIN
+    sys.partitions p ON o.object_id = p.object_id AND p.index_id IN (0, 1)
+LEFT JOIN
+    sys.allocation_units a ON p.partition_id = a.container_id
+LEFT JOIN
+    sys.extended_properties ep ON o.object_id = ep.major_id AND ep.minor_id = 0 AND ep.name = 'MS_Description'
 WHERE
     t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
     AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+GROUP BY
+    t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_TYPE, v.VIEW_DEFINITION, o.create_date, o.modify_date, p.rows, ep.value
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `
 				mock.ExpectQuery(expectedQuery).
-					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION"}).
-						AddRow("dbo", "users", "BASE TABLE", nil).
-						AddRow("dbo", "orders", "BASE TABLE", nil).
-						AddRow("sales", "products", "BASE TABLE", nil).
-						AddRow("sales", "categories", "BASE TABLE", nil))
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION", "create_date", "modify_date", "row_count", "size_bytes", "table_comment"}).
+						AddRow("dbo", "users", "BASE TABLE", nil, nil, nil, nil, nil, nil).
+						AddRow("dbo", "orders", "BASE TABLE", nil, nil, nil, nil, nil, nil).
+						AddRow("sales", "products", "BASE TABLE", nil, nil, nil, nil, nil, nil).
+						AddRow("sales", "categories", "BASE TABLE", nil, nil, nil, nil, nil, nil))
 			},
 			config: &Config{Database: "testdb"},
 			want: &ansisql.DBDatabase{
@@ -172,20 +187,35 @@ SELECT
     t.TABLE_SCHEMA,
     t.TABLE_NAME,
     t.TABLE_TYPE,
-    v.VIEW_DEFINITION
+    v.VIEW_DEFINITION,
+    o.create_date,
+    o.modify_date,
+    CAST(p.rows AS BIGINT) as row_count,
+    CAST(SUM(a.total_pages) * 8 * 1024 AS BIGINT) as size_bytes,
+    CAST(ep.value AS NVARCHAR(MAX)) as table_comment
 FROM
     INFORMATION_SCHEMA.TABLES t
 LEFT JOIN
     INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
+LEFT JOIN
+    sys.objects o ON o.name = t.TABLE_NAME AND SCHEMA_NAME(o.schema_id) = t.TABLE_SCHEMA
+LEFT JOIN
+    sys.partitions p ON o.object_id = p.object_id AND p.index_id IN (0, 1)
+LEFT JOIN
+    sys.allocation_units a ON p.partition_id = a.container_id
+LEFT JOIN
+    sys.extended_properties ep ON o.object_id = ep.major_id AND ep.minor_id = 0 AND ep.name = 'MS_Description'
 WHERE
     t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
     AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+GROUP BY
+    t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_TYPE, v.VIEW_DEFINITION, o.create_date, o.modify_date, p.rows, ep.value
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `
 				mock.ExpectQuery(expectedQuery).
-					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION"}).
-						AddRow("dbo", "users", "BASE TABLE", nil).
-						AddRow("dbo", "orders", "BASE TABLE", nil))
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION", "create_date", "modify_date", "row_count", "size_bytes", "table_comment"}).
+						AddRow("dbo", "users", "BASE TABLE", nil, nil, nil, nil, nil, nil).
+						AddRow("dbo", "orders", "BASE TABLE", nil, nil, nil, nil, nil, nil))
 			},
 			config: &Config{Database: "testdb"},
 			want: &ansisql.DBDatabase{
@@ -211,18 +241,33 @@ SELECT
     t.TABLE_SCHEMA,
     t.TABLE_NAME,
     t.TABLE_TYPE,
-    v.VIEW_DEFINITION
+    v.VIEW_DEFINITION,
+    o.create_date,
+    o.modify_date,
+    CAST(p.rows AS BIGINT) as row_count,
+    CAST(SUM(a.total_pages) * 8 * 1024 AS BIGINT) as size_bytes,
+    CAST(ep.value AS NVARCHAR(MAX)) as table_comment
 FROM
     INFORMATION_SCHEMA.TABLES t
 LEFT JOIN
     INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
+LEFT JOIN
+    sys.objects o ON o.name = t.TABLE_NAME AND SCHEMA_NAME(o.schema_id) = t.TABLE_SCHEMA
+LEFT JOIN
+    sys.partitions p ON o.object_id = p.object_id AND p.index_id IN (0, 1)
+LEFT JOIN
+    sys.allocation_units a ON p.partition_id = a.container_id
+LEFT JOIN
+    sys.extended_properties ep ON o.object_id = ep.major_id AND ep.minor_id = 0 AND ep.name = 'MS_Description'
 WHERE
     t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
     AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+GROUP BY
+    t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_TYPE, v.VIEW_DEFINITION, o.create_date, o.modify_date, p.rows, ep.value
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `
 				mock.ExpectQuery(expectedQuery).
-					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION"}))
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE", "VIEW_DEFINITION", "create_date", "modify_date", "row_count", "size_bytes", "table_comment"}))
 			},
 			config: &Config{Database: "testdb"},
 			want: &ansisql.DBDatabase{
@@ -240,14 +285,29 @@ SELECT
     t.TABLE_SCHEMA,
     t.TABLE_NAME,
     t.TABLE_TYPE,
-    v.VIEW_DEFINITION
+    v.VIEW_DEFINITION,
+    o.create_date,
+    o.modify_date,
+    CAST(p.rows AS BIGINT) as row_count,
+    CAST(SUM(a.total_pages) * 8 * 1024 AS BIGINT) as size_bytes,
+    CAST(ep.value AS NVARCHAR(MAX)) as table_comment
 FROM
     INFORMATION_SCHEMA.TABLES t
 LEFT JOIN
     INFORMATION_SCHEMA.VIEWS v ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
+LEFT JOIN
+    sys.objects o ON o.name = t.TABLE_NAME AND SCHEMA_NAME(o.schema_id) = t.TABLE_SCHEMA
+LEFT JOIN
+    sys.partitions p ON o.object_id = p.object_id AND p.index_id IN (0, 1)
+LEFT JOIN
+    sys.allocation_units a ON p.partition_id = a.container_id
+LEFT JOIN
+    sys.extended_properties ep ON o.object_id = ep.major_id AND ep.minor_id = 0 AND ep.name = 'MS_Description'
 WHERE
     t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
     AND t.TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+GROUP BY
+    t.TABLE_SCHEMA, t.TABLE_NAME, t.TABLE_TYPE, v.VIEW_DEFINITION, o.create_date, o.modify_date, p.rows, ep.value
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 `
 				mock.ExpectQuery(expectedQuery).
