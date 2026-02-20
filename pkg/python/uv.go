@@ -149,7 +149,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 }
 
 func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
-	flags := []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
+	flags := []string{"run", "--no-config", "--no-project", "--python", pythonVersion}
 	if execCtx.requirementsTxt != "" {
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 	}
@@ -197,7 +197,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return fmt.Errorf("failed to write to temp file: %w", err)
 	}
 
-	flags := []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
+	flags := []string{"run", "--no-config", "--no-project", "--python", pythonVersion}
 	if execCtx.requirementsTxt != "" {
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 	}
