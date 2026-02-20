@@ -1,5 +1,8 @@
 # Concepts
 
+> [!TIP]
+> This content has been reorganized. See [Core Concepts](/core-concepts/overview) for an updated guide to Bruin's features and concepts.
+
 Bruin has a few simple concepts that enable you to make the most out of it.
 
 ## Asset
@@ -55,13 +58,15 @@ An asset consists of two primary components:
 - definition: the metadata that enables Bruin to learn about the asset and its metadata
 - content: the actual query/logic that creates the asset
 
-The details on the asset definition can be seen [here](../assets/definition-schema.md).
+The details on the asset definition can be seen [here](/assets/definition-schema).
 
 ## Pipeline
 
 A pipeline is a group of assets that are executed together in the right order.
 For instance, if you have an asset that ingests data from an API, and another one that creates another table from the ingested data, you have a pipeline.
 Asset executions occur on a pipeline level.
+
+For complete pipeline documentation, see [Pipeline Definition](/pipelines/definition).
 
 A pipeline is defined with a `pipeline.yml` file, and all the assets need to be under a folder called `assets` next to this file:
 
@@ -111,9 +116,11 @@ bruin run /path/to/the/asset/file.sql
 
 A connection is a set of credentials that enable Bruin to communicate with an external platform.
 
+For complete connection documentation, see [Core Concepts: Connections](/core-concepts/connections).
+
 Platform specific connections have specific schemas, and "generic" connections are built as key-value pairs to inject secrets into your assets from outside.
 
-Connections are defined in the `.bruin.yml` file locally, although other [secrets backends](../secrets/overview.md) can be used. A connection has a name and the credentials.
+Connections are defined in the `.bruin.yml` file locally, although other [secrets backends](/secrets/overview) can be used. A connection has a name and the credentials.
 
 When you run a pipeline, Bruin will find this file in the repo root, parse the connections there, build client objects internally to interact with these external platforms and then run your assets.
 
@@ -150,7 +157,7 @@ default:
       - query: "SET my_var = 0"
 ```
 
-For more details, see [pipeline defaults](./pipeline.md#default-pipeline-level-defaults) and the template example [here](https://github.com/bruin-data/bruin/blob/main/templates/chess/pipeline.yml).
+For more details, see [pipeline defaults](/pipelines/definition#default-pipeline-level-defaults) and the template example [here](https://github.com/bruin-data/bruin/blob/main/templates/chess/pipeline.yml).
 
 ## Sensors
 

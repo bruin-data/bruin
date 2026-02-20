@@ -8,7 +8,7 @@ The Bruin extension works with SQL, Python, R, and YAML files. Open a file with 
 
 ## 2. Create a Bruin Section
 
-To access Bruin features, add a Bruin section in your code. You can do this manually or with the extension’s predefined snippets. You can learn more about Bruin sections in the [Asset Definition](../getting-started/concepts.md) **Concepts** section under **Asset Schema Definition**.
+To access Bruin features, add a Bruin section in your code. You can do this manually or with the extension’s predefined snippets. You can learn more about Bruin sections in the [Asset Definition](/assets/definition-schema) documentation.
 
 - **Using Snippets**: Quickly create Bruin sections with these snippets:
   - **For SQL Files**: Type `!fullsqlasset` and select the snippet to insert a Bruin section. Or, create it manually like this:

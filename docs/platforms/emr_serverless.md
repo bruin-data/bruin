@@ -375,7 +375,7 @@ if __name__ == "__main__":
 :::
 
 ::: tip
-If all your assets share the same `type` and `parameters.athena_connection`, you can set them as [defaults](/getting-started/concepts.html#defaults) in your `pipeline.yml` to avoid repeating them for each asset.
+If all your assets share the same `type` and `parameters.athena_connection`, you can set them as [defaults](/pipelines/definition#default-pipeline-level-defaults) in your `pipeline.yml` to avoid repeating them for each asset.
 
 ```yaml
 name: my-pipeline

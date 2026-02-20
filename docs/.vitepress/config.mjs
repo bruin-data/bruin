@@ -83,21 +83,36 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         ],
                     },
                     {
-                        text: "Features",
-                        link: "/getting-started/features",
+                        text: "Core Concepts",
+                        link: "/core-concepts/overview",
                         items: [
-                            {text: "Pipeline", link: "/getting-started/pipeline"},
-                            {text: "Glossary", link: "/getting-started/glossary"},
-                            {text: "Policies", link: "/getting-started/policies"},
-                            {text: "Environments", link: "/getting-started/devenv"},
-                            {text: "Variables", link: "/getting-started/pipeline-variables"},
-                            {text: "Concurrency", link: "/getting-started/concurrency"},
-                            {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
-                            {text: "Lakehouse Support", link: "/getting-started/lakehouse"},
-                        ]
+                            {
+                                text: "Environments",
+                                link: "/core-concepts/environments",
+                                items: [
+                                    {text: "Connections", link: "/core-concepts/connections"},
+                                    {text: "Secrets", link: "/core-concepts/secrets"},
+                                ],
+                            },
+                            {text: "Pipeline", link: "/pipelines/definition"},
+                            {text: "Asset", link: "/assets/definition-schema"},
+                            {
+                                text: "Variables",
+                                link: "/core-concepts/variables",
+                                items: [
+                                    {text: "Built-in Variables", link: "/core-concepts/variables#built-in-variables"},
+                                    {text: "Custom Variables", link: "/core-concepts/variables#custom-variables"},
+                                ],
+                            },
+                            {text: "Commands", link: "/commands/overview"},
+                        ],
                     },
-                    {text: "Concepts", link: "/getting-started/concepts"},
                     {text: "Design Principles", link: "/getting-started/design-principles"},
+                    {text: "Glossary", link: "/getting-started/glossary"},
+                    {text: "Policies", link: "/getting-started/policies"},
+                    {text: "Concurrency", link: "/getting-started/concurrency"},
+                    {text: "Bruin MCP", link: "/getting-started/bruin-mcp"},
+                    {text: "Lakehouse Support", link: "/getting-started/lakehouse"},
 
                     {
                         text: "Templates",
@@ -181,6 +196,16 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 ],
             },
             {
+                text: "Pipelines",
+                collapsed: false,
+                items: [
+                    {text: "Definition", link: "/pipelines/definition"},
+                    {text: "Scheduling", link: "/pipelines/definition#schedule"},
+                    {text: "Default Connections", link: "/pipelines/definition#default-connections"},
+                    {text: "Pipeline Defaults", link: "/pipelines/definition#default-pipeline-level-defaults"},
+                ],
+            },
+            {
                 text: "Assets",
                 collapsed: false,
                 items: [
@@ -199,7 +224,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
-                    {text: "Credentials", link: "/getting-started/credentials"},
                     {text: "Interval Modifiers", link: "/assets/interval-modifiers"},
                     {text: "Materialization", link: "/assets/materialization"},
                     {
@@ -363,9 +387,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             },
             {
                 text: "Commands",
+                link: "/commands/overview",
                 collapsed: false,
                 items: [
-                    {text: "AI Enhance", link: "/commands/ai-enhance"},
+                    {text: "Overview", link: "/commands/overview"},
+                    {text: "Run", link: "/commands/run"},
+                    {text: "Validate", link: "/commands/validate"},
                     {text: "Init", link: "/commands/init"},
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections"},
@@ -376,9 +403,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Lineage", link: "/commands/lineage"},
                     {text: "Patch", link: "/commands/patch"},
                     {text: "Render", link: "/commands/render"},
-                    {text: "Run", link: "/commands/run"},
                     {text: "Query", link: "/commands/query"},
-                    {text: "Validate", link: "/commands/validate"},
+                    {text: "AI Enhance", link: "/commands/ai-enhance"},
                 ],
 
             },

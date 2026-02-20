@@ -532,4 +532,4 @@ echo "=== Completed successfully at $(date) ===" >> "$LOG_FILE"
 
 - [Bruin CLI Documentation](/)
 - [Bruin Commands](/commands/run)
-- [Credentials Management](/getting-started/credentials)
+- [Environments & Credentials](/core-concepts/environments)
