@@ -57,6 +57,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/trino"
+	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -1782,6 +1783,38 @@ func SetupExecutors(
 		// we set the Python runners to run the checks on MsSQL
 		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		}
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuery) || estimateCustomCheckType == pipeline.AssetTypeVerticaQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeVerticaSeed) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeVerticaTableSensor) {
+		verticaOperator := vertica.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+			Mat: vertica.NewMaterializer(fullRefresh),
+		})
+		verticaCheckRunner := vertica.NewColumnCheckOperator(conn)
+		verticaQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		verticaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
+
+		mainExecutors[pipeline.AssetTypeVerticaQuery][scheduler.TaskInstanceTypeMain] = verticaOperator
+		mainExecutors[pipeline.AssetTypeVerticaQuery][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
+		mainExecutors[pipeline.AssetTypeVerticaQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeVerticaSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeVerticaSeed][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
+		mainExecutors[pipeline.AssetTypeVerticaSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeVerticaQuerySensor][scheduler.TaskInstanceTypeMain] = verticaQuerySensor
+		mainExecutors[pipeline.AssetTypeVerticaQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
+		mainExecutors[pipeline.AssetTypeVerticaQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeVerticaTableSensor][scheduler.TaskInstanceTypeMain] = verticaTableSensor
+		mainExecutors[pipeline.AssetTypeVerticaTableSensor][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
+		mainExecutors[pipeline.AssetTypeVerticaTableSensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		if estimateCustomCheckType == pipeline.AssetTypeVerticaQuery {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = verticaCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}

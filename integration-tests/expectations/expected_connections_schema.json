@@ -971,6 +971,12 @@
                         "$ref": "#/$defs/CustomerIoConnection"
                     },
                     "type": "array"
+                },
+                "vertica": {
+                    "items": {
+                        "$ref": "#/$defs/VerticaConnection"
+                    },
+                    "type": "array"
                 }
             },
             "additionalProperties": false,
@@ -3075,6 +3081,42 @@
                 "name",
                 "business_unit_id",
                 "api_key"
+            ]
+        },
+        "VerticaConnection": {
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "host": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "integer",
+                    "default": 5433
+                },
+                "database": {
+                    "type": "string"
+                },
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+                "name",
+                "username",
+                "password",
+                "host",
+                "port",
+                "database"
             ]
         },
         "WiseConnection": {
