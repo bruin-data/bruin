@@ -6,13 +6,16 @@ A project in Bruin is a Git-initialized repository that contains your data pipel
 
 In Bruin, **project = repository**. Your Bruin project is simply your Git repository, and all configuration lives in a single `.bruin.yml` file at the root of that repository.
 
-The `.bruin.yml` file must be located in the root directory of your Git repository. You can override this location using the `--config-file` flag:
+The `.bruin.yml` file must be located in the root directory of your Git repository. You can override this location using the `--config-file` flag or the `BRUIN_CONFIG_FILE` environment variable:
 
 ```bash
 bruin run --config-file /path/to/.bruin.yml
+
+# or
+export BRUIN_CONFIG_FILE=/path/to/.bruin.yml
 ```
 
-When you first run any `bruin` command, the `.bruin.yml` file is automatically created and added to `.gitignore` to keep credentials secure.
+The first time you run `bruin run`, `bruin validate`, or most other commands that need configuration, the `.bruin.yml` file is automatically created and added to `.gitignore` to keep credentials secure.
 
 ## Configuration File Structure
 
@@ -121,7 +124,7 @@ environments:
 ```
 
 > [!NOTE]
-> You can reference environment variables in connection fields using `${VAR_NAME}` placeholders, which are expanded at runtime (not when the file is parsed).
+> Environment variables are expanded at runtime, not when the file is parsed. This lets you use different values in different deployment environments and integrate with CI/CD secret injection.
 
 ## Local vs Cloud
 
@@ -129,7 +132,7 @@ environments:
 
 For local development, Bruin reads credentials from your local `.bruin.yml` file. This is the simplest setup:
 
-1. Run `bruin init` or any `bruin` command to create `.bruin.yml`
+1. Run `bruin init` to create `.bruin.yml`
 2. Add your connections to the file
 3. Run `bruin run` to execute your pipeline
 
