@@ -1,0 +1,172 @@
+package vertica
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/helpers"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+)
+
+var matMap = pipeline.AssetMaterializationMap{
+	pipeline.MaterializationTypeView: {
+		pipeline.MaterializationStrategyNone:          viewMaterializer,
+		pipeline.MaterializationStrategyAppend:        errorMaterializer,
+		pipeline.MaterializationStrategyCreateReplace: errorMaterializer,
+		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
+	},
+	pipeline.MaterializationTypeTable: {
+		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
+		pipeline.MaterializationStrategyTruncateInsert: ansisql.BuildTruncateInsertQuery,
+		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
+		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+	},
+}
+
+func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
+	return &pipeline.Materializer{
+		MaterializationMap: matMap,
+		FullRefresh:        fullRefresh,
+	}
+}
+
+func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
+	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s and asset type %s", asset.Materialization.Strategy, asset.Materialization.Type, asset.Type)
+}
+
+func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
+	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
+}
+
+func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
+	mat := task.Materialization
+
+	if len(mat.ClusterBy) > 0 {
+		return "", errors.New("Vertica assets do not support `cluster_by`")
+	}
+	query = strings.TrimSuffix(query, ";")
+
+	// Vertica does not support CREATE OR REPLACE TABLE, so we use DROP + CREATE TABLE AS
+	queries := []string{
+		"DROP TABLE IF EXISTS " + task.Name + " CASCADE",
+		fmt.Sprintf("CREATE TABLE %s AS (%s)", task.Name, query),
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
+	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
+}
+
+func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
+	mat := task.Materialization
+	strategy := pipeline.MaterializationStrategyDeleteInsert
+
+	if mat.IncrementalKey == "" {
+		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
+	}
+
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
+	queries := []string{
+		fmt.Sprintf("CREATE LOCAL TEMPORARY TABLE %s ON COMMIT PRESERVE ROWS AS (%s)", tempTableName, query),
+		fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
+		"DROP TABLE IF EXISTS " + tempTableName,
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
+	}
+
+	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
+	columnNames := asset.ColumnNames()
+
+	on := make([]string, 0, len(primaryKeys))
+	for _, key := range primaryKeys {
+		on = append(on, fmt.Sprintf("target.%s = source.%s", key, key))
+	}
+	onQuery := strings.Join(on, " AND ")
+
+	allColumnValues := strings.Join(columnNames, ", ")
+
+	sourceColumnValues := make([]string, len(columnNames))
+	for i, col := range columnNames {
+		sourceColumnValues[i] = "source." + col
+	}
+	sourceValues := strings.Join(sourceColumnValues, ", ")
+
+	whenMatchedThenQuery := ""
+
+	if len(mergeColumns) > 0 {
+		matchedUpdateStatements := make([]string, 0, len(mergeColumns))
+		for _, col := range mergeColumns {
+			if col.MergeSQL != "" {
+				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("target.%s = %s", col.Name, col.MergeSQL))
+			} else {
+				matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("target.%s = source.%s", col.Name, col.Name))
+			}
+		}
+
+		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
+		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
+	}
+
+	mergeLines := []string{
+		fmt.Sprintf("MERGE INTO %s target", asset.Name),
+		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		whenMatchedThenQuery,
+		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, sourceValues),
+	}
+
+	return strings.Join(mergeLines, "\n") + ";", nil
+}
+
+func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Materialization.IncrementalKey == "" {
+		return "", errors.New("incremental_key is required for time_interval strategy")
+	}
+
+	if asset.Materialization.TimeGranularity == "" {
+		return "", errors.New("time_granularity is required for time_interval strategy")
+	}
+
+	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp || asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
+		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
+	}
+
+	startVar := "{{start_timestamp}}"
+	endVar := "{{end_timestamp}}"
+	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
+		startVar = "{{start_date}}"
+		endVar = "{{end_date}}"
+	}
+
+	queries := []string{
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+			asset.Name,
+			asset.Materialization.IncrementalKey,
+			startVar,
+			endVar),
+		fmt.Sprintf(`INSERT INTO %s %s`,
+			asset.Name,
+			strings.TrimSuffix(query, ";")),
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}

@@ -119,6 +119,7 @@ type Connections struct {
 	Primer              []PrimerConnection              `yaml:"primer,omitempty" json:"primer,omitempty" mapstructure:"primer"`
 	Indeed              []IndeedConnection              `yaml:"indeed,omitempty" json:"indeed,omitempty" mapstructure:"indeed"`
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
+	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -1099,6 +1100,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.CustomerIo = append(env.Connections.CustomerIo, conn)
+	case "vertica":
+		var conn VerticaConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Vertica = append(env.Connections.Vertica, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1310,6 +1318,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Indeed = removeConnection(env.Connections.Indeed, connectionName)
 	case "customerio":
 		env.Connections.CustomerIo = removeConnection(env.Connections.CustomerIo, connectionName)
+	case "vertica":
+		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1433,6 +1443,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Primer, source.Primer)
 	mergeConnectionList(&c.Indeed, source.Indeed)
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
+	mergeConnectionList(&c.Vertica, source.Vertica)
 	c.buildConnectionKeyMap()
 	return nil
 }

@@ -123,6 +123,11 @@ const (
 	AssetTypeTableauWorksheet          = AssetType("tableau.worksheet")
 	AssetTypeTrinoQuery                = AssetType("trino.sql")
 	AssetTypeTrinoQuerySensor          = AssetType("trino.sensor.query")
+	AssetTypeVerticaQuery              = AssetType("vertica.sql")
+	AssetTypeVerticaQuerySensor        = AssetType("vertica.sensor.query")
+	AssetTypeVerticaSeed               = AssetType("vertica.seed")
+	AssetTypeVerticaSource             = AssetType("vertica.source")
+	AssetTypeVerticaTableSensor        = AssetType("vertica.sensor.table")
 	RunConfigApplyIntervalModifiers    = RunConfig("apply-interval-modifiers")
 	RunConfigEndDate                   = RunConfig("end-date")
 	RunConfigFullRefresh               = RunConfig("full-refresh")
@@ -183,6 +188,7 @@ var defaultMapping = map[string]string{
 	"sftp":                  "sftp-default",
 	"motherduck":            "motherduck-default",
 	"elasticsearch":         "elasticsearch-default",
+	"vertica":               "vertica-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", ".r", "task.yml", "task.yaml"}
@@ -664,6 +670,11 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeOracleSource:              "oracle",
 	AssetTypeS3KeySensor:               "aws",
 	AssetTypeElasticsearch:             "elasticsearch",
+	AssetTypeVerticaQuery:              "vertica",
+	AssetTypeVerticaSeed:               "vertica",
+	AssetTypeVerticaQuerySensor:        "vertica",
+	AssetTypeVerticaTableSensor:        "vertica",
+	AssetTypeVerticaSource:             "vertica",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -680,6 +691,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
 	"elasticsearch": AssetTypeElasticsearch,
+	"vertica":       AssetTypeVerticaQuery,
 }
 
 type SecretMapping struct {
@@ -1680,6 +1692,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeSnowflakeQuery:    0,
 		AssetTypePostgresQuery:     0,
 		AssetTypeMsSQLQuery:        0,
+		AssetTypeVerticaQuery:      0,
 		AssetTypeDatabricksQuery:   0,
 		AssetTypeRedshiftQuery:     0,
 		AssetTypeSynapseQuery:      0,
@@ -2285,6 +2298,7 @@ func (a *Asset) IsSQLAsset() bool {
 		AssetTypePostgresQuery:     true,
 		AssetTypeRedshiftQuery:     true,
 		AssetTypeMsSQLQuery:        true,
+		AssetTypeVerticaQuery:      true,
 		AssetTypeDatabricksQuery:   true,
 		AssetTypeSynapseQuery:      true,
 		AssetTypeFabricQuery:       true,
