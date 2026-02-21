@@ -46,6 +46,46 @@ func TestQuoteIdentifier(t *testing.T) {
 	}
 }
 
+func TestLimit(t *testing.T) {
+	t.Parallel()
+
+	db := &DB{config: &Config{Database: "testdb"}}
+
+	tests := []struct {
+		name  string
+		query string
+		limit int64
+		want  string
+	}{
+		{
+			name:  "basic query",
+			query: "SELECT * FROM users",
+			limit: 10,
+			want:  "SELECT * FROM (\nSELECT * FROM users\n) t LIMIT 10",
+		},
+		{
+			name:  "query with trailing semicolon",
+			query: "SELECT * FROM users;",
+			limit: 5,
+			want:  "SELECT * FROM (\nSELECT * FROM users\n) t LIMIT 5",
+		},
+		{
+			name:  "query with trailing whitespace and semicolons",
+			query: "SELECT * FROM users; \n\t",
+			limit: 100,
+			want:  "SELECT * FROM (\nSELECT * FROM users\n) t LIMIT 100",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := db.Limit(tt.query, tt.limit)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestBuildTableExistsQuery(t *testing.T) {
 	t.Parallel()
 

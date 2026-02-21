@@ -270,12 +270,18 @@ ORDER BY ordinal_position`,
 			continue
 		}
 
-		isNullableStr, _ := row[2].(string)
+		var isNullable bool
+		switch v := row[2].(type) {
+		case bool:
+			isNullable = v
+		case string:
+			isNullable = strings.ToUpper(v) == "YES" || strings.ToUpper(v) == "TRUE"
+		}
 
 		column := &ansisql.DBColumn{
 			Name:       columnName,
 			Type:       dataType,
-			Nullable:   strings.ToUpper(isNullableStr) == "YES" || strings.ToUpper(isNullableStr) == "TRUE",
+			Nullable:   isNullable,
 			PrimaryKey: false,
 			Unique:     false,
 		}
@@ -371,6 +377,11 @@ ORDER BY 1, 2`
 	})
 
 	return summary, nil
+}
+
+func (db *DB) Limit(query string, limit int64) string {
+	query = strings.TrimRight(query, "; \n\t")
+	return fmt.Sprintf("SELECT * FROM (\n%s\n) t LIMIT %d", query, limit)
 }
 
 func (db *DB) BuildTableExistsQuery(tableName string) (string, error) {

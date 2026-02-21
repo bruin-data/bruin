@@ -74,10 +74,14 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
+	// CTAS for temp table must be outside transaction (DDL auto-commits in Vertica).
+	// The DELETE+INSERT is wrapped in a transaction for atomicity.
 	queries := []string{
 		fmt.Sprintf("CREATE LOCAL TEMPORARY TABLE %s ON COMMIT PRESERVE ROWS AS (%s)", tempTableName, query),
+		"BEGIN TRANSACTION",
 		fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
+		"COMMIT",
 		"DROP TABLE IF EXISTS " + tempTableName,
 	}
 
@@ -158,6 +162,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	queries := []string{
+		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,
@@ -166,6 +171,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name,
 			strings.TrimSuffix(query, ";")),
+		"COMMIT",
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil

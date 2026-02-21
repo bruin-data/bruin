@@ -110,8 +110,10 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: "^CREATE LOCAL TEMPORARY TABLE __bruin_tmp_.+ ON COMMIT PRESERVE ROWS AS \\(SELECT 1\\);\n" +
+				"BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE dt IN \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
+				"COMMIT;\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;$",
 		},
 		{
@@ -250,8 +252,10 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
-			want: "^DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';$",
+			want: "^BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"COMMIT;$",
 		},
 		{
 			name: "time_interval_date",
@@ -265,8 +269,10 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
-			want: "^DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';$",
+			want: "^BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
+				"COMMIT;$",
 		},
 		{
 			name: "truncate+insert",
