@@ -131,11 +131,20 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 	envVariables["BRUIN_ASSET"] = t.Name
 	envVariables["BRUIN_THIS"] = t.Name
+	if t.Connection != "" {
+		envVariables["BRUIN_CONNECTION"] = t.Connection
+	}
 
+	connectionTypes := make(map[string]string)
 	for _, mapping := range t.Secrets {
 		conn := o.config.GetConnectionDetails(mapping.SecretKey)
 		if conn == nil {
 			return errors.New(fmt.Sprintf("there's no secret with the name '%s'.", mapping.SecretKey))
+		}
+
+		connType := o.config.GetConnectionType(mapping.SecretKey)
+		if connType != "" {
+			connectionTypes[mapping.InjectedKey] = connType
 		}
 
 		val, ok := conn.(*config.GenericConnection)
@@ -149,6 +158,14 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 			return errors.Wrapf(err, "failed to marshal connection")
 		}
 		envVariables[mapping.InjectedKey] = string(res)
+	}
+
+	if len(connectionTypes) > 0 {
+		typesJSON, err := json.Marshal(connectionTypes)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal connection types")
+		}
+		envVariables["BRUIN_CONNECTION_TYPES"] = string(typesJSON)
 	}
 
 	err = o.runner.Run(ctx, &executionContext{

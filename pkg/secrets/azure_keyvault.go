@@ -220,6 +220,14 @@ func (c *AzureKeyVaultClient) GetConnectionDetails(name string) any {
 	return deets
 }
 
+func (c *AzureKeyVaultClient) GetConnectionType(name string) string {
+	manager, err := c.getAzureKeyVaultManager(name)
+	if err != nil {
+		return ""
+	}
+	return manager.GetConnectionType(name)
+}
+
 func (c *AzureKeyVaultClient) getAzureKeyVaultManager(name string) (config.ConnectionAndDetailsGetter, error) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()

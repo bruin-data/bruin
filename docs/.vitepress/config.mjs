@@ -86,25 +86,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         text: "Core Concepts",
                         link: "/core-concepts/overview",
                         items: [
-                            {
-                                text: "Environments",
-                                link: "/core-concepts/environments",
-                                items: [
-                                    {text: "Connections", link: "/core-concepts/connections"},
-                                    {text: "Secrets", link: "/core-concepts/secrets"},
-                                ],
-                            },
-                            {text: "Pipeline", link: "/pipelines/definition"},
                             {text: "Asset", link: "/assets/definition-schema"},
-                            {
-                                text: "Variables",
-                                link: "/core-concepts/variables",
-                                items: [
-                                    {text: "Built-in Variables", link: "/core-concepts/variables#built-in-variables"},
-                                    {text: "Custom Variables", link: "/core-concepts/variables#custom-variables"},
-                                ],
-                            },
+                            {text: "Pipeline", link: "/pipelines/definition"},
                             {text: "Commands", link: "/commands/overview"},
+                            {text: "Project", link: "/core-concepts/project"},
+                            {text: "Variables", link: "/core-concepts/variables"},
                         ],
                     },
                     {text: "Design Principles", link: "/getting-started/design-principles"},

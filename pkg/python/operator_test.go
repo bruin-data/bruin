@@ -3,6 +3,7 @@ package python
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -49,10 +50,15 @@ type mockSecretFinder struct {
 
 func (m *mockSecretFinder) GetConnection(name string) any {
 	args := m.Called(name)
-	return args.String(0)
+	return args.Get(0)
 }
 
 func (m *mockSecretFinder) GetConnectionDetails(name string) any {
+	args := m.Called(name)
+	return args.Get(0)
+}
+
+func (m *mockSecretFinder) GetConnectionType(name string) string {
 	args := m.Called(name)
 	return args.String(0)
 }
@@ -65,6 +71,14 @@ func TestLocalOperator_RunTask(t *testing.T) {
 		ExecutableFile: pipeline.ExecutableFile{
 			Path: "/path/to/file.py",
 		},
+	}
+
+	assetWithConnection := &pipeline.Asset{
+		Name: "my-asset",
+		ExecutableFile: pipeline.ExecutableFile{
+			Path: "/path/to/file.py",
+		},
+		Connection: "my_bigquery",
 	}
 
 	assetWithSecrets := &pipeline.Asset{
@@ -84,10 +98,12 @@ func TestLocalOperator_RunTask(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		name    string
-		task    *pipeline.Asset
-		setup   func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder)
-		wantErr assert.ErrorAssertionFunc
+		name     string
+		task     *pipeline.Asset
+		pipeline *pipeline.Pipeline
+		ctx      func(t *testing.T) context.Context
+		setup    func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder)
+		wantErr  assert.ErrorAssertionFunc
 	}{
 		{
 			name: "should return an error if the repo finder fails",
@@ -176,12 +192,14 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
 					Return("", &NoRequirementsFoundError{})
 
-				msf.On("GetConnection", "key1").Return(config.GenericConnection{
+				msf.On("GetConnectionDetails", "key1").Return(&config.GenericConnection{
 					Value: "value1",
 				})
-				msf.On("GetConnection", "key2").Return(config.GenericConnection{
+				msf.On("GetConnectionDetails", "key2").Return(&config.GenericConnection{
 					Value: "value2",
 				})
+				msf.On("GetConnectionType", "key1").Return("generic")
+				msf.On("GetConnectionType", "key2").Return("generic")
 
 				runner.On("Run", mock.Anything, &executionContext{
 					repo:            repo,
@@ -189,20 +207,56 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					requirementsTxt: "",
 					asset:           assetWithSecrets,
 					envVariables: map[string]string{
-						"key1_injected":         "value1",
-						"key2":                  "value2",
-						"BRUIN_ASSET":           "my-asset",
-						"BRUIN_START_DATE":      "2024-01-01",
-						"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
-						"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
-						"BRUIN_END_DATE":        "2024-01-01",
-						"BRUIN_END_DATETIME":    "2024-01-01T00:00:00",
-						"BRUIN_END_TIMESTAMP":   "2024-01-01T00:00:00.000000Z",
+						"key1_injected":          "value1",
+						"key2":                   "value2",
+						"BRUIN_ASSET":            "my-asset",
+						"BRUIN_START_DATE":       "2024-01-01",
+						"BRUIN_START_DATETIME":   "2024-01-01T00:00:00",
+						"BRUIN_START_TIMESTAMP":  "2024-01-01T00:00:00.000000Z",
+						"BRUIN_END_DATE":         "2024-01-01",
+						"BRUIN_END_DATETIME":     "2024-01-01T00:00:00",
+						"BRUIN_END_TIMESTAMP":    "2024-01-01T00:00:00.000000Z",
+						"BRUIN_CONNECTION_TYPES": `{"key1_injected":"generic","key2":"generic"}`,
 					},
 				}).
 					Return(assert.AnError)
 			},
 			wantErr: assert.Error,
+		},
+		{
+			name:     "should inject BRUIN_CONNECTION when asset has a connection",
+			task:     assetWithConnection,
+			pipeline: &pipeline.Pipeline{Name: "test-pipeline"},
+			ctx: func(t *testing.T) context.Context {
+				ctx := t.Context()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+				return ctx
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return("path.to.module", nil)
+
+				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
+					Return("", &NoRequirementsFoundError{})
+
+				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
+					return ec.module == "path.to.module" &&
+						ec.envVariables["BRUIN_CONNECTION"] == "my_bigquery" &&
+						ec.envVariables["BRUIN_ASSET"] == "my-asset" &&
+						ec.envVariables["BRUIN_THIS"] == "my-asset" &&
+						ec.envVariables["BRUIN_PIPELINE"] == "test-pipeline"
+				})).
+					Return(nil)
+			},
+			wantErr: assert.NoError,
 		},
 		{
 			name: "should call runner with the found requirements.txt file",
@@ -256,7 +310,14 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				config:     secret,
 			}
 
-			tt.wantErr(t, o.RunTask(t.Context(), nil, tt.task))
+			var testCtx context.Context
+			if tt.ctx != nil {
+				testCtx = tt.ctx(t)
+			} else {
+				testCtx = t.Context()
+			}
+			p := tt.pipeline
+			tt.wantErr(t, o.RunTask(testCtx, p, tt.task))
 		})
 	}
 }

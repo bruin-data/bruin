@@ -108,6 +108,7 @@ import (
 
 type Manager struct {
 	AllConnectionDetails map[string]any
+	connectionTypes      map[string]string
 	BigQuery             map[string]*bigquery.Client
 	Snowflake            map[string]*snowflake.DB
 	Postgres             map[string]*postgres.Client
@@ -219,6 +220,13 @@ func (m *Manager) GetConnectionDetails(name string) any {
 		return nil
 	}
 	return connection
+}
+
+func (m *Manager) GetConnectionType(name string) string {
+	if m.connectionTypes == nil {
+		return ""
+	}
+	return m.connectionTypes[name]
 }
 
 func convertPKCS1ToPKCS8(privateKey string) string {
@@ -2677,6 +2685,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	connectionManager := &Manager{}
 	connectionManager.availableConnections = make(map[string]any)
 	connectionManager.AllConnectionDetails = make(map[string]any)
+	connectionManager.connectionTypes = cm.SelectedEnvironment.Connections.ConnectionsSummaryList()
 
 	var wg conc.WaitGroup
 	var errList []error

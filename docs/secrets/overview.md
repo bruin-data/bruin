@@ -2,7 +2,7 @@
 
 Bruin CLI normally retrieves secrets to instantiate connections to different platforms based on your local [`.bruin.yml`](./bruinyml), but it's also possible to use secret management solutions to provide these secrets.
 
-For a complete guide on managing environments and secrets, see the [Environments](/core-concepts/environments) documentation.
+For a complete guide on managing your project, environments, and secrets, see the [Project](/core-concepts/project) documentation.
 
 At the moment, Bruin supports the following:
 
