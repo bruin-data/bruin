@@ -110,7 +110,8 @@ func TestInjectConnectionEnv(t *testing.T) {
 
 			envVars := make(map[string]string)
 			connTypes := make(map[string]string)
-			InjectConnectionEnv(cfg, tt.asset, envVars, connTypes)
+			err := InjectConnectionEnv(cfg, tt.asset, envVars, connTypes)
+			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wantConnectionTypes, connTypes)
 			for k, v := range tt.wantEnv {

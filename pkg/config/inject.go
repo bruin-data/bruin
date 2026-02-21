@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
 )
 
 // InjectConnectionEnv auto-injects the asset's default connection into envVariables and connectionTypes
@@ -14,20 +15,20 @@ func InjectConnectionEnv(
 	asset *pipeline.Asset,
 	envVariables map[string]string,
 	connectionTypes map[string]string,
-) {
+) error {
 	if asset.Connection == "" {
-		return
+		return nil
 	}
 
 	for _, mapping := range asset.Secrets {
 		if mapping.SecretKey == asset.Connection {
-			return
+			return nil
 		}
 	}
 
 	conn := cfg.GetConnectionDetails(asset.Connection)
 	if conn == nil {
-		return
+		return nil
 	}
 
 	connType := cfg.GetConnectionType(asset.Connection)
@@ -37,12 +38,13 @@ func InjectConnectionEnv(
 
 	if val, ok := conn.(*GenericConnection); ok {
 		envVariables[asset.Connection] = val.Value
-		return
+		return nil
 	}
 
 	res, err := json.Marshal(conn)
 	if err != nil {
-		return
+		return errors.Wrapf(err, "failed to marshal connection '%s'", asset.Connection)
 	}
 	envVariables[asset.Connection] = string(res)
+	return nil
 }
