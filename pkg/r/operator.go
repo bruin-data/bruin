@@ -131,6 +131,9 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 	envVariables["BRUIN_ASSET"] = t.Name
 	envVariables["BRUIN_THIS"] = t.Name
+	if t.Connection != "" {
+		envVariables["BRUIN_CONNECTION"] = t.Connection
+	}
 
 	connectionTypes := make(map[string]string)
 	for _, mapping := range t.Secrets {
