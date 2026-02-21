@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -25,6 +26,9 @@ type Client struct {
 	schemaCreator *ansisql.SchemaCreator
 	schemaCache   *sync.Map // Cache for created schemas to avoid repeated CREATE SCHEMA calls
 	typeMapper    *diff.DatabaseTypeMapper
+	sqlParser     *sqlparser.SQLParser
+	parserOnce    sync.Once
+	parserErr     error
 }
 
 type PgConfig interface {
@@ -142,22 +146,18 @@ func (c *Client) Ping(ctx context.Context) error {
 	return nil
 }
 
+func (c *Client) initParser() error {
+	c.parserOnce.Do(func() {
+		c.sqlParser, c.parserErr = sqlparser.NewSQLParser(false)
+	})
+	return c.parserErr
+}
+
 func (c *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
-	// Wrap the query in a PostgreSQL test pattern that doesn't execute
-	testQuery := fmt.Sprintf(`DO $TEST$ BEGIN RETURN;
-    %s
-END; $TEST$;`, query.String())
-
-	rows, err := c.connection.Query(ctx, testQuery)
-	if err == nil {
-		err = rows.Err()
+	if err := c.initParser(); err != nil {
+		return false, errors.Wrap(err, "failed to initialize sql parser")
 	}
-
-	if rows != nil {
-		defer rows.Close()
-	}
-
-	return err == nil, err
+	return c.sqlParser.Validate(query.String(), "postgres")
 }
 
 func (c *Client) GetDatabases(ctx context.Context) ([]string, error) {
