@@ -295,3 +295,7 @@ func (m *mockConnectionGetter) GetConnection(name string) any {
 func (m *mockConnectionGetter) GetConnectionDetails(name string) any {
 	return m.details
 }
+
+func (m *mockConnectionGetter) GetConnectionType(name string) string {
+	return ""
+}

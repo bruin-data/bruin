@@ -456,6 +456,11 @@ func TestNewManagerFromConfig(t *testing.T) {
 						ClientSecret: "",
 					}),
 				},
+				connectionTypes: map[string]string{
+					"key1": "personio",
+					"key2": "personio",
+					"key3": "personio",
+				},
 				Personio: map[string]*personio.Client{
 					"key1": personio.NewClient(personio.Config{
 						ClientID:     "id1",

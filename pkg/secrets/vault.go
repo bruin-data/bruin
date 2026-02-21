@@ -162,6 +162,14 @@ func (c *Client) GetConnectionDetails(name string) any {
 	return deets
 }
 
+func (c *Client) GetConnectionType(name string) string {
+	manager, err := c.getVaultManager(name)
+	if err != nil {
+		return ""
+	}
+	return manager.GetConnectionType(name)
+}
+
 func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter, error) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()

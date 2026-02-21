@@ -164,6 +164,14 @@ func (c *DopplerClient) GetConnectionDetails(name string) any {
 	return deets
 }
 
+func (c *DopplerClient) GetConnectionType(name string) string {
+	manager, err := c.getDopplerManager(name)
+	if err != nil {
+		return ""
+	}
+	return manager.GetConnectionType(name)
+}
+
 func (c *DopplerClient) getDopplerManager(name string) (config.ConnectionAndDetailsGetter, error) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
