@@ -9,7 +9,8 @@ Please reach out to us via our [Slack Community](https://join.slack.com/t/bruind
 Register for [Bruin Cloud](https://cloud.getbruin.com/register) to deploy your pipelines: registration is free (no credit card required) and includes complimentary credits to get started.
 
 ### YouTube Video Tutorial Playlist
-[![Video Tutorials Playlist](https://img.youtube.com/vi/f6vg7lGqZx0/hqdefault.jpg)](https://www.youtube.com/playlist?list=PLnRr-L-cuxO4lUUdkXV5YPHT5ZEcEeXQD)
+- [Video Tutorials Playlist](https://www.youtube.com/playlist?list=PLnRr-L-cuxO4lUUdkXV5YPHT5ZEcEeXQD)
+- [Bruin Core Concepts Playlist](https://www.youtube.com/playlist?list=PLnRr-L-cuxO72ws5jYS8oyKMWs-AosgdP)
 
 ## Learning Goals
 
