@@ -6,12 +6,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	_ "github.com/vertica/vertica-sql-go"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/vertica/vertica-sql-go"
-	"github.com/pkg/errors"
 )
 
 type DB struct {
@@ -166,7 +167,7 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 
 	schemaName := tableParts[0]
 	q := &query.Query{
-		Query: fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", QuoteIdentifier(schemaName)),
+		Query: "CREATE SCHEMA IF NOT EXISTS " + QuoteIdentifier(schemaName),
 	}
 
 	return db.RunQueryWithoutResult(ctx, q)

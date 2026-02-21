@@ -47,7 +47,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	mat := task.Materialization
 
 	if len(mat.ClusterBy) > 0 {
-		return "", errors.New("Vertica assets do not support `cluster_by`")
+		return "", errors.New("vertica assets do not support `cluster_by`")
 	}
 	query = strings.TrimSuffix(query, ";")
 
