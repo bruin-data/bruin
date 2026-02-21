@@ -3,10 +3,9 @@ package vertica
 import (
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 func TestMaterializer_Render(t *testing.T) {

@@ -6,13 +6,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
-	_ "github.com/vertica/vertica-sql-go"
-
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	_ "github.com/vertica/vertica-sql-go"
 )
 
 type DB struct {
