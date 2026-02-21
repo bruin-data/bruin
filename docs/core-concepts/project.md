@@ -1,20 +1,23 @@
-# Environments
+# Project
 
-Environments are configuration contexts that define how Bruin connects to external systems. They enable you to run the same pipeline code against different targets—for example, a development database during testing and a production database in deployment.
-
-All environment configuration is stored in the `.bruin.yml` file, which is automatically created when you first run Bruin and added to `.gitignore` to keep credentials secure.
+A project in Bruin is a Git-initialized repository that contains your data pipelines. The project is defined by the `.bruin.yml` configuration file, which stores your environments, connections, and secrets.
 
 ## Overview
 
-An environment consists of:
+In Bruin, **project = repository**. Your Bruin project is simply your Git repository, and all configuration lives in a single `.bruin.yml` file at the root of that repository.
 
-- **[Connections](/core-concepts/connections)**: Built-in connection configurations for data platforms and ingestion sources
-- **[Secrets](/core-concepts/secrets)**: Custom credentials and API keys for injection into assets
-- **Schema prefix**: Optional prefix for schema-based environment isolation
+The `.bruin.yml` file must be located in the root directory of your Git repository. You can override this location using the `--config-file` flag or the `BRUIN_CONFIG_FILE` environment variable:
 
-## File Structure
+```bash
+bruin run --config-file /path/to/.bruin.yml
 
-The `.bruin.yml` file is expected to be in the root of your Git repository. You can specify a different location using `--config-file /path/to/.bruin.yml`.
+# or
+export BRUIN_CONFIG_FILE=/path/to/.bruin.yml
+```
+
+The first time you run `bruin run`, `bruin validate`, or most other commands that need configuration, the `.bruin.yml` file is automatically created and added to `.gitignore` to keep credentials secure.
+
+## Configuration File Structure
 
 ```yaml
 default_environment: default
@@ -59,7 +62,25 @@ environments:
 | `default_environment` | string | No | Environment to use when none is specified. Defaults to `default`. |
 | `environments` | map | Yes | Map of environment names to their configurations. |
 
-## Environment Configuration
+## Key Concepts
+
+The `.bruin.yml` file contains three main concepts that define how your project connects to external systems:
+
+### Connections
+
+Connections are sets of credentials that enable Bruin to communicate with external platforms—both data platforms (BigQuery, Snowflake, PostgreSQL) and ingestion sources (Shopify, HubSpot, Stripe).
+
+[Learn more about Connections →](/core-concepts/connections)
+
+### Secrets
+
+Secrets are custom credentials—API keys, passwords, tokens—that can be injected into your assets during execution. They complement connections for cases where you need direct access to credentials in your code.
+
+[Learn more about Secrets →](/core-concepts/secrets)
+
+### Environments
+
+Environments are configuration contexts that enable you to run the same pipeline code against different targets. For example, you can use a development database during testing and a production database in deployment.
 
 Each environment contains:
 
@@ -103,7 +124,7 @@ environments:
 ```
 
 > [!NOTE]
-> You can reference environment variables in connection fields using `${VAR_NAME}` placeholders, which are expanded at runtime (not when the file is parsed).
+> Environment variables are expanded at runtime, not when the file is parsed. This lets you use different values in different deployment environments and integrate with CI/CD secret injection.
 
 ## Local vs Cloud
 
@@ -111,7 +132,7 @@ environments:
 
 For local development, Bruin reads credentials from your local `.bruin.yml` file. This is the simplest setup:
 
-1. Run `bruin init` or any `bruin` command to create `.bruin.yml`
+1. Run `bruin init` to create `.bruin.yml`
 2. Add your connections to the file
 3. Run `bruin run` to execute your pipeline
 

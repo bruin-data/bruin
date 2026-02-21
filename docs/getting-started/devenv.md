@@ -1,7 +1,7 @@
 # Developer Environments
 
 > [!TIP]
-> This page covers advanced environment configuration. For a general overview of environments in Bruin, see [Core Concepts: Environments](/core-concepts/environments).
+> This page covers advanced environment configuration. For a general overview of environments in Bruin, see [Core Concepts: Project](/core-concepts/project).
 
 Bruin has native support for running the same pipeline against multiple environments. This feature is very useful for testing and development, as it allows you to quickly switch between different environments without having to change your code.
 

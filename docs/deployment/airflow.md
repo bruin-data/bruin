@@ -827,4 +827,4 @@ Always set `is_delete_operator_pod=True` to clean up completed pods.
 - [Apache Airflow Documentation](https://airflow.apache.org/docs/)
 - [Bruin Docker Images](https://github.com/bruin-data/bruin/pkgs/container/bruin)
 - [Bruin CLI Documentation](/)
-- [Environments & Credentials](/core-concepts/environments)
+- [Project & Credentials](/core-concepts/project)
