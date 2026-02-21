@@ -247,6 +247,9 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
 					Return("", &NoRequirementsFoundError{})
 
+				// Auto-inject: the connection is looked up even though it's not in secrets
+				msf.On("GetConnectionDetails", "my_bigquery").Return(nil)
+
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.module == "path.to.module" &&
 						ec.envVariables["BRUIN_CONNECTION"] == "my_bigquery" &&

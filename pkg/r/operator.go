@@ -136,6 +136,8 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 
 	connectionTypes := make(map[string]string)
+	config.InjectConnectionEnv(o.config, t, envVariables, connectionTypes)
+
 	for _, mapping := range t.Secrets {
 		conn := o.config.GetConnectionDetails(mapping.SecretKey)
 		if conn == nil {
