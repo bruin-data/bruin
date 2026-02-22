@@ -277,7 +277,7 @@ func TestSetupVariables(t *testing.T) {
 		assert.Equal(t, map[string]any{"type": "integer"}, schema["count"])
 	})
 
-	t.Run("empty variables do not inject BRUIN_VARS_SCHEMA", func(t *testing.T) {
+	t.Run("empty variables set BRUIN_VARS_SCHEMA to empty object", func(t *testing.T) {
 		t.Parallel()
 
 		ctx := t.Context()
@@ -294,7 +294,6 @@ func TestSetupVariables(t *testing.T) {
 		result, err := env.SetupVariables(ctx, p, &pipeline.Asset{}, nil)
 		require.NoError(t, err)
 
-		_, exists := result["BRUIN_VARS_SCHEMA"]
-		assert.False(t, exists, "BRUIN_VARS_SCHEMA should not be set for empty variables")
+		assert.Equal(t, "{}", result["BRUIN_VARS_SCHEMA"])
 	})
 }

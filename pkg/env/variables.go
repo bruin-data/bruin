@@ -63,6 +63,7 @@ func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.A
 func envInjectVariables(env map[string]string, variables map[string]any, schema map[string]any) (map[string]string, error) {
 	if len(variables) == 0 {
 		env["BRUIN_VARS"] = "{}"
+		env["BRUIN_VARS_SCHEMA"] = "{}"
 		return env, nil
 	}
 
