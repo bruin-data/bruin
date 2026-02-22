@@ -2,11 +2,14 @@ package env_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetupVariables(t *testing.T) {
@@ -198,6 +201,66 @@ func TestSetupVariables(t *testing.T) {
 			},
 		},
 	}
+
+	// Verify BRUIN_VARS_SCHEMA is injected for the "with variables" case
+	t.Run("with variables injects BRUIN_VARS_SCHEMA", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := t.Context()
+		ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+		ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+
+		p := &pipeline.Pipeline{
+			Name: "test-pipeline",
+			Variables: pipeline.Variables{
+				"env": map[string]any{
+					"type":    "string",
+					"default": "dev",
+				},
+				"count": map[string]any{
+					"type":    "integer",
+					"default": 42,
+				},
+			},
+		}
+
+		result, err := env.SetupVariables(ctx, p, &pipeline.Asset{}, nil)
+		require.NoError(t, err)
+
+		raw, exists := result["BRUIN_VARS_SCHEMA"]
+		require.True(t, exists, "BRUIN_VARS_SCHEMA should be set")
+
+		var schema map[string]any
+		err = json.Unmarshal([]byte(raw), &schema)
+		require.NoError(t, err)
+
+		assert.Equal(t, map[string]any{"type": "string"}, schema["env"])
+		assert.Equal(t, map[string]any{"type": "integer"}, schema["count"])
+	})
+
+	t.Run("empty variables do not inject BRUIN_VARS_SCHEMA", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := t.Context()
+		ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+		ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+		ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+
+		p := &pipeline.Pipeline{
+			Name: "test-pipeline",
+		}
+
+		result, err := env.SetupVariables(ctx, p, &pipeline.Asset{}, nil)
+		require.NoError(t, err)
+
+		_, exists := result["BRUIN_VARS_SCHEMA"]
+		assert.False(t, exists, "BRUIN_VARS_SCHEMA should not be set for empty variables")
+	})
 
 	defaultPipeline := &pipeline.Pipeline{
 		Name: "test-pipeline",

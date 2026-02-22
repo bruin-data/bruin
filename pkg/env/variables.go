@@ -19,7 +19,7 @@ func SetupVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset
 		return nil, err
 	}
 
-	env, err = envInjectVariables(env, p.Variables.Value())
+	env, err = envInjectVariables(env, p.Variables.Value(), p.Variables.SchemaMap())
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.A
 	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, &executionDate, p.Name, runID, fullRefresh), nil
 }
 
-func envInjectVariables(env map[string]string, variables map[string]any) (map[string]string, error) {
+func envInjectVariables(env map[string]string, variables map[string]any, schema map[string]any) (map[string]string, error) {
 	if len(variables) == 0 {
 		env["BRUIN_VARS"] = "{}"
 		return env, nil
@@ -72,5 +72,14 @@ func envInjectVariables(env map[string]string, variables map[string]any) (map[st
 	}
 
 	env["BRUIN_VARS"] = string(doc)
+
+	if len(schema) > 0 {
+		schemaDoc, err := json.Marshal(schema)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling variables schema to JSON: %w", err)
+		}
+		env["BRUIN_VARS_SCHEMA"] = string(schemaDoc)
+	}
+
 	return env, nil
 }
