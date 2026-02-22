@@ -35,6 +35,14 @@ func (m *mockModuleFinder) FindRequirementsTxtInPath(path string, executable *pi
 	return args.Get(0).(string), args.Error(1)
 }
 
+func (m *mockModuleFinder) FindDependencyConfig(path string, executable *pipeline.ExecutableFile) (*DependencyConfig, error) {
+	args := m.Called(path, executable)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*DependencyConfig), args.Error(1)
+}
+
 type mockRunner struct {
 	mock.Mock
 }
@@ -128,7 +136,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 			wantErr: assert.Error,
 		},
 		{
-			name: "should fail if requirement finding fails",
+			name: "should continue without dependencies if FindDependencyConfig fails",
 			task: task,
 			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
 				repo := &git.Repo{Path: "/path/to/repo"}
@@ -136,15 +144,23 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
-				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
-					Return("", assert.AnError)
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(nil, assert.AnError)
+
+				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
+					return ec.repo == repo &&
+						ec.module == testModule &&
+						ec.requirementsTxt == "" &&
+						ec.dependencyConfig != nil &&
+						ec.dependencyConfig.Type == DependencyTypeNone
+				})).Return(assert.AnError)
 			},
 			wantErr: assert.Error,
 		},
 		{
-			name: "should call runner if there is no requirements.txt file",
+			name: "should call runner if there is no dependency configuration",
 			task: task,
 			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
 				repo := &git.Repo{Path: "/path/to/repo"}
@@ -152,29 +168,18 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
-				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
-					Return("", &NoRequirementsFoundError{})
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
 
-				runner.On("Run", mock.Anything, &executionContext{
-					repo:            repo,
-					module:          "path.to.module",
-					requirementsTxt: "",
-					asset:           task,
-					envVariables: map[string]string{
-						"BRUIN_ASSET":           "my-asset",
-						"BRUIN_START_DATE":      "2024-01-01",
-						"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
-						"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
-						"BRUIN_END_DATE":        "2024-01-01",
-						"BRUIN_END_DATETIME":    "2024-01-01T00:00:00",
-						"BRUIN_END_TIMESTAMP":   "2024-01-01T00:00:00.000000Z",
-						"BRUIN_PIPELINE":        "test-pipeline",
-						"BRUIN_RUN_ID":          "test-run",
-					},
-				}).
-					Return(assert.AnError)
+				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
+					return ec.repo == repo &&
+						ec.module == testModule &&
+						ec.requirementsTxt == "" &&
+						ec.dependencyConfig.Type == DependencyTypeNone &&
+						ec.envVariables["BRUIN_ASSET"] == "my-asset"
+				})).Return(assert.AnError)
 			},
 			wantErr: assert.Error,
 		},
@@ -187,10 +192,10 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
-				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
-					Return("", &NoRequirementsFoundError{})
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
 
 				msf.On("GetConnectionDetails", "key1").Return(&config.GenericConnection{
 					Value: "value1",
@@ -201,25 +206,15 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				msf.On("GetConnectionType", "key1").Return("generic")
 				msf.On("GetConnectionType", "key2").Return("generic")
 
-				runner.On("Run", mock.Anything, &executionContext{
-					repo:            repo,
-					module:          "path.to.module",
-					requirementsTxt: "",
-					asset:           assetWithSecrets,
-					envVariables: map[string]string{
-						"key1_injected":          "value1",
-						"key2":                   "value2",
-						"BRUIN_ASSET":            "my-asset",
-						"BRUIN_START_DATE":       "2024-01-01",
-						"BRUIN_START_DATETIME":   "2024-01-01T00:00:00",
-						"BRUIN_START_TIMESTAMP":  "2024-01-01T00:00:00.000000Z",
-						"BRUIN_END_DATE":         "2024-01-01",
-						"BRUIN_END_DATETIME":     "2024-01-01T00:00:00",
-						"BRUIN_END_TIMESTAMP":    "2024-01-01T00:00:00.000000Z",
-						"BRUIN_CONNECTION_TYPES": `{"key1_injected":"generic","key2":"generic"}`,
-					},
-				}).
-					Return(assert.AnError)
+				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
+					return ec.repo == repo &&
+						ec.module == testModule &&
+						ec.requirementsTxt == "" &&
+						ec.dependencyConfig.Type == DependencyTypeNone &&
+						ec.envVariables["key1_injected"] == "value1" &&
+						ec.envVariables["key2"] == "value2" &&
+						ec.envVariables["BRUIN_CONNECTION_TYPES"] == `{"key1_injected":"generic","key2":"generic"}`
+				})).Return(assert.AnError)
 			},
 			wantErr: assert.Error,
 		},
@@ -244,8 +239,8 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindModulePath", repo, mock.Anything).
 					Return("path.to.module", nil)
 
-				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
-					Return("", &NoRequirementsFoundError{})
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
 
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.module == "path.to.module" &&
@@ -267,26 +262,50 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					Return(repo, nil)
 
 				mf.On("FindModulePath", repo, mock.Anything).
-					Return("path.to.module", nil)
+					Return(testModule, nil)
 
-				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
-					Return("/path/to/requirements.txt", nil)
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{
+						Type:            DependencyTypeRequirementsTxt,
+						RequirementsTxt: "/path/to/requirements.txt",
+						ProjectRoot:     "/path/to",
+					}, nil)
 
-				runner.On("Run", mock.Anything, &executionContext{
-					repo:            repo,
-					module:          "path.to.module",
-					requirementsTxt: "/path/to/requirements.txt",
-					asset:           task,
-					envVariables: map[string]string{
-						"BRUIN_ASSET":           "my-asset",
-						"BRUIN_START_DATE":      "2024-01-01",
-						"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
-						"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
-						"BRUIN_END_DATE":        "2024-01-01",
-						"BRUIN_END_DATETIME":    "2024-01-01T00:00:00",
-						"BRUIN_END_TIMESTAMP":   "2024-01-01T00:00:00.000000Z",
-					},
-				}).Return(assert.AnError)
+				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
+					return ec.repo == repo &&
+						ec.module == testModule &&
+						ec.requirementsTxt == "/path/to/requirements.txt" &&
+						ec.dependencyConfig.Type == DependencyTypeRequirementsTxt &&
+						ec.envVariables["BRUIN_ASSET"] == "my-asset"
+				})).Return(assert.AnError)
+			},
+			wantErr: assert.Error,
+		},
+		{
+			name: "should call runner with pyproject.toml configuration",
+			task: task,
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{
+						Type:          DependencyTypePyproject,
+						PyprojectPath: "/path/to/pyproject.toml",
+						ProjectRoot:   "/path/to",
+					}, nil)
+
+				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
+					return ec.repo == repo &&
+						ec.module == testModule &&
+						ec.requirementsTxt == "" &&
+						ec.dependencyConfig.Type == DependencyTypePyproject &&
+						ec.dependencyConfig.PyprojectPath == "/path/to/pyproject.toml"
+				})).Return(assert.AnError)
 			},
 			wantErr: assert.Error,
 		},

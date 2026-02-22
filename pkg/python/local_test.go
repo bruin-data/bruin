@@ -20,6 +20,8 @@ func (m *mockReqInstaller) EnsureVirtualEnvExists(ctx context.Context, repo *git
 	return called.String(0), called.Error(1)
 }
 
+const testModule = "path.to.module"
+
 func Test_localPythonRunner_Run(t *testing.T) {
 	t.Parallel()
 
@@ -30,7 +32,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 
 	repo := &git.Repo{}
 
-	module := "path.to.module"
+	module := testModule
 	requirementsTxt := "/path/to/requirements.txt"
 	defaultExecContext := &executionContext{
 		repo:            repo,
@@ -71,7 +73,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: Shell,
-					Args: []string{ShellSubcommandFlag, "/test/python -u -m path.to.module"},
+					Args: []string{ShellSubcommandFlag, "/test/python -u -m " + testModule},
 				}).Return(nil)
 
 				return &fields{
@@ -110,7 +112,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: Shell,
-					Args: []string{ShellSubcommandFlag, "/test/python -u -m path.to.module"},
+					Args: []string{ShellSubcommandFlag, "/test/python -u -m " + testModule},
 				}).Return(nil)
 
 				return &fields{
@@ -128,7 +130,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				reqs.On("EnsureVirtualEnvExists", mock.Anything, repo, requirementsTxt).
 					Return(venvPath, nil)
 
-				expectedCommand := fmt.Sprintf("/path/to/venv/%s/activate && echo 'activated virtualenv' && /path/to/venv/%s/%s -u -m path.to.module", VirtualEnvBinaryFolder, VirtualEnvBinaryFolder, DefaultPythonExecutable)
+				expectedCommand := fmt.Sprintf("/path/to/venv/%s/activate && echo 'activated virtualenv' && /path/to/venv/%s/%s -u -m "+testModule, VirtualEnvBinaryFolder, VirtualEnvBinaryFolder, DefaultPythonExecutable)
 				if runtime.GOOS != WINDOWS {
 					expectedCommand = ". " + expectedCommand
 				}
@@ -154,7 +156,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				reqs.On("EnsureVirtualEnvExists", mock.Anything, repo, requirementsTxt).
 					Return(venvPath, nil)
 
-				expectedCommand := fmt.Sprintf("/path/to/venv/%s/activate && echo 'activated virtualenv' && /path/to/venv/%s/%s -u -m path.to.module", VirtualEnvBinaryFolder, VirtualEnvBinaryFolder, DefaultPythonExecutable)
+				expectedCommand := fmt.Sprintf("/path/to/venv/%s/activate && echo 'activated virtualenv' && /path/to/venv/%s/%s -u -m "+testModule, VirtualEnvBinaryFolder, VirtualEnvBinaryFolder, DefaultPythonExecutable)
 				if runtime.GOOS != WINDOWS {
 					expectedCommand = ". " + expectedCommand
 				}

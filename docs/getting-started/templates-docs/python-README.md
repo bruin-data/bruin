@@ -13,7 +13,7 @@ This pipeline is a good example of Bruin's Python execution abilities.
 A couple of remarks:
 
 - All of these assets are executed in isolated environments.
-- All of the assets have separate `requirements.txt` files, which may contain different dependencies.
+- All of the assets have separate `requirements.txt` files, which may contain different dependencies. You can also use `pyproject.toml` with `uv.lock` for dependency management.
 
 ## Running the pipeline
 
