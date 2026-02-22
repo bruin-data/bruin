@@ -107,6 +107,55 @@ func TestVariables(t *testing.T) {
 	})
 }
 
+func TestVariables_SchemaMap(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns type definitions without defaults", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"env": map[string]any{
+				"type":    "string",
+				"default": "dev",
+			},
+			"count": map[string]any{
+				"type":    "integer",
+				"default": 42,
+			},
+		}
+		schema := vars.SchemaMap()
+		assert.Equal(t, map[string]any{"type": "string"}, schema["env"])
+		assert.Equal(t, map[string]any{"type": "integer"}, schema["count"])
+	})
+
+	t.Run("preserves extra fields like properties", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"cfg": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"port": map[string]any{"type": "integer"},
+				},
+				"default": map[string]any{"port": 8080},
+			},
+		}
+		schema := vars.SchemaMap()
+		expected := map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"port": map[string]any{"type": "integer"},
+			},
+		}
+		assert.Equal(t, expected, schema["cfg"])
+	})
+
+	t.Run("empty variables return empty schema", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{}
+		schema := vars.SchemaMap()
+		assert.Empty(t, schema)
+	})
+}
+
 func TestVariables_UnmarshalJSON(t *testing.T) {
 	t.Parallel()
 

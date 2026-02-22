@@ -47,6 +47,20 @@ func (v *Variables) Value() map[string]any {
 	return values
 }
 
+func (v *Variables) SchemaMap() map[string]any {
+	schema := make(map[string]any)
+	for key, value := range *v {
+		def := make(map[string]any)
+		for k, val := range value {
+			if k != "default" {
+				def[k] = val
+			}
+		}
+		schema[key] = def
+	}
+	return schema
+}
+
 func (v *Variables) Schema() any {
 	return map[string]any{
 		"$schema":    "https://json-schema.org/draft-07/schema",
