@@ -202,7 +202,43 @@ func TestSetupVariables(t *testing.T) {
 		},
 	}
 
-	// Verify BRUIN_VARS_SCHEMA is injected for the "with variables" case
+	defaultPipeline := &pipeline.Pipeline{
+		Name: "test-pipeline",
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := tt.setupCtx()
+			p := tt.pipeline
+			if p == nil {
+				p = defaultPipeline
+			}
+			result, err := env.SetupVariables(ctx, p, tt.asset, tt.existingEnv)
+			if err != nil {
+				t.Errorf("error: %v", err)
+				return
+			}
+
+			t.Logf("Test case: %s", tt.name)
+			t.Logf("Expected env: %+v", tt.expectedEnv)
+			t.Logf("Actual result: %+v", result)
+
+			// Check only the keys we care about
+			for k, expected := range tt.expectedEnv {
+				actual, exists := result[k]
+				if !exists {
+					t.Errorf("key %s missing from result", k)
+					continue
+				}
+				if actual != expected {
+					t.Errorf("key %s: expected '%s', got '%s'", k, expected, actual)
+				}
+			}
+		})
+	}
+
 	t.Run("with variables injects BRUIN_VARS_SCHEMA", func(t *testing.T) {
 		t.Parallel()
 
@@ -261,41 +297,4 @@ func TestSetupVariables(t *testing.T) {
 		_, exists := result["BRUIN_VARS_SCHEMA"]
 		assert.False(t, exists, "BRUIN_VARS_SCHEMA should not be set for empty variables")
 	})
-
-	defaultPipeline := &pipeline.Pipeline{
-		Name: "test-pipeline",
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			ctx := tt.setupCtx()
-			p := tt.pipeline
-			if p == nil {
-				p = defaultPipeline
-			}
-			result, err := env.SetupVariables(ctx, p, tt.asset, tt.existingEnv)
-			if err != nil {
-				t.Errorf("error: %v", err)
-				return
-			}
-
-			t.Logf("Test case: %s", tt.name)
-			t.Logf("Expected env: %+v", tt.expectedEnv)
-			t.Logf("Actual result: %+v", result)
-
-			// Check only the keys we care about
-			for k, expected := range tt.expectedEnv {
-				actual, exists := result[k]
-				if !exists {
-					t.Errorf("key %s missing from result", k)
-					continue
-				}
-				if actual != expected {
-					t.Errorf("key %s: expected '%s', got '%s'", k, expected, actual)
-				}
-			}
-		})
-	}
 }
