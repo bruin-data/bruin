@@ -239,8 +239,8 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindModulePath", repo, mock.Anything).
 					Return("path.to.module", nil)
 
-				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
-					Return("", &NoRequirementsFoundError{})
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
 
 				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
 					return ec.module == "path.to.module" &&
