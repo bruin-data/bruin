@@ -640,6 +640,73 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"UNION ALL\n" +
 				"SELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_insert;",
 		},
+		{
+			name: "scd2_by_column_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "col1"},
+					{Name: "updated_at", Type: "timestamp"},
+				},
+			},
+			query: "SELECT id, col1, updated_at from source_table",
+			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
+				"WITH\n" +
+				"time_now AS (\n" +
+				"\tSELECT CURRENT_TIMESTAMP AS now\n" +
+				"),\n" +
+				"source AS (\n" +
+				"\tSELECT id, col1, updated_at,\n" +
+				"\tTRUE as _matched_by_source\n" +
+				"\tFROM (SELECT id, col1, updated_at from source_table\n" +
+				"\t)\n" +
+				"),\n" +
+				"target AS (\n" +
+				"\tSELECT id, col1, updated_at, _valid_from, _valid_until, _is_current,\n" +
+				"\tTRUE as _matched_by_target FROM my.asset\n" +
+				"),\n" +
+				"current_data AS (\n" +
+				"\tSELECT id, col1, updated_at, _valid_from, _valid_until, _is_current, _matched_by_target\n" +
+				"\tFROM target as t\n" +
+				"\tWHERE _is_current = TRUE\n" +
+				"),\n" +
+				"--current or updated (expired) existing rows from target\n" +
+				"to_keep AS (\n" +
+				"\tSELECT t.id, t.col1, t.updated_at,\n" +
+				"\tt._valid_from,\n" +
+				"\t\tCASE\n" +
+				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.updated_at != s.updated_at) THEN CAST(s.updated_at AS TIMESTAMP)\n" +
+				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
+				"\t\t\tELSE t._valid_until\n" +
+				"\t\tEND AS _valid_until,\n" +
+				"\t\tCASE\n" +
+				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.updated_at != s.updated_at) THEN FALSE\n" +
+				"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE\n" +
+				"\t\t\tELSE t._is_current\n" +
+				"\t\tEND AS _is_current\n" +
+				"\tFROM target t\n" +
+				"\tLEFT JOIN source s ON (t.id = s.id) AND t._is_current = TRUE\n" +
+				"),\n" +
+				"--new/updated rows from source\n" +
+				"to_insert AS (\n" +
+				"\tSELECT s.id AS id, s.col1 AS col1, s.updated_at AS updated_at,\n" +
+				"\tCAST(s.updated_at AS TIMESTAMP) AS _valid_from,\n" +
+				"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"\tTRUE AS _is_current\n" +
+				"\tFROM source s\n" +
+				"\tLEFT JOIN current_data t ON (t.id = s.id)\n" +
+				"\tWHERE (_matched_by_target IS NULL) OR (t.col1 != s.col1 OR t.updated_at != s.updated_at)\n" +
+				")\n" +
+				"SELECT id, col1, updated_at, _valid_from, _valid_until, _is_current FROM to_keep\n" +
+				"UNION ALL\n" +
+				"SELECT id, col1, updated_at, _valid_from, _valid_until, _is_current FROM to_insert;",
+		},
 	}
 
 	for _, tt := range tests {
@@ -757,6 +824,32 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
 				"TRUE AS _is_current\n" +
 				"FROM (SELECT id, name, price from source_table\n" +
+				") AS src;",
+		},
+		{
+			name: "scd2_full_refresh_by_column_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price, updated_at from source_table",
+			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
+				"SELECT src.id, src.name, src.price, src.updated_at,\n" +
+				"CAST(src.updated_at AS TIMESTAMP) AS _valid_from,\n" +
+				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"TRUE AS _is_current\n" +
+				"FROM (SELECT id, name, price, updated_at from source_table\n" +
 				") AS src;",
 		},
 	}

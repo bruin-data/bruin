@@ -1362,7 +1362,7 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			want: []string{
-				"Incremental key is only supported with 'delete+insert', 'time_interval' and 'scd2_by_time' strategies.",
+				"Incremental key is only supported with 'delete+insert', 'time_interval', 'scd2_by_time' and 'scd2_by_column' strategies.",
 			},
 		},
 		{

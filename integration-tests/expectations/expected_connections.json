@@ -27,6 +27,10 @@
           "path": "duckdb-files/scd2-by-time.db"
         },
         {
+          "name": "duckdb-scd2-by-column-incremental-key",
+          "path": "duckdb-files/scd2-by-column-incremental-key.db"
+        },
+        {
           "name": "duckdb-start-date-flags",
           "path": "duckdb-files/start-date-flags.db"
         },
@@ -76,6 +80,10 @@
           {
             "name": "duckdb-scd2-by-time",
             "path": "duckdb-files/scd2-by-time.db"
+          },
+          {
+            "name": "duckdb-scd2-by-column-incremental-key",
+            "path": "duckdb-files/scd2-by-column-incremental-key.db"
           },
           {
             "name": "duckdb-start-date-flags",
@@ -489,6 +497,17 @@
           {
             "name": "duckdb-scd2-by-column",
             "path": "duckdb-files/scd2-by-column.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-scd2-by-column-incremental-key": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-scd2-by-column-incremental-key",
+            "path": "duckdb-files/scd2-by-column-incremental-key.db"
           }
         ]
       },

@@ -909,6 +909,85 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				") AS src;\n" +
 				"COMMIT;",
 		},
+		{
+			name: "scd2_by_column_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "updated_at", Type: "timestamp"},
+				},
+			},
+			query: "SELECT id, col1, col2, updated_at from source_table",
+			want: "MERGE INTO \"my\".\"asset\" AS target\n" +
+				"USING (\n" +
+				"  WITH s1 AS (\n" +
+				"    SELECT id, col1, col2, updated_at from source_table\n" +
+				"  )\n" +
+				"  SELECT *, TRUE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  UNION ALL\n" +
+				"  SELECT s1.*, FALSE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  JOIN   \"my\".\"asset\" AS t1 USING (id)\n" +
+				"  WHERE  (t1.col1 != s1.col1 OR t1.col2 != s1.col2 OR t1.updated_at != s1.updated_at) AND t1._is_current\n" +
+				") AS source\n" +
+				"ON  target.id = source.id AND target._is_current AND source._is_current\n" +
+				"\n" +
+				"WHEN MATCHED AND (\n" +
+				"    target.col1 != source.col1 OR target.col2 != source.col2 OR target.updated_at != source.updated_at\n" +
+				") THEN\n" +
+				"  UPDATE SET\n" +
+				"    _valid_until = source.updated_at,\n" +
+				"    _is_current  = FALSE\n" +
+				"\n" +
+				"WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n" +
+				"  UPDATE SET \n" +
+				"    _valid_until = CURRENT_TIMESTAMP,\n" +
+				"    _is_current  = FALSE\n" +
+				"\n" +
+				"WHEN NOT MATCHED BY TARGET THEN\n" +
+				"  INSERT (id, col1, col2, updated_at, _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.id, source.col1, source.col2, source.updated_at, source.updated_at, '9999-12-31 00:00:00'::TIMESTAMP, TRUE);", //nolint:dupword
+		},
+		{
+			name: "scd2_full_refresh_by_column_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price, updated_at from source_table",
+			want: "BEGIN TRANSACTION;\n" +
+				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
+				"CREATE TABLE \"my\".\"asset\" AS\n" +
+				"SELECT\n" +
+				"  \"updated_at\" AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, name, price, updated_at from source_table\n" +
+				") AS src;\n" +
+				"COMMIT;",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1422,6 +1501,91 @@ func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
 				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price from source_table\n" +
+				") AS src;\n" +
+				"COMMIT;",
+		},
+		{
+			name: "scd2_by_column_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "updated_at", Type: "timestamp"},
+				},
+			},
+			query: "SELECT id, col1, col2, updated_at from source_table",
+			want: "^BEGIN TRANSACTION;\n\n" +
+				"-- Capture the timestamp once for the entire transaction\n" +
+				"CREATE TEMP TABLE _ts AS \n" +
+				"SELECT CURRENT_TIMESTAMP AS session_timestamp;\n\n" +
+				"-- Create temp table with source data\n" +
+				"CREATE TEMP TABLE __bruin_scd2_tmp_.+ AS \n" +
+				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, col1, col2, updated_at from source_table\\) AS src;\n\n" +
+				"-- Update existing records that have changes\n" +
+				"UPDATE \"my\"\\.\"asset\" AS target\n" +
+				"SET _valid_until = \\(SELECT source\\.\"updated_at\" FROM __bruin_scd2_tmp_.+ AS source WHERE target\\.\"id\" = source\\.\"id\" LIMIT 1\\), _is_current = FALSE\n" +
+				"WHERE target\\._is_current = TRUE\n" +
+				"  AND EXISTS \\(\n" +
+				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"    WHERE target\\.\"id\" = source\\.\"id\" AND \\(target\\.\"col1\" != source\\.\"col1\" OR target\\.\"col2\" != source\\.\"col2\" OR target\\.\"updated_at\" != source\\.\"updated_at\"\\)\n" +
+				"  \\);\n\n" +
+				"-- Update records that are no longer in source \\(expired\\)\n" +
+				"UPDATE \"my\"\\.\"asset\" AS target\n" +
+				"SET _valid_until = \\(SELECT session_timestamp FROM _ts\\), _is_current = FALSE\n" +
+				"WHERE target\\._is_current = TRUE\n" +
+				"  AND NOT EXISTS \\(\n" +
+				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"    WHERE target\\.\"id\" = source\\.\"id\"\n" +
+				"  \\);\n\n" +
+				"-- Insert new records and new versions of changed records\n" +
+				"INSERT INTO \"my\"\\.\"asset\" \\(\"id\", \"col1\", \"col2\", \"updated_at\", _valid_from, _valid_until, _is_current\\)\n" +
+				//nolint:dupword
+				"SELECT source\\.\"id\", source\\.\"col1\", source\\.\"col2\", source\\.\"updated_at\", source\\.\"updated_at\", TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"WHERE NOT EXISTS \\(\n" +
+				"  SELECT 1 FROM \"my\"\\.\"asset\" AS target \n" +
+				"  WHERE target\\.\"id\" = source\\.\"id\" AND target\\._is_current = TRUE\n" +
+				"\\);\n\n" +
+				"DROP TABLE __bruin_scd2_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "scd2_full_refresh_by_column_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price, updated_at from source_table",
+			want: "BEGIN TRANSACTION;\n" +
+				"DROP TABLE IF EXISTS \"my\".\"asset\";\n" +
+				"CREATE TABLE \"my\".\"asset\" AS\n" +
+				"SELECT\n" +
+				"  \"updated_at\" AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, name, price, updated_at from source_table\n" +
 				") AS src;\n" +
 				"COMMIT;",
 		},

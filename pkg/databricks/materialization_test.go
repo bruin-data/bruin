@@ -624,6 +624,67 @@ func TestMaterializer_Render(t *testing.T) {
 				"FROM \\(",
 			},
 		},
+		{
+			name: "scd2_by_column with incremental_key",
+			task: &pipeline.Asset{
+				Name: "test.menu",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "ID", Type: "INT", PrimaryKey: true},
+					{Name: "Name", Type: "VARCHAR"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			query: "SELECT 1 AS ID, 'Cola' AS Name, CURRENT_TIMESTAMP() AS updated_at",
+			want: []string{
+				"MERGE INTO test\\.menu AS target",
+				"WITH s1 AS",
+				"SELECT \\*, TRUE AS _is_current",
+				"UNION ALL",
+				"JOIN   test\\.menu AS t1 USING \\(ID\\)",
+				"ON  target\\.ID = source\\.ID AND target\\._is_current AND source\\._is_current",
+				"WHEN MATCHED AND",
+				"target\\.Name != source\\.Name OR target\\.updated_at != source\\.updated_at",
+				"UPDATE SET",
+				"_valid_until = source\\.updated_at",
+				"_is_current  = FALSE",
+				"WHEN NOT MATCHED THEN",
+				"WHEN NOT MATCHED BY SOURCE AND target\\._is_current = TRUE THEN",
+				"INSERT \\(ID, Name, updated_at, _valid_from, _valid_until, _is_current\\)",
+				"VALUES \\(source\\.ID, source\\.Name, source\\.updated_at, source\\.updated_at, TIMESTAMP '9999-12-31 00:00:00', TRUE\\)", //nolint:dupword
+			},
+		},
+		{
+			name: "scd2_by_column full refresh with incremental_key",
+			task: &pipeline.Asset{
+				Name: "test.menu",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "ID", Type: "INT", PrimaryKey: true},
+					{Name: "Name", Type: "VARCHAR"},
+					{Name: "updated_at", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT 1 AS ID, 'Cola' AS Name, CURRENT_TIMESTAMP() AS updated_at",
+			want: []string{
+				"CREATE OR REPLACE TABLE test\\.menu AS",
+				"SELECT",
+				"updated_at AS _valid_from",
+				"src\\.\\*",
+				"TIMESTAMP '9999-12-31 00:00:00' AS _valid_until",
+				"TRUE AS _is_current",
+				"FROM \\(",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

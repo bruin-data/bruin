@@ -974,10 +974,10 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		}
 
 		if asset.Materialization.IncrementalKey != "" &&
-			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert && asset.Materialization.Strategy != pipeline.MaterializationStrategyTimeInterval && asset.Materialization.Strategy != pipeline.MaterializationStrategySCD2ByTime {
+			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert && asset.Materialization.Strategy != pipeline.MaterializationStrategyTimeInterval && asset.Materialization.Strategy != pipeline.MaterializationStrategySCD2ByTime && asset.Materialization.Strategy != pipeline.MaterializationStrategySCD2ByColumn {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Incremental key is only supported with 'delete+insert', 'time_interval' and 'scd2_by_time' strategies.",
+				Description: "Incremental key is only supported with 'delete+insert', 'time_interval', 'scd2_by_time' and 'scd2_by_column' strategies.",
 			})
 		}
 
