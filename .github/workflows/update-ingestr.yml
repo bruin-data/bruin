@@ -64,6 +64,7 @@ jobs:
           echo "Changes staged successfully"
 
       - name: Create Pull Request
+        id: create-pr
         if: steps.check.outputs.new == 'true'
         uses: peter-evans/create-pull-request@v7.0.8
         with:
@@ -73,3 +74,24 @@ jobs:
           body: "Automated update of ingestr to v${{ steps.check.outputs.version }}"
           delete-branch: true
           labels: automated-update
+
+      - name: Close older ingestr bump PRs
+        if: steps.create-pr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          new_pr=${{ steps.create-pr.outputs.pull-request-number }}
+          echo "New PR: #${new_pr}"
+
+          # Find open PRs with the automated-update label and ingestr bump title
+          gh pr list \
+            --state open \
+            --label automated-update \
+            --search "chore: bump ingestr to" \
+            --json number,title \
+            --jq ".[] | select(.number != ${new_pr}) | .number" |
+          while read -r pr_number; do
+            echo "Closing outdated PR #${pr_number}"
+            gh pr close "${pr_number}" --delete-branch --comment "Superseded by #${new_pr}"
+          done
