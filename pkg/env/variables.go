@@ -74,13 +74,14 @@ func envInjectVariables(env map[string]string, variables map[string]any, schema 
 
 	env["BRUIN_VARS"] = string(doc)
 
-	if len(schema) > 0 {
-		schemaDoc, err := json.Marshal(schema)
-		if err != nil {
-			return nil, fmt.Errorf("error marshalling variables schema to JSON: %w", err)
-		}
-		env["BRUIN_VARS_SCHEMA"] = string(schemaDoc)
+	if schema == nil {
+		schema = make(map[string]any)
 	}
+	schemaDoc, err := json.Marshal(schema)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling variables schema to JSON: %w", err)
+	}
+	env["BRUIN_VARS_SCHEMA"] = string(schemaDoc)
 
 	return env, nil
 }
