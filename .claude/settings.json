@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "Run 'make format' in the project root directory. Then check if there are any unstaged changes with 'git diff'. If there are formatting changes, respond with {\"ok\": false, \"reason\": \"Formatting issues were found and fixed by make format. Please review and stage the formatting changes.\"}. If there are no changes, respond with {\"ok\": true}.",
+            "timeout": 120
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "Run 'make test' in the project root directory. If any tests fail, respond with {\"ok\": false, \"reason\": \"Tests failed: <include the relevant failure output>\"} so the issues can be fixed. If all tests pass, respond with {\"ok\": true}.",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}
