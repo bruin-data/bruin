@@ -15,6 +15,7 @@ import (
 	"cloud.google.com/go/bigquery/datatransfer/apiv1/datatransferpb"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -33,18 +34,18 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-func Import() *cli.Command {
+func Import(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name: "import",
 		Commands: []*cli.Command{
-			ImportDatabase(),
+			ImportDatabase(isDebug),
 			ImportScheduledQueries(),
 			ImportTableauDashboards(),
 		},
 	}
 }
 
-func ImportDatabase() *cli.Command {
+func ImportDatabase(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "database",
 		Usage:     "Import database tables as Bruin assets",
@@ -100,7 +101,13 @@ func ImportDatabase() *cli.Command {
 				return cli.Exit("cannot use both --schema and --schemas flags together", 1)
 			}
 
-			return runImport(ctx, pipelinePath, connectionName, schema, schemas, !noColumns, environment, configFile)
+			log := makeLogger(*isDebug)
+			err := runImport(ctx, log, pipelinePath, connectionName, schema, schemas, !noColumns, environment, configFile)
+			if err != nil {
+				errorPrinter.Printf("Failed to import database: %s\n", err)
+				return cli.Exit("", 1)
+			}
+			return nil
 		},
 	}
 }
@@ -176,13 +183,18 @@ type importWarning struct {
 	message   string
 }
 
-func runImport(ctx context.Context, pipelinePath, connectionName, schema string, schemas []string, fillColumns bool, environment, configFile string) error {
+func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionName, schema string, schemas []string, fillColumns bool, environment, configFile string) error {
 	fs := afero.NewOsFs()
+
+	log.Debugf("starting database import: connection=%s, schema=%q, schemas=%v, fillColumns=%v, environment=%q",
+		connectionName, schema, schemas, fillColumns, environment)
 
 	conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
 	if err != nil {
 		return errors2.Wrap(err, "failed to get database connection")
 	}
+
+	log.Debugf("resolved connection type: %T", conn)
 
 	var summary *ansisql.DBDatabase
 
@@ -200,10 +212,16 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 			pipelinePath = strings.Join(pathParts[:len(pathParts)-1], "/")
 		}
 	}
+
+	log.Debugf("resolved pipeline path: %s", pipelinePath)
+
 	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)
 	if err != nil {
 		return errors2.Wrap(err, "failed to get pipeline from path")
 	}
+
+	log.Debugf("found pipeline with %d existing assets", len(pipelineFound.Assets))
+
 	existingAssets := make(map[string]*pipeline.Asset, len(pipelineFound.Assets))
 	for _, asset := range pipelineFound.Assets {
 		existingAssets[strings.ToLower(asset.Name)] = asset
@@ -211,49 +229,70 @@ func runImport(ctx context.Context, pipelinePath, connectionName, schema string,
 
 	// If schema(s) specified, try to use GetDatabaseSummaryForSchemas if available
 	if len(schemaList) > 0 {
+		log.Debugf("attempting GetDatabaseSummaryForSchemas with schemas: %v", schemaList)
 		if schemaSummarizer, ok := conn.(interface {
 			GetDatabaseSummaryForSchemas(ctx context.Context, schemas []string) (*ansisql.DBDatabase, error)
 		}); ok {
+			log.Debugf("connection supports GetDatabaseSummaryForSchemas, calling it")
 			summary, err = schemaSummarizer.GetDatabaseSummaryForSchemas(ctx, schemaList)
 			if err != nil {
 				return errors2.Wrap(err, "failed to retrieve database summary for specified schemas")
 			}
+		} else {
+			log.Debugf("connection does not support GetDatabaseSummaryForSchemas, will fall back to GetDatabaseSummary")
 		}
 	}
 
 	// Fall back to GetDatabaseSummary if no schema specified or connection doesn't support filtered summary
 	if summary == nil {
+		log.Debugf("attempting GetDatabaseSummary on connection type %T", conn)
 		summarizer, ok := conn.(interface {
 			GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
 		})
 		if !ok {
+			log.Debugf("connection type %T does not implement GetDatabaseSummary", conn)
 			return fmt.Errorf("connection type '%s' does not support database summary", connectionName)
 		}
 
+		log.Debugf("calling GetDatabaseSummary")
 		summary, err = summarizer.GetDatabaseSummary(ctx)
 		if err != nil {
+			log.Debugf("GetDatabaseSummary failed: %v", err)
 			return errors2.Wrap(err, "failed to retrieve database summary")
 		}
+		log.Debugf("GetDatabaseSummary returned successfully")
+	}
+
+	log.Debugf("database summary retrieved: name=%s, schemas=%d", summary.Name, len(summary.Schemas))
+	for _, s := range summary.Schemas {
+		log.Debugf("  schema %q: %d tables", s.Name, len(s.Tables))
 	}
 
 	assetsPath := filepath.Join(pipelinePath, "assets")
 	assetType := determineAssetTypeFromConnection(connectionName, conn)
+	log.Debugf("determined asset type: %s", assetType)
+
 	totalTables := 0
 	mergedTableCount := 0
 	var warnings []importWarning
 
 	for _, schemaObj := range summary.Schemas {
 		if schema != "" && !strings.EqualFold(schemaObj.Name, schema) {
+			log.Debugf("skipping schema %q (filter: %q)", schemaObj.Name, schema)
 			continue
 		}
+		log.Debugf("processing schema %q with %d tables", schemaObj.Name, len(schemaObj.Tables))
 		for _, table := range schemaObj.Tables {
 			fullName := fmt.Sprintf("%s.%s", schemaObj.Name, table.Name)
+			log.Debugf("creating asset for %s (type: %v, columns from summary: %d)", fullName, table.Type, len(table.Columns))
 			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns, table)
 			if warning != "" {
+				log.Debugf("warning for %s: %s", fullName, warning)
 				warnings = append(warnings, importWarning{tableName: fullName, message: warning})
 			}
 
 			if createdAsset == nil {
+				log.Debugf("createAsset returned nil for %s, skipping", fullName)
 				continue
 			}
 

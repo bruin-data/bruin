@@ -75,7 +75,7 @@ func main() {
 			cmd.Query(),
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
-			cmd.Import(),
+			cmd.Import(&isDebug),
 			cmd.Upgrade(),
 			mcp.MCPCmd(),
 			versionCommand,
