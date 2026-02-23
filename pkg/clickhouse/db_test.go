@@ -44,23 +44,21 @@ func (r MockRows) Next() bool {
 	return (*r.index) <= len(r.rows)
 }
 
-type scanner interface {
-	SetValues(values []any)
-}
-
 func (r MockRows) Scan(dest ...any) error {
 	if r.scanError != nil {
 		return r.scanError
 	}
 
 	data := r.rows[(*r.index)-1]
-	content := dest[0]
-	scr, ok := (content).(scanner)
-	if !ok {
-		panic("This shouldn't happen")
+	for i, d := range dest {
+		scanner, ok := d.(interface{ Scan(src any) error })
+		if !ok {
+			panic("dest argument does not implement Scan(any) error")
+		}
+		if err := scanner.Scan(data[i]); err != nil {
+			return err
+		}
 	}
-
-	scr.SetValues(data)
 
 	return nil
 }
