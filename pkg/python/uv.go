@@ -155,7 +155,7 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 	}
 
 	// Fall back to requirements.txt or no dependencies (existing behavior)
-	flags := []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
+	flags := []string{"run", "--no-config", "--no-project", "--python", pythonVersion}
 	if execCtx.requirementsTxt != "" {
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 	}
@@ -289,7 +289,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	} else {
 		// Fall back to requirements.txt or no dependencies
 		runRepo = execCtx.repo
-		flags = []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
+		flags = []string{"run", "--no-config", "--no-project", "--python", pythonVersion}
 		if execCtx.requirementsTxt != "" {
 			flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 		}
