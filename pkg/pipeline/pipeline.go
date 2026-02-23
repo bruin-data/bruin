@@ -1868,6 +1868,7 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 	b.assetMutators = []AssetMutator{
 		b.fillGlossaryStuff,
 		b.SetupDefaultsFromPipeline,
+		b.InjectConnectionAsSecret,
 		b.translateRetryConfig,
 		b.SetNameFromPath,
 	}
@@ -2201,6 +2202,25 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if len(asset.Hooks.Post) == 0 {
 		asset.Hooks.Post = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Post...)
 	}
+
+	return asset, nil
+}
+
+func (b *Builder) InjectConnectionAsSecret(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	if asset == nil || asset.Connection == "" {
+		return asset, nil
+	}
+
+	for _, secret := range asset.Secrets {
+		if secret.SecretKey == asset.Connection {
+			return asset, nil
+		}
+	}
+
+	asset.Secrets = append(asset.Secrets, SecretMapping{
+		SecretKey:   asset.Connection,
+		InjectedKey: asset.Connection,
+	})
 
 	return asset, nil
 }
