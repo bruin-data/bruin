@@ -425,7 +425,18 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 		return []string{}, nil //nolint:nilerr
 	}
 
-	renderedQ, err := renderer.Render(asset.ExecutableFile.Content)
+	queryToRender := asset.ExecutableFile.Content
+	if len(pipeline.Macros) > 0 {
+		var macroContent strings.Builder
+		for _, macro := range pipeline.Macros {
+			macroContent.WriteString(string(macro))
+			macroContent.WriteString("\n")
+		}
+
+		queryToRender = macroContent.String() + "\n" + queryToRender
+	}
+
+	renderedQ, err := renderer.Render(queryToRender)
 	if err != nil {
 		return []string{}, errors.New("failed to render the query before parsing the SQL")
 	}
