@@ -39,7 +39,22 @@ Environment: someother
 
 ## Add Connection
 
-To add a connection to a specific environment, run the following command:
+### Interactive mode
+
+When run without flags in a terminal, `bruin connections add` launches an interactive wizard that walks you through:
+
+1. Selecting an environment
+2. Entering a connection name
+3. Choosing a connection type (with search/filter)
+4. Filling in the credential fields for that type
+
+```bash
+bruin connections add
+```
+
+### Flag-based mode
+
+You can also provide all parameters via flags for scripting and CI/CD usage:
 
 ```bash
 bruin connections add --env someother --type generic --name MY_SECRET --credentials '{"value": "someothersecret"}'
@@ -49,14 +64,18 @@ This will add the connection to the `.bruin.yml` file and the connection will be
 
 The parameter after `--credentials` is the value of the connection in JSON format, as you would write it in the `.bruin.yml` file. For further reference, you can check the [Connections](/core-concepts/connections) documentation.
 
+> [!INFO]
+> When using flags, all four of `--env`, `--name`, `--type`, and `--credentials` must be provided together. Providing only some of them will result in an error.
+
 ### Flags
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--environment`, `-e`, `--env` | str | - | The name of the environment to add the connection to. |
+| `--name` | str | - | The name of the connection. |
+| `--type` | str | - | The type of the connection. |
+| `--credentials` | str | - | The JSON object containing the credentials. |
 | `--config-file` | str | - | The path to the .bruin.yml file. |
-
-> [!INFO]
-> This command is meant to be used programmatically rather than human beings, since the `credentials` parameter is in JSON format.
 
 ### Example: a GCP connection
 
