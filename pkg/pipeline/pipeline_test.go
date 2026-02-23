@@ -76,7 +76,9 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"param2": "value2",
 		},
 		Connection: "conn1",
-		Secrets:    []pipeline.SecretMapping{},
+		Secrets: []pipeline.SecretMapping{
+			{SecretKey: "conn1", InjectedKey: "conn1"},
+		},
 		Upstreams: []pipeline.Upstream{
 			{
 				Type:    "asset",
@@ -135,7 +137,9 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"param3": "third-parameter",
 		},
 		Connection: "first-connection",
-		Secrets:    []pipeline.SecretMapping{},
+		Secrets: []pipeline.SecretMapping{
+			{SecretKey: "first-connection", InjectedKey: "first-connection"},
+		},
 		Upstreams: []pipeline.Upstream{
 			{Type: "asset", Value: "task1", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 			{Type: "asset", Value: "task2", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
@@ -170,7 +174,9 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"param2": "second-parameter",
 		},
 		Connection: "conn2",
-		Secrets:    []pipeline.SecretMapping{},
+		Secrets: []pipeline.SecretMapping{
+			{SecretKey: "conn2", InjectedKey: "conn2"},
+		},
 		Upstreams: []pipeline.Upstream{
 			{Type: "asset", Value: "task1", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 			{Type: "asset", Value: "task2", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
@@ -1905,6 +1911,108 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 
 			builder := &pipeline.Builder{}
 			got, err := builder.SetupDefaultsFromPipeline(t.Context(), tt.asset, tt.foundPipeline)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestBuilder_InjectConnectionAsSecret(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  *pipeline.Asset
+	}{
+		{
+			name:  "nil asset returns nil",
+			asset: nil,
+			want:  nil,
+		},
+		{
+			name: "no connection set, no change",
+			asset: &pipeline.Asset{
+				Name:    "test-asset",
+				Secrets: []pipeline.SecretMapping{},
+			},
+			want: &pipeline.Asset{
+				Name:    "test-asset",
+				Secrets: []pipeline.SecretMapping{},
+			},
+		},
+		{
+			name: "connection set, nil secrets, adds secret",
+			asset: &pipeline.Asset{
+				Name:       "test-asset",
+				Connection: "my-conn",
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Connection: "my-conn",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "my-conn", InjectedKey: "my-conn"},
+				},
+			},
+		},
+		{
+			name: "connection set, empty secrets, adds secret",
+			asset: &pipeline.Asset{
+				Name:       "test-asset",
+				Connection: "my-conn",
+				Secrets:    []pipeline.SecretMapping{},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Connection: "my-conn",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "my-conn", InjectedKey: "my-conn"},
+				},
+			},
+		},
+		{
+			name: "connection already in secrets, no duplicate added",
+			asset: &pipeline.Asset{
+				Name:       "test-asset",
+				Connection: "my-conn",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "my-conn", InjectedKey: "MY_CONN_OVERRIDE"},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Connection: "my-conn",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "my-conn", InjectedKey: "MY_CONN_OVERRIDE"},
+				},
+			},
+		},
+		{
+			name: "connection set with existing other secrets, appends",
+			asset: &pipeline.Asset{
+				Name:       "test-asset",
+				Connection: "my-conn",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "other-key", InjectedKey: "OTHER"},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Connection: "my-conn",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "other-key", InjectedKey: "OTHER"},
+					{SecretKey: "my-conn", InjectedKey: "my-conn"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			builder := &pipeline.Builder{}
+			got, err := builder.InjectConnectionAsSecret(t.Context(), tt.asset, nil)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})

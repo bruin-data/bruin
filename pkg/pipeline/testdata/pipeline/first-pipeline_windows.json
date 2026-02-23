@@ -58,7 +58,12 @@
                 "param1": "value1",
                 "param2": "value2"
             },
-            "secrets": [],
+            "secrets": [
+                {
+                    "secret_key": "conn1",
+                    "injected_key": "conn1"
+                }
+            ],
             "extends": null,
             "columns": [],
             "custom_checks": [],
@@ -175,7 +180,12 @@
                 "param2": "second-parameter",
                 "param3": "third-parameter"
             },
-            "secrets": [],
+            "secrets": [
+                {
+                    "secret_key": "first-connection",
+                    "injected_key": "first-connection"
+                }
+            ],
             "extends": null,
             "columns": [],
             "custom_checks": [],
@@ -251,7 +261,12 @@
                 "param1": "first-parameter",
                 "param2": "second-parameter"
             },
-            "secrets": [],
+            "secrets": [
+                {
+                    "secret_key": "conn2",
+                    "injected_key": "conn2"
+                }
+            ],
             "extends": null,
             "columns": [],
             "custom_checks": [],
