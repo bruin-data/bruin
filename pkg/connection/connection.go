@@ -2029,6 +2029,7 @@ func (m *Manager) AddMixpanelConnectionFromConfig(connection *config.MixpanelCon
 	client, err := mixpanel.NewClient(mixpanel.Config{
 		Username:  connection.Username,
 		Password:  connection.Password,
+		APISecret: connection.APISecret,
 		ProjectID: connection.ProjectID,
 		Server:    connection.Server,
 	})

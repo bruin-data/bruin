@@ -9,7 +9,8 @@ import (
 type Config struct {
 	Username  string `yaml:"username" json:"username" mapstructure:"username"`
 	Password  string `yaml:"password" json:"password" mapstructure:"password"`
-	ProjectID string `yaml:"project_id" json:"project_id" mapstructure:"project_id"`
+	APISecret string `yaml:"api_secret,omitempty" json:"api_secret,omitempty" mapstructure:"api_secret"`
+	ProjectID string `yaml:"project_id,omitempty" json:"project_id,omitempty" mapstructure:"project_id"`
 	Server    string `yaml:"server,omitempty" json:"server,omitempty" mapstructure:"server"`
 }
 
@@ -18,6 +19,7 @@ func (c *Config) GetIngestrURI() string {
 	params := url.Values{}
 	params.Set("username", c.Username)
 	params.Set("password", c.Password)
+	params.Set("api_secret", c.APISecret)
 	params.Set("project_id", c.ProjectID)
 
 	server := strings.TrimSpace(c.Server)

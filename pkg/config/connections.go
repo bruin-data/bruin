@@ -836,9 +836,10 @@ func (c PipedriveConnection) GetName() string {
 
 type MixpanelConnection struct {
 	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username  string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password  string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	ProjectID string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	Username  string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password  string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	APISecret string `yaml:"api_secret,omitempty" json:"api_secret,omitempty" mapstructure:"api_secret"`
+	ProjectID string `yaml:"project_id,omitempty" json:"project_id,omitempty" mapstructure:"project_id"`
 	Server    string `yaml:"server,omitempty" json:"server,omitempty" mapstructure:"server"`
 }
 
