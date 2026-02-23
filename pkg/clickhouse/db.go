@@ -19,10 +19,6 @@ type RowScanner struct {
 	values []any
 }
 
-func (s *RowScanner) SetValues(values []any) {
-	s.values = values
-}
-
 func (s *RowScanner) Scan(src any) error {
 	s.values = append(s.values, src)
 	return nil
@@ -75,14 +71,28 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	defer rows.Close()
 
+	columnCount := len(rows.ColumnTypes())
+
 	collectedRows := make([][]interface{}, 0)
 	for rows.Next() {
-		result := RowScanner{}
-		if err := rows.Scan(&result); err != nil {
+		scanArgs := make([]any, columnCount)
+		for i := range scanArgs {
+			scanArgs[i] = &RowScanner{}
+		}
+
+		if err := rows.Scan(scanArgs...); err != nil {
 			return nil, errors.Wrap(err, "failed to scan row")
 		}
 
-		collectedRows = append(collectedRows, result.values)
+		values := make([]interface{}, columnCount)
+		for i, arg := range scanArgs {
+			scanner := arg.(*RowScanner)
+			if len(scanner.values) > 0 {
+				values[i] = scanner.values[0]
+			}
+		}
+
+		collectedRows = append(collectedRows, values)
 	}
 
 	return collectedRows, nil
@@ -107,13 +117,28 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		columnTypes[i] = field.DatabaseTypeName()
 	}
 
+	columnCount := len(fieldDescriptions)
+
 	collectedRows := make([][]interface{}, 0)
 	for rows.Next() {
-		result := RowScanner{}
-		if err := rows.Scan(&result); err != nil {
+		scanArgs := make([]any, columnCount)
+		for i := range scanArgs {
+			scanArgs[i] = &RowScanner{}
+		}
+
+		if err := rows.Scan(scanArgs...); err != nil {
 			return nil, errors.Wrap(err, "failed to scan row")
 		}
-		collectedRows = append(collectedRows, result.values)
+
+		values := make([]interface{}, columnCount)
+		for i, arg := range scanArgs {
+			scanner := arg.(*RowScanner)
+			if len(scanner.values) > 0 {
+				values[i] = scanner.values[0]
+			}
+		}
+
+		collectedRows = append(collectedRows, values)
 	}
 
 	return &query.QueryResult{
