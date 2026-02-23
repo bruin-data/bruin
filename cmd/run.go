@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	path2 "path"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -1122,8 +1121,6 @@ func Run(isDebug *bool) *cli.Command {
 			// Check ADC credentials for BigQuery connections used by pending assets
 			// This ensures credentials are available before any tasks begin running
 			pendingAssets := getPendingAssets(s)
-			warnUnsupportedHooksForScriptAssets(pendingAssets, foundPipeline)
-
 			if err := bigquery.CheckADCCredentialsForPipeline(runCtx, foundPipeline, pendingAssets, connectionManager); err != nil {
 				errorPrinter.Printf("Failed to verify BigQuery ADC credentials: %v\n", err)
 				return cli.Exit("", 1)
@@ -2292,61 +2289,6 @@ func getPendingAssets(s *scheduler.Scheduler) []*pipeline.Asset {
 	}
 
 	return assets
-}
-
-func scriptAssetsWithUnsupportedHooks(assets []*pipeline.Asset, p *pipeline.Pipeline) []string {
-	names := make([]string, 0)
-
-	for _, asset := range assets {
-		switch {
-		case asset == nil:
-			continue
-		case asset.Type != pipeline.AssetTypePython && asset.Type != pipeline.AssetTypeR:
-			continue
-		case asset.Hooks.IsZero():
-			continue
-		case hooksOnlyFromPipelineDefaults(asset, p):
-			continue
-		}
-
-		names = append(names, asset.Name)
-	}
-
-	slices.Sort(names)
-	return names
-}
-
-func hooksOnlyFromPipelineDefaults(asset *pipeline.Asset, p *pipeline.Pipeline) bool {
-	if asset == nil || p == nil || p.DefaultValues == nil {
-		return false
-	}
-
-	return reflect.DeepEqual(asset.Hooks.Pre, p.DefaultValues.Hooks.Pre) &&
-		reflect.DeepEqual(asset.Hooks.Post, p.DefaultValues.Hooks.Post)
-}
-
-func warnUnsupportedHooksForScriptAssets(assets []*pipeline.Asset, p *pipeline.Pipeline) {
-	names := scriptAssetsWithUnsupportedHooks(assets, p)
-	if len(names) == 0 {
-		return
-	}
-
-	const maxShown = 5
-	displayNames := names
-	if len(displayNames) > maxShown {
-		displayNames = displayNames[:maxShown]
-	}
-
-	display := strings.Join(displayNames, ", ")
-	if len(names) > maxShown {
-		display = fmt.Sprintf("%s and %d more", display, len(names)-maxShown)
-	}
-
-	warningPrinter.Printf(
-		"Warning: Hooks are SQL-only; ignoring hooks on %d Python/R asset(s): %s\n",
-		len(names),
-		display,
-	)
 }
 
 func ensurePythonCacheGitignore(fs afero.Fs, repoRoot string) error {
