@@ -373,9 +373,7 @@
         "password",
         "host",
         "port",
-        "database",
-        "http_port",
-        "secure"
+        "database"
       ]
     },
     "ClickupConnection": {
