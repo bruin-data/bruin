@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockUvInstaller struct {
@@ -169,13 +170,15 @@ func Test_buildIngestrPackageKey(t *testing.T) {
 			t.Parallel()
 
 			u := &UvPythonRunner{}
-			key := u.buildIngestrPackageKey(context.Background(), tt.extraPackages)
+			key := u.buildIngestrPackageKey(t.Context(), tt.extraPackages)
 			assert.Equal(t, tt.expected, key)
 		})
 	}
 }
 
 func Test_ensureIngestrInstalled_OnlyInstallsOnce(t *testing.T) {
+	t.Parallel()
+
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
@@ -198,22 +201,24 @@ func Test_ensureIngestrInstalled_OnlyInstallsOnce(t *testing.T) {
 		binaryFullPath: "~/.bruin/uv",
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	extraPackages := []string{"pyodbc"}
 
 	err := u.ensureIngestrInstalled(ctx, extraPackages, repo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = u.ensureIngestrInstalled(ctx, extraPackages, repo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = u.ensureIngestrInstalled(ctx, extraPackages, repo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, int32(1), installCount.Load(), "ingestr should only be installed once for the same package combination")
 }
 
 func Test_ensureIngestrInstalled_InstallsForDifferentPackages(t *testing.T) {
+	t.Parallel()
+
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
@@ -236,21 +241,23 @@ func Test_ensureIngestrInstalled_InstallsForDifferentPackages(t *testing.T) {
 		binaryFullPath: "~/.bruin/uv",
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := u.ensureIngestrInstalled(ctx, []string{"pyodbc"}, repo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = u.ensureIngestrInstalled(ctx, []string{"duckdb"}, repo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = u.ensureIngestrInstalled(ctx, []string{"pyodbc", "duckdb"}, repo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, int32(3), installCount.Load(), "ingestr should be installed once for each unique package combination")
 }
 
 func Test_ensureIngestrInstalled_ConcurrentCalls(t *testing.T) {
+	t.Parallel()
+
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
@@ -273,7 +280,7 @@ func Test_ensureIngestrInstalled_ConcurrentCalls(t *testing.T) {
 		binaryFullPath: "~/.bruin/uv",
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	extraPackages := []string{"pyodbc"}
 
 	var wg sync.WaitGroup

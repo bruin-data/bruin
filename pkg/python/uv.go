@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	ingestrInstallMutex     sync.Mutex
+	ingestrInstallMutex      sync.Mutex
 	ingestrInstalledPackages = make(map[string]bool)
 )
 
