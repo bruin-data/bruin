@@ -1023,6 +1023,31 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 			expectedDeps:  []string{},
 			expectedError: false,
 		},
+		{
+			name: "asset query renders with pipeline macros",
+			asset: &pipeline.Asset{
+				Name: "macro_example",
+				Type: pipeline.AssetTypeDuckDBQuery,
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "example"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "{{ count_by('example', 'country') }}",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "example"},
+				},
+				Macros: []pipeline.Macro{
+					`{% macro count_by(table, column) -%}
+SELECT {{ column }}, COUNT(*) AS count FROM {{ table }} GROUP BY {{ column }}
+{%- endmacro %}`,
+				},
+			},
+			expectedDeps:  []string{},
+			expectedError: false,
+		},
 	}
 
 	parser, err := NewSQLParser(true)
