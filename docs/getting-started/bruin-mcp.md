@@ -15,10 +15,12 @@ Please make sure you have [Bruin CLI installed](/getting-started/introduction/in
 :::warning Windows Users
 On Windows, you may need to use the full path to the `bruin` executable instead of just `bruin` in the configuration files below.
 
-To find the path, run the following command in your terminal:
+To find the path, open **Git Bash** (not PowerShell or Command Prompt) and run the following command:
 ```bash
 which bruin
 ```
+
+> **Note:** The `which` command is a Unix/Bash command and will not work in PowerShell or Command Prompt. Make sure you're using Git Bash, which is included with [Git for Windows](https://git-scm.com/download/win).
 
 Then use the output path (e.g., `C:\Users\YourName\.bruin\bin\bruin.exe`) in place of `bruin` in the `command` field of your MCP configuration.
 :::
