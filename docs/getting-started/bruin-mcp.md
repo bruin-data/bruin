@@ -12,6 +12,17 @@ Bruin MCP allows you to extend your AI agents to analyze, understand, and build 
 Please make sure you have [Bruin CLI installed](/getting-started/introduction/installation.md).
 :::
 
+:::warning Windows Users
+On Windows, you may need to use the full path to the `bruin` executable instead of just `bruin` in the configuration files below.
+
+To find the path, run the following command in your terminal:
+```bash
+which bruin
+```
+
+Then use the output path (e.g., `C:\Users\YourName\.bruin\bin\bruin.exe`) in place of `bruin` in the `command` field of your MCP configuration.
+:::
+
 ### Claude Code
 
 To use Bruin MCP in Claude Code, run the following command in your terminal:
