@@ -206,7 +206,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 		&SimpleRule{
 			Identifier:       "script-hooks-unsupported",
 			Fast:             true,
-			Severity:         ValidatorSeverityWarning,
+			Severity:         ValidatorSeverityCritical,
 			AssetValidator:   ValidateScriptAssetHooksUnsupported,
 			ApplicableLevels: []Level{LevelAsset},
 		},
