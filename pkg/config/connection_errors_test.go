@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -58,6 +57,6 @@ func TestNewConnectionNotFoundError_ReturnsTypedError(t *testing.T) {
 	err := NewConnectionNotFoundError(ctx, "", "warehouse")
 
 	var typedErr *MissingConnectionError
-	require.True(t, errors.As(err, &typedErr))
+	require.ErrorAs(t, err, &typedErr)
 	require.Equal(t, "connection 'warehouse' not found in secrets backend 'aws-secrets-manager'", err.Error())
 }
