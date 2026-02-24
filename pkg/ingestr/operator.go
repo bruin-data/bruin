@@ -405,22 +405,3 @@ func (o *SeedOperator) resolveSeedDestinationTableName(connectionName, destURI, 
 
 	return tableName
 }
-func connectionNotFoundError(ctx context.Context, role, name string) error {
-	secretsBackend, _ := ctx.Value(config.SecretsBackendContextKey).(string)
-	secretsBackend = strings.TrimSpace(secretsBackend)
-
-	if secretsBackend != "" {
-		return errors.Errorf(
-			"%s connection '%s' not found.\nconfigure it in the '%s' secrets backend under the correct secret name, or switch backend with '--secrets-backend'",
-			role,
-			name,
-			secretsBackend,
-		)
-	}
-
-	return errors.Errorf(
-		"%s connection '%s' not found.\nconfigure it under the correct environment in '.bruin.yml' at the repository root, or pass '--config-file' to use a different config path",
-		role,
-		name,
-	)
-}
