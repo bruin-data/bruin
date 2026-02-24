@@ -204,6 +204,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "script-hooks-unsupported",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateScriptAssetHooksUnsupported,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "emr-serverless-spark-validation",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
