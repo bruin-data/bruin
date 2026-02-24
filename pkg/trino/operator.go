@@ -69,9 +69,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, ok := o.connection.GetConnection(connName).(*Client)
+	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
+	if err != nil {
+		return err
+	}
+
+	conn, ok := rawConn.(*Client)
 	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a trino connection", connName)
+		return errors.Errorf("connection '%s' is not a trino connection", connName)
 	}
 
 	// Extract multiple queries from the materialized string

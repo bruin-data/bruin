@@ -149,7 +149,7 @@ func TestNewTableSensorConnectionNotFound(t *testing.T) {
 		},
 	})
 
-	assert.ErrorContains(t, err, "does not exist")
+	assert.ErrorContains(t, err, "connection 'gcp-default' not found in config file '.bruin.yml' under environment 'default'")
 }
 
 func TestNewTableSensorNoTableExistsChecker(t *testing.T) {

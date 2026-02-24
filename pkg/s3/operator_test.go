@@ -210,7 +210,7 @@ func TestKeySensor_RunTask_ConnectionNotFound(t *testing.T) {
 	}
 	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "does not exist")
+	assert.Contains(t, err.Error(), "connection 'my-conn' not found in config file '.bruin.yml' under environment 'default'")
 }
 
 func TestKeySensor_RunTask_WrongConnectionType(t *testing.T) {

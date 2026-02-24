@@ -906,7 +906,7 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 	}
 }
 
-func TestBasicOperator_Run_MissingConnectionErrorIsActionable(t *testing.T) {
+func TestBasicOperator_Run_MissingConnectionError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -919,33 +919,29 @@ func TestBasicOperator_Run_MissingConnectionErrorIsActionable(t *testing.T) {
 		notExpectedParts []string
 	}{
 		{
-			name: "missing source connection uses .bruin.yml guidance",
+			name: "missing source connection reports config path and environment",
 			connections: map[string]string{
 				"bq": "bigquery://uri-here",
 			},
 			assetConnection:  "bq",
 			sourceConnection: "missing-source",
 			expectedParts: []string{
-				"source connection 'missing-source' not found",
-				"configure it under the correct environment in '.bruin.yml' at the repository root",
-				"--config-file",
+				"source connection 'missing-source' not found in config file '.bruin.yml' under environment 'default'",
 			},
 		},
 		{
-			name: "missing destination connection uses .bruin.yml guidance",
+			name: "missing destination connection reports config path and environment",
 			connections: map[string]string{
 				"sf": "snowflake://uri-here",
 			},
 			assetConnection:  "missing-destination",
 			sourceConnection: "sf",
 			expectedParts: []string{
-				"destination connection 'missing-destination' not found",
-				"configure it under the correct environment in '.bruin.yml' at the repository root",
-				"--config-file",
+				"destination connection 'missing-destination' not found in config file '.bruin.yml' under environment 'default'",
 			},
 		},
 		{
-			name: "missing source connection uses secrets backend guidance",
+			name: "missing source connection reports secrets backend",
 			connections: map[string]string{
 				"bq": "bigquery://uri-here",
 			},
@@ -953,9 +949,7 @@ func TestBasicOperator_Run_MissingConnectionErrorIsActionable(t *testing.T) {
 			sourceConnection: "missing-source",
 			secretsBackend:   "vault",
 			expectedParts: []string{
-				"source connection 'missing-source' not found",
-				"configure it in the 'vault' secrets backend",
-				"--secrets-backend",
+				"source connection 'missing-source' not found in secrets backend 'vault'",
 			},
 			notExpectedParts: []string{
 				".bruin.yml",

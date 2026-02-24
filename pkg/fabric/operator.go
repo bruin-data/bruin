@@ -65,9 +65,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, ok := o.connection.GetConnection(connName).(*DB)
+	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
+	if err != nil {
+		return err
+	}
+
+	conn, ok := rawConn.(*DB)
 	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a Fabric Warehouse connection", connName)
+		return errors.Errorf("connection '%s' is not a fabric warehouse connection", connName)
 	}
 
 	writer := ctx.Value(executor.KeyPrinter)

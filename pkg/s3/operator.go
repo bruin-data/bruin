@@ -154,7 +154,7 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 
 	connDetails := ks.connection.GetConnectionDetails(connName)
 	if connDetails == nil {
-		return errors.Errorf("connection '%s' does not exist", connName)
+		return config.ConnectionNotFoundErrorFromContext(ctx, "", connName)
 	}
 
 	var secretKey, accessKey, region, endpointURL string
@@ -167,7 +167,7 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 	} else {
 		s3Conn, ok2 := connDetails.(*config.S3Connection)
 		if !ok2 {
-			return errors.Errorf("'%s' either does not exist or is not an AWS/S3 connection", connName)
+			return errors.Errorf("connection '%s' is not an AWS/S3 connection", connName)
 		}
 		secretKey = s3Conn.SecretAccessKey
 		accessKey = s3Conn.AccessKeyID

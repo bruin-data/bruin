@@ -94,7 +94,7 @@ func TestDevEnvQueryModifier_Modify(t *testing.T) {
 				f.Conn.On("GetConnection", "postgres-default").
 					Return(nil)
 			},
-			error: "failed to get connection",
+			error: "connection 'postgres-default' not found in config file '.bruin.yml' under environment 'default'",
 		},
 		{
 			name:        "connection found but it cannot be used for devenv, error",
