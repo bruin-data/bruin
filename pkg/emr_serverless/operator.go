@@ -33,9 +33,9 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
-	rawConn, err := config.GetRequiredConnection(ctx, op.connection, "", connID)
-	if err != nil {
-		return err
+	rawConn := op.connection.GetConnection(connID)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connID)
 	}
 
 	conn, ok := rawConn.(*Client)

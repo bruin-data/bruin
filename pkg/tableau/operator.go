@@ -29,9 +29,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Wrap(err, "failed to get connection name for asset")
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	client, ok := rawConn.(*Client)

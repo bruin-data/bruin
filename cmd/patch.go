@@ -77,10 +77,11 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager conf
 
 		conn = manager.GetConnection(connName)
 		if conn == nil {
-			return fillStatusFailed, config.ConnectionNotFoundError(config.ConnectionLookupDetails{
+			return fillStatusFailed, &config.MissingConnectionError{
+				Name:            connName,
 				ConfigFilePath:  pp.Config.Path(),
 				EnvironmentName: pp.Config.SelectedEnvironmentName,
-			}, "", connName)
+			}
 		}
 	} else {
 		_, conn, err = getConnectionFromPipelineInfoWithContext(context.Background(), pp, environment)

@@ -97,9 +97,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	conn, ok := rawConn.(SfClient)
@@ -177,9 +177,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	conn, ok := rawConn.(SfClient)
@@ -224,9 +224,9 @@ func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) e
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	client, ok := rawConn.(SfClient)

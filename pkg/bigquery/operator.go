@@ -101,9 +101,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	conn, ok := rawConn.(DB)
@@ -221,9 +221,9 @@ func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstanc
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	client, ok := rawConn.(DB)
@@ -290,9 +290,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	conn, ok := rawConn.(DB)
@@ -368,9 +368,9 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, ts.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := ts.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	conn, ok := rawConn.(DB)

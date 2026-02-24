@@ -437,7 +437,7 @@ func getTableSummaryWithManager(ctx context.Context, manager config.ConnectionAn
 
 	conn := manager.GetConnection(connectionName)
 	if conn == nil {
-		return &TableSummary{TableName: tableName, Error: config.ConnectionNotFoundErrorFromContext(ctx, "", connectionName).Error()}
+		return &TableSummary{TableName: tableName, Error: config.NewConnectionNotFoundError(ctx, "", connectionName).Error()}
 	}
 
 	summarizer, ok := conn.(diff.TableSummarizer)

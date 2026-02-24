@@ -354,9 +354,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return err
 	}
 
-	destConnection, err := config.GetRequiredConnection(ctx, u.conn, "destination", destConnectionName)
-	if err != nil {
-		return err
+	destConnection := u.conn.GetConnection(destConnectionName)
+	if destConnection == nil {
+		return config.NewConnectionNotFoundError(ctx, "destination", destConnectionName)
 	}
 
 	destConnectionInst, ok := destConnection.(pipelineConnection)

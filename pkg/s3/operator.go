@@ -154,7 +154,7 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 
 	connDetails := ks.connection.GetConnectionDetails(connName)
 	if connDetails == nil {
-		return config.ConnectionNotFoundErrorFromContext(ctx, "", connName)
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	var secretKey, accessKey, region, endpointURL string

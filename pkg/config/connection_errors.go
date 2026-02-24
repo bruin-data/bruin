@@ -2,76 +2,69 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"strings"
-
-	errors2 "github.com/pkg/errors"
 )
 
-type ConnectionLookupDetails struct {
+// MissingConnectionError is returned when a requested connection cannot be found.
+type MissingConnectionError struct {
+	Role            string
+	Name            string
 	SecretsBackend  string
 	ConfigFilePath  string
 	EnvironmentName string
 }
 
-func ConnectionLookupDetailsFromContext(ctx context.Context) ConnectionLookupDetails {
-	details := ConnectionLookupDetails{}
+func NewConnectionNotFoundError(ctx context.Context, role, name string) *MissingConnectionError {
+	err := &MissingConnectionError{
+		Role: role,
+		Name: name,
+	}
+
 	if ctx == nil {
-		return details
+		return err
 	}
 
 	if backend, ok := ctx.Value(SecretsBackendContextKey).(string); ok {
-		details.SecretsBackend = backend
+		err.SecretsBackend = backend
 	}
 	if configPath, ok := ctx.Value(ConfigFilePathContextKey).(string); ok {
-		details.ConfigFilePath = configPath
+		err.ConfigFilePath = configPath
 	}
 	if envName, ok := ctx.Value(EnvironmentNameContextKey).(string); ok {
-		details.EnvironmentName = envName
+		err.EnvironmentName = envName
 	}
 
-	return details
+	return err
 }
 
-func ConnectionNotFoundError(details ConnectionLookupDetails, role, name string) error {
-	role = strings.TrimSpace(role)
+func (e *MissingConnectionError) Error() string {
+	role := strings.TrimSpace(e.Role)
 	prefix := ""
 	if role != "" {
 		prefix = role + " "
 	}
 
-	secretsBackend := strings.TrimSpace(details.SecretsBackend)
+	secretsBackend := strings.TrimSpace(e.SecretsBackend)
 	if secretsBackend != "" {
-		return errors2.Errorf("%sconnection '%s' not found in secrets backend '%s'", prefix, name, secretsBackend)
+		return fmt.Sprintf("%sconnection '%s' not found in secrets backend '%s'", prefix, e.Name, secretsBackend)
 	}
 
-	configFilePath := strings.TrimSpace(details.ConfigFilePath)
+	configFilePath := strings.TrimSpace(e.ConfigFilePath)
 	if configFilePath == "" {
 		configFilePath = ".bruin.yml"
 	}
 
-	environmentName := strings.TrimSpace(details.EnvironmentName)
+	environmentName := strings.TrimSpace(e.EnvironmentName)
 	if environmentName == "" {
 		environmentName = "default"
 	}
 
-	return errors2.Errorf(
+	return fmt.Sprintf(
 		"%sconnection '%s' not found in config file '%s' under environment '%s'",
 		prefix,
-		name,
+		e.Name,
 		configFilePath,
 		environmentName,
 	)
-}
-
-func ConnectionNotFoundErrorFromContext(ctx context.Context, role, name string) error {
-	return ConnectionNotFoundError(ConnectionLookupDetailsFromContext(ctx), role, name)
-}
-
-func GetRequiredConnection(ctx context.Context, getter ConnectionGetter, role, name string) (any, error) {
-	conn := getter.GetConnection(name)
-	if conn == nil {
-		return nil, ConnectionNotFoundErrorFromContext(ctx, role, name)
-	}
-
-	return conn, nil
 }

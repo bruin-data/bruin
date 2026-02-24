@@ -447,10 +447,11 @@ func PingConnection() *cli.Command {
 
 			conn := manager.GetConnection(name)
 			if conn == nil {
-				printErrorForOutput(output, config.ConnectionNotFoundError(config.ConnectionLookupDetails{
+				printErrorForOutput(output, &config.MissingConnectionError{
+					Name:            name,
 					ConfigFilePath:  configFilePath,
 					EnvironmentName: cm.SelectedEnvironmentName,
-				}, "", name))
+				})
 				return cli.Exit("", 1)
 			}
 

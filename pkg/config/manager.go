@@ -239,10 +239,11 @@ func (c *Config) CanRunTaskInstances(p *pipeline.Pipeline, tasks []scheduler.Tas
 
 		for _, connName := range connNames {
 			if !c.SelectedEnvironment.Connections.Exists(connName) {
-				return ConnectionNotFoundError(ConnectionLookupDetails{
+				return &MissingConnectionError{
+					Name:            connName,
 					ConfigFilePath:  c.path,
 					EnvironmentName: c.SelectedEnvironmentName,
-				}, "", connName)
+				}
 			}
 		}
 	}

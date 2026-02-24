@@ -107,9 +107,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	conn, ok := rawConn.(PgClient)
@@ -179,9 +179,9 @@ func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) e
 		return err
 	}
 
-	rawConn, err := config.GetRequiredConnection(ctx, o.connection, "", connName)
-	if err != nil {
-		return err
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	client, ok := rawConn.(PgClient)
