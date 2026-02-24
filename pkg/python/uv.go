@@ -25,6 +25,11 @@ import (
 	"github.com/spf13/afero"
 )
 
+var (
+	ingestrInstallMutex      sync.Mutex
+	ingestrInstalledPackages = make(map[string]bool)
+)
+
 var AvailablePythonVersions = map[string]bool{
 	"3.8":  true,
 	"3.9":  true,
@@ -126,12 +131,9 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 	u.binaryFullPath = binaryFullPath
 
-	err = u.Cmd.Run(ctx, repo, &CommandInstance{
-		Name: u.binaryFullPath,
-		Args: u.ingestrInstallCmd(ctx, extraPackages),
-	})
+	err = u.ensureIngestrInstalled(ctx, extraPackages, repo)
 	if err != nil {
-		return errors.Wrap(err, "failed to install ingestr")
+		return err
 	}
 
 	flags := []string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}
@@ -381,12 +383,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
-		Name: u.binaryFullPath,
-		Args: u.ingestrInstallCmd(ctx, extraPackages),
-	})
+	err = u.ensureIngestrInstalled(ctx, extraPackages, execCtx.repo)
 	if err != nil {
-		return errors.Wrap(err, "failed to install ingestr")
+		return err
 	}
 
 	runArgs := slices.Concat([]string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
@@ -425,18 +424,20 @@ func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
 
 // ingestrInstallCmd returns the uv tool commandline
 // args necessary for installing ingestr.
-func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string) []string {
+func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string, forceReinstall bool) []string {
 	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
 	cmdline := []string{
 		"tool",
 		"install",
 		"--no-config",
-		"--force",
 		"--quiet",
 		"--prerelease",
 		"allow",
 		"--python",
 		pythonVersionForIngestr,
+	}
+	if forceReinstall {
+		cmdline = append(cmdline, "--force")
 	}
 	for _, pkg := range pkgs {
 		cmdline = append(cmdline, "--with", pkg)
@@ -446,6 +447,52 @@ func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string) [
 	}
 	cmdline = append(cmdline, ingestrPackageName)
 	return cmdline
+}
+
+// buildIngestrPackageKey creates a unique key for the combination of ingestr version and extra packages.
+func (u *UvPythonRunner) buildIngestrPackageKey(ctx context.Context, extraPackages []string) string {
+	ingestrPackageName, _ := u.ingestrPackage(ctx)
+	sortedPkgs := make([]string, len(extraPackages))
+	copy(sortedPkgs, extraPackages)
+	sort.Strings(sortedPkgs)
+	return ingestrPackageName + ":" + strings.Join(sortedPkgs, ",")
+}
+
+// ensureIngestrInstalled installs ingestr with the specified extra packages in a thread-safe manner.
+// It prevents parallel workers from installing ingestr simultaneously, which causes file lock
+// conflicts on Windows (OS error 32).
+func (u *UvPythonRunner) ensureIngestrInstalled(ctx context.Context, extraPackages []string, repo *git.Repo) error {
+	packageKey := u.buildIngestrPackageKey(ctx, extraPackages)
+
+	ingestrInstallMutex.Lock()
+	defer ingestrInstallMutex.Unlock()
+
+	_, isLocal := u.ingestrPackage(ctx)
+	if !isLocal {
+		if ingestrInstalledPackages[packageKey] {
+			return nil
+		}
+	}
+
+	forceReinstall := isLocal || !ingestrInstalledPackages[packageKey]
+	err := u.Cmd.Run(ctx, repo, &CommandInstance{
+		Name: u.binaryFullPath,
+		Args: u.ingestrInstallCmd(ctx, extraPackages, forceReinstall),
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to install ingestr")
+	}
+
+	ingestrInstalledPackages[packageKey] = true
+	return nil
+}
+
+// ResetIngestrInstallCache resets the ingestr installation cache.
+// This is primarily useful for testing.
+func ResetIngestrInstallCache() {
+	ingestrInstallMutex.Lock()
+	defer ingestrInstallMutex.Unlock()
+	ingestrInstalledPackages = make(map[string]bool)
 }
 
 const PythonArrowTemplate = `
