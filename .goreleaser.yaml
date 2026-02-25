@@ -85,8 +85,8 @@ builds:
       - -buildmode=exe
 
 release:
-  make_latest: true
-  prerelease: false
+  make_latest: false
+  prerelease: true
 
 archives:
   - format: tar.gz

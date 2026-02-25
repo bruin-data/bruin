@@ -136,10 +136,9 @@ jobs:
         shell: msys2 {0}
     steps:
       - name: Optimize Git for Windows
+        shell: powershell
         run: |
-          # Disable compression for faster network transfer.
           git config --global core.compression 0
-          # Turn off fsync
           git config --global core.fsync -all
 
       - uses: actions/checkout@v4
@@ -244,6 +243,7 @@ jobs:
     needs: [prepare-windows, release-unix, integration-tests]
     steps:
       - name: Optimize Git for Windows
+        shell: powershell
         run: |
           # Disable compression for faster network transfer.
           git config --global core.compression 0
