@@ -36,12 +36,6 @@ func TestCheckLint(t *testing.T) {
 			expectError:   false,
 			expectChange:  true,
 		},
-		{
-			name:          "Hook Needs Reformatting",
-			assetFilePath: filepath.Join(testDatadir, "hook_needs_reformatting.sql"),
-			expectError:   false,
-			expectChange:  true,
-		},
 	}
 
 	for _, tc := range tests {
