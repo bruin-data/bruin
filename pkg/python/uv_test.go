@@ -177,8 +177,6 @@ func Test_buildIngestrPackageKey(t *testing.T) {
 }
 
 func Test_ensureIngestrInstalled_OnlyInstallsOnce(t *testing.T) {
-	t.Parallel()
-
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
@@ -217,8 +215,6 @@ func Test_ensureIngestrInstalled_OnlyInstallsOnce(t *testing.T) {
 }
 
 func Test_ensureIngestrInstalled_InstallsForDifferentPackages(t *testing.T) {
-	t.Parallel()
-
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
@@ -256,8 +252,6 @@ func Test_ensureIngestrInstalled_InstallsForDifferentPackages(t *testing.T) {
 }
 
 func Test_ensureIngestrInstalled_ConcurrentCalls(t *testing.T) {
-	t.Parallel()
-
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
