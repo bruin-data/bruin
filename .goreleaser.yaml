@@ -3,13 +3,29 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - id: bruin-darwin
+  - id: bruin-darwin-amd64
     binary: bruin
     ldflags:
       - -s -w -X main.version={{ .Env.VERSION }} -X main.commit={{ .Env.COMMIT_SHA }} -X main.telemetryKey={{ .Env.TELEMETRY_KEY }}
     main: ./
     goarch:
       - amd64
+    goos:
+      - darwin
+    env:
+      - CC=o64-clang
+      - CXX=o64-clang++
+      - CGO_ENABLED=1
+      - MACOSX_DEPLOYMENT_TARGET=10.15
+    flags:
+      - -trimpath
+
+  - id: bruin-darwin-arm64
+    binary: bruin
+    ldflags:
+      - -s -w -X main.version={{ .Env.VERSION }} -X main.commit={{ .Env.COMMIT_SHA }} -X main.telemetryKey={{ .Env.TELEMETRY_KEY }}
+    main: ./
+    goarch:
       - arm64
     goos:
       - darwin
@@ -20,7 +36,6 @@ builds:
       - MACOSX_DEPLOYMENT_TARGET=10.15
     flags:
       - -trimpath
- 
   - id: bruin-linux-amd64
     binary: bruin
     main: ./
@@ -70,8 +85,8 @@ builds:
       - -buildmode=exe
 
 release:
-  make_latest: false
-  prerelease: true
+  make_latest: true
+  prerelease: false
 
 archives:
   - format: tar.gz
