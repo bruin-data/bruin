@@ -38,8 +38,6 @@ Or you can also use `wget` to install Bruin:
 wget -qO- https://getbruin.com/install/cli | sh
 ```
 
-> [!NOTE]
-> The Homebrew installation method is **deprecated**. If you previously installed Bruin using `brew`, uninstall it first before running the `curl` command.
 > [!IMPORTANT]
 > If you are on Windows, make sure to run the command in the [Git Bash](https://git-scm.com/downloads/win) or [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) terminal.
 

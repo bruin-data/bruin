@@ -314,7 +314,7 @@ print(summary(forecast_result))
 
 R assets require R to be installed on your system. Install R using one of these methods:
 
-- **macOS**: `brew install r`
+- **macOS**: Download from [CRAN](https://cran.r-project.org/bin/macosx/)
 - **Ubuntu/Debian**: `sudo apt-get install r-base`
 - **Windows**: Download from [CRAN](https://cran.r-project.org/bin/windows/base/)
 - **Other platforms**: See [CRAN installation guides](https://cran.r-project.org/)

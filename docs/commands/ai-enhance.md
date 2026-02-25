@@ -16,12 +16,6 @@ Claude Code is the default and recommended AI provider. Install it using one of 
 curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-**Homebrew (macOS):**
-
-```bash
-brew install --cask claude-code
-```
-
 **Windows PowerShell:**
 
 ```powershell
@@ -33,9 +27,6 @@ After installation, authenticate by running `claude` and following the prompts. 
 ```bash
 claude doctor
 ```
-
-> [!TIP]
-> Native installations (curl/PowerShell) auto-update automatically. Homebrew installations require manual updates via `brew upgrade claude-code`.
 
 ### Alternative Providers
 
