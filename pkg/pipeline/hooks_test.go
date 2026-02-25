@@ -1,9 +1,11 @@
 package pipeline
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
@@ -115,4 +117,59 @@ func TestWrapHookQueriesList(t *testing.T) {
 			assert.Equal(t, tt.want, wrapHookQueriesList(tt.queries, tt.hooks))
 		})
 	}
+}
+
+type hookRendererStub struct {
+	render func(string) (string, error)
+}
+
+func (r hookRendererStub) Render(query string) (string, error) {
+	return r.render(query)
+}
+
+func TestResolveHookTemplatesToNew(t *testing.T) {
+	t.Parallel()
+
+	renderer := hookRendererStub{
+		render: func(query string) (string, error) {
+			return query + " rendered", nil
+		},
+	}
+
+	original := Hooks{
+		Pre:  []Hook{{Query: "select '{{ start_date }}'"}},
+		Post: []Hook{{Query: "select '{{ end_date }}'"}},
+	}
+
+	rendered, err := ResolveHookTemplatesToNew(original, renderer)
+	require.NoError(t, err)
+	assert.Equal(t, Hooks{
+		Pre:  []Hook{{Query: "select '{{ start_date }}' rendered"}},
+		Post: []Hook{{Query: "select '{{ end_date }}' rendered"}},
+	}, rendered)
+
+	// Ensure original hooks are not mutated.
+	assert.Equal(t, Hooks{
+		Pre:  []Hook{{Query: "select '{{ start_date }}'"}},
+		Post: []Hook{{Query: "select '{{ end_date }}'"}},
+	}, original)
+}
+
+func TestResolveHookTemplatesToNew_Error(t *testing.T) {
+	t.Parallel()
+
+	renderer := hookRendererStub{
+		render: func(query string) (string, error) {
+			if query == "bad" {
+				return "", fmt.Errorf("missing variable")
+			}
+			return query, nil
+		},
+	}
+
+	_, err := ResolveHookTemplatesToNew(Hooks{
+		Pre: []Hook{{Query: "bad"}},
+	}, renderer)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "failed to render pre hook 1")
 }

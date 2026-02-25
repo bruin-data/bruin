@@ -200,6 +200,10 @@ func RenderDDL() *cli.Command {
 			if err != nil {
 				return err
 			}
+			if err := renderAssetHooks(runCtx, pl, asset, forAsset); err != nil {
+				printError(err, c.String("output"), "Failed to render hooks:")
+				return cli.Exit("", 1)
+			}
 
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
