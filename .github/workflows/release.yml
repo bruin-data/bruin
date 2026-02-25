@@ -148,6 +148,7 @@ jobs:
             cmd/
             pkg/
             internal/
+            docs/
             go.mod
             go.sum
             main.go
@@ -257,6 +258,7 @@ jobs:
             cmd/
             pkg/
             internal/
+            docs/
             go.mod
             go.sum
             main.go
