@@ -5,6 +5,10 @@ on:
     tags:
       - '*'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -24,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup Go 
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: true
@@ -57,7 +61,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: true
@@ -92,107 +96,68 @@ jobs:
         run: |
           cd integration-tests/cloud-integration-tests/bigquery
           go test -v -timeout 30m ./...
-
-  prepare-darwin:
-    runs-on: depot-ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Workaround Git Security Warning
-        run: |
-          # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" 
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: 'go.mod'
-          cache: false
-      - shell: bash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - name: cache darwin
-        uses: actions/cache@v3
-        with:
-          path: dist/darwin
-          key: darwin-${{ env.sha_short }}
-      - name: Run GoReleaser
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross-pro:v1.23 release --clean --split --verbose
-  
         
-  prepare-linux:
+  prepare-unix:
+    strategy:
+      matrix:
+        os: [darwin, linux]
     runs-on: depot-ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Workaround Git Security Warning
         run: |
           # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" 
-      - uses: actions/setup-go@v4
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: false
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - name: cache linux
-        uses: actions/cache@v3
+      - name: Cache ${{ matrix.os }} build
+        id: cache-build
+        uses: actions/cache@v4
         with:
-          path: dist/linux
-          key: linux-${{ env.sha_short }}
+          path: dist/${{ matrix.os }}
+          key: ${{ matrix.os }}-${{ env.sha_short }}
       - name: Run GoReleaser
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
-          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross-pro:v1.23 release --clean --split --verbose
+          docker run --privileged -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=${{ matrix.os }} -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross-pro:v1.23 release --clean --split --verbose
 
-
-  release-unix:
-    runs-on: depot-ubuntu-latest
-    needs: [prepare-linux, prepare-darwin, integration-tests]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Workaround Git Security Warning
-        run: |
-          # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" 
-      - shell: bash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - uses: actions/cache@v3
-        with:
-          path: dist/linux
-          key: linux-${{ env.sha_short }}
-      - uses: actions/cache@v3
-        with:
-          path: dist/darwin
-          key: darwin-${{ env.sha_short }}
-      - uses: goreleaser/goreleaser-action@v3
-        with:
-          distribution: goreleaser-pro
-          version: v2.3.2
-          args: continue --merge
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
-
-  release-windows:
+  prepare-windows:
     runs-on: depot-windows-latest
-    needs: [prepare-linux, prepare-darwin, integration-tests]
     defaults:
       run:
         shell: msys2 {0}
-
     steps:
-      - uses: actions/checkout@v3
+      - name: Optimize Git for Windows
+        shell: powershell
+        run: |
+          git config --global core.compression 0
+          git config --global core.fsync -all
+
+      - uses: actions/checkout@v4
+        with:
+          filter: 'blob:none'
+          sparse-checkout: |
+            cmd/
+            pkg/
+            internal/
+            docs/
+            go.mod
+            go.sum
+            main.go
+            Makefile
+            .goreleaser.yaml
+            pythonsrc/
+            templates/
+            resources/
+            scripts/
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -205,12 +170,23 @@ jobs:
             mingw-w64-ucrt-x86_64-winpthreads
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-          cache: true
+          cache: false
 
-      - name: Release
+      - shell: bash
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: cache windows
+        id: cache-windows
+        uses: actions/cache@v4
+        with:
+          path: dist/windows
+          key: windows-${{ env.sha_short }}
+
+      - name: Build
+        if: steps.cache-windows.outputs.cache-hit != 'true'
         uses: goreleaser/goreleaser-action@v6
         with:
           version: v2.3.2
@@ -230,6 +206,78 @@ jobs:
           CC: x86_64-w64-mingw32-gcc
           CGO_LDFLAGS: "-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
 
+  release-unix:
+    runs-on: depot-ubuntu-latest
+    needs: [prepare-unix, integration-tests]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Workaround Git Security Warning
+        run: |
+          # Workaround a bug in github actions:
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - shell: bash
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - uses: actions/cache@v4
+        with:
+          path: dist/linux
+          key: linux-${{ env.sha_short }}
+      - uses: actions/cache@v4
+        with:
+          path: dist/darwin
+          key: darwin-${{ env.sha_short }}
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser-pro
+          version: v2.3.2
+          args: continue --merge
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
+
+  release-windows:
+    runs-on: depot-windows-latest
+    needs: [prepare-windows, release-unix, integration-tests]
+    steps:
+      - name: Optimize Git for Windows
+        shell: powershell
+        run: |
+          # Disable compression for faster network transfer.
+          git config --global core.compression 0
+          # Turn off fsync
+          git config --global core.fsync -all
+
+      - uses: actions/checkout@v4
+        with:
+          filter: 'blob:none'
+          sparse-checkout: |
+            cmd/ 
+            pkg/
+            internal/
+            docs/
+            go.mod
+            go.sum
+            main.go
+            Makefile
+            .goreleaser.yaml
+            pythonsrc/
+            templates/
+            resources/
+            scripts/
+
+      - shell: bash
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Restore Windows artifacts from cache
+        uses: actions/cache@v4
+        with:
+          path: dist/windows
+          key: windows-${{ env.sha_short }}
+
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -244,7 +292,7 @@ jobs:
   dockerBuild:
     runs-on: depot-ubuntu-latest
     name: Docker Build
-    needs: [release-windows, release-unix]
+    needs: [release-unix]
     permissions:
       # allow issuing OIDC tokens for this workflow run
       id-token: write
@@ -369,7 +417,7 @@ jobs:
     name: Installer Script on Windows
     needs: [release-windows, release-unix]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Show directories
         shell: bash
         run: pwd && cd && pwd
@@ -386,7 +434,7 @@ jobs:
     needs: [release-windows, release-unix]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Extract tag from ref
@@ -403,7 +451,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [install-unix, install-windows]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Extract tag from ref
         id: extract_tag
         run: |
