@@ -106,9 +106,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 		return err
 	}
 
-	conn, ok := o.connection.GetConnection(connName).(MySQLClient)
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
+	}
+
+	conn, ok := rawConn.(MySQLClient)
 	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a MySQL connection", connName)
+		return errors.Errorf("connection '%s' is not a mysql connection", connName)
 	}
 
 	if asset.Materialization.Type != pipeline.MaterializationTypeNone {

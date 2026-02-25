@@ -33,9 +33,14 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
-	conn, ok := op.connection.GetConnection(connID).(*Client)
+	rawConn := op.connection.GetConnection(connID)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connID)
+	}
+
+	conn, ok := rawConn.(*Client)
 	if !ok {
-		return fmt.Errorf("'%s' either does not exist or is not a EMR Serverless connection", connID)
+		return fmt.Errorf("connection '%s' is not an emr serverless connection", connID)
 	}
 
 	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark && conn.Workspace == "" {

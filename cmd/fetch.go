@@ -423,7 +423,11 @@ func getConnectionFromConfigWithContext(ctx context.Context, env string, connect
 
 	conn := manager.GetConnection(connectionName)
 	if conn == nil {
-		return nil, errors.Errorf("failed to get connection '%s'", connectionName)
+		return nil, &config.MissingConnectionError{
+			Name:            connectionName,
+			ConfigFilePath:  configFilePath,
+			EnvironmentName: cm.SelectedEnvironmentName,
+		}
 	}
 
 	return conn, nil
@@ -464,7 +468,11 @@ func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo 
 
 	conn := manager.GetConnection(connName)
 	if conn == nil {
-		return "", nil, errors.Errorf("failed to get connection '%s'", connName)
+		return "", nil, &config.MissingConnectionError{
+			Name:            connName,
+			ConfigFilePath:  pipelineInfo.Config.Path(),
+			EnvironmentName: pipelineInfo.Config.SelectedEnvironmentName,
+		}
 	}
 
 	return connName, conn, nil

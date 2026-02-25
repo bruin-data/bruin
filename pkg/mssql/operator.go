@@ -79,9 +79,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, ok := o.connection.GetConnection(connName).(MsClient)
+	rawConn := o.connection.GetConnection(connName)
+	if rawConn == nil {
+		return config.NewConnectionNotFoundError(ctx, "", connName)
+	}
+
+	conn, ok := rawConn.(MsClient)
 	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a MsSql connection", connName)
+		return errors.Errorf("connection '%s' is not a mssql connection", connName)
 	}
 
 	writer := ctx.Value(executor.KeyPrinter)

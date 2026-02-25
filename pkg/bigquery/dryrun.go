@@ -59,9 +59,14 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 		return nil, err
 	}
 
-	bqClient, _ := r.ConnectionGetter.GetConnection(connName).(DryRunnerQuerier)
-	if bqClient == nil {
-		return nil, errors.New("resolved connection is not BigQuery")
+	rawConn := r.ConnectionGetter.GetConnection(connName)
+	if rawConn == nil {
+		return nil, config.NewConnectionNotFoundError(ctx, "", connName)
+	}
+
+	bqClient, ok := rawConn.(DryRunnerQuerier)
+	if !ok {
+		return nil, errors.Errorf("connection '%s' is not a bigquery connection", connName)
 	}
 
 	meta, err := bqClient.QueryDryRun(ctx, q)

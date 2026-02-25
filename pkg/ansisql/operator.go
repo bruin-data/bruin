@@ -62,7 +62,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 
 	conn := o.connection.GetConnection(connName)
 	if conn == nil {
-		return errors.Errorf("'%s' does not exist", connName)
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
@@ -158,7 +158,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	conn := ts.connection.GetConnection(connName)
 	if conn == nil {
-		return errors.Errorf("'%s' does not exist", connName)
+		return config.NewConnectionNotFoundError(ctx, "", connName)
 	}
 
 	tableChecker, ok := conn.(TableExistsChecker)

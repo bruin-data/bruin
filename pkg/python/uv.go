@@ -355,10 +355,13 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	destConnection := u.conn.GetConnection(destConnectionName)
+	if destConnection == nil {
+		return config.NewConnectionNotFoundError(ctx, "destination", destConnectionName)
+	}
 
 	destConnectionInst, ok := destConnection.(pipelineConnection)
 	if !ok {
-		return errors.Errorf("destination connection %s is not supported by ingestr or doesn't exist", destConnectionName)
+		return errors.Errorf("destination connection '%s' is not supported by ingestr", destConnectionName)
 	}
 
 	destURI, err := destConnectionInst.GetIngestrURI()
