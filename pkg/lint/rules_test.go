@@ -2965,6 +2965,92 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 	})
 }
 
+func TestValidateHookQueryDryRun(t *testing.T) {
+	t.Parallel()
+
+	sqlAssetWithHooks := &pipeline.Asset{
+		Name: "asset_with_hooks",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		Hooks: pipeline.Hooks{
+			Pre: []pipeline.Hook{
+				{Query: "SELECT 1"},
+				{Query: " "},
+			},
+			Post: []pipeline.Hook{
+				{Query: "SELECT 2;"},
+			},
+		},
+	}
+	sqlAssetWithoutHooks := &pipeline.Asset{
+		Name: "asset_without_hooks",
+		Type: pipeline.AssetTypeBigqueryQuery,
+	}
+	pythonAssetWithHooks := &pipeline.Asset{
+		Name: "python_with_hooks",
+		Type: pipeline.AssetTypePython,
+		Hooks: pipeline.Hooks{
+			Pre: []pipeline.Hook{{Query: "SELECT 1"}},
+		},
+	}
+
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{sqlAssetWithHooks, sqlAssetWithoutHooks, pythonAssetWithHooks},
+	}
+
+	t.Run("valid hook queries", func(t *testing.T) {
+		t.Parallel()
+
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
+		validator := ValidateHookQueryDryRun(cm)
+		issues, err := validator(t.Context(), p, sqlAssetWithHooks)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("invalid hook query", func(t *testing.T) {
+		t.Parallel()
+
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
+		validator := ValidateHookQueryDryRun(cm)
+		issues, err := validator(t.Context(), p, sqlAssetWithHooks)
+		require.NoError(t, err)
+		require.NotEmpty(t, issues)
+		assert.Contains(t, issues[0].Description, "pre hook query #1 is invalid")
+		assert.Contains(t, issues[0].Description, "SELECT 1;")
+	})
+
+	t.Run("hook validation returns error", func(t *testing.T) {
+		t.Parallel()
+
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{err: errors.New("syntax error")}}
+		validator := ValidateHookQueryDryRun(cm)
+		issues, err := validator(t.Context(), p, sqlAssetWithHooks)
+		require.NoError(t, err)
+		require.NotEmpty(t, issues)
+		assert.Contains(t, issues[0].Description, "Failed to validate pre hook query #1")
+	})
+
+	t.Run("sql asset without hooks", func(t *testing.T) {
+		t.Parallel()
+
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
+		validator := ValidateHookQueryDryRun(cm)
+		issues, err := validator(t.Context(), p, sqlAssetWithoutHooks)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("non sql asset with hooks", func(t *testing.T) {
+		t.Parallel()
+
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
+		validator := ValidateHookQueryDryRun(cm)
+		issues, err := validator(t.Context(), p, pythonAssetWithHooks)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+}
+
 func TestEnsurePipelineConcurrencyIsValid(t *testing.T) {
 	t.Parallel()
 
