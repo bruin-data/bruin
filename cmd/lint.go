@@ -195,6 +195,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			rules = append(rules, queryValidatorRules(logger, cm, connectionManager, fullRefresh)...)
 			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager, renderer))
+			rules = append(rules, lint.GetHookQueryDryRunRule(connectionManager))
 			rules = append(rules, SeedAssetsValidator)
 
 			if c.Bool("fast") {

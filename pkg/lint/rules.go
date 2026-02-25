@@ -1377,6 +1377,77 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 	}
 }
 
+// ValidateHookQueryDryRun validates SQL asset hooks using a dry-run against the target DB.
+func ValidateHookQueryDryRun(connections connectionManager) AssetValidator {
+	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		var issues []*Issue
+
+		if !asset.IsSQLAsset() || asset.Hooks.IsZero() {
+			return issues, nil
+		}
+
+		connName, err := p.GetConnectionNameForAsset(asset)
+		if err != nil { //nolint
+			return issues, nil
+		}
+
+		validator := connections.GetConnection(connName)
+		if validator == nil {
+			return issues, nil
+		}
+
+		validatorInstance, ok := validator.(queryValidator)
+		if !ok { //nolint
+			return issues, nil
+		}
+
+		validateHook := func(position string, index int, hookQuery string) {
+			normalized := normalizeHookQueryForValidation(hookQuery)
+			if normalized == "" {
+				return
+			}
+
+			q := &query.Query{Query: normalized}
+			valid, err := validatorInstance.IsValid(ctx, q)
+			if err != nil {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("Failed to validate %s hook query #%d: %s", position, index, err),
+				})
+				return
+			}
+
+			if !valid {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("%s hook query #%d is invalid: %s", position, index, normalized),
+				})
+			}
+		}
+
+		for i, hook := range asset.Hooks.Pre {
+			validateHook("pre", i+1, hook.Query)
+		}
+
+		for i, hook := range asset.Hooks.Post {
+			validateHook("post", i+1, hook.Query)
+		}
+
+		return issues, nil
+	}
+}
+
+func normalizeHookQueryForValidation(queryText string) string {
+	trimmed := strings.TrimSpace(queryText)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasSuffix(trimmed, ";") {
+		return trimmed
+	}
+	return trimmed + ";"
+}
+
 type GlossaryChecker struct {
 	gr                 *glossary.GlossaryReader
 	foundGlossary      *glossary.Glossary

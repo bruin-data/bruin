@@ -1064,11 +1064,22 @@ func (a *Asset) removeExtraSpacesAtLineEndingsInTextContent() {
 		a.CustomChecks[i].Description = ClearSpacesAtLineEndings(a.CustomChecks[i].Description)
 		a.CustomChecks[i].Query = ClearSpacesAtLineEndings(a.CustomChecks[i].Query)
 	}
+	isSQLAsset := a.IsSQLAsset()
 	for i := range a.Hooks.Pre {
-		a.Hooks.Pre[i].Query = ClearSpacesAtLineEndings(a.Hooks.Pre[i].Query)
+		clearedQuery := ClearSpacesAtLineEndings(a.Hooks.Pre[i].Query)
+		if isSQLAsset {
+			a.Hooks.Pre[i].Query = formatStatement(clearedQuery)
+			continue
+		}
+		a.Hooks.Pre[i].Query = clearedQuery
 	}
 	for i := range a.Hooks.Post {
-		a.Hooks.Post[i].Query = ClearSpacesAtLineEndings(a.Hooks.Post[i].Query)
+		clearedQuery := ClearSpacesAtLineEndings(a.Hooks.Post[i].Query)
+		if isSQLAsset {
+			a.Hooks.Post[i].Query = formatStatement(clearedQuery)
+			continue
+		}
+		a.Hooks.Post[i].Query = clearedQuery
 	}
 }
 
