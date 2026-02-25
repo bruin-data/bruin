@@ -93,7 +93,8 @@ archives:
     builds:
       - bruin-linux-arm64
       - bruin-linux-amd64
-      - bruin-darwin
+      - bruin-darwin-amd64
+      - bruin-darwin-arm64
       - bruin-windows-amd64
     name_template: >-
       {{ .ProjectName }}_

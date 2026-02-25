@@ -135,7 +135,29 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
+      - name: Optimize Git for Windows
+        run: |
+          # Disable compression for faster network transfer.
+          git config --global core.compression 0
+          # Turn off fsync
+          git config --global core.fsync -all
+
       - uses: actions/checkout@v4
+        with:
+          filter: 'blob:none'
+          sparse-checkout: |
+            cmd/
+            pkg/
+            internal/
+            go.mod
+            go.sum
+            main.go
+            Makefile
+            .goreleaser.yaml
+            pythonsrc/
+            templates/
+            resources/
+            scripts/
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -221,7 +243,29 @@ jobs:
     runs-on: depot-windows-latest
     needs: [prepare-windows, release-unix, integration-tests]
     steps:
+      - name: Optimize Git for Windows
+        run: |
+          # Disable compression for faster network transfer.
+          git config --global core.compression 0
+          # Turn off fsync
+          git config --global core.fsync -all
+
       - uses: actions/checkout@v4
+        with:
+          filter: 'blob:none'
+          sparse-checkout: |
+            cmd/
+            pkg/
+            internal/
+            go.mod
+            go.sum
+            main.go
+            Makefile
+            .goreleaser.yaml
+            pythonsrc/
+            templates/
+            resources/
+            scripts/
 
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
