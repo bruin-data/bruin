@@ -44,6 +44,13 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	res := strings.Join(val, "','")
 	res = fmt.Sprintf("'%s'", res)
 
+	if err := validateIdentifier(ti.GetAsset().Name, "table name"); err != nil {
+		return err
+	}
+	if err := validateIdentifier(ti.Column.Name, "column name"); err != nil {
+		return err
+	}
+
 	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as VARCHAR2(4000)) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
 
 	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "accepted_values", func(count int64) error {
@@ -62,6 +69,13 @@ func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 
 	// Escape single quotes to prevent SQL injection / syntax errors
 	escapedPattern := strings.ReplaceAll(*ti.Check.Value.String, "'", "''")
+
+	if err := validateIdentifier(ti.GetAsset().Name, "table name"); err != nil {
+		return err
+	}
+	if err := validateIdentifier(ti.Column.Name, "column name"); err != nil {
+		return err
+	}
 
 	// Oracle uses REGEXP_LIKE for regex matching, so NOT REGEXP_LIKE finds lines that do not match the pattern.
 	qq := fmt.Sprintf(

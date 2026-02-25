@@ -97,6 +97,9 @@ func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query string) (string, er
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
 	}
+	if err := validateIdentifier(asset.Materialization.IncrementalKey, "incremental_key column"); err != nil {
+		return "", err
+	}
 
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
@@ -232,6 +235,11 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
 	columnNames := asset.ColumnNames()
+	for _, name := range columnNames {
+		if err := validateIdentifier(name, "column name"); err != nil {
+			return "", err
+		}
+	}
 	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
 
 	onQuery := strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND ")
@@ -297,6 +305,9 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
+	}
+	if err := validateIdentifier(asset.Materialization.IncrementalKey, "incremental_key column"); err != nil {
+		return "", err
 	}
 
 	var (
