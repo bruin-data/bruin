@@ -949,6 +949,11 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 
+			if err := renderPipelineHooks(runCtx, pipelineInfo.Pipeline, renderer); err != nil {
+				errorPrinter.Printf("Failed to render hooks: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
 			// handle log files
 			executionStartLog := "Starting execution..."
 			if !c.Bool("minimal-logs") {

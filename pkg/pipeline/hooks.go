@@ -1,6 +1,9 @@
 package pipeline
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 func WrapHooks(query string, hooks Hooks) string {
 	preParts := formatHookQueries(hooks.Pre)
@@ -53,4 +56,34 @@ func formatStatement(query string) string {
 		return trimmed
 	}
 	return trimmed + ";"
+}
+
+// ResolveHookTemplatesToNew renders hook query templates with the provided renderer and returns a new hooks value.
+func ResolveHookTemplatesToNew(hooks Hooks, renderer RendererInterface) (Hooks, error) {
+	if renderer == nil {
+		return hooks, nil
+	}
+
+	rendered := Hooks{
+		Pre:  make([]Hook, 0, len(hooks.Pre)),
+		Post: make([]Hook, 0, len(hooks.Post)),
+	}
+
+	for i, hook := range hooks.Pre {
+		renderedQuery, err := renderer.Render(hook.Query)
+		if err != nil {
+			return Hooks{}, fmt.Errorf("failed to render pre hook %d: %w", i+1, err)
+		}
+		rendered.Pre = append(rendered.Pre, Hook{Query: strings.TrimSpace(renderedQuery)})
+	}
+
+	for i, hook := range hooks.Post {
+		renderedQuery, err := renderer.Render(hook.Query)
+		if err != nil {
+			return Hooks{}, fmt.Errorf("failed to render post hook %d: %w", i+1, err)
+		}
+		rendered.Post = append(rendered.Post, Hook{Query: strings.TrimSpace(renderedQuery)})
+	}
+
+	return rendered, nil
 }

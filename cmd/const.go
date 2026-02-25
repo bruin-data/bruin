@@ -70,6 +70,35 @@ func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMu
 	}
 }
 
+func renderAssetHooks(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, renderer jinja.RendererInterface) error {
+	assetRenderer, err := renderer.CloneForAsset(ctx, p, a)
+	if err != nil {
+		return fmt.Errorf("error creating renderer for asset hooks %s: %w", a.Name, err)
+	}
+
+	renderedHooks, err := pipeline.ResolveHookTemplatesToNew(a.Hooks, assetRenderer)
+	if err != nil {
+		return fmt.Errorf("error rendering hooks for asset %s: %w", a.Name, err)
+	}
+	a.Hooks = renderedHooks
+
+	return nil
+}
+
+func renderPipelineHooks(ctx context.Context, p *pipeline.Pipeline, renderer jinja.RendererInterface) error {
+	if p == nil {
+		return nil
+	}
+
+	for _, asset := range p.Assets {
+		if err := renderAssetHooks(ctx, p, asset, renderer); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {
 		overrides := map[string]any{}
