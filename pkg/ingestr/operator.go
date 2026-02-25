@@ -81,7 +81,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	sourceConnection := o.conn.GetConnection(sourceConnectionName)
 	if sourceConnection == nil {
-		return config.NewConnectionNotFoundError(ctx, "source", sourceConnectionName)
+		return errors.Errorf("source connection %s not found", sourceConnectionName)
 	}
 
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
@@ -145,7 +145,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	destConnection := o.conn.GetConnection(destConnectionName)
 	if destConnection == nil {
-		return config.NewConnectionNotFoundError(ctx, "destination", destConnectionName)
+		return errors.Errorf("destination connection %s not found", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
@@ -296,7 +296,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destConnection := o.conn.GetConnection(destConnectionName)
 	if destConnection == nil {
-		return config.NewConnectionNotFoundError(ctx, "destination", destConnectionName)
+		return errors.Errorf("destination connection %s not found", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()

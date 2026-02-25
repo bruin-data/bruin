@@ -29,14 +29,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Wrap(err, "failed to get connection name for asset")
 	}
 
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	client, ok := rawConn.(*Client)
+	client, ok := o.connection.GetConnection(connName).(*Client)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a tableau connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a tableau connection", connName)
 	}
 
 	if t.Parameters["refresh"] == "" {

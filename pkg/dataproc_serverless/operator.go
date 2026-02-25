@@ -33,14 +33,9 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
-	rawConn := op.connection.GetConnection(connID)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connID)
-	}
-
-	conn, ok := rawConn.(*Client)
+	conn, ok := op.connection.GetConnection(connID).(*Client)
 	if !ok {
-		return fmt.Errorf("connection '%s' is not a dataproc serverless connection", connID)
+		return fmt.Errorf("'%s' either does not exist or is not a Dataproc Serverless connection", connID)
 	}
 
 	if asset.Type == pipeline.AssetTypeDataprocServerlessPyspark && conn.Workspace == "" {

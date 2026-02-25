@@ -101,14 +101,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(DB)
+	conn, ok := o.connection.GetConnection(connName).(DB)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
@@ -216,19 +211,14 @@ func NewMetadataPushOperator(conn config.ConnectionGetter) *MetadataPushOperator
 }
 
 func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	connName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	conn, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
 	if err != nil {
 		return err
 	}
 
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	client, ok := rawConn.(DB)
+	client, ok := o.connection.GetConnection(conn).(DB)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", conn)
 	}
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
@@ -290,14 +280,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(DB)
+	conn, ok := o.connection.GetConnection(connName).(DB)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
@@ -368,14 +353,9 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn := ts.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(DB)
+	conn, ok := ts.connection.GetConnection(connName).(DB)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	qq, err := conn.BuildTableExistsQuery(tableName)

@@ -75,14 +75,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(ClickHouseClient)
+	conn, ok := o.connection.GetConnection(connName).(ClickHouseClient)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a clickhouse connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a clickhouse connection", connName)
 	}
 
 	for _, queryString := range materializedQueries {

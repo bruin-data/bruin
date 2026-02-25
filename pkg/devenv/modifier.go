@@ -2,6 +2,7 @@ package devenv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -53,7 +54,7 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 
 	conn := d.Conn.GetConnection(connName)
 	if conn == nil {
-		return nil, config.NewConnectionNotFoundError(ctx, "", connName)
+		return nil, errors.New("failed to get connection")
 	}
 
 	dbFetcherConn, ok := conn.(interface {

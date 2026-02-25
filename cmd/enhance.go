@@ -350,9 +350,6 @@ func preFetchTableSummary(ctx context.Context, fs afero.Fs, assetPath string, as
 		}
 	}
 
-	ctx = context.WithValue(ctx, config.ConfigFilePathContextKey, filepath.Join(repoRoot.Path, ".bruin.yml"))
-	ctx = context.WithValue(ctx, config.EnvironmentNameContextKey, cm.SelectedEnvironmentName)
-
 	manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 	if len(errs) > 0 {
 		return ""
@@ -437,7 +434,7 @@ func getTableSummaryWithManager(ctx context.Context, manager config.ConnectionAn
 
 	conn := manager.GetConnection(connectionName)
 	if conn == nil {
-		return &TableSummary{TableName: tableName, Error: config.NewConnectionNotFoundError(ctx, "", connectionName).Error()}
+		return &TableSummary{TableName: tableName, Error: fmt.Sprintf("connection '%s' not found", connectionName)}
 	}
 
 	summarizer, ok := conn.(diff.TableSummarizer)

@@ -107,14 +107,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(PgClient)
+	conn, ok := o.connection.GetConnection(connName).(PgClient)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a postgres connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a postgres connection", connName)
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
@@ -179,14 +174,9 @@ func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) e
 		return err
 	}
 
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	client, ok := rawConn.(PgClient)
+	client, ok := o.connection.GetConnection(connName).(PgClient)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a postgres connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a postgres connection", connName)
 	}
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)

@@ -90,14 +90,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(DuckDBClient)
+	conn, ok := o.connection.GetConnection(connName).(DuckDBClient)
 	if !ok {
-		return errors.Errorf("connection '%s' is not a duckdb connection", connName)
+		return errors.Errorf("'%s' either does not exist or is not a duckdb connection", connName)
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {

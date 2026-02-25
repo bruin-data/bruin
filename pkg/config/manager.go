@@ -209,10 +209,7 @@ type Environment struct {
 type EnvContextKey string
 
 const (
-	EnvironmentContextKey     EnvContextKey = "environment"
-	SecretsBackendContextKey  EnvContextKey = "secrets_backend"
-	EnvironmentNameContextKey EnvContextKey = "environment_name"
-	ConfigFilePathContextKey  EnvContextKey = "config_file_path"
+	EnvironmentContextKey EnvContextKey = "environment"
 )
 
 type Config struct {
@@ -225,10 +222,6 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
-func (c *Config) Path() string {
-	return c.path
-}
-
 func (c *Config) CanRunTaskInstances(p *pipeline.Pipeline, tasks []scheduler.TaskInstance) error {
 	for _, task := range tasks {
 		asset := task.GetAsset()
@@ -239,11 +232,7 @@ func (c *Config) CanRunTaskInstances(p *pipeline.Pipeline, tasks []scheduler.Tas
 
 		for _, connName := range connNames {
 			if !c.SelectedEnvironment.Connections.Exists(connName) {
-				return &MissingConnectionError{
-					Name:            connName,
-					ConfigFilePath:  c.path,
-					EnvironmentName: c.SelectedEnvironmentName,
-				}
+				return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, asset.Name)
 			}
 		}
 	}

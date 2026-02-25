@@ -160,7 +160,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "is not a bigquery connection")
+		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
 		connGetter.AssertExpectations(t)
@@ -198,7 +198,7 @@ func TestDryRunner_DryRun(t *testing.T) {
 		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "is not a bigquery connection")
+		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
 		connGetter.AssertExpectations(t)
@@ -291,7 +291,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "is not a bigquery connection")
+		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
 		connGetter.AssertExpectations(t)
@@ -329,7 +329,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, nil)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "is not a bigquery connection")
+		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
 		connGetter.AssertExpectations(t)
@@ -402,7 +402,7 @@ func TestDryRunner_DryRun_EdgeCases(t *testing.T) {
 		result, err := dryRunner.DryRun(t.Context(), *pipeline, asset, &config.Config{})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "is not a bigquery connection")
+		assert.Contains(t, err.Error(), "resolved connection is not BigQuery")
 		assert.Nil(t, result)
 
 		connGetter.AssertExpectations(t)
