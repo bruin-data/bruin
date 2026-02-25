@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -161,7 +161,7 @@ func TestResolveHookTemplatesToNew_Error(t *testing.T) {
 	renderer := hookRendererStub{
 		render: func(query string) (string, error) {
 			if query == "bad" {
-				return "", fmt.Errorf("missing variable")
+				return "", errors.New("missing variable")
 			}
 			return query, nil
 		},

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -21,7 +20,7 @@ func TestRenderAssetHooks(t *testing.T) {
 		},
 	}
 
-	err := renderAssetHooks(context.Background(), &pipeline.Pipeline{Name: "pipe"}, asset, jinja.NewRenderer(jinja.Context{
+	err := renderAssetHooks(t.Context(), &pipeline.Pipeline{Name: "pipe"}, asset, jinja.NewRenderer(jinja.Context{
 		"foo": "bar",
 	}))
 	require.NoError(t, err)
@@ -52,7 +51,7 @@ func TestRenderPipelineHooks(t *testing.T) {
 		},
 	}
 
-	err := renderPipelineHooks(context.Background(), p, jinja.NewRenderer(jinja.Context{
+	err := renderPipelineHooks(t.Context(), p, jinja.NewRenderer(jinja.Context{
 		"foo": "bar",
 	}))
 	require.NoError(t, err)
@@ -70,7 +69,7 @@ func TestRenderAssetHooks_Error(t *testing.T) {
 		},
 	}
 
-	err := renderAssetHooks(context.Background(), &pipeline.Pipeline{Name: "pipe"}, asset, jinja.NewRenderer(jinja.Context{}))
+	err := renderAssetHooks(t.Context(), &pipeline.Pipeline{Name: "pipe"}, asset, jinja.NewRenderer(jinja.Context{}))
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "error rendering hooks for asset schema.asset")
 }
