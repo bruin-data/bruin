@@ -287,6 +287,16 @@ func GetCustomCheckQueryDryRunRule(connectionManager connectionManager, renderer
 	}
 }
 
+func GetHookQueryDryRunRule(connectionManager connectionManager) *SimpleRule {
+	return &SimpleRule{
+		Identifier:       "hook-query-dry-run",
+		Fast:             false,
+		Severity:         ValidatorSeverityCritical,
+		AssetValidator:   ValidateHookQueryDryRun(connectionManager),
+		ApplicableLevels: []Level{LevelAsset},
+	}
+}
+
 func FilterRulesByLevel(rules []Rule, level Level) []Rule {
 	filtered := make([]Rule, 0, len(rules))
 	for _, rule := range rules {

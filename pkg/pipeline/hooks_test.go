@@ -173,3 +173,32 @@ func TestResolveHookTemplatesToNew_Error(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "failed to render pre hook 1")
 }
+
+func TestAssetFormatContent_HookQueries_NoSemicolonInjection(t *testing.T) {
+	t.Parallel()
+
+	asset := &Asset{
+		Name: "local.hook_demo",
+		Type: AssetTypeDuckDBQuery,
+		Hooks: Hooks{
+			Pre: []Hook{
+				{Query: "SELECT 1; -- comment"},
+				{Query: "SELECT 2   "},
+			},
+			Post: []Hook{
+				{Query: "SELECT 3;   "},
+			},
+		},
+		ExecutableFile: ExecutableFile{
+			Path:    "hook_demo.sql",
+			Content: "SELECT 1 AS id",
+		},
+	}
+
+	_, err := asset.FormatContent()
+	require.NoError(t, err)
+
+	assert.Equal(t, "SELECT 1; -- comment", asset.Hooks.Pre[0].Query)
+	assert.Equal(t, "SELECT 2", asset.Hooks.Pre[1].Query)
+	assert.Equal(t, "SELECT 3;", asset.Hooks.Post[0].Query)
+}
