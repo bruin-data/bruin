@@ -255,7 +255,7 @@ jobs:
         with:
           filter: 'blob:none'
           sparse-checkout: |
-            cmd/
+            cmd/ 
             pkg/
             internal/
             docs/
