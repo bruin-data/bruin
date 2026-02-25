@@ -71,6 +71,16 @@ The type of the asset determines how execution will happen. Must be one of the t
 
 - **Type:** `String`
 
+## `connection`
+
+The connection name used to run this asset. If omitted, Bruin uses the pipeline-level `default_connections` value for the asset platform.
+
+```yaml
+connection: bigquery-default
+```
+
+- **Type:** `String`
+
 ## `owner`
 
 The owner of the asset, has no functional implications on Bruin CLI as of today, allows documenting the ownership information. On [Bruin Cloud](https://getbruin.com), it is used to analyze ownership information, used in governance reports and ownership lineage.
