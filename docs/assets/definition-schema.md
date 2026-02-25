@@ -177,7 +177,7 @@ hooks:
     - query: "SET s3_region=''"
 ```
 
-Hooks are currently supported for SQL assets. Each hook entry supports a single `query` field and is executed in order. Queries may have a trailing `;` or not.
+Hooks are currently supported for SQL assets. Each hook entry supports a single `query` field and is executed in order. Queries may have a trailing `;` or not. Hook queries support Jinja templating with the same context available to asset queries.
 
 Hooks can also be set as pipeline defaults (see [pipeline defaults](/getting-started/pipeline#default-pipeline-level-defaults)). Assets inherit default `pre` and `post` hooks independently - defining only `pre` hooks on an asset will still inherit default `post` hooks.
 
