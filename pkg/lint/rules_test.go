@@ -3016,7 +3016,7 @@ func TestValidateHookQueryDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, issues)
 		assert.Contains(t, issues[0].Description, "pre hook query #1 is invalid")
-		assert.Contains(t, issues[0].Description, "SELECT 1;")
+		assert.Contains(t, issues[0].Description, "SELECT 1")
 	})
 
 	t.Run("hook validation returns error", func(t *testing.T) {

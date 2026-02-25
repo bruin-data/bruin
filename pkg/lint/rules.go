@@ -1402,7 +1402,7 @@ func ValidateHookQueryDryRun(connections connectionManager) AssetValidator {
 		}
 
 		validateHook := func(position string, index int, hookQuery string) {
-			normalized := normalizeHookQueryForValidation(hookQuery)
+			normalized := strings.TrimSpace(hookQuery)
 			if normalized == "" {
 				return
 			}
@@ -1435,17 +1435,6 @@ func ValidateHookQueryDryRun(connections connectionManager) AssetValidator {
 
 		return issues, nil
 	}
-}
-
-func normalizeHookQueryForValidation(queryText string) string {
-	trimmed := strings.TrimSpace(queryText)
-	if trimmed == "" {
-		return ""
-	}
-	if strings.HasSuffix(trimmed, ";") {
-		return trimmed
-	}
-	return trimmed + ";"
 }
 
 type GlossaryChecker struct {
