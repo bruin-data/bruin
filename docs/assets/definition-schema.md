@@ -73,7 +73,8 @@ The type of the asset determines how execution will happen. Must be one of the t
 
 ## `connection`
 
-The connection name used to run this asset. If omitted, Bruin uses the pipeline-level `default_connections` value for the asset platform.
+The connection name used to run this asset. If omitted, Bruin uses the pipeline-level `default_connections` value for the asset platform in most cases.
+For Python assets with `materialization.type: table`, `connection` must be set explicitly on the asset.
 
 ```yaml
 connection: bigquery-default

@@ -305,9 +305,10 @@ You can override the value of variables at runtime using `--var` [flag](/assets/
 
 Bruin runs regular Python scripts by default; however, quite often teams need to load data into a destination from their Python scripts. Bruin supports materializing the data returned by a Python script into a data warehouse.
 
-The requirements to get this working is:
+The requirements to get this working are:
 
 - define a `materialization` config in the asset definition
+- define a `connection` in the asset definition (required for Python assets with `materialization.type: table`)
 - have a function called `materialize` in your Python script that returns a pandas/polars dataframe or a list of dicts.
 
 > [!WARNING]
