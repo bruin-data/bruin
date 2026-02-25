@@ -2,6 +2,12 @@
 package sqlparser
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -585,7 +591,7 @@ GROUP BY 1`,
 							{Column: "FIRST_ACTIVITY_TIMESTAMP", Table: "FACT.SOME_DAILY_METRICS"},
 							{Column: "FIRST_DEVICE_TYPE", Table: "FACT.SOME_DAILY_METRICS"},
 						},
-						Type: "UNKNOWN",
+						Type: "TEXT",
 					},
 					{
 						Name: "RECENCY",
@@ -628,6 +634,42 @@ GROUP BY 1`,
 						Name: "USER_ID",
 						Upstream: []UpstreamColumn{
 							{Column: "USER_ID", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "",
+					},
+				},
+			},
+		},
+		{
+			name:    "case insensitive schema matching",
+			dialect: "bigquery",
+			sql:     `SELECT t.Name, count(*) as c FROM raw.Teams t GROUP BY 1`,
+			schema: Schema{
+				"raw.teams": {
+					"Name": "STRING",
+					"Id":   "INTEGER",
+				},
+			},
+			want: &Lineage{
+				Columns: []ColumnLineage{
+					{
+						Name:     "c",
+						Upstream: []UpstreamColumn{},
+						Type:     "BIGINT",
+					},
+					{
+						Name: "name",
+						Upstream: []UpstreamColumn{
+							{Column: "name", Table: "raw.Teams"},
+						},
+						Type: "TEXT",
+					},
+				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "name",
+						Upstream: []UpstreamColumn{
+							{Column: "name", Table: "raw.Teams"},
 						},
 						Type: "",
 					},
@@ -1261,6 +1303,513 @@ func TestSqlParser_IsSingleSelectQuery(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedIsSelect, got)
 			}
+		})
+	}
+}
+
+type pythonMainLineageCase struct {
+	Name                string                 `json:"name"`
+	Dialect             string                 `json:"dialect"`
+	Query               string                 `json:"query"`
+	Schema              map[string]interface{} `json:"schema"`
+	Expected            []ColumnLineage        `json:"expected"`
+	ExpectedNonSelected []ColumnLineage        `json:"expected_non_selected"`
+}
+
+type pythonMainNonSelectedCase struct {
+	Name     string                 `json:"name"`
+	Dialect  string                 `json:"dialect"`
+	Query    string                 `json:"query"`
+	Schema   map[string]interface{} `json:"schema"`
+	Expected []pythonSelectedColumn `json:"expected"`
+}
+
+type pythonSelectedColumn struct {
+	Name  string `json:"name"`
+	Table string `json:"table"`
+}
+
+func fixturePath(t *testing.T, filename string) string {
+	t.Helper()
+
+	_, currentFilePath, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+
+	return filepath.Join(filepath.Dir(currentFilePath), "testdata", filename)
+}
+
+func loadFixture[T any](t *testing.T, filename string) []T {
+	t.Helper()
+
+	payload, err := os.ReadFile(fixturePath(t, filename))
+	require.NoError(t, err)
+
+	result := make([]T, 0)
+	require.NoError(t, json.Unmarshal(payload, &result))
+	return result
+}
+
+func getLineageWithRawSchema(t *testing.T, parser *SQLParser, query, dialect string, schema map[string]interface{}) *Lineage {
+	t.Helper()
+
+	responsePayload, err := parser.sendCommand(&parserCommand{
+		Command: "lineage",
+		Contents: map[string]interface{}{
+			"query":   query,
+			"dialect": dialect,
+			"schema":  schema,
+		},
+	})
+	require.NoError(t, err)
+
+	var result Lineage
+	require.NoError(t, json.Unmarshal([]byte(responsePayload), &result))
+	return &result
+}
+
+func flattenNonSelectedColumns(columns []ColumnLineage) []pythonSelectedColumn {
+	result := make([]pythonSelectedColumn, 0)
+	for _, column := range columns {
+		for _, upstream := range column.Upstream {
+			result = append(result, pythonSelectedColumn{
+				Name:  column.Name,
+				Table: upstream.Table,
+			})
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Name == result[j].Name {
+			return result[i].Table < result[j].Table
+		}
+		return result[i].Name < result[j].Name
+	})
+
+	return result
+}
+
+func normalizeColumnType(columnType string) string {
+	switch columnType {
+	case "UNKNOWN":
+		return "TEXT"
+	case "TIMESTAMP":
+		return "TIMESTAMPLTZ"
+	default:
+		return columnType
+	}
+}
+
+func normalizeLineageTypes(columns []ColumnLineage) []ColumnLineage {
+	result := make([]ColumnLineage, len(columns))
+	for i, column := range columns {
+		result[i] = column
+		result[i].Type = normalizeColumnType(column.Type)
+	}
+	return result
+}
+
+func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
+	cases := loadFixture[pythonMainLineageCase](t, "python_main_lineage_cases.json")
+
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	defer parser.Close()
+
+	require.NoError(t, parser.Start())
+
+	for idx, testCase := range cases { //nolint:paralleltest
+		t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
+			got := getLineageWithRawSchema(t, parser, testCase.Query, testCase.Dialect, testCase.Schema)
+			require.Equal(t, normalizeLineageTypes(testCase.Expected), normalizeLineageTypes(got.Columns))
+			require.Equal(t, testCase.ExpectedNonSelected, got.NonSelectedColumns)
+		})
+	}
+}
+
+func TestExtractNonSelectColumn_PythonMainCases(t *testing.T) {
+	cases := loadFixture[pythonMainNonSelectedCase](t, "python_main_non_selected_cases.json")
+
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	defer parser.Close()
+
+	require.NoError(t, parser.Start())
+
+	for idx, testCase := range cases { //nolint:paralleltest
+		t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
+			got := getLineageWithRawSchema(t, parser, testCase.Query, testCase.Dialect, testCase.Schema)
+
+			expected := append([]pythonSelectedColumn(nil), testCase.Expected...)
+			sort.Slice(expected, func(i, j int) bool {
+				if expected[i].Name == expected[j].Name {
+					return expected[i].Table < expected[j].Table
+				}
+				return expected[i].Name < expected[j].Name
+			})
+
+			require.ElementsMatch(t, expected, flattenNonSelectedColumns(got.NonSelectedColumns))
+		})
+	}
+}
+
+func TestSqlParser_GetTables_PythonMainParity(t *testing.T) {
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	defer parser.Close()
+
+	require.NoError(t, parser.Start())
+
+	tests := []struct {
+		name    string
+		dialect string
+		query   string
+		want    []string
+	}{
+		{
+			name:    "single table select",
+			dialect: "bigquery",
+			query:   "SELECT * FROM table1",
+			want:    []string{"table1"},
+		},
+		{
+			name:    "create table as select",
+			dialect: "bigquery",
+			query:   "CREATE TABLE public.example AS SELECT 1 AS id, 'Spain' AS country, 'Juan' AS name UNION ALL SELECT 2 AS id, 'Germany' AS country, 'Markus' AS name UNION ALL SELECT 3 AS id, 'France' AS country, 'Antoine' AS name UNION ALL SELECT 4 AS id, 'Poland' AS country, 'Franciszek' AS name",
+			want:    []string{"public.example"},
+		},
+		{
+			name:    "cte source table only",
+			dialect: "bigquery",
+			query: `
+with my_cte as (
+select
+    COUNTRY_CODE,
+    COUNTRY_NAME
+from raw.my_cte
+)
+SELECT * from my_cte
+`,
+			want: []string{"raw.my_cte"},
+		},
+		{
+			name:    "trailing semicolon",
+			dialect: "bigquery",
+			query:   "SELECT * FROM table1;",
+			want:    []string{"table1"},
+		},
+		{
+			name:    "double trailing semicolon",
+			dialect: "bigquery",
+			query:   "SELECT * FROM table1;;",
+			want:    []string{"table1"},
+		},
+		{
+			name:    "tsql use statement context",
+			dialect: "tsql",
+			query: `
+use MY_DWH;
+
+select * from table1;
+
+select * from schema2.table1;
+
+select * from OTHER_DWH..some_table;
+
+select * from SOME_OTHER_DWH.dbo.my_table;
+`,
+			want: []string{
+				"MY_DWH.dbo.table1",
+				"MY_DWH.schema2.table1",
+				"OTHER_DWH.dbo.some_table",
+				"SOME_OTHER_DWH.dbo.my_table",
+			},
+		},
+	}
+
+	for _, tt := range tests { //nolint
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parser.UsedTables(tt.query, tt.dialect)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSqlParser_GetTables_SQLServerHintsAndQuotedIdentifiers(t *testing.T) {
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	defer parser.Close()
+
+	require.NoError(t, parser.Start())
+
+	tests := []struct {
+		name    string
+		dialect string
+		query   string
+		want    []string
+	}{
+		{
+			name:    "sqlserver table with nolock",
+			dialect: "tsql",
+			query:   "SELECT * FROM Warehouse.schema.FactTable(nolock)",
+			want:    []string{"Warehouse.schema.FactTable"},
+		},
+		{
+			name:    "sqlserver table with multiple hints",
+			dialect: "tsql",
+			query:   "SELECT * FROM sales.orders(nolock, nowait)",
+			want:    []string{"sales.orders"},
+		},
+		{
+			name:    "sqlserver bracketed identifiers with hint",
+			dialect: "tsql",
+			query:   "SELECT * FROM mytable.[dbo].[my_fact](nolock)",
+			want:    []string{"mytable.dbo.my_fact"},
+		},
+		{
+			name:    "sqlserver simple table with hint",
+			dialect: "tsql",
+			query:   "SELECT * FROM employees(nolock)",
+			want:    []string{"employees"},
+		},
+		{
+			name:    "join context with hint",
+			dialect: "tsql",
+			query: `
+SELECT * FROM
+    sales.customers c
+    JOIN sales.orders(nolock) o ON c.id = o.customer_id
+`,
+			want: []string{"sales.customers", "sales.orders"},
+		},
+		{
+			name:    "bigquery backticked table",
+			dialect: "bigquery",
+			query:   "SELECT * FROM `project.dataset.table`",
+			want:    []string{"project.dataset.table"},
+		},
+		{
+			name:    "postgres quoted identifiers",
+			dialect: "postgres",
+			query:   `SELECT * FROM "public"."users"`,
+			want:    []string{"public.users"},
+		},
+		{
+			name:    "mysql backticked identifiers",
+			dialect: "mysql",
+			query:   "SELECT * FROM `database`.`table`",
+			want:    []string{"database.table"},
+		},
+		{
+			name:    "snowflake uppercase path",
+			dialect: "snowflake",
+			query:   "SELECT * FROM DATABASE.SCHEMA.TABLE",
+			want:    []string{"DATABASE.SCHEMA.TABLE"},
+		},
+		{
+			name:    "sqlserver query with multiple tables",
+			dialect: "tsql",
+			query: `
+SELECT * FROM
+    Database1.schema.Table1(nolock) t1
+    JOIN Database2.schema.Table2(nolock) t2 ON t1.id = t2.id
+`,
+			want: []string{"Database1.schema.Table1", "Database2.schema.Table2"},
+		},
+	}
+
+	for _, tt := range tests { //nolint
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parser.UsedTables(tt.query, tt.dialect)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSqlParser_AddLimit_PythonMainParity(t *testing.T) {
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	defer parser.Close()
+
+	require.NoError(t, parser.Start())
+
+	tests := []struct {
+		name          string
+		dialect       string
+		limit         int
+		query         string
+		expectedQuery string
+	}{
+		{
+			name:    "existing limit with order by",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT DISTINCT product_id, product_name, price, stock, created_at
+FROM test.products
+ORDER BY created_at DESC
+LIMIT 1000;
+`,
+			expectedQuery: `
+SELECT DISTINCT product_id, product_name, price, stock, created_at
+FROM test.products
+ORDER BY created_at DESC
+LIMIT 10;
+`,
+		},
+		{
+			name:    "no existing limit",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT product_id, product_name
+FROM test.products
+`,
+			expectedQuery: `
+SELECT product_id, product_name
+FROM test.products
+LIMIT 10
+`,
+		},
+		{
+			name:    "replace existing limit",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT product_id, product_name
+FROM test.products
+LIMIT 50
+`,
+			expectedQuery: `
+SELECT product_id, product_name
+FROM test.products
+LIMIT 10
+`,
+		},
+		{
+			name:    "add limit with order by",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT product_id, product_name
+FROM test.products
+ORDER BY product_name
+`,
+			expectedQuery: `
+SELECT product_id, product_name
+FROM test.products
+ORDER BY product_name
+LIMIT 10
+`,
+		},
+		{
+			name:    "add limit with group by",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT product_name, COUNT(*)
+FROM test.products
+GROUP BY product_name
+`,
+			expectedQuery: `
+SELECT product_name, COUNT(*)
+FROM test.products
+GROUP BY product_name
+LIMIT 10
+`,
+		},
+		{
+			name:    "add limit with semicolon",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT product_id, product_name
+FROM test.products
+LIMIT 50;
+`,
+			expectedQuery: `
+SELECT product_id, product_name
+FROM test.products
+LIMIT 10;
+`,
+		},
+		{
+			name:    "add limit without semicolon",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT product_id, product_name
+FROM test.products
+LIMIT 50
+`,
+			expectedQuery: `
+SELECT product_id, product_name
+FROM test.products
+LIMIT 10
+`,
+		},
+		{
+			name:    "nested query existing inner limit",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT * FROM (
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 50
+) AS subquery
+`,
+			expectedQuery: `
+SELECT * FROM (
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 50
+) AS subquery
+LIMIT 10
+`,
+		},
+		{
+			name:    "nested query no inner limit",
+			dialect: "bigquery",
+			limit:   10,
+			query: `
+SELECT * FROM (
+    SELECT product_id, product_name
+    FROM test.products
+) AS subquery
+`,
+			expectedQuery: `
+SELECT * FROM (
+    SELECT product_id, product_name
+    FROM test.products
+) AS subquery
+LIMIT 10
+`,
+		},
+		{
+			name:    "snowflake convert timezone",
+			dialect: "snowflake",
+			limit:   10,
+			query: `
+SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z')
+LIMIT 100
+`,
+			expectedQuery: `
+SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z')
+LIMIT 10
+`,
+		},
+	}
+
+	for _, tt := range tests { //nolint
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parser.AddLimit(tt.query, tt.limit, tt.dialect)
+			require.NoError(t, err)
+
+			expected, err := parser.AddLimit(tt.expectedQuery, tt.limit, tt.dialect)
+			require.NoError(t, err)
+			require.Equal(t, expected, got)
 		})
 	}
 }

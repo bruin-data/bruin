@@ -1,0 +1,15 @@
+e1890b2472c724a62761__mypyc.cpython-313-aarch64-linux-gnu.so,sha256=IiM4kgpJRa-4J1MqTGuXzfTco34JBvK70sI3HSdP3rs,2608264
+sqlglot/errors.cpython-313-aarch64-linux-gnu.so,sha256=_hgKp6-hhCcsC2zsL7r_RPWp7ZZLspwmMiWAWOhzfwA,203112
+sqlglot/expression_core.cpython-313-aarch64-linux-gnu.so,sha256=OxnQdTAV4sRVzLKe9VVcjlgFldx5uw2lEE6CPexXMyU,203160
+sqlglot/helper.cpython-313-aarch64-linux-gnu.so,sha256=mD5llXdnPsuJLdwTayQgMduUjeXDU8bUc3CR1mzElFw,203112
+sqlglot/parser_core.cpython-313-aarch64-linux-gnu.so,sha256=JVgWcp_Ubyz4UvhEMfpdjqk-iaGud8I3E3zmtuPRh6M,203144
+sqlglot/schema.cpython-313-aarch64-linux-gnu.so,sha256=c9rTmhVb8n0tgcpXg6YzODrzUJ10eNThKtMHMTyIvf0,203112
+sqlglot/serde.cpython-313-aarch64-linux-gnu.so,sha256=12eDK2Bb1Lzjmc7wEuHld65aH_0wYYy5NTbgb6kccJ0,203104
+sqlglot/time.cpython-313-aarch64-linux-gnu.so,sha256=sWhuq_HztBkN1I-qYaQw-I01xWr_FAqBJXv0SlFcTbA,203104
+sqlglot/tokenizer_core.cpython-313-aarch64-linux-gnu.so,sha256=g0xp9Hlu-gq5_rPdpxJ4NKvnDpynqimMoDUXqJqVZwI,203152
+sqlglot/trie.cpython-313-aarch64-linux-gnu.so,sha256=D6ekDjbqAN1ZZeeqGetgwoMJ-_AvYYQZjrF_44Gf8nM,203104
+sqlglotc-29.0.1.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+sqlglotc-29.0.1.dist-info/METADATA,sha256=yeB3D0y76HkfPKc0tWe8xPVA5pX82kUGwXTNyn2niEw,295
+sqlglotc-29.0.1.dist-info/RECORD,,
+sqlglotc-29.0.1.dist-info/WHEEL,sha256=65U2bRr26elOgbbHUP4CzthLsEBkhD1XO-v8kEQ6Ka4,193
+sqlglotc-29.0.1.dist-info/top_level.txt,sha256=tZPBkcIsZJG7-F9q-c4A-JkQDKMHKvn3-pNNX3Qhdqc,36

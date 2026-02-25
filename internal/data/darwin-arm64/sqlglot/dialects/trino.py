@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from sqlglot import exp, parser
+from sqlglot import exp, parser, transforms
 from sqlglot.dialects.dialect import (
     merge_without_target_sql,
     trim_sql,
     timestrtotime_sql,
     groupconcat_sql,
+    rename_func,
 )
-from sqlglot.dialects.presto import Presto
+from sqlglot.dialects.presto import amend_exploded_column_table, Presto
 from sqlglot.tokens import TokenType
 import typing as t
 
@@ -16,11 +17,23 @@ class Trino(Presto):
     SUPPORTS_USER_DEFINED_TYPES = False
     LOG_BASE_FIRST = True
 
+    class Tokenizer(Presto.Tokenizer):
+        KEYWORDS = {
+            **Presto.Tokenizer.KEYWORDS,
+            "REFRESH": TokenType.REFRESH,
+        }
+
     class Parser(Presto.Parser):
+        FUNCTIONS = {
+            **Presto.Parser.FUNCTIONS,
+            "VERSION": exp.CurrentVersion.from_arg_list,
+        }
+
         FUNCTION_PARSERS = {
             **Presto.Parser.FUNCTION_PARSERS,
             "TRIM": lambda self: self._parse_trim(),
             "JSON_QUERY": lambda self: self._parse_json_query(),
+            "JSON_VALUE": lambda self: self._parse_json_value(),
             "LISTAGG": lambda self: self._parse_string_agg(),
         }
 
@@ -62,6 +75,7 @@ class Trino(Presto):
             )
 
     class Generator(Presto.Generator):
+        EXCEPT_INTERSECT_SUPPORT_ALL_CLAUSE = True
         PROPERTIES_LOCATION = {
             **Presto.Generator.PROPERTIES_LOCATION,
             exp.LocationProperty: exp.Properties.Location.POST_WITH,
@@ -72,9 +86,19 @@ class Trino(Presto):
             exp.ArraySum: lambda self,
             e: f"REDUCE({self.sql(e, 'this')}, 0, (acc, x) -> acc + x, acc -> acc)",
             exp.ArrayUniqueAgg: lambda self, e: f"ARRAY_AGG(DISTINCT {self.sql(e, 'this')})",
+            exp.CurrentVersion: rename_func("VERSION"),
             exp.GroupConcat: lambda self, e: groupconcat_sql(self, e, on_overflow=True),
             exp.LocationProperty: lambda self, e: self.property_sql(e),
             exp.Merge: merge_without_target_sql,
+            exp.Select: transforms.preprocess(
+                [
+                    transforms.eliminate_qualify,
+                    transforms.eliminate_distinct_on,
+                    transforms.explode_projection_to_unnest(1),
+                    transforms.eliminate_semi_and_anti_joins,
+                    amend_exploded_column_table,
+                ]
+            ),
             exp.TimeStrToTime: lambda self, e: timestrtotime_sql(self, e, include_precision=True),
             exp.Trim: trim_sql,
         }
