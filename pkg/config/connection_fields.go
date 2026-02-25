@@ -78,7 +78,8 @@ func GetConnectionTypeNames() []string {
 // GetConnectionFieldsForType returns the credential fields for a specific
 // connection type, or nil if the type is not found.
 func GetConnectionFieldsForType(typeName string) []ConnectionFieldDef {
-	for _, d := range GetConnectionTypeDefs() {
+	defs := GetConnectionTypeDefs()
+	for _, d := range defs {
 		if d.TypeName == typeName {
 			return d.Fields
 		}
