@@ -176,9 +176,7 @@ func Test_buildIngestrPackageKey(t *testing.T) {
 	}
 }
 
-func Test_ensureIngestrInstalled_OnlyInstallsOnce(t *testing.T) {
-	t.Parallel()
-
+func Test_ensureIngestrInstalled_OnlyInstallsOnce(t *testing.T) { //nolint:paralleltest
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
@@ -216,9 +214,7 @@ func Test_ensureIngestrInstalled_OnlyInstallsOnce(t *testing.T) {
 	assert.Equal(t, int32(1), installCount.Load(), "ingestr should only be installed once for the same package combination")
 }
 
-func Test_ensureIngestrInstalled_InstallsForDifferentPackages(t *testing.T) {
-	t.Parallel()
-
+func Test_ensureIngestrInstalled_InstallsForDifferentPackages(t *testing.T) { //nolint:paralleltest
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
@@ -255,9 +251,7 @@ func Test_ensureIngestrInstalled_InstallsForDifferentPackages(t *testing.T) {
 	assert.Equal(t, int32(3), installCount.Load(), "ingestr should be installed once for each unique package combination")
 }
 
-func Test_ensureIngestrInstalled_ConcurrentCalls(t *testing.T) {
-	t.Parallel()
-
+func Test_ensureIngestrInstalled_ConcurrentCalls(t *testing.T) { //nolint:paralleltest
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()
 
