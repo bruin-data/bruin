@@ -258,6 +258,11 @@ func Init() *cli.Command {
 				}
 			}
 
+			if templateName == "." || templateName == ".." {
+				errorPrinter.Printf("Template name cannot be '%s'\n", templateName)
+				return cli.Exit("", 1)
+			}
+
 			_, err = templates.Templates.ReadDir(templateName)
 			if err != nil {
 				errorPrinter.Printf("Template '%s' not found\n", templateName)
