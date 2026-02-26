@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -259,7 +260,7 @@ func Init() *cli.Command {
 			}
 
 			_, err = templates.Templates.ReadDir(templateName)
-			if err != nil {
+			if err != nil || !slices.Contains(templateList, templateName) {
 				errorPrinter.Printf("Template '%s' not found\n", templateName)
 				return cli.Exit("", 1)
 			}
