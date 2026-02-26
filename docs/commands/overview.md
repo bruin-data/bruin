@@ -106,7 +106,7 @@ bruin init chess my-chess-project
 bruin connections list
 
 # Test a specific connection
-bruin connections ping my-postgres-connection
+bruin connections test --name my-postgres-connection
 ```
 
 ### Debugging Templates

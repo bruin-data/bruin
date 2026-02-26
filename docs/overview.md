@@ -40,7 +40,7 @@ bruin init [template] [folder-name]
 
 bruin connections list
 bruin connections add
-bruin connections ping [connection-name]
+bruin connections test --name [connection-name]
 
 ### Command: Validate
 
@@ -188,7 +188,7 @@ columns:
 ### **Connections**
 
 - If connection is not defined for an asset, check the `default_connections` in `pipeline.yml`
-- Use `bruin connections ping [name]` to test if a connection is working
+- Use `bruin connections test --name [name]` to test if a connection is working
 
 ### **Common Workflows**
 
