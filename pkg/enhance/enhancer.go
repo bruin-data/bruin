@@ -40,9 +40,11 @@ func NewEnhancer(providerType ProviderType, model string) *Enhancer {
 		provider = NewClaudeProvider(model, fs)
 	}
 	return &Enhancer{
-		provider:        provider,
-		pipelineBuilder: pipeline.NewBuilder(pipeline.BuilderConfig{}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil),
-		fs:              fs,
+		provider: provider,
+		pipelineBuilder: pipeline.NewBuilder(pipeline.BuilderConfig{
+			TasksFileSuffixes: []string{"task.yml", "task.yaml", "asset.yml", "asset.yaml"},
+		}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil),
+		fs: fs,
 	}
 }
 

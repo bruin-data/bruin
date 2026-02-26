@@ -59,10 +59,10 @@ func NewCodexProvider(model string, fs afero.Fs) Provider {
 	config := CLIProviderConfig{
 		Name:         "codex",
 		BinaryName:   "codex",
-		DefaultModel: "gpt-5-codex",
+		DefaultModel: "",
 		UseAPIKeyEnv: false, // Uses native auth system (requires `codex` login first)
 		BuildArgs: func(modelName, prompt, systemPrompt string) []string {
-			args := []string{"exec"}
+			args := []string{"exec", "--full-auto"}
 			if modelName != "" {
 				args = append(args, "--model", modelName)
 			}
