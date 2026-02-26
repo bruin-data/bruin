@@ -208,7 +208,6 @@ func Init() *cli.Command {
 	for _, entry := range folders {
 		if entry.IsDir() {
 			templateList = append(templateList, entry.Name())
-
 		}
 	}
 	for _, t := range templateList {
