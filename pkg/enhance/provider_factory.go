@@ -62,7 +62,7 @@ func NewCodexProvider(model string, fs afero.Fs) Provider {
 		DefaultModel: "",
 		UseAPIKeyEnv: false, // Uses native auth system (requires `codex` login first)
 		BuildArgs: func(modelName, prompt, systemPrompt string) []string {
-			args := []string{"exec"}
+			args := []string{"exec", "--full-auto"}
 			if modelName != "" {
 				args = append(args, "--model", modelName)
 			}
