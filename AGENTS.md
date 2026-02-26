@@ -318,7 +318,7 @@ make refresh-integration-expectations
 ./bin/bruin connections list
 
 # Test connection
-./bin/bruin connections ping connection-name
+./bin/bruin connections test --name connection-name
 
 # Add new connection
 ./bin/bruin connections add

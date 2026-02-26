@@ -201,7 +201,7 @@ The most common commands you'll use during development:
 | `bruin lineage <path>` | View asset dependencies (upstream/downstream) |
 | `bruin query --connection <conn> --query "..."` | Execute ad-hoc SQL queries |
 | `bruin connections list` | List configured connections |
-| `bruin connections ping <name>` | Test connection connectivity |
+| `bruin connections test --name <name>` | Test connection connectivity |
 
 **Try these commands with your default pipeline:**
 
@@ -677,7 +677,7 @@ Bruin Cloud provides managed infrastructure to schedule and run your pipelines a
 | `bruin render <path>` | Show rendered template output |
 | `bruin format <path>` | Format code |
 | `bruin connections list` | List configured connections |
-| `bruin connections ping <name>` | Test connection connectivity |
+| `bruin connections test --name <name>` | Test connection connectivity |
 
 ---
 

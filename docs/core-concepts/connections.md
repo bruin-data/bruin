@@ -112,7 +112,7 @@ Use the `connections` command to verify your connections:
 bruin connections list
 
 # Test a specific connection
-bruin connections ping gcp-prod
+bruin connections test --name gcp-prod
 ```
 
 ## Related Topics
