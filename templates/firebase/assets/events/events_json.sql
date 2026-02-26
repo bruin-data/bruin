@@ -129,10 +129,10 @@ SELECT
           WHEN 'yes' THEN True
           WHEN 'no' THEN False
         END as is_limited_ad_tracking,
-        device.time_zone_offset_seconds / 3600 as time_zone_offset_seconds,
+        device.time_zone_offset_seconds / 3600 as device_time_zone_offset,
     )) as device,
     to_json(privacy_info) as privacy_info,
-    event_server_timestamp_offset / 1000 as event_server_timestamp_offset,
+    event_server_timestamp_offset / 1000000 as event_server_timestamp_offset,
     event_value_in_usd,
 from `analytics_123456789.events_*` --TODO: Change 123456789 to your analytics ID
 where true
