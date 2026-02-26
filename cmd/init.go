@@ -206,12 +206,17 @@ func Init() *cli.Command {
 	}
 	templateList := make([]string, 0)
 	for _, entry := range folders {
-		if entry.IsDir() && entry.Name() != "bootstrap" {
+		if entry.IsDir() {
 			templateList = append(templateList, entry.Name())
+
+		}
+	}
+	for _, t := range templateList {
+		if t != "bootstrap" {
+			choices = append(choices, t)
 		}
 	}
 
-	choices = templateList
 	initialHeight := getTerminalHeight()
 	p := tea.NewProgram(model{height: initialHeight})
 	return &cli.Command{
