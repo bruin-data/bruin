@@ -38,7 +38,7 @@ select
     lax_string(device.mobile_os_hardware_model) as mobile_os_hardware_model,
     lax_string(device.operating_system) as operating_system,
     lax_string(device.operating_system_version) as operating_system_version,
-    lax_int64(device.time_zone_offset_seconds) / 3600 as device_time_zone_offset,
+    lax_int64(device.device_time_zone_offset) as device_time_zone_offset,
     lax_string(device.vendor_id) as vendor_id,
     lax_string(device.web_info) as web_info
   ) as device,
@@ -84,6 +84,11 @@ select
   lax_string(event_params.timestamp) as timestamp,
   lax_string(event_params.error_value) as error_value,
   lax_string(event_params.term) as term,
+
+  -- AD IMPRESSIONS
+  lax_string(event_params.ad_format) as ad_format,
+  lax_float64(event_params.value) as value,
+  event_value_in_usd,
 
   --TODO: add other parameters and properties specific to your app
 
