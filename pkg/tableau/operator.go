@@ -87,7 +87,7 @@ func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Clie
 		}
 		datasourceID = id
 	}
-	incremental := resolveIncrementalRefresh(t.Parameters)
+	incremental := resolveIncrementalRefresh(ctx, t.Parameters)
 	if err := client.RefreshDataSource(ctx, datasourceID, incremental); err != nil {
 		return errors.Wrap(err, "failed to refresh Tableau data source")
 	}
@@ -123,7 +123,7 @@ func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client
 		}
 		workbookID = id
 	}
-	incremental := resolveIncrementalRefresh(t.Parameters)
+	incremental := resolveIncrementalRefresh(ctx, t.Parameters)
 	if err := client.RefreshWorksheet(ctx, workbookID, incremental); err != nil {
 		return errors.Wrap(err, "failed to refresh Tableau workbook")
 	}
@@ -131,8 +131,9 @@ func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client
 	return nil
 }
 
-func resolveIncrementalRefresh(params map[string]string) bool {
-	if fullRefresh, ok := getBoolParam(params, "full_refresh"); ok && fullRefresh {
+func resolveIncrementalRefresh(ctx context.Context, params map[string]string) bool {
+	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	if fullRefresh {
 		return false
 	}
 

@@ -71,9 +71,7 @@ If both ID and name are missing, or the name cannot be resolved, the pipeline wi
 For `tableau.datasource`, `tableau.workbook`, and `tableau` assets, Bruin supports controlling the refresh mode:
 
 - `incremental` (optional): defaults to `true`. When `true`, Bruin requests incremental refresh.
-- `full_refresh` (optional): defaults to `false`. When `true`, Bruin forces non-incremental (full) refresh.
-
-If both are set, `full_refresh: true` takes precedence.
+- Pipeline run flag `--full-refresh`: when enabled, Bruin forces non-incremental refresh for Tableau assets.
 
 If an incremental refresh is requested but the Tableau extract is not configured for incremental updates, Bruin automatically retries once without the incremental flag.
 
@@ -111,7 +109,6 @@ type: tableau.workbook
 parameters:
   refresh: true
   workbook_id: "7741f406-e190-4941-83e0-7be218fb1952"
-  full_refresh: true
 ```
 
 Or, using a name lookup:

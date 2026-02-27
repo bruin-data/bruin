@@ -1,8 +1,10 @@
 package tableau
 
 import (
+	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
 )
 
@@ -11,6 +13,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 
 	tests := []struct {
 		name       string
+		ctx        context.Context
 		parameters map[string]string
 		want       bool
 	}{
@@ -18,6 +21,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 			name:       "defaults to incremental",
 			parameters: map[string]string{},
 			want:       true,
+			ctx:        context.Background(),
 		},
 		{
 			name: "uses explicit incremental true",
@@ -25,6 +29,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 				"incremental": "true",
 			},
 			want: true,
+			ctx:  context.Background(),
 		},
 		{
 			name: "uses explicit incremental false",
@@ -32,14 +37,15 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 				"incremental": "false",
 			},
 			want: false,
+			ctx:  context.Background(),
 		},
 		{
-			name: "full refresh overrides incremental true",
+			name: "run full refresh overrides incremental true",
 			parameters: map[string]string{
 				"incremental": "true",
-				"full_refresh": "true",
 			},
 			want: false,
+			ctx:  context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, true),
 		},
 		{
 			name: "invalid incremental falls back to default",
@@ -47,6 +53,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 				"incremental": "maybe",
 			},
 			want: true,
+			ctx:  context.Background(),
 		},
 		{
 			name: "empty incremental falls back to default",
@@ -54,6 +61,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 				"incremental": " ",
 			},
 			want: true,
+			ctx:  context.Background(),
 		},
 	}
 
@@ -61,7 +69,7 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, tt.want, resolveIncrementalRefresh(tt.parameters))
+			require.Equal(t, tt.want, resolveIncrementalRefresh(tt.ctx, tt.parameters))
 		})
 	}
 }
