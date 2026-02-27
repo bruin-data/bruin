@@ -283,7 +283,15 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 		return nil
 	}
 
-	if incremental && shouldRetryWithoutIncremental(statusCode, responseBody) {
+	if incremental && shouldRetryWithoutIncremental(statusCode) {
+		var writer io.Writer = os.Stdout
+		if w := ctx.Value(executor.KeyPrinter); w != nil {
+			if wr, ok := w.(io.Writer); ok {
+				writer = wr
+			}
+		}
+		fmt.Fprintf(writer, "Incremental refresh failed (status %d), retrying with full refresh\n", statusCode)
+
 		statusCode, responseBody, err = c.sendRefreshRequest(ctx, refreshURL, payloadKey, resourceID, false)
 		if err != nil {
 			return err
@@ -349,17 +357,8 @@ func (c *Client) pollFromRefreshResponse(ctx context.Context, responseBody []byt
 	return c.pollJobStatus(ctx, jobResp.Job.ID)
 }
 
-func shouldRetryWithoutIncremental(statusCode int, body []byte) bool {
-	if statusCode != http.StatusBadRequest && statusCode != http.StatusConflict && statusCode != http.StatusUnprocessableEntity {
-		return false
-	}
-
-	response := strings.ToLower(string(body))
-	if response == "" {
-		return false
-	}
-
-	return strings.Contains(response, "incremental")
+func shouldRetryWithoutIncremental(statusCode int) bool {
+	return statusCode == http.StatusBadRequest || statusCode == http.StatusConflict || statusCode == http.StatusUnprocessableEntity
 }
 
 // GetHost returns the Tableau host URL.

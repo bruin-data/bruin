@@ -228,46 +228,44 @@ func TestShouldRetryWithoutIncremental(t *testing.T) {
 	tests := []struct {
 		name       string
 		statusCode int
-		body       string
 		want       bool
 	}{
 		{
-			name:       "400 with incremental error retries",
+			name:       "400 retries",
 			statusCode: 400,
-			body:       "Incremental refresh is not configured",
 			want:       true,
 		},
 		{
-			name:       "409 with incremental message retries",
+			name:       "409 retries",
 			statusCode: 409,
-			body:       "cannot run INCREMENTAL refresh for this extract",
 			want:       true,
 		},
 		{
-			name:       "422 with incremental message retries",
+			name:       "422 retries",
 			statusCode: 422,
-			body:       "incremental update not supported",
 			want:       true,
 		},
 		{
-			name:       "400 without keyword does not retry",
-			statusCode: 400,
-			body:       "invalid id",
+			name:       "500 does not retry",
+			statusCode: 500,
 			want:       false,
 		},
 		{
-			name:       "500 with keyword does not retry",
-			statusCode: 500,
-			body:       "incremental refresh is not configured",
+			name:       "200 does not retry",
+			statusCode: 200,
+			want:       false,
+		},
+		{
+			name:       "202 does not retry",
+			statusCode: 202,
 			want:       false,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := shouldRetryWithoutIncremental(tt.statusCode, []byte(tt.body))
+			got := shouldRetryWithoutIncremental(tt.statusCode)
 			require.Equal(t, tt.want, got)
 		})
 	}
