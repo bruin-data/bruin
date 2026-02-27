@@ -4,7 +4,7 @@ import typing as t
 
 from sqlglot import expressions as exp
 from sqlglot.errors import UnsupportedError
-from sqlglot.helper import find_new_name, name_sequence
+from sqlglot.helper import find_new_name, name_sequence, seq_get
 
 
 if t.TYPE_CHECKING:
@@ -14,6 +14,7 @@ if t.TYPE_CHECKING:
 
 def preprocess(
     transforms: t.List[t.Callable[[exp.Expression], exp.Expression]],
+    generator: t.Optional[t.Callable[[Generator, exp.Expression], str]] = None,
 ) -> t.Callable[[Generator, exp.Expression], str]:
     """
     Creates a new transform by chaining a sequence of transformations and converts the resulting
@@ -36,6 +37,9 @@ def preprocess(
                 expression = transform(expression)
         except UnsupportedError as unsupported_error:
             self.unsupported(str(unsupported_error))
+
+        if generator:
+            return generator(self, expression)
 
         _sql_handler = getattr(self, expression.key + "_sql", None)
         if _sql_handler:
@@ -110,10 +114,10 @@ def unnest_generate_date_array_using_recursive_cte(expression: exp.Expression) -
             count += 1
 
         if recursive_ctes:
-            with_expression = expression.args.get("with") or exp.With()
+            with_expression = expression.args.get("with_") or exp.With()
             with_expression.set("recursive", True)
             with_expression.set("expressions", [*recursive_ctes, *with_expression.expressions])
-            expression.set("with", with_expression)
+            expression.set("with_", with_expression)
 
     return expression
 
@@ -127,39 +131,6 @@ def unnest_generate_series(expression: exp.Expression) -> exp.Expression:
             return exp.alias_(unnest, alias="_u", table=[expression.alias], copy=False)
 
         return unnest
-
-    return expression
-
-
-def unalias_group(expression: exp.Expression) -> exp.Expression:
-    """
-    Replace references to select aliases in GROUP BY clauses.
-
-    Example:
-        >>> import sqlglot
-        >>> sqlglot.parse_one("SELECT a AS b FROM x GROUP BY b").transform(unalias_group).sql()
-        'SELECT a AS b FROM x GROUP BY 1'
-
-    Args:
-        expression: the expression that will be transformed.
-
-    Returns:
-        The transformed expression.
-    """
-    if isinstance(expression, exp.Group) and isinstance(expression.parent, exp.Select):
-        aliased_selects = {
-            e.alias: i
-            for i, e in enumerate(expression.parent.expressions, start=1)
-            if isinstance(e, exp.Alias)
-        }
-
-        for group_by in expression.expressions:
-            if (
-                isinstance(group_by, exp.Column)
-                and not group_by.table
-                and group_by.name in aliased_selects
-            ):
-                group_by.replace(exp.Literal.number(aliased_selects.get(group_by.name)))
 
     return expression
 
@@ -309,10 +280,9 @@ def unqualify_unnest(expression: exp.Expression) -> exp.Expression:
         }
         if unnest_aliases:
             for column in expression.find_all(exp.Column):
-                if column.table in unnest_aliases:
-                    column.set("table", None)
-                elif column.db in unnest_aliases:
-                    column.set("db", None)
+                leftmost_part = column.parts[0]
+                if leftmost_part.arg_key != "this" and leftmost_part.this in unnest_aliases:
+                    leftmost_part.pop()
 
     return expression
 
@@ -344,22 +314,26 @@ def unnest_to_explode(
         return exp.Inline if has_multi_expr else exp.Explode
 
     if isinstance(expression, exp.Select):
-        from_ = expression.args.get("from")
+        from_ = expression.args.get("from_")
 
         if from_ and isinstance(from_.this, exp.Unnest):
             unnest = from_.this
             alias = unnest.args.get("alias")
             exprs = unnest.expressions
             has_multi_expr = len(exprs) > 1
-            this, *expressions = _unnest_zip_exprs(unnest, exprs, has_multi_expr)
+            this, *_ = _unnest_zip_exprs(unnest, exprs, has_multi_expr)
+
+            columns = alias.columns if alias else []
+            offset = unnest.args.get("offset")
+            if offset:
+                columns.insert(
+                    0, offset if isinstance(offset, exp.Identifier) else exp.to_identifier("pos")
+                )
 
             unnest.replace(
                 exp.Table(
-                    this=_udtf_type(unnest, has_multi_expr)(
-                        this=this,
-                        expressions=expressions,
-                    ),
-                    alias=exp.TableAlias(this=alias.this, columns=alias.columns) if alias else None,
+                    this=_udtf_type(unnest, has_multi_expr)(this=this),
+                    alias=exp.TableAlias(this=alias.this, columns=columns) if alias else None,
                 )
             )
 
@@ -394,6 +368,13 @@ def unnest_to_explode(
                         "CROSS JOIN UNNEST to LATERAL VIEW EXPLODE transformation requires explicit column aliases"
                     )
 
+                offset = unnest.args.get("offset")
+                if offset:
+                    alias_cols.insert(
+                        0,
+                        offset if isinstance(offset, exp.Identifier) else exp.to_identifier("pos"),
+                    )
+
                 for e, column in zip(exprs, alias_cols):
                     expression.append(
                         "laterals",
@@ -410,10 +391,12 @@ def unnest_to_explode(
     return expression
 
 
-def explode_to_unnest(index_offset: int = 0) -> t.Callable[[exp.Expression], exp.Expression]:
-    """Convert explode/posexplode into unnest."""
+def explode_projection_to_unnest(
+    index_offset: int = 0,
+) -> t.Callable[[exp.Expression], exp.Expression]:
+    """Convert explode/posexplode projections into unnests."""
 
-    def _explode_to_unnest(expression: exp.Expression) -> exp.Expression:
+    def _explode_projection_to_unnest(expression: exp.Expression) -> exp.Expression:
         if isinstance(expression, exp.Select):
             from sqlglot.optimizer.scope import Scope
 
@@ -512,7 +495,7 @@ def explode_to_unnest(index_offset: int = 0) -> t.Callable[[exp.Expression], exp
                         expression.set("expressions", expressions)
 
                     if not arrays:
-                        if expression.args.get("from"):
+                        if expression.args.get("from_"):
                             expression.join(series, copy=False, join_type="CROSS")
                         else:
                             expression.from_(series, copy=False)
@@ -558,7 +541,7 @@ def explode_to_unnest(index_offset: int = 0) -> t.Callable[[exp.Expression], exp
 
         return expression
 
-    return _explode_to_unnest
+    return _explode_projection_to_unnest
 
 
 def add_within_group_for_percentiles(expression: exp.Expression) -> exp.Expression:
@@ -656,7 +639,7 @@ def eliminate_full_outer_join(expression: exp.Expression) -> exp.Expression:
             expression.set("limit", None)
             index, full_outer_join = full_outer_joins[0]
 
-            tables = (expression.args["from"].alias_or_name, full_outer_join.alias_or_name)
+            tables = (expression.args["from_"].alias_or_name, full_outer_join.alias_or_name)
             join_conditions = full_outer_join.args.get("on") or exp.and_(
                 *[
                     exp.column(col, tables[0]).eq(exp.column(col, tables[1]))
@@ -665,11 +648,13 @@ def eliminate_full_outer_join(expression: exp.Expression) -> exp.Expression:
             )
 
             full_outer_join.set("side", "left")
-            anti_join_clause = exp.select("1").from_(expression.args["from"]).where(join_conditions)
+            anti_join_clause = (
+                exp.select("1").from_(expression.args["from_"]).where(join_conditions)
+            )
             expression_copy.args["joins"][index].set("side", "right")
             expression_copy = expression_copy.where(exp.Exists(this=anti_join_clause).not_())
-            expression_copy.args.pop("with", None)  # remove CTEs from RIGHT side
-            expression.args.pop("order", None)  # remove order by from LEFT side
+            expression_copy.set("with_", None)  # remove CTEs from RIGHT side
+            expression.set("order", None)  # remove order by from LEFT side
 
             return exp.union(expression, expression_copy, copy=False, distinct=False)
 
@@ -688,14 +673,14 @@ def move_ctes_to_top_level(expression: E) -> E:
 
     TODO: handle name clashes whilst moving CTEs (it can get quite tricky & costly).
     """
-    top_level_with = expression.args.get("with")
+    top_level_with = expression.args.get("with_")
     for inner_with in expression.find_all(exp.With):
         if inner_with.parent is expression:
             continue
 
         if not top_level_with:
             top_level_with = inner_with.pop()
-            expression.set("with", top_level_with)
+            expression.set("with_", top_level_with)
         else:
             if inner_with.recursive:
                 top_level_with.set("recursive", True)
@@ -841,88 +826,104 @@ def struct_kv_to_alias(expression: exp.Expression) -> exp.Expression:
 
 
 def eliminate_join_marks(expression: exp.Expression) -> exp.Expression:
+    """https://docs.oracle.com/cd/B19306_01/server.102/b14200/queries006.htm#sthref3178
+
+    1. You cannot specify the (+) operator in a query block that also contains FROM clause join syntax.
+
+    2. The (+) operator can appear only in the WHERE clause or, in the context of left-correlation (that is, when specifying the TABLE clause) in the FROM clause, and can be applied only to a column of a table or view.
+
+    The (+) operator does not produce an outer join if you specify one table in the outer query and the other table in an inner query.
+
+    You cannot use the (+) operator to outer-join a table to itself, although self joins are valid.
+
+    The (+) operator can be applied only to a column, not to an arbitrary expression. However, an arbitrary expression can contain one or more columns marked with the (+) operator.
+
+    A WHERE condition containing the (+) operator cannot be combined with another condition using the OR logical operator.
+
+    A WHERE condition cannot use the IN comparison condition to compare a column marked with the (+) operator with an expression.
+
+    A WHERE condition cannot compare any column marked with the (+) operator with a subquery.
+
+    -- example with WHERE
+    SELECT d.department_name, sum(e.salary) as total_salary
+    FROM departments d, employees e
+    WHERE e.department_id(+) = d.department_id
+    group by department_name
+
+    -- example of left correlation in select
+    SELECT d.department_name, (
+        SELECT SUM(e.salary)
+            FROM employees e
+            WHERE e.department_id(+) = d.department_id) AS total_salary
+    FROM departments d;
+
+    -- example of left correlation in from
+    SELECT d.department_name, t.total_salary
+    FROM departments d, (
+            SELECT SUM(e.salary) AS total_salary
+            FROM employees e
+            WHERE e.department_id(+) = d.department_id
+        ) t
     """
-    Remove join marks from an AST. This rule assumes that all marked columns are qualified.
-    If this does not hold for a query, consider running `sqlglot.optimizer.qualify` first.
 
-    For example,
-        SELECT * FROM a, b WHERE a.id = b.id(+)    -- ... is converted to
-        SELECT * FROM a LEFT JOIN b ON a.id = b.id -- this
-
-    Args:
-        expression: The AST to remove join marks from.
-
-    Returns:
-       The AST with join marks removed.
-    """
     from sqlglot.optimizer.scope import traverse_scope
+    from sqlglot.optimizer.normalize import normalize, normalized
+    from collections import defaultdict
 
-    for scope in traverse_scope(expression):
+    # we go in reverse to check the main query for left correlation
+    for scope in reversed(traverse_scope(expression)):
         query = scope.expression
 
         where = query.args.get("where")
-        joins = query.args.get("joins")
+        joins = query.args.get("joins", [])
 
-        if not where or not joins:
+        if not where or not any(c.args.get("join_mark") for c in where.find_all(exp.Column)):
             continue
 
-        query_from = query.args["from"]
+        # knockout: we do not support left correlation (see point 2)
+        assert not scope.is_correlated_subquery, "Correlated queries are not supported"
 
-        # These keep track of the joins to be replaced
-        new_joins: t.Dict[str, exp.Join] = {}
-        old_joins = {join.alias_or_name: join for join in joins}
+        # make sure we have AND of ORs to have clear join terms
+        where = normalize(where.this)
+        assert normalized(where), "Cannot normalize JOIN predicates"
 
-        for column in scope.columns:
-            if not column.args.get("join_mark"):
+        joins_ons = defaultdict(list)  # dict of {name: list of join AND conditions}
+        for cond in [where] if not isinstance(where, exp.And) else where.flatten():
+            join_cols = [col for col in cond.find_all(exp.Column) if col.args.get("join_mark")]
+
+            left_join_table = set(col.table for col in join_cols)
+            if not left_join_table:
                 continue
 
-            predicate = column.find_ancestor(exp.Predicate, exp.Select)
-            assert isinstance(
-                predicate, exp.Binary
-            ), "Columns can only be marked with (+) when involved in a binary operation"
-
-            predicate_parent = predicate.parent
-            join_predicate = predicate.pop()
-
-            left_columns = [
-                c for c in join_predicate.left.find_all(exp.Column) if c.args.get("join_mark")
-            ]
-            right_columns = [
-                c for c in join_predicate.right.find_all(exp.Column) if c.args.get("join_mark")
-            ]
-
             assert not (
-                left_columns and right_columns
-            ), "The (+) marker cannot appear in both sides of a binary predicate"
+                len(left_join_table) > 1
+            ), "Cannot combine JOIN predicates from different tables"
 
-            marked_column_tables = set()
-            for col in left_columns or right_columns:
-                table = col.table
-                assert table, f"Column {col} needs to be qualified with a table"
-
+            for col in join_cols:
                 col.set("join_mark", False)
-                marked_column_tables.add(table)
 
-            assert (
-                len(marked_column_tables) == 1
-            ), "Columns of only a single table can be marked with (+) in a given binary predicate"
+            joins_ons[left_join_table.pop()].append(cond)
 
-            # Add predicate if join already copied, or add join if it is new
-            join_this = old_joins.get(col.table, query_from).this
-            existing_join = new_joins.get(join_this.alias_or_name)
-            if existing_join:
-                existing_join.set("on", exp.and_(existing_join.args["on"], join_predicate))
-            else:
-                new_joins[join_this.alias_or_name] = exp.Join(
-                    this=join_this.copy(), on=join_predicate.copy(), kind="LEFT"
-                )
+        old_joins = {join.alias_or_name: join for join in joins}
+        new_joins = {}
+        query_from = query.args["from_"]
 
-            # If the parent of the target predicate is a binary node, then it now has only one child
-            if isinstance(predicate_parent, exp.Binary):
-                if predicate_parent.left is None:
-                    predicate_parent.replace(predicate_parent.right)
-                else:
-                    predicate_parent.replace(predicate_parent.left)
+        for table, predicates in joins_ons.items():
+            join_what = old_joins.get(table, query_from).this.copy()
+            new_joins[join_what.alias_or_name] = exp.Join(
+                this=join_what, on=exp.and_(*predicates), kind="LEFT"
+            )
+
+            for p in predicates:
+                while isinstance(p.parent, exp.Paren):
+                    p.parent.replace(p)
+
+                parent = p.parent
+                p.pop()
+                if isinstance(parent, exp.Binary):
+                    parent.replace(parent.right if parent.left is None else parent.left)
+                elif isinstance(parent, exp.Where):
+                    parent.pop()
 
         if query_from.alias_or_name in new_joins:
             only_old_joins = old_joins.keys() - new_joins.keys()
@@ -931,13 +932,15 @@ def eliminate_join_marks(expression: exp.Expression) -> exp.Expression:
             ), "Cannot determine which table to use in the new FROM clause"
 
             new_from_name = list(only_old_joins)[0]
-            query.set("from", exp.From(this=old_joins[new_from_name].this))
+            query.set("from_", exp.From(this=old_joins[new_from_name].this))
 
         if new_joins:
+            for n, j in old_joins.items():  # preserve any other joins
+                if n not in new_joins and n != query.args["from_"].name:
+                    if not j.kind:
+                        j.set("kind", "CROSS")
+                    new_joins[n] = j
             query.set("joins", list(new_joins.values()))
-
-        if not where.this:
-            where.pop()
 
     return expression
 
@@ -954,16 +957,101 @@ def any_to_exists(expression: exp.Expression) -> exp.Expression:
     transformation
     """
     if isinstance(expression, exp.Select):
-        for any in expression.find_all(exp.Any):
-            this = any.this
-            if isinstance(this, exp.Query):
+        for any_expr in expression.find_all(exp.Any):
+            this = any_expr.this
+            if isinstance(this, exp.Query) or isinstance(any_expr.parent, (exp.Like, exp.ILike)):
                 continue
 
-            binop = any.parent
+            binop = any_expr.parent
             if isinstance(binop, exp.Binary):
                 lambda_arg = exp.to_identifier("x")
-                any.replace(lambda_arg)
+                any_expr.replace(lambda_arg)
                 lambda_expr = exp.Lambda(this=binop.copy(), expressions=[lambda_arg])
                 binop.replace(exp.Exists(this=this.unnest(), expression=lambda_expr))
+
+    return expression
+
+
+def eliminate_window_clause(expression: exp.Expression) -> exp.Expression:
+    """Eliminates the `WINDOW` query clause by inling each named window."""
+    if isinstance(expression, exp.Select) and expression.args.get("windows"):
+        from sqlglot.optimizer.scope import find_all_in_scope
+
+        windows = expression.args["windows"]
+        expression.set("windows", None)
+
+        window_expression: t.Dict[str, exp.Expression] = {}
+
+        def _inline_inherited_window(window: exp.Expression) -> None:
+            inherited_window = window_expression.get(window.alias.lower())
+            if not inherited_window:
+                return
+
+            window.set("alias", None)
+            for key in ("partition_by", "order", "spec"):
+                arg = inherited_window.args.get(key)
+                if arg:
+                    window.set(key, arg.copy())
+
+        for window in windows:
+            _inline_inherited_window(window)
+            window_expression[window.name.lower()] = window
+
+        for window in find_all_in_scope(expression, exp.Window):
+            _inline_inherited_window(window)
+
+    return expression
+
+
+def inherit_struct_field_names(expression: exp.Expression) -> exp.Expression:
+    """
+    Inherit field names from the first struct in an array.
+
+    BigQuery supports implicitly inheriting names from the first STRUCT in an array:
+
+    Example:
+        ARRAY[
+          STRUCT('Alice' AS name, 85 AS score),  -- defines names
+          STRUCT('Bob', 92),                     -- inherits names
+          STRUCT('Diana', 95)                    -- inherits names
+        ]
+
+    This transformation makes the field names explicit on all structs by adding
+    PropertyEQ nodes, in order to facilitate transpilation to other dialects.
+
+    Args:
+        expression: The expression tree to transform
+
+    Returns:
+        The modified expression with field names inherited in all structs
+    """
+    if (
+        isinstance(expression, exp.Array)
+        and expression.args.get("struct_name_inheritance")
+        and isinstance(first_item := seq_get(expression.expressions, 0), exp.Struct)
+        and all(isinstance(fld, exp.PropertyEQ) for fld in first_item.expressions)
+    ):
+        field_names = [fld.this for fld in first_item.expressions]
+
+        # Apply field names to subsequent structs that don't have them
+        for struct in expression.expressions[1:]:
+            if not isinstance(struct, exp.Struct) or len(struct.expressions) != len(field_names):
+                continue
+
+            # Convert unnamed expressions to PropertyEQ with inherited names
+            new_expressions = []
+            for i, expr in enumerate(struct.expressions):
+                if not isinstance(expr, exp.PropertyEQ):
+                    # Create PropertyEQ: field_name := value, preserving the type from the inner expression
+                    property_eq = exp.PropertyEQ(
+                        this=exp.Identifier(this=field_names[i].copy()),
+                        expression=expr,
+                    )
+                    property_eq.type = expr.type
+                    new_expressions.append(property_eq)
+                else:
+                    new_expressions.append(expr)
+
+            struct.set("expressions", new_expressions)
 
     return expression

@@ -1,0 +1,1967 @@
+[
+  {
+    "name": "nested subqueries",
+    "dialect": "bigquery",
+    "query": "\n             select *\n             from table1\n             join (\n                 select *\n                 from (\n                     select *\n                     from table2\n                 ) t2\n             ) t3\n             using(a)\n         ",
+    "schema": {
+      "table1": {
+        "a": "str",
+        "b": "int64"
+      },
+      "table2": {
+        "a": "str",
+        "c": "int64"
+      }
+    },
+    "expected": [
+      {
+        "name": "a",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "a",
+            "table": "table1"
+          },
+          {
+            "column": "a",
+            "table": "table2"
+          }
+        ]
+      },
+      {
+        "name": "b",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "b",
+            "table": "table1"
+          }
+        ]
+      },
+      {
+        "name": "c",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "c",
+            "table": "table2"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "a",
+        "upstream": [
+          {
+            "column": "a",
+            "table": "table1"
+          },
+          {
+            "column": "a",
+            "table": "table2"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "case-when",
+    "dialect": "bigquery",
+    "query": "\n             SELECT\n                 items.item_id as item_id,\n                 CASE\n                     WHEN price > 1000 AND t2.somecol < 250 THEN 'high'\n                     WHEN price > 100 THEN 'medium'\n                     ELSE 'low'\n                 END as price_category\n             FROM items\n             JOIN orders as t2 on items.item_id = t2.item_id\n             WHERE in_stock = true\n         ",
+    "schema": {
+      "items": {
+        "item_id": "str",
+        "price": "int64",
+        "in_stock": "bool"
+      },
+      "orders": {
+        "item_id": "str",
+        "somecol": "int64"
+      }
+    },
+    "expected": [
+      {
+        "name": "item_id",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "item_id",
+            "table": "items"
+          }
+        ]
+      },
+      {
+        "name": "price_category",
+        "type": "VARCHAR",
+        "upstream": [
+          {
+            "column": "price",
+            "table": "items"
+          },
+          {
+            "column": "somecol",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "in_stock",
+        "upstream": [
+          {
+            "column": "in_stock",
+            "table": "items"
+          }
+        ]
+      },
+      {
+        "name": "item_id",
+        "upstream": [
+          {
+            "column": "item_id",
+            "table": "items"
+          },
+          {
+            "column": "item_id",
+            "table": "orders"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "simple join",
+    "dialect": "bigquery",
+    "query": "\n             SELECT t1.col1, t2.col2\n             FROM table1 t1\n             JOIN table2 t2 ON t1.id = t2.id\n         ",
+    "schema": {
+      "table1": {
+        "id": "str",
+        "col1": "int64"
+      },
+      "table2": {
+        "id": "str",
+        "col2": "int64"
+      }
+    },
+    "expected": [
+      {
+        "name": "col1",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "table2"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "id",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "table1"
+          },
+          {
+            "column": "id",
+            "table": "table2"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "aggregate function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT customer_id as cid, COUNT(order_id) as order_count\n             FROM orders\n             GROUP BY customer_id\n         ",
+    "schema": {
+      "orders": {
+        "customer_id": "str",
+        "order_id": "int64"
+      }
+    },
+    "expected": [
+      {
+        "name": "cid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "order_count",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "order_id",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "customer_id",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "subquery in select",
+    "dialect": "bigquery",
+    "query": "\n             SELECT\n                 emp_id,\n                 (SELECT AVG(salary) FROM salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary\n             FROM employees\n         ",
+    "schema": {
+      "employees": {
+        "emp_id": "str"
+      },
+      "salaries": {
+        "emp_id": "str",
+        "salary": "int64"
+      }
+    },
+    "expected": [
+      {
+        "name": "avg_salary",
+        "type": "DOUBLE",
+        "upstream": [
+          {
+            "column": "salary",
+            "table": "salaries"
+          }
+        ]
+      },
+      {
+        "name": "emp_id",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "emp_id",
+            "table": "employees"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "emp_id",
+        "upstream": [
+          {
+            "column": "emp_id",
+            "table": "employees"
+          },
+          {
+            "column": "emp_id",
+            "table": "salaries"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "union all",
+    "dialect": "bigquery",
+    "query": "\n             SELECT id, name FROM customers\n             UNION ALL\n             SELECT id, name FROM employees\n         ",
+    "schema": {
+      "customers": {
+        "id": "str",
+        "name": "str"
+      },
+      "employees": {
+        "id": "str",
+        "name": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "customers"
+          },
+          {
+            "column": "id",
+            "table": "employees"
+          }
+        ]
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "customers"
+          },
+          {
+            "column": "name",
+            "table": "employees"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "self join",
+    "dialect": "bigquery",
+    "query": "\n             SELECT e1.id, e2.manager_id\n             FROM employees e1\n             JOIN employees e2 ON e1.manager_id = e2.id\n         ",
+    "schema": {
+      "employees": {
+        "id": "str",
+        "manager_id": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "employees"
+          }
+        ]
+      },
+      {
+        "name": "manager_id",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "manager_id",
+            "table": "employees"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "id",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "employees"
+          }
+        ]
+      },
+      {
+        "name": "manager_id",
+        "upstream": [
+          {
+            "column": "manager_id",
+            "table": "employees"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "complex case-when",
+    "dialect": "bigquery",
+    "query": "\n             SELECT\n                 sales.id,\n                 CASE\n                     WHEN sales.amount > 500 THEN 'large'\n                     WHEN sales.amount > 100 THEN 'medium'\n                     ELSE 'small'\n                 END as sale_size,\n                 CASE\n                     WHEN regions.name = 'North' THEN 'N'\n                     WHEN regions.name = 'South' THEN 'S'\n                     ELSE 'Other'\n                 END as region_abbr,\n                 'fixed' as fixed,\n                 now() as updated_at\n             FROM sales\n             JOIN regions ON sales.region_id = regions.id\n         ",
+    "schema": {
+      "sales": {
+        "id": "str",
+        "amount": "int64",
+        "region_id": "str"
+      },
+      "regions": {
+        "id": "str",
+        "name": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "fixed",
+        "type": "VARCHAR",
+        "upstream": []
+      },
+      {
+        "name": "id",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "sales"
+          }
+        ]
+      },
+      {
+        "name": "region_abbr",
+        "type": "VARCHAR",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "regions"
+          }
+        ]
+      },
+      {
+        "name": "sale_size",
+        "type": "VARCHAR",
+        "upstream": [
+          {
+            "column": "amount",
+            "table": "sales"
+          }
+        ]
+      },
+      {
+        "name": "updated_at",
+        "upstream": [],
+        "type": "UNKNOWN"
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "id",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "regions"
+          }
+        ]
+      },
+      {
+        "name": "region_id",
+        "upstream": [
+          {
+            "column": "region_id",
+            "table": "sales"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "aggregate functions with multiple columns",
+    "dialect": "bigquery",
+    "query": "\n             SELECT\n                 customer_id,\n                 SUM(order_amount) as total_amount,\n                 AVG(order_amount) as average_amount,\n                 COUNT(order_id) as order_count\n             FROM orders\n             GROUP BY customer_id\n         ",
+    "schema": {
+      "orders": {
+        "customer_id": "str",
+        "order_id": "str",
+        "order_amount": "int64"
+      }
+    },
+    "expected": [
+      {
+        "name": "average_amount",
+        "type": "DOUBLE",
+        "upstream": [
+          {
+            "column": "order_amount",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "customer_id",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "order_count",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "order_id",
+            "table": "orders"
+          }
+        ]
+      },
+      {
+        "name": "total_amount",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "order_amount",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "customer_id",
+        "upstream": [
+          {
+            "column": "customer_id",
+            "table": "orders"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "upper function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT UPPER(name) as upper_name\n             FROM users\n         ",
+    "schema": {
+      "users": {
+        "name": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "upper_name",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "users"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "lower function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT LOWER(email) as lower_email\n             FROM users\n         ",
+    "schema": {
+      "users": {
+        "email": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "lower_email",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "email",
+            "table": "users"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "length function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT LENGTH(description) as description_length\n             FROM products\n         ",
+    "schema": {
+      "products": {
+        "description": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "description_length",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "description",
+            "table": "products"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "trim function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT TRIM(whitespace_column) as trimmed_column\n             FROM data\n         ",
+    "schema": {
+      "data": {
+        "whitespace_column": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "trimmed_column",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "whitespace_column",
+            "table": "data"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "round function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT ROUND(price, 2) as rounded_price\n             FROM products\n         ",
+    "schema": {
+      "products": {
+        "price": "float"
+      }
+    },
+    "expected": [
+      {
+        "name": "rounded_price",
+        "type": "FLOAT",
+        "upstream": [
+          {
+            "column": "price",
+            "table": "products"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "coalesce function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT COALESCE(middle_name, 'N/A') as middle_name\n             FROM users\n         ",
+    "schema": {
+      "users": {
+        "middle_name": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "middle_name",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "middle_name",
+            "table": "users"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "cast function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT CAST(order_id AS INT) as order_id_int\n             FROM orders\n         ",
+    "schema": {
+      "orders": {
+        "order_id": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "order_id_int",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "order_id",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "date function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT DATE(order_date) as order_date_only\n             FROM orders\n         ",
+    "schema": {
+      "orders": {
+        "order_date": "datetime"
+      }
+    },
+    "expected": [
+      {
+        "name": "order_date_only",
+        "type": "DATE",
+        "upstream": [
+          {
+            "column": "order_date",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "extract function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT EXTRACT(YEAR FROM order_date) as order_year\n             FROM orders\n         ",
+    "schema": {
+      "orders": {
+        "order_date": "datetime"
+      }
+    },
+    "expected": [
+      {
+        "name": "order_year",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "order_date",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "substring function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT SUBSTRING(name FROM 1 FOR 3) as name_prefix\n             FROM users\n         ",
+    "schema": {
+      "users": {
+        "name": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "name_prefix",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "users"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "floor function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT FLOOR(price) as floored_price\n             FROM products\n         ",
+    "schema": {
+      "products": {
+        "price": "float"
+      }
+    },
+    "expected": [
+      {
+        "name": "floored_price",
+        "type": "FLOAT",
+        "upstream": [
+          {
+            "column": "price",
+            "table": "products"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "ceil function",
+    "dialect": "bigquery",
+    "query": "\n             SELECT CEIL(price) as ceiled_price\n             FROM products\n         ",
+    "schema": {
+      "products": {
+        "price": "float"
+      }
+    },
+    "expected": [
+      {
+        "name": "ceiled_price",
+        "type": "FLOAT",
+        "upstream": [
+          {
+            "column": "price",
+            "table": "products"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "mysql date_format function",
+    "dialect": "mysql",
+    "query": "\n             SELECT DATE_FORMAT(order_date, '%Y-%m-%d') as formatted_date\n             FROM orders\n         ",
+    "schema": {
+      "orders": {
+        "order_date": "datetime"
+      }
+    },
+    "expected": [
+      {
+        "name": "formatted_date",
+        "type": "VARCHAR",
+        "upstream": [
+          {
+            "column": "order_date",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "snowflake to_timestamp function",
+    "dialect": "snowflake",
+    "query": "\n             SELECT TO_TIMESTAMP(order_date) as timestamp_date\n             FROM orders\n         ",
+    "schema": {
+      "orders": {
+        "order_date": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "TIMESTAMP_DATE",
+        "type": "UNKNOWN",
+        "upstream": [
+          {
+            "column": "ORDER_DATE",
+            "table": "ORDERS"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "duckdb current_timestamp function",
+    "dialect": "duckdb",
+    "query": "\n             SELECT order_id,CURRENT_TIMESTAMP as current_time\n             FROM orders\n         ",
+    "schema": {
+      "orders": {
+        "order_id": "str"
+      }
+    },
+    "expected": [
+      {
+        "name": "current_time",
+        "type": "TIMESTAMP",
+        "upstream": []
+      },
+      {
+        "name": "order_id",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "order_id",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "redshift date_trunc function",
+    "dialect": "redshift",
+    "query": "\n             SELECT DATE_TRUNC('month', order_date) as month_start\n             FROM orders\n         ",
+    "schema": {
+      "orders": {
+        "order_date": "datetime"
+      }
+    },
+    "expected": [
+      {
+        "name": "month_start",
+        "type": "UNKNOWN",
+        "upstream": [
+          {
+            "column": "order_date",
+            "table": "orders"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "dashboard.report",
+    "dialect": "bigquery",
+    "query": "\n         SELECT\n             t1.col1,\n             t1.col2,\n             t1.col3,\n             t1.col4,\n             t1.col5,\n             t1.col6,\n             t1.col7 is not null as is_refunded,\n             1 as ai_credits,\n             if(t2.col1 is not null, 1, 0) as ai_credits_used,\n             t3.col1 as TeamName,\n             t3.col2 as TeamId,\n             t4.col1,\n             t4.col2,\n             t5.col1 as Organization,\n             t5.col2 as OrganizationId,\n             t4.col3,\n             t4.col4,\n             t6.col1 as ProgramName,\n             t5.col3,\n             t5.col4\n         FROM `dataset1.table1` as t1\n         INNER JOIN `dataset2.table2` as t6\n             ON t1.col3 = t6.col1\n         INNER JOIN `dataset3.table3` as t5\n             ON t6.col2 = t5.col2\n         LEFT JOIN `dataset4.table4` as t7\n             ON t7.col1 = t1.col4\n         LEFT JOIN `dataset5.table5` as t2\n             ON t1.col1 = t2.col2\n         LEFT JOIN `dataset6.table6` as t3\n             ON t3.col2 = cast(t2.col3 as int64)\n         LEFT JOIN `dataset7.table7` as t4\n             ON t4.col5 = safe_cast(t1.col5 as int64)\n     ",
+    "schema": {
+      "dataset1.table1": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING",
+        "col5": "STRING",
+        "col6": "STRING",
+        "col7": "STRING"
+      },
+      "dataset2.table2": {
+        "col1": "STRING",
+        "col2": "STRING"
+      },
+      "dataset3.table3": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING"
+      },
+      "dataset4.table4": {
+        "col1": "STRING"
+      },
+      "dataset5.table5": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING"
+      },
+      "dataset6.table6": {
+        "col1": "STRING",
+        "col2": "STRING"
+      },
+      "dataset7.table7": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING",
+        "col5": "STRING"
+      }
+    },
+    "expected": [
+      {
+        "name": "ai_credits",
+        "type": "INT",
+        "upstream": []
+      },
+      {
+        "name": "ai_credits_used",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset5.table5"
+          }
+        ]
+      },
+      {
+        "name": "col1",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col1",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col5",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col5",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col6",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col6",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "is_refunded",
+        "type": "BOOLEAN",
+        "upstream": [
+          {
+            "column": "col7",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "organization",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset3.table3"
+          }
+        ]
+      },
+      {
+        "name": "organizationid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset3.table3"
+          }
+        ]
+      },
+      {
+        "name": "programname",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset2.table2"
+          }
+        ]
+      },
+      {
+        "name": "teamid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset6.table6"
+          }
+        ]
+      },
+      {
+        "name": "teamname",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset6.table6"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "col1",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "dataset1.table1"
+          },
+          {
+            "column": "col1",
+            "table": "dataset2.table2"
+          },
+          {
+            "column": "col1",
+            "table": "dataset4.table4"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "dataset2.table2"
+          },
+          {
+            "column": "col2",
+            "table": "dataset3.table3"
+          },
+          {
+            "column": "col2",
+            "table": "dataset5.table5"
+          },
+          {
+            "column": "col2",
+            "table": "dataset6.table6"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "dataset1.table1"
+          },
+          {
+            "column": "col3",
+            "table": "dataset5.table5"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col5",
+        "upstream": [
+          {
+            "column": "col5",
+            "table": "dataset1.table1"
+          },
+          {
+            "column": "col5",
+            "table": "dataset7.table7"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "project_report",
+    "dialect": "bigquery",
+    "query": "\n        SELECT\n            p1.col1,\n            p1.col2,\n            p1.col3,\n            p1.col4,\n            p1.col5,\n            p1.col6,\n            p1.col7 is not null as is_active,\n            1 as project_credits,\n            if(p2.col1 is not null, 1, 0) as credits_used,\n            p3.col1 as ProjectName,\n            p3.col2 as ProjectId,\n            p4.col1,\n            p4.col2,\n            p5.col1 as Department,\n            p5.col2 as DepartmentId,\n            p4.col3,\n            p4.col4,\n            p6.col1 as ProgramName,\n            p5.col3,\n            p5.col4\n        FROM `project1.dataset1.table1` as p1\n        INNER JOIN `project2.dataset2.table2` as p6\n            ON p1.col3 = p6.col1\n        INNER JOIN `project3.dataset3.table3` as p5\n            ON p6.col2 = p5.col2\n        LEFT JOIN `project4.dataset4.table4` as p7\n            ON p7.col1 = p1.col4\n        LEFT JOIN `project5.dataset5.table5` as p2\n            ON p1.col1 = p2.col2\n        LEFT JOIN `project6.dataset6.table6` as p3\n            ON p3.col2 = cast(p2.col3 as int64)\n        LEFT JOIN `project7.dataset7.table7` as p4\n            ON p4.col5 = safe_cast(p1.col5 as int64)\n    ",
+    "schema": {
+      "project1.dataset1.table1": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING",
+        "col5": "STRING",
+        "col6": "STRING",
+        "col7": "STRING"
+      },
+      "project2.dataset2.table2": {
+        "col1": "STRING",
+        "col2": "STRING"
+      },
+      "project3.dataset3.table3": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING"
+      },
+      "project4.dataset4.table4": {
+        "col1": "STRING"
+      },
+      "project5.dataset5.table5": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING"
+      },
+      "project6.dataset6.table6": {
+        "col1": "STRING",
+        "col2": "STRING"
+      },
+      "project7.dataset7.table7": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING",
+        "col5": "STRING"
+      }
+    },
+    "expected": [
+      {
+        "name": "col1",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col1",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col5",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col5",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col6",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col6",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "credits_used",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project5.dataset5.table5"
+          }
+        ]
+      },
+      {
+        "name": "department",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project3.dataset3.table3"
+          }
+        ]
+      },
+      {
+        "name": "departmentid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project3.dataset3.table3"
+          }
+        ]
+      },
+      {
+        "name": "is_active",
+        "type": "BOOLEAN",
+        "upstream": [
+          {
+            "column": "col7",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "programname",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project2.dataset2.table2"
+          }
+        ]
+      },
+      {
+        "name": "project_credits",
+        "type": "INT",
+        "upstream": []
+      },
+      {
+        "name": "projectid",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project6.dataset6.table6"
+          }
+        ]
+      },
+      {
+        "name": "projectname",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project6.dataset6.table6"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "col1",
+        "upstream": [
+          {
+            "column": "col1",
+            "table": "project1.dataset1.table1"
+          },
+          {
+            "column": "col1",
+            "table": "project2.dataset2.table2"
+          },
+          {
+            "column": "col1",
+            "table": "project4.dataset4.table4"
+          }
+        ]
+      },
+      {
+        "name": "col2",
+        "upstream": [
+          {
+            "column": "col2",
+            "table": "project2.dataset2.table2"
+          },
+          {
+            "column": "col2",
+            "table": "project3.dataset3.table3"
+          },
+          {
+            "column": "col2",
+            "table": "project5.dataset5.table5"
+          },
+          {
+            "column": "col2",
+            "table": "project6.dataset6.table6"
+          }
+        ]
+      },
+      {
+        "name": "col3",
+        "upstream": [
+          {
+            "column": "col3",
+            "table": "project1.dataset1.table1"
+          },
+          {
+            "column": "col3",
+            "table": "project5.dataset5.table5"
+          }
+        ]
+      },
+      {
+        "name": "col4",
+        "upstream": [
+          {
+            "column": "col4",
+            "table": "project1.dataset1.table1"
+          }
+        ]
+      },
+      {
+        "name": "col5",
+        "upstream": [
+          {
+            "column": "col5",
+            "table": "project1.dataset1.table1"
+          },
+          {
+            "column": "col5",
+            "table": "project7.dataset7.table7"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "simple nested table references",
+    "dialect": "bigquery",
+    "query": "SELECT mycol FROM raw.table1",
+    "schema": {
+      "raw.table1": {
+        "mycol": "STRING"
+      }
+    },
+    "expected": [
+      {
+        "name": "mycol",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "mycol",
+            "table": "raw.table1"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  },
+  {
+    "name": "simple nested table references",
+    "dialect": "bigquery",
+    "query": "\n    select\n        u.OrganizationId,\n        o.Name as Organization,\n    from raw.Users as u\n    inner join `raw.Organizations` o\n        on u.OrganizationId = o.Id\n    ",
+    "schema": {
+      "raw.Organizations": {
+        "Id": "INTEGER",
+        "Name": "STRING"
+      },
+      "raw.Users": {
+        "OrganizationId": "INTEGER"
+      },
+      "raw.TeamMemberships": {
+        "UserId": "INTEGER",
+        "TeamId": "INTEGER"
+      },
+      "raw.Teams": {
+        "Id": "INTEGER",
+        "Name": "STRING"
+      }
+    },
+    "expected": [
+      {
+        "name": "organization",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "raw.Organizations"
+          }
+        ]
+      },
+      {
+        "name": "organizationid",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "organizationid",
+            "table": "raw.Users"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "id",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "raw.Organizations"
+          }
+        ]
+      },
+      {
+        "name": "organizationid",
+        "upstream": [
+          {
+            "column": "organizationid",
+            "table": "raw.Users"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "failing scenario for CTEs and case-sensitive fields",
+    "dialect": "bigquery",
+    "query": "\n    SELECT Teams.Name, count(*) as c\n    FROM raw.TeamMemberships as TeamMemberships\n    join raw.Teams \n        on Teams.Id = TeamMemberships.TeamId\n    GROUP BY 1\n",
+    "schema": {
+      "raw.TeamMemberships": {
+        "Id": "INTEGER",
+        "UserId": "INTEGER",
+        "TeamId": "INTEGER",
+        "CreatedDate": "TIMESTAMP",
+        "CreatedById": "INTEGER",
+        "UpdatedDate": "TIMESTAMP",
+        "UpdatedById": "INTEGER"
+      },
+      "raw.teams": {
+        "Id": "INTEGER",
+        "Name": "STRING",
+        "Description": "STRING",
+        "ResourceId": "INTEGER",
+        "OrganizationId": "INTEGER",
+        "TimeZoneId": "INTEGER",
+        "TeamMemberCount": "INTEGER",
+        "TeamLeaderId": "INTEGER",
+        "Active": "BOOLEAN",
+        "CreatedDate": "TIMESTAMP",
+        "CreatedById": "INTEGER",
+        "UpdatedDate": "TIMESTAMP",
+        "UpdatedById": "INTEGER",
+        "IsGuest": "BOOLEAN"
+      }
+    },
+    "expected": [
+      {
+        "name": "c",
+        "type": "BIGINT",
+        "upstream": []
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "raw.Teams"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "id",
+        "upstream": [
+          {
+            "column": "id",
+            "table": "raw.Teams"
+          }
+        ]
+      },
+      {
+        "name": "name",
+        "upstream": [
+          {
+            "column": "name",
+            "table": "raw.Teams"
+          }
+        ]
+      },
+      {
+        "name": "teamid",
+        "upstream": [
+          {
+            "column": "teamid",
+            "table": "raw.TeamMemberships"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "snowflake function call",
+    "dialect": "snowflake",
+    "query": "\nWITH ufd AS (\n    SELECT\n        user_id,\n        MIN(date_utc) as my_date_col\n    FROM fact.some_daily_metrics\n    GROUP BY 1\n),\nuser_retention AS (\n    SELECT\n        d.user_id,\n        MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) as some_day1_metric,\n    FROM fact.some_daily_metrics d\n    INNER JOIN ufd f ON d.user_id = f.user_id\n    GROUP BY 1\n)\nSELECT\n    d.user_id, \n    DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) as recency,\n    COUNT(DISTINCT d.date_utc) as active_days, \n    MIN_BY(d.first_device_type, d.first_activity_timestamp) as first_device_type, \n    AVG(NULLIF(d.estimated_session_duration, 0)) as avg_session_duration, \n    SUM(d.event_start) as total_event_start, \n    MAX(r.some_day1_metric) as some_day1_metric, \n    case when sum(d.event_start) > 0 then 'Player' else 'Visitor' end as user_type, \nFROM fact.some_daily_metrics d\nLEFT JOIN user_retention r ON d.user_id = r.user_id\nGROUP BY 1\n        ",
+    "schema": {
+      "fact.some_daily_metrics": {
+        "user_id": "integer",
+        "date_utc": "date",
+        "first_device_type": "string",
+        "first_activity_timestamp": "timestamp",
+        "estimated_session_duration": "float",
+        "event_start": "integer"
+      }
+    },
+    "expected": [
+      {
+        "name": "ACTIVE_DAYS",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "DATE_UTC",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "AVG_SESSION_DURATION",
+        "type": "DOUBLE",
+        "upstream": [
+          {
+            "column": "ESTIMATED_SESSION_DURATION",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "FIRST_DEVICE_TYPE",
+        "type": "UNKNOWN",
+        "upstream": [
+          {
+            "column": "FIRST_ACTIVITY_TIMESTAMP",
+            "table": "FACT.SOME_DAILY_METRICS"
+          },
+          {
+            "column": "FIRST_DEVICE_TYPE",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "RECENCY",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "DATE_UTC",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "SOME_DAY1_METRIC",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "DATE_UTC",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "TOTAL_EVENT_START",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "EVENT_START",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "USER_ID",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "USER_ID",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "USER_TYPE",
+        "type": "VARCHAR",
+        "upstream": [
+          {
+            "column": "EVENT_START",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "USER_ID",
+        "upstream": [
+          {
+            "column": "USER_ID",
+            "table": "FACT.SOME_DAILY_METRICS"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "snowflake test",
+    "dialect": "snowflake",
+    "query": "\n       SELECT\n    t.event_date,\n    t.location_code as location,\n    t.session_id as session,\n    COUNT(DISTINCT t.customer_id) as visitor_count,\n    SUM(t.activity_count) as total_activities,\n    SUM(t.interaction_count) as total_interactions,\n    CURRENT_TIMESTAMP() as created_at\nFROM analytics.daily_customer_metrics t\nGROUP BY 1, 2, 3\nORDER BY 1, 2, 3\n        ",
+    "schema": {
+      "analytics.daily_customer_metrics": {
+        "event_date": "date",
+        "location_code": "string",
+        "session_id": "string",
+        "customer_id": "integer",
+        "activity_count": "integer",
+        "interaction_count": "integer"
+      }
+    },
+    "expected": [
+      {
+        "name": "CREATED_AT",
+        "type": "TIMESTAMP",
+        "upstream": []
+      },
+      {
+        "name": "EVENT_DATE",
+        "type": "DATE",
+        "upstream": [
+          {
+            "column": "EVENT_DATE",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "LOCATION",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "LOCATION_CODE",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "SESSION",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "SESSION_ID",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "TOTAL_ACTIVITIES",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "ACTIVITY_COUNT",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "TOTAL_INTERACTIONS",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "INTERACTION_COUNT",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "VISITOR_COUNT",
+        "type": "BIGINT",
+        "upstream": [
+          {
+            "column": "CUSTOMER_ID",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": [
+      {
+        "name": "EVENT_DATE",
+        "upstream": [
+          {
+            "column": "EVENT_DATE",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "LOCATION_CODE",
+        "upstream": [
+          {
+            "column": "LOCATION_CODE",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      },
+      {
+        "name": "SESSION_ID",
+        "upstream": [
+          {
+            "column": "SESSION_ID",
+            "table": "ANALYTICS.DAILY_CUSTOMER_METRICS"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "snowflake example with condition",
+    "dialect": "snowflake",
+    "query": "\n        SELECT \n            case\n                when bookings.CancelledAt is not null\n                then coalesce(bookings.CancellationReason, 'Empty Reason')\n            end as CancellationReason,\n            case\n                when\n                    bookings.Id is not null and\n                    bookingCreditRefundedAt is null and\n                    bookings.Accepted\n                then 1\n                else 0\n            end as credits_spent\n        FROM bookings\n        ",
+    "schema": {
+      "bookings": {
+        "Id": "STRING",
+        "CancelledAt": "TIMESTAMP",
+        "CancellationReason": "STRING",
+        "bookingCreditRefundedAt": "TIMESTAMP",
+        "Accepted": "BOOLEAN"
+      }
+    },
+    "expected": [
+      {
+        "name": "CANCELLATIONREASON",
+        "type": "TEXT",
+        "upstream": [
+          {
+            "column": "CANCELLATIONREASON",
+            "table": "BOOKINGS"
+          },
+          {
+            "column": "CANCELLEDAT",
+            "table": "BOOKINGS"
+          }
+        ]
+      },
+      {
+        "name": "CREDITS_SPENT",
+        "type": "INT",
+        "upstream": [
+          {
+            "column": "ACCEPTED",
+            "table": "BOOKINGS"
+          },
+          {
+            "column": "BOOKINGCREDITREFUNDEDAT",
+            "table": "BOOKINGS"
+          },
+          {
+            "column": "ID",
+            "table": "BOOKINGS"
+          }
+        ]
+      }
+    ],
+    "expected_non_selected": []
+  }
+]

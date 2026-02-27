@@ -1,0 +1,15 @@
+e1890b2472c724a62761__mypyc.cp313-win_amd64.pyd,sha256=IqtFgJwmcAMi97FeW_-wASmBgoZ43vJU-q5WsklqsAk,707584
+sqlglot/errors.cp313-win_amd64.pyd,sha256=FBtL8RtPiqpH9-s_LLggYitPppLby4ZR5bFXtWW5I3E,10752
+sqlglot/expression_core.cp313-win_amd64.pyd,sha256=t42dhble__vd6vc9Ph6f9jAtdqsLmebug-HBeK6zjAw,10752
+sqlglot/helper.cp313-win_amd64.pyd,sha256=MlQROzYWYOPqHnIpHxrYqvopoa1DWdLuCv2Yc8hHDkY,10752
+sqlglot/parser_core.cp313-win_amd64.pyd,sha256=sp9fTfRvsVzLYZ4raiJeeZjQRBk8pPY7HimD3LSyP_A,10752
+sqlglot/schema.cp313-win_amd64.pyd,sha256=Akdx8-DSO9st3Fc0CpGShiO30PRjOSUmN7BruzEJnm8,10752
+sqlglot/serde.cp313-win_amd64.pyd,sha256=qV2BUd27_EUzkUrZtM1XdSbD5IV-gEOC1LPJzOYh81w,10752
+sqlglot/time.cp313-win_amd64.pyd,sha256=z6h88ldAbKVSbAVsRQywHljJlRD_-hIpzNzH37eDeLc,10752
+sqlglot/tokenizer_core.cp313-win_amd64.pyd,sha256=wVwEO7zVATGRLSVZjmPMsuwXBQtboWshtdpWTPDHkZc,10752
+sqlglot/trie.cp313-win_amd64.pyd,sha256=rrWVR9Ldf64zE-PCnsAY5L61OsRfNcsAhigEfCkgigI,10752
+sqlglotc-29.0.1.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+sqlglotc-29.0.1.dist-info/METADATA,sha256=_ABu62xZAsiE_yuMNF75d02FbKHs63lsPdjJUqJqPwU,304
+sqlglotc-29.0.1.dist-info/RECORD,,
+sqlglotc-29.0.1.dist-info/WHEEL,sha256=Xr-hSQu17ZxKorLWItir4Mz0GplQpPFz9u2i9sztbpM,101
+sqlglotc-29.0.1.dist-info/top_level.txt,sha256=tZPBkcIsZJG7-F9q-c4A-JkQDKMHKvn3-pNNX3Qhdqc,36

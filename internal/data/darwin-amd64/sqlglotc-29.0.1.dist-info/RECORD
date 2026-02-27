@@ -1,0 +1,15 @@
+e1890b2472c724a62761__mypyc.cpython-313-darwin.so,sha256=IE96oFtdPC6hnqAkRzBmW9VCqFSCDbveQGn4z4o-xtA,4089728
+sqlglot/errors.cpython-313-darwin.so,sha256=pgsJrWEh8SCU8XhJ1skaUSurKLSmRGKkM3anD6HPV_k,67008
+sqlglot/expression_core.cpython-313-darwin.so,sha256=kRiMP69fXr_xoRgvY88_Dtl1eqawg1j8vRAls9O1irg,67048
+sqlglot/helper.cpython-313-darwin.so,sha256=17e7UW9qzLqZEjlSA8ZlsgEJC6zwboseP4NQY6v4qeU,67008
+sqlglot/parser_core.cpython-313-darwin.so,sha256=nL2ac6WP6X8ZRqrZiehhIxOOGVoHVqFbYB6hILmjpvs,67024
+sqlglot/schema.cpython-313-darwin.so,sha256=RB96BgvuGdZvnBgRUntdi0Iv3C4sEtMBbotxXh06_Lw,67008
+sqlglot/serde.cpython-313-darwin.so,sha256=0HLvD3lGpMIUQNoBKrz2xfTocxWS6jmxd9hSwZzwKzk,67000
+sqlglot/time.cpython-313-darwin.so,sha256=0x5VnzAjMWqszCFfSulFVn5pIsVKl0qPawx359c9Epo,67000
+sqlglot/tokenizer_core.cpython-313-darwin.so,sha256=wJyp8wT20ugiS73jXmdM_epAodxykqBnB5IlSExXqhA,67048
+sqlglot/trie.cpython-313-darwin.so,sha256=ixt7KA1PriM0GXAcdSNrxIRvrAcs-0RRJTUHoqcxd9U,67000
+sqlglotc-29.0.1.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+sqlglotc-29.0.1.dist-info/METADATA,sha256=yeB3D0y76HkfPKc0tWe8xPVA5pX82kUGwXTNyn2niEw,295
+sqlglotc-29.0.1.dist-info/RECORD,,
+sqlglotc-29.0.1.dist-info/WHEEL,sha256=88ly2tRJHgOPM-_hwiJeCt-cz695tTm6PbjcNWO7Vpk,142
+sqlglotc-29.0.1.dist-info/top_level.txt,sha256=tZPBkcIsZJG7-F9q-c4A-JkQDKMHKvn3-pNNX3Qhdqc,36

@@ -29,6 +29,7 @@ from sqlglot.expressions import (
     condition as condition,
     delete as delete,
     except_ as except_,
+    find_tables as find_tables,
     from_ as from_,
     func as func,
     insert as insert,
@@ -138,12 +139,10 @@ def parse_one(
     else:
         result = dialect.parse(sql, **opts)
 
-    for expression in result:
-        if not expression:
-            raise ParseError(f"No expression was parsed from '{sql}'")
-        return expression
-    else:
+    if not result or result[0] is None:
         raise ParseError(f"No expression was parsed from '{sql}'")
+
+    return exp.Block(expressions=result) if len(result) > 1 else result[0]
 
 
 def transpile(

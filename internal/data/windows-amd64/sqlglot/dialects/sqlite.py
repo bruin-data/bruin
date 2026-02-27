@@ -18,21 +18,8 @@ from sqlglot.dialects.dialect import (
     strposition_sql,
 )
 from sqlglot.generator import unsupported_args
+from sqlglot.parser import binary_range_parser
 from sqlglot.tokens import TokenType
-
-
-def _date_add_sql(self: SQLite.Generator, expression: exp.DateAdd) -> str:
-    modifier = expression.expression
-    modifier = modifier.name if modifier.is_string else self.sql(modifier)
-    unit = expression.args.get("unit")
-    modifier = f"'{modifier} {unit.name}'" if unit else f"'{modifier}'"
-    return self.func("DATE", expression.this, modifier)
-
-
-def _json_extract_sql(self: SQLite.Generator, expression: exp.JSONExtract) -> str:
-    if expression.expressions:
-        return self.function_fallback_sql(expression)
-    return arrow_json_extract_sql(self, expression)
 
 
 def _build_strftime(args: t.List) -> exp.Anonymous | exp.TimeToStr:
@@ -103,23 +90,52 @@ class SQLite(Dialect):
     SUPPORTS_SEMI_ANTI_JOIN = False
     TYPED_DIVISION = True
     SAFE_DIVISION = True
+    SAFE_TO_ELIMINATE_DOUBLE_NEGATION = False
 
     class Tokenizer(tokens.Tokenizer):
         IDENTIFIERS = ['"', ("[", "]"), "`"]
         HEX_STRINGS = [("x'", "'"), ("X'", "'"), ("0x", ""), ("0X", "")]
 
-        KEYWORDS = tokens.Tokenizer.KEYWORDS.copy()
+        NESTED_COMMENTS = False
+
+        KEYWORDS = {
+            **tokens.Tokenizer.KEYWORDS,
+            "ATTACH": TokenType.ATTACH,
+            "DETACH": TokenType.DETACH,
+            "INDEXED BY": TokenType.INDEXED_BY,
+            "MATCH": TokenType.MATCH,
+        }
+
         KEYWORDS.pop("/*+")
 
+        COMMANDS = {*tokens.Tokenizer.COMMANDS, TokenType.REPLACE}
+
     class Parser(parser.Parser):
+        STRING_ALIASES = True
+        ALTER_RENAME_REQUIRES_COLUMN = False
+        JOINS_HAVE_EQUAL_PRECEDENCE = True
+        ADD_JOIN_ON_TRUE = True
+
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
             "EDITDIST3": exp.Levenshtein.from_arg_list,
             "STRFTIME": _build_strftime,
             "DATETIME": lambda args: exp.Anonymous(this="DATETIME", expressions=args),
             "TIME": lambda args: exp.Anonymous(this="TIME", expressions=args),
+            "SQLITE_VERSION": exp.CurrentVersion.from_arg_list,
         }
-        STRING_ALIASES = True
+
+        STATEMENT_PARSERS = {
+            **parser.Parser.STATEMENT_PARSERS,
+            TokenType.ATTACH: lambda self: self._parse_attach_detach(),
+            TokenType.DETACH: lambda self: self._parse_attach_detach(is_attach=False),
+        }
+
+        RANGE_PARSERS = {
+            **parser.Parser.RANGE_PARSERS,
+            # https://www.sqlite.org/lang_expr.html
+            TokenType.MATCH: binary_range_parser(exp.Match),
+        }
 
         def _parse_unique(self) -> exp.UniqueColumnConstraint:
             # Do not consume more tokens if UNIQUE is used as a standalone constraint, e.g:
@@ -128,6 +144,16 @@ class SQLite(Dialect):
                 return self.expression(exp.UniqueColumnConstraint)
 
             return super()._parse_unique()
+
+        def _parse_attach_detach(self, is_attach=True) -> exp.Attach | exp.Detach:
+            self._match(TokenType.DATABASE)
+            this = self._parse_expression()
+
+            return (
+                self.expression(exp.Attach, this=this)
+                if is_attach
+                else self.expression(exp.Detach, this=this)
+            )
 
     class Generator(generator.Generator):
         JOIN_HINTS = False
@@ -138,9 +164,11 @@ class SQLite(Dialect):
         SUPPORTS_CREATE_TABLE_LIKE = False
         SUPPORTS_TABLE_ALIAS_COLUMNS = False
         SUPPORTS_TO_NUMBER = False
+        SUPPORTS_WINDOW_EXCLUDE = True
         EXCEPT_INTERSECT_SUPPORT_ALL_CLAUSE = False
         SUPPORTS_MEDIAN = False
         JSON_KEY_VALUE_PAIR_SEP = ","
+        PARSE_JSON_NAME: t.Optional[str] = None
 
         SUPPORTED_JSON_PATH_PARTS = {
             exp.JSONPathKey,
@@ -181,12 +209,11 @@ class SQLite(Dialect):
             exp.CurrentDate: lambda *_: "CURRENT_DATE",
             exp.CurrentTime: lambda *_: "CURRENT_TIME",
             exp.CurrentTimestamp: lambda *_: "CURRENT_TIMESTAMP",
+            exp.CurrentVersion: lambda *_: "SQLITE_VERSION()",
             exp.ColumnDef: transforms.preprocess([_generated_to_auto_increment]),
-            exp.DateAdd: _date_add_sql,
             exp.DateStrToDate: lambda self, e: self.sql(e, "this"),
             exp.If: rename_func("IIF"),
             exp.ILike: no_ilike_sql,
-            exp.JSONExtract: _json_extract_sql,
             exp.JSONExtractScalar: arrow_json_extract_sql,
             exp.Levenshtein: unsupported_args("ins_cost", "del_cost", "sub_cost", "max_dist")(
                 rename_func("EDITDIST3")
@@ -224,11 +251,31 @@ class SQLite(Dialect):
 
         LIMIT_FETCH = "LIMIT"
 
+        def jsonextract_sql(self, expression: exp.JSONExtract) -> str:
+            if expression.expressions:
+                return self.function_fallback_sql(expression)
+            return arrow_json_extract_sql(self, expression)
+
+        def dateadd_sql(self, expression: exp.DateAdd) -> str:
+            modifier = expression.expression
+            modifier = modifier.name if modifier.is_string else self.sql(modifier)
+            unit = expression.args.get("unit")
+            modifier = f"'{modifier} {unit.name}'" if unit else f"'{modifier}'"
+            return self.func("DATE", expression.this, modifier)
+
         def cast_sql(self, expression: exp.Cast, safe_prefix: t.Optional[str] = None) -> str:
             if expression.is_type("date"):
                 return self.func("DATE", expression.this)
 
             return super().cast_sql(expression)
+
+        # Note: SQLite's TRUNC always returns REAL (e.g., trunc(10.99) -> 10.0), not INTEGER.
+        # This creates a transpilation gap affecting division semantics, similar to Presto.
+        # Unlike Presto where this only affects decimals=0, SQLite has no decimals parameter
+        # so every use of TRUNC is affected. Modeling precisely would require exp.FloatTrunc.
+        @unsupported_args("decimals")
+        def trunc_sql(self, expression: exp.Trunc) -> str:
+            return self.func("TRUNC", expression.this)
 
         def generateseries_sql(self, expression: exp.GenerateSeries) -> str:
             parent = expression.parent
@@ -308,3 +355,19 @@ class SQLite(Dialect):
         @unsupported_args("this")
         def currentschema_sql(self, expression: exp.CurrentSchema) -> str:
             return "'main'"
+
+        def ignorenulls_sql(self, expression: exp.IgnoreNulls) -> str:
+            self.unsupported("SQLite does not support IGNORE NULLS.")
+            return self.sql(expression.this)
+
+        def respectnulls_sql(self, expression: exp.RespectNulls) -> str:
+            return self.sql(expression.this)
+
+        def windowspec_sql(self, expression: exp.WindowSpec) -> str:
+            if (
+                expression.text("kind").upper() == "RANGE"
+                and expression.text("start").upper() == "CURRENT ROW"
+            ):
+                return "RANGE CURRENT ROW"
+
+            return super().windowspec_sql(expression)

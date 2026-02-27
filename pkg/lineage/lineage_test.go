@@ -513,7 +513,7 @@ func TestParseLineageRecursively(t *testing.T) { //nolint
 							{Name: "visitor_count", Type: "integer", Description: "Customer identifier", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}}},
 							{Name: "total_activities", Type: "integer", Description: "Sum of activity counts", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "activity_count", Table: "raw_sales"}}},
 							{Name: "total_interactions", Type: "integer", Description: "Sum of activity counts", PrimaryKey: false, Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "interaction_count", Table: "raw_sales"}}},
-							{Name: "created_at", Type: "TIMESTAMP", Description: "", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+							{Name: "created_at", Type: "TIMESTAMPTZ", Description: "", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 						},
 						Upstreams: []pipeline.Upstream{{Value: "raw_sales", Columns: []pipeline.DependsColumn{{Name: "event_date", Usage: "raw_sales"}, {Name: "location_code", Usage: "raw_sales"}, {Name: "session_id", Usage: "raw_sales"}, {Name: "customer_id", Usage: "raw_sales"}, {Name: "activity_count", Usage: "raw_sales"}, {Name: "interaction_count", Usage: "raw_sales"}}}},
 					},

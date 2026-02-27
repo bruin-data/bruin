@@ -90,6 +90,7 @@ class Teradata(Dialect):
             "HELP": TokenType.COMMAND,
             "INS": TokenType.INSERT,
             "LE": TokenType.LTE,
+            "LOCKING": TokenType.LOCK,
             "LT": TokenType.LT,
             "MINUS": TokenType.EXCEPT,
             "MOD": TokenType.MOD,
@@ -155,6 +156,26 @@ class Teradata(Dialect):
                 exp.Use, this=self._parse_table(schema=False)
             ),
             TokenType.REPLACE: lambda self: self._parse_create(),
+            TokenType.LOCK: lambda self: self._parse_locking_statement(),
+        }
+
+        def _parse_locking_statement(self) -> exp.LockingStatement:
+            # Reuse exp.LockingProperty parsing for the lock kind, type etc
+            locking_property = self._parse_locking()
+            wrapped_query = self._parse_select()
+
+            if not wrapped_query:
+                self.raise_error("Expected SELECT statement after LOCKING clause")
+
+            return self.expression(
+                exp.LockingStatement,
+                this=locking_property,
+                expression=wrapped_query,
+            )
+
+        SET_PARSERS = {
+            **parser.Parser.SET_PARSERS,
+            "QUERY_BAND": lambda self: self._parse_query_band(),
         }
 
         FUNCTION_PARSERS = {
@@ -162,7 +183,7 @@ class Teradata(Dialect):
             # https://docs.teradata.com/r/SQL-Functions-Operators-Expressions-and-Predicates/June-2017/Data-Type-Conversions/TRYCAST
             "TRYCAST": parser.Parser.FUNCTION_PARSERS["TRY_CAST"],
             "RANGE_N": lambda self: self._parse_rangen(),
-            "TRANSLATE": lambda self: self._parse_translate(self.STRICT_CAST),
+            "TRANSLATE": lambda self: self._parse_translate(),
         }
 
         FUNCTIONS = {
@@ -175,32 +196,27 @@ class Teradata(Dialect):
             TokenType.DSTAR: exp.Pow,
         }
 
-        def _parse_translate(self, strict: bool) -> exp.Expression:
+        def _parse_translate(self) -> exp.TranslateCharacters:
             this = self._parse_assignment()
+            self._match(TokenType.USING)
+            self._match_texts(self.CHARSET_TRANSLATORS)
 
-            if not self._match(TokenType.USING):
-                self.raise_error("Expected USING in TRANSLATE")
-
-            if self._match_texts(self.CHARSET_TRANSLATORS):
-                charset_split = self._prev.text.split("_TO_")
-                to = self.expression(exp.CharacterSet, this=charset_split[1])
-            else:
-                self.raise_error("Expected a character set translator after USING in TRANSLATE")
-
-            return self.expression(exp.Cast if strict else exp.TryCast, this=this, to=to)
+            return self.expression(
+                exp.TranslateCharacters,
+                this=this,
+                expression=self._prev.text.upper(),
+                with_error=self._match_text_seq("WITH", "ERROR"),
+            )
 
         # FROM before SET in Teradata UPDATE syntax
         # https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/Teradata-VantageTM-SQL-Data-Manipulation-Language-17.20/Statement-Syntax/UPDATE/UPDATE-Syntax-Basic-Form-FROM-Clause
         def _parse_update(self) -> exp.Update:
             return self.expression(
                 exp.Update,
-                **{  # type: ignore
-                    "this": self._parse_table(alias_tokens=self.UPDATE_ALIAS_TOKENS),
-                    "from": self._parse_from(joins=True),
-                    "expressions": self._match(TokenType.SET)
-                    and self._parse_csv(self._parse_equality),
-                    "where": self._parse_where(),
-                },
+                this=self._parse_table(alias_tokens=self.UPDATE_ALIAS_TOKENS),
+                from_=self._parse_from(joins=True),
+                expressions=self._match(TokenType.SET) and self._parse_csv(self._parse_equality),
+                where=self._parse_where(),
             )
 
         def _parse_rangen(self):
@@ -212,12 +228,81 @@ class Teradata(Dialect):
 
             return self.expression(exp.RangeN, this=this, expressions=expressions, each=each)
 
+        def _parse_query_band(self) -> exp.QueryBand:
+            # Parse: SET QUERY_BAND = 'key=value;key2=value2;' FOR SESSION|TRANSACTION
+            # Also supports: SET QUERY_BAND = 'key=value;' UPDATE FOR SESSION|TRANSACTION
+            # Also supports: SET QUERY_BAND = NONE FOR SESSION|TRANSACTION
+            self._match(TokenType.EQ)
+
+            # Handle both string literals and NONE keyword
+            if self._match_text_seq("NONE"):
+                query_band_string: t.Optional[exp.Expression] = exp.Var(this="NONE")
+            else:
+                query_band_string = self._parse_string()
+
+            update = self._match_text_seq("UPDATE")
+            self._match_text_seq("FOR")
+
+            # Handle scope - can be SESSION, TRANSACTION, VOLATILE, or SESSION VOLATILE
+            if self._match_text_seq("SESSION", "VOLATILE"):
+                scope = "SESSION VOLATILE"
+            elif self._match_texts(("SESSION", "TRANSACTION")):
+                scope = self._prev.text.upper()
+            else:
+                scope = None
+
+            return self.expression(
+                exp.QueryBand,
+                this=query_band_string,
+                scope=scope,
+                update=update,
+            )
+
         def _parse_index_params(self) -> exp.IndexParameters:
             this = super()._parse_index_params()
 
             if this.args.get("on"):
                 this.set("on", None)
                 self._retreat(self._index - 2)
+            return this
+
+        def _parse_function(
+            self,
+            functions: t.Optional[t.Dict[str, t.Callable]] = None,
+            anonymous: bool = False,
+            optional_parens: bool = True,
+            any_token: bool = False,
+        ) -> t.Optional[exp.Expression]:
+            # Teradata uses a `(FORMAT <format_string>)` clause after column references to
+            # override the output format. When we see this pattern we do not
+            # parse it as a function call.  The syntax is documented at
+            # https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/SQL-Data-Types-and-Literals/Data-Type-Formats-and-Format-Phrases/FORMAT
+            if (
+                self._next
+                and self._next.token_type == TokenType.L_PAREN
+                and self._index + 2 < len(self._tokens)
+                and self._tokens[self._index + 2].token_type == TokenType.FORMAT
+            ):
+                return None
+
+            return super()._parse_function(
+                functions=functions,
+                anonymous=anonymous,
+                optional_parens=optional_parens,
+                any_token=any_token,
+            )
+
+        def _parse_column_ops(self, this: t.Optional[exp.Expression]) -> t.Optional[exp.Expression]:
+            this = super()._parse_column_ops(this)
+
+            if self._match_pair(TokenType.L_PAREN, TokenType.FORMAT):
+                # `(FORMAT <format_string>)` after a column specifies a Teradata format override.
+                # See https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/SQL-Data-Types-and-Literals/Data-Type-Formats-and-Format-Phrases/FORMAT
+                fmt_string = self._parse_string()
+                self._match_r_paren()
+
+                this = self.expression(exp.FormatPhrase, this=this, format=fmt_string)
+
             return this
 
     class Generator(generator.Generator):
@@ -299,7 +384,7 @@ class Teradata(Dialect):
         # https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/Teradata-VantageTM-SQL-Data-Manipulation-Language-17.20/Statement-Syntax/UPDATE/UPDATE-Syntax-Basic-Form-FROM-Clause
         def update_sql(self, expression: exp.Update) -> str:
             this = self.sql(expression, "this")
-            from_sql = self.sql(expression, "from")
+            from_sql = self.sql(expression, "from_")
             set_sql = self.expressions(expression, flat=True)
             where_sql = self.sql(expression, "where")
             sql = f"UPDATE {this}{from_sql} SET {set_sql}{where_sql}"
@@ -308,11 +393,6 @@ class Teradata(Dialect):
         def mod_sql(self, expression: exp.Mod) -> str:
             return self.binary(expression, "MOD")
 
-        def datatype_sql(self, expression: exp.DataType) -> str:
-            type_sql = super().datatype_sql(expression)
-            prefix_sql = expression.args.get("prefix")
-            return f"SYSUDTLIB.{type_sql}" if prefix_sql else type_sql
-
         def rangen_sql(self, expression: exp.RangeN) -> str:
             this = self.sql(expression, "this")
             expressions_sql = self.expressions(expression)
@@ -320,6 +400,13 @@ class Teradata(Dialect):
             each_sql = f" EACH {each_sql}" if each_sql else ""
 
             return f"RANGE_N({this} BETWEEN {expressions_sql}{each_sql})"
+
+        def lockingstatement_sql(self, expression: exp.LockingStatement) -> str:
+            """Generate SQL for LOCKING statement"""
+            locking_clause = self.sql(expression, "this")
+            query_sql = self.sql(expression, "expression")
+
+            return f"{locking_clause} {query_sql}"
 
         def createable_sql(self, expression: exp.Create, locations: t.DefaultDict) -> str:
             kind = self.sql(expression, "kind").upper()

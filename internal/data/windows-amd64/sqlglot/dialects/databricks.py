@@ -1,23 +1,20 @@
 from __future__ import annotations
 
-import typing as t
+from copy import deepcopy
+from collections import defaultdict
 
-from sqlglot import exp, transforms, jsonpath
+from sqlglot import exp, transforms, jsonpath, parser
 from sqlglot.dialects.dialect import (
     date_delta_sql,
     build_date_delta,
     timestamptrunc_sql,
     build_formatted_time,
+    groupconcat_sql,
 )
 from sqlglot.dialects.spark import Spark
+from sqlglot.helper import seq_get
 from sqlglot.tokens import TokenType
-
-
-def _build_json_extract(args: t.List) -> exp.JSONExtract:
-    # Transform GET_JSON_OBJECT(expr, '$.<path>') -> expr:<path>
-    this = args[0]
-    path = args[1].name.lstrip("$.")
-    return exp.JSONExtract(this=this, expression=path)
+from sqlglot.optimizer.annotate_types import TypeAnnotator
 
 
 def _jsonextract_sql(
@@ -32,8 +29,24 @@ class Databricks(Spark):
     SAFE_DIVISION = False
     COPY_PARAMS_ARE_CSV = False
 
+    COERCES_TO = defaultdict(set, deepcopy(TypeAnnotator.COERCES_TO))
+    for text_type in exp.DataType.TEXT_TYPES:
+        COERCES_TO[text_type] |= {
+            *exp.DataType.NUMERIC_TYPES,
+            *exp.DataType.TEMPORAL_TYPES,
+            exp.DataType.Type.BINARY,
+            exp.DataType.Type.BOOLEAN,
+            exp.DataType.Type.INTERVAL,
+        }
+
     class JSONPathTokenizer(jsonpath.JSONPathTokenizer):
         IDENTIFIERS = ["`", '"']
+
+    class Tokenizer(Spark.Tokenizer):
+        KEYWORDS = {
+            **Spark.Tokenizer.KEYWORDS,
+            "VOID": TokenType.VOID,
+        }
 
     class Parser(Spark.Parser):
         LOG_DEFAULTS_TO_LN = True
@@ -42,12 +55,21 @@ class Databricks(Spark):
 
         FUNCTIONS = {
             **Spark.Parser.FUNCTIONS,
+            "GETDATE": exp.CurrentTimestamp.from_arg_list,
             "DATEADD": build_date_delta(exp.DateAdd),
             "DATE_ADD": build_date_delta(exp.DateAdd),
             "DATEDIFF": build_date_delta(exp.DateDiff),
             "DATE_DIFF": build_date_delta(exp.DateDiff),
-            "GET_JSON_OBJECT": _build_json_extract,
+            "NOW": exp.CurrentTimestamp.from_arg_list,
             "TO_DATE": build_formatted_time(exp.TsOrDsToDate, "databricks"),
+            "UNIFORM": lambda args: exp.Uniform(
+                this=seq_get(args, 0), expression=seq_get(args, 1), seed=seq_get(args, 2)
+            ),
+        }
+
+        NO_PAREN_FUNCTION_PARSERS = {
+            **Spark.Parser.NO_PAREN_FUNCTION_PARSERS,
+            "CURDATE": lambda self: self._parse_curdate(),
         }
 
         FACTOR = {
@@ -55,15 +77,32 @@ class Databricks(Spark):
             TokenType.COLON: exp.JSONExtract,
         }
 
+        COLUMN_OPERATORS = {
+            **parser.Parser.COLUMN_OPERATORS,
+            TokenType.QDCOLON: lambda self, this, to: self.expression(
+                exp.TryCast,
+                this=this,
+                to=to,
+            ),
+        }
+
+        def _parse_curdate(self) -> exp.CurrentDate:
+            # CURDATE, an alias for CURRENT_DATE, has optional parentheses
+            if self._match(TokenType.L_PAREN):
+                self._match_r_paren()
+            return self.expression(exp.CurrentDate)
+
     class Generator(Spark.Generator):
         TABLESAMPLE_SEED_KEYWORD = "REPEATABLE"
         COPY_PARAMS_ARE_WRAPPED = False
         COPY_PARAMS_EQ_REQUIRED = True
         JSON_PATH_SINGLE_QUOTE_ESCAPE = False
         QUOTE_JSON_PATH = False
+        PARSE_JSON_NAME = "PARSE_JSON"
 
         TRANSFORMS = {
             **Spark.Generator.TRANSFORMS,
+            exp.CurrentVersion: lambda *_: "CURRENT_VERSION()",
             exp.DateAdd: date_delta_sql("DATEADD"),
             exp.DateDiff: date_delta_sql("DATEDIFF"),
             exp.DatetimeAdd: lambda self, e: self.func(
@@ -76,6 +115,7 @@ class Databricks(Spark):
                 e.this,
             ),
             exp.DatetimeTrunc: timestamptrunc_sql(),
+            exp.GroupConcat: groupconcat_sql,
             exp.Select: transforms.preprocess(
                 [
                     transforms.eliminate_distinct_on,
@@ -86,10 +126,21 @@ class Databricks(Spark):
             exp.JSONExtract: _jsonextract_sql,
             exp.JSONExtractScalar: _jsonextract_sql,
             exp.JSONPathRoot: lambda *_: "",
-            exp.ToChar: lambda self, e: self.function_fallback_sql(e),
+            exp.ToChar: lambda self, e: (
+                self.cast_sql(exp.Cast(this=e.this, to=exp.DataType(this="STRING")))
+                if e.args.get("is_numeric")
+                else self.function_fallback_sql(e)
+            ),
+            exp.CurrentCatalog: lambda *_: "CURRENT_CATALOG()",
         }
 
+        TRANSFORMS.pop(exp.RegexpLike)
         TRANSFORMS.pop(exp.TryCast)
+
+        TYPE_MAPPING = {
+            **Spark.Generator.TYPE_MAPPING,
+            exp.DataType.Type.NULL: "VOID",
+        }
 
         def columndef_sql(self, expression: exp.ColumnDef, sep: str = " ") -> str:
             constraint = expression.find(exp.GeneratedAsIdentityColumnConstraint)
@@ -113,3 +164,13 @@ class Databricks(Spark):
         def jsonpath_sql(self, expression: exp.JSONPath) -> str:
             expression.set("escape", None)
             return super().jsonpath_sql(expression)
+
+        def uniform_sql(self, expression: exp.Uniform) -> str:
+            gen = expression.args.get("gen")
+            seed = expression.args.get("seed")
+
+            # From Snowflake UNIFORM(min, max, gen) as RANDOM(), RANDOM(seed), or constant value -> Extract seed
+            if gen:
+                seed = gen.this
+
+            return self.func("UNIFORM", expression.this, expression.expression, seed)

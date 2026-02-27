@@ -1,5 +1,6 @@
 from __future__ import annotations
 from sqlglot.dialects.postgres import Postgres
+from sqlglot.generator import Generator
 from sqlglot.tokens import TokenType
 import typing as t
 
@@ -7,6 +8,9 @@ from sqlglot import exp
 
 
 class RisingWave(Postgres):
+    REQUIRES_PARENTHESIZED_STRUCT_ACCESS = True
+    SUPPORTS_STRUCT_STAR_EXPANSION = True
+
     class Tokenizer(Postgres.Tokenizer):
         KEYWORDS = {
             **Postgres.Tokenizer.KEYWORDS,
@@ -22,6 +26,20 @@ class RisingWave(Postgres):
             "ENCODE": lambda self: self._parse_encode_property(),
             "INCLUDE": lambda self: self._parse_include_property(),
             "KEY": lambda self: self._parse_encode_property(key=True),
+        }
+
+        CONSTRAINT_PARSERS = {
+            **Postgres.Parser.CONSTRAINT_PARSERS,
+            "WATERMARK": lambda self: self.expression(
+                exp.WatermarkColumnConstraint,
+                this=self._match(TokenType.FOR) and self._parse_column(),
+                expression=self._match(TokenType.ALIAS) and self._parse_disjunction(),
+            ),
+        }
+
+        SCHEMA_UNNAMED_CONSTRAINTS = {
+            *Postgres.Parser.SCHEMA_UNNAMED_CONSTRAINTS,
+            "WATERMARK",
         }
 
         def _parse_table_hints(self) -> t.Optional[t.List[exp.Expression]]:
@@ -60,6 +78,7 @@ class RisingWave(Postgres):
 
     class Generator(Postgres.Generator):
         LOCKING_READS_SUPPORTED = False
+        SUPPORTS_BETWEEN_FLAGS = False
 
         TRANSFORMS = {
             **Postgres.Generator.TRANSFORMS,
@@ -72,3 +91,13 @@ class RisingWave(Postgres):
         }
 
         EXPRESSION_PRECEDES_PROPERTIES_CREATABLES = {"SINK"}
+
+        def computedcolumnconstraint_sql(self, expression: exp.ComputedColumnConstraint) -> str:
+            return Generator.computedcolumnconstraint_sql(self, expression)
+
+        def datatype_sql(self, expression: exp.DataType) -> str:
+            if expression.is_type(exp.DataType.Type.MAP) and len(expression.expressions) == 2:
+                key_type, value_type = expression.expressions
+                return f"MAP({self.sql(key_type)}, {self.sql(value_type)})"
+
+            return super().datatype_sql(expression)

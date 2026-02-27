@@ -94,7 +94,7 @@ class Step:
         """
         ctes = ctes or {}
         expression = expression.unnest()
-        with_ = expression.args.get("with")
+        with_ = expression.args.get("with_")
 
         # CTEs break the mold of scope and introduce themselves to all in the context.
         if with_:
@@ -104,7 +104,7 @@ class Step:
                 step.name = cte.alias
                 ctes[step.name] = step  # type: ignore
 
-        from_ = expression.args.get("from")
+        from_ = expression.args.get("from_")
 
         if isinstance(expression, exp.Select) and from_:
             step = Scan.from_expression(from_.this, ctes)
@@ -122,7 +122,9 @@ class Step:
             join.add_dependency(step)
             step = join
 
-        projections = []  # final selects in this chain of steps representing a select
+        projections: t.List[
+            exp.Expression
+        ] = []  # final selects in this chain of steps representing a select
         operands = {}  # intermediate computations of agg funcs eg x + 1 in SUM(x + 1)
         aggregations = {}
         next_operand_name = name_sequence("_a_")
