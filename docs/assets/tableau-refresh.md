@@ -66,6 +66,17 @@ To trigger a refresh, set the `refresh` parameter to `true` on a supported asset
 
 If both ID and name are missing, or the name cannot be resolved, the pipeline will error.
 
+### Refresh Mode: Incremental vs Full
+
+For `tableau.datasource`, `tableau.workbook`, and `tableau` assets, Bruin supports controlling the refresh mode:
+
+- `incremental` (optional): defaults to `true`. When `true`, Bruin requests incremental refresh.
+- `full_refresh` (optional): defaults to `false`. When `true`, Bruin forces non-incremental (full) refresh.
+
+If both are set, `full_refresh: true` takes precedence.
+
+If an incremental refresh is requested but the Tableau extract is not configured for incremental updates, Bruin automatically retries once without the incremental flag.
+
 ### Example: Refreshing a Data Source
 
 ```yaml
@@ -75,6 +86,7 @@ type: tableau.datasource
 parameters:
   refresh: true
   datasource_id: "12345678-1234-1234-1234-123456789012"
+  incremental: true
 ```
 
 Or, using a name lookup:
@@ -99,6 +111,7 @@ type: tableau.workbook
 parameters:
   refresh: true
   workbook_id: "7741f406-e190-4941-83e0-7be218fb1952"
+  full_refresh: true
 ```
 
 Or, using a name lookup:
@@ -151,6 +164,7 @@ parameters:
 - Refreshes are performed using the Tableau REST API:
   - Data source: `POST /api/{version}/sites/{site-id}/datasources/{datasource-id}/refresh`
   - Workbook:    `POST /api/{version}/sites/{site-id}/workbooks/{workbook-id}/refresh`
+- When incremental mode is enabled, Bruin includes the Tableau incremental refresh request attribute.
 - Authentication is handled via the connection config (Personal Access Token recommended).
 
 ## Importing Tableau Dashboards

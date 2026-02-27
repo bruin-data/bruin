@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -190,12 +191,12 @@ func (c *Client) authenticate(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) RefreshDataSource(ctx context.Context, datasourceID string) error {
-	return c.refreshResource(ctx, "datasources", datasourceID, "datasource")
+func (c *Client) RefreshDataSource(ctx context.Context, datasourceID string, incremental bool) error {
+	return c.refreshResource(ctx, "datasources", datasourceID, "datasource", incremental)
 }
 
-func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string) error {
-	return c.refreshResource(ctx, "workbooks", workbookID, "workbook")
+func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string, incremental bool) error {
+	return c.refreshResource(ctx, "workbooks", workbookID, "workbook", incremental)
 }
 
 func (c *Client) pollJobStatus(ctx context.Context, jobID string) error {
@@ -261,7 +262,7 @@ func (c *Client) pollJobStatus(ctx context.Context, jobID string) error {
 	}
 }
 
-func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, payloadKey string) error {
+func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, payloadKey string, incremental bool) error {
 	if err := c.authenticate(ctx); err != nil {
 		return errors.Wrap(err, "failed to authenticate with Tableau")
 	}
@@ -269,20 +270,54 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 	refreshURL := fmt.Sprintf("https://%s/api/%s/sites/%s/%s/%s/refresh",
 		c.config.Host, c.config.APIVersion, c.siteID, resourceType, resourceID)
 
+	statusCode, responseBody, err := c.sendRefreshRequest(ctx, refreshURL, payloadKey, resourceID, incremental)
+	if err != nil {
+		return err
+	}
+
+	if statusCode == http.StatusAccepted {
+		return c.pollFromRefreshResponse(ctx, responseBody)
+	}
+
+	if statusCode == http.StatusOK {
+		return nil
+	}
+
+	if incremental && shouldRetryWithoutIncremental(statusCode, responseBody) {
+		statusCode, responseBody, err = c.sendRefreshRequest(ctx, refreshURL, payloadKey, resourceID, false)
+		if err != nil {
+			return err
+		}
+
+		if statusCode == http.StatusAccepted {
+			return c.pollFromRefreshResponse(ctx, responseBody)
+		}
+		if statusCode == http.StatusOK {
+			return nil
+		}
+	}
+
+	return errors.Errorf("refresh failed with status %d: %s", statusCode, string(responseBody))
+}
+
+func (c *Client) sendRefreshRequest(ctx context.Context, refreshURL, payloadKey, resourceID string, incremental bool) (int, []byte, error) {
 	refreshPayload := map[string]interface{}{
 		payloadKey: map[string]interface{}{
 			"id": resourceID,
 		},
 	}
+	if incremental {
+		refreshPayload[payloadKey].(map[string]interface{})["incremental"] = true
+	}
 
 	payloadBytes, err := json.Marshal(refreshPayload)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal refresh payload")
+		return 0, nil, errors.Wrap(err, "failed to marshal refresh payload")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, refreshURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		return errors.Wrap(err, "failed to create refresh request")
+		return 0, nil, errors.Wrap(err, "failed to create refresh request")
 	}
 
 	req.Header.Set("X-Tableau-Auth", c.authToken)
@@ -291,31 +326,40 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return errors.Wrap(err, "failed to perform refresh request")
+		return 0, nil, errors.Wrap(err, "failed to perform refresh request")
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusAccepted { // 202
-		// Parse job ID from response
-		var jobResp struct {
-			Job struct {
-				ID string `json:"id"`
-			} `json:"job"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&jobResp); err != nil {
-			return errors.Wrap(err, "failed to decode Tableau job response")
-		}
-		if jobResp.Job.ID == "" {
-			return errors.New("missing job ID in Tableau response")
-		}
-		return c.pollJobStatus(ctx, jobResp.Job.ID)
+	body, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, body, nil
+}
+
+func (c *Client) pollFromRefreshResponse(ctx context.Context, responseBody []byte) error {
+	var jobResp struct {
+		Job struct {
+			ID string `json:"id"`
+		} `json:"job"`
+	}
+	if err := json.Unmarshal(responseBody, &jobResp); err != nil {
+		return errors.Wrap(err, "failed to decode Tableau job response")
+	}
+	if jobResp.Job.ID == "" {
+		return errors.New("missing job ID in Tableau response")
+	}
+	return c.pollJobStatus(ctx, jobResp.Job.ID)
+}
+
+func shouldRetryWithoutIncremental(statusCode int, body []byte) bool {
+	if statusCode != http.StatusBadRequest && statusCode != http.StatusConflict && statusCode != http.StatusUnprocessableEntity {
+		return false
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return errors.Errorf("refresh failed with status %d: %s", resp.StatusCode, string(body))
+	response := strings.ToLower(string(body))
+	if response == "" {
+		return false
 	}
-	return nil
+
+	return strings.Contains(response, "incremental")
 }
 
 // GetHost returns the Tableau host URL.
@@ -638,8 +682,7 @@ func (c *Client) ListAllViews(ctx context.Context) ([]ViewInfo, error) {
 		// Check if we have more pages
 		if viewsResp.Pagination != nil && viewsResp.Pagination.TotalAvailable != "" {
 			// Parse string pagination values
-			totalAvail := 0
-			_, _ = fmt.Sscanf(viewsResp.Pagination.TotalAvailable, "%d", &totalAvail)
+			totalAvail, _ := strconv.Atoi(viewsResp.Pagination.TotalAvailable)
 
 			totalFetched := pageNumber * pageSize
 			if totalFetched >= totalAvail {

@@ -221,3 +221,54 @@ func TestFindWorkbookIDByName(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "w4", id)
 }
+
+func TestShouldRetryWithoutIncremental(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		want       bool
+	}{
+		{
+			name:       "400 with incremental error retries",
+			statusCode: 400,
+			body:       "Incremental refresh is not configured",
+			want:       true,
+		},
+		{
+			name:       "409 with incremental message retries",
+			statusCode: 409,
+			body:       "cannot run INCREMENTAL refresh for this extract",
+			want:       true,
+		},
+		{
+			name:       "422 with incremental message retries",
+			statusCode: 422,
+			body:       "incremental update not supported",
+			want:       true,
+		},
+		{
+			name:       "400 without keyword does not retry",
+			statusCode: 400,
+			body:       "invalid id",
+			want:       false,
+		},
+		{
+			name:       "500 with keyword does not retry",
+			statusCode: 500,
+			body:       "incremental refresh is not configured",
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := shouldRetryWithoutIncremental(tt.statusCode, []byte(tt.body))
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
