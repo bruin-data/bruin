@@ -305,6 +305,7 @@
     },
     "retries": 3,
     "concurrency": 1,
+    "max_active_steps": null,
     "commit": "",
     "snapshot": "",
     "agent": false,
