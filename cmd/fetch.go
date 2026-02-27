@@ -103,6 +103,10 @@ func Query() *cli.Command {
 				Sources: cli.EnvVars("BRUIN_AGENT_ID"),
 				Usage:   "agent ID to include in query annotations for tracking purposes",
 			},
+			&cli.StringFlag{
+				Name:  "description",
+				Usage: "if you are an AI agent, use this flag to describe why you ran the query",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
@@ -179,6 +183,7 @@ func Query() *cli.Command {
 					Environment: c.String("environment"),
 					Limit:       c.Int64("limit"),
 					Timeout:     c.Int("timeout"),
+					Description: c.String("description"),
 				}
 				if err := saveQueryLog(queryStr, connName, result, queryErr, logOpts); err != nil {
 					// Log the error but don't fail the command
@@ -738,6 +743,7 @@ type QueryLog struct {
 	Environment string          `json:"environment,omitempty"`
 	Limit       int64           `json:"limit,omitempty"`
 	Timeout     int             `json:"timeout,omitempty"`
+	Description string          `json:"description,omitempty"`
 }
 
 // QueryLogOptions contains optional parameters for query logging.
@@ -746,6 +752,7 @@ type QueryLogOptions struct {
 	Environment string
 	Limit       int64
 	Timeout     int
+	Description string
 }
 
 func saveQueryLog(queryStr string, connName string, result *query.QueryResult, queryErr error, opts QueryLogOptions) error {
@@ -783,6 +790,7 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 		Environment: opts.Environment,
 		Limit:       opts.Limit,
 		Timeout:     opts.Timeout,
+		Description: opts.Description,
 	}
 
 	if queryErr != nil {
