@@ -23,7 +23,7 @@ bruin run [FLAGS] [path to the pipeline/asset]
 
 ### Command: Query
 
-bruin query --connection my_connection --query "SELECT * FROM table"
+bruin query --connection my_connection --query "SELECT * FROM table" --description "why you ran this query"
 
 Always use the `--description` flag to describe why you are running the query, e.g. `--description "checking row counts after ingestion"`.
 
