@@ -32,9 +32,9 @@ MySQL catalogs are currently not supported for DuckLake in Bruin due to limitati
 
 Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-data-catalog.html)). The table shows supported storage + catalog combinations.
 
-| Catalog | S3 | GCS |
-|-------------------|----|-----|
-| Glue | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
+| Catalog | S3 |
+|-------------------|----|
+| Glue | <span class="lh-check" aria-label="supported"></span> |
 
 
 ### Trino [↗](../platforms/trino.md#lakehouse-support)

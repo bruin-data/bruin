@@ -186,9 +186,9 @@ MySQL catalogs are currently not supported for DuckLake in Bruin due to limitati
 
 #### Iceberg
 
-| Catalog | S3 | GCS |
-|-------------------|----|-----|
-| Glue | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
+| Catalog | S3 |
+|-------------------|----|
+| Glue | <span class="lh-check" aria-label="supported"></span> |
 
 
 For background, see DuckDB's [lakehouse format overview](https://duckdb.org/docs/stable/lakehouse_formats).
@@ -273,7 +273,7 @@ Quick link (GCP Console): [Interoperability settings](https://console.cloud.goog
 ```yaml
 storage:
   type: gcs
-  path: "gs://my-ducklake-warehouse/path" # required for DuckLake, optional for Iceberg
+  path: "gs://my-ducklake-warehouse/path" # required for DuckLake
   auth:
     access_key: "${GCS_HMAC_ACCESS_KEY}"
     secret_key: "${GCS_HMAC_SECRET_KEY}"
