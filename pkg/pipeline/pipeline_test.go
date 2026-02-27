@@ -2278,3 +2278,31 @@ func TestIntervalModifiers_JSON_Integration(t *testing.T) {
 
 	assert.Equal(t, modifiers, result)
 }
+
+func TestPipeline_ValidateCatchupMode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		yaml    string
+		wantErr bool
+	}{
+		{name: "empty is valid", yaml: "name: test\n", wantErr: false},
+		{name: "active is valid", yaml: "name: test\ncatchup_mode: active\n", wantErr: false},
+		{name: "all is valid", yaml: "name: test\ncatchup_mode: all\n", wantErr: false},
+		{name: "invalid value", yaml: "name: test\ncatchup_mode: invalid\n", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var p pipeline.Pipeline
+			err := yaml.Unmarshal([]byte(tt.yaml), &p)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

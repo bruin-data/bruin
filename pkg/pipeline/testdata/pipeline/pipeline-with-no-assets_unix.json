@@ -21,7 +21,8 @@
         "discord": [],
         "webhook": []
     },
-    "catchup": false, "catchup_mode": "",
+    "catchup": false,
+    "catchup_mode": "",
     "metadata_push": {
         "bigquery": false
     },

@@ -28,7 +28,8 @@
     "ms_teams" : [],
     "webhook": []
   },
-  "catchup": false, "catchup_mode": "",
+  "catchup": false,
+  "catchup_mode": "",
   "commit": "",
   "retries": 0,
   "concurrency": 1
