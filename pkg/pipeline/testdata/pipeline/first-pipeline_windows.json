@@ -302,6 +302,7 @@
     "webhook": []
   },
   "catchup": false,
+  "catchup_mode": "",
   "commit": "",
   "retries": 3,
   "concurrency": 1
