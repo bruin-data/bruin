@@ -1,0 +1,15 @@
+# Bronze Layer - Raw data ingestion from Frankfurter API to Snowflake
+# This asset fetches currency exchange rates data
+name: bronze_exchange_rates
+type: ingestr
+
+parameters:
+  source_connection: frankfurter
+  source_table: latest
+  destination: snowflake
+  destination_connection: snowflake
+  destination_table: RAW_DATA.BRONZE_EXCHANGE_RATES
+
+description: |
+  Ingests raw currency exchange rate data from the Frankfurter API.
+  No transformations applied - raw data extraction for bronze layer.
