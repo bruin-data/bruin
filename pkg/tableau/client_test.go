@@ -221,3 +221,52 @@ func TestFindWorkbookIDByName(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "w4", id)
 }
+
+func TestShouldRetryWithoutIncremental(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		want       bool
+	}{
+		{
+			name:       "400 retries",
+			statusCode: 400,
+			want:       true,
+		},
+		{
+			name:       "409 retries",
+			statusCode: 409,
+			want:       true,
+		},
+		{
+			name:       "422 retries",
+			statusCode: 422,
+			want:       true,
+		},
+		{
+			name:       "500 does not retry",
+			statusCode: 500,
+			want:       false,
+		},
+		{
+			name:       "200 does not retry",
+			statusCode: 200,
+			want:       false,
+		},
+		{
+			name:       "202 does not retry",
+			statusCode: 202,
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := shouldRetryWithoutIncremental(tt.statusCode)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
