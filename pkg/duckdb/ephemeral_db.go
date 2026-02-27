@@ -328,6 +328,36 @@ func convertAssign(dest, src any) error {
 			*d = b
 		}
 		return nil
+	case *sql.NullString:
+		if src == nil {
+			*d = sql.NullString{}
+		} else if s, ok := src.(string); ok {
+			*d = sql.NullString{String: s, Valid: true}
+		} else {
+			*d = sql.NullString{String: fmt.Sprintf("%v", src), Valid: true}
+		}
+		return nil
+	case *sql.NullInt64:
+		if src == nil {
+			*d = sql.NullInt64{}
+		} else if i, ok := src.(int64); ok {
+			*d = sql.NullInt64{Int64: i, Valid: true}
+		}
+		return nil
+	case *sql.NullFloat64:
+		if src == nil {
+			*d = sql.NullFloat64{}
+		} else if f, ok := src.(float64); ok {
+			*d = sql.NullFloat64{Float64: f, Valid: true}
+		}
+		return nil
+	case *sql.NullBool:
+		if src == nil {
+			*d = sql.NullBool{}
+		} else if b, ok := src.(bool); ok {
+			*d = sql.NullBool{Bool: b, Valid: true}
+		}
+		return nil
 	}
 
 	// Use reflection for any other pointer type
