@@ -298,7 +298,7 @@
         ],
         "webhook": []
     },
-    "catchup": false,
+    "catchup": false, "catchup_mode": "",
     "metadata_push": {
         "bigquery": false
     },

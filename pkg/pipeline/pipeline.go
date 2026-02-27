@@ -1509,6 +1509,7 @@ type Pipeline struct {
 	Assets             []*Asset               `json:"assets" yaml:"assets,omitempty"`
 	Notifications      Notifications          `json:"notifications" yaml:"notifications,omitempty" mapstructure:"notifications"`
 	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
+	CatchupMode        string                 `json:"catchup_mode" yaml:"catchup_mode,omitempty" mapstructure:"catchup_mode"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
@@ -1524,6 +1525,15 @@ type Pipeline struct {
 	Macros             []Macro                `json:"macros" yaml:"macros,omitempty" mapstructure:"macros"`
 }
 
+func validateCatchupMode(mode string) error {
+	switch mode {
+	case "", "active", "all":
+		return nil
+	default:
+		return fmt.Errorf("invalid catchup_mode %q, must be one of: 'active', 'all'", mode)
+	}
+}
+
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type pipelineAlias Pipeline
 	aux := (*pipelineAlias)(p)
@@ -1534,6 +1544,10 @@ func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	if p.Concurrency == 0 {
 		p.Concurrency = 1
+	}
+
+	if err := validateCatchupMode(p.CatchupMode); err != nil {
+		return err
 	}
 
 	return nil
@@ -1549,6 +1563,10 @@ func (p *Pipeline) UnmarshalJSON(data []byte) error {
 
 	if p.Concurrency == 0 {
 		p.Concurrency = 1
+	}
+
+	if err := validateCatchupMode(p.CatchupMode); err != nil {
+		return err
 	}
 
 	return nil
