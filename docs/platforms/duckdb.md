@@ -139,7 +139,7 @@ B,LinkedIn,SDE 2,2024-01-01
 
 ## Lakehouse Support <Badge type="warning" text="beta" />
 
-DuckDB can query [Iceberg](https://duckdb.org/docs/extensions/iceberg) and [DuckLake](https://duckdb.org/docs/extensions/ducklake) tables through its native extensions. DuckLake supports DuckDB, SQLite, or Postgres catalogs with S3-backed storage.
+DuckDB can query [Iceberg](https://duckdb.org/docs/extensions/iceberg) and [DuckLake](https://duckdb.org/docs/extensions/ducklake) tables through its native extensions. DuckLake supports DuckDB, SQLite, or Postgres catalogs with S3- or GCS-backed storage.
 
 ### Connection
 
@@ -156,7 +156,7 @@ connections:
           type: <glue|postgres|duckdb|sqlite>
           auth: { ... } # optional
         storage:
-          type: <s3>
+          type: <s3|gcs>
           auth: { ... } # optional
 ```
 
@@ -175,20 +175,20 @@ connections:
 
 #### DuckLake
 
-| Catalog | S3 |
-|-------------------|----|
-| DuckDB | <span class="lh-check" aria-label="supported"></span> |
-| SQLite | <span class="lh-check" aria-label="supported"></span> |
-| Postgres | <span class="lh-check" aria-label="supported"></span> |
+| Catalog | S3 | GCS |
+|-------------------|----|-----|
+| DuckDB | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
+| SQLite | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
+| Postgres | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
 
 MySQL catalogs are currently not supported for DuckLake in Bruin due to limitations in the DuckDB MySQL connector and incomplete MySQL support in the DuckLake DuckDB extension.
 
 
 #### Iceberg
 
-| Catalog | S3 |
-|-------------------|----|
-| Glue | <span class="lh-check" aria-label="supported"></span> |
+| Catalog | S3 | GCS |
+|-------------------|----|-----|
+| Glue | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
 
 
 For background, see DuckDB's [lakehouse format overview](https://duckdb.org/docs/stable/lakehouse_formats).
@@ -265,10 +265,24 @@ storage:
     session_token: "${AWS_SESSION_TOKEN}" # optional
 ```
 
+#### GCS
+
+Bruin currently supports explicit GCS HMAC credentials in the `auth` block (`access_key` and `secret_key`).
+You need to create GCS HMAC keys first and declare them here.
+Quick link (GCP Console): [Interoperability settings](https://console.cloud.google.com/storage/settings;tab=interoperability)
+```yaml
+storage:
+  type: gcs
+  path: "gs://my-ducklake-warehouse/path" # required for DuckLake, optional for Iceberg
+  auth:
+    access_key: "${GCS_HMAC_ACCESS_KEY}"
+    secret_key: "${GCS_HMAC_SECRET_KEY}"
+```
+
 ---
 ### Usage
 
-Bruin makes the lakehouse catalog active for your session and ensures a default `main` schema is available (cannot create Iceberg on S3 schemas/tables, so they must already exist). You can query tables with or without a schema:
+Bruin makes the lakehouse catalog active for your session and ensures a default `main` schema is available (cannot create Iceberg schemas/tables directly on object storage, so they must already exist). You can query tables with or without a schema:
 
 ```sql
 SELECT * FROM my_table;
