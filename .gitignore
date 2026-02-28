@@ -153,8 +153,9 @@ duckdb.db
 venv
 logs/runs
 logs/exports
-.claude
+.claude/*
 !.claude/commands/
+!.claude/settings.json
 bruin
 
 __debug_bin*
