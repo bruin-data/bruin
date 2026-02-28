@@ -7,16 +7,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/enhance"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/sergi/go-diff/diffmatchpatch"
+	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 )
@@ -26,7 +29,7 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "enhance",
 		Usage:     "Enhance asset definitions with AI-powered suggestions for metadata, quality checks, and descriptions",
-		ArgsUsage: "[path to asset or pipeline]",
+		ArgsUsage: "[path to asset file or folder]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "output",
@@ -63,6 +66,11 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 				Usage: "Show debug information during enhancement",
 				Value: false,
 			},
+			&cli.IntFlag{
+				Name:  "concurrency",
+				Usage: "Number of assets to enhance in parallel when processing a folder",
+				Value: 5,
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			// Check both global and local debug flags
@@ -79,15 +87,102 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 
 	inputPath := c.Args().Get(0)
 	if inputPath == "" {
-		return printEnhanceError(output, errors.New("please provide a path to an asset file"))
+		return printEnhanceError(output, errors.New("please provide a path to an asset file or folder"))
 	}
 
-	// Only single asset enhancement is supported
-	if !isPathReferencingAsset(inputPath) {
-		return printEnhanceError(output, errors.New("please provide a path to a single asset file (e.g., assets/my_asset.sql or assets/my_asset.asset.yml)"))
+	if isPathReferencingAsset(inputPath) {
+		return enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug)
 	}
 
-	return enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug)
+	if isDir(inputPath) {
+		return enhanceFolder(ctx, c, inputPath, fs, output, isDebug)
+	}
+
+	return printEnhanceError(output, errors.New("please provide a path to an asset file or a folder containing assets"))
+}
+
+func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs afero.Fs, output string, isDebug *bool) error {
+	concurrency := max(c.Int("concurrency"), 1)
+
+	assetPaths := path.GetAllPossibleAssetPaths(folderPath, assetsDirectoryNames, pipeline.SupportedFileSuffixes)
+	if len(assetPaths) == 0 {
+		return printEnhanceError(output, errors.New("no assets found in the given folder"))
+	}
+
+	if output != "json" {
+		infoPrinter.Printf("Found %d assets in '%s', enhancing with concurrency %d...\n\n", len(assetPaths), folderPath, concurrency)
+	}
+
+	var mu sync.Mutex
+	var succeeded, failed int
+	var enhanceErrors []string
+
+	p := pool.New().WithMaxGoroutines(concurrency)
+	for _, ap := range assetPaths {
+		p.Go(func() {
+			if output != "json" {
+				mu.Lock()
+				infoPrinter.Printf("Starting enhancement for '%s'...\n", filepath.Base(ap))
+				mu.Unlock()
+			}
+
+			err := enhanceSingleAsset(ctx, c, ap, fs, output, isDebug)
+
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				failed++
+				enhanceErrors = append(enhanceErrors, fmt.Sprintf("%s: %v", filepath.Base(ap), err))
+			} else {
+				succeeded++
+			}
+		})
+	}
+
+	p.Wait()
+
+	if output == "json" {
+		result := struct {
+			Status    string   `json:"status"`
+			Total     int      `json:"total"`
+			Succeeded int      `json:"succeeded"`
+			Failed    int      `json:"failed"`
+			Errors    []string `json:"errors,omitempty"`
+		}{
+			Total:     len(assetPaths),
+			Succeeded: succeeded,
+			Failed:    failed,
+			Errors:    enhanceErrors,
+		}
+		if failed > 0 {
+			result.Status = "partial"
+		} else {
+			result.Status = "success"
+		}
+		jsonBytes, err := json.Marshal(result)
+		if err != nil {
+			return printEnhanceError(output, errors.Wrap(err, "failed to marshal result"))
+		}
+		fmt.Println(string(jsonBytes))
+		if failed > 0 {
+			return cli.Exit("", 1)
+		}
+		return nil
+	}
+
+	fmt.Println()
+	successPrinter.Printf("Enhancement complete: %d/%d assets succeeded", succeeded, len(assetPaths))
+	if failed > 0 {
+		fmt.Println()
+		warningPrinter.Printf("%d assets failed:\n", failed)
+		for _, e := range enhanceErrors {
+			warningPrinter.Printf("  - %s\n", e)
+		}
+		return cli.Exit("", 1)
+	}
+	fmt.Println()
+
+	return nil
 }
 
 func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, isDebug *bool) error {
@@ -95,6 +190,9 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to get absolute path"))
 	}
+
+	// Use the filename as a log prefix to identify the asset being processed
+	logPrefix := filepath.Base(assetPath)
 
 	// Read original file content before any modifications (for diff display)
 	originalContent, err := afero.ReadFile(fs, absAssetPath)
@@ -104,23 +202,27 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 
 	// Step 1: Fill columns from DB
 	if output != "json" {
-		infoPrinter.Println("Step 1/4: Filling columns from database...")
+		infoPrinter.Printf("[%s] Step 1/4: Filling columns from database...\n", logPrefix)
 	}
 	pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
 	if err == nil {
+		// Update log prefix with actual asset name if available
+		if pp.Asset.Name != "" {
+			logPrefix = pp.Asset.Name
+		}
 		status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil) //nolint:contextcheck
 		if fillErr != nil && output != "json" {
-			warningPrinter.Printf("Warning: fill columns failed: %v\n", fillErr)
+			warningPrinter.Printf("[%s] Warning: fill columns failed: %v\n", logPrefix, fillErr)
 		} else if status == fillStatusUpdated && output != "json" {
-			infoPrinter.Println("  Columns updated from database schema.")
+			infoPrinter.Printf("[%s]   Columns updated from database schema.\n", logPrefix)
 		}
 	} else if output != "json" {
-		warningPrinter.Printf("Warning: could not load asset for column filling: %v\n", err)
+		warningPrinter.Printf("[%s] Warning: could not load asset for column filling: %v\n", logPrefix, err)
 	}
 
 	// Step 2: AI Enhancement
 	if output != "json" {
-		infoPrinter.Println("Step 2/4: Enhancing asset with AI...")
+		infoPrinter.Printf("[%s] Step 2/4: Enhancing asset with AI...\n", logPrefix)
 	}
 
 	// Reload asset after previous step may have modified it
@@ -164,7 +266,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 
 	env := c.String("environment")
 	if env != "" && output != "json" {
-		infoPrinter.Printf("  Using environment: %s\n", env)
+		infoPrinter.Printf("[%s]   Using environment: %s\n", logPrefix, env)
 	}
 
 	// Check if the selected provider's CLI is available
@@ -185,19 +287,19 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 
 	// Step 3: Format
 	if output != "json" {
-		infoPrinter.Println("Step 3/4: Formatting asset...")
+		infoPrinter.Printf("[%s] Step 3/4: Formatting asset...\n", logPrefix)
 	}
 	_, err = formatAsset(assetPath)
 	if err != nil {
 		if output != "json" {
-			warningPrinter.Printf("Warning: formatting failed: %v\n", err)
+			warningPrinter.Printf("[%s] Warning: formatting failed: %v\n", logPrefix, err)
 		}
 		// Continue even if formatting fails
 	}
 
 	// Step 4: Validate using the existing bruin validate command
 	if output != "json" {
-		infoPrinter.Println("Step 4/4: Validating asset...")
+		infoPrinter.Printf("[%s] Step 4/4: Validating asset...\n", logPrefix)
 	}
 	validateCmd := Lint(isDebug)
 	args := []string{"validate", absAssetPath}
@@ -227,7 +329,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		}
 		fmt.Println(string(jsonBytes))
 	} else {
-		successPrinter.Printf("\n✓ Enhanced '%s'\n", pp.Asset.Name)
+		successPrinter.Printf("\n[%s] ✓ Enhanced '%s'\n", logPrefix, pp.Asset.Name)
 		// Show diff to display what changed
 		showDiff(originalContent, absAssetPath)
 	}
