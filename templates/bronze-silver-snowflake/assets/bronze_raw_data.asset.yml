@@ -1,0 +1,46 @@
+name: bronze.frankfurter_rates
+type: ingestr
+
+description: Ingests daily foreign exchange rates from the Frankfurter API into Snowflake without transformation to form the bronze layer.
+columns:
+  - name: base_currency
+    type: varchar
+    description: "Three letter code representing the base currency returned by the Frankfurter API."
+    checks:
+      - name: not_null
+  - name: currency_code
+    type: varchar
+    description: "Quoted currency code fetched from the Frankfurter API response payload."
+    checks:
+      - name: not_null
+  - name: rate
+    type: float
+    description: "Exchange rate published by the European Central Bank for the associated currency pair."
+    checks:
+      - name: not_null
+      - name: positive
+  - name: date
+    type: timestamp
+    description: "Timestamp associated with the exchange rate reading."
+    checks:
+      - name: not_null
+
+parameters:
+  source_connection: frankfurter-default
+  source_table: rates
+  destination: snowflake
+  destination_table: frankfurter_rates
+  loader_file_format: jsonl
+
+custom_checks:
+  - name: ensure single base currency
+    value: 1
+    query: |
+      SELECT COUNT(DISTINCT base_currency) AS distinct_base_currencies
+      FROM bronze.frankfurter_rates
+  - name: ensure positive rates
+    value: 0
+    query: |
+      SELECT COUNT(*) AS non_positive_rates
+      FROM bronze.frankfurter_rates
+      WHERE rate <= 0
