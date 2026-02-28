@@ -108,7 +108,7 @@ bruin run --environment production
 
 ### Environment Variables
 
-Use environment variables to keep credentials out of `.bruin.yml`. This example uses literal values for clarity:
+Use environment variables to keep credentials out of `.bruin.yml`. Reference them using the `${VAR_NAME}` syntax:
 
 ```yaml
 environments:
@@ -116,8 +116,8 @@ environments:
     connections:
       postgres:
         - name: my_postgres
-          username: "bruin_user"
-          password: "super_secret"
+          username: ${POSTGRES_USERNAME}
+          password: ${POSTGRES_PASSWORD}
           host: "db.example.com"
           port: 5432
           database: "analytics"
