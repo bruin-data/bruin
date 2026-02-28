@@ -13,15 +13,31 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Rowscanner exists since clickhouse library requires us to scan either to a specific type or an implementor of the
-// interface sql.Scanner, cannot scan directly to interface{}.
 type RowScanner struct {
-	values []any
+	value any
 }
 
 func (s *RowScanner) Scan(src any) error {
-	s.values = append(s.values, src)
+	s.value = src
 	return nil
+}
+
+func scanValues(rows driver.Rows, columnCount int) ([]interface{}, error) {
+	scanArgs := make([]any, columnCount)
+	for i := range scanArgs {
+		scanArgs[i] = &RowScanner{}
+	}
+
+	if err := rows.Scan(scanArgs...); err != nil {
+		return nil, errors.Wrap(err, "failed to scan row")
+	}
+
+	values := make([]interface{}, columnCount)
+	for i, arg := range scanArgs {
+		values[i] = arg.(*RowScanner).value
+	}
+
+	return values, nil
 }
 
 type Client struct {
@@ -75,23 +91,10 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	collectedRows := make([][]interface{}, 0)
 	for rows.Next() {
-		scanArgs := make([]any, columnCount)
-		for i := range scanArgs {
-			scanArgs[i] = &RowScanner{}
+		values, err := scanValues(rows, columnCount)
+		if err != nil {
+			return nil, err
 		}
-
-		if err := rows.Scan(scanArgs...); err != nil {
-			return nil, errors.Wrap(err, "failed to scan row")
-		}
-
-		values := make([]interface{}, columnCount)
-		for i, arg := range scanArgs {
-			scanner := arg.(*RowScanner)
-			if len(scanner.values) > 0 {
-				values[i] = scanner.values[0]
-			}
-		}
-
 		collectedRows = append(collectedRows, values)
 	}
 
@@ -121,23 +124,10 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 
 	collectedRows := make([][]interface{}, 0)
 	for rows.Next() {
-		scanArgs := make([]any, columnCount)
-		for i := range scanArgs {
-			scanArgs[i] = &RowScanner{}
+		values, err := scanValues(rows, columnCount)
+		if err != nil {
+			return nil, err
 		}
-
-		if err := rows.Scan(scanArgs...); err != nil {
-			return nil, errors.Wrap(err, "failed to scan row")
-		}
-
-		values := make([]interface{}, columnCount)
-		for i, arg := range scanArgs {
-			scanner := arg.(*RowScanner)
-			if len(scanner.values) > 0 {
-				values[i] = scanner.values[0]
-			}
-		}
-
 		collectedRows = append(collectedRows, values)
 	}
 

@@ -53,10 +53,9 @@ func ImportDatabase(isDebug *bool) *cli.Command {
 		Before:    telemetry.BeforeCommand,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     "connection",
-				Aliases:  []string{"c"},
-				Usage:    "the name of the connection to use",
-				Required: true,
+				Name:    "connection",
+				Aliases: []string{"c"},
+				Usage:   "the name of the connection to use (if omitted, launches interactive TUI)",
 			},
 			&cli.StringFlag{
 				Name:    "schema",
@@ -90,19 +89,24 @@ func ImportDatabase(isDebug *bool) *cli.Command {
 			}
 
 			connectionName := c.String("connection")
-			schema := c.String("schema")
-			schemas := c.StringSlice("schemas")
 			noColumns := c.Bool("no-columns")
 			environment := c.String("environment")
 			configFile := c.String("config-file")
+			var err error
 
-			// Validate that both --schema and --schemas are not used together
-			if schema != "" && len(schemas) > 0 {
-				return cli.Exit("cannot use both --schema and --schemas flags together", 1)
+			if connectionName == "" {
+				err = runImportDatabaseTUI(ctx, pipelinePath, environment, configFile, !noColumns)
+			} else {
+				schema := c.String("schema")
+				schemas := c.StringSlice("schemas")
+				if schema != "" && len(schemas) > 0 {
+					return cli.Exit("cannot use both --schema and --schemas flags together", 1)
+				}
+
+				log := makeLogger(*isDebug)
+				err = runImport(ctx, log, pipelinePath, connectionName, schema, schemas, !noColumns, environment, configFile)
 			}
 
-			log := makeLogger(*isDebug)
-			err := runImport(ctx, log, pipelinePath, connectionName, schema, schemas, !noColumns, environment, configFile)
 			if err != nil {
 				errorPrinter.Printf("Failed to import database: %s\n", err)
 				return cli.Exit("", 1)
@@ -198,20 +202,12 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	var summary *ansisql.DBDatabase
 
-	// Build schema list from --schema or --schemas flags
 	schemaList := schemas
 	if schema != "" {
 		schemaList = []string{schema}
 	}
 
-	pathParts := strings.Split(pipelinePath, "/")
-	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
-		if len(pathParts) == 1 {
-			pipelinePath = "."
-		} else {
-			pipelinePath = strings.Join(pathParts[:len(pathParts)-1], "/")
-		}
-	}
+	pipelinePath = resolvePipelinePath(pipelinePath)
 
 	log.Debugf("resolved pipeline path: %s", pipelinePath)
 
@@ -227,7 +223,6 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 		existingAssets[strings.ToLower(asset.Name)] = asset
 	}
 
-	// If schema(s) specified, try to use GetDatabaseSummaryForSchemas if available
 	if len(schemaList) > 0 {
 		log.Debugf("attempting GetDatabaseSummaryForSchemas with schemas: %v", schemaList)
 		if schemaSummarizer, ok := conn.(interface {
@@ -243,7 +238,6 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 		}
 	}
 
-	// Fall back to GetDatabaseSummary if no schema specified or connection doesn't support filtered summary
 	if summary == nil {
 		log.Debugf("attempting GetDatabaseSummary on connection type %T", conn)
 		summarizer, ok := conn.(interface {
@@ -264,9 +258,6 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 	}
 
 	log.Debugf("database summary retrieved: name=%s, schemas=%d", summary.Name, len(summary.Schemas))
-	for _, s := range summary.Schemas {
-		log.Debugf("  schema %q: %d tables", s.Name, len(s.Tables))
-	}
 
 	assetsPath := filepath.Join(pipelinePath, "assets")
 	assetType := determineAssetTypeFromConnection(connectionName, conn)
@@ -278,21 +269,16 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 
 	for _, schemaObj := range summary.Schemas {
 		if schema != "" && !strings.EqualFold(schemaObj.Name, schema) {
-			log.Debugf("skipping schema %q (filter: %q)", schemaObj.Name, schema)
 			continue
 		}
-		log.Debugf("processing schema %q with %d tables", schemaObj.Name, len(schemaObj.Tables))
 		for _, table := range schemaObj.Tables {
 			fullName := fmt.Sprintf("%s.%s", schemaObj.Name, table.Name)
-			log.Debugf("creating asset for %s (type: %v, columns from summary: %d)", fullName, table.Type, len(table.Columns))
 			createdAsset, warning := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns, table)
 			if warning != "" {
-				log.Debugf("warning for %s: %s", fullName, warning)
 				warnings = append(warnings, importWarning{tableName: fullName, message: warning})
 			}
 
 			if createdAsset == nil {
-				log.Debugf("createAsset returned nil for %s, skipping", fullName)
 				continue
 			}
 
@@ -348,6 +334,20 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 	}
 
 	return nil
+}
+
+func resolvePipelinePath(pipelinePath string) string {
+	pathParts := strings.Split(pipelinePath, "/")
+	last := pathParts[len(pathParts)-1]
+	if last != "pipeline.yml" && last != "pipeline.yaml" {
+		return pipelinePath
+	}
+
+	if len(pathParts) == 1 {
+		return "."
+	}
+
+	return strings.Join(pathParts[:len(pathParts)-1], "/")
 }
 
 func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn interface{}, schemaName, tableName string) error {
@@ -1003,6 +1003,8 @@ type scheduledQueryModel struct {
 	focusedPane   int // 0 for left pane, 1 for right pane
 }
 
+const keyEnter = "enter"
+
 // Color constants for UI styling.
 const (
 	colorGray      = "#374151"
@@ -1074,7 +1076,7 @@ func (m *scheduledQueryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				m.updateRightPanelContent()
 			}
-		case "enter":
+		case keyEnter:
 			// Finish selection
 			m.confirmed = true
 			m.quitting = true
@@ -2057,7 +2059,7 @@ func (m *tableauDashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.list.SetDelegate(m.delegate)
 				m.updateRightPanelContent()
 			}
-		case "enter":
+		case keyEnter:
 			m.confirmed = true
 			m.quitting = true
 			return m, tea.Quit

@@ -53,7 +53,7 @@ func (r MockRows) Scan(dest ...any) error {
 	for i, d := range dest {
 		scanner, ok := d.(interface{ Scan(src any) error })
 		if !ok {
-			panic("dest argument does not implement Scan(any) error")
+			return errors.New("dest argument does not implement Scan(any) error")
 		}
 		if err := scanner.Scan(data[i]); err != nil {
 			return err
