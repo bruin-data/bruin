@@ -19,11 +19,11 @@ DuckLake uses a DuckDB, SQLite, or Postgres catalog. The table shows supported s
 For more guidance, see DuckLake's [choosing a catalog database](https://ducklake.select/docs/stable/duckdb/usage/choosing_a_catalog_database).
 
 
-| Catalog | S3 |
-|-------------------|----|
-| DuckDB| <span class="lh-check" aria-label="supported"></span> |
-| SQLite | <span class="lh-check" aria-label="supported"></span> |
-| Postgres| <span class="lh-check" aria-label="supported"></span> |
+| Catalog | S3 | GCS |
+|-------------------|----|-----|
+| DuckDB| <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
+| SQLite | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
+| Postgres| <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
 
 MySQL catalogs are currently not supported for DuckLake in Bruin due to limitations in the DuckDB MySQL connector and incomplete MySQL support in the DuckLake DuckDB extension.
 
