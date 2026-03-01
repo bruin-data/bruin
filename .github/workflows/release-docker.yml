@@ -36,6 +36,10 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+          sparse-checkout: |
+            /*
+            !docs/
+          sparse-checkout-cone-mode: false
 
       - name: Checkout manual tag
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -43,6 +47,10 @@ jobs:
         with:
           ref: refs/tags/${{ github.event.inputs.tag }}
           fetch-depth: 0
+          sparse-checkout: |
+            /*
+            !docs/
+          sparse-checkout-cone-mode: false
 
       - name: Determine release tag (workflow run)
         id: workflow_tag
