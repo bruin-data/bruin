@@ -342,6 +342,28 @@ func TestClient_RunQueryWithoutResult(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "PL/SQL block preserves trailing semicolon",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("BEGIN\n   EXECUTE IMMEDIATE 'DROP TABLE test';\nEXCEPTION\n   WHEN OTHERS THEN\n      IF SQLCODE != -942 THEN\n         RAISE;\n      END IF;\nEND;").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			query: &query.Query{
+				Query: "BEGIN\n   EXECUTE IMMEDIATE 'DROP TABLE test';\nEXCEPTION\n   WHEN OTHERS THEN\n      IF SQLCODE != -942 THEN\n         RAISE;\n      END IF;\nEND;",
+			},
+			wantErr: false,
+		},
+		{
+			name: "PL/SQL block with BEGIN END DML",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("BEGIN\n   DELETE FROM users WHERE id = 1;\n   INSERT INTO users (id) VALUES (1);\nEND;").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			query: &query.Query{
+				Query: "BEGIN\n   DELETE FROM users WHERE id = 1;\n   INSERT INTO users (id) VALUES (1);\nEND;",
+			},
+			wantErr: false,
+		},
+		{
 			name: "invalid query returns error",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(`some broken query`).

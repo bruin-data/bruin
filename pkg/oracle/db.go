@@ -8,7 +8,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/pkg/errors"
 	_ "github.com/sijms/go-ora/v2"
 )
 
@@ -20,12 +19,12 @@ type Client struct {
 func NewClient(c Config) (*Client, error) {
 	dsn, err := c.DSN()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create DSN")
+		return nil, fmt.Errorf("failed to create DSN: %w", err)
 	}
 
 	conn, err := sql.Open("oracle", dsn)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open oracle connection")
+		return nil, fmt.Errorf("failed to open oracle connection: %w", err)
 	}
 
 	return &Client{
@@ -36,9 +35,34 @@ func NewClient(c Config) (*Client, error) {
 
 func (db *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	queryStr := strings.TrimSpace(query.String())
-	queryStr = strings.TrimSuffix(queryStr, ";")
+	if !isPLSQLBlock(queryStr) {
+		queryStr = strings.TrimSuffix(queryStr, ";")
+	}
 	_, err := db.conn.ExecContext(ctx, queryStr)
-	return errors.Wrap(err, "failed to execute query")
+	if err != nil {
+		return fmt.Errorf("failed to execute query: %w", err)
+	}
+	return nil
+}
+
+// isPLSQLBlock detects PL/SQL anonymous blocks that require the trailing semicolon.
+// It checks for a word boundary after BEGIN/DECLARE to avoid false positives
+// on identifiers like BEGINDATE.
+func isPLSQLBlock(q string) bool {
+	upper := strings.ToUpper(strings.TrimSpace(q))
+	if !strings.HasSuffix(upper, "END;") {
+		return false
+	}
+	for _, prefix := range []string{"BEGIN", "DECLARE"} {
+		if strings.HasPrefix(upper, prefix) {
+			// Ensure it's a word boundary: the prefix must be followed by
+			// whitespace or be the entire string (e.g., "BEGIN\n...END;")
+			if len(upper) == len(prefix) || upper[len(prefix)] == ' ' || upper[len(prefix)] == '\n' || upper[len(prefix)] == '\r' || upper[len(prefix)] == '\t' {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (db *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
@@ -46,14 +70,14 @@ func (db *Client) Select(ctx context.Context, query *query.Query) ([][]interface
 	queryStr = strings.TrimSuffix(queryStr, ";")
 	rows, err := db.conn.QueryContext(ctx, queryStr)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to execute select query")
+		return nil, fmt.Errorf("failed to execute select query: %w", err)
 	}
 	defer rows.Close()
 
 	// Get column names
 	cols, err := rows.Columns()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get column names")
+		return nil, fmt.Errorf("failed to get column names: %w", err)
 	}
 
 	var result [][]interface{}
@@ -66,14 +90,14 @@ func (db *Client) Select(ctx context.Context, query *query.Query) ([][]interface
 
 		// Scan the result into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
-			return nil, errors.Wrap(err, "failed to scan row")
+			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
 		result = append(result, columns)
 	}
 
 	if rows.Err() != nil {
-		return nil, errors.Wrap(rows.Err(), "error during row iteration")
+		return nil, fmt.Errorf("error during row iteration: %w", rows.Err())
 	}
 
 	return result, nil
@@ -94,7 +118,7 @@ func (db *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (
 	queryStr = strings.TrimSuffix(queryStr, ";")
 	rows, err := db.conn.QueryContext(ctx, queryStr)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to execute select query")
+		return nil, fmt.Errorf("failed to execute select query: %w", err)
 	}
 	defer rows.Close()
 
@@ -108,14 +132,14 @@ func (db *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (
 	// Fetch column names
 	cols, err := rows.Columns()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to retrieve column names")
+		return nil, fmt.Errorf("failed to retrieve column names: %w", err)
 	}
 	result.Columns = cols
 
 	// Fetch column types
 	columnTypes, err := rows.ColumnTypes()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to retrieve column types")
+		return nil, fmt.Errorf("failed to retrieve column types: %w", err)
 	}
 	typeStrings := make([]string, len(columnTypes))
 	for i, ct := range columnTypes {

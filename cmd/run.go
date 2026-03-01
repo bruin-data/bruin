@@ -41,6 +41,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
@@ -1690,6 +1691,23 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeMain] = trinoQuerySensor
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
+		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
+		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+			Mat: oracle.NewMaterializer(fullRefresh),
+		}, parser)
+		oracleMetadataPushOperator := postgres.NewMetadataPushOperator(conn) // using Postgres Metadata Push for Oracle if suitable, or skipping it
+
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeMain] = oracleOperator
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeColumnCheck] = oracleCheckRunner
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeMetadataPush] = oracleMetadataPushOperator
+		
+		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeMain] = executor.NoOpOperator{}
+		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeColumnCheck] = oracleCheckRunner
+		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeMetadataPush] = oracleMetadataPushOperator
 	}
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeTableSensor)
 	if shouldInitiateSnowflake {
