@@ -1259,3 +1259,17 @@ type CustomerIoConnection struct {
 func (c CustomerIoConnection) GetName() string {
 	return c.Name
 }
+
+type VerticaConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=5433"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Schema   string `yaml:"schema,omitempty"   json:"schema,omitempty" mapstructure:"schema"`
+}
+
+func (c VerticaConnection) GetName() string {
+	return c.Name
+}
