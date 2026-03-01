@@ -29,7 +29,10 @@ const (
 	stepCancelled  = 6
 )
 
-const keyEnter = "enter"
+const (
+	keyEnter = "enter"
+	keyCtrlC = "ctrl+c"
+)
 
 // Styling for the TUI.
 var (
@@ -162,7 +165,7 @@ func (m addConnectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.typeList.SetSize(msg.Width-4, msg.Height-6)
 		return m, nil
 	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
+		if msg.String() == keyCtrlC {
 			m.step = stepCancelled
 			return m, tea.Quit
 		}

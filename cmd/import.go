@@ -1003,8 +1003,6 @@ type scheduledQueryModel struct {
 	focusedPane   int // 0 for left pane, 1 for right pane
 }
 
-const keyEnter = "enter"
-
 // Color constants for UI styling.
 const (
 	colorGray      = "#374151"
@@ -1055,7 +1053,7 @@ func (m *scheduledQueryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		case keyCtrlC, "q", "esc":
 			m.quitting = true
 			return m, tea.Quit
 		case "tab":
@@ -2043,7 +2041,7 @@ func (m *tableauDashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		case keyCtrlC, "q", "esc":
 			m.quitting = true
 			return m, tea.Quit
 		case "tab":

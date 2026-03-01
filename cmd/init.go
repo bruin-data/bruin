@@ -77,7 +77,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pageStart = 0
 		}
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		case keyCtrlC, "q", "esc":
 			m.quitting = true
 			return m, tea.Quit
 		case "enter":
