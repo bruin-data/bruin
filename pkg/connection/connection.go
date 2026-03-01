@@ -1397,8 +1397,12 @@ func (m *Manager) AddSlackConnectionFromConfig(connection *config.SlackConnectio
 		m.Slack = make(map[string]*slack.Client)
 	}
 	m.mutex.Unlock()
+	apiKey := connection.APIKey
+	if apiKey == "" {
+		apiKey = connection.Token
+	}
 	client, err := slack.NewClient(slack.Config{
-		APIKey: connection.APIKey,
+		APIKey: apiKey,
 	})
 	if err != nil {
 		return err
