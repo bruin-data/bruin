@@ -521,6 +521,16 @@ def add_limit(query: str, limit_value: int, dialect: str = None) -> dict:
     return {"query": limited_query}
 
 
+def validate_query(query: str, dialect: str = None) -> dict:
+    try:
+        parsed = parse(query, dialect=dialect)
+        if not parsed:
+            return {"valid": False, "error": "unable to parse query"}
+        return {"valid": True, "error": ""}
+    except Exception as e:
+        return {"valid": False, "error": str(e)}
+
+
 def is_single_select_query(query: str, dialect: str = None) -> dict:
     """
     Check if a query is a single SELECT statement.

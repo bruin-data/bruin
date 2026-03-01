@@ -379,6 +379,44 @@ func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, err
 	return resp.Query, nil
 }
 
+func (s *SQLParser) Validate(sql string, dialect string) (bool, error) {
+	err := s.Start()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to start sql parser")
+	}
+
+	command := parserCommand{
+		Command: "validate",
+		Contents: map[string]interface{}{
+			"query":   sql,
+			"dialect": dialect,
+		},
+	}
+
+	responsePayload, err := s.sendCommand(&command)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to send command")
+	}
+
+	var resp struct {
+		Valid bool   `json:"valid"`
+		Error string `json:"error"`
+	}
+	err = json.Unmarshal([]byte(responsePayload), &resp)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to unmarshal response")
+	}
+
+	if !resp.Valid {
+		if resp.Error != "" {
+			return false, errors.New(resp.Error)
+		}
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error) {
 	err := s.Start()
 	if err != nil {

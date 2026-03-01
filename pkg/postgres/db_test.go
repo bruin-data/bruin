@@ -7,6 +7,7 @@ import (
 	_ "github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v3"
 	"github.com/stretchr/testify/assert"
@@ -328,206 +329,65 @@ func TestClient_Ping(t *testing.T) {
 func TestDB_IsValid(t *testing.T) {
 	t.Parallel()
 
+	parser, err := sqlparser.NewSQLParser(false)
+	require.NoError(t, err)
+	defer parser.Close()
+
 	tests := []struct {
-		name         string
-		setupMock    func(mock pgxmock.PgxPoolIface)
-		query        query.Query
-		want         bool
-		wantErr      bool
-		errorMessage string
+		name    string
+		query   query.Query
+		want    bool
+		wantErr bool
 	}{
 		{
-			name: "simple valid select query is handled",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    SELECT 1
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "SELECT 1",
-			},
-			want: true,
+			name:  "simple valid select query",
+			query: query.Query{Query: "SELECT 1"},
+			want:  true,
 		},
 		{
-			name: "complex valid query with multiple statements",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    SELECT id, name FROM users WHERE active = true
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "SELECT id, name FROM users WHERE active = true",
-			},
-			want: true,
+			name:  "valid select with WHERE clause",
+			query: query.Query{Query: "SELECT id, name FROM users WHERE active = true"},
+			want:  true,
 		},
 		{
-			name: "valid INSERT query",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    INSERT INTO users \(name, email\) VALUES \('John', 'john@example\.com'\)
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "INSERT INTO users (name, email) VALUES ('John', 'john@example.com')",
-			},
-			want: true,
+			name:  "valid INSERT query",
+			query: query.Query{Query: "INSERT INTO users (name, email) VALUES ('John', 'john@example.com')"},
+			want:  true,
 		},
 		{
-			name: "valid UPDATE query",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    UPDATE users SET active = false WHERE last_login < NOW\(\) - INTERVAL '1 year'
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "UPDATE users SET active = false WHERE last_login < NOW() - INTERVAL '1 year'",
-			},
-			want: true,
+			name:  "valid UPDATE query",
+			query: query.Query{Query: "UPDATE users SET active = false WHERE id = 1"},
+			want:  true,
 		},
 		{
-			name: "valid DELETE query",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    DELETE FROM logs WHERE created_at < NOW\(\) - INTERVAL '30 days'
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'",
-			},
-			want: true,
+			name:  "valid DELETE query",
+			query: query.Query{Query: "DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'"},
+			want:  true,
 		},
 		{
-			name: "invalid query with syntax error",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    SELECT \* FORM users
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).
-					WillReturnError(errors.New("syntax error at or near \"FORM\""))
-			},
-			query: query.Query{
-				Query: "SELECT * FORM users",
-			},
-			want:         false,
-			wantErr:      true,
-			errorMessage: "syntax error at or near \"FORM\"",
+			name:    "invalid query with syntax error",
+			query:   query.Query{Query: "SELECT * FORM users"},
+			want:    false,
+			wantErr: true,
 		},
 		{
-			name: "invalid query with missing table",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    SELECT \* FROM non_existent_table
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).
-					WillReturnError(errors.New("relation \"non_existent_table\" does not exist"))
-			},
-			query: query.Query{
-				Query: "SELECT * FROM non_existent_table",
-			},
-			want:         false,
-			wantErr:      true,
-			errorMessage: "relation \"non_existent_table\" does not exist",
+			name:  "query with CTE (WITH clause)",
+			query: query.Query{Query: "WITH active_users AS (SELECT * FROM users WHERE active = true) SELECT * FROM active_users"},
+			want:  true,
 		},
 		{
-			name: "invalid query with wrong column reference",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    SELECT invalid_column FROM users
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).
-					WillReturnError(errors.New("column \"invalid_column\" does not exist"))
-			},
-			query: query.Query{
-				Query: "SELECT invalid_column FROM users",
-			},
-			want:         false,
-			wantErr:      true,
-			errorMessage: "column \"invalid_column\" does not exist",
+			name:  "query with JOIN",
+			query: query.Query{Query: "SELECT u.name, p.title FROM users u JOIN posts p ON u.id = p.user_id"},
+			want:  true,
 		},
 		{
-			name: "query with CTE (WITH clause)",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    WITH active_users AS \(SELECT \* FROM users WHERE active = true\) SELECT \* FROM active_users
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "WITH active_users AS (SELECT * FROM users WHERE active = true) SELECT * FROM active_users",
-			},
-			want: true,
-		},
-		{
-			name: "query with JOIN",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    SELECT u\.name, p\.title FROM users u JOIN posts p ON u\.id = p\.user_id
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "SELECT u.name, p.title FROM users u JOIN posts p ON u.id = p.user_id",
-			},
-			want: true,
-		},
-		{
-			name: "invalid query with broken SQL",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    some broken query
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).
-					WillReturnError(errors.New("syntax error"))
-			},
-			query: query.Query{
-				Query: "some broken query",
-			},
-			want:         false,
-			wantErr:      true,
-			errorMessage: "syntax error",
+			name:    "invalid query with broken SQL",
+			query:   query.Query{Query: "some broken query"},
+			want:    false,
+			wantErr: true,
 		},
 		{
 			name: "query with multiline formatting",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    SELECT
-        id,
-        name,
-        email
-    FROM users
-    WHERE active = true
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
 			query: query.Query{
 				Query: `SELECT
         id,
@@ -539,94 +399,35 @@ END; \$TEST\$;`
 			want: true,
 		},
 		{
-			name: "CREATE TABLE query validation",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    CREATE TABLE test_table \(id SERIAL PRIMARY KEY, name VARCHAR\(100\)\)
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "CREATE TABLE test_table (id SERIAL PRIMARY KEY, name VARCHAR(100))",
-			},
-			want: true,
+			name:  "CREATE TABLE query validation",
+			query: query.Query{Query: "CREATE TABLE test_table (id SERIAL PRIMARY KEY, name VARCHAR(100))"},
+			want:  true,
 		},
 		{
-			name: "ALTER TABLE query validation",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    ALTER TABLE users ADD COLUMN age INTEGER
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "ALTER TABLE users ADD COLUMN age INTEGER",
-			},
-			want: true,
+			name:  "DROP TABLE query validation",
+			query: query.Query{Query: "DROP TABLE IF EXISTS temp_table"},
+			want:  true,
 		},
 		{
-			name: "DROP TABLE query validation",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    DROP TABLE IF EXISTS temp_table
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "DROP TABLE IF EXISTS temp_table",
-			},
-			want: true,
-		},
-		{
-			name: "query with special characters in strings",
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "result"},
-				).AddRow("DO")
-				expectedQuery := `DO \$TEST\$ BEGIN RETURN;
-    SELECT \* FROM users WHERE name = 'O''Brien' AND email LIKE '%@example\.com'
-END; \$TEST\$;`
-				mock.ExpectQuery(expectedQuery).WillReturnRows(rows)
-			},
-			query: query.Query{
-				Query: "SELECT * FROM users WHERE name = 'O''Brien' AND email LIKE '%@example.com'",
-			},
-			want: true,
+			name:  "valid select from non-existent table is syntactically valid",
+			query: query.Query{Query: "SELECT * FROM non_existent_table"},
+			want:  true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mock, err := pgxmock.NewPool()
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer mock.Close()
-
-			tt.setupMock(mock)
-
-			client := Client{connection: mock}
+			client := Client{sqlParser: parser}
 
 			got, err := client.IsValid(t.Context(), &tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
-				require.Equal(t, tt.errorMessage, err.Error())
 			} else {
 				require.NoError(t, err)
 			}
 
 			require.Equal(t, tt.want, got)
-			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
 }

@@ -7,6 +7,7 @@ from parser.main import (
     get_tables,
     add_limit,
     is_single_select_query,
+    validate_query,
 )
 
 from pathlib import Path
@@ -59,6 +60,10 @@ def main():
                 logging.info("got add-limit command")
                 c = cmd["contents"]
                 result = add_limit(c["query"], c["limit"], c["dialect"])
+            elif cmd["command"] == "validate":
+                logging.info("got validate command")
+                c = cmd["contents"]
+                result = validate_query(c["query"], c.get("dialect"))
             elif cmd["command"] == "is-single-select":
                 logging.info("got is-single-select command")
                 c = cmd["contents"]
