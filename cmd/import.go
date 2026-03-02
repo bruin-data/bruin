@@ -1003,8 +1003,6 @@ type scheduledQueryModel struct {
 	focusedPane   int // 0 for left pane, 1 for right pane
 }
 
-const keyEnter = "enter"
-
 // Color constants for UI styling.
 const (
 	colorGray      = "#374151"
