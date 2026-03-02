@@ -50,9 +50,10 @@ const (
 	pipelineMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
 
-	pipelineConcurrencyMustBePositive = "Pipeline concurrency must be 1 or greater"
-	assetTierMustBeBetweenOneAndFive  = "Asset tier must be between 1 and 5"
-	secretMappingKeyMustExist         = "Secrets must have a `key` attribute"
+	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
+	pipelineMaxActiveStepsMustBePositive = "Pipeline max_active_steps must be a positive number"
+	assetTierMustBeBetweenOneAndFive     = "Asset tier must be between 1 and 5"
+	secretMappingKeyMustExist            = "Secrets must have a `key` attribute"
 
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
@@ -1626,6 +1627,17 @@ func EnsurePipelineConcurrencyIsValid(ctx context.Context, p *pipeline.Pipeline)
 	if p.Concurrency <= 0 {
 		issues = append(issues, &Issue{
 			Description: pipelineConcurrencyMustBePositive,
+		})
+	}
+
+	return issues, nil
+}
+
+func EnsurePipelineMaxActiveStepsIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if p.MaxActiveSteps != nil && *p.MaxActiveSteps <= 0 {
+		issues = append(issues, &Issue{
+			Description: pipelineMaxActiveStepsMustBePositive,
 		})
 	}
 

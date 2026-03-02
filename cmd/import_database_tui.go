@@ -273,7 +273,7 @@ func (m *importDatabaseModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *importDatabaseModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.String() == "ctrl+c" {
+	if msg.String() == keyCtrlC {
 		m.quitting = true
 		return m, tea.Quit
 	}

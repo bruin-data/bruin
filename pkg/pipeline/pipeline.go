@@ -1514,6 +1514,7 @@ type Pipeline struct {
 	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
+	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit" yaml:"commit,omitempty"`
 	Snapshot           string                 `json:"snapshot" yaml:"snapshot,omitempty"`

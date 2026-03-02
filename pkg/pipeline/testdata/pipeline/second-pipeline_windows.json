@@ -275,5 +275,6 @@
   "catchup_mode": "",
   "commit": "",
   "retries": 0,
-  "concurrency": 1
+  "concurrency": 1,
+  "max_active_steps": null
 }
