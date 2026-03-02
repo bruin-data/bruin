@@ -1,0 +1,32 @@
+name: raw.seed
+type: bq.seed
+description: This asset loads a CSV file into a BigQuery table.
+
+parameters:
+  path: ./seed.csv
+
+columns:
+  - name: name
+    type: string
+    description: Contact person's full name
+    checks:
+      - name: not_null
+  - name: networking_through
+    type: string
+    description: Source or connection through which contact was made
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value:
+          - LinkedIn
+          - Twitter
+          - Facebook
+          - Instagram
+  - name: position
+    type: string
+    description: Contact's job position or title
+    checks:
+      - name: not_null
+  - name: contact_date
+    type: string
+    description: Date when contact was established
