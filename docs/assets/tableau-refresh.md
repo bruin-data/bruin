@@ -71,6 +71,7 @@ If both ID and name are missing, or the name cannot be resolved, the pipeline wi
 For `tableau.datasource`, `tableau.workbook`, and `tableau` assets, Bruin supports controlling the refresh mode:
 
 - `incremental` (optional): defaults to `true`. When `true`, Bruin requests incremental refresh.
+- `refresh_timeout_minutes` (optional): defaults to `60`. Controls how long Bruin waits for Tableau job completion before timing out.
 - Pipeline run flag `--full-refresh`: when enabled, Bruin forces non-incremental refresh for Tableau assets.
 
 If an incremental refresh is requested but the Tableau extract is not configured for incremental updates, Bruin automatically retries once without the incremental flag.
@@ -85,6 +86,7 @@ parameters:
   refresh: true
   datasource_id: "12345678-1234-1234-1234-123456789012"
   incremental: true
+  refresh_timeout_minutes: 90
 ```
 
 Or, using a name lookup:

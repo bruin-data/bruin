@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -14,6 +15,8 @@ import (
 type BasicOperator struct {
 	connection config.ConnectionGetter
 }
+
+const defaultRefreshTimeout = 60 * time.Minute
 
 func NewBasicOperator(conn config.ConnectionGetter) *BasicOperator {
 	return &BasicOperator{
@@ -88,7 +91,8 @@ func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Clie
 		datasourceID = id
 	}
 	incremental := resolveIncrementalRefresh(ctx, t.Parameters)
-	if err := client.RefreshDataSource(ctx, datasourceID, incremental); err != nil {
+	timeout := resolveRefreshTimeout(t.Parameters)
+	if err := client.RefreshDataSource(ctx, datasourceID, incremental, timeout); err != nil {
 		return errors.Wrap(err, "failed to refresh Tableau data source")
 	}
 
@@ -124,7 +128,8 @@ func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client
 		workbookID = id
 	}
 	incremental := resolveIncrementalRefresh(ctx, t.Parameters)
-	if err := client.RefreshWorksheet(ctx, workbookID, incremental); err != nil {
+	timeout := resolveRefreshTimeout(t.Parameters)
+	if err := client.RefreshWorksheet(ctx, workbookID, incremental, timeout); err != nil {
 		return errors.Wrap(err, "failed to refresh Tableau workbook")
 	}
 
@@ -145,6 +150,15 @@ func resolveIncrementalRefresh(ctx context.Context, params map[string]string) bo
 	return true
 }
 
+func resolveRefreshTimeout(params map[string]string) time.Duration {
+	timeoutMinutes, ok := getIntParam(params, "refresh_timeout_minutes")
+	if !ok || timeoutMinutes <= 0 {
+		return defaultRefreshTimeout
+	}
+
+	return time.Duration(timeoutMinutes) * time.Minute
+}
+
 func getBoolParam(params map[string]string, key string) (bool, bool) {
 	value, ok := params[key]
 	if !ok {
@@ -159,6 +173,25 @@ func getBoolParam(params map[string]string, key string) (bool, bool) {
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
 		return false, false
+	}
+
+	return parsed, true
+}
+
+func getIntParam(params map[string]string, key string) (int, bool) {
+	value, ok := params[key]
+	if !ok {
+		return 0, false
+	}
+
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, false
 	}
 
 	return parsed, true

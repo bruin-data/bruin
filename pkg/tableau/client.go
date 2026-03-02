@@ -191,16 +191,16 @@ func (c *Client) authenticate(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) RefreshDataSource(ctx context.Context, datasourceID string, incremental bool) error {
-	return c.refreshResource(ctx, "datasources", datasourceID, "datasource", incremental)
+func (c *Client) RefreshDataSource(ctx context.Context, datasourceID string, incremental bool, timeout time.Duration) error {
+	return c.refreshResource(ctx, "datasources", datasourceID, "datasource", incremental, timeout)
 }
 
-func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string, incremental bool) error {
-	return c.refreshResource(ctx, "workbooks", workbookID, "workbook", incremental)
+func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string, incremental bool, timeout time.Duration) error {
+	return c.refreshResource(ctx, "workbooks", workbookID, "workbook", incremental, timeout)
 }
 
-func (c *Client) pollJobStatus(ctx context.Context, jobID string) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+func (c *Client) pollJobStatus(ctx context.Context, jobID string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	statusURL := fmt.Sprintf("https://%s/api/%s/sites/%s/jobs/%s", c.config.Host, c.config.APIVersion, c.siteID, jobID)
 	var writer io.Writer = os.Stdout
@@ -262,7 +262,7 @@ func (c *Client) pollJobStatus(ctx context.Context, jobID string) error {
 	}
 }
 
-func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, payloadKey string, incremental bool) error {
+func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, payloadKey string, incremental bool, timeout time.Duration) error {
 	if err := c.authenticate(ctx); err != nil {
 		return errors.Wrap(err, "failed to authenticate with Tableau")
 	}
@@ -276,7 +276,7 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 	}
 
 	if statusCode == http.StatusAccepted {
-		return c.pollFromRefreshResponse(ctx, responseBody)
+		return c.pollFromRefreshResponse(ctx, responseBody, timeout)
 	}
 
 	if statusCode == http.StatusOK {
@@ -298,7 +298,7 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 		}
 
 		if statusCode == http.StatusAccepted {
-			return c.pollFromRefreshResponse(ctx, responseBody)
+			return c.pollFromRefreshResponse(ctx, responseBody, timeout)
 		}
 		if statusCode == http.StatusOK {
 			return nil
@@ -342,7 +342,7 @@ func (c *Client) sendRefreshRequest(ctx context.Context, refreshURL, payloadKey,
 	return resp.StatusCode, body, nil
 }
 
-func (c *Client) pollFromRefreshResponse(ctx context.Context, responseBody []byte) error {
+func (c *Client) pollFromRefreshResponse(ctx context.Context, responseBody []byte, timeout time.Duration) error {
 	var jobResp struct {
 		Job struct {
 			ID string `json:"id"`
@@ -354,7 +354,7 @@ func (c *Client) pollFromRefreshResponse(ctx context.Context, responseBody []byt
 	if jobResp.Job.ID == "" {
 		return errors.New("missing job ID in Tableau response")
 	}
-	return c.pollJobStatus(ctx, jobResp.Job.ID)
+	return c.pollJobStatus(ctx, jobResp.Job.ID, timeout)
 }
 
 func shouldRetryWithoutIncremental(statusCode int) bool {
