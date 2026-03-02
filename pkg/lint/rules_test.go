@@ -3110,6 +3110,73 @@ func TestEnsurePipelineConcurrencyIsValid(t *testing.T) {
 	}
 }
 
+func TestEnsurePipelineMaxActiveStepsIsValid(t *testing.T) {
+	t.Parallel()
+
+	intPtr := func(v int) *int { return &v }
+
+	tests := []struct {
+		name           string
+		maxActiveSteps *int
+		want           []*Issue
+		wantErr        bool
+	}{
+		{
+			name:           "nil is valid",
+			maxActiveSteps: nil,
+			want:           noIssues,
+			wantErr:        false,
+		},
+		{
+			name:           "positive value is valid",
+			maxActiveSteps: intPtr(10),
+			want:           noIssues,
+			wantErr:        false,
+		},
+		{
+			name:           "value of 1 is valid",
+			maxActiveSteps: intPtr(1),
+			want:           noIssues,
+			wantErr:        false,
+		},
+		{
+			name:           "zero is invalid",
+			maxActiveSteps: intPtr(0),
+			want: []*Issue{
+				{
+					Description: pipelineMaxActiveStepsMustBePositive,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:           "negative value is invalid",
+			maxActiveSteps: intPtr(-5),
+			want: []*Issue{
+				{
+					Description: pipelineMaxActiveStepsMustBePositive,
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := &pipeline.Pipeline{
+				MaxActiveSteps: tt.maxActiveSteps,
+			}
+			got, err := EnsurePipelineMaxActiveStepsIsValid(t.Context(), p)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("EnsurePipelineMaxActiveStepsIsValid() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
 	t.Parallel()
 

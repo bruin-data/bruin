@@ -310,6 +310,7 @@
   },
   "retries": 0,
   "concurrency": 1,
+  "max_active_steps": null,
   "default": {
     "type": "ingestr",
     "parameters": {

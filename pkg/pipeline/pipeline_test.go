@@ -1178,6 +1178,85 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 	})
 }
 
+func TestPipeline_MaxActiveSteps(t *testing.T) {
+	t.Parallel()
+
+	t.Run("YAML parsing sets value when provided", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := yaml.Unmarshal([]byte("name: test\nmax_active_steps: 10\n"), &p)
+		require.NoError(t, err)
+		require.NotNil(t, p.MaxActiveSteps)
+		assert.Equal(t, 10, *p.MaxActiveSteps)
+	})
+
+	t.Run("YAML parsing leaves nil when not provided", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := yaml.Unmarshal([]byte("name: test\n"), &p)
+		require.NoError(t, err)
+		assert.Nil(t, p.MaxActiveSteps)
+	})
+
+	t.Run("JSON parsing sets value when provided", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := json.Unmarshal([]byte(`{"name":"test","max_active_steps":20}`), &p)
+		require.NoError(t, err)
+		require.NotNil(t, p.MaxActiveSteps)
+		assert.Equal(t, 20, *p.MaxActiveSteps)
+	})
+
+	t.Run("JSON parsing leaves nil when not provided", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := json.Unmarshal([]byte(`{"name":"test"}`), &p)
+		require.NoError(t, err)
+		assert.Nil(t, p.MaxActiveSteps)
+	})
+
+	t.Run("JSON includes null when nil", func(t *testing.T) {
+		t.Parallel()
+		p := pipeline.Pipeline{Name: "test"}
+		data, err := json.Marshal(p)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"max_active_steps":null`)
+	})
+
+	t.Run("JSON includes field when set", func(t *testing.T) {
+		t.Parallel()
+		val := 8
+		p := pipeline.Pipeline{Name: "test", MaxActiveSteps: &val}
+		data, err := json.Marshal(p)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"max_active_steps":8`)
+	})
+
+	t.Run("FormatContent includes max_active_steps when set", func(t *testing.T) {
+		t.Parallel()
+		val := 12
+		p := &pipeline.Pipeline{
+			Name:           "test-pipeline",
+			MaxActiveSteps: &val,
+			DefinitionFile: pipeline.DefinitionFile{Path: "/test/pipeline.yml"},
+		}
+		content, err := p.FormatContent()
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "max_active_steps: 12")
+	})
+
+	t.Run("FormatContent omits max_active_steps when nil", func(t *testing.T) {
+		t.Parallel()
+		p := &pipeline.Pipeline{
+			Name:           "test-pipeline",
+			DefinitionFile: pipeline.DefinitionFile{Path: "/test/pipeline.yml"},
+		}
+		content, err := p.FormatContent()
+		require.NoError(t, err)
+		assert.NotContains(t, string(content), "max_active_steps")
+	})
+}
+
 func TestClearSpacesAtLineEndings(t *testing.T) {
 	t.Parallel()
 
