@@ -386,13 +386,17 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		_ = tempPyScript.Close()
 	}(tempPyScript)
 
-	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", strings.ReplaceAll(execCtx.repo.Path, "\\", "\\\\"))
-	// Use adjusted module path for pyproject-based execution
+	// Use adjusted module path and root for pyproject-based execution.
+	// When pyproject.toml is in a subdirectory, the module path is relative to the project
+	// root, so sys.path must also point to the project root (not the git repo root).
 	modulePath := execCtx.module
+	rootPath := execCtx.repo.Path
 	isPyproject := execCtx.dependencyConfig != nil && execCtx.dependencyConfig.Type == DependencyTypePyproject
 	if isPyproject {
 		modulePath = u.calculateModuleFromProjectRoot(execCtx, execCtx.dependencyConfig.ProjectRoot)
+		rootPath = execCtx.dependencyConfig.ProjectRoot
 	}
+	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", strings.ReplaceAll(rootPath, "\\", "\\\\"))
 	arrowScript = strings.ReplaceAll(arrowScript, "$MODULE_PATH", modulePath)
 	arrowScript = strings.ReplaceAll(arrowScript, "$ARROW_FILE_PATH", strings.ReplaceAll(arrowFilePath, "\\", "\\\\"))
 
