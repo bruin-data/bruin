@@ -71,6 +71,10 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 				Usage: "Number of assets to enhance in parallel when processing a folder",
 				Value: 5,
 			},
+			&cli.StringFlag{
+				Name:  "system-prompt",
+				Usage: "Custom system prompt to append to the default enhancement instructions",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			// Check both global and local debug flags
@@ -280,7 +284,8 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		tableSummaryJSON = preFetchTableSummary(ctx, fs, assetPath, pp.Asset, env, output)
 	}
 
-	err = enhancer.EnhanceAsset(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON)
+	customSystemPrompt := c.String("system-prompt")
+	err = enhancer.EnhanceAsset(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON, customSystemPrompt)
 	if err != nil {
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
