@@ -533,7 +533,11 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	// Build enhanced description with metadata
 	description := buildEnhancedDescription(table, schemaName, tableName)
 
+	// Build asset name as <schema>.<table>
+	assetName := fmt.Sprintf("%s.%s", strings.ToLower(schemaName), strings.ToLower(tableName))
+
 	asset := &pipeline.Asset{
+		Name: assetName,
 		Type: actualAssetType,
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    fileName,
