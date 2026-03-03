@@ -18,24 +18,83 @@ func TestViewMaterializer(t *testing.T) {
 
 func TestBuildCreateReplaceQuery(t *testing.T) {
 	t.Parallel()
-	asset := &pipeline.Asset{Name: "dbo.Table"}
-	result, err := buildCreateReplaceQuery(asset, "SELECT 1;")
-	require.NoError(t, err)
-	assert.Contains(t, result, "SELECT * INTO [dbo].[Table__bruin_tmp]")
-	assert.Contains(t, result, "EXEC sp_rename 'dbo.Table', 'Table__bruin_backup'")
-	assert.Contains(t, result, "EXEC sp_rename 'dbo.Table__bruin_tmp', 'Table'")
+
+	t.Run("simple query", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{Name: "dbo.Table"}
+		result, err := buildCreateReplaceQuery(asset, "SELECT 1;")
+		require.NoError(t, err)
+		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
+			"DROP TABLE IF EXISTS [dbo].[Table__bruin_backup];\n" +
+			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
+			"SELECT 1;\n" +
+			"IF OBJECT_ID('dbo.Table', 'U') IS NOT NULL BEGIN EXEC sp_rename 'dbo.Table', 'Table__bruin_backup' END;\n" +
+			"EXEC sp_rename 'dbo.Table__bruin_tmp', 'Table';\n" +
+			"DROP TABLE IF EXISTS [dbo].[Table__bruin_backup];"
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("query with CTE", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{Name: "dbo.Table"}
+		result, err := buildCreateReplaceQuery(asset, "WITH monthly AS (SELECT id, amount FROM sales) SELECT * FROM monthly;")
+		require.NoError(t, err)
+		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
+			"DROP TABLE IF EXISTS [dbo].[Table__bruin_backup];\n" +
+			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
+			"WITH monthly AS (SELECT id, amount FROM sales) SELECT * FROM monthly;\n" +
+			"IF OBJECT_ID('dbo.Table', 'U') IS NOT NULL BEGIN EXEC sp_rename 'dbo.Table', 'Table__bruin_backup' END;\n" +
+			"EXEC sp_rename 'dbo.Table__bruin_tmp', 'Table';\n" +
+			"DROP TABLE IF EXISTS [dbo].[Table__bruin_backup];"
+		assert.Equal(t, expected, result)
+	})
 }
 
 func TestBuildDeleteInsertQuery(t *testing.T) {
 	t.Parallel()
-	asset := &pipeline.Asset{Name: "dbo.Table"}
 
-	_, err := buildDeleteInsertQuery(asset, "SELECT 1")
-	require.Error(t, err)
+	t.Run("error without columns", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{Name: "dbo.Table"}
+		_, err := buildDeleteInsertQuery(asset, "SELECT 1")
+		require.Error(t, err)
+	})
 
-	asset.Columns = []pipeline.Column{{Name: "id", PrimaryKey: true}}
-	result, err := buildDeleteInsertQuery(asset, "SELECT 1")
-	require.NoError(t, err)
-	assert.Contains(t, result, "DELETE FROM [dbo].[Table]")
-	assert.Contains(t, result, "[dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]")
+	t.Run("simple query", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Name:    "dbo.Table",
+			Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+		}
+		result, err := buildDeleteInsertQuery(asset, "SELECT 1")
+		require.NoError(t, err)
+		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
+			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
+			"SELECT 1;\n" +
+			"DELETE FROM [dbo].[Table] WHERE EXISTS (\n" +
+			"  SELECT 1 FROM [dbo].[Table__bruin_tmp] WHERE [dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]\n" +
+			");\n" +
+			"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[Table__bruin_tmp];\n" +
+			"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];"
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("query with CTE", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Name:    "dbo.Table",
+			Columns: []pipeline.Column{{Name: "id", PrimaryKey: true}},
+		}
+		result, err := buildDeleteInsertQuery(asset, "WITH cte AS (SELECT id, val FROM src) SELECT * FROM cte")
+		require.NoError(t, err)
+		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
+			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
+			"WITH cte AS (SELECT id, val FROM src) SELECT * FROM cte;\n" +
+			"DELETE FROM [dbo].[Table] WHERE EXISTS (\n" +
+			"  SELECT 1 FROM [dbo].[Table__bruin_tmp] WHERE [dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]\n" +
+			");\n" +
+			"INSERT INTO [dbo].[Table] SELECT * FROM [dbo].[Table__bruin_tmp];\n" +
+			"DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];"
+		assert.Equal(t, expected, result)
+	})
 }
