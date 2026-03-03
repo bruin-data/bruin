@@ -11,12 +11,35 @@ Bruin supports using a local DuckDB database.
       duckdb:
         - name: "connection_name"
           path: "/path/to/your/duckdb/database.db"
+          read_only: false
 ```
 
-The field `path` is the only one you need and it can point to an existing database or the full path of the database that you want to create and where your queries would be materialized.
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `path` | string | Yes | | Path to an existing or new DuckDB database file |
+| `read_only` | boolean | No | `false` | Open the database in read-only mode, enabling parallel read queries |
 
 > [!WARNING]
 > DuckDB does not allow concurrency between different processes, which means other clients should not be connected to the database while Bruin is running.
+
+### Read-Only Mode
+
+When `read_only` is set to `true`, the connection opens the DuckDB database in read-only access mode. This has two effects:
+- DuckDB does not acquire a write lock on the database file, allowing other processes to access it concurrently.
+- Multiple Bruin queries on the same connection can run in parallel instead of being serialized.
+
+This is useful when you only need to read from a shared DuckDB database and want to maximize query throughput.
+
+```yaml
+    connections:
+      duckdb:
+        - name: "my_readonly_db"
+          path: "/shared/data/analytics.db"
+          read_only: true
+```
+
+> [!NOTE]
+> Write operations (materializations, DDL) will fail on read-only connections. Only use this for connections that are exclusively used for reading.
 
 ## Assets
 

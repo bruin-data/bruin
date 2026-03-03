@@ -4,6 +4,7 @@ import "github.com/bruin-data/bruin/pkg/config"
 
 type Config struct {
 	Path      string
+	ReadOnly  bool
 	Lakehouse *config.LakehouseConfig
 }
 

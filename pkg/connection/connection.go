@@ -1232,6 +1232,7 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 
 	client, err := duck.NewClient(duck.Config{
 		Path:      connection.Path,
+		ReadOnly:  connection.ReadOnly,
 		Lakehouse: connection.Lakehouse,
 	})
 	if err != nil {

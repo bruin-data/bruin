@@ -23,3 +23,14 @@ func TestConfig_ToIngestr(t *testing.T) {
 
 	assert.Equal(t, "duckdb:////some/path/db.duckdb", c.GetIngestrURI())
 }
+
+func TestConfig_ReadOnly_DoesNotAffectURI(t *testing.T) {
+	t.Parallel()
+	c := Config{
+		Path:     "/some/path/db.duckdb",
+		ReadOnly: true,
+	}
+
+	assert.Equal(t, "/some/path/db.duckdb", c.ToDBConnectionURI())
+	assert.Equal(t, "duckdb:////some/path/db.duckdb", c.GetIngestrURI())
+}
