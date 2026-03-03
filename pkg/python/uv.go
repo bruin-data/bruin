@@ -387,7 +387,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		// Batch mode: process each batch file separately
 		_, _ = output.Write([]byte(fmt.Sprintf("Processing %d batches...\n", batchCount)))
 
-		for i := 0; i < batchCount; i++ {
+		for i := range batchCount {
 			batchFilePath := fmt.Sprintf("%s.batch_%d", arrowFilePath, i)
 			defer func(name string) {
 				_ = os.Remove(name)
