@@ -27,6 +27,7 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 type Client struct {
 	connection    connection
 	config        DuckDBConfig
+	readOnly      bool
 	schemaCreator *DuckDBSchemaCreator
 }
 

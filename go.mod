@@ -67,6 +67,7 @@ require (
 	github.com/trinodb/trino-go-client v0.326.0
 	github.com/uber/athenadriver v1.1.15
 	github.com/urfave/cli/v3 v3.3.8
+	github.com/vertica/vertica-sql-go v1.3.5
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/xlab/treeprint v1.2.0
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
@@ -365,7 +366,6 @@ require (
 	github.com/ultraware/whitespace v0.2.0 // indirect
 	github.com/uudashr/gocognit v1.2.0 // indirect
 	github.com/uudashr/iface v1.3.1 // indirect
-	github.com/vertica/vertica-sql-go v1.3.5 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect

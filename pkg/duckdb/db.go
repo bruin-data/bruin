@@ -99,6 +99,7 @@ func normalizeTypeName(arrowType string) string {
 type Client struct {
 	connection    connection
 	config        DuckDBConfig
+	readOnly      bool
 	schemaCreator *DuckDBSchemaCreator
 	typeMapper    *diff.DatabaseTypeMapper
 }
@@ -155,8 +156,15 @@ func (w *sqlxWrapper) QueryRowContext(ctx context.Context, query string, args ..
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
-	LockDatabase(c.ToDBConnectionURI())
-	defer UnlockDatabase(c.ToDBConnectionURI())
+	readOnly := false
+	if cfg, ok := c.(Config); ok {
+		readOnly = cfg.ReadOnly
+	}
+
+	if !readOnly {
+		LockDatabase(c.ToDBConnectionURI())
+		defer UnlockDatabase(c.ToDBConnectionURI())
+	}
 
 	conn, err := NewEphemeralConnection(c)
 	if err != nil {
@@ -166,14 +174,27 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 	return &Client{
 		connection:    conn,
 		config:        c,
+		readOnly:      readOnly,
 		schemaCreator: NewDuckDBSchemaCreator(),
 		typeMapper:    diff.NewDuckDBTypeMapper(),
 	}, nil
 }
 
+func (c *Client) lockIfNeeded() {
+	if !c.readOnly {
+		LockDatabase(c.config.ToDBConnectionURI())
+	}
+}
+
+func (c *Client) unlockIfNeeded() {
+	if !c.readOnly {
+		UnlockDatabase(c.config.ToDBConnectionURI())
+	}
+}
+
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
+	c.lockIfNeeded()
+	defer c.unlockIfNeeded()
 	_, err := c.connection.ExecContext(ctx, query.String())
 	if err != nil {
 		return err
@@ -192,8 +213,8 @@ func (c *Client) GetDBConnectionURI() (string, error) {
 
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
+	c.lockIfNeeded()
+	defer c.unlockIfNeeded()
 
 	rows, err := c.connection.QueryContext(ctx, query.String())
 	if err != nil {
@@ -242,8 +263,8 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
+	c.lockIfNeeded()
+	defer c.unlockIfNeeded()
 
 	rows, err := c.connection.QueryContext(ctx, queryObject.String())
 	if err != nil {
@@ -375,8 +396,8 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 }
 
 func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
+	c.lockIfNeeded()
+	defer c.unlockIfNeeded()
 
 	var rowCount int64
 
@@ -666,8 +687,8 @@ func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 }
 
 func (c *Client) GetDatabases(ctx context.Context) ([]string, error) {
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
+	c.lockIfNeeded()
+	defer c.unlockIfNeeded()
 
 	q := `
 SELECT DISTINCT table_schema
@@ -703,8 +724,8 @@ func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, 
 		return nil, errors.New("database name cannot be empty")
 	}
 
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
+	c.lockIfNeeded()
+	defer c.unlockIfNeeded()
 
 	q := `
 SELECT table_name
@@ -744,8 +765,8 @@ func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 		return nil, errors.New("table name cannot be empty")
 	}
 
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
+	c.lockIfNeeded()
+	defer c.unlockIfNeeded()
 
 	q := `
 SELECT
@@ -799,8 +820,8 @@ ORDER BY ordinal_position;
 func (c *Client) Close() {}
 
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
+	c.lockIfNeeded()
+	defer c.unlockIfNeeded()
 
 	// DuckDB uses a catalog approach, we'll use the INFORMATION_SCHEMA
 	// First, let's get all schemas and tables with view definitions

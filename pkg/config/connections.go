@@ -507,6 +507,7 @@ func (c AirtableConnection) GetName() string {
 type DuckDBConnection struct {
 	Name      string           `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Path      string           `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+	ReadOnly  bool             `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 	Lakehouse *LakehouseConfig `yaml:"lakehouse,omitempty" json:"lakehouse,omitempty" mapstructure:"lakehouse"`
 }
 

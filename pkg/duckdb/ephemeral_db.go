@@ -26,7 +26,13 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 
 func (e *EphemeralConnection) openDB(ctx context.Context) (*sql.DB, error) {
 	path := e.config.ToDBConnectionURI()
-	db, err := sql.Open("adbc_duckdb", "driver=duckdb;path="+path)
+	connStr := "driver=duckdb;path=" + path
+
+	if cfg, ok := e.config.(Config); ok && cfg.ReadOnly {
+		connStr += ";access_mode=read_only"
+	}
+
+	db, err := sql.Open("adbc_duckdb", connStr)
 	if err != nil {
 		return nil, err
 	}
