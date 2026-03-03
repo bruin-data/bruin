@@ -99,6 +99,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
+	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/bruin-data/bruin/pkg/wise"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
@@ -200,6 +201,7 @@ type Manager struct {
 	InfluxDB             map[string]*influxdb.Client
 	Tableau              map[string]*tableau.Client
 	Trino                map[string]*trino.Client
+	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
@@ -2631,6 +2633,34 @@ func (m *Manager) AddTrinoConnectionFromConfig(connection *config.TrinoConnectio
 	return nil
 }
 
+func (m *Manager) AddVerticaConnectionFromConfig(connection *config.VerticaConnection) error {
+	m.mutex.Lock()
+	if m.Vertica == nil {
+		m.Vertica = make(map[string]*vertica.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := vertica.NewDB(&vertica.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+		Schema:   connection.Schema,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Vertica[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
 func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
@@ -2791,6 +2821,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
