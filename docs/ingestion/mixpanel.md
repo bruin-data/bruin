@@ -4,13 +4,25 @@
 
 Bruin supports Mixpanel as a source for [Ingestr assets](/assets/ingestr). You can ingest data from Mixpanel into your data platform.
 
-To set up a Mixpanel connection, add a configuration item in the `.bruin.yml` file and in your asset file. The configuration requires `username`, `password`, `project_id` and optionally `server` (defaults to `eu`).
+To set up a Mixpanel connection, add a configuration item in the `.bruin.yml` file and in your asset file. You can authenticate either with `api_secret` alone, or with `username`, `password`, and `project_id`. Optionally you can set `server` (defaults to `eu`).
 
 Follow these steps to set up Mixpanel and run ingestion.
 
 ## Configuration
 
 ### Step 1: Add a connection to the .bruin.yml file
+
+#### Option 1: Using API Secret
+
+```yaml
+connections:
+  mixpanel:
+    - name: "mixpanel"
+      api_secret: "your-api-secret"
+      server: "eu"
+```
+
+#### Option 2: Using Service Account
 
 ```yaml
 connections:
@@ -22,6 +34,7 @@ connections:
       server: "eu"
 ```
 
+- `api_secret`: Mixpanel API secret. If provided, `username`, `password`, and `project_id` are not required.
 - `username`: Mixpanel service account username.
 - `password`: Secret associated with the service account.
 - `project_id`: The numeric project ID.
