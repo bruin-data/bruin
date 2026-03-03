@@ -128,6 +128,11 @@ func ResolvePythonVersion(requiresPython string, defaultVersion string) (string,
 		// Strip wildcard suffix (e.g., "3.12.*" -> "3.12")
 		ver = strings.TrimSuffix(ver, ".*")
 
+		// Strip patch version (e.g., "3.13.0" -> "3.13")
+		if verParts := strings.Split(ver, "."); len(verParts) > 2 {
+			ver = verParts[0] + "." + verParts[1]
+		}
+
 		major, minor, ok := parsePythonVersion(ver)
 		if !ok {
 			return defaultVersion, nil

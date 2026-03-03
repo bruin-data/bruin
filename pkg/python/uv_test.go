@@ -382,6 +382,18 @@ func TestResolvePythonVersion(t *testing.T) {
 			defaultVersion: "3.11",
 			want:           "3.12",
 		},
+		{
+			name:           "patch version is stripped >=3.13.0",
+			requiresPython: ">=3.13.0",
+			defaultVersion: "3.11",
+			want:           "3.13",
+		},
+		{
+			name:           "patch version is stripped >=3.12.1",
+			requiresPython: ">=3.12.1",
+			defaultVersion: "3.11",
+			want:           "3.12",
+		},
 	}
 
 	for _, tt := range tests {
