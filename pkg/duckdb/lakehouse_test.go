@@ -167,6 +167,29 @@ func TestValidateLakehouseConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "iceberg with glue, gcs and auth passes",
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Storage.Type = config.StorageTypeGCS
+				cfg.Storage.Path = "gs://warehouse"
+				cfg.Storage.Region = ""
+				return cfg
+			},
+			wantErr: false,
+		},
+		{
+			name: "iceberg with gcs but no storage auth fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validIcebergLakehouseConfig()
+				cfg.Storage.Type = config.StorageTypeGCS
+				cfg.Storage.Path = "gs://warehouse"
+				cfg.Storage.Auth = config.StorageAuth{}
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "with gcs storage requires access_key and secret_key",
+		},
+		{
 			name: "ducklake with unsupported catalog type fails",
 			build: func() *config.LakehouseConfig {
 				cfg := validDuckLakePostgresConfig()
@@ -230,6 +253,39 @@ func TestValidateLakehouseConfig(t *testing.T) {
 			name:    "ducklake with sqlite catalog and s3 storage passes",
 			build:   validDuckLakeSQLiteConfig,
 			wantErr: false,
+		},
+		{
+			name: "ducklake with postgres and gcs storage passes",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakePostgresConfig()
+				cfg.Storage.Type = config.StorageTypeGCS
+				cfg.Storage.Path = "gs://warehouse"
+				return cfg
+			},
+			wantErr: false,
+		},
+		{
+			name: "ducklake with gcs storage missing auth fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakePostgresConfig()
+				cfg.Storage.Type = config.StorageTypeGCS
+				cfg.Storage.Path = "gs://warehouse"
+				cfg.Storage.Auth = config.StorageAuth{}
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "with gcs storage requires access_key and secret_key",
+		},
+		{
+			name: "ducklake with gcs storage missing path fails",
+			build: func() *config.LakehouseConfig {
+				cfg := validDuckLakePostgresConfig()
+				cfg.Storage.Type = config.StorageTypeGCS
+				cfg.Storage.Path = ""
+				return cfg
+			},
+			wantErr: true,
+			errMsg:  "with gcs storage requires path",
 		},
 	}
 
@@ -319,6 +375,20 @@ func TestLakehouseAttacher_GetRequiredExtensions(t *testing.T) {
 				},
 			},
 			wantExts: []string{"ducklake", "sqlite", "aws", "httpfs"},
+		},
+		{
+			name: "ducklake with sqlite and gcs",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: config.CatalogConfig{
+					Type: config.CatalogTypeSQLite,
+					Path: "metadata.sqlite",
+				},
+				Storage: config.StorageConfig{
+					Type: config.StorageTypeGCS,
+				},
+			},
+			wantExts: []string{"ducklake", "sqlite", "httpfs"},
 		},
 	}
 
@@ -416,6 +486,67 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := attacher.generateS3Secret("test_secret", *tt.storage)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestLakehouseAttacher_GenerateGCSSecret(t *testing.T) {
+	t.Parallel()
+	attacher := NewLakehouseAttacher()
+
+	tests := []struct {
+		name    string
+		storage *config.StorageConfig
+		want    string
+	}{
+		{
+			name: "gcs with access key and secret key",
+			storage: &config.StorageConfig{
+				Type: config.StorageTypeGCS,
+				Auth: config.StorageAuth{
+					AccessKey: "GOOGEXAMPLE",
+					SecretKey: "gcssecret",
+				},
+			},
+			want: `CREATE OR REPLACE SECRET test_secret (
+    TYPE gcs
+,   KEY_ID 'GOOGEXAMPLE'
+,   SECRET 'gcssecret'
+,   SCOPE 'gs://'
+)`,
+		},
+		{
+			name: "gcs with scope path",
+			storage: &config.StorageConfig{
+				Type: config.StorageTypeGCS,
+				Path: "gs://ducklake/warehouse",
+				Auth: config.StorageAuth{
+					AccessKey: "GOOGEXAMPLE",
+					SecretKey: "gcssecret",
+				},
+			},
+			want: `CREATE OR REPLACE SECRET test_secret (
+    TYPE gcs
+,   KEY_ID 'GOOGEXAMPLE'
+,   SECRET 'gcssecret'
+,   SCOPE 'gs://ducklake/warehouse'
+)`,
+		},
+		{
+			name: "gcs without credentials returns empty",
+			storage: &config.StorageConfig{
+				Type: config.StorageTypeGCS,
+				Auth: config.StorageAuth{},
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := attacher.generateGCSSecret("test_secret", *tt.storage)
 			assert.Equal(t, tt.want, result)
 		})
 	}
@@ -778,6 +909,39 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 				"USE ducklake_catalog",
 			},
 			wantMinLen: 8,
+		},
+		{
+			name: "ducklake with duckdb and gcs storage",
+			lh: &config.LakehouseConfig{
+				Format: config.LakehouseFormatDuckLake,
+				Catalog: config.CatalogConfig{
+					Type: config.CatalogTypeDuckDB,
+					Path: "metadata.ducklake",
+				},
+				Storage: config.StorageConfig{
+					Type: config.StorageTypeGCS,
+					Path: "gs://ducklake/warehouse",
+					Auth: config.StorageAuth{
+						AccessKey: "GOOGEXAMPLE",
+						SecretKey: "gcssecret",
+					},
+				},
+			},
+			alias: "ducklake_catalog",
+			wantContains: []string{
+				"INSTALL ducklake",
+				"LOAD ducklake",
+				"INSTALL httpfs",
+				"LOAD httpfs",
+				"CREATE OR REPLACE SECRET",
+				"TYPE gcs",
+				"ATTACH 'ducklake:metadata.ducklake' AS ducklake_catalog",
+				"DATA_PATH 'gs://ducklake/warehouse'",
+				"OVERRIDE_DATA_PATH true",
+				"CREATE SCHEMA IF NOT EXISTS ducklake_catalog.main",
+				"USE ducklake_catalog",
+			},
+			wantMinLen: 7,
 		},
 		{
 			name: "ducklake with sqlite and s3 storage",
