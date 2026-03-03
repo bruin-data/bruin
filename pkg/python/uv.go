@@ -576,6 +576,7 @@ except ImportError:
 
 def convert_to_arrow_table(data):
     """Convert various data types to a PyArrow table."""
+    global pd, pl
     if pd is not None and isinstance(data, pd.DataFrame):
         return pa.Table.from_pandas(data)
     elif pl is not None and isinstance(data, pl.DataFrame):
@@ -588,17 +589,13 @@ def convert_to_arrow_table(data):
         type_name = type(data).__name__
         type_module = type(data).__module__
         if 'pandas' in type_module and type_name == 'DataFrame':
-            try:
-                import pandas as pd
-                return pa.Table.from_pandas(data)
-            except ImportError:
-                raise TypeError(f"Unsupported return type: {type(data)}. pandas DataFrame detected but pandas cannot be imported.")
+            if pd is None:
+                raise TypeError(f"Unsupported return type: {type(data)}. pandas DataFrame detected but pandas is not installed.")
+            return pa.Table.from_pandas(data)
         elif 'polars' in type_module and type_name == 'DataFrame':
-            try:
-                import polars as pl
-                return data.to_arrow()
-            except ImportError:
-                raise TypeError(f"Unsupported return type: {type(data)}. polars DataFrame detected but polars cannot be imported.")
+            if pl is None:
+                raise TypeError(f"Unsupported return type: {type(data)}. polars DataFrame detected but polars is not installed.")
+            return data.to_arrow()
         else:
             raise TypeError(f"Unsupported return type: {type(data)}")
 
