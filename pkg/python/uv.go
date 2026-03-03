@@ -249,9 +249,14 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	arrowFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("asset_data_%d.arrow", time.Now().UnixNano()))
+	manifestPath := arrowFilePath + ".manifest"
+
 	defer func(name string) {
 		_ = os.Remove(name)
 	}(arrowFilePath)
+	defer func(name string) {
+		_ = os.Remove(name)
+	}(manifestPath)
 
 	tempPyScript, err := os.CreateTemp("", "bruin-arrow-*.py")
 	if err != nil {
@@ -314,12 +319,21 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
+	// Check if we're in batch mode (generator/yield was used)
+	batchCount := 0
+	if manifestData, err := os.ReadFile(manifestPath); err == nil {
+		if _, err := fmt.Sscanf(string(manifestData), "%d", &batchCount); err != nil {
+			return errors.Wrap(err, "failed to parse batch manifest")
+		}
+	}
+
 	if len(asset.Parameters) == 0 {
 		asset.Parameters = make(map[string]string)
 	}
 
-	if mat.Strategy != "" {
-		ingestrStrategy, ok := TranslateBruinStrategyToIngestr(mat.Strategy)
+	originalStrategy := mat.Strategy
+	if originalStrategy != "" {
+		ingestrStrategy, ok := TranslateBruinStrategyToIngestr(originalStrategy)
 		if ok {
 			asset.Parameters["incremental_strategy"] = ingestrStrategy
 		}
@@ -327,26 +341,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	if mat.IncrementalKey != "" {
 		asset.Parameters["incremental_key"] = mat.IncrementalKey
-	}
-
-	// build ingestr flags
-	cmdArgs, err := ConsolidatedParameters(ctx, asset, []string{
-		"ingest",
-		"--source-uri",
-		"mmap://" + arrowFilePath,
-		"--source-table",
-		"asset_data",
-		"--dest-table",
-		execCtx.asset.Name,
-		"--yes",
-		"--progress",
-		"log",
-	}, &ColumnHintOptions{
-		NormalizeColumnNames:   false,
-		EnforceSchemaByDefault: false,
-	})
-	if err != nil {
-		return err
 	}
 
 	destConnectionName, err := execCtx.pipeline.GetConnectionNameForAsset(asset)
@@ -373,8 +367,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return errors.New("destination uri is empty, which means the destination connection is not configured correctly")
 	}
 
-	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
-
 	// Compute extra packages based on destination URI (e.g., pyodbc for MSSQL)
 	var extraPackages []string
 	extraPackages = AddExtraPackages(destURI, "", extraPackages)
@@ -391,6 +383,65 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return err
 	}
 
+	if batchCount > 0 {
+		// Batch mode: process each batch file separately
+		_, _ = output.Write([]byte(fmt.Sprintf("Processing %d batches...\n", batchCount)))
+
+		for i := 0; i < batchCount; i++ {
+			batchFilePath := fmt.Sprintf("%s.batch_%d", arrowFilePath, i)
+			defer func(name string) {
+				_ = os.Remove(name)
+			}(batchFilePath)
+
+			// For batches after the first, use append strategy
+			if i > 0 {
+				asset.Parameters["incremental_strategy"] = "append"
+			}
+
+			err = u.runIngestrForFile(ctx, execCtx, asset, batchFilePath, destURI, output)
+			if err != nil {
+				return errors.Wrapf(err, "failed to load batch %d into the destination", i)
+			}
+
+			_, _ = output.Write([]byte(fmt.Sprintf("Successfully loaded batch %d/%d into the destination.\n", i+1, batchCount)))
+		}
+
+		_, _ = output.Write([]byte(fmt.Sprintf("Successfully loaded all %d batches into the destination.\n", batchCount)))
+	} else {
+		// Single file mode (backward compatible with return)
+		err = u.runIngestrForFile(ctx, execCtx, asset, arrowFilePath, destURI, output)
+		if err != nil {
+			return errors.Wrap(err, "failed to load the data into the destination")
+		}
+
+		_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
+	}
+
+	return nil
+}
+
+func (u *UvPythonRunner) runIngestrForFile(ctx context.Context, execCtx *executionContext, asset *pipeline.Asset, arrowFilePath, destURI string, output io.Writer) error {
+	cmdArgs, err := ConsolidatedParameters(ctx, asset, []string{
+		"ingest",
+		"--source-uri",
+		"mmap://" + arrowFilePath,
+		"--source-table",
+		"asset_data",
+		"--dest-table",
+		execCtx.asset.Name,
+		"--yes",
+		"--progress",
+		"log",
+	}, &ColumnHintOptions{
+		NormalizeColumnNames:   false,
+		EnforceSchemaByDefault: false,
+	})
+	if err != nil {
+		return err
+	}
+
+	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
+
 	runArgs := slices.Concat([]string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
 
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
@@ -400,17 +451,10 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
+	return u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: runArgs,
 	})
-	if err != nil {
-		return errors.Wrap(err, "failed to run load the data into the destination")
-	}
-
-	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
-
-	return nil
 }
 
 func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
@@ -506,6 +550,7 @@ const PythonArrowTemplate = `
 # ///
 
 import sys
+import types
 import importlib.util
 from pathlib import Path
 
@@ -515,13 +560,9 @@ def import_module_from_path(module_path: str, module_name: str):
 
     return importlib.import_module(module_name)
 
-module = import_module_from_path("$REPO_ROOT", "$MODULE_PATH")
-df = module.materialize()
-
 import pyarrow as pa
 import pyarrow.ipc as ipc
 
-# Try importing pandas and polars for isinstance checks
 try:
     import pandas as pd
 except ImportError:
@@ -532,44 +573,65 @@ try:
 except ImportError:
     pl = None
 
-# Use isinstance() for robust type checking across pandas/polars versions
-# This works across all pandas versions (including 3.0+) regardless of string representation
-if pd is not None and isinstance(df, pd.DataFrame):
-    table = pa.Table.from_pandas(df)
-elif pl is not None and isinstance(df, pl.DataFrame):
-    table = df.to_arrow()
-elif isinstance(df, (list, tuple)):
-    table = pa.Table.from_pylist(list(df))
-elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
-    # Handle generators and other iterables (but not strings/bytes)
-    table = pa.Table.from_pylist(list(df))
-else:
-    # Fallback: check type module/name for pandas/polars if isinstance failed
-    # This handles edge cases where pandas/polars might not be importable
-    type_name = type(df).__name__
-    type_module = type(df).__module__
-    if 'pandas' in type_module and type_name == 'DataFrame':
-        # Try to import pandas if not already imported
-        try:
-            import pandas as pd
-            table = pa.Table.from_pandas(df)
-        except ImportError:
-            raise TypeError(f"Unsupported return type: {type(df)}. pandas DataFrame detected but pandas cannot be imported.")
-    elif 'polars' in type_module and type_name == 'DataFrame':
-        # Try to import polars if not already imported
-        try:
-            import polars as pl
-            table = df.to_arrow()
-        except ImportError:
-            raise TypeError(f"Unsupported return type: {type(df)}. polars DataFrame detected but polars cannot be imported.")
-    else:
-        raise TypeError(f"Unsupported return type: {type(df)}")
 
-# Write to memory mapped file
-with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
-	writer = ipc.new_file(f, table.schema)
-	writer.write_table(table)
-	writer.close()
+def convert_to_arrow_table(data):
+    """Convert various data types to a PyArrow table."""
+    if pd is not None and isinstance(data, pd.DataFrame):
+        return pa.Table.from_pandas(data)
+    elif pl is not None and isinstance(data, pl.DataFrame):
+        return data.to_arrow()
+    elif isinstance(data, (list, tuple)):
+        return pa.Table.from_pylist(list(data))
+    elif hasattr(data, '__iter__') and not isinstance(data, (str, bytes)) and not isinstance(data, types.GeneratorType):
+        return pa.Table.from_pylist(list(data))
+    else:
+        type_name = type(data).__name__
+        type_module = type(data).__module__
+        if 'pandas' in type_module and type_name == 'DataFrame':
+            try:
+                import pandas as pd
+                return pa.Table.from_pandas(data)
+            except ImportError:
+                raise TypeError(f"Unsupported return type: {type(data)}. pandas DataFrame detected but pandas cannot be imported.")
+        elif 'polars' in type_module and type_name == 'DataFrame':
+            try:
+                import polars as pl
+                return data.to_arrow()
+            except ImportError:
+                raise TypeError(f"Unsupported return type: {type(data)}. polars DataFrame detected but polars cannot be imported.")
+        else:
+            raise TypeError(f"Unsupported return type: {type(data)}")
+
+
+def write_arrow_file(table, file_path):
+    """Write a PyArrow table to a file."""
+    with pa.OSFile(file_path, 'wb') as f:
+        writer = ipc.new_file(f, table.schema)
+        writer.write_table(table)
+        writer.close()
+
+
+module = import_module_from_path("$REPO_ROOT", "$MODULE_PATH")
+result = module.materialize()
+
+arrow_base_path = "$ARROW_FILE_PATH"
+manifest_path = arrow_base_path + ".manifest"
+
+if isinstance(result, types.GeneratorType):
+    batch_count = 0
+    for batch in result:
+        table = convert_to_arrow_table(batch)
+        batch_file_path = f"{arrow_base_path}.batch_{batch_count}"
+        write_arrow_file(table, batch_file_path)
+        print(f"Batch {batch_count} written with {table.num_rows} rows")
+        batch_count += 1
+    
+    with open(manifest_path, 'w') as f:
+        f.write(str(batch_count))
+    print(f"Total batches: {batch_count}")
+else:
+    table = convert_to_arrow_table(result)
+    write_arrow_file(table, arrow_base_path)
 `
 
 type SqlfluffRunner struct {
