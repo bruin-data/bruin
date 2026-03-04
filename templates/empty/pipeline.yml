@@ -1,0 +1,17 @@
+name: my-pipeline
+
+# schedule: daily
+# start_date: "2024-01-01"
+# catchup: false
+
+# default_connections:
+#   duckdb: "duckdb-default"
+#   bigquery: "bigquery-default"
+#   snowflake: "snowflake-default"
+
+# notifications:
+#   slack:
+#     - channel: "#data-alerts"
+
+# retries: 3
+# concurrency: 1
