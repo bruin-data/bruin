@@ -30,28 +30,28 @@ func TestNewVaultClient(t *testing.T) {
 
 	t.Run("returns error if host is empty", func(t *testing.T) {
 		t.Parallel()
-		client, err := NewVaultClient(log, "", "token", "role", "path", "mount")
+		client, err := NewVaultClient(log, "", "token", "role", "path", "mount", "kubernetes")
 		require.Error(t, err)
 		require.Nil(t, client)
 	})
 
 	t.Run("returns error if path is empty", func(t *testing.T) {
 		t.Parallel()
-		client, err := NewVaultClient(log, "host", "token", "role", "", "mount")
+		client, err := NewVaultClient(log, "host", "token", "role", "", "mount", "kubernetes")
 		require.Error(t, err)
 		require.Nil(t, client)
 	})
 
 	t.Run("returns error if mountPath is empty", func(t *testing.T) {
 		t.Parallel()
-		client, err := NewVaultClient(log, "host", "token", "role", "path", "")
+		client, err := NewVaultClient(log, "host", "token", "role", "path", "", "kubernetes")
 		require.Error(t, err)
 		require.Nil(t, client)
 	})
 
 	t.Run("returns error if no credentials provided", func(t *testing.T) {
 		t.Parallel()
-		client, err := NewVaultClient(log, "host", "", "", "path", "mount")
+		client, err := NewVaultClient(log, "host", "", "", "path", "mount", "kubernetes")
 		require.Error(t, err)
 		require.Nil(t, client)
 	})

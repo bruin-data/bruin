@@ -34,11 +34,15 @@ func NewVaultClientFromEnv(logger logger.Logger) (*Client, error) {
 	if mountPath == "" {
 		return nil, errors.New("BRUIN_VAULT_MOUNT_PATH env variable not set")
 	}
+	kubernetesAuthMountPath := os.Getenv("BRUIN_VAULT_K8S_AUTH_MOUNT")
+	if kubernetesAuthMountPath == "" {
+		kubernetesAuthMountPath = "kubernetes"
+	}
 
-	return NewVaultClient(logger, host, token, role, path, mountPath)
+	return NewVaultClient(logger, host, token, role, path, mountPath, kubernetesAuthMountPath)
 }
 
-func NewVaultClient(logger logger.Logger, host, token, role, path string, mountPath string) (*Client, error) {
+func NewVaultClient(logger logger.Logger, host, token, role, path string, mountPath string, kubernetesAuthMountPath string) (*Client, error) {
 	if host == "" {
 		return nil, errors.New("empty vault host provided")
 	}
@@ -52,7 +56,7 @@ func NewVaultClient(logger logger.Logger, host, token, role, path string, mountP
 		return newVaultClientWithToken(host, token, mountPath, logger, path)
 	}
 	if role != "" {
-		return newVaultClientWithKubernetesAuth(host, role, mountPath, logger, path)
+		return newVaultClientWithKubernetesAuth(host, role, mountPath, kubernetesAuthMountPath, logger, path)
 	}
 
 	return nil, errors.New("no vault credentials provided")
@@ -94,7 +98,7 @@ func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger
 	}, nil
 }
 
-func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logger.Logger, path string) (*Client, error) {
+func newVaultClientWithKubernetesAuth(host, role, mountPath, kubernetesAuthMountPath string, logger logger.Logger, path string) (*Client, error) {
 	client, err := vault.New(
 		vault.WithAddress(host),
 		vault.WithRequestTimeout(30*time.Second),
@@ -109,7 +113,7 @@ func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logge
 		return nil, errors.Wrap(err, "failed to read service account token")
 	}
 
-	resp, err := client.Auth.KubernetesLogin(context.Background(), schema.KubernetesLoginRequest{Jwt: string(token), Role: role})
+	resp, err := client.Auth.KubernetesLogin(context.Background(), schema.KubernetesLoginRequest{Jwt: string(token), Role: role}, vault.WithMountPath(kubernetesAuthMountPath))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to login to the secrets backend")
 	}
