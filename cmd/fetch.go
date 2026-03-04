@@ -160,6 +160,9 @@ func Query() *cli.Command {
 				if c.Bool("export") {
 					return handleError(c.String("output"), errors.New("cannot combine --dry-run with --export"))
 				}
+				if c.IsSet("limit") {
+					return handleError(c.String("output"), errors.New("cannot combine --dry-run with --limit; the limit would distort cost estimates"))
+				}
 				output := c.String("output")
 				if output == "csv" {
 					return handleError(output, errors.New("CSV output is not supported for --dry-run; use 'plain' or 'json'"))
