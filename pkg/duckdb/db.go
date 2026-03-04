@@ -262,6 +262,20 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return result, nil
 }
 
+func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
+	explainQuery := &query.Query{Query: "EXPLAIN " + q.String()}
+	explainResult, err := c.SelectWithSchema(ctx, explainQuery)
+	if err != nil {
+		return nil, fmt.Errorf("EXPLAIN failed: %w", err)
+	}
+
+	return &query.DryRunResult{
+		ConnectionType: "duckdb",
+		Valid:          true,
+		ExplainRows:    explainResult,
+	}, nil
+}
+
 func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
 	c.lockIfNeeded()
 	defer c.unlockIfNeeded()

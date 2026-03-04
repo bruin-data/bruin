@@ -380,6 +380,37 @@ func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigqu
 	return qs, nil
 }
 
+func (d *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
+	stats, err := d.QueryDryRun(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &query.DryRunResult{
+		ConnectionType:      "bigquery",
+		Valid:               true,
+		TotalBytesProcessed: stats.TotalBytesProcessed,
+		EstimatedCostUSD:    float64(stats.TotalBytesProcessed) / 1e12 * 5.0,
+		StatementType:       stats.StatementType,
+	}
+
+	for _, t := range stats.ReferencedTables {
+		result.ReferencedTables = append(result.ReferencedTables,
+			fmt.Sprintf("%s.%s.%s", t.ProjectID, t.DatasetID, t.TableID))
+	}
+
+	if stats.Schema != nil {
+		for _, f := range stats.Schema {
+			result.Schema = append(result.Schema, query.DryRunColumn{
+				Name: f.Name,
+				Type: string(f.Type),
+			})
+		}
+	}
+
+	return result, nil
+}
+
 type NoMetadataUpdatedError struct{}
 
 func (m NoMetadataUpdatedError) Error() string {

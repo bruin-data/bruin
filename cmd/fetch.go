@@ -98,6 +98,10 @@ func Query() *cli.Command {
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.BoolFlag{
+				Name:  "dry-run",
+				Usage: "validate the query without executing it; show estimated cost and metadata when available",
+			},
 			&cli.StringFlag{
 				Name:    "agent-id",
 				Sources: cli.EnvVars("BRUIN_AGENT_ID"),
@@ -151,6 +155,33 @@ func Query() *cli.Command {
 			if c.IsSet("limit") && parser != nil {
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
+
+			if c.Bool("dry-run") {
+				if c.Bool("export") {
+					return handleError(c.String("output"), errors.New("cannot combine --dry-run with --export"))
+				}
+				output := c.String("output")
+				if output == "csv" {
+					return handleError(output, errors.New("CSV output is not supported for --dry-run; use 'plain' or 'json'"))
+				}
+
+				dryRunner, ok := conn.(query.QueryDryRunner)
+				if !ok {
+					return handleError(output, errors.Errorf("connection '%s' does not support dry-run", connName))
+				}
+
+				timeoutCtx, timeoutCancel := context.WithTimeout(ctx, time.Duration(c.Int("timeout"))*time.Second)
+				defer timeoutCancel()
+
+				q := query.Query{Query: queryStr}
+				result, dryRunErr := dryRunner.DryRunQuery(timeoutCtx, &q)
+				if dryRunErr != nil {
+					return handleError(output, errors.Wrap(dryRunErr, "dry-run failed"))
+				}
+
+				return outputDryRunResult(output, connName, queryStr, result)
+			}
+
 			//nolint:nestif
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
@@ -873,4 +904,116 @@ func trimDecimalString(value string) string {
 	}
 
 	return trimmed
+}
+
+func outputDryRunResult(output, connName, queryStr string, result *query.DryRunResult) error {
+	switch output {
+	case "json":
+		return outputDryRunJSON(connName, queryStr, result)
+	case outputFormatPlain:
+		return outputDryRunPlain(connName, result)
+	default:
+		return handleError(output, errors.Errorf("unsupported output format for dry-run: %s", output))
+	}
+}
+
+func outputDryRunPlain(connName string, result *query.DryRunResult) error {
+	fmt.Println("Dry Run Results")
+	fmt.Printf("Connection:  %s (%s)\n", connName, result.ConnectionType)
+	fmt.Printf("Valid:       %s\n", formatBool(result.Valid))
+
+	if result.TotalBytesProcessed > 0 || result.EstimatedCostUSD > 0 {
+		fmt.Println()
+		fmt.Printf("Estimated bytes processed: %s\n", formatBytes(result.TotalBytesProcessed))
+		fmt.Printf("Estimated cost:            %s\n", formatCost(result.EstimatedCostUSD))
+	}
+
+	if result.StatementType != "" {
+		fmt.Printf("Statement type:            %s\n", result.StatementType)
+	}
+
+	if len(result.ReferencedTables) > 0 {
+		fmt.Println()
+		fmt.Println("Referenced tables:")
+		for _, t := range result.ReferencedTables {
+			fmt.Printf("  - %s\n", t)
+		}
+	}
+
+	if len(result.Schema) > 0 {
+		fmt.Println()
+		fmt.Println("Output schema:")
+		cols := []string{"Column Name", "Type"}
+		rows := make([][]interface{}, len(result.Schema))
+		for i, col := range result.Schema {
+			rows[i] = []interface{}{col.Name, col.Type}
+		}
+		printTable(cols, rows)
+	}
+
+	if result.ExplainRows != nil && len(result.ExplainRows.Rows) > 0 {
+		fmt.Println()
+		fmt.Println("Query plan:")
+		printTable(result.ExplainRows.Columns, result.ExplainRows.Rows)
+	}
+
+	return nil
+}
+
+func outputDryRunJSON(connName, queryStr string, result *query.DryRunResult) error {
+	type dryRunJSONResponse struct {
+		ConnectionName      string               `json:"connectionName"`
+		ConnectionType      string               `json:"connectionType"`
+		Query               string               `json:"query"`
+		Valid               bool                 `json:"valid"`
+		TotalBytesProcessed int64                `json:"totalBytesProcessed,omitempty"`
+		EstimatedCostUSD    float64              `json:"estimatedCostUSD,omitempty"`
+		StatementType       string               `json:"statementType,omitempty"`
+		ReferencedTables    []string             `json:"referencedTables,omitempty"`
+		Schema              []query.DryRunColumn `json:"schema,omitempty"`
+		ExplainColumns      []string             `json:"explainColumns,omitempty"`
+		ExplainPlan         [][]interface{}      `json:"explainPlan,omitempty"`
+	}
+
+	resp := dryRunJSONResponse{
+		ConnectionName:      connName,
+		ConnectionType:      result.ConnectionType,
+		Query:               queryStr,
+		Valid:               result.Valid,
+		TotalBytesProcessed: result.TotalBytesProcessed,
+		EstimatedCostUSD:    result.EstimatedCostUSD,
+		StatementType:       result.StatementType,
+		ReferencedTables:    result.ReferencedTables,
+		Schema:              result.Schema,
+	}
+
+	if result.ExplainRows != nil {
+		resp.ExplainColumns = result.ExplainRows.Columns
+		resp.ExplainPlan = result.ExplainRows.Rows
+	}
+
+	jsonData, err := json.Marshal(resp)
+	if err != nil {
+		return handleError("json", errors.Wrap(err, "failed to marshal dry-run result to JSON"))
+	}
+	fmt.Println(string(jsonData))
+	return nil
+}
+
+func formatCost(cost float64) string {
+	switch {
+	case cost == 0:
+		return "$0.00"
+	case cost < 0.01:
+		return fmt.Sprintf("$%.6f", cost)
+	default:
+		return fmt.Sprintf("$%.2f", cost)
+	}
+}
+
+func formatBool(v bool) string {
+	if v {
+		return "Yes"
+	}
+	return "No"
 }
