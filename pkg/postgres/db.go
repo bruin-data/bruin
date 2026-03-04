@@ -160,6 +160,20 @@ END; $TEST$;`, query.String())
 	return err == nil, err
 }
 
+func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
+	explainQuery := &query.Query{Query: "EXPLAIN " + q.String()}
+	explainResult, err := c.SelectWithSchema(ctx, explainQuery)
+	if err != nil {
+		return nil, fmt.Errorf("EXPLAIN failed: %w", err)
+	}
+
+	return &query.DryRunResult{
+		ConnectionType: "postgres",
+		Valid:          true,
+		ExplainRows:    explainResult,
+	}, nil
+}
+
 func (c *Client) GetDatabases(ctx context.Context) ([]string, error) {
 	q := `
 SELECT datname

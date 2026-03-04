@@ -62,6 +62,10 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return nil, errDuckDBNotSupported
 }
 
+func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
+	return nil, errDuckDBNotSupported
+}
+
 func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
 	return nil, errDuckDBNotSupported
 }
