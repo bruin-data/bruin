@@ -1574,14 +1574,15 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		fullRefresh       bool
-		name              string
-		pipelineStartDate string
-		flagStartDate     string
-		flagEndDate       string
-		expectedStartDate time.Time
-		expectedEndDate   time.Time
-		expectedError     bool
+		fullRefresh               bool
+		name                      string
+		pipelineStartDate         string
+		flagStartDate             string
+		flagEndDate               string
+		cliStartDateExplicitlySet bool
+		expectedStartDate         time.Time
+		expectedEndDate           time.Time
+		expectedError             bool
 	}{
 		// 1. Start with non-full refresh tests (simpler cases)
 		{
@@ -1746,6 +1747,37 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			expectedStartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			expectedEndDate:   time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
 		},
+		// 6. NEW BEHAVIOR: Explicitly provided CLI start-date takes priority (for VS Code extension)
+		{
+			fullRefresh:               true,
+			name:                      "full refresh + explicit CLI start-date: CLI flag takes priority over pipeline",
+			pipelineStartDate:         "2023-01-01",
+			flagStartDate:             "2024-05-01",
+			flagEndDate:               "2024-05-31",
+			cliStartDateExplicitlySet: true,
+			expectedStartDate:         time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:           time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			fullRefresh:               true,
+			name:                      "full refresh + explicit CLI start-date: works with empty pipeline start",
+			pipelineStartDate:         "",
+			flagStartDate:             "2024-03-15",
+			flagEndDate:               "2024-03-31",
+			cliStartDateExplicitlySet: true,
+			expectedStartDate:         time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:           time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			fullRefresh:               true,
+			name:                      "full refresh + explicit CLI start-date: CLI flag overrides even when pipeline has earlier date",
+			pipelineStartDate:         "2020-01-01",
+			flagStartDate:             "2024-06-01",
+			flagEndDate:               "2024-06-30",
+			cliStartDateExplicitlySet: true,
+			expectedStartDate:         time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:           time.Date(2024, 6, 30, 0, 0, 0, 0, time.UTC),
+		},
 	}
 
 	for _, tt := range tests {
@@ -1776,7 +1808,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			}
 
 			// Call the actual implementation
-			actualStartDate, err := DetermineStartDate(cliStartDate, testPipeline, tt.fullRefresh, logger)
+			actualStartDate, err := DetermineStartDate(cliStartDate, tt.cliStartDateExplicitlySet, testPipeline, tt.fullRefresh, logger)
 
 			// Parse end date separately
 			actualEndDate, endDateErr := date.ParseTime(cliEndDate)
@@ -2722,15 +2754,17 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 	futureDateStr := futureDate.Format("2006-01-02 15:04:05.000000")
 
 	tests := []struct {
-		name          string
-		cliStartDate  string
-		pipeline      *pipeline.Pipeline
-		fullRefresh   bool
-		expectedError bool
+		name                      string
+		cliStartDate              string
+		cliStartDateExplicitlySet bool
+		pipeline                  *pipeline.Pipeline
+		fullRefresh               bool
+		expectedError             bool
 	}{
 		{
-			name:         "future CLI start date with full refresh false should succeed",
-			cliStartDate: futureDateStr,
+			name:                      "future CLI start date with full refresh false should succeed",
+			cliStartDate:              futureDateStr,
+			cliStartDateExplicitlySet: true,
 			pipeline: &pipeline.Pipeline{
 				Name:      "TestPipeline",
 				StartDate: "",
@@ -2740,15 +2774,17 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:          "future CLI start date with nil pipeline should succeed",
-			cliStartDate:  futureDateStr,
-			pipeline:      nil,
-			fullRefresh:   true,
-			expectedError: false,
+			name:                      "future CLI start date with nil pipeline should succeed",
+			cliStartDate:              futureDateStr,
+			cliStartDateExplicitlySet: true,
+			pipeline:                  nil,
+			fullRefresh:               true,
+			expectedError:             false,
 		},
 		{
-			name:         "future CLI start date with empty pipeline start date should succeed",
-			cliStartDate: futureDateStr,
+			name:                      "future CLI start date with empty pipeline start date should succeed",
+			cliStartDate:              futureDateStr,
+			cliStartDateExplicitlySet: true,
 			pipeline: &pipeline.Pipeline{
 				Name:      "TestPipeline",
 				StartDate: "",
@@ -2758,8 +2794,9 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:         "future pipeline start date should succeed",
-			cliStartDate: "",
+			name:                      "future pipeline start date should succeed",
+			cliStartDate:              "",
+			cliStartDateExplicitlySet: false,
 			pipeline: &pipeline.Pipeline{
 				Name:      "TestPipeline",
 				StartDate: futureDate.Format("2006-01-02"),
@@ -2769,8 +2806,9 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:         "past CLI start date should succeed",
-			cliStartDate: now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05.000000"),
+			name:                      "past CLI start date should succeed",
+			cliStartDate:              now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05.000000"),
+			cliStartDateExplicitlySet: true,
 			pipeline: &pipeline.Pipeline{
 				Name:      "TestPipeline",
 				StartDate: "",
@@ -2780,8 +2818,9 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:         "past pipeline start date should succeed",
-			cliStartDate: "",
+			name:                      "past pipeline start date should succeed",
+			cliStartDate:              "",
+			cliStartDateExplicitlySet: false,
 			pipeline: &pipeline.Pipeline{
 				Name:      "TestPipeline",
 				StartDate: now.AddDate(0, 0, -1).Format("2006-01-02"),
@@ -2791,8 +2830,9 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:         "current date (date only) should succeed",
-			cliStartDate: now.Format("2006-01-02"),
+			name:                      "current date (date only) should succeed",
+			cliStartDate:              now.Format("2006-01-02"),
+			cliStartDateExplicitlySet: true,
 			pipeline: &pipeline.Pipeline{
 				Name:      "TestPipeline",
 				StartDate: "",
@@ -2807,7 +2847,7 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			startDate, err := DetermineStartDate(tt.cliStartDate, tt.pipeline, tt.fullRefresh, logger)
+			startDate, err := DetermineStartDate(tt.cliStartDate, tt.cliStartDateExplicitlySet, tt.pipeline, tt.fullRefresh, logger)
 
 			if tt.expectedError {
 				require.Error(t, err, "Expected error")

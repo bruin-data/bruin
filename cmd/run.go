@@ -745,6 +745,7 @@ func Run(isDebug *bool) *cli.Command {
 			runID := NewRunID()
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDateExplicitlySet, c.IsSet("start-date"))
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, applyIntervalModifiers)
@@ -928,7 +929,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Re-determine start date based on pipeline configuration and full-refresh flag
-			startDate, err = DetermineStartDate(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			startDate, err = DetermineStartDate(runConfig.StartDate, c.IsSet("start-date"), pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
 			if err != nil {
 				return err
 			}
@@ -1368,12 +1369,17 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 	return startDate, endDate, nil
 }
 
-func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, error) {
+func DetermineStartDate(cliStartDate string, cliStartDateExplicitlySet bool, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, error) {
 	var startDate time.Time
 	var err error
 
-	// Start date logic
 	switch {
+	case cliStartDateExplicitlySet:
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+		logger.Debug("Using explicitly provided CLI start_date: ", cliStartDate)
 	case !fullRefresh:
 		startDate, err = date.ParseTime(cliStartDate)
 		if err != nil {

@@ -129,7 +129,7 @@ func Render() *cli.Command {
 			}
 
 			// Determine start date based on full-refresh flag and pipeline configuration
-			startDate, err := DetermineStartDate(c.String("start-date"), pl, fullRefresh, logger)
+			startDate, err := DetermineStartDate(c.String("start-date"), c.IsSet("start-date"), pl, fullRefresh, logger)
 			if err != nil {
 				if c.String("output") == "json" {
 					printErrorJSON(errors.New("Please give a valid start date: bruin render --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
@@ -173,7 +173,8 @@ func Render() *cli.Command {
 			}
 
 			// If asset has its own start_date, use it instead of pipeline's start_date
-			if asset.StartDate != "" && fullRefresh {
+			// But only if CLI start-date was NOT explicitly provided
+			if asset.StartDate != "" && fullRefresh && !c.IsSet("start-date") {
 				startDate, err = date.ParseTime(asset.StartDate)
 				if err != nil {
 					if c.String("output") == "json" {
@@ -221,6 +222,7 @@ func Render() *cli.Command {
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "your-run-id")
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDateExplicitlySet, c.IsSet("start-date"))
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))

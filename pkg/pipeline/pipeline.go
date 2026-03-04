@@ -134,6 +134,7 @@ const (
 	RunConfigQueryAnnotations          = RunConfig("query-annotations")
 	RunConfigRunID                     = RunConfig("run-id")
 	RunConfigStartDate                 = RunConfig("start-date")
+	RunConfigStartDateExplicitlySet    = RunConfig("start-date-explicitly-set")
 	RunConfigExecutionDate             = RunConfig("execution-date")
 )
 
