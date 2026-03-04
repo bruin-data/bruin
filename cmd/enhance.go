@@ -235,6 +235,22 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return printEnhanceError(output, errors.Wrap(err, "failed to load asset"))
 	}
 
+	// Infer name from path if file doesn't have explicit name field
+	inferredName, nameErr := pp.Asset.GetNameIfItWasSetFromItsPath(pp.Pipeline)
+	if nameErr != nil {
+		return printEnhanceError(output, errors.Wrap(nameErr, "failed to infer asset name from path"))
+	}
+	if inferredName != "" && pp.Asset.Name == inferredName {
+		// Name was inferred from path (not set in file) — persist it explicitly
+		pp.Asset.Name = inferredName
+		if output != "json" {
+			infoPrinter.Printf("[%s]   Inferred asset name from path: %s\n", logPrefix, inferredName)
+		}
+		if persistErr := pp.Asset.Persist(fs); persistErr != nil {
+			return printEnhanceError(output, errors.Wrap(persistErr, "failed to persist asset with inferred name"))
+		}
+	}
+
 	// Determine provider from flags
 	providerType := enhance.ProviderClaude // default
 
