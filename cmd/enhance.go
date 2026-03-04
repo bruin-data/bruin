@@ -290,21 +290,9 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
 	}
 
-	// Step 3: Format
+	// Step 3: Validate using the existing bruin validate command
 	if output != "json" {
-		infoPrinter.Printf("[%s] Step 3/4: Formatting asset...\n", logPrefix)
-	}
-	_, err = formatAsset(assetPath)
-	if err != nil {
-		if output != "json" {
-			warningPrinter.Printf("[%s] Warning: formatting failed: %v\n", logPrefix, err)
-		}
-		// Continue even if formatting fails
-	}
-
-	// Step 4: Validate using the existing bruin validate command
-	if output != "json" {
-		infoPrinter.Printf("[%s] Step 4/4: Validating asset...\n", logPrefix)
+		infoPrinter.Printf("[%s] Step 3/3: Validating asset...\n", logPrefix)
 	}
 	validateCmd := Lint(isDebug)
 	args := []string{"validate", absAssetPath}
