@@ -202,7 +202,8 @@ my_secret = os.environ["creds"] #[!code warning]
 
 :::
 
-This allows you to map a secret key to any environment variable name you prefer inside your Python code.  
+This allows you to map a secret key to any environment variable name you prefer inside your Python code.
+
 
 ## Environment Variables
 
@@ -225,12 +226,22 @@ The following environment variables are available in every Python asset executio
 | `BRUIN_EXECUTION_TIMESTAMP` | The execution timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`) |
 | `BRUIN_RUN_ID`          | The unique identifier for the pipeline run                                                                        |
 | `BRUIN_PIPELINE`        | The name of the pipeline being executed                                                                           |
-| `BRUIN_FULL_REFRESH`    | Set to `1` when the pipeline is running with the `--full-refresh` flag, empty otherwise                           |
-| `BRUIN_THIS`            | The name of the python asset                                                                                      |
+| `BRUIN_FULL_REFRESH`    | Set to `1` when the pipeline is running with the `--full-refresh` flag, empty string otherwise                   |
+| `BRUIN_ASSET`            | The name of the current Python asset (alias for `BRUIN_THIS`)                                                      |
+| `BRUIN_THIS`             | The name of the current Python asset                                                                              |
+| `BRUIN_CONNECTION`       | The connection name configured for the asset (only set if the asset has a `connection` defined)                   |
+| `BRUIN_CONNECTION_TYPES` | JSON object mapping secret injection keys to their connection types (e.g., `{"DATABASE": "postgres"}`). Only set if secrets are defined |
+| `BRUIN_VARS`            | JSON document containing all pipeline variables (see [Pipeline Variables](#pipeline) section below)              |
+| `BRUIN_VARS_SCHEMA`     | JSON document containing the schema definition for pipeline variables (see [Variables](/core-concepts/variables)) |
+| `PYTHONUNBUFFERED`      | Set to `1` to enable unbuffered Python output for real-time logging                                               |
 
 ### Pipeline
 
-Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your python asset as `BRUIN_VARS`. When no variables exist, `BRUIN_VARS` is set to `{}`. See [Variables](/core-concepts/variables) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/core-concepts/variables#custom-variables).
+Bruin supports user-defined variables at a pipeline level. These become available as JSON documents in your python asset:
+- `BRUIN_VARS`: Contains the actual variable values
+- `BRUIN_VARS_SCHEMA`: Contains the JSON Schema definition for the variables (useful for validation and type checking)
+
+When no variables exist, both `BRUIN_VARS` and `BRUIN_VARS_SCHEMA` are set to `{}`. See [Variables](/core-concepts/variables) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/core-concepts/variables#custom-variables).
 
 Here's a short example:
 ::: code-group

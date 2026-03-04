@@ -86,6 +86,9 @@ SELECT * FROM my_table
 WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 ```
 
+> [!NOTE]
+> For Python assets, these built-in variables are available as environment variables. See [Python Assets](/assets/python.md#environment-variables) for the complete list of predefined environment variables.
+
 The `full_refresh` variable is particularly useful for implementing different logic based on whether a full refresh is being performed:
 
 ```sql
