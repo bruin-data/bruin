@@ -2687,7 +2687,7 @@ func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
 						},
 						Connection: "conn1",
 					},
-					Description: "Materialization strategy 'scd2_by_time' is not supported for Python assets. Supported strategies are: create+replace, append, merge, delete+insert, time_interval",
+					Description: "Materialization strategy 'scd2_by_time' is not supported for Python assets. Supported strategies are: create+replace, append, merge, delete+insert",
 				},
 			},
 			wantErr: false,
