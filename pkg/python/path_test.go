@@ -280,10 +280,11 @@ func TestFindDependencyConfig(t *testing.T) {
 		executable *pipeline.ExecutableFile
 	}
 	tests := []struct {
-		name     string
-		args     args
-		wantType DependencyType
-		wantErr  bool
+		name               string
+		args               args
+		wantType           DependencyType
+		wantRequiresPython string
+		wantErr            bool
 	}{
 		{
 			name: "requirements.txt takes priority over pyproject.toml",
@@ -351,6 +352,18 @@ func TestFindDependencyConfig(t *testing.T) {
 			wantType: DependencyTypePyproject,
 			wantErr:  false,
 		},
+		{
+			name: "pyproject.toml with requires-python populates field",
+			args: args{
+				repoPath: abs("./testdata/pyproject_python_version"),
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/pyproject_python_version/main.py"),
+				},
+			},
+			wantType:           DependencyTypePyproject,
+			wantRequiresPython: ">=3.13",
+			wantErr:            false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -367,6 +380,9 @@ func TestFindDependencyConfig(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, got)
 			assert.Equal(t, tt.wantType, got.Type)
+			if tt.wantRequiresPython != "" {
+				assert.Equal(t, tt.wantRequiresPython, got.RequiresPython)
+			}
 		})
 	}
 }

@@ -39,11 +39,132 @@ var AvailablePythonVersions = map[string]bool{
 	"3.13": true,
 }
 
+// SortedPythonVersions is the list of available Python versions sorted ascending.
+var SortedPythonVersions = []string{"3.8", "3.9", "3.10", "3.11", "3.12", "3.13"}
+
 const (
 	pythonVersionForIngestr = "3.11"
+	defaultPythonVersion    = "3.11"
 	ingestrVersion          = "0.14.140"
 	sqlfluffVersion         = "3.4.1"
 )
+
+// parsePythonVersion parses a "X.Y" version string into (major, minor).
+func parsePythonVersion(v string) (int, int, bool) {
+	parts := strings.Split(v, ".")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	var major, minor int
+	if _, err := fmt.Sscanf(parts[0], "%d", &major); err != nil {
+		return 0, 0, false
+	}
+	if _, err := fmt.Sscanf(parts[1], "%d", &minor); err != nil {
+		return 0, 0, false
+	}
+	return major, minor, true
+}
+
+// versionSatisfies checks if version v satisfies a single constraint like ">=3.12".
+func versionSatisfies(vMajor, vMinor int, op string, cMajor, cMinor int) bool {
+	switch op {
+	case ">=":
+		return vMajor > cMajor || (vMajor == cMajor && vMinor >= cMinor)
+	case ">":
+		return vMajor > cMajor || (vMajor == cMajor && vMinor > cMinor)
+	case "<=":
+		return vMajor < cMajor || (vMajor == cMajor && vMinor <= cMinor)
+	case "<":
+		return vMajor < cMajor || (vMajor == cMajor && vMinor < cMinor)
+	case "==":
+		return vMajor == cMajor && vMinor == cMinor
+	case "!=":
+		return vMajor != cMajor || vMinor != cMinor
+	case "~=":
+		// ~=3.12 means >=3.12, <4.0 (compatible release)
+		return (vMajor > cMajor || (vMajor == cMajor && vMinor >= cMinor)) && vMajor == cMajor
+	default:
+		return false
+	}
+}
+
+// ResolvePythonVersion resolves the minimum available Python version that satisfies
+// the given requires-python specifier (PEP 440). Returns defaultVersion if the
+// specifier is empty. Returns an error if no available version satisfies the constraint.
+func ResolvePythonVersion(requiresPython string, defaultVersion string) (string, error) {
+	requiresPython = strings.TrimSpace(requiresPython)
+	if requiresPython == "" {
+		return defaultVersion, nil
+	}
+
+	// Parse all constraints (comma-separated)
+	type constraint struct {
+		op    string
+		major int
+		minor int
+	}
+	parts := strings.Split(requiresPython, ",")
+	constraints := make([]constraint, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		var op, ver string
+		for _, prefix := range []string{">=", "<=", "!=", "~=", "==", ">", "<"} {
+			if strings.HasPrefix(part, prefix) {
+				op = prefix
+				ver = strings.TrimSpace(part[len(prefix):])
+				break
+			}
+		}
+		if op == "" {
+			// bare version like "3.12" — treat as ==
+			op = "=="
+			ver = part
+		}
+
+		// Strip wildcard suffix (e.g., "3.12.*" -> "3.12")
+		ver = strings.TrimSuffix(ver, ".*")
+
+		// Strip patch version (e.g., "3.13.0" -> "3.13")
+		if verParts := strings.Split(ver, "."); len(verParts) > 2 {
+			ver = verParts[0] + "." + verParts[1]
+		}
+
+		major, minor, ok := parsePythonVersion(ver)
+		if !ok {
+			return defaultVersion, nil
+		}
+		constraints = append(constraints, constraint{op: op, major: major, minor: minor})
+	}
+
+	if len(constraints) == 0 {
+		return defaultVersion, nil
+	}
+
+	// Find the minimum available version that satisfies all constraints
+	for _, v := range SortedPythonVersions {
+		vMajor, vMinor, ok := parsePythonVersion(v)
+		if !ok {
+			continue
+		}
+
+		satisfiesAll := true
+		for _, c := range constraints {
+			if !versionSatisfies(vMajor, vMinor, c.op, c.major, c.minor) {
+				satisfiesAll = false
+				break
+			}
+		}
+		if satisfiesAll {
+			return v, nil
+		}
+	}
+
+	return "", fmt.Errorf("no available Python version satisfies the constraint %q (available: %s)", requiresPython, strings.Join(SortedPythonVersions, ", "))
+}
 
 var DatabasePrefixToSqlfluffDialect = map[string]string{
 	"bq":         "bigquery",
@@ -89,13 +210,19 @@ func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 
 	u.binaryFullPath = binaryFullPath
 
-	pythonVersion := "3.11"
+	pythonVersion := defaultPythonVersion
 	if execCtx.asset.Image != "" {
 		image := execCtx.asset.Image
 		parts := strings.Split(image, ":")
 		if len(parts) > 1 && parts[0] == "python" && AvailablePythonVersions[parts[1]] {
 			pythonVersion = parts[1]
 		}
+	} else if execCtx.dependencyConfig != nil && execCtx.dependencyConfig.RequiresPython != "" {
+		resolved, err := ResolvePythonVersion(execCtx.dependencyConfig.RequiresPython, defaultPythonVersion)
+		if err != nil {
+			return err
+		}
+		pythonVersion = resolved
 	}
 
 	if execCtx.asset.Materialization.Type == "" {
@@ -264,14 +391,27 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		_ = tempPyScript.Close()
 	}(tempPyScript)
 
-	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", strings.ReplaceAll(execCtx.repo.Path, "\\", "\\\\"))
-	// Use adjusted module path for pyproject-based execution
+	// Use adjusted module path and root for pyproject-based execution.
+	// When pyproject.toml is in a subdirectory, the module path is relative to the project
+	// root, so sys.path must also point to the project root (not the git repo root).
 	modulePath := execCtx.module
-	if execCtx.dependencyConfig != nil && execCtx.dependencyConfig.Type == DependencyTypePyproject {
+	rootPath := execCtx.repo.Path
+	isPyproject := execCtx.dependencyConfig != nil && execCtx.dependencyConfig.Type == DependencyTypePyproject
+	if isPyproject {
 		modulePath = u.calculateModuleFromProjectRoot(execCtx, execCtx.dependencyConfig.ProjectRoot)
+		rootPath = execCtx.dependencyConfig.ProjectRoot
 	}
+	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", strings.ReplaceAll(rootPath, "\\", "\\\\"))
 	arrowScript = strings.ReplaceAll(arrowScript, "$MODULE_PATH", modulePath)
 	arrowScript = strings.ReplaceAll(arrowScript, "$ARROW_FILE_PATH", strings.ReplaceAll(arrowFilePath, "\\", "\\\\"))
+
+	// For pyproject-based execution, strip inline script metadata (PEP 723) so that uv
+	// stays in project mode and uses pyproject.toml dependencies. Without this, uv enters
+	// script mode which creates an isolated env with only pyarrow, ignoring project deps.
+	// pyarrow is then provided via --with flag instead.
+	if isPyproject {
+		arrowScript = strings.ReplaceAll(arrowScript, pythonArrowInlineMetadata, "")
+	}
 
 	if _, err := io.WriteString(tempPyScript, arrowScript); err != nil {
 		return fmt.Errorf("failed to write to temp file: %w", err)
@@ -281,13 +421,14 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	var flags []string
 	var runRepo *git.Repo
 
-	if execCtx.dependencyConfig != nil && execCtx.dependencyConfig.Type == DependencyTypePyproject {
-		// Use pyproject.toml - lock dependencies first, then run
+	if isPyproject {
+		// Use pyproject.toml - lock dependencies first, then run.
+		// pyarrow is added via --with since inline script metadata was stripped above.
 		runRepo = &git.Repo{Path: execCtx.dependencyConfig.ProjectRoot}
 		if err := u.lockPyprojectDeps(ctx, runRepo, pythonVersion); err != nil {
 			return errors.Wrap(err, "failed to lock pyproject.toml dependencies")
 		}
-		flags = []string{"run", "--python", pythonVersion, tempPyScript.Name()}
+		flags = []string{"run", "--python", pythonVersion, "--with", "pyarrow==18.0.0", tempPyScript.Name()}
 	} else {
 		// Fall back to requirements.txt or no dependencies
 		runRepo = execCtx.repo
@@ -497,6 +638,15 @@ func ResetIngestrInstallCache() {
 	defer ingestrInstallMutex.Unlock()
 	ingestrInstalledPackages = make(map[string]bool)
 }
+
+// pythonArrowInlineMetadata is the PEP 723 inline script metadata header in the arrow template.
+// When running in pyproject mode, this must be stripped so uv stays in project mode
+// (inline metadata forces uv into script mode, ignoring pyproject.toml dependencies).
+const pythonArrowInlineMetadata = `# /// script
+# dependencies = [
+#   "pyarrow==18.0.0"
+# ]
+# ///`
 
 const PythonArrowTemplate = `
 # /// script

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
@@ -38,6 +39,7 @@ type DependencyConfig struct {
 	PyprojectPath   string // Path to pyproject.toml (empty if not found)
 	RequirementsTxt string // Path to requirements.txt (empty if not found)
 	ProjectRoot     string // Directory containing the dependency file
+	RequiresPython  string // The requires-python specifier from pyproject.toml (e.g., ">=3.13")
 }
 
 type ModulePathFinder struct {
@@ -146,9 +148,31 @@ func (m *ModulePathFinder) FindDependencyConfig(path string, executable *pipelin
 		config.Type = DependencyTypePyproject
 		config.PyprojectPath = pyprojectToml
 		config.ProjectRoot = filepath.Dir(pyprojectToml)
+		config.RequiresPython = readRequiresPython(pyprojectToml)
 		return config, nil
 	}
 
 	// No dependency configuration found
 	return config, nil
+}
+
+// readRequiresPython reads the requires-python field from a pyproject.toml file.
+// Returns empty string if the file can't be read or doesn't contain the field.
+func readRequiresPython(pyprojectPath string) string {
+	content, err := os.ReadFile(pyprojectPath)
+	if err != nil {
+		return ""
+	}
+
+	var pyproject struct {
+		Project struct {
+			RequiresPython string `toml:"requires-python"`
+		} `toml:"project"`
+	}
+
+	if err := toml.Unmarshal(content, &pyproject); err != nil {
+		return ""
+	}
+
+	return pyproject.Project.RequiresPython
 }

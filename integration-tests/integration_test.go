@@ -3276,6 +3276,23 @@ func TestIngestrTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "run-python-pyproject-materialization",
+			task: e2e.Task{
+				Name:    "run-python-pyproject-materialization",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-pyproject-materialization", filepath.Join(currentFolder, "test-pipelines/python-pyproject-materialization")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: materialize.countries"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "validate-r-basic-execution",
 			task: e2e.Task{
 				Name:    "validate-r-basic-execution",
