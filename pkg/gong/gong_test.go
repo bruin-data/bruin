@@ -17,7 +17,7 @@ func TestBuildDownloadURL(t *testing.T) {
 	assert.Contains(t, url, BaseURL)
 
 	// URL should contain the version
-	assert.Contains(t, url, Version)
+	assert.Contains(t, url, strings.TrimSpace(Version))
 
 	// URL should follow the expected format
 	expectedOS := getOSName()
