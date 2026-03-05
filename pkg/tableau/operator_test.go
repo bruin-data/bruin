@@ -3,6 +3,7 @@ package tableau
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
@@ -73,6 +74,50 @@ func TestResolveIncrementalRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, tt.want, resolveIncrementalRefresh(tt.ctxFunc(t), tt.parameters))
+		})
+	}
+}
+
+func TestResolveRefreshTimeout(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		parameters map[string]string
+		want       time.Duration
+	}{
+		{
+			name:       "defaults to sixty minutes",
+			parameters: map[string]string{},
+			want:       60 * time.Minute,
+		},
+		{
+			name: "uses explicit timeout value",
+			parameters: map[string]string{
+				"refresh_timeout_minutes": "90",
+			},
+			want: 90 * time.Minute,
+		},
+		{
+			name: "invalid timeout falls back to default",
+			parameters: map[string]string{
+				"refresh_timeout_minutes": "abc",
+			},
+			want: 60 * time.Minute,
+		},
+		{
+			name: "non-positive timeout falls back to default",
+			parameters: map[string]string{
+				"refresh_timeout_minutes": "0",
+			},
+			want: 60 * time.Minute,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.want, resolveRefreshTimeout(tt.parameters))
 		})
 	}
 }
