@@ -89,7 +89,7 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 func buildDownloadURL() string {
 	osName := getOSName()
 	archName := getArchName()
-	return fmt.Sprintf("%s/releases/%s/%s/gong_%s", BaseURL, Version, osName, archName)
+	return fmt.Sprintf("%s/releases/%s/%s/gong_%s", BaseURL, strings.TrimSpace(Version), osName, archName)
 }
 
 func getOSName() string {
