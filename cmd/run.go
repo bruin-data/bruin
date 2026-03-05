@@ -546,10 +546,6 @@ func Run(isDebug *bool) *cli.Command {
 				DefaultText: "false",
 			},
 			&cli.BoolFlag{
-				Name:  "use-pip",
-				Usage: "use pip for managing Python dependencies",
-			},
-			&cli.BoolFlag{
 				Name:  "continue",
 				Usage: "use continue to run the pipeline from the last failed asset",
 			},
@@ -687,7 +683,6 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetadata:           c.Bool("push-metadata"),
 				NoLogFile:              c.Bool("no-log-file"),
 				FullRefresh:            fullRefresh,
-				UsePip:                 c.Bool("use-pip"),
 				Tag:                    c.String("tag"),
 				ExcludeTag:             c.String("exclude-tag"),
 				Only:                   c.StringSlice("only"),
@@ -1133,7 +1128,7 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1536,7 +1531,6 @@ func SetupExecutors(
 	pipelineName string,
 	runID string,
 	fullRefresh bool,
-	usePipForPython bool,
 	sensorMode string,
 	renderer *jinja.Renderer,
 	parser *sqlparser.SQLParser,
@@ -1554,11 +1548,7 @@ func SetupExecutors(
 
 	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		if usePipForPython {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
-		} else {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(conn, jinjaVariables)
-		}
+		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeR) {

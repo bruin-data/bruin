@@ -41,7 +41,6 @@ table td:first-child {
 | `--sensor-mode` | str | `'once'` | Set sensor mode: `skip`, `once`, or `wait`. |
 | `--full-refresh` | bool | `false` | Truncate the table before running. Also sets the `full_refresh` jinja variable to `True` and `BRUIN_FULL_REFRESH` environment variable to `1`. |
 | `--apply-interval-modifiers` | bool | `false` | Apply interval modifiers. |
-| `--use-pip` | bool | `false` | Use pip for managing Python dependencies. |
 | `--continue` | bool | `false` | Continue from the last failed asset. |
 | `--tag` | str | - | Pick assets with the given tag. |
 | `--single-check` | str | - | Run a single column or custom check by ID. |
