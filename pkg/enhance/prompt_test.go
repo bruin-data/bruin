@@ -29,8 +29,7 @@ func TestBuildEnhancePrompt(t *testing.T) {
 		// Should include guidelines for different check types
 		assert.Contains(t, prompt, "not_null")
 		assert.Contains(t, prompt, "unique")
-		assert.Contains(t, prompt, "non_negative")
-		assert.Contains(t, prompt, "accepted_values")
+		assert.Contains(t, prompt, "enum checks for status fields")
 	})
 
 	t.Run("includes pre-fetched stats when provided", func(t *testing.T) {
