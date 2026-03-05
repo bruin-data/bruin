@@ -311,6 +311,8 @@ The requirements to get this working are:
 - define a `connection` in the asset definition (required for Python assets with `materialization.type: table`)
 - have a function called `materialize` in your Python script that returns a pandas/polars dataframe or a list of dicts.
 
+Supported materialization strategies for Python assets are: `create+replace`, `append`, `merge`, and `delete+insert`. The `time_interval` strategy is not supported for Python assets.
+
 > [!WARNING]
 > This feature has been very recently introduced, and is not battle-tested yet. Please create an issue if you encounter any bugs.
 
