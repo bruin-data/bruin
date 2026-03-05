@@ -1009,6 +1009,7 @@ func (a *Asset) PrefixUpstreams(prefix string) {
 // This is particularly useful when we save a formatted version of the asset itself.
 func (a *Asset) removeRedundanciesBeforePersisting() {
 	a.clearDuplicateUpstreams()
+	a.clearDuplicateTags()
 	a.removeExtraSpacesAtLineEndingsInTextContent()
 
 	// python assets don't require a type anymore
@@ -1017,8 +1018,33 @@ func (a *Asset) removeRedundanciesBeforePersisting() {
 	}
 }
 
-// removeRedundanciesBeforePersisting aims to remove unnecessary configuration from the asset.
-// This is particularly useful when we save a formatted version of the asset itself.
+func deduplicateTags(tags EmptyStringArray) EmptyStringArray {
+	if len(tags) == 0 {
+		return tags
+	}
+
+	seen := make(map[string]bool, len(tags))
+	unique := make(EmptyStringArray, 0, len(tags))
+	for _, tag := range tags {
+		lower := strings.ToLower(tag)
+		if seen[lower] {
+			continue
+		}
+		seen[lower] = true
+		unique = append(unique, tag)
+	}
+
+	return unique
+}
+
+func (a *Asset) clearDuplicateTags() {
+	a.Tags = deduplicateTags(a.Tags)
+	for i := range a.Columns {
+		a.Columns[i].Tags = deduplicateTags(a.Columns[i].Tags)
+	}
+}
+
+// clearDuplicateUpstreams removes duplicate upstream dependencies from the asset.
 func (a *Asset) clearDuplicateUpstreams() {
 	if a.Upstreams == nil {
 		return
