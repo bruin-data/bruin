@@ -2,6 +2,7 @@ package gong
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestBuildDownloadURL(t *testing.T) {
 	// URL should follow the expected format
 	expectedOS := getOSName()
 	expectedArch := getArchName()
-	expectedURL := BaseURL + "/releases/" + Version + "/" + expectedOS + "/gong_" + expectedArch
+	expectedURL := BaseURL + "/releases/" + strings.TrimSpace(Version) + "/" + expectedOS + "/gong_" + expectedArch
 	assert.Equal(t, expectedURL, url)
 }
 
