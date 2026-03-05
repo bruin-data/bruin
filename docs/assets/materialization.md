@@ -288,6 +288,9 @@ select 2 as UserId, 'Bob' as UserName
 
 ### `time_interval`
 
+> [!NOTE]
+> The `time_interval` strategy is only supported for SQL assets. Python assets do not support this strategy.
+
 The `time_interval` strategy is designed for incrementally loading time-based data. It's useful when you want to process data within specific time windows, ensuring efficient updates of historical data while maintaining data consistency.
 
 This strategy requires the following configuration:

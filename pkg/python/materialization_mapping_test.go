@@ -19,7 +19,7 @@ func TestIsPythonMaterializationStrategySupported(t *testing.T) {
 		{name: "append", strategy: pipeline.MaterializationStrategyAppend, want: true},
 		{name: "merge", strategy: pipeline.MaterializationStrategyMerge, want: true},
 		{name: "delete+insert", strategy: pipeline.MaterializationStrategyDeleteInsert, want: true},
-		{name: "time_interval", strategy: pipeline.MaterializationStrategyTimeInterval, want: true},
+		{name: "time_interval is unsupported", strategy: pipeline.MaterializationStrategyTimeInterval, want: false},
 		{name: "scd2_by_time is unsupported", strategy: pipeline.MaterializationStrategySCD2ByTime, want: false},
 		{name: "ddl is unsupported", strategy: pipeline.MaterializationStrategyDDL, want: false},
 		{name: "empty is unsupported", strategy: pipeline.MaterializationStrategyNone, want: false},
@@ -46,7 +46,7 @@ func TestTranslateBruinStrategyToIngestr(t *testing.T) {
 		{name: "append maps to append", strategy: pipeline.MaterializationStrategyAppend, wantIngestr: "append", wantExists: true},
 		{name: "merge maps to merge", strategy: pipeline.MaterializationStrategyMerge, wantIngestr: "merge", wantExists: true},
 		{name: "delete+insert maps to delete+insert", strategy: pipeline.MaterializationStrategyDeleteInsert, wantIngestr: "delete+insert", wantExists: true},
-		{name: "time_interval maps to delete+insert", strategy: pipeline.MaterializationStrategyTimeInterval, wantIngestr: "delete+insert", wantExists: true},
+		{name: "time_interval is unsupported", strategy: pipeline.MaterializationStrategyTimeInterval, wantIngestr: "", wantExists: false},
 		{name: "unsupported strategy returns false", strategy: pipeline.MaterializationStrategySCD2ByTime, wantIngestr: "", wantExists: false},
 	}
 
