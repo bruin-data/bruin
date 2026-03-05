@@ -7,15 +7,27 @@ import re
 import sys
 import typing as t
 from collections.abc import Collection, Set
-from contextlib import contextmanager
 from copy import copy
+from difflib import get_close_matches
 from enum import Enum
 from itertools import count
 
+try:
+    from mypy_extensions import mypyc_attr, trait
+except ImportError:
+
+    def mypyc_attr(*attrs: str, **kwattrs: object) -> t.Callable[[t.Any], t.Any]:  # type: ignore[misc]
+        return lambda f: f
+
+    def trait(f: t.Any) -> t.Any:  # type: ignore[misc]
+        return f
+
+
+T = t.TypeVar("T")
+E = t.TypeVar("E")
+
 if t.TYPE_CHECKING:
-    from sqlglot import exp
-    from sqlglot._typing import A, E, T
-    from sqlglot.expressions import Expression
+    from sqlglot.expression_core import ExpressionCore
 
 
 CAMEL_CASE_PATTERN = re.compile("(?<!^)(?=[A-Z])")
@@ -35,13 +47,18 @@ class AutoName(Enum):
         return name
 
 
-class classproperty(property):
-    """
-    Similar to a normal property but works for class methods
-    """
+def suggest_closest_match_and_fail(
+    kind: str,
+    word: str,
+    possibilities: t.Iterable[str],
+) -> None:
+    close_matches = get_close_matches(word, possibilities, n=1)
 
-    def __get__(self, obj: t.Any, owner: t.Any = None) -> t.Any:
-        return classmethod(self.fget).__get__(None, owner)()  # type: ignore
+    similar = seq_get(close_matches, 0) or ""
+    if similar:
+        similar = f" Did you mean {similar}?"
+
+    raise ValueError(f"Unknown {kind} '{word}'.{similar}")
 
 
 def seq_get(seq: t.Sequence[T], index: int) -> t.Optional[T]:
@@ -124,7 +141,7 @@ def csv(*args: str, sep: str = ", ") -> str:
 def subclasses(
     module_name: str,
     classes: t.Type | t.Tuple[t.Type, ...],
-    exclude: t.Type | t.Tuple[t.Type, ...] = (),
+    exclude: t.Set[t.Type] = set(),
 ) -> t.List[t.Type]:
     """
     Returns all subclasses for a collection of classes, possibly excluding some of them.
@@ -132,7 +149,7 @@ def subclasses(
     Args:
         module_name: The name of the module to search for subclasses in.
         classes: Class(es) we want to find the subclasses of.
-        exclude: Class(es) we want to exclude from the returned list.
+        exclude: Classes we want to exclude from the returned list.
 
     Returns:
         The target subclasses.
@@ -146,58 +163,12 @@ def subclasses(
     ]
 
 
-def apply_index_offset(
-    this: exp.Expression,
-    expressions: t.List[E],
-    offset: int,
-) -> t.List[E]:
-    """
-    Applies an offset to a given integer literal expression.
-
-    Args:
-        this: The target of the index.
-        expressions: The expression the offset will be applied to, wrapped in a list.
-        offset: The offset that will be applied.
-
-    Returns:
-        The original expression with the offset applied to it, wrapped in a list. If the provided
-        `expressions` argument contains more than one expression, it's returned unaffected.
-    """
-    if not offset or len(expressions) != 1:
-        return expressions
-
-    expression = expressions[0]
-
-    from sqlglot import exp
-    from sqlglot.optimizer.annotate_types import annotate_types
-    from sqlglot.optimizer.simplify import simplify
-
-    if not this.type:
-        annotate_types(this)
-
-    if t.cast(exp.DataType, this.type).this not in (
-        exp.DataType.Type.UNKNOWN,
-        exp.DataType.Type.ARRAY,
-    ):
-        return expressions
-
-    if not expression.type:
-        annotate_types(expression)
-
-    if t.cast(exp.DataType, expression.type).this in exp.DataType.INTEGER_TYPES:
-        logger.info("Applying array index offset (%s)", offset)
-        expression = simplify(expression + offset)
-        return [expression]
-
-    return expressions
-
-
 def camel_to_snake_case(name: str) -> str:
     """Converts `name` from camelCase to snake_case and returns the result."""
     return CAMEL_CASE_PATTERN.sub("_", name).upper()
 
 
-def while_changing(expression: Expression, func: t.Callable[[Expression], E]) -> E:
+def while_changing(expression: E, func: t.Callable[[E], E]) -> E:
     """
     Applies a transformation to a given expression until a fix point is reached.
 
@@ -208,16 +179,13 @@ def while_changing(expression: Expression, func: t.Callable[[Expression], E]) ->
     Returns:
         The transformed expression.
     """
+
     while True:
-        for n in reversed(tuple(expression.walk())):
-            n._hash = hash(n)
-
-        start = hash(expression)
+        start_hash = hash(expression)
         expression = func(expression)
+        end_hash = hash(expression)
 
-        for n in expression.walk():
-            n._hash = None
-        if start == hash(expression):
+        if start_hash == end_hash:
             break
 
     return expression
@@ -255,47 +223,6 @@ def tsort(dag: t.Dict[T, t.Set[T]]) -> t.List[T]:
         result.extend(sorted(current))  # type: ignore
 
     return result
-
-
-def open_file(file_name: str) -> t.TextIO:
-    """Open a file that may be compressed as gzip and return it in universal newline mode."""
-    with open(file_name, "rb") as f:
-        gzipped = f.read(2) == b"\x1f\x8b"
-
-    if gzipped:
-        import gzip
-
-        return gzip.open(file_name, "rt", newline="")
-
-    return open(file_name, encoding="utf-8", newline="")
-
-
-@contextmanager
-def csv_reader(read_csv: exp.ReadCSV) -> t.Any:
-    """
-    Returns a csv reader given the expression `READ_CSV(name, ['delimiter', '|', ...])`.
-
-    Args:
-        read_csv: A `ReadCSV` function call.
-
-    Yields:
-        A python csv reader.
-    """
-    args = read_csv.expressions
-    file = open_file(read_csv.name)
-
-    delimiter = ","
-    args = iter(arg.name for arg in args)  # type: ignore
-    for k, v in zip(args, args):
-        if k == "delimiter":
-            delimiter = v
-
-    try:
-        import csv as csv_
-
-        yield csv_.reader(file, delimiter=delimiter)
-    finally:
-        file.close()
 
 
 def find_new_name(taken: t.Collection[str], base: str) -> str:
@@ -396,9 +323,9 @@ def is_iterable(value: t.Any) -> bool:
     Returns:
         A `bool` value indicating if it is an iterable.
     """
-    from sqlglot import Expression
+    from sqlglot.expression_core import ExpressionCore
 
-    return hasattr(value, "__iter__") and not isinstance(value, (str, bytes, Expression))
+    return hasattr(value, "__iter__") and not isinstance(value, (str, bytes, ExpressionCore))
 
 
 def flatten(values: t.Iterable[t.Iterable[t.Any] | t.Any]) -> t.Iterator[t.Any]:
@@ -425,7 +352,7 @@ def flatten(values: t.Iterable[t.Iterable[t.Any] | t.Any]) -> t.Iterator[t.Any]:
             yield value
 
 
-def dict_depth(d: t.Dict) -> int:
+def dict_depth(d: t.Any) -> int:
     """
     Get the nesting depth of a dictionary.
 
@@ -470,7 +397,7 @@ def to_bool(value: t.Optional[str | bool]) -> t.Optional[str | bool]:
     return value
 
 
-def merge_ranges(ranges: t.List[t.Tuple[A, A]]) -> t.List[t.Tuple[A, A]]:
+def merge_ranges(ranges: t.List[t.Tuple[t.Any, t.Any]]) -> t.List[t.Tuple[t.Any, t.Any]]:
     """
     Merges a sequence of ranges, represented as tuples (low, high) whose values
     belong to some totally-ordered set.
@@ -517,7 +444,7 @@ def is_iso_datetime(text: str) -> bool:
 DATE_UNITS = {"day", "week", "month", "quarter", "year", "year_month"}
 
 
-def is_date_unit(expression: t.Optional[exp.Expression]) -> bool:
+def is_date_unit(expression: t.Optional[ExpressionCore]) -> bool:
     return expression is not None and expression.name.lower() in DATE_UNITS
 
 

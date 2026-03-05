@@ -14,6 +14,7 @@ import (
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/term"
 )
 
 func Connections() *cli.Command {
@@ -80,25 +81,21 @@ func AddConnection() *cli.Command {
 		Usage: "add a new connection to a Bruin project",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     "environment",
-				Aliases:  []string{"e", "env"},
-				Usage:    "the name of the environment to add the connection to",
-				Required: true,
+				Name:    "environment",
+				Aliases: []string{"e", "env"},
+				Usage:   "the name of the environment to add the connection to",
 			},
 			&cli.StringFlag{
-				Name:     "name",
-				Usage:    "the name of the connection",
-				Required: true,
+				Name:  "name",
+				Usage: "the name of the connection",
 			},
 			&cli.StringFlag{
-				Name:     "type",
-				Usage:    "the type of the connection",
-				Required: true,
+				Name:  "type",
+				Usage: "the type of the connection",
 			},
 			&cli.StringFlag{
-				Name:     "credentials",
-				Usage:    "the JSON object containing the credentials",
-				Required: true,
+				Name:  "credentials",
+				Usage: "the JSON object containing the credentials",
 			},
 			&cli.StringFlag{
 				Name:    "output",
@@ -112,6 +109,34 @@ func AddConnection() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
+			hasEnv := c.IsSet("environment")
+			hasName := c.IsSet("name")
+			hasType := c.IsSet("type")
+			hasCreds := c.IsSet("credentials")
+
+			flagCount := 0
+			for _, set := range []bool{hasEnv, hasName, hasType, hasCreds} {
+				if set {
+					flagCount++
+				}
+			}
+
+			// No flags provided: launch interactive TUI if in a terminal
+			if flagCount == 0 {
+				if term.IsTerminal(int(os.Stdin.Fd())) {
+					return runInteractiveAddConnection(c)
+				}
+				errorPrinter.Println("No flags provided and not running in a terminal. Use --environment, --name, --type, and --credentials flags.")
+				return cli.Exit("", 1)
+			}
+
+			// Partial flags: error
+			if flagCount < 4 {
+				errorPrinter.Println("All of --environment, --name, --type, and --credentials flags must be provided together, or omit all flags for interactive mode.")
+				return cli.Exit("", 1)
+			}
+
+			// All flags provided: existing non-interactive path
 			path := "."
 			if c.Args().Present() {
 				path = c.Args().First()

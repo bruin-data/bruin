@@ -173,5 +173,7 @@ join t2
 )
 def test_replace_table_references(query, table_references, expected):
     result = replace_table_references(query, "bigquery", table_references)
-    assert result["query"] == "; ".join([q.sql() for q in parse(expected)])
+    assert result["query"] == "; ".join(
+        [q.sql(dialect="bigquery") for q in parse(expected, dialect="bigquery")]
+    )
     assert result["error"] is None

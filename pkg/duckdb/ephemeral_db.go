@@ -26,7 +26,13 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 
 func (e *EphemeralConnection) openDB(ctx context.Context) (*sql.DB, error) {
 	path := e.config.ToDBConnectionURI()
-	db, err := sql.Open("adbc_duckdb", "driver=duckdb;path="+path)
+	connStr := "driver=duckdb;path=" + path
+
+	if cfg, ok := e.config.(Config); ok && cfg.ReadOnly {
+		connStr += ";access_mode=read_only"
+	}
+
+	db, err := sql.Open("adbc_duckdb", connStr)
 	if err != nil {
 		return nil, err
 	}
@@ -326,6 +332,36 @@ func convertAssign(dest, src any) error {
 			*d = nil
 		} else if b, ok := src.([]byte); ok {
 			*d = b
+		}
+		return nil
+	case *sql.NullString:
+		if src == nil {
+			*d = sql.NullString{}
+		} else if s, ok := src.(string); ok {
+			*d = sql.NullString{String: s, Valid: true}
+		} else {
+			*d = sql.NullString{String: fmt.Sprintf("%v", src), Valid: true}
+		}
+		return nil
+	case *sql.NullInt64:
+		if src == nil {
+			*d = sql.NullInt64{}
+		} else if i, ok := src.(int64); ok {
+			*d = sql.NullInt64{Int64: i, Valid: true}
+		}
+		return nil
+	case *sql.NullFloat64:
+		if src == nil {
+			*d = sql.NullFloat64{}
+		} else if f, ok := src.(float64); ok {
+			*d = sql.NullFloat64{Float64: f, Valid: true}
+		}
+		return nil
+	case *sql.NullBool:
+		if src == nil {
+			*d = sql.NullBool{}
+		} else if b, ok := src.(bool); ok {
+			*d = sql.NullBool{Bool: b, Valid: true}
 		}
 		return nil
 	}

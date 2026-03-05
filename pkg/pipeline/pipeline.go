@@ -123,6 +123,11 @@ const (
 	AssetTypeTableauWorksheet          = AssetType("tableau.worksheet")
 	AssetTypeTrinoQuery                = AssetType("trino.sql")
 	AssetTypeTrinoQuerySensor          = AssetType("trino.sensor.query")
+	AssetTypeVerticaQuery              = AssetType("vertica.sql")
+	AssetTypeVerticaQuerySensor        = AssetType("vertica.sensor.query")
+	AssetTypeVerticaSeed               = AssetType("vertica.seed")
+	AssetTypeVerticaSource             = AssetType("vertica.source")
+	AssetTypeVerticaTableSensor        = AssetType("vertica.sensor.table")
 	RunConfigApplyIntervalModifiers    = RunConfig("apply-interval-modifiers")
 	RunConfigEndDate                   = RunConfig("end-date")
 	RunConfigFullRefresh               = RunConfig("full-refresh")
@@ -183,6 +188,7 @@ var defaultMapping = map[string]string{
 	"sftp":                  "sftp-default",
 	"motherduck":            "motherduck-default",
 	"elasticsearch":         "elasticsearch-default",
+	"vertica":               "vertica-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", ".r", "task.yml", "task.yaml"}
@@ -664,6 +670,11 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeOracleSource:              "oracle",
 	AssetTypeS3KeySensor:               "aws",
 	AssetTypeElasticsearch:             "elasticsearch",
+	AssetTypeVerticaQuery:              "vertica",
+	AssetTypeVerticaSeed:               "vertica",
+	AssetTypeVerticaQuerySensor:        "vertica",
+	AssetTypeVerticaTableSensor:        "vertica",
+	AssetTypeVerticaSource:             "vertica",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -680,6 +691,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
 	"elasticsearch": AssetTypeElasticsearch,
+	"vertica":       AssetTypeVerticaQuery,
 }
 
 type SecretMapping struct {
@@ -997,6 +1009,7 @@ func (a *Asset) PrefixUpstreams(prefix string) {
 // This is particularly useful when we save a formatted version of the asset itself.
 func (a *Asset) removeRedundanciesBeforePersisting() {
 	a.clearDuplicateUpstreams()
+	a.clearDuplicateTags()
 	a.removeExtraSpacesAtLineEndingsInTextContent()
 
 	// python assets don't require a type anymore
@@ -1005,8 +1018,33 @@ func (a *Asset) removeRedundanciesBeforePersisting() {
 	}
 }
 
-// removeRedundanciesBeforePersisting aims to remove unnecessary configuration from the asset.
-// This is particularly useful when we save a formatted version of the asset itself.
+func deduplicateTags(tags EmptyStringArray) EmptyStringArray {
+	if len(tags) == 0 {
+		return tags
+	}
+
+	seen := make(map[string]bool, len(tags))
+	unique := make(EmptyStringArray, 0, len(tags))
+	for _, tag := range tags {
+		lower := strings.ToLower(tag)
+		if seen[lower] {
+			continue
+		}
+		seen[lower] = true
+		unique = append(unique, tag)
+	}
+
+	return unique
+}
+
+func (a *Asset) clearDuplicateTags() {
+	a.Tags = deduplicateTags(a.Tags)
+	for i := range a.Columns {
+		a.Columns[i].Tags = deduplicateTags(a.Columns[i].Tags)
+	}
+}
+
+// clearDuplicateUpstreams removes duplicate upstream dependencies from the asset.
 func (a *Asset) clearDuplicateUpstreams() {
 	if a.Upstreams == nil {
 		return
@@ -1514,6 +1552,7 @@ type Pipeline struct {
 	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
+	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit" yaml:"commit,omitempty"`
 	Snapshot           string                 `json:"snapshot" yaml:"snapshot,omitempty"`
@@ -1698,6 +1737,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeSnowflakeQuery:    0,
 		AssetTypePostgresQuery:     0,
 		AssetTypeMsSQLQuery:        0,
+		AssetTypeVerticaQuery:      0,
 		AssetTypeDatabricksQuery:   0,
 		AssetTypeRedshiftQuery:     0,
 		AssetTypeSynapseQuery:      0,
@@ -2323,6 +2363,7 @@ func (a *Asset) IsSQLAsset() bool {
 		AssetTypePostgresQuery:     true,
 		AssetTypeRedshiftQuery:     true,
 		AssetTypeMsSQLQuery:        true,
+		AssetTypeVerticaQuery:      true,
 		AssetTypeDatabricksQuery:   true,
 		AssetTypeSynapseQuery:      true,
 		AssetTypeFabricQuery:       true,

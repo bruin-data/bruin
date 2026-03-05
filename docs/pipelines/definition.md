@@ -51,6 +51,7 @@ metadata_push:
 
 retries: 2
 concurrency: 4
+max_active_steps: 8
 
 default:
   rerun_cooldown: 300
@@ -122,6 +123,7 @@ variables:
 - [Retries](#retries)
 - [Rerun Cooldown](#rerun-cooldown)
 - [Concurrency](#concurrency)
+- [Max Active Steps](#max-active-steps)
 - [Default (pipeline-level defaults)](#default-pipeline-level-defaults)
 - [Variables](#variables)
 
@@ -351,6 +353,25 @@ concurrency: 4
 > Setting concurrency too high can overload downstream systems. Tune based on your warehouse/engine capacity.
 
 See also: [Concurrency & Resource Limits](/getting-started/concurrency).
+
+### Max Active Steps
+
+Limit the number of steps that can run in parallel within a single pipeline run on Bruin Cloud. A "step" includes any unit of work: asset execution (SQL queries, Python scripts, etc.) as well as quality checks. This is useful for controlling the load on downstream systems when a pipeline has many independent assets or checks.
+
+Example:
+
+```yaml
+max_active_steps: 8
+```
+
+- **Type:** `Integer`
+- **Default:** `15` (on Bruin Cloud)
+
+> [!NOTE]
+> This setting only applies to Bruin Cloud. Local runs via `bruin run` are not affected.
+
+> [!WARNING]
+> Setting this too low may slow down pipeline execution. Setting it too high can overload your data warehouse or database. Tune based on the capacity of the systems your assets connect to.
 
 ### Default (pipeline-level defaults)
 

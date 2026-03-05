@@ -22,8 +22,10 @@ def canonicalize(expression: exp.Expression, dialect: DialectType = None) -> exp
     dialect = Dialect.get_or_raise(dialect)
 
     def _canonicalize(expression: exp.Expression) -> exp.Expression:
+        if not isinstance(expression, _CANONICALIZE_TYPES):
+            return expression
         expression = add_text_to_concat(expression)
-        expression = replace_date_funcs(expression)
+        expression = replace_date_funcs(expression, dialect=dialect)
         expression = coerce_type(expression, dialect.PROMOTE_TO_INFERRED_DATETIME_TYPE)
         expression = remove_redundant_casts(expression)
         expression = ensure_bools(expression, _replace_int_predicate)
@@ -31,31 +33,6 @@ def canonicalize(expression: exp.Expression, dialect: DialectType = None) -> exp
         return expression
 
     return exp.replace_tree(expression, _canonicalize)
-
-
-def add_text_to_concat(node: exp.Expression) -> exp.Expression:
-    if isinstance(node, exp.Add) and node.type and node.type.this in exp.DataType.TEXT_TYPES:
-        node = exp.Concat(expressions=[node.left, node.right])
-    return node
-
-
-def replace_date_funcs(node: exp.Expression) -> exp.Expression:
-    if (
-        isinstance(node, (exp.Date, exp.TsOrDsToDate))
-        and not node.expressions
-        and not node.args.get("zone")
-        and node.this.is_string
-        and is_iso_date(node.this.name)
-    ):
-        return exp.cast(node.this, to=exp.DataType.Type.DATE)
-    if isinstance(node, exp.Timestamp) and not node.args.get("zone"):
-        if not node.type:
-            from sqlglot.optimizer.annotate_types import annotate_types
-
-            node = annotate_types(node)
-        return exp.cast(node.this, to=node.type or exp.DataType.Type.TIMESTAMP)
-
-    return node
 
 
 COERCIBLE_DATE_OPS = (
@@ -72,12 +49,73 @@ COERCIBLE_DATE_OPS = (
 )
 
 
+# All expression types that any of the canonicalize functions can act on
+_CANONICALIZE_TYPES = tuple(
+    {
+        # add_text_to_concat
+        exp.Add,
+        # replace_date_funcs
+        exp.Date,
+        exp.TsOrDsToDate,
+        exp.Timestamp,
+        # coerce_type (COERCIBLE_DATE_OPS + Between, Extract, DateAdd, DateSub, DateTrunc, DateDiff)
+        *COERCIBLE_DATE_OPS,
+        exp.Between,
+        exp.Extract,
+        exp.DateAdd,
+        exp.DateSub,
+        exp.DateTrunc,
+        exp.DateDiff,
+        # remove_redundant_casts
+        exp.Cast,
+        # ensure_bools (Connector, Not, If, Where, Having)
+        exp.Connector,
+        exp.Not,
+        exp.If,
+        exp.Where,
+        exp.Having,
+        # remove_ascending_order
+        exp.Ordered,
+    }
+)
+
+
+def add_text_to_concat(node: exp.Expression) -> exp.Expression:
+    if isinstance(node, exp.Add) and node.type and node.type.this in exp.DataType.TEXT_TYPES:
+        node = exp.Concat(
+            expressions=[node.left, node.right],
+            # All known dialects, i.e. Redshift and T-SQL, that support
+            # concatenating strings with the + operator do not coalesce NULLs.
+            coalesce=False,
+        )
+    return node
+
+
+def replace_date_funcs(node: exp.Expression, dialect: DialectType) -> exp.Expression:
+    if (
+        isinstance(node, (exp.Date, exp.TsOrDsToDate))
+        and not node.expressions
+        and not node.args.get("zone")
+        and node.this.is_string
+        and is_iso_date(node.this.name)
+    ):
+        return exp.cast(node.this, to=exp.DataType.Type.DATE)
+    if isinstance(node, exp.Timestamp) and not node.args.get("zone"):
+        if not node.type:
+            from sqlglot.optimizer.annotate_types import annotate_types
+
+            node = annotate_types(node, dialect=dialect)
+        return exp.cast(node.this, to=node.type or exp.DataType.Type.TIMESTAMP)
+
+    return node
+
+
 def coerce_type(node: exp.Expression, promote_to_inferred_datetime_type: bool) -> exp.Expression:
     if isinstance(node, COERCIBLE_DATE_OPS):
         _coerce_date(node.left, node.right, promote_to_inferred_datetime_type)
     elif isinstance(node, exp.Between):
         _coerce_date(node.this, node.args["low"], promote_to_inferred_datetime_type)
-    elif isinstance(node, exp.Extract) and not node.expression.type.is_type(
+    elif isinstance(node, exp.Extract) and not node.expression.is_type(
         *exp.DataType.TEMPORAL_TYPES
     ):
         _replace_cast(node.expression, exp.DataType.Type.DATETIME)
@@ -93,15 +131,18 @@ def remove_redundant_casts(expression: exp.Expression) -> exp.Expression:
     if (
         isinstance(expression, exp.Cast)
         and expression.this.type
-        and expression.to.this == expression.this.type.this
+        and expression.to == expression.this.type
     ):
         return expression.this
+
     if (
         isinstance(expression, (exp.Date, exp.TsOrDsToDate))
         and expression.this.type
         and expression.this.type.this == exp.DataType.Type.DATE
+        and not expression.this.type.expressions
     ):
         return expression.this
+
     return expression
 
 

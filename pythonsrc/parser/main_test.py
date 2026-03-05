@@ -1553,15 +1553,15 @@ test_cases = [
             {
                 "name": "name",
                 "type": "TEXT",
-                "upstream": [{"column": "name", "table": "raw.teams"}],
+                "upstream": [{"column": "name", "table": "raw.Teams"}],
             },
         ],
         "expected_non_selected": [
-            {"name": "id", "upstream": [{"column": "id", "table": "raw.teams"}]},
-            {"name": "name", "upstream": [{"column": "name", "table": "raw.teams"}]},
+            {"name": "id", "upstream": [{"column": "id", "table": "raw.Teams"}]},
+            {"name": "name", "upstream": [{"column": "name", "table": "raw.Teams"}]},
             {
                 "name": "teamid",
-                "upstream": [{"column": "teamid", "table": "raw.teammemberships"}],
+                "upstream": [{"column": "teamid", "table": "raw.TeamMemberships"}],
             },
         ],
     },
@@ -2426,3 +2426,54 @@ def test_get_table_name():
     assert len(tables) == 2
     assert get_table_name(tables[0]) == "Database1.schema.Table1"
     assert get_table_name(tables[1]) == "Database2.schema.Table2"
+
+
+def test_align_schema_casing():
+    """Test that align_schema_casing remaps schema keys to match query table casing."""
+    from .main import align_schema_casing
+
+    schema = {
+        "raw.teams": {"Id": "INTEGER", "Name": "STRING"},
+        "raw.TeamMemberships": {"Id": "INTEGER", "TeamId": "INTEGER"},
+    }
+
+    # Query uses raw.Teams (uppercase T), schema has raw.teams (lowercase)
+    parsed = parse_one(
+        "SELECT * FROM raw.Teams JOIN raw.TeamMemberships ON Teams.Id = TeamMemberships.TeamId",
+        dialect="bigquery",
+    )
+    result = align_schema_casing(schema, parsed)
+
+    # Should add raw.Teams mapped to the same value as raw.teams
+    assert "raw.Teams" in result
+    assert result["raw.Teams"] == {"Id": "INTEGER", "Name": "STRING"}
+    # Original keys should still be present
+    assert "raw.teams" in result
+    assert "raw.TeamMemberships" in result
+
+
+def test_align_schema_casing_already_matching():
+    """Test that align_schema_casing is a no-op when casing already matches."""
+    from .main import align_schema_casing
+
+    schema = {
+        "raw.Teams": {"Id": "INTEGER"},
+    }
+    parsed = parse_one("SELECT * FROM raw.Teams", dialect="bigquery")
+    result = align_schema_casing(schema, parsed)
+    assert result == schema
+
+
+def test_get_column_lineage_case_insensitive_schema():
+    """Test that column lineage resolves types even when schema and query casing differ."""
+    result = get_column_lineage(
+        "SELECT t.Name FROM raw.Teams t",
+        {"raw.teams": {"Name": "STRING"}},
+        "bigquery",
+    )
+    assert len(result["columns"]) == 1
+    assert result["columns"][0]["name"] == "name"
+    assert result["columns"][0]["type"] == "TEXT"
+    assert result["columns"][0]["upstream"] == [
+        {"column": "name", "table": "raw.Teams"}
+    ]

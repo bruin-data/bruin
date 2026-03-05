@@ -293,3 +293,205 @@ func Test_ensureIngestrInstalled_ConcurrentCalls(t *testing.T) { //nolint:parall
 
 	assert.Equal(t, int32(1), installCount.Load(), "ingestr should only be installed once even with concurrent calls")
 }
+
+func TestResolvePythonVersion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		requiresPython string
+		defaultVersion string
+		want           string
+		wantErr        bool
+	}{
+		{
+			name:           "empty string returns default",
+			requiresPython: "",
+			defaultVersion: "3.11",
+			want:           "3.11",
+		},
+		{
+			name:           "whitespace only returns default",
+			requiresPython: "   ",
+			defaultVersion: "3.11",
+			want:           "3.11",
+		},
+		{
+			name:           ">=3.13 returns 3.13",
+			requiresPython: ">=3.13",
+			defaultVersion: "3.11",
+			want:           "3.13",
+		},
+		{
+			name:           ">=3.11 returns 3.11",
+			requiresPython: ">=3.11",
+			defaultVersion: "3.11",
+			want:           "3.11",
+		},
+		{
+			name:           ">=3.12,<3.14 returns 3.12",
+			requiresPython: ">=3.12,<3.14",
+			defaultVersion: "3.11",
+			want:           "3.12",
+		},
+		{
+			name:           "==3.12 returns 3.12",
+			requiresPython: "==3.12",
+			defaultVersion: "3.11",
+			want:           "3.12",
+		},
+		{
+			name:           ">3.11 returns 3.12",
+			requiresPython: ">3.11",
+			defaultVersion: "3.11",
+			want:           "3.12",
+		},
+		{
+			name:           "~=3.10 returns 3.10",
+			requiresPython: "~=3.10",
+			defaultVersion: "3.11",
+			want:           "3.10",
+		},
+		{
+			name:           ">=3.8 returns lowest default 3.8",
+			requiresPython: ">=3.8",
+			defaultVersion: "3.11",
+			want:           "3.8",
+		},
+		{
+			name:           ">=3.14 returns error",
+			requiresPython: ">=3.14",
+			defaultVersion: "3.11",
+			wantErr:        true,
+		},
+		{
+			name:           "==3.14 returns error",
+			requiresPython: "==3.14",
+			defaultVersion: "3.11",
+			wantErr:        true,
+		},
+		{
+			name:           "handles spaces in specifier",
+			requiresPython: ">= 3.12 , < 3.14",
+			defaultVersion: "3.11",
+			want:           "3.12",
+		},
+		{
+			name:           "wildcard suffix is handled",
+			requiresPython: "==3.12.*",
+			defaultVersion: "3.11",
+			want:           "3.12",
+		},
+		{
+			name:           "patch version is stripped >=3.13.0",
+			requiresPython: ">=3.13.0",
+			defaultVersion: "3.11",
+			want:           "3.13",
+		},
+		{
+			name:           "patch version is stripped >=3.12.1",
+			requiresPython: ">=3.12.1",
+			defaultVersion: "3.11",
+			want:           "3.12",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ResolvePythonVersion(tt.requiresPython, tt.defaultVersion)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_uvPythonRunner_Run_UsesRequiresPython(t *testing.T) {
+	t.Parallel()
+
+	repo := &git.Repo{}
+	module := "path.to.module"
+
+	tests := []struct {
+		name             string
+		image            string
+		dependencyConfig *DependencyConfig
+		expectedVersion  string
+	}{
+		{
+			name:  "pyproject with requires-python >=3.13 uses 3.13",
+			image: "",
+			dependencyConfig: &DependencyConfig{
+				Type:           DependencyTypePyproject,
+				RequiresPython: ">=3.13",
+				ProjectRoot:    "/tmp/project",
+				PyprojectPath:  "/tmp/project/pyproject.toml",
+			},
+			expectedVersion: "3.13",
+		},
+		{
+			name:  "explicit image overrides requires-python",
+			image: "python:3.12",
+			dependencyConfig: &DependencyConfig{
+				Type:           DependencyTypePyproject,
+				RequiresPython: ">=3.13",
+				ProjectRoot:    "/tmp/project",
+				PyprojectPath:  "/tmp/project/pyproject.toml",
+			},
+			expectedVersion: "3.12",
+		},
+		{
+			name:  "no image and no requires-python uses default",
+			image: "",
+			dependencyConfig: &DependencyConfig{
+				Type:          DependencyTypePyproject,
+				ProjectRoot:   "/tmp/project",
+				PyprojectPath: "/tmp/project/pyproject.toml",
+			},
+			expectedVersion: "3.11",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := new(mockCmd)
+
+			// For pyproject-based runs, expect lock then run calls
+			projectRepo := &git.Repo{Path: tt.dependencyConfig.ProjectRoot}
+			cmd.On("Run", mock.Anything, projectRepo, &CommandInstance{
+				Name: "~/.bruin/uv",
+				Args: []string{"lock", "--python", tt.expectedVersion},
+			}).Return(nil)
+			cmd.On("Run", mock.Anything, projectRepo, mock.MatchedBy(func(c *CommandInstance) bool {
+				return len(c.Args) > 0 && c.Args[0] == "run" &&
+					c.Args[2] == tt.expectedVersion
+			})).Return(nil)
+
+			inst := new(mockUvInstaller)
+			inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+
+			runner := &UvPythonRunner{
+				Cmd:         cmd,
+				UvInstaller: inst,
+			}
+
+			err := runner.Run(t.Context(), &executionContext{
+				repo:             repo,
+				module:           module,
+				dependencyConfig: tt.dependencyConfig,
+				asset: &pipeline.Asset{
+					Image: tt.image,
+				},
+			})
+			require.NoError(t, err)
+			cmd.AssertExpectations(t)
+		})
+	}
+}

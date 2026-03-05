@@ -209,9 +209,14 @@ Start by reading the file.`,
 
 // GetSystemPrompt returns the system prompt for Claude.
 // If hasPreFetchedStats is true, uses the prompt that references pre-fetched statistics.
-func GetSystemPrompt(hasPreFetchedStats bool) string {
+// If customSystemPrompt is provided, it is appended to the default system prompt.
+func GetSystemPrompt(hasPreFetchedStats bool, customSystemPrompt string) string {
+	base := systemPromptTemplate
 	if hasPreFetchedStats {
-		return systemPromptTemplateWithStats
+		base = systemPromptTemplateWithStats
 	}
-	return systemPromptTemplate
+	if customSystemPrompt != "" {
+		return base + "\n\n" + customSystemPrompt
+	}
+	return base
 }

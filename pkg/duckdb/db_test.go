@@ -1,8 +1,13 @@
 package duck
 
 import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -298,6 +303,124 @@ ORDER BY t.table_schema, t.table_name;`).
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+// delayedConnection is a mock connection that sleeps for a configurable duration
+// on ExecContext calls. Used to test parallel vs serial execution behavior.
+type delayedConnection struct {
+	delay time.Duration
+}
+
+//nolint:ireturn
+func (d *delayedConnection) QueryContext(_ context.Context, _ string, _ ...any) (Rows, error) {
+	time.Sleep(d.delay)
+	return &emptyRows{}, nil
+}
+
+func (d *delayedConnection) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	time.Sleep(d.delay)
+	return driver.RowsAffected(0), nil
+}
+
+//nolint:ireturn
+//nolint:ireturn
+func (d *delayedConnection) QueryRowContext(_ context.Context, _ string, _ ...any) Row {
+	time.Sleep(d.delay)
+	return &errorRow{err: sql.ErrNoRows}
+}
+
+// emptyRows implements Rows with no data.
+type emptyRows struct{}
+
+func (r *emptyRows) Close() error                            { return nil }
+func (r *emptyRows) Columns() ([]string, error)              { return nil, nil }
+func (r *emptyRows) ColumnTypes() ([]*sql.ColumnType, error) { return nil, nil }
+func (r *emptyRows) Err() error                              { return nil }
+func (r *emptyRows) Next() bool                              { return false }
+func (r *emptyRows) Scan(_ ...any) error                     { return sql.ErrNoRows }
+
+func TestClient_ReadOnly_AllowsParallelQueries(t *testing.T) {
+	t.Parallel()
+
+	const (
+		queryDelay  = 150 * time.Millisecond
+		concurrency = 3
+	)
+
+	// Use a unique path to avoid conflicts with other tests using the global lock map.
+	path := "test_readonly_parallel_" + t.Name() + ".db"
+
+	clients := make([]*Client, concurrency)
+	for i := range concurrency {
+		clients[i] = &Client{
+			connection: &delayedConnection{delay: queryDelay},
+			config:     Config{Path: path, ReadOnly: true},
+			readOnly:   true,
+		}
+	}
+
+	start := time.Now()
+
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	for i := range concurrency {
+		go func() {
+			defer wg.Done()
+			err := clients[i].RunQueryWithoutResult(t.Context(), &query.Query{Query: "SELECT 1"})
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	elapsed := time.Since(start)
+
+	// If queries ran in parallel, total time should be ~1x queryDelay.
+	// If serialized, it would be ~3x queryDelay (450ms).
+	// Use 2x as the threshold to leave margin for scheduling jitter.
+	maxExpected := queryDelay * 2
+	assert.Less(t, elapsed, maxExpected,
+		"readonly queries should run in parallel: expected < %v, got %v", maxExpected, elapsed)
+}
+
+func TestClient_NonReadOnly_SerializesQueries(t *testing.T) {
+	t.Parallel()
+
+	const (
+		queryDelay  = 100 * time.Millisecond
+		concurrency = 3
+	)
+
+	path := "test_serial_nonreadonly_" + t.Name() + ".db"
+
+	clients := make([]*Client, concurrency)
+	for i := range concurrency {
+		clients[i] = &Client{
+			connection: &delayedConnection{delay: queryDelay},
+			config:     Config{Path: path, ReadOnly: false},
+			readOnly:   false,
+		}
+	}
+
+	start := time.Now()
+
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	for i := range concurrency {
+		go func() {
+			defer wg.Done()
+			err := clients[i].RunQueryWithoutResult(t.Context(), &query.Query{Query: "SELECT 1"})
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	elapsed := time.Since(start)
+
+	// If queries were serialized by the lock, total time should be >= 3x queryDelay.
+	// Allow some tolerance for timing.
+	minExpected := queryDelay*time.Duration(concurrency) - 50*time.Millisecond
+	assert.GreaterOrEqual(t, elapsed, minExpected,
+		"non-readonly queries should be serialized: expected >= %v, got %v", minExpected, elapsed)
 }
 
 func TestRoundToScale(t *testing.T) {

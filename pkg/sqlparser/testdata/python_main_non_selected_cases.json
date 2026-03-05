@@ -1,0 +1,438 @@
+[
+  {
+    "name": "Select all from orders",
+    "dialect": "bigquery",
+    "query": "\n\t        select * from orders\n\t    ",
+    "schema": {
+      "orders": {
+        "id": "bigint",
+        "order_number": "string",
+        "customer_id": "bigint",
+        "shipping_country": "string"
+      },
+      "customers": {
+        "id": "bigint",
+        "name": "string",
+        "age": "bigint",
+        "country": "string"
+      }
+    },
+    "expected": []
+  },
+  {
+    "name": "Select orders with id greater than 10",
+    "dialect": "bigquery",
+    "query": "\n\t        select * from orders where id > 10\n\t    ",
+    "schema": {
+      "orders": {
+        "id": "bigint",
+        "order_number": "string",
+        "customer_id": "bigint",
+        "shipping_country": "string"
+      },
+      "customers": {
+        "id": "bigint",
+        "name": "string",
+        "age": "bigint",
+        "country": "string"
+      }
+    },
+    "expected": [
+      {
+        "name": "id",
+        "table": "orders"
+      }
+    ]
+  },
+  {
+    "name": "Join orders and customers with id filter",
+    "dialect": "bigquery",
+    "query": "\n\t        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10;\n\t    ",
+    "schema": {
+      "orders": {
+        "id": "bigint",
+        "order_number": "string",
+        "customer_id": "bigint",
+        "shipping_country": "string"
+      },
+      "customers": {
+        "id": "bigint",
+        "name": "string",
+        "age": "bigint",
+        "country": "string"
+      }
+    },
+    "expected": [
+      {
+        "name": "customer_id",
+        "table": "orders"
+      },
+      {
+        "name": "id",
+        "table": "customers"
+      },
+      {
+        "name": "id",
+        "table": "orders"
+      }
+    ]
+  },
+  {
+    "name": "Join orders and customers with country filter",
+    "dialect": "bigquery",
+    "query": "\n\t        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = \"UK\";\n\t    ",
+    "schema": {
+      "orders": {
+        "id": "bigint",
+        "order_number": "string",
+        "customer_id": "bigint",
+        "shipping_country": "string"
+      },
+      "customers": {
+        "id": "bigint",
+        "name": "string",
+        "age": "bigint",
+        "country": "string"
+      }
+    },
+    "expected": [
+      {
+        "name": "country",
+        "table": "customers"
+      },
+      {
+        "name": "customer_id",
+        "table": "orders"
+      },
+      {
+        "name": "id",
+        "table": "customers"
+      },
+      {
+        "name": "id",
+        "table": "orders"
+      }
+    ]
+  },
+  {
+    "name": "Join with additional condition on shipping country",
+    "dialect": "bigquery",
+    "query": "\n\t        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = \"UK\" and concat(customers.country, orders.shipping_country)=\"UKUK\";\n\t    ",
+    "schema": {
+      "orders": {
+        "id": "bigint",
+        "order_number": "string",
+        "customer_id": "bigint",
+        "shipping_country": "string"
+      },
+      "customers": {
+        "id": "bigint",
+        "name": "string",
+        "age": "bigint",
+        "country": "string"
+      }
+    },
+    "expected": [
+      {
+        "name": "country",
+        "table": "customers"
+      },
+      {
+        "name": "customer_id",
+        "table": "orders"
+      },
+      {
+        "name": "id",
+        "table": "customers"
+      },
+      {
+        "name": "id",
+        "table": "orders"
+      },
+      {
+        "name": "shipping_country",
+        "table": "orders"
+      }
+    ]
+  },
+  {
+    "name": "CTE with cross join",
+    "dialect": "bigquery",
+    "query": "\n\t        with t1 as (\n\t            select col1, count(*) as cnt1 from table1 group by col1\n\t        ), t2 as (\n\t            select avg(col3) as col3_avg from table1 group by col1\n\t        )\n\t        select col1, cnt1, col3_avg from t1 cross join t2\n\t    ",
+    "schema": {
+      "table1": {
+        "col3": "int",
+        "col1": "int",
+        "col2": "int"
+      }
+    },
+    "expected": [
+      {
+        "name": "col1",
+        "table": "table1"
+      }
+    ]
+  },
+  {
+    "name": "CTE with cross",
+    "dialect": "bigquery",
+    "query": "\n            SELECT t1.col1, t2.col2 \t\t\t\t\n            FROM table1 t1 \t\t\t\t\n            JOIN table2 t2 \n                ON t1.id = t2.id\n\t",
+    "schema": {
+      "table1": {
+        "id": "str",
+        "col1": "int64"
+      },
+      "table2": {
+        "id": "str",
+        "col2": "int64"
+      }
+    },
+    "expected": [
+      {
+        "name": "id",
+        "table": "table1"
+      },
+      {
+        "name": "id",
+        "table": "table2"
+      }
+    ]
+  },
+  {
+    "name": "CTE with cross test 2 ",
+    "dialect": "bigquery",
+    "query": "\n\t   SELECT emp_id, (SELECT AVG(salary) FROM salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary FROM employees\n\t",
+    "schema": {
+      "employees": {
+        "emp_id": "str"
+      },
+      "salaries": {
+        "emp_id": "str",
+        "salary": "int64"
+      }
+    },
+    "expected": [
+      {
+        "name": "emp_id",
+        "table": "employees"
+      },
+      {
+        "name": "emp_id",
+        "table": "salaries"
+      }
+    ]
+  },
+  {
+    "name": "complex CTEs with aliases",
+    "dialect": "snowflake",
+    "query": "\nWITH ufd AS (\n    SELECT\n        user_id,\n        MIN(date_utc) as my_date_col\n    FROM fact.some_daily_metrics\n    GROUP BY 1\n),\nuser_retention AS (\n    SELECT\n        d.user_id,\n        MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) as some_day1_metric,\n    FROM fact.some_daily_metrics d\n    INNER JOIN ufd f ON d.user_id = f.user_id\n    GROUP BY 1\n)\nSELECT\n    d.user_id, \n    DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) as recency,\n    COUNT(DISTINCT d.date_utc) as active_days, \n    MIN_BY(d.first_device_type, d.first_activity_timestamp) as first_device_type, \n    AVG(NULLIF(d.estimated_session_duration, 0)) as avg_session_duration, \n    SUM(d.event_start) as total_event_start, \n    MAX(r.some_day1_metric) as some_day1_metric, \n    case when sum(d.event_start) > 0 then 'Player' else 'Visitor' end as user_type, \nFROM fact.some_daily_metrics d\nLEFT JOIN user_retention r ON d.user_id = r.user_id\nGROUP BY 1\n\t",
+    "schema": {
+      "fact": {
+        "some_daily_metrics": {
+          "user_id": "STRING",
+          "date_utc": "DATE",
+          "first_device_type": "STRING",
+          "first_activity_timestamp": "TIMESTAMP",
+          "estimated_session_duration": "INT64",
+          "event_start": "INT64"
+        }
+      }
+    },
+    "expected": [
+      {
+        "name": "USER_ID",
+        "table": "FACT.SOME_DAILY_METRICS"
+      }
+    ]
+  },
+  {
+    "name": "dashboard.report",
+    "dialect": "bigquery",
+    "query": "\n        SELECT\n            t1.col1,\n            t1.col2,\n            t1.col3,\n            t1.col4,\n            t1.col5,\n            t1.col6,\n            t1.col7 is not null as is_refunded,\n            1 as ai_credits,\n            if(t2.col1 is not null, 1, 0) as ai_credits_used,\n            t3.col1 as TeamName,\n            t3.col2 as TeamId,\n            t4.col1,\n            t4.col2,\n            t5.col1 as Organization,\n            t5.col2 as OrganizationId,\n            t4.col3,\n            t4.col4,\n            t6.col1 as ProgramName,\n            t5.col3,\n            t5.col4\n        FROM `dataset1.table1` as t1\n        INNER JOIN `dataset2.table2` as t6\n            ON t1.col3 = t6.col1\n        INNER JOIN `dataset3.table3` as t5\n            ON t6.col2 = t5.col2\n        LEFT JOIN `dataset4.table4` as t7\n            ON t7.col1 = t1.col4\n        LEFT JOIN `dataset5.table5` as t2\n            ON t1.col1 = t2.col2\n        LEFT JOIN `dataset6.table6` as t3\n            ON t3.col2 = cast(t2.col3 as int64)\n        LEFT JOIN `dataset7.table7` as t4\n            ON t4.col5 = safe_cast(t1.col5 as int64)\n    ",
+    "schema": {
+      "dataset1.table1": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING",
+        "col5": "STRING",
+        "col6": "STRING",
+        "col7": "STRING"
+      },
+      "dataset2.table2": {
+        "col1": "STRING",
+        "col2": "STRING"
+      },
+      "dataset3.table3": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING"
+      },
+      "dataset4.table4": {
+        "col1": "STRING"
+      },
+      "dataset5.table5": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING"
+      },
+      "dataset6.table6": {
+        "col1": "STRING",
+        "col2": "STRING"
+      },
+      "dataset7.table7": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING",
+        "col5": "STRING"
+      }
+    },
+    "expected": [
+      {
+        "name": "col1",
+        "table": "dataset1.table1"
+      },
+      {
+        "name": "col1",
+        "table": "dataset2.table2"
+      },
+      {
+        "name": "col1",
+        "table": "dataset4.table4"
+      },
+      {
+        "name": "col2",
+        "table": "dataset2.table2"
+      },
+      {
+        "name": "col2",
+        "table": "dataset3.table3"
+      },
+      {
+        "name": "col2",
+        "table": "dataset5.table5"
+      },
+      {
+        "name": "col2",
+        "table": "dataset6.table6"
+      },
+      {
+        "name": "col3",
+        "table": "dataset1.table1"
+      },
+      {
+        "name": "col3",
+        "table": "dataset5.table5"
+      },
+      {
+        "name": "col4",
+        "table": "dataset1.table1"
+      },
+      {
+        "name": "col5",
+        "table": "dataset1.table1"
+      },
+      {
+        "name": "col5",
+        "table": "dataset7.table7"
+      }
+    ]
+  },
+  {
+    "name": "project_report",
+    "dialect": "bigquery",
+    "query": "\n       SELECT\n           p1.col1,\n           p1.col2,\n           p1.col3,\n           p1.col4,\n           p1.col5,\n           p1.col6,\n           p1.col7 is not null as is_active,\n           1 as project_credits,\n           if(p2.col1 is not null, 1, 0) as credits_used,\n           p3.col1 as ProjectName,\n           p3.col2 as ProjectId,\n           p4.col1,\n           p4.col2,\n           p5.col1 as Department,\n           p5.col2 as DepartmentId,\n           p4.col3,\n           p4.col4,\n           p6.col1 as ProgramName,\n           p5.col3,\n           p5.col4\n       FROM `project1.dataset1.table1` as p1\n       INNER JOIN `project2.dataset2.table2` as p6\n           ON p1.col3 = p6.col1\n       INNER JOIN `project3.dataset3.table3` as p5\n           ON p6.col2 = p5.col2\n       LEFT JOIN `project4.dataset4.table4` as p7\n           ON p7.col1 = p1.col4\n       LEFT JOIN `project5.dataset5.table5` as p2\n           ON p1.col1 = p2.col2\n       LEFT JOIN `project6.dataset6.table6` as p3\n           ON p3.col2 = cast(p2.col3 as int64)\n       LEFT JOIN `project7.dataset7.table7` as p4\n           ON p4.col5 = safe_cast(p1.col5 as int64)\n   ",
+    "schema": {
+      "project1.dataset1.table1": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING",
+        "col5": "STRING",
+        "col6": "STRING",
+        "col7": "STRING"
+      },
+      "project2.dataset2.table2": {
+        "col1": "STRING",
+        "col2": "STRING"
+      },
+      "project3.dataset3.table3": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING"
+      },
+      "project4.dataset4.table4": {
+        "col1": "STRING"
+      },
+      "project5.dataset5.table5": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING"
+      },
+      "project6.dataset6.table6": {
+        "col1": "STRING",
+        "col2": "STRING"
+      },
+      "project7.dataset7.table7": {
+        "col1": "STRING",
+        "col2": "STRING",
+        "col3": "STRING",
+        "col4": "STRING",
+        "col5": "STRING"
+      }
+    },
+    "expected": [
+      {
+        "name": "col1",
+        "table": "project1.dataset1.table1"
+      },
+      {
+        "name": "col1",
+        "table": "project2.dataset2.table2"
+      },
+      {
+        "name": "col1",
+        "table": "project4.dataset4.table4"
+      },
+      {
+        "name": "col2",
+        "table": "project2.dataset2.table2"
+      },
+      {
+        "name": "col2",
+        "table": "project3.dataset3.table3"
+      },
+      {
+        "name": "col2",
+        "table": "project5.dataset5.table5"
+      },
+      {
+        "name": "col2",
+        "table": "project6.dataset6.table6"
+      },
+      {
+        "name": "col3",
+        "table": "project1.dataset1.table1"
+      },
+      {
+        "name": "col3",
+        "table": "project5.dataset5.table5"
+      },
+      {
+        "name": "col4",
+        "table": "project1.dataset1.table1"
+      },
+      {
+        "name": "col5",
+        "table": "project1.dataset1.table1"
+      },
+      {
+        "name": "col5",
+        "table": "project7.dataset7.table7"
+      }
+    ]
+  }
+]

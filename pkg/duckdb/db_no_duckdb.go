@@ -27,6 +27,7 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 type Client struct {
 	connection    connection
 	config        DuckDBConfig
+	readOnly      bool
 	schemaCreator *DuckDBSchemaCreator
 }
 
@@ -58,6 +59,10 @@ func (c *Client) GetDBConnectionURI() (string, error) {
 
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	return nil, errDuckDBNotSupported
+}
+
+func (c *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
 	return nil, errDuckDBNotSupported
 }
 

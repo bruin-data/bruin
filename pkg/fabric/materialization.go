@@ -58,7 +58,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 	queries := []string{
 		"DROP TABLE IF EXISTS " + tempName,
 		"DROP TABLE IF EXISTS " + backupName,
-		"SELECT * INTO " + tempName + " FROM (\n" + query + "\n) AS __bruin_src",
+		"CREATE TABLE " + tempName + " AS\n" + query,
 		"IF OBJECT_ID('" + targetFullName + "', 'U') IS NOT NULL BEGIN EXEC sp_rename '" + targetFullName + "', '" + backupBase + "' END",
 		"EXEC sp_rename '" + tempFullName + "', '" + targetBase + "'",
 		"DROP TABLE IF EXISTS " + backupName,
@@ -89,7 +89,7 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 
 	queries := []string{
 		"DROP TABLE IF EXISTS " + tempName,
-		"SELECT * INTO " + tempName + " FROM (\n" + query + "\n) AS __bruin_src",
+		"CREATE TABLE " + tempName + " AS\n" + query,
 		"DELETE FROM " + tableName + " WHERE EXISTS (\n  SELECT 1 FROM " + tempName + " WHERE " + deleteCondition + "\n)",
 		"INSERT INTO " + tableName + " SELECT * FROM " + tempName,
 		"DROP TABLE IF EXISTS " + tempName,

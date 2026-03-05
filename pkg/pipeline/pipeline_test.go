@@ -1178,6 +1178,85 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 	})
 }
 
+func TestPipeline_MaxActiveSteps(t *testing.T) {
+	t.Parallel()
+
+	t.Run("YAML parsing sets value when provided", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := yaml.Unmarshal([]byte("name: test\nmax_active_steps: 10\n"), &p)
+		require.NoError(t, err)
+		require.NotNil(t, p.MaxActiveSteps)
+		assert.Equal(t, 10, *p.MaxActiveSteps)
+	})
+
+	t.Run("YAML parsing leaves nil when not provided", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := yaml.Unmarshal([]byte("name: test\n"), &p)
+		require.NoError(t, err)
+		assert.Nil(t, p.MaxActiveSteps)
+	})
+
+	t.Run("JSON parsing sets value when provided", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := json.Unmarshal([]byte(`{"name":"test","max_active_steps":20}`), &p)
+		require.NoError(t, err)
+		require.NotNil(t, p.MaxActiveSteps)
+		assert.Equal(t, 20, *p.MaxActiveSteps)
+	})
+
+	t.Run("JSON parsing leaves nil when not provided", func(t *testing.T) {
+		t.Parallel()
+		var p pipeline.Pipeline
+		err := json.Unmarshal([]byte(`{"name":"test"}`), &p)
+		require.NoError(t, err)
+		assert.Nil(t, p.MaxActiveSteps)
+	})
+
+	t.Run("JSON includes null when nil", func(t *testing.T) {
+		t.Parallel()
+		p := pipeline.Pipeline{Name: "test"}
+		data, err := json.Marshal(p)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"max_active_steps":null`)
+	})
+
+	t.Run("JSON includes field when set", func(t *testing.T) {
+		t.Parallel()
+		val := 8
+		p := pipeline.Pipeline{Name: "test", MaxActiveSteps: &val}
+		data, err := json.Marshal(p)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"max_active_steps":8`)
+	})
+
+	t.Run("FormatContent includes max_active_steps when set", func(t *testing.T) {
+		t.Parallel()
+		val := 12
+		p := &pipeline.Pipeline{
+			Name:           "test-pipeline",
+			MaxActiveSteps: &val,
+			DefinitionFile: pipeline.DefinitionFile{Path: "/test/pipeline.yml"},
+		}
+		content, err := p.FormatContent()
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "max_active_steps: 12")
+	})
+
+	t.Run("FormatContent omits max_active_steps when nil", func(t *testing.T) {
+		t.Parallel()
+		p := &pipeline.Pipeline{
+			Name:           "test-pipeline",
+			DefinitionFile: pipeline.DefinitionFile{Path: "/test/pipeline.yml"},
+		}
+		content, err := p.FormatContent()
+		require.NoError(t, err)
+		assert.NotContains(t, string(content), "max_active_steps")
+	})
+}
+
 func TestClearSpacesAtLineEndings(t *testing.T) {
 	t.Parallel()
 
@@ -2303,6 +2382,76 @@ func TestPipeline_ValidateCatchupMode(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		assetTags  pipeline.EmptyStringArray
+		columnTags pipeline.EmptyStringArray
+		wantAsset  pipeline.EmptyStringArray
+		wantColumn pipeline.EmptyStringArray
+	}{
+		{
+			name:       "exact duplicate tags",
+			assetTags:  pipeline.EmptyStringArray{"marketing", "marketing", "sales"},
+			columnTags: pipeline.EmptyStringArray{"pii", "pii"},
+			wantAsset:  pipeline.EmptyStringArray{"marketing", "sales"},
+			wantColumn: pipeline.EmptyStringArray{"pii"},
+		},
+		{
+			name:       "case-insensitive duplicate tags",
+			assetTags:  pipeline.EmptyStringArray{"Marketing", "marketing", "MARKETING"},
+			columnTags: pipeline.EmptyStringArray{"PII", "pii", "Pii"},
+			wantAsset:  pipeline.EmptyStringArray{"Marketing"},
+			wantColumn: pipeline.EmptyStringArray{"PII"},
+		},
+		{
+			name:       "no duplicates unchanged",
+			assetTags:  pipeline.EmptyStringArray{"marketing", "sales"},
+			columnTags: pipeline.EmptyStringArray{"pii", "sensitive"},
+			wantAsset:  pipeline.EmptyStringArray{"marketing", "sales"},
+			wantColumn: pipeline.EmptyStringArray{"pii", "sensitive"},
+		},
+		{
+			name:       "nil tags unchanged",
+			assetTags:  nil,
+			columnTags: nil,
+			wantAsset:  nil,
+			wantColumn: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			asset := &pipeline.Asset{
+				Name: "test-asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Tags: tt.assetTags,
+				Columns: []pipeline.Column{
+					{
+						Name: "col1",
+						Type: "string",
+						Tags: tt.columnTags,
+					},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Path:    "test.sql",
+					Content: "SELECT 1",
+				},
+			}
+
+			_, err := asset.FormatContent()
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantAsset, asset.Tags)
+			assert.Equal(t, tt.wantColumn, asset.Columns[0].Tags)
 		})
 	}
 }

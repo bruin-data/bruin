@@ -425,18 +425,7 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 		return []string{}, nil //nolint:nilerr
 	}
 
-	queryToRender := asset.ExecutableFile.Content
-	if len(pipeline.Macros) > 0 {
-		var macroContent strings.Builder
-		for _, macro := range pipeline.Macros {
-			macroContent.WriteString(string(macro))
-			macroContent.WriteString("\n")
-		}
-
-		queryToRender = macroContent.String() + "\n" + queryToRender
-	}
-
-	renderedQ, err := renderer.Render(queryToRender)
+	renderedQ, err := renderer.Render(mergeMacrosWithQuery(asset.ExecutableFile.Content, pipeline.Macros))
 	if err != nil {
 		return []string{}, errors.New("failed to render the query before parsing the SQL")
 	}
@@ -490,4 +479,20 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 	}
 
 	return missingDependencies, nil
+}
+
+func mergeMacrosWithQuery(query string, macros []pipeline.Macro) string {
+	if len(macros) == 0 {
+		return query
+	}
+
+	var b strings.Builder
+	for _, macro := range macros {
+		b.WriteString(string(macro))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(query)
+
+	return b.String()
 }

@@ -266,6 +266,20 @@ func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	return err == nil, err
 }
 
+func (db *DB) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRunResult, error) {
+	explainQuery := &query.Query{Query: q.ToExplainQuery()}
+	explainResult, err := db.SelectWithSchema(ctx, explainQuery)
+	if err != nil {
+		return nil, fmt.Errorf("EXPLAIN failed: %w", err)
+	}
+
+	return &query.DryRunResult{
+		ConnectionType: "snowflake",
+		Valid:          true,
+		ExplainRows:    explainResult,
+	}, nil
+}
+
 // Test runs a simple query (SELECT 1) to validate the connection.
 func (db *DB) Ping(ctx context.Context) error {
 	// Define the test query

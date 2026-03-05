@@ -89,13 +89,85 @@ Replace the URL with your actual repository URL.
 
 Bruin needs access to your data platforms. Set up your credentials in the `.bruin.yml` file in your project root.
 
+::: tip Best Practice: Use Environment Variables
+Instead of storing sensitive credentials as plain text in your configuration files, use environment variables. This approach is more secure and makes it easier to manage secrets across different environments.
+:::
+
 Create or edit the `.bruin.yml` file:
 
 ```bash
 nano .bruin.yml
 ```
 
-Example configuration:
+### Option A: Using Environment Variables (Recommended)
+
+Use the `${VAR_NAME}` syntax to reference environment variables in your configuration:
+
+```yaml
+environments:
+  production:
+    connections:
+      google_cloud_platform:
+        - name: "my_gcp"
+          service_account_json: ${GCP_SERVICE_ACCOUNT_JSON}
+          project_id: ${GCP_PROJECT_ID}
+
+      postgres:
+        - name: "my_postgres"
+          username: ${POSTGRES_USERNAME}
+          password: ${POSTGRES_PASSWORD}
+          host: ${POSTGRES_HOST}
+          port: ${POSTGRES_PORT}
+          database: ${POSTGRES_DATABASE}
+```
+
+Environment variables are expanded at runtime, keeping your `.bruin.yml` file free of sensitive data.
+
+#### Setting Up Environment Variables
+
+Create a secure directory and environment file to store your credentials:
+
+```bash
+sudo mkdir -p /etc/bruin
+sudo nano /etc/bruin/credentials.env
+```
+
+Add your credentials:
+
+```bash
+# Google Cloud Platform
+GCP_PROJECT_ID=my-project-id
+GCP_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"my-project-id","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...","client_id":"...","auth_uri":"...","token_uri":"...","auth_provider_x509_cert_url":"...","client_x509_cert_url":"..."}'
+
+# PostgreSQL
+POSTGRES_USERNAME=postgres_user
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=mydb
+```
+
+Secure the file:
+
+```bash
+sudo chmod 600 /etc/bruin/credentials.env
+sudo chown $(whoami):$(whoami) /etc/bruin/credentials.env
+```
+
+#### Loading Environment Variables
+
+For interactive sessions, add to your shell profile:
+
+```bash
+echo 'set -a; source /etc/bruin/credentials.env; set +a' >> ~/.bashrc
+source ~/.bashrc
+```
+
+For cron jobs, source the file in your wrapper script (see Step 12).
+
+### Option B: Using Service Account Files
+
+If you prefer to use service account files instead of inline JSON:
 
 ```yaml
 environments:
@@ -115,7 +187,7 @@ environments:
           database: "mydb"
 ```
 
-### Storing Service Account Files
+#### Storing Service Account Files
 
 If you're using service account files (e.g., for Google Cloud):
 
@@ -129,6 +201,10 @@ Paste your service account JSON content, save, and secure the file:
 ```bash
 chmod 600 ~/.config/gcloud/service-account.json
 ```
+
+::: warning
+When using service account files, ensure the files are properly secured and never committed to version control.
+:::
 
 ## Step 7: Test Your Pipeline
 
@@ -340,6 +416,18 @@ Update your wrapper script:
 ```bash
 #!/bin/bash
 
+set -e
+
+export PATH="/home/username/.local/bin:$PATH"
+export HOME="/home/username"
+
+# Load credentials from secure environment file
+if [ -f /etc/bruin/credentials.env ]; then
+    set -a
+    source /etc/bruin/credentials.env
+    set +a
+fi
+
 LOG_FILE="/home/username/logs/bruin.log"
 PROJECT_PATH="/home/username/your-bruin-project"
 BRUIN_BIN="/home/username/.local/bin/bruin"
@@ -359,18 +447,46 @@ fi
 echo "=== Completed successfully at $(date) ===" >> "$LOG_FILE"
 ```
 
+The `set -a` and `set +a` commands enable and disable automatic export of all variables, ensuring that all credentials from the environment file are available to Bruin.
+
 ## Security Best Practices
 
-### 1. Secure Your Credentials
+### 1. Use Environment Variables for Credentials
+
+Instead of hardcoding credentials in `.bruin.yml`, use environment variables:
+
+```yaml
+# Good: Using environment variables
+postgres:
+  - name: "my_postgres"
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
+
+# Avoid: Hardcoded credentials
+postgres:
+  - name: "my_postgres"
+    username: "admin"
+    password: "plaintext_password"
+```
+
+### 2. Secure Your Credentials
 
 Never commit credentials to Git:
 
 ```bash
 echo ".bruin.yml" >> .gitignore
 echo "*.json" >> .gitignore
+echo "credentials.env" >> .gitignore
 ```
 
-### 2. Use SSH Keys for Git
+Store credentials in a secure location with restricted permissions:
+
+```bash
+sudo mkdir -p /etc/bruin
+sudo chmod 700 /etc/bruin
+```
+
+### 3. Use SSH Keys for Git
 
 Set up SSH keys for passwordless Git operations:
 
@@ -381,14 +497,15 @@ cat ~/.ssh/id_ed25519.pub
 
 Add the public key to your Git provider (GitHub, GitLab, etc.).
 
-### 3. Restrict File Permissions
+### 4. Restrict File Permissions
 
 ```bash
 chmod 600 ~/.bruin.yml
 chmod 600 ~/.config/gcloud/*.json
+sudo chmod 600 /etc/bruin/credentials.env
 ```
 
-### 4. Use a Dedicated User
+### 5. Use a Dedicated User
 
 Create a dedicated user for running Bruin:
 
@@ -466,7 +583,7 @@ export HOME="/home/username"
 
 ## Example: Complete Production Setup
 
-Here's a complete example for a production deployment:
+Here's a complete example for a production deployment using environment variable injection:
 
 ### Directory Structure
 
@@ -474,15 +591,68 @@ Here's a complete example for a production deployment:
 /home/bruin/
 ├── projects/
 │   └── analytics-pipeline/
+│       └── .bruin.yml
 ├── scripts/
 │   ├── run-ingestion.sh
 │   └── run-analytics.sh
-├── logs/
-│   ├── ingestion.log
-│   └── analytics.log
-└── .config/
-    └── gcloud/
-        └── service-account.json
+└── logs/
+    ├── ingestion.log
+    └── analytics.log
+
+/etc/bruin/
+└── credentials.env
+```
+
+### .bruin.yml (in project root)
+
+```yaml
+default_environment: production
+
+environments:
+  production:
+    connections:
+      google_cloud_platform:
+        - name: "gcp-prod"
+          service_account_json: ${GCP_SERVICE_ACCOUNT_JSON}
+          project_id: ${GCP_PROJECT_ID}
+
+      postgres:
+        - name: "postgres-analytics"
+          username: ${POSTGRES_USERNAME}
+          password: ${POSTGRES_PASSWORD}
+          host: ${POSTGRES_HOST}
+          port: ${POSTGRES_PORT}
+          database: ${POSTGRES_DATABASE}
+
+      snowflake:
+        - name: "snowflake-prod"
+          account: ${SNOWFLAKE_ACCOUNT}
+          username: ${SNOWFLAKE_USERNAME}
+          password: ${SNOWFLAKE_PASSWORD}
+          database: ${SNOWFLAKE_DATABASE}
+          warehouse: ${SNOWFLAKE_WAREHOUSE}
+```
+
+### /etc/bruin/credentials.env
+
+```bash
+# Google Cloud Platform
+GCP_PROJECT_ID=my-analytics-project
+GCP_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"my-analytics-project",...}'
+
+# PostgreSQL
+POSTGRES_USERNAME=analytics_user
+POSTGRES_PASSWORD=super_secure_password
+POSTGRES_HOST=db.company.com
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=analytics
+
+# Snowflake
+SNOWFLAKE_ACCOUNT=ABC12345
+SNOWFLAKE_USERNAME=bruin_user
+SNOWFLAKE_PASSWORD=snowflake_secure_password
+SNOWFLAKE_DATABASE=ANALYTICS
+SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 ```
 
 ### Crontab
@@ -504,6 +674,13 @@ set -e
 
 export PATH="/home/bruin/.local/bin:$PATH"
 export HOME="/home/bruin"
+
+# Load credentials from secure environment file
+if [ -f /etc/bruin/credentials.env ]; then
+    set -a
+    source /etc/bruin/credentials.env
+    set +a
+fi
 
 LOG_FILE="/home/bruin/logs/analytics.log"
 PROJECT_PATH="/home/bruin/projects/analytics-pipeline"

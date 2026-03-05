@@ -507,6 +507,7 @@ func (c AirtableConnection) GetName() string {
 type DuckDBConnection struct {
 	Name      string           `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Path      string           `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+	ReadOnly  bool             `yaml:"read_only,omitempty" json:"read_only,omitempty" mapstructure:"read_only"`
 	Lakehouse *LakehouseConfig `yaml:"lakehouse,omitempty" json:"lakehouse,omitempty" mapstructure:"lakehouse"`
 }
 
@@ -531,8 +532,8 @@ type ClickHouseConnection struct {
 	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
 	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
 	Database string `yaml:"database" json:"database" mapstructure:"database"`
-	HTTPPort int    `yaml:"http_port" json:"http_port" mapstructure:"http_port"`
-	Secure   *int   `yaml:"secure" json:"secure" mapstructure:"secure"`
+	HTTPPort int    `yaml:"http_port,omitempty" json:"http_port,omitempty" mapstructure:"http_port"`
+	Secure   *int   `yaml:"secure,omitempty" json:"secure,omitempty" mapstructure:"secure"`
 }
 
 func (c ClickHouseConnection) GetName() string {
@@ -1257,5 +1258,19 @@ type CustomerIoConnection struct {
 }
 
 func (c CustomerIoConnection) GetName() string {
+	return c.Name
+}
+
+type VerticaConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=5433"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Schema   string `yaml:"schema,omitempty"   json:"schema,omitempty" mapstructure:"schema"`
+}
+
+func (c VerticaConnection) GetName() string {
 	return c.Name
 }

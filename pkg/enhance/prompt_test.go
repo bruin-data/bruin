@@ -1,10 +1,15 @@
 package enhance
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func indexOf(s, substr string) int {
+	return strings.Index(s, substr)
+}
 
 func TestBuildEnhancePrompt(t *testing.T) {
 	t.Parallel()
@@ -42,7 +47,7 @@ func TestGetSystemPrompt(t *testing.T) {
 	t.Parallel()
 	t.Run("without pre-fetched stats", func(t *testing.T) {
 		t.Parallel()
-		prompt := GetSystemPrompt(false)
+		prompt := GetSystemPrompt(false, "")
 
 		assert.NotEmpty(t, prompt)
 		assert.Contains(t, prompt, "data quality expert")
@@ -51,7 +56,7 @@ func TestGetSystemPrompt(t *testing.T) {
 
 	t.Run("with pre-fetched stats", func(t *testing.T) {
 		t.Parallel()
-		prompt := GetSystemPrompt(true)
+		prompt := GetSystemPrompt(true, "")
 
 		assert.NotEmpty(t, prompt)
 		assert.Contains(t, prompt, "data quality expert")
@@ -60,5 +65,35 @@ func TestGetSystemPrompt(t *testing.T) {
 		assert.Contains(t, prompt, "PRE-FETCHED")
 		// Should mention sample_values in the context of statistics
 		assert.Contains(t, prompt, "sample_values")
+	})
+
+	t.Run("with custom system prompt", func(t *testing.T) {
+		t.Parallel()
+		custom := "Focus on financial data compliance checks"
+		prompt := GetSystemPrompt(false, custom)
+
+		assert.NotEmpty(t, prompt)
+		// Custom prompt should be appended
+		assert.Greater(t, len(prompt), len(custom))
+		assert.Contains(t, prompt, custom)
+		assert.Contains(t, prompt, "data quality expert")
+		// Custom prompt should appear after the default
+		assert.Greater(t,
+			indexOf(prompt, custom),
+			indexOf(prompt, "data quality expert"),
+		)
+	})
+
+	t.Run("with custom system prompt and pre-fetched stats", func(t *testing.T) {
+		t.Parallel()
+		custom := "Always add pattern checks for email columns"
+		prompt := GetSystemPrompt(true, custom)
+
+		assert.Contains(t, prompt, custom)
+		assert.Contains(t, prompt, "sample_values")
+		assert.Greater(t,
+			indexOf(prompt, custom),
+			indexOf(prompt, "data quality expert"),
+		)
 	})
 }

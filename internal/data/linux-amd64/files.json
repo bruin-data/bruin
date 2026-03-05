@@ -1,59 +1,70 @@
 {
-  "contentHash": "f02a4f81200750b3bffbf855a95ffea36847b151d6ec8a1727a293cd4678f786",
+  "contentHash": "1abc842dfbf3d1957af2133458ec4d8dacdd8bf97b2bdd7e1891614f7848c6df",
   "files": [
+    {
+      "name": "e1890b2472c724a62761__mypyc.cpython-313-x86_64-linux-gnu.so",
+      "size": 2432720,
+      "perm": 493,
+      "compressed": true
+    },
     {
       "name": "sqlglot",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglot-26.11.1.dist-info",
+      "name": "sqlglot-29.0.1.dist-info",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglot-26.11.1.dist-info/INSTALLER",
+      "name": "sqlglot-29.0.1.dist-info/INSTALLER",
       "size": 4,
       "perm": 420
     },
     {
-      "name": "sqlglot-26.11.1.dist-info/LICENSE",
-      "size": 1065,
+      "name": "sqlglot-29.0.1.dist-info/METADATA",
+      "size": 22644,
       "perm": 420
     },
     {
-      "name": "sqlglot-26.11.1.dist-info/METADATA",
-      "size": 20865,
+      "name": "sqlglot-29.0.1.dist-info/RECORD",
+      "size": 13676,
       "perm": 420
     },
     {
-      "name": "sqlglot-26.11.1.dist-info/RECORD",
-      "size": 10918,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot-26.11.1.dist-info/REQUESTED",
+      "name": "sqlglot-29.0.1.dist-info/REQUESTED",
       "size": 0,
       "perm": 420
     },
     {
-      "name": "sqlglot-26.11.1.dist-info/WHEEL",
+      "name": "sqlglot-29.0.1.dist-info/WHEEL",
       "size": 91,
       "perm": 420
     },
     {
-      "name": "sqlglot-26.11.1.dist-info/top_level.txt",
+      "name": "sqlglot-29.0.1.dist-info/licenses",
+      "size": 0,
+      "perm": 2147484141
+    },
+    {
+      "name": "sqlglot-29.0.1.dist-info/licenses/LICENSE",
+      "size": 1065,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot-29.0.1.dist-info/top_level.txt",
       "size": 8,
       "perm": 420
     },
     {
       "name": "sqlglot/__init__.py",
-      "size": 5391,
+      "size": 5375,
       "perm": 420
     },
     {
       "name": "sqlglot/__main__.py",
-      "size": 2069,
+      "size": 2179,
       "perm": 420
     },
     {
@@ -63,7 +74,7 @@
     },
     {
       "name": "sqlglot/_version.py",
-      "size": 515,
+      "size": 706,
       "perm": 420
     },
     {
@@ -73,37 +84,42 @@
     },
     {
       "name": "sqlglot/dialects/__init__.py",
-      "size": 3418,
+      "size": 3811,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/athena.py",
-      "size": 6393,
+      "size": 10966,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/bigquery.py",
-      "size": 49720,
+      "size": 61809,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/clickhouse.py",
-      "size": 52840,
+      "size": 62472,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/databricks.py",
-      "size": 3996,
+      "size": 6280,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/dialect.py",
-      "size": 66994,
+      "size": 93903,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/doris.py",
-      "size": 14339,
+      "size": 22045,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/dialects/dremio.py",
+      "size": 8613,
       "perm": 420
     },
     {
@@ -113,12 +129,12 @@
     },
     {
       "name": "sqlglot/dialects/druid.py",
-      "size": 490,
+      "size": 762,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/duckdb.py",
-      "size": 46096,
+      "size": 174694,
       "perm": 420
     },
     {
@@ -127,73 +143,93 @@
       "perm": 420
     },
     {
+      "name": "sqlglot/dialects/exasol.py",
+      "size": 36058,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/dialects/fabric.py",
+      "size": 10222,
+      "perm": 420
+    },
+    {
       "name": "sqlglot/dialects/hive.py",
-      "size": 30151,
+      "size": 36036,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/materialize.py",
-      "size": 3494,
+      "size": 3533,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/mysql.py",
-      "size": 48022,
+      "size": 55501,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/oracle.py",
-      "size": 14900,
+      "size": 18920,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/postgres.py",
-      "size": 29666,
+      "size": 40908,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/presto.py",
-      "size": 29122,
+      "size": 34374,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/prql.py",
-      "size": 7802,
+      "size": 7908,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/redshift.py",
-      "size": 15441,
+      "size": 17753,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/risingwave.py",
-      "size": 2684,
+      "size": 3882,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/dialects/singlestore.py",
+      "size": 62512,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/snowflake.py",
-      "size": 55220,
+      "size": 98258,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/dialects/solr.py",
+      "size": 617,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/spark.py",
-      "size": 7594,
+      "size": 13342,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/spark2.py",
-      "size": 14543,
+      "size": 15271,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/sqlite.py",
-      "size": 11998,
+      "size": 14617,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/starrocks.py",
-      "size": 10598,
+      "size": 17220,
       "perm": 420
     },
     {
@@ -203,27 +239,33 @@
     },
     {
       "name": "sqlglot/dialects/teradata.py",
-      "size": 14244,
+      "size": 17853,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/trino.py",
-      "size": 3867,
+      "size": 4757,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/tsql.py",
-      "size": 50412,
+      "size": 58498,
       "perm": 420
     },
     {
       "name": "sqlglot/diff.py",
-      "size": 17314,
+      "size": 17371,
       "perm": 420
     },
     {
+      "name": "sqlglot/errors.cpython-313-x86_64-linux-gnu.so",
+      "size": 17520,
+      "perm": 493,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/errors.py",
-      "size": 2126,
+      "size": 4880,
       "perm": 420
     },
     {
@@ -233,7 +275,7 @@
     },
     {
       "name": "sqlglot/executor/__init__.py",
-      "size": 2904,
+      "size": 2827,
       "perm": 420
     },
     {
@@ -248,37 +290,54 @@
     },
     {
       "name": "sqlglot/executor/python.py",
-      "size": 16627,
+      "size": 15549,
       "perm": 420
     },
     {
       "name": "sqlglot/executor/table.py",
-      "size": 4070,
+      "size": 4419,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expression_core.cpython-313-x86_64-linux-gnu.so",
+      "size": 17576,
+      "perm": 493,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expression_core.py",
+      "size": 14324,
       "perm": 420
     },
     {
       "name": "sqlglot/expressions.py",
-      "size": 238592,
+      "size": 262121,
       "perm": 420
     },
     {
       "name": "sqlglot/generator.py",
-      "size": 207320,
+      "size": 241743,
       "perm": 420
     },
     {
+      "name": "sqlglot/helper.cpython-313-x86_64-linux-gnu.so",
+      "size": 17520,
+      "perm": 493,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/helper.py",
-      "size": 14031,
+      "size": 11939,
       "perm": 420
     },
     {
       "name": "sqlglot/jsonpath.py",
-      "size": 7664,
+      "size": 7905,
       "perm": 420
     },
     {
       "name": "sqlglot/lineage.py",
-      "size": 15303,
+      "size": 15489,
       "perm": 420
     },
     {
@@ -293,107 +352,123 @@
     },
     {
       "name": "sqlglot/optimizer/annotate_types.py",
-      "size": 22240,
+      "size": 33622,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/canonicalize.py",
-      "size": 7622,
+      "size": 8784,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/eliminate_ctes.py",
-      "size": 1448,
+      "size": 1568,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/eliminate_joins.py",
-      "size": 5874,
+      "size": 6070,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/eliminate_subqueries.py",
-      "size": 6292,
+      "size": 6294,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/isolate_table_selects.py",
-      "size": 1128,
+      "size": 1464,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/merge_subqueries.py",
-      "size": 15167,
+      "size": 16384,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/normalize.py",
-      "size": 6667,
+      "size": 7041,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/normalize_identifiers.py",
-      "size": 2098,
+      "size": 2840,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/optimize_joins.py",
-      "size": 2991,
+      "size": 4120,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/optimizer.py",
-      "size": 3533,
+      "size": 3775,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/pushdown_predicates.py",
-      "size": 7780,
+      "size": 8602,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/pushdown_projections.py",
-      "size": 5362,
+      "size": 6668,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/qualify.py",
-      "size": 4002,
+      "size": 4374,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/qualify_columns.py",
-      "size": 38682,
+      "size": 38664,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/qualify_tables.py",
-      "size": 6315,
+      "size": 8483,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/resolver.py",
+      "size": 17068,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/scope.py",
-      "size": 30063,
+      "size": 32090,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/simplify.py",
-      "size": 50516,
+      "size": 59143,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/unnest_subqueries.py",
-      "size": 10865,
+      "size": 11751,
       "perm": 420
     },
     {
       "name": "sqlglot/parser.py",
-      "size": 305783,
+      "size": 355404,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parser_core.cpython-313-x86_64-linux-gnu.so",
+      "size": 17552,
+      "perm": 493,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parser_core.py",
+      "size": 6042,
       "perm": 420
     },
     {
       "name": "sqlglot/planner.py",
-      "size": 14634,
+      "size": 14682,
       "perm": 420
     },
     {
@@ -402,14 +477,32 @@
       "perm": 420
     },
     {
+      "name": "sqlglot/schema.cpython-313-x86_64-linux-gnu.so",
+      "size": 17520,
+      "perm": 493,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/schema.py",
-      "size": 20509,
+      "size": 27748,
       "perm": 420
     },
     {
+      "name": "sqlglot/serde.cpython-313-x86_64-linux-gnu.so",
+      "size": 17520,
+      "perm": 493,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/serde.py",
-      "size": 2031,
+      "size": 3137,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/time.cpython-313-x86_64-linux-gnu.so",
+      "size": 17520,
+      "perm": 493,
+      "compressed": true
     },
     {
       "name": "sqlglot/time.py",
@@ -417,14 +510,31 @@
       "perm": 420
     },
     {
+      "name": "sqlglot/tokenizer_core.cpython-313-x86_64-linux-gnu.so",
+      "size": 17560,
+      "perm": 493,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/tokenizer_core.py",
+      "size": 33000,
+      "perm": 420
+    },
+    {
       "name": "sqlglot/tokens.py",
-      "size": 48382,
+      "size": 22632,
       "perm": 420
     },
     {
       "name": "sqlglot/transforms.py",
-      "size": 38121,
+      "size": 42361,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/trie.cpython-313-x86_64-linux-gnu.so",
+      "size": 17520,
+      "perm": 493,
+      "compressed": true
     },
     {
       "name": "sqlglot/trie.py",
@@ -432,45 +542,94 @@
       "perm": 420
     },
     {
-      "name": "sqlglotrs",
+      "name": "sqlglot/typing",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglotrs-0.4.0.dist-info",
+      "name": "sqlglot/typing/__init__.py",
+      "size": 10647,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/bigquery.py",
+      "size": 12437,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/clickhouse.py",
+      "size": 296,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/duckdb.py",
+      "size": 1433,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/hive.py",
+      "size": 1944,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/mysql.py",
+      "size": 771,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/presto.py",
+      "size": 1041,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/snowflake.py",
+      "size": 17782,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/spark.py",
+      "size": 1180,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/spark2.py",
+      "size": 2723,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/tsql.py",
+      "size": 852,
+      "perm": 420
+    },
+    {
+      "name": "sqlglotc-29.0.1.dist-info",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglotrs-0.4.0.dist-info/INSTALLER",
+      "name": "sqlglotc-29.0.1.dist-info/INSTALLER",
       "size": 4,
       "perm": 420
     },
     {
-      "name": "sqlglotrs-0.4.0.dist-info/METADATA",
-      "size": 545,
+      "name": "sqlglotc-29.0.1.dist-info/METADATA",
+      "size": 295,
       "perm": 420
     },
     {
-      "name": "sqlglotrs-0.4.0.dist-info/RECORD",
-      "size": 544,
+      "name": "sqlglotc-29.0.1.dist-info/RECORD",
+      "size": 1482,
       "perm": 420
     },
     {
-      "name": "sqlglotrs-0.4.0.dist-info/WHEEL",
-      "size": 129,
+      "name": "sqlglotc-29.0.1.dist-info/WHEEL",
+      "size": 190,
       "perm": 420
     },
     {
-      "name": "sqlglotrs/__init__.py",
-      "size": 119,
+      "name": "sqlglotc-29.0.1.dist-info/top_level.txt",
+      "size": 36,
       "perm": 420
-    },
-    {
-      "name": "sqlglotrs/sqlglotrs.cpython-312-x86_64-linux-gnu.so",
-      "size": 816960,
-      "perm": 493,
-      "compressed": true
     }
   ]
 }

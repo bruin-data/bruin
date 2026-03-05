@@ -6,8 +6,9 @@ from sqlglot import exp, generator, parser, tokens, transforms
 from sqlglot.dialects.dialect import (
     Dialect,
     NormalizationStrategy,
-    build_timetostr_or_tochar,
     build_formatted_time,
+    build_timetostr_or_tochar,
+    build_trunc,
     no_ilike_sql,
     rename_func,
     strposition_sql,
@@ -31,12 +32,21 @@ def _trim_sql(self: Oracle.Generator, expression: exp.Trim) -> str:
     return trim_sql(self, expression)
 
 
+def _build_to_timestamp(args: t.List) -> exp.StrToTime | exp.Anonymous:
+    if len(args) == 1:
+        return exp.Anonymous(this="TO_TIMESTAMP", expressions=args)
+
+    return build_formatted_time(exp.StrToTime, "oracle")(args)
+
+
 class Oracle(Dialect):
     ALIAS_POST_TABLESAMPLE = True
     LOCKING_READS_SUPPORTED = True
     TABLESAMPLE_SIZE_IS_PERCENT = True
     NULL_ORDERING = "nulls_are_large"
     ON_CONDITION_EMPTY_BEFORE_ERROR = False
+    ALTER_TABLE_ADD_REQUIRED_FOR_EACH_COLUMN = False
+    DISABLES_ALIAS_REF_EXPANSION = True
 
     # See section 8: https://docs.oracle.com/cd/A97630_01/server.920/a96540/sql_elements9a.htm
     NORMALIZATION_STRATEGY = NormalizationStrategy.UPPERCASE
@@ -44,10 +54,6 @@ class Oracle(Dialect):
     # https://docs.oracle.com/database/121/SQLRF/sql_elements004.htm#SQLRF00212
     # https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
     TIME_MAPPING = {
-        "AM": "%p",  # Meridian indicator with or without periods
-        "A.M.": "%p",  # Meridian indicator with or without periods
-        "PM": "%p",  # Meridian indicator with or without periods
-        "P.M.": "%p",  # Meridian indicator with or without periods
         "D": "%u",  # Day of week (1-7)
         "DAY": "%A",  # name of day
         "DD": "%d",  # day of month (1-31)
@@ -67,6 +73,15 @@ class Oracle(Dialect):
         "YYYY": "%Y",  # 2015
         "FF6": "%f",  # only 6 digits are supported in python formats
     }
+
+    PSEUDOCOLUMNS = {"ROWNUM", "ROWID", "OBJECT_ID", "OBJECT_VALUE", "LEVEL"}
+
+    def can_quote(self, identifier: exp.Identifier, identify: str | bool = "safe") -> bool:
+        # Disable quoting for pseudocolumns as it may break queries e.g
+        # `WHERE "ROWNUM" = ...` does not work but `WHERE ROWNUM = ...` does
+        return (
+            identifier.quoted or not isinstance(identifier.parent, exp.Pseudocolumn)
+        ) and super().can_quote(identifier, identify=identify)
 
     class Tokenizer(tokens.Tokenizer):
         VAR_SINGLE_TOKENS = {"@", "$", "#"}
@@ -94,31 +109,39 @@ class Oracle(Dialect):
             "START": TokenType.BEGIN,
             "TOP": TokenType.TOP,
             "VARCHAR2": TokenType.VARCHAR,
+            "SYSTIMESTAMP": TokenType.SYSTIMESTAMP,
         }
 
     class Parser(parser.Parser):
-        ALTER_TABLE_ADD_REQUIRED_FOR_EACH_COLUMN = False
         WINDOW_BEFORE_PAREN_TOKENS = {TokenType.OVER, TokenType.KEEP}
         VALUES_FOLLOWED_BY_PAREN = False
 
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
+            "CONVERT": exp.ConvertToCharset.from_arg_list,
+            "L2_DISTANCE": exp.EuclideanDistance.from_arg_list,
             "NVL": lambda args: build_coalesce(args, is_nvl=True),
             "SQUARE": lambda args: exp.Pow(this=seq_get(args, 0), expression=exp.Literal.number(2)),
             "TO_CHAR": build_timetostr_or_tochar,
-            "TO_TIMESTAMP": build_formatted_time(exp.StrToTime, "oracle"),
+            "TO_TIMESTAMP": _build_to_timestamp,
             "TO_DATE": build_formatted_time(exp.StrToDate, "oracle"),
-            "TRUNC": lambda args: exp.DateTrunc(
-                unit=seq_get(args, 1) or exp.Literal.string("DD"),
-                this=seq_get(args, 0),
-                unabbreviate=False,
+            "TRUNC": lambda args, dialect: build_trunc(
+                args, dialect, date_trunc_unabbreviate=False, default_date_trunc_unit="DD"
             ),
         }
+        FUNCTIONS.pop("TO_BOOLEAN")
 
         NO_PAREN_FUNCTION_PARSERS = {
             **parser.Parser.NO_PAREN_FUNCTION_PARSERS,
             "NEXT": lambda self: self._parse_next_value_for(),
+            "PRIOR": lambda self: self.expression(exp.Prior, this=self._parse_bitwise()),
             "SYSDATE": lambda self: self.expression(exp.CurrentTimestamp, sysdate=True),
+            "DBMS_RANDOM": lambda self: self._parse_dbms_random(),
+        }
+
+        NO_PAREN_FUNCTIONS = {
+            **parser.Parser.NO_PAREN_FUNCTIONS,
+            TokenType.SYSTIMESTAMP: exp.Systimestamp,
         }
 
         FUNCTION_PARSERS: t.Dict[str, t.Callable] = {
@@ -134,6 +157,7 @@ class Oracle(Dialect):
             ),
             "JSON_EXISTS": lambda self: self._parse_json_exists(),
         }
+        FUNCTION_PARSERS.pop("CONVERT")
 
         PROPERTY_PARSERS = {
             **parser.Parser.PROPERTY_PARSERS,
@@ -153,7 +177,11 @@ class Oracle(Dialect):
         TYPE_LITERAL_PARSERS = {
             exp.DataType.Type.DATE: lambda self, this, _: self.expression(
                 exp.DateStrToDate, this=this
-            )
+            ),
+            # https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/NLS_TIMESTAMP_FORMAT.html
+            exp.DataType.Type.TIMESTAMP: lambda self, this, _: _build_to_timestamp(
+                [this, '"%Y-%m-%d %H:%M:%S.%f"']
+            ),
         }
 
         # SELECT UNIQUE .. is old-style Oracle syntax for SELECT DISTINCT ..
@@ -166,6 +194,19 @@ class Oracle(Dialect):
                 ("CHECK", "OPTION"),
             ),
         }
+
+        def _parse_dbms_random(self) -> t.Optional[exp.Expression]:
+            if self._match_text_seq(".", "VALUE"):
+                lower, upper = None, None
+                if self._match(TokenType.L_PAREN, advance=False):
+                    lower_upper = self._parse_wrapped_csv(self._parse_bitwise)
+                    if len(lower_upper) == 2:
+                        lower, upper = lower_upper
+
+                return exp.Rand(lower=lower, upper=upper)
+
+            self._retreat(self._index - 1)
+            return None
 
         def _parse_json_array(self, expr_type: t.Type[E], **kwargs) -> E:
             return self.expression(
@@ -240,6 +281,43 @@ class Oracle(Dialect):
 
             return self.expression(exp.Into, bulk_collect=bulk_collect, expressions=expressions)
 
+        def _parse_connect_with_prior(self):
+            return self._parse_assignment()
+
+        def _parse_column_ops(self, this: t.Optional[exp.Expression]) -> t.Optional[exp.Expression]:
+            this = super()._parse_column_ops(this)
+
+            if not this:
+                return this
+
+            index = self._index
+
+            # https://docs.oracle.com/en/database/oracle/oracle-database/26/sqlrf/Interval-Expressions.html
+            interval_span = self._try_parse(lambda: self._parse_interval_span(this))
+            if interval_span and isinstance(interval_span.args.get("unit"), exp.IntervalSpan):
+                return interval_span
+
+            self._retreat(index)
+            return this
+
+        def _parse_insert_table(self) -> t.Optional[exp.Expression]:
+            # Oracle does not use AS for INSERT INTO alias
+            # https://docs.oracle.com/en/database/oracle/oracle-database/18/sqlrf/INSERT.html
+            # Parse table parts without schema to avoid parsing the alias with its columns
+            this = self._parse_table_parts(schema=True)
+
+            if isinstance(this, exp.Table):
+                alias_name = self._parse_id_var(any_token=False)
+                if alias_name:
+                    this.set("alias", exp.TableAlias(this=alias_name))
+
+                this.set("partition", self._parse_partition())
+
+                # Now parse the schema (column list) if present
+                return self._parse_schema(this=this)
+
+            return this
+
     class Generator(generator.Generator):
         LOCKING_READS_SUPPORTED = True
         JOIN_HINTS = False
@@ -251,7 +329,9 @@ class Oracle(Dialect):
         LAST_DAY_SUPPORTS_DATE_PART = False
         SUPPORTS_SELECT_INTO = True
         TZ_TO_WITH_TIME_ZONE = True
+        SUPPORTS_WINDOW_EXCLUDE = True
         QUERY_HINT_SEP = " "
+        SUPPORTS_DECODE_CASE = True
 
         TYPE_MAPPING = {
             **generator.Generator.TYPE_MAPPING,
@@ -266,6 +346,7 @@ class Oracle(Dialect):
             exp.DataType.Type.NCHAR: "NCHAR",
             exp.DataType.Type.TEXT: "CLOB",
             exp.DataType.Type.TIMETZ: "TIME",
+            exp.DataType.Type.TIMESTAMPNTZ: "TIMESTAMP",
             exp.DataType.Type.TIMESTAMPTZ: "TIMESTAMP",
             exp.DataType.Type.BINARY: "BLOB",
             exp.DataType.Type.VARBINARY: "BLOB",
@@ -279,11 +360,12 @@ class Oracle(Dialect):
                 "TO_DATE", e.this, exp.Literal.string("YYYY-MM-DD")
             ),
             exp.DateTrunc: lambda self, e: self.func("TRUNC", e.this, e.unit),
-            exp.Group: transforms.preprocess([transforms.unalias_group]),
+            exp.EuclideanDistance: rename_func("L2_DISTANCE"),
             exp.ILike: no_ilike_sql,
             exp.LogicalOr: rename_func("MAX"),
             exp.LogicalAnd: rename_func("MIN"),
             exp.Mod: rename_func("MOD"),
+            exp.Rand: rename_func("DBMS_RANDOM.VALUE"),
             exp.Select: transforms.preprocess(
                 [
                     transforms.eliminate_distinct_on,
@@ -309,6 +391,9 @@ class Oracle(Dialect):
             exp.Unicode: lambda self, e: f"ASCII(UNISTR({self.sql(e.this)}))",
             exp.UnixToTime: lambda self,
             e: f"TO_DATE('1970-01-01', 'YYYY-MM-DD') + ({self.sql(e, 'this')} / 86400)",
+            exp.UtcTimestamp: rename_func("UTC_TIMESTAMP"),
+            exp.UtcTime: rename_func("UTC_TIME"),
+            exp.Systimestamp: lambda self, e: "SYSTIMESTAMP",
         }
 
         PROPERTIES_LOCATION = {
@@ -326,11 +411,8 @@ class Oracle(Dialect):
         def offset_sql(self, expression: exp.Offset) -> str:
             return f"{super().offset_sql(expression)} ROWS"
 
-        def add_column_sql(self, expression: exp.Alter) -> str:
-            actions = self.expressions(expression, key="actions", flat=True)
-            if len(expression.args.get("actions", [])) > 1:
-                return f"ADD ({actions})"
-            return f"ADD {actions}"
+        def add_column_sql(self, expression: exp.Expression) -> str:
+            return f"ADD {self.sql(expression)}"
 
         def queryoption_sql(self, expression: exp.QueryOption) -> str:
             option = self.sql(expression, "this")
@@ -364,3 +446,13 @@ class Oracle(Dialect):
 
         def isascii_sql(self, expression: exp.IsAscii) -> str:
             return f"NVL(REGEXP_LIKE({self.sql(expression.this)}, '^[' || CHR(1) || '-' || CHR(127) || ']*$'), TRUE)"
+
+        def interval_sql(self, expression: exp.Interval) -> str:
+            return f"{'INTERVAL ' if isinstance(expression.this, exp.Literal) else ''}{self.sql(expression, 'this')} {self.sql(expression, 'unit')}"
+
+        def columndef_sql(self, expression: exp.ColumnDef, sep: str = " ") -> str:
+            param_constraint = expression.find(exp.InOutColumnConstraint)
+            if param_constraint:
+                sep = f" {self.sql(param_constraint)} "
+                param_constraint.pop()
+            return super().columndef_sql(expression, sep)

@@ -350,17 +350,19 @@ func (p *PipelineIssues) MarshalJSON() ([]byte, error) {
 
 	for rule, issues := range p.Issues {
 		for _, issue := range issues {
-			if issue.Task == nil {
-				continue
-			}
-
 			ctx := make([]string, 0, len(issue.Context))
 			if issue.Context != nil {
 				ctx = issue.Context
 			}
 
-			issuesByAsset[issue.Task.Name] = append(issuesByAsset[issue.Task.Name], &IssueSummary{
-				Asset:       issue.Task.Name,
+			// Use "_pipeline" as the key for pipeline-level issues (e.g., circular dependencies)
+			assetName := "_pipeline"
+			if issue.Task != nil {
+				assetName = issue.Task.Name
+			}
+
+			issuesByAsset[assetName] = append(issuesByAsset[assetName], &IssueSummary{
+				Asset:       assetName,
 				Description: issue.Description,
 				Context:     ctx,
 				Severity:    severityNames[rule.GetSeverity()],

@@ -304,12 +304,14 @@
     "discord": [],
     "webhook": []
   },
-  "catchup": false, "catchup_mode": "",
+  "catchup": false,
+  "catchup_mode": "",
   "metadata_push": {
     "bigquery": false
   },
   "retries": 0,
   "concurrency": 1,
+  "max_active_steps": null,
   "default": {
     "type": "ingestr",
     "parameters": {

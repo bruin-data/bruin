@@ -289,7 +289,8 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     from sqlglot.optimizer.qualify import qualify
     from sqlglot.optimizer.unnest_subqueries import unnest_subqueries
 
-    nested_schema = schema_dict_to_schema_object(schema)
+    aligned_schema = align_schema_casing(schema, parsed)
+    nested_schema = schema_dict_to_schema_object(aligned_schema)
     try:
         try:
             optimized = optimize(
@@ -443,6 +444,35 @@ def merge_parts(table: exp.Table) -> str:
             else:
                 parts.append(str(part.this))
     return ".".join(parts)
+
+
+def align_schema_casing(schema: dict, parsed) -> dict:
+    """Remap schema keys to match the table name casing produced by sqlglot's parser.
+
+    sqlglot 29+ preserves the original casing of table names from the query.
+    If the schema uses different casing (e.g. 'raw.teams' vs query's 'raw.Teams'),
+    the optimizer can't resolve column types. This adds copies of each schema entry
+    under the casing used in the query so lookups succeed.
+    """
+    query_table_names = set()
+    for table in parsed.find_all(exp.Table):
+        parts = [p.name for p in table.parts if hasattr(p, "name")]
+        if parts:
+            query_table_names.add(".".join(parts))
+
+    lower_to_query = {}
+    for qt in query_table_names:
+        lower_to_query[qt.lower()] = qt
+
+    new_schema = dict(schema)
+    for k, v in schema.items():
+        lower_k = k.lower()
+        if lower_k in lower_to_query:
+            query_key = lower_to_query[lower_k]
+            if query_key not in new_schema:
+                new_schema[query_key] = v
+
+    return new_schema
 
 
 def schema_dict_to_schema_object(schema_dict: dict) -> dict:

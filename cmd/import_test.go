@@ -80,6 +80,7 @@ func TestCreateAsset(t *testing.T) {
 				Columns: nil,
 			},
 			want: &pipeline.Asset{
+				Name: "public.users",
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name: "users.asset.yml",
@@ -105,6 +106,7 @@ func TestCreateAsset(t *testing.T) {
 				},
 			},
 			want: &pipeline.Asset{
+				Name: "public.products",
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name: "products.asset.yml",
@@ -130,6 +132,7 @@ func TestCreateAsset(t *testing.T) {
 				Columns: []*ansisql.DBColumn{},
 			},
 			want: &pipeline.Asset{
+				Name: "public.orders",
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name: "orders.asset.yml",
@@ -152,6 +155,7 @@ func TestCreateAsset(t *testing.T) {
 				Columns:        nil,
 			},
 			want: &pipeline.Asset{
+				Name: "public.active_users",
 				Type: pipeline.AssetTypePostgresQuery,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "active_users.sql",
@@ -178,6 +182,7 @@ func TestCreateAsset(t *testing.T) {
 				Columns:        nil,
 			},
 			want: &pipeline.Asset{
+				Name: "public.some_view",
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name: "some_view.asset.yml",
@@ -200,6 +205,7 @@ func TestCreateAsset(t *testing.T) {
 				Columns:        nil,
 			},
 			want: &pipeline.Asset{
+				Name: "analytics.daily_metrics",
 				Type: pipeline.AssetTypeBigqueryQuery,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "daily_metrics.sql",

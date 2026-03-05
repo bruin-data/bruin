@@ -8,6 +8,8 @@ from sqlglot.dialects.dialect import (
     NormalizationStrategy,
     binary_from_function,
     bool_xor_sql,
+    bracket_to_element_at_sql,
+    build_replace_with_optional_replacement,
     date_trunc_to_time,
     datestrtodate_sql,
     encode_decode_sql,
@@ -30,18 +32,27 @@ from sqlglot.dialects.dialect import (
     sequence_sql,
     build_regexp_extract,
     explode_to_unnest_sql,
+    sha2_digest_sql,
 )
 from sqlglot.dialects.hive import Hive
 from sqlglot.dialects.mysql import MySQL
-from sqlglot.helper import apply_index_offset, seq_get
+from sqlglot.helper import seq_get
+from sqlglot.optimizer.scope import find_all_in_scope
 from sqlglot.tokens import TokenType
 from sqlglot.transforms import unqualify_columns
 from sqlglot.generator import unsupported_args
+from sqlglot.typing.presto import EXPRESSION_METADATA
 
 DATE_ADD_OR_SUB = t.Union[exp.DateAdd, exp.TimestampAdd, exp.DateSub]
 
 
 def _initcap_sql(self: Presto.Generator, expression: exp.Initcap) -> str:
+    delimiters = expression.expression
+    if delimiters and not (
+        delimiters.is_string and delimiters.this == self.dialect.INITCAP_DEFAULT_DELIMITER_CHARS
+    ):
+        self.unsupported("INITCAP does not support custom delimiters")
+
     regex = r"(\w)(\w*)"
     return f"REGEXP_REPLACE({self.sql(expression, 'this')}, '{regex}', x -> UPPER(x[1]) || LOWER(x[2]))"
 
@@ -55,12 +66,21 @@ def _no_sort_array(self: Presto.Generator, expression: exp.SortArray) -> str:
 
 
 def _schema_sql(self: Presto.Generator, expression: exp.Schema) -> str:
-    if isinstance(expression.parent, exp.Property):
-        columns = ", ".join(f"'{c.name}'" for c in expression.expressions)
-        return f"ARRAY[{columns}]"
+    if isinstance(expression.parent, exp.PartitionedByProperty):
+        # Any columns in the ARRAY[] string literals should not be quoted
+        expression.transform(lambda n: n.name if isinstance(n, exp.Identifier) else n, copy=False)
+
+        partition_exprs = [
+            self.sql(c) if isinstance(c, (exp.Func, exp.Property)) else self.sql(c, "this")
+            for c in expression.expressions
+        ]
+        return self.sql(exp.Array(expressions=[exp.Literal.string(c) for c in partition_exprs]))
 
     if expression.parent:
         for schema in expression.parent.find_all(exp.Schema):
+            if schema is expression:
+                continue
+
             column_defs = schema.find_all(exp.ColumnDef)
             if column_defs and isinstance(schema.parent, exp.Property):
                 expression.expressions.extend(column_defs)
@@ -188,6 +208,56 @@ def _date_delta_sql(
     return _delta_sql
 
 
+def _explode_to_unnest_sql(self: Presto.Generator, expression: exp.Lateral) -> str:
+    explode = expression.this
+    if isinstance(explode, exp.Explode):
+        exploded_type = explode.this.type
+        alias = expression.args.get("alias")
+
+        # This attempts a best-effort transpilation of LATERAL VIEW EXPLODE on a struct array
+        if (
+            isinstance(alias, exp.TableAlias)
+            and isinstance(exploded_type, exp.DataType)
+            and exploded_type.is_type(exp.DataType.Type.ARRAY)
+            and exploded_type.expressions
+            and exploded_type.expressions[0].is_type(exp.DataType.Type.STRUCT)
+        ):
+            # When unnesting a ROW in Presto, it produces N columns, so we need to fix the alias
+            alias.set("columns", [c.this.copy() for c in exploded_type.expressions[0].expressions])
+    elif isinstance(explode, exp.Inline):
+        explode.replace(exp.Explode(this=explode.this.copy()))
+
+    return explode_to_unnest_sql(self, expression)
+
+
+def amend_exploded_column_table(expression: exp.Expression) -> exp.Expression:
+    # We check for expression.type because the columns can be amended only if types were inferred
+    if isinstance(expression, exp.Select) and expression.type:
+        for lateral in expression.args.get("laterals") or []:
+            alias = lateral.args.get("alias")
+            if (
+                not isinstance(lateral.this, exp.Explode)
+                or not isinstance(alias, exp.TableAlias)
+                or len(alias.columns) != 1
+            ):
+                continue
+
+            new_table = alias.this
+            old_table = alias.columns[0].name.lower()
+
+            # When transpiling a LATERAL VIEW EXPLODE Spark query, the exploded fields may be qualified
+            # with the struct column, resulting in invalid Presto references that need to be amended
+            for column in find_all_in_scope(expression, exp.Column):
+                if column.db.lower() == old_table:
+                    column.set("table", column.args["db"].pop())
+                elif column.table.lower() == old_table:
+                    column.set("table", new_table.copy())
+                elif column.name.lower() == old_table and isinstance(column.parent, exp.Dot):
+                    column.parent.replace(exp.column(column.parent.expression, table=new_table))
+
+    return expression
+
+
 class Presto(Dialect):
     INDEX_OFFSET = 1
     NULL_ORDERING = "nulls_are_last"
@@ -198,6 +268,7 @@ class Presto(Dialect):
     TABLESAMPLE_SIZE_IS_PERCENT = True
     LOG_BASE_FIRST: t.Optional[bool] = None
     SUPPORTS_VALUES_DEFAULT = False
+    LEAST_GREATEST_IGNORES_NULLS = False
 
     TIME_MAPPING = MySQL.TIME_MAPPING
 
@@ -206,19 +277,11 @@ class Presto(Dialect):
     # https://github.com/prestodb/presto/issues/2863
     NORMALIZATION_STRATEGY = NormalizationStrategy.CASE_INSENSITIVE
 
-    # The result of certain math functions in Presto/Trino is of type
-    # equal to the input type e.g: FLOOR(5.5/2) -> DECIMAL, FLOOR(5/2) -> BIGINT
-    ANNOTATORS = {
-        **Dialect.ANNOTATORS,
-        exp.Floor: lambda self, e: self._annotate_by_args(e, "this"),
-        exp.Ceil: lambda self, e: self._annotate_by_args(e, "this"),
-        exp.Mod: lambda self, e: self._annotate_by_args(e, "this", "expression"),
-        exp.Round: lambda self, e: self._annotate_by_args(e, "this"),
-        exp.Sign: lambda self, e: self._annotate_by_args(e, "this"),
-        exp.Abs: lambda self, e: self._annotate_by_args(e, "this"),
-        exp.Rand: lambda self, e: self._annotate_by_args(e, "this")
-        if e.this
-        else self._set_type(e, exp.DataType.Type.DOUBLE),
+    EXPRESSION_METADATA = EXPRESSION_METADATA.copy()
+
+    SUPPORTED_SETTINGS = {
+        *Dialect.SUPPORTED_SETTINGS,
+        "variant_extract_is_json_extract",
     }
 
     class Tokenizer(tokens.Tokenizer):
@@ -228,6 +291,8 @@ class Presto(Dialect):
             for q in t.cast(t.List[str], tokens.Tokenizer.QUOTES)
             for prefix in ("U&", "u&")
         ]
+
+        NESTED_COMMENTS = False
 
         KEYWORDS = {
             **tokens.Tokenizer.KEYWORDS,
@@ -248,6 +313,7 @@ class Presto(Dialect):
 
     class Parser(parser.Parser):
         VALUES_FOLLOWED_BY_PAREN = False
+        ZONE_AWARE_TIMESTAMP_CONSTRUCTOR = True
 
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
@@ -270,6 +336,8 @@ class Presto(Dialect):
             "DATE_PARSE": build_formatted_time(exp.StrToTime, "presto"),
             "DATE_TRUNC": date_trunc_to_time,
             "DAY_OF_WEEK": exp.DayOfWeekIso.from_arg_list,
+            "DOW": exp.DayOfWeekIso.from_arg_list,
+            "DOY": exp.DayOfYear.from_arg_list,
             "ELEMENT_AT": lambda args: exp.Bracket(
                 this=seq_get(args, 0), expressions=[seq_get(args, 1)], offset=1, safe=True
             ),
@@ -277,6 +345,9 @@ class Presto(Dialect):
             "FROM_UNIXTIME": _build_from_unixtime,
             "FROM_UTF8": lambda args: exp.Decode(
                 this=seq_get(args, 0), replace=seq_get(args, 1), charset=exp.Literal.string("utf-8")
+            ),
+            "JSON_FORMAT": lambda args: exp.JSONFormat(
+                this=seq_get(args, 0), options=seq_get(args, 1), is_json=True
             ),
             "LEVENSHTEIN_DISTANCE": exp.Levenshtein.from_arg_list,
             "NOW": exp.CurrentTimestamp.from_arg_list,
@@ -287,6 +358,7 @@ class Presto(Dialect):
                 expression=seq_get(args, 1),
                 replacement=seq_get(args, 2) or exp.Literal.string(""),
             ),
+            "REPLACE": build_replace_with_optional_replacement,
             "ROW": exp.Struct.from_arg_list,
             "SEQUENCE": exp.GenerateSeries.from_arg_list,
             "SET_AGG": exp.ArrayUniqueAgg.from_arg_list,
@@ -294,6 +366,7 @@ class Presto(Dialect):
             "STRPOS": lambda args: exp.StrPosition(
                 this=seq_get(args, 0), substr=seq_get(args, 1), occurrence=seq_get(args, 2)
             ),
+            "SLICE": exp.ArraySlice.from_arg_list,
             "TO_CHAR": _build_to_char,
             "TO_UNIXTIME": exp.TimeToUnix.from_arg_list,
             "TO_UTF8": lambda args: exp.Encode(
@@ -302,6 +375,7 @@ class Presto(Dialect):
             "MD5": exp.MD5Digest.from_arg_list,
             "SHA256": lambda args: exp.SHA2(this=seq_get(args, 0), length=exp.Literal.number(256)),
             "SHA512": lambda args: exp.SHA2(this=seq_get(args, 0), length=exp.Literal.number(512)),
+            "WEEK": exp.WeekOfYear.from_arg_list,
         }
 
         FUNCTION_PARSERS = parser.Parser.FUNCTION_PARSERS.copy()
@@ -353,15 +427,25 @@ class Presto(Dialect):
         TRANSFORMS = {
             **generator.Generator.TRANSFORMS,
             exp.AnyValue: rename_func("ARBITRARY"),
-            exp.ApproxQuantile: rename_func("APPROX_PERCENTILE"),
+            exp.ApproxQuantile: lambda self, e: self.func(
+                "APPROX_PERCENTILE",
+                e.this,
+                e.args.get("weight"),
+                e.args.get("quantile"),
+                e.args.get("accuracy"),
+            ),
             exp.ArgMax: rename_func("MAX_BY"),
             exp.ArgMin: rename_func("MIN_BY"),
-            exp.Array: lambda self, e: f"ARRAY[{self.expressions(e, flat=True)}]",
+            exp.Array: transforms.preprocess(
+                [transforms.inherit_struct_field_names],
+                generator=lambda self, e: f"ARRAY[{self.expressions(e, flat=True)}]",
+            ),
             exp.ArrayAny: rename_func("ANY_MATCH"),
             exp.ArrayConcat: rename_func("CONCAT"),
             exp.ArrayContains: rename_func("CONTAINS"),
             exp.ArrayToString: rename_func("ARRAY_JOIN"),
             exp.ArrayUniqueAgg: rename_func("SET_AGG"),
+            exp.ArraySlice: rename_func("SLICE"),
             exp.AtTimeZone: rename_func("AT_TIMEZONE"),
             exp.BitwiseAnd: lambda self, e: self.func("BITWISE_AND", e.this, e.expression),
             exp.BitwiseLeftShift: lambda self, e: self.func(
@@ -391,19 +475,19 @@ class Presto(Dialect):
             exp.DiToDate: lambda self,
             e: f"CAST(DATE_PARSE(CAST({self.sql(e, 'this')} AS VARCHAR), {Presto.DATEINT_FORMAT}) AS DATE)",
             exp.Encode: lambda self, e: encode_decode_sql(self, e, "TO_UTF8"),
-            exp.FileFormatProperty: lambda self, e: f"FORMAT='{e.name.upper()}'",
+            exp.FileFormatProperty: lambda self,
+            e: f"format={self.sql(exp.Literal.string(e.name))}",
             exp.First: _first_last_sql,
             exp.FromTimeZone: lambda self,
             e: f"WITH_TIMEZONE({self.sql(e, 'this')}, {self.sql(e, 'zone')}) AT TIME ZONE 'UTC'",
             exp.GenerateSeries: sequence_sql,
             exp.GenerateDateArray: sequence_sql,
-            exp.Group: transforms.preprocess([transforms.unalias_group]),
             exp.If: if_sql(),
             exp.ILike: no_ilike_sql,
             exp.Initcap: _initcap_sql,
             exp.Last: _first_last_sql,
             exp.LastDay: lambda self, e: self.func("LAST_DAY_OF_MONTH", e.this),
-            exp.Lateral: explode_to_unnest_sql,
+            exp.Lateral: _explode_to_unnest_sql,
             exp.Left: left_to_substring_sql,
             exp.Levenshtein: unsupported_args("ins_cost", "del_cost", "sub_cost", "max_dist")(
                 rename_func("LEVENSHTEIN_DISTANCE")
@@ -419,10 +503,12 @@ class Presto(Dialect):
             exp.SchemaCommentProperty: lambda self, e: self.naked_property(e),
             exp.Select: transforms.preprocess(
                 [
+                    transforms.eliminate_window_clause,
                     transforms.eliminate_qualify,
                     transforms.eliminate_distinct_on,
-                    transforms.explode_to_unnest(1),
+                    transforms.explode_projection_to_unnest(1),
                     transforms.eliminate_semi_and_anti_joins,
+                    amend_exploded_column_table,
                 ]
             ),
             exp.SortArray: _no_sort_array,
@@ -460,10 +546,18 @@ class Presto(Dialect):
             exp.WithinGroup: transforms.preprocess(
                 [transforms.remove_within_group_for_percentiles]
             ),
+            # Note: Presto's TRUNCATE always returns DOUBLE, even with decimals=0, whereas
+            # most dialects return INT (SQLite also returns REAL, see sqlite.py). This creates
+            # a bidirectional transpilation gap: Presto→Other may change float division to int
+            # division, and vice versa. Modeling precisely would require exp.FloatTrunc or
+            # similar, deemed overengineering for this subtle semantic difference.
+            exp.Trunc: rename_func("TRUNCATE"),
             exp.Xor: bool_xor_sql,
             exp.MD5Digest: rename_func("MD5"),
             exp.SHA: rename_func("SHA1"),
+            exp.SHA1Digest: rename_func("SHA1"),
             exp.SHA2: sha256_sql,
+            exp.SHA2Digest: sha2_digest_sql,
         }
 
         RESERVED_KEYWORDS = {
@@ -527,13 +621,52 @@ class Presto(Dialect):
             "with",
         }
 
+        def extract_sql(self, expression: exp.Extract) -> str:
+            date_part = expression.name
+
+            if not date_part.startswith("EPOCH"):
+                return super().extract_sql(expression)
+
+            if date_part == "EPOCH_MILLISECOND":
+                scale = 10**3
+            elif date_part == "EPOCH_MICROSECOND":
+                scale = 10**6
+            elif date_part == "EPOCH_NANOSECOND":
+                scale = 10**9
+            else:
+                scale = None
+
+            value = expression.expression
+
+            ts = exp.cast(value, to=exp.DataType.build("TIMESTAMP"))
+            to_unix: exp.Expression = exp.TimeToUnix(this=ts)
+
+            if scale:
+                to_unix = exp.Mul(this=to_unix, expression=exp.Literal.number(scale))
+
+            return self.sql(to_unix)
+
+        def jsonformat_sql(self, expression: exp.JSONFormat) -> str:
+            this = expression.this
+            is_json = expression.args.get("is_json")
+
+            if this and not (is_json or this.type):
+                from sqlglot.optimizer.annotate_types import annotate_types
+
+                this = annotate_types(this, dialect=self.dialect)
+
+            if not (is_json or this.is_type(exp.DataType.Type.JSON)):
+                this.replace(exp.cast(this, exp.DataType.Type.JSON))
+
+            return self.function_fallback_sql(expression)
+
         def md5_sql(self, expression: exp.MD5) -> str:
             this = expression.this
 
             if not this.type:
                 from sqlglot.optimizer.annotate_types import annotate_types
 
-                this = annotate_types(this)
+                this = annotate_types(this, dialect=self.dialect)
 
             if this.is_type(*exp.DataType.TEXT_TYPES):
                 this = exp.Encode(this=this, charset=exp.Literal.string("utf-8"))
@@ -567,24 +700,15 @@ class Presto(Dialect):
 
         def bracket_sql(self, expression: exp.Bracket) -> str:
             if expression.args.get("safe"):
-                return self.func(
-                    "ELEMENT_AT",
-                    expression.this,
-                    seq_get(
-                        apply_index_offset(
-                            expression.this,
-                            expression.expressions,
-                            1 - expression.args.get("offset", 0),
-                        ),
-                        0,
-                    ),
-                )
+                return bracket_to_element_at_sql(self, expression)
             return super().bracket_sql(expression)
 
         def struct_sql(self, expression: exp.Struct) -> str:
-            from sqlglot.optimizer.annotate_types import annotate_types
+            if not expression.type:
+                from sqlglot.optimizer.annotate_types import annotate_types
 
-            expression = annotate_types(expression)
+                annotate_types(expression, dialect=self.dialect)
+
             values: t.List[str] = []
             schema: t.List[str] = []
             unknown_type = False

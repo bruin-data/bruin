@@ -13,28 +13,30 @@ SQL expressions, such as `sqlglot.expressions.select`.
 from __future__ import annotations
 
 import datetime
+import logging
 import math
 import numbers
 import re
 import textwrap
 import typing as t
-from collections import deque
 from copy import deepcopy
 from decimal import Decimal
 from enum import auto
 from functools import reduce
 
-from sqlglot.errors import ErrorLevel, ParseError
+from sqlglot.errors import ErrorLevel, ParseError, TokenError
+from sqlglot.expression_core import ExpressionCore
 from sqlglot.helper import (
     AutoName,
     camel_to_snake_case,
     ensure_collection,
     ensure_list,
     seq_get,
+    split_num_words,
     subclasses,
-    to_bool,
 )
-from sqlglot.tokens import Token, TokenError
+
+from sqlglot.tokens import Token
 
 if t.TYPE_CHECKING:
     from typing_extensions import Self
@@ -46,27 +48,14 @@ if t.TYPE_CHECKING:
     S = t.TypeVar("S", bound="SetOperation")
 
 
-class _Expression(type):
-    def __new__(cls, clsname, bases, attrs):
-        klass = super().__new__(cls, clsname, bases, attrs)
+logger = logging.getLogger("sqlglot")
 
-        # When an Expression class is created, its key is automatically set to be
-        # the lowercase version of the class' name.
-        klass.key = clsname.lower()
-
-        # This is so that docstrings are not inherited in pdoc
-        klass.__doc__ = klass.__doc__ or ""
-
-        return klass
-
-
-SQLGLOT_META = "sqlglot.meta"
 SQLGLOT_ANONYMOUS = "sqlglot.anonymous"
 TABLE_PARTS = ("this", "db", "catalog")
 COLUMN_PARTS = ("this", "table", "db", "catalog")
 
 
-class Expression(metaclass=_Expression):
+class Expression(ExpressionCore):
     """
     The base class for all expressions in a syntax tree. Each Expression encapsulates any necessary
     context, such as its child expressions, their names (arg keys), and whether a given child expression
@@ -98,60 +87,25 @@ class Expression(metaclass=_Expression):
         args: a mapping used for retrieving the arguments of an expression, given their arg keys.
     """
 
+    __slots__ = ()
+
     key = "expression"
     arg_types = {"this": True}
-    __slots__ = ("args", "parent", "arg_key", "index", "comments", "_type", "_meta", "_hash")
+    required_args = {"this"}
+    parent: t.Optional[Expression]
 
-    def __init__(self, **args: t.Any):
-        self.args: t.Dict[str, t.Any] = args
-        self.parent: t.Optional[Expression] = None
-        self.arg_key: t.Optional[str] = None
-        self.index: t.Optional[int] = None
-        self.comments: t.Optional[t.List[str]] = None
-        self._type: t.Optional[DataType] = None
-        self._meta: t.Optional[t.Dict[str, t.Any]] = None
-        self._hash: t.Optional[int] = None
+    @classmethod
+    def __init_subclass__(cls, **kwargs: t.Any) -> None:
+        super().__init_subclass__(**kwargs)
+        cls.key = cls.__name__.lower()
+        cls.required_args = {k for k, v in cls.arg_types.items() if v}
+        # This is so that docstrings are not inherited in pdoc
+        cls.__doc__ = cls.__doc__ or ""
 
-        for arg_key, value in self.args.items():
-            self._set_parent(arg_key, value)
+    def __reduce__(self) -> t.Tuple[t.Callable, t.Tuple[t.List[t.Dict[str, t.Any]]]]:
+        from sqlglot.serde import dump, load
 
-    def __eq__(self, other) -> bool:
-        return type(self) is type(other) and hash(self) == hash(other)
-
-    @property
-    def hashable_args(self) -> t.Any:
-        return frozenset(
-            (k, tuple(_norm_arg(a) for a in v) if type(v) is list else _norm_arg(v))
-            for k, v in self.args.items()
-            if not (v is None or v is False or (type(v) is list and not v))
-        )
-
-    def __hash__(self) -> int:
-        if self._hash is not None:
-            return self._hash
-
-        return hash((self.__class__, self.hashable_args))
-
-    @property
-    def this(self) -> t.Any:
-        """
-        Retrieves the argument with key "this".
-        """
-        return self.args.get("this")
-
-    @property
-    def expression(self) -> t.Any:
-        """
-        Retrieves the argument with key "expression".
-        """
-        return self.args.get("expression")
-
-    @property
-    def expressions(self) -> t.List[t.Any]:
-        """
-        Retrieves the argument with key "expressions".
-        """
-        return self.args.get("expressions") or []
+        return (load, (dump(self),))
 
     def text(self, key) -> str:
         """
@@ -166,6 +120,10 @@ class Expression(metaclass=_Expression):
         if isinstance(field, (Star, Null)):
             return field.name
         return ""
+
+    @property
+    def name(self) -> str:
+        return self.text("this")
 
     @property
     def is_string(self) -> bool:
@@ -183,12 +141,6 @@ class Expression(metaclass=_Expression):
             isinstance(self, Neg) and self.this.is_number
         )
 
-    def to_py(self) -> t.Any:
-        """
-        Returns a Python object equivalent of the SQL node.
-        """
-        raise ValueError(f"{self} cannot be converted to a Python object.")
-
     @property
     def is_int(self) -> bool:
         """
@@ -202,50 +154,10 @@ class Expression(metaclass=_Expression):
         return isinstance(self, Star) or (isinstance(self, Column) and isinstance(self.this, Star))
 
     @property
-    def alias(self) -> str:
-        """
-        Returns the alias of the expression, or an empty string if it's not aliased.
-        """
-        if isinstance(self.args.get("alias"), TableAlias):
-            return self.args["alias"].name
-        return self.text("alias")
-
-    @property
-    def alias_column_names(self) -> t.List[str]:
-        table_alias = self.args.get("alias")
-        if not table_alias:
-            return []
-        return [c.name for c in table_alias.args.get("columns") or []]
-
-    @property
-    def name(self) -> str:
-        return self.text("this")
-
-    @property
-    def alias_or_name(self) -> str:
-        return self.alias or self.name
-
-    @property
-    def output_name(self) -> str:
-        """
-        Name of the output column if this expression is a selection.
-
-        If the Expression has no output name, an empty string is returned.
-
-        Example:
-            >>> from sqlglot import parse_one
-            >>> parse_one("SELECT a").expressions[0].output_name
-            'a'
-            >>> parse_one("SELECT b AS c").expressions[0].output_name
-            'c'
-            >>> parse_one("SELECT 1 + 2").expressions[0].output_name
-            ''
-        """
-        return ""
-
-    @property
     def type(self) -> t.Optional[DataType]:
-        return self._type
+        if isinstance(self, Cast):
+            return self._type or self.to  # type: ignore[return-value]
+        return self._type  # type: ignore[return-value]
 
     @type.setter
     def type(self, dtype: t.Optional[DataType | DataType.Type | str]) -> None:
@@ -256,302 +168,12 @@ class Expression(metaclass=_Expression):
     def is_type(self, *dtypes) -> bool:
         return self.type is not None and self.type.is_type(*dtypes)
 
-    def is_leaf(self) -> bool:
-        return not any(isinstance(v, (Expression, list)) for v in self.args.values())
-
-    @property
-    def meta(self) -> t.Dict[str, t.Any]:
-        if self._meta is None:
-            self._meta = {}
-        return self._meta
-
-    def __deepcopy__(self, memo):
-        root = self.__class__()
-        stack = [(self, root)]
-
-        while stack:
-            node, copy = stack.pop()
-
-            if node.comments is not None:
-                copy.comments = deepcopy(node.comments)
-            if node._type is not None:
-                copy._type = deepcopy(node._type)
-            if node._meta is not None:
-                copy._meta = deepcopy(node._meta)
-            if node._hash is not None:
-                copy._hash = node._hash
-
-            for k, vs in node.args.items():
-                if hasattr(vs, "parent"):
-                    stack.append((vs, vs.__class__()))
-                    copy.set(k, stack[-1][-1])
-                elif type(vs) is list:
-                    copy.args[k] = []
-
-                    for v in vs:
-                        if hasattr(v, "parent"):
-                            stack.append((v, v.__class__()))
-                            copy.append(k, stack[-1][-1])
-                        else:
-                            copy.append(k, v)
-                else:
-                    copy.args[k] = vs
-
-        return root
-
-    def copy(self) -> Self:
-        """
-        Returns a deep copy of the expression.
-        """
-        return deepcopy(self)
-
-    def add_comments(self, comments: t.Optional[t.List[str]] = None, prepend: bool = False) -> None:
-        if self.comments is None:
-            self.comments = []
-
-        if comments:
-            for comment in comments:
-                _, *meta = comment.split(SQLGLOT_META)
-                if meta:
-                    for kv in "".join(meta).split(","):
-                        k, *v = kv.split("=")
-                        value = v[0].strip() if v else True
-                        self.meta[k.strip()] = to_bool(value)
-
-                if not prepend:
-                    self.comments.append(comment)
-
-            if prepend:
-                self.comments = comments + self.comments
-
-    def pop_comments(self) -> t.List[str]:
-        comments = self.comments or []
-        self.comments = None
-        return comments
-
-    def append(self, arg_key: str, value: t.Any) -> None:
-        """
-        Appends value to arg_key if it's a list or sets it as a new list.
-
-        Args:
-            arg_key (str): name of the list expression arg
-            value (Any): value to append to the list
-        """
-        if type(self.args.get(arg_key)) is not list:
-            self.args[arg_key] = []
-        self._set_parent(arg_key, value)
-        values = self.args[arg_key]
-        if hasattr(value, "parent"):
-            value.index = len(values)
-        values.append(value)
-
-    def set(
-        self,
-        arg_key: str,
-        value: t.Any,
-        index: t.Optional[int] = None,
-        overwrite: bool = True,
-    ) -> None:
-        """
-        Sets arg_key to value.
-
-        Args:
-            arg_key: name of the expression arg.
-            value: value to set the arg to.
-            index: if the arg is a list, this specifies what position to add the value in it.
-            overwrite: assuming an index is given, this determines whether to overwrite the
-                list entry instead of only inserting a new value (i.e., like list.insert).
-        """
-        if index is not None:
-            expressions = self.args.get(arg_key) or []
-
-            if seq_get(expressions, index) is None:
-                return
-            if value is None:
-                expressions.pop(index)
-                for v in expressions[index:]:
-                    v.index = v.index - 1
-                return
-
-            if isinstance(value, list):
-                expressions.pop(index)
-                expressions[index:index] = value
-            elif overwrite:
-                expressions[index] = value
-            else:
-                expressions.insert(index, value)
-
-            value = expressions
-        elif value is None:
-            self.args.pop(arg_key, None)
-            return
-
-        self.args[arg_key] = value
-        self._set_parent(arg_key, value, index)
-
-    def _set_parent(self, arg_key: str, value: t.Any, index: t.Optional[int] = None) -> None:
-        if hasattr(value, "parent"):
-            value.parent = self
-            value.arg_key = arg_key
-            value.index = index
-        elif type(value) is list:
-            for index, v in enumerate(value):
-                if hasattr(v, "parent"):
-                    v.parent = self
-                    v.arg_key = arg_key
-                    v.index = index
-
-    @property
-    def depth(self) -> int:
-        """
-        Returns the depth of this tree.
-        """
-        if self.parent:
-            return self.parent.depth + 1
-        return 0
-
-    def iter_expressions(self, reverse: bool = False) -> t.Iterator[Expression]:
-        """Yields the key and expression for all arguments, exploding list args."""
-        for vs in reversed(self.args.values()) if reverse else self.args.values():  # type: ignore
-            if type(vs) is list:
-                for v in reversed(vs) if reverse else vs:  # type: ignore
-                    if hasattr(v, "parent"):
-                        yield v
-            else:
-                if hasattr(vs, "parent"):
-                    yield vs
-
-    def find(self, *expression_types: t.Type[E], bfs: bool = True) -> t.Optional[E]:
-        """
-        Returns the first node in this tree which matches at least one of
-        the specified types.
-
-        Args:
-            expression_types: the expression type(s) to match.
-            bfs: whether to search the AST using the BFS algorithm (DFS is used if false).
-
-        Returns:
-            The node which matches the criteria or None if no such node was found.
-        """
-        return next(self.find_all(*expression_types, bfs=bfs), None)
-
-    def find_all(self, *expression_types: t.Type[E], bfs: bool = True) -> t.Iterator[E]:
-        """
-        Returns a generator object which visits all nodes in this tree and only
-        yields those that match at least one of the specified expression types.
-
-        Args:
-            expression_types: the expression type(s) to match.
-            bfs: whether to search the AST using the BFS algorithm (DFS is used if false).
-
-        Returns:
-            The generator object.
-        """
-        for expression in self.walk(bfs=bfs):
-            if isinstance(expression, expression_types):
-                yield expression
-
-    def find_ancestor(self, *expression_types: t.Type[E]) -> t.Optional[E]:
-        """
-        Returns a nearest parent matching expression_types.
-
-        Args:
-            expression_types: the expression type(s) to match.
-
-        Returns:
-            The parent node.
-        """
-        ancestor = self.parent
-        while ancestor and not isinstance(ancestor, expression_types):
-            ancestor = ancestor.parent
-        return ancestor  # type: ignore
-
     @property
     def parent_select(self) -> t.Optional[Select]:
         """
         Returns the parent select statement.
         """
         return self.find_ancestor(Select)
-
-    @property
-    def same_parent(self) -> bool:
-        """Returns if the parent is the same class as itself."""
-        return type(self.parent) is self.__class__
-
-    def root(self) -> Expression:
-        """
-        Returns the root expression of this tree.
-        """
-        expression = self
-        while expression.parent:
-            expression = expression.parent
-        return expression
-
-    def walk(
-        self, bfs: bool = True, prune: t.Optional[t.Callable[[Expression], bool]] = None
-    ) -> t.Iterator[Expression]:
-        """
-        Returns a generator object which visits all nodes in this tree.
-
-        Args:
-            bfs: if set to True the BFS traversal order will be applied,
-                otherwise the DFS traversal will be used instead.
-            prune: callable that returns True if the generator should stop traversing
-                this branch of the tree.
-
-        Returns:
-            the generator object.
-        """
-        if bfs:
-            yield from self.bfs(prune=prune)
-        else:
-            yield from self.dfs(prune=prune)
-
-    def dfs(
-        self, prune: t.Optional[t.Callable[[Expression], bool]] = None
-    ) -> t.Iterator[Expression]:
-        """
-        Returns a generator object which visits all nodes in this tree in
-        the DFS (Depth-first) order.
-
-        Returns:
-            The generator object.
-        """
-        stack = [self]
-
-        while stack:
-            node = stack.pop()
-
-            yield node
-
-            if prune and prune(node):
-                continue
-
-            for v in node.iter_expressions(reverse=True):
-                stack.append(v)
-
-    def bfs(
-        self, prune: t.Optional[t.Callable[[Expression], bool]] = None
-    ) -> t.Iterator[Expression]:
-        """
-        Returns a generator object which visits all nodes in this tree in
-        the BFS (Breadth-first) order.
-
-        Returns:
-            The generator object.
-        """
-        queue = deque([self])
-
-        while queue:
-            node = queue.popleft()
-
-            yield node
-
-            if prune and prune(node):
-                continue
-
-            for v in node.iter_expressions():
-                queue.append(v)
 
     def unnest(self):
         """
@@ -582,7 +204,7 @@ class Expression(metaclass=_Expression):
 
         A AND B AND C -> [A, B, C]
         """
-        for node in self.dfs(prune=lambda n: n.parent and type(n) is not self.__class__):
+        for node in self.dfs(prune=lambda n: bool(n.parent and type(n) is not self.__class__)):
             if type(node) is not self.__class__:
                 yield node.unnest() if unnest and not isinstance(node, Subquery) else node
 
@@ -613,145 +235,6 @@ class Expression(metaclass=_Expression):
         from sqlglot.dialects import Dialect
 
         return Dialect.get_or_raise(dialect).generate(self, **opts)
-
-    def transform(self, fun: t.Callable, *args: t.Any, copy: bool = True, **kwargs) -> Expression:
-        """
-        Visits all tree nodes (excluding already transformed ones)
-        and applies the given transformation function to each node.
-
-        Args:
-            fun: a function which takes a node as an argument and returns a
-                new transformed node or the same node without modifications. If the function
-                returns None, then the corresponding node will be removed from the syntax tree.
-            copy: if set to True a new tree instance is constructed, otherwise the tree is
-                modified in place.
-
-        Returns:
-            The transformed tree.
-        """
-        root = None
-        new_node = None
-
-        for node in (self.copy() if copy else self).dfs(prune=lambda n: n is not new_node):
-            parent, arg_key, index = node.parent, node.arg_key, node.index
-            new_node = fun(node, *args, **kwargs)
-
-            if not root:
-                root = new_node
-            elif parent and arg_key and new_node is not node:
-                parent.set(arg_key, new_node, index)
-
-        assert root
-        return root.assert_is(Expression)
-
-    @t.overload
-    def replace(self, expression: E) -> E: ...
-
-    @t.overload
-    def replace(self, expression: None) -> None: ...
-
-    def replace(self, expression):
-        """
-        Swap out this expression with a new expression.
-
-        For example::
-
-            >>> tree = Select().select("x").from_("tbl")
-            >>> tree.find(Column).replace(column("y"))
-            Column(
-              this=Identifier(this=y, quoted=False))
-            >>> tree.sql()
-            'SELECT y FROM tbl'
-
-        Args:
-            expression: new node
-
-        Returns:
-            The new expression or expressions.
-        """
-        parent = self.parent
-
-        if not parent or parent is expression:
-            return expression
-
-        key = self.arg_key
-        value = parent.args.get(key)
-
-        if type(expression) is list and isinstance(value, Expression):
-            # We are trying to replace an Expression with a list, so it's assumed that
-            # the intention was to really replace the parent of this expression.
-            value.parent.replace(expression)
-        else:
-            parent.set(key, expression, self.index)
-
-        if expression is not self:
-            self.parent = None
-            self.arg_key = None
-            self.index = None
-
-        return expression
-
-    def pop(self: E) -> E:
-        """
-        Remove this expression from its AST.
-
-        Returns:
-            The popped expression.
-        """
-        self.replace(None)
-        return self
-
-    def assert_is(self, type_: t.Type[E]) -> E:
-        """
-        Assert that this `Expression` is an instance of `type_`.
-
-        If it is NOT an instance of `type_`, this raises an assertion error.
-        Otherwise, this returns this expression.
-
-        Examples:
-            This is useful for type security in chained expressions:
-
-            >>> import sqlglot
-            >>> sqlglot.parse_one("SELECT x from y").assert_is(Select).select("z").sql()
-            'SELECT x, z FROM y'
-        """
-        if not isinstance(self, type_):
-            raise AssertionError(f"{self} is not {type_}.")
-        return self
-
-    def error_messages(self, args: t.Optional[t.Sequence] = None) -> t.List[str]:
-        """
-        Checks if this expression is valid (e.g. all mandatory args are set).
-
-        Args:
-            args: a sequence of values that were used to instantiate a Func expression. This is used
-                to check that the provided arguments don't exceed the function argument limit.
-
-        Returns:
-            A list of error messages for all possible errors that were found.
-        """
-        errors: t.List[str] = []
-
-        for k in self.args:
-            if k not in self.arg_types:
-                errors.append(f"Unexpected keyword: '{k}' for {self.__class__}")
-        for k, mandatory in self.arg_types.items():
-            v = self.args.get(k)
-            if mandatory and (v is None or (isinstance(v, list) and not v)):
-                errors.append(f"Required keyword: '{k}' missing for {self.__class__}")
-
-        if (
-            args
-            and isinstance(self, Func)
-            and len(args) > len(self.arg_types)
-            and not self.is_var_len_args
-        ):
-            errors.append(
-                f"The number of provided arguments ({len(args)}) is greater than "
-                f"the maximum number of supported arguments ({len(self.arg_types)})"
-            )
-
-        return errors
 
     def dump(self):
         """
@@ -907,12 +390,23 @@ class Expression(metaclass=_Expression):
             ),
         )
 
-    def between(self, low: t.Any, high: t.Any, copy: bool = True, **opts) -> Between:
-        return Between(
+    def between(
+        self,
+        low: t.Any,
+        high: t.Any,
+        copy: bool = True,
+        symmetric: t.Optional[bool] = None,
+        **opts,
+    ) -> Between:
+        between = Between(
             this=maybe_copy(self, copy),
             low=convert(low, copy=copy, **opts),
             high=convert(high, copy=copy, **opts),
         )
+        if symmetric is not None:
+            between.set("symmetric", symmetric)
+
+        return between
 
     def is_(self, other: ExpOrStr) -> Is:
         return self._binop(Is, other)
@@ -934,8 +428,8 @@ class Expression(metaclass=_Expression):
 
     def div(self, other: ExpOrStr, typed: bool = False, safe: bool = False) -> Div:
         div = self._binop(Div, other)
-        div.args["typed"] = typed
-        div.args["safe"] = safe
+        div.set("typed", typed)
+        div.set("safe", safe)
         return div
 
     def asc(self, nulls_first: bool = True) -> Ordered:
@@ -1174,7 +668,7 @@ class Query(Expression):
     @property
     def ctes(self) -> t.List[CTE]:
         """Returns a list of all the CTEs attached to this query."""
-        with_ = self.args.get("with")
+        with_ = self.args.get("with_")
         return with_.expressions if with_ else []
 
     @property
@@ -1216,6 +710,45 @@ class Query(Expression):
         """
         raise NotImplementedError("Query objects must implement `select`")
 
+    def where(
+        self: Q,
+        *expressions: t.Optional[ExpOrStr],
+        append: bool = True,
+        dialect: DialectType = None,
+        copy: bool = True,
+        **opts,
+    ) -> Q:
+        """
+        Append to or set the WHERE expressions.
+
+        Examples:
+            >>> Select().select("x").from_("tbl").where("x = 'a' OR x < 'b'").sql()
+            "SELECT x FROM tbl WHERE x = 'a' OR x < 'b'"
+
+        Args:
+            *expressions: the SQL code strings to parse.
+                If an `Expression` instance is passed, it will be used as-is.
+                Multiple expressions are combined with an AND operator.
+            append: if `True`, AND the new expressions to any existing expression.
+                Otherwise, this resets the expression.
+            dialect: the dialect used to parse the input expressions.
+            copy: if `False`, modify this expression instance in-place.
+            opts: other options to use to parse the input expressions.
+
+        Returns:
+            The modified expression.
+        """
+        return _apply_conjunction_builder(
+            *[expr.this if isinstance(expr, Where) else expr for expr in expressions],
+            instance=self,
+            arg="where",
+            append=append,
+            into=Where,
+            dialect=dialect,
+            copy=copy,
+            **opts,
+        )
+
     def with_(
         self: Q,
         alias: ExpOrStr,
@@ -1225,7 +758,7 @@ class Query(Expression):
         append: bool = True,
         dialect: DialectType = None,
         copy: bool = True,
-        scalar: bool = False,
+        scalar: t.Optional[bool] = None,
         **opts,
     ) -> Q:
         """
@@ -1356,14 +889,14 @@ class Uncache(Expression):
 
 
 class Refresh(Expression):
-    pass
+    arg_types = {"this": True, "kind": True}
 
 
 class DDL(Expression):
     @property
     def ctes(self) -> t.List[CTE]:
         """Returns a list of all the CTEs attached to this statement."""
-        with_ = self.args.get("with")
+        with_ = self.args.get("with_")
         return with_.expressions if with_ else []
 
     @property
@@ -1378,6 +911,11 @@ class DDL(Expression):
         names of the query's projections.
         """
         return self.expression.named_selects if isinstance(self.expression, Query) else []
+
+
+# https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/SQL-Data-Manipulation-Language/Statement-Syntax/LOCKING-Request-Modifier/LOCKING-Request-Modifier-Syntax
+class LockingStatement(Expression):
+    arg_types = {"this": True, "expression": True}
 
 
 class DML(Expression):
@@ -1419,7 +957,7 @@ class DML(Expression):
 
 class Create(DDL):
     arg_types = {
-        "with": False,
+        "with_": False,
         "this": True,
         "kind": True,
         "expression": False,
@@ -1431,7 +969,6 @@ class Create(DDL):
         "indexes": False,
         "no_schema_binding": False,
         "begin": False,
-        "end": False,
         "clone": False,
         "concurrently": False,
         "clustered": False,
@@ -1453,6 +990,35 @@ class SequenceProperties(Expression):
         "owned": False,
         "options": False,
     }
+
+
+# https://www.postgresql.org/docs/current/sql-createtrigger.html
+class TriggerProperties(Expression):
+    arg_types = {
+        "table": True,
+        "timing": True,
+        "events": True,
+        "execute": True,
+        "constraint": False,
+        "referenced_table": False,
+        "deferrable": False,
+        "initially": False,
+        "referencing": False,
+        "for_each": False,
+        "when": False,
+    }
+
+
+class TriggerExecute(Expression):
+    pass
+
+
+class TriggerEvent(Expression):
+    arg_types = {"this": True, "columns": False}
+
+
+class TriggerReferencing(Expression):
+    arg_types = {"old": False, "new": False}
 
 
 class TruncateTable(Expression):
@@ -1483,6 +1049,7 @@ class Describe(Expression):
         "expressions": False,
         "partition": False,
         "format": False,
+        "as_json": False,
     }
 
 
@@ -1494,6 +1061,11 @@ class Attach(Expression):
 # https://duckdb.org/docs/sql/statements/attach.html#detach
 class Detach(Expression):
     arg_types = {"this": True, "exists": False}
+
+
+# https://duckdb.org/docs/sql/statements/load_and_install.html
+class Install(Expression):
+    arg_types = {"this": True, "from_": False, "force": False}
 
 
 # https://duckdb.org/docs/guides/meta/summarize.html
@@ -1514,7 +1086,7 @@ class Declare(Expression):
 
 
 class DeclareItem(Expression):
-    arg_types = {"this": True, "kind": True, "default": False}
+    arg_types = {"this": True, "kind": False, "default": False}
 
 
 class Set(Expression):
@@ -1531,8 +1103,12 @@ class SetItem(Expression):
         "expressions": False,
         "kind": False,
         "collate": False,  # MySQL SET NAMES statement
-        "global": False,
+        "global_": False,
     }
+
+
+class QueryBand(Expression):
+    arg_types = {"this": True, "scope": False, "update": False}
 
 
 class Show(Expression):
@@ -1544,7 +1120,7 @@ class Show(Expression):
         "offset": False,
         "starts_with": False,
         "limit": False,
-        "from": False,
+        "from_": False,
         "like": False,
         "where": False,
         "db": False,
@@ -1554,11 +1130,17 @@ class Show(Expression):
         "mutex": False,
         "query": False,
         "channel": False,
-        "global": False,
+        "global_": False,
         "log": False,
         "position": False,
         "types": False,
         "privileges": False,
+        "for_table": False,
+        "for_group": False,
+        "for_user": False,
+        "for_role": False,
+        "into_outfile": False,
+        "json": False,
     }
 
 
@@ -1594,6 +1176,7 @@ class CTE(DerivedTable):
         "alias": True,
         "scalar": False,
         "materialized": False,
+        "key_expressions": False,
     }
 
 
@@ -1618,7 +1201,7 @@ class HexString(Condition):
 
 
 class ByteString(Condition):
-    pass
+    arg_types = {"this": True, "is_bytes": False}
 
 
 class RawString(Condition):
@@ -1657,17 +1240,21 @@ class Column(Condition):
             if self.args.get(part)
         ]
 
-    def to_dot(self) -> Dot | Identifier:
+    def to_dot(self, include_dots: bool = True) -> Dot | Identifier:
         """Converts the column into a dot expression."""
         parts = self.parts
         parent = self.parent
 
-        while parent:
-            if isinstance(parent, Dot):
+        if include_dots:
+            while isinstance(parent, Dot):
                 parts.append(parent.expression)
-            parent = parent.parent
+                parent = parent.parent
 
         return Dot.build(deepcopy(parts)) if len(parts) > 1 else parts[0]
+
+
+class Pseudocolumn(Column):
+    pass
 
 
 class ColumnPosition(Expression):
@@ -1705,6 +1292,7 @@ class AlterColumn(Expression):
         "comment": False,
         "allow_null": False,
         "visible": False,
+        "rename_to": False,
     }
 
 
@@ -1759,7 +1347,13 @@ class Comment(Expression):
 
 
 class Comprehension(Expression):
-    arg_types = {"this": True, "expression": True, "iterator": True, "condition": False}
+    arg_types = {
+        "this": True,
+        "expression": True,
+        "position": False,
+        "iterator": True,
+        "condition": False,
+    }
 
 
 # https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#mergetree-table-ttl
@@ -1810,6 +1404,10 @@ class ColumnConstraintKind(Expression):
 
 class AutoIncrementColumnConstraint(ColumnConstraintKind):
     pass
+
+
+class ZeroFillColumnConstraint(ColumnConstraint):
+    arg_types = {}
 
 
 class PeriodForSystemTimeConstraint(ColumnConstraintKind):
@@ -1880,6 +1478,7 @@ class GeneratedAsIdentityColumnConstraint(ColumnConstraintKind):
         "minvalue": False,
         "maxvalue": False,
         "cycle": False,
+        "order": False,
     }
 
 
@@ -1927,13 +1526,8 @@ class OnUpdateColumnConstraint(ColumnConstraintKind):
     pass
 
 
-# https://docs.snowflake.com/en/sql-reference/sql/create-external-table#optional-parameters
-class TransformColumnConstraint(ColumnConstraintKind):
-    pass
-
-
 class PrimaryKeyColumnConstraint(ColumnConstraintKind):
-    arg_types = {"desc": False}
+    arg_types = {"desc": False, "options": False}
 
 
 class TitleColumnConstraint(ColumnConstraintKind):
@@ -1941,11 +1535,17 @@ class TitleColumnConstraint(ColumnConstraintKind):
 
 
 class UniqueColumnConstraint(ColumnConstraintKind):
-    arg_types = {"this": False, "index_type": False, "on_conflict": False, "nulls": False}
+    arg_types = {
+        "this": False,
+        "index_type": False,
+        "on_conflict": False,
+        "nulls": False,
+        "options": False,
+    }
 
 
 class UppercaseColumnConstraint(ColumnConstraintKind):
-    arg_types: t.Dict[str, t.Any] = {}
+    arg_types: t.ClassVar[t.Dict[str, t.Any]] = {}
 
 
 # https://docs.risingwave.com/processing/watermarks#syntax
@@ -1965,7 +1565,12 @@ class ProjectionPolicyColumnConstraint(ColumnConstraintKind):
 # computed column expression
 # https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql?view=sql-server-ver16
 class ComputedColumnConstraint(ColumnConstraintKind):
-    arg_types = {"this": True, "persisted": False, "not_null": False}
+    arg_types = {"this": True, "persisted": False, "not_null": False, "data_type": False}
+
+
+# https://docs.oracle.com/en/database/other-databases/timesten/22.1/plsql-developer/examples-using-input-and-output-parameters-and-bind-variables.html#GUID-4B20426E-F93F-4835-88CB-6A79829A8D7F
+class InOutColumnConstraint(ColumnConstraintKind):
+    arg_types = {"input_": False, "output": False, "variadic": False}
 
 
 class Constraint(Expression):
@@ -1974,11 +1579,12 @@ class Constraint(Expression):
 
 class Delete(DML):
     arg_types = {
-        "with": False,
+        "with_": False,
         "this": False,
         "using": False,
         "where": False,
         "returning": False,
+        "order": False,
         "limit": False,
         "tables": False,  # Multiple-Table Syntax (MySQL)
         "cluster": False,  # Clickhouse
@@ -2108,7 +1714,7 @@ class Copy(DML):
     arg_types = {
         "this": True,
         "kind": True,
-        "files": True,
+        "files": False,
         "credentials": False,
         "format": False,
         "params": False,
@@ -2130,8 +1736,12 @@ class Prior(Expression):
 
 
 class Directory(Expression):
-    # https://spark.apache.org/docs/3.0.0-preview/sql-ref-syntax-dml-insert-overwrite-directory-hive.html
     arg_types = {"this": True, "local": False, "row_format": False}
+
+
+# https://docs.snowflake.com/en/user-guide/data-load-dirtables-query
+class DirectoryStage(Expression):
+    pass
 
 
 class ForeignKey(Expression):
@@ -2140,6 +1750,7 @@ class ForeignKey(Expression):
         "reference": False,
         "delete": False,
         "update": False,
+        "options": False,
     }
 
 
@@ -2148,7 +1759,7 @@ class ColumnPrefix(Expression):
 
 
 class PrimaryKey(Expression):
-    arg_types = {"expressions": True, "options": False}
+    arg_types = {"this": False, "expressions": True, "options": False, "include": False}
 
 
 # https://www.postgresql.org/docs/9.1/sql-selectinto.html
@@ -2186,15 +1797,12 @@ class JoinHint(Expression):
 
 
 class Identifier(Expression):
-    arg_types = {"this": True, "quoted": False, "global": False, "temporary": False}
+    arg_types = {"this": True, "quoted": False, "global_": False, "temporary": False}
+    _hash_raw_args = True
 
     @property
     def quoted(self) -> bool:
         return bool(self.args.get("quoted"))
-
-    @property
-    def hashable_args(self) -> t.Any:
-        return (self.this, self.quoted)
 
     @property
     def output_name(self) -> str:
@@ -2233,7 +1841,7 @@ class IndexParameters(Expression):
 class Insert(DDL, DML):
     arg_types = {
         "hint": False,
-        "with": False,
+        "with_": False,
         "is_function": False,
         "this": False,
         "expression": False,
@@ -2249,6 +1857,7 @@ class Insert(DDL, DML):
         "partition": False,
         "settings": False,
         "source": False,
+        "default": False,
     }
 
     def with_(
@@ -2312,6 +1921,7 @@ class OnConflict(Expression):
         "expressions": False,
         "action": False,
         "conflict_keys": False,
+        "index_predicate": False,
         "constraint": False,
         "where": False,
     }
@@ -2352,7 +1962,7 @@ class Partition(Expression):
 
 
 class PartitionRange(Expression):
-    arg_types = {"this": True, "expression": True}
+    arg_types = {"this": True, "expression": False, "expressions": False}
 
 
 # https://clickhouse.com/docs/en/sql-reference/statements/alter/partition#how-to-set-partition-expression
@@ -2376,6 +1986,10 @@ class Grant(Expression):
         "principals": True,
         "grant_option": False,
     }
+
+
+class Revoke(Expression):
+    arg_types = {**Grant.arg_types, "cascade": False}
 
 
 class Group(Expression):
@@ -2402,7 +2016,7 @@ class GroupingSets(Expression):
 
 
 class Lambda(Expression):
-    arg_types = {"this": True, "expressions": True}
+    arg_types = {"this": True, "expressions": True, "colon": False}
 
 
 class Limit(Expression):
@@ -2425,14 +2039,22 @@ class LimitOptions(Expression):
 
 class Literal(Condition):
     arg_types = {"this": True, "is_string": True}
-
-    @property
-    def hashable_args(self) -> t.Any:
-        return (self.this, self.args.get("is_string"))
+    _hash_raw_args = True
 
     @classmethod
-    def number(cls, number) -> Literal:
-        return cls(this=str(number), is_string=False)
+    def number(cls, number) -> Literal | Neg:
+        expr: Literal | Neg = cls(this=str(number), is_string=False)
+
+        try:
+            to_py = expr.to_py()
+
+            if not isinstance(to_py, str) and to_py < 0:
+                expr.set("this", str(abs(to_py)))
+                expr = Neg(this=expr)
+        except Exception:
+            pass
+
+        return expr
 
     @classmethod
     def string(cls, string) -> Literal:
@@ -2459,10 +2081,12 @@ class Join(Expression):
         "kind": False,
         "using": False,
         "method": False,
-        "global": False,
+        "global_": False,
         "hint": False,
         "match_condition": False,  # Snowflake
+        "directed": False,  # Snowflake
         "expressions": False,
+        "pivots": False,
     }
 
     @property
@@ -2584,6 +2208,7 @@ class Lateral(UDTF):
         "outer": False,
         "alias": False,
         "cross_apply": False,  # True -> CROSS APPLY, False -> OUTER APPLY
+        "ordinality": False,
     }
 
 
@@ -2636,7 +2261,7 @@ class Order(Expression):
 # https://clickhouse.com/docs/en/sql-reference/statements/select/order-by#order-by-expr-with-fill-modifier
 class WithFill(Expression):
     arg_types = {
-        "from": False,
+        "from_": False,
         "to": False,
         "step": False,
         "interpolate": False,
@@ -2659,6 +2284,10 @@ class Sort(Order):
 
 class Ordered(Expression):
     arg_types = {"this": True, "desc": False, "nulls_first": True, "with_fill": False}
+
+    @property
+    def name(self) -> str:
+        return self.this.name
 
 
 class Property(Expression):
@@ -2691,6 +2320,11 @@ class AutoRefreshProperty(Property):
 
 
 class BackupProperty(Property):
+    arg_types = {"this": True}
+
+
+# https://doris.apache.org/docs/sql-manual/sql-statements/table-and-view/async-materialized-view/CREATE-ASYNC-MATERIALIZED-VIEW/
+class BuildProperty(Property):
     arg_types = {"this": True}
 
 
@@ -2731,7 +2365,7 @@ class DataBlocksizeProperty(Property):
 
 
 class DataDeletionProperty(Property):
-    arg_types = {"on": True, "filter_col": False, "retention_period": False}
+    arg_types = {"on": True, "filter_column": False, "retention_period": False}
 
 
 class DefinerProperty(Property):
@@ -2780,8 +2414,13 @@ class FallbackProperty(Property):
     arg_types = {"no": True, "protection": False}
 
 
+# https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-create-table-hiveformat
 class FileFormatProperty(Property):
-    arg_types = {"this": True}
+    arg_types = {"this": False, "expressions": False, "hive_format": False}
+
+
+class CredentialsProperty(Property):
+    arg_types = {"expressions": True}
 
 
 class FreespaceProperty(Property):
@@ -2824,6 +2463,10 @@ class JournalProperty(Property):
 
 class LanguageProperty(Property):
     arg_types = {"this": True}
+
+
+class EnviromentProperty(Property):
+    arg_types = {"expressions": True}
 
 
 # spark ddl
@@ -2908,6 +2551,14 @@ class PartitionedByProperty(Property):
     arg_types = {"this": True}
 
 
+class PartitionedByBucket(Property):
+    arg_types = {"this": True, "expression": True}
+
+
+class PartitionByTruncate(Property):
+    arg_types = {"this": True, "expression": True}
+
+
 # https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/CREATE_TABLE/
 class PartitionByRangeProperty(Property):
     arg_types = {"partition_expressions": True, "create_expressions": True}
@@ -2916,6 +2567,37 @@ class PartitionByRangeProperty(Property):
 # https://docs.starrocks.io/docs/table_design/data_distribution/#range-partitioning
 class PartitionByRangePropertyDynamic(Expression):
     arg_types = {"this": False, "start": True, "end": True, "every": True}
+
+
+# https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/CREATE_TABLE/#rollup-index
+class RollupProperty(Property):
+    arg_types = {"expressions": True}
+
+
+# https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/CREATE_TABLE/#rollup-index
+class RollupIndex(Expression):
+    arg_types = {"this": True, "expressions": True, "from_index": False, "properties": False}
+
+
+# https://doris.apache.org/docs/table-design/data-partitioning/manual-partitioning
+class PartitionByListProperty(Property):
+    arg_types = {"partition_expressions": True, "create_expressions": True}
+
+
+# https://doris.apache.org/docs/table-design/data-partitioning/manual-partitioning
+class PartitionList(Expression):
+    arg_types = {"this": True, "expressions": True}
+
+
+# https://doris.apache.org/docs/sql-manual/sql-statements/table-and-view/async-materialized-view/CREATE-ASYNC-MATERIALIZED-VIEW
+class RefreshTriggerProperty(Property):
+    arg_types = {
+        "method": False,
+        "kind": False,
+        "every": False,
+        "unit": False,
+        "starts": False,
+    }
 
 
 # https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/CREATE_TABLE/
@@ -3002,8 +2684,18 @@ class SchemaCommentProperty(Property):
     arg_types = {"this": True}
 
 
+class SemanticView(Expression):
+    arg_types = {
+        "this": True,
+        "metrics": False,
+        "dimensions": False,
+        "facts": False,
+        "where": False,
+    }
+
+
 class SerdeProperties(Property):
-    arg_types = {"expressions": True, "with": False}
+    arg_types = {"expressions": True, "with_": False}
 
 
 class SetProperty(Property):
@@ -3031,7 +2723,7 @@ class SqlReadWriteProperty(Property):
 
 
 class SqlSecurityProperty(Property):
-    arg_types = {"definer": True}
+    arg_types = {"this": True}
 
 
 class StabilityProperty(Property):
@@ -3067,6 +2759,11 @@ class UnloggedProperty(Property):
     arg_types = {}
 
 
+# https://docs.snowflake.com/en/sql-reference/sql/create-table#create-table-using-template
+class UsingTemplateProperty(Property):
+    arg_types = {"this": True}
+
+
 # https://learn.microsoft.com/en-us/sql/t-sql/statements/create-view-transact-sql?view=sql-server-ver16
 class ViewAttributeProperty(Property):
     arg_types = {"this": True}
@@ -3094,7 +2791,7 @@ class WithSystemVersioningProperty(Property):
         "this": False,
         "data_consistency": False,
         "retention_period": False,
-        "with": True,
+        "with_": True,
     }
 
 
@@ -3124,6 +2821,7 @@ class Properties(Expression):
         "CLUSTERED_BY": ClusteredByProperty,
         "COLLATE": CollateProperty,
         "COMMENT": SchemaCommentProperty,
+        "CREDENTIALS": CredentialsProperty,
         "DEFINER": DefinerProperty,
         "DISTKEY": DistKeyProperty,
         "DISTRIBUTED_BY": DistributedByProperty,
@@ -3277,6 +2975,11 @@ class Put(Expression):
     arg_types = {"this": True, "target": True, "properties": False}
 
 
+# https://docs.snowflake.com/en/sql-reference/sql/get
+class Get(Expression):
+    arg_types = {"this": True, "target": True, "properties": False}
+
+
 class Table(Expression):
     arg_types = {
         "this": False,
@@ -3298,6 +3001,7 @@ class Table(Expression):
         "changes": False,
         "rows_from": False,
         "sample": False,
+        "indexed": False,
     }
 
     @property
@@ -3356,11 +3060,14 @@ class Table(Expression):
 
 class SetOperation(Query):
     arg_types = {
-        "with": False,
+        "with_": False,
         "this": True,
         "expression": True,
         "distinct": False,
         "by_name": False,
+        "side": False,
+        "kind": False,
+        "on": False,
         **QUERY_MODIFIERS,
     }
 
@@ -3381,7 +3088,10 @@ class SetOperation(Query):
 
     @property
     def named_selects(self) -> t.List[str]:
-        return self.this.unnest().named_selects
+        expression = self
+        while isinstance(expression, SetOperation):
+            expression = expression.this.unnest()
+        return expression.named_selects
 
     @property
     def is_star(self) -> bool:
@@ -3389,7 +3099,10 @@ class SetOperation(Query):
 
     @property
     def selects(self) -> t.List[Expression]:
-        return self.this.unnest().selects
+        expression = self
+        while isinstance(expression, SetOperation):
+            expression = expression.this.unnest()
+        return expression.selects
 
     @property
     def left(self) -> Query:
@@ -3398,6 +3111,14 @@ class SetOperation(Query):
     @property
     def right(self) -> Query:
         return self.expression
+
+    @property
+    def kind(self) -> str:
+        return self.text("kind").upper()
+
+    @property
+    def side(self) -> str:
+        return self.text("side").upper()
 
 
 class Union(SetOperation):
@@ -3414,14 +3135,15 @@ class Intersect(SetOperation):
 
 class Update(DML):
     arg_types = {
-        "with": False,
+        "with_": False,
         "this": False,
-        "expressions": True,
-        "from": False,
+        "expressions": False,
+        "from_": False,
         "where": False,
         "returning": False,
         "order": False,
         "limit": False,
+        "options": False,
     }
 
     def table(
@@ -3564,7 +3286,7 @@ class Update(DML):
         return _apply_builder(
             expression=expression,
             instance=self,
-            arg="from",
+            arg="from_",
             into=From,
             prefix="FROM",
             dialect=dialect,
@@ -3619,8 +3341,15 @@ class Update(DML):
         )
 
 
+# DuckDB supports VALUES followed by https://duckdb.org/docs/stable/sql/query_syntax/limit
 class Values(UDTF):
-    arg_types = {"expressions": True, "alias": False}
+    arg_types = {
+        "expressions": True,
+        "alias": False,
+        "order": False,
+        "limit": False,
+        "offset": False,
+    }
 
 
 class Var(Expression):
@@ -3648,19 +3377,22 @@ class Schema(Expression):
 # https://dev.mysql.com/doc/refman/8.0/en/select.html
 # https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/SELECT.html
 class Lock(Expression):
-    arg_types = {"update": True, "expressions": False, "wait": False}
+    arg_types = {"update": True, "expressions": False, "wait": False, "key": False}
 
 
+# In Redshift, * and EXCLUDE can be separated with column projections (e.g., SELECT *, col1 EXCLUDE (col2))
+# The "exclude" arg enables correct parsing and transpilation of this clause
 class Select(Query):
     arg_types = {
-        "with": False,
+        "with_": False,
         "kind": False,
         "expressions": False,
         "hint": False,
         "distinct": False,
         "into": False,
-        "from": False,
+        "from_": False,
         "operation_modifiers": False,
+        "exclude": False,
         **QUERY_MODIFIERS,
     }
 
@@ -3688,7 +3420,7 @@ class Select(Query):
         return _apply_builder(
             expression=expression,
             instance=self,
-            arg="from",
+            arg="from_",
             into=From,
             prefix="FROM",
             dialect=dialect,
@@ -3976,45 +3708,6 @@ class Select(Query):
             **opts,
         )
 
-    def where(
-        self,
-        *expressions: t.Optional[ExpOrStr],
-        append: bool = True,
-        dialect: DialectType = None,
-        copy: bool = True,
-        **opts,
-    ) -> Select:
-        """
-        Append to or set the WHERE expressions.
-
-        Example:
-            >>> Select().select("x").from_("tbl").where("x = 'a' OR x < 'b'").sql()
-            "SELECT x FROM tbl WHERE x = 'a' OR x < 'b'"
-
-        Args:
-            *expressions: the SQL code strings to parse.
-                If an `Expression` instance is passed, it will be used as-is.
-                Multiple expressions are combined with an AND operator.
-            append: if `True`, AND the new expressions to any existing expression.
-                Otherwise, this resets the expression.
-            dialect: the dialect used to parse the input expressions.
-            copy: if `False`, modify this expression instance in-place.
-            opts: other options to use to parse the input expressions.
-
-        Returns:
-            Select: the modified expression.
-        """
-        return _apply_conjunction_builder(
-            *expressions,
-            instance=self,
-            arg="where",
-            append=append,
-            into=Where,
-            dialect=dialect,
-            copy=copy,
-            **opts,
-        )
-
     def having(
         self,
         *expressions: t.Optional[ExpOrStr],
@@ -4204,7 +3897,14 @@ class Select(Query):
 
     @property
     def named_selects(self) -> t.List[str]:
-        return [e.output_name for e in self.expressions if e.alias_or_name]
+        selects = []
+
+        for e in self.expressions:
+            if e.alias_or_name:
+                selects.append(e.output_name)
+            elif isinstance(e, Aliases):
+                selects.extend([a.name for a in e.aliases])
+        return selects
 
     @property
     def is_star(self) -> bool:
@@ -4222,7 +3922,7 @@ class Subquery(DerivedTable, Query):
     arg_types = {
         "this": True,
         "alias": False,
-        "with": False,
+        "with_": False,
         **QUERY_MODIFIERS,
     }
 
@@ -4302,7 +4002,7 @@ class Pivot(Expression):
         "this": False,
         "alias": False,
         "expressions": False,
-        "field": False,
+        "fields": False,
         "unpivot": False,
         "using": False,
         "group": False,
@@ -4310,11 +4010,16 @@ class Pivot(Expression):
         "include_nulls": False,
         "default_on_null": False,
         "into": False,
+        "with_": False,
     }
 
     @property
     def unpivot(self) -> bool:
         return bool(self.args.get("unpivot"))
+
+    @property
+    def fields(self) -> t.List[Expression]:
+        return self.args.get("fields", [])
 
 
 # https://duckdb.org/docs/sql/statements/unpivot#simplified-unpivot-syntax
@@ -4342,6 +4047,7 @@ class WindowSpec(Expression):
         "start_side": False,
         "end": False,
         "end_side": False,
+        "exclude": False,
     }
 
 
@@ -4354,7 +4060,7 @@ class Where(Expression):
 
 
 class Star(Expression):
-    arg_types = {"except": False, "replace": False, "rename": False}
+    arg_types = {"except_": False, "replace": False, "rename": False}
 
     @property
     def name(self) -> str:
@@ -4373,8 +4079,10 @@ class SessionParameter(Condition):
     arg_types = {"this": True, "kind": False}
 
 
+# https://www.databricks.com/blog/parameterized-queries-pyspark
+# https://jdbc.postgresql.org/documentation/query/#using-the-statement-or-preparedstatement-interface
 class Placeholder(Condition):
-    arg_types = {"this": False, "kind": False}
+    arg_types = {"this": False, "kind": False, "widget": False, "jdbc": False}
 
     @property
     def name(self) -> str:
@@ -4382,7 +4090,7 @@ class Placeholder(Condition):
 
 
 class Null(Condition):
-    arg_types: t.Dict[str, t.Any] = {}
+    arg_types: t.ClassVar[t.Dict[str, t.Any]] = {}
 
     @property
     def name(self) -> str:
@@ -4413,7 +4121,6 @@ class DataType(Expression):
         "expressions": False,
         "nested": False,
         "values": False,
-        "prefix": False,
         "kind": False,
         "nullable": False,
     }
@@ -4424,6 +4131,7 @@ class DataType(Expression):
         SIMPLEAGGREGATEFUNCTION = auto()
         BIGDECIMAL = auto()
         BIGINT = auto()
+        BIGNUM = auto()
         BIGSERIAL = auto()
         BINARY = auto()
         BIT = auto()
@@ -4443,14 +4151,17 @@ class DataType(Expression):
         DECIMAL64 = auto()
         DECIMAL128 = auto()
         DECIMAL256 = auto()
+        DECFLOAT = auto()
         DOUBLE = auto()
         DYNAMIC = auto()
         ENUM = auto()
         ENUM8 = auto()
         ENUM16 = auto()
+        FILE = auto()
         FIXEDSTRING = auto()
         FLOAT = auto()
         GEOGRAPHY = auto()
+        GEOGRAPHYPOINT = auto()
         GEOMETRY = auto()
         POINT = auto()
         RING = auto()
@@ -4488,6 +4199,7 @@ class DataType(Expression):
         NAME = auto()
         NCHAR = auto()
         NESTED = auto()
+        NOTHING = auto()
         NULL = auto()
         NUMMULTIRANGE = auto()
         NUMRANGE = auto()
@@ -4508,6 +4220,7 @@ class DataType(Expression):
         TINYTEXT = auto()
         TIME = auto()
         TIMETZ = auto()
+        TIME_NS = auto()
         TIMESTAMP = auto()
         TIMESTAMPNTZ = auto()
         TIMESTAMPLTZ = auto()
@@ -4542,6 +4255,7 @@ class DataType(Expression):
         TDIGEST = auto()
 
     STRUCT_TYPES = {
+        Type.FILE,
         Type.NESTED,
         Type.OBJECT,
         Type.STRUCT,
@@ -4607,6 +4321,7 @@ class DataType(Expression):
         Type.DECIMAL64,
         Type.DECIMAL128,
         Type.DECIMAL256,
+        Type.DECFLOAT,
         Type.MONEY,
         Type.SMALLMONEY,
         Type.UDECIMAL,
@@ -4673,6 +4388,8 @@ class DataType(Expression):
                 if udt:
                     return DataType(this=DataType.Type.USERDEFINED, kind=dtype, **kwargs)
                 raise
+        elif isinstance(dtype, (Identifier, Dot)) and udt:
+            return DataType(this=DataType.Type.USERDEFINED, kind=dtype, **kwargs)
         elif isinstance(dtype, DataType.Type):
             data_type_exp = DataType(this=dtype)
         elif isinstance(dtype, DataType):
@@ -4680,7 +4397,10 @@ class DataType(Expression):
         else:
             raise ValueError(f"Invalid data type: {type(dtype)}. Expected str or DataType.Type")
 
-        return DataType(**{**data_type_exp.args, **kwargs})
+        if kwargs:
+            for k, v in kwargs.items():
+                data_type_exp.set(k, v)
+        return data_type_exp
 
     def is_type(self, *dtypes: DATA_TYPE, check_nullable: bool = False) -> bool:
         """
@@ -4712,9 +4432,6 @@ class DataType(Expression):
             if matches:
                 return True
         return False
-
-
-DATA_TYPE = t.Union[str, DataType, DataType.Type]
 
 
 # https://www.postgresql.org/docs/15/datatype-pseudo.html
@@ -4760,7 +4477,7 @@ class Rollback(Expression):
 
 class Alter(Expression):
     arg_types = {
-        "this": True,
+        "this": False,
         "kind": True,
         "actions": True,
         "exists": False,
@@ -4768,6 +4485,8 @@ class Alter(Expression):
         "options": False,
         "cluster": False,
         "not_valid": False,
+        "check": False,
+        "cascade": False,
     }
 
     @property
@@ -4778,6 +4497,10 @@ class Alter(Expression):
     @property
     def actions(self) -> t.List[Expression]:
         return self.args.get("actions") or []
+
+
+class AlterSession(Expression):
+    arg_types = {"expressions": True, "unset": False}
 
 
 class Analyze(Expression):
@@ -4846,6 +4569,10 @@ class AddConstraint(Expression):
     arg_types = {"expressions": True}
 
 
+class AddPartition(Expression):
+    arg_types = {"this": True, "exists": False, "location": False}
+
+
 class AttachOption(Expression):
     arg_types = {"this": True, "expression": False}
 
@@ -4881,23 +4608,23 @@ class Connector(Binary):
 
 
 class BitwiseAnd(Binary):
-    pass
+    arg_types = {"this": True, "expression": True, "padside": False}
 
 
 class BitwiseLeftShift(Binary):
-    pass
+    arg_types = {"this": True, "expression": True, "requires_int128": False}
 
 
 class BitwiseOr(Binary):
-    pass
+    arg_types = {"this": True, "expression": True, "padside": False}
 
 
 class BitwiseRightShift(Binary):
-    pass
+    arg_types = {"this": True, "expression": True, "requires_int128": False}
 
 
 class BitwiseXor(Binary):
-    pass
+    arg_types = {"this": True, "expression": True, "padside": False}
 
 
 class Div(Binary):
@@ -4905,6 +4632,14 @@ class Div(Binary):
 
 
 class Overlaps(Binary):
+    pass
+
+
+class ExtendsLeft(Binary):
+    pass
+
+
+class ExtendsRight(Binary):
     pass
 
 
@@ -4944,6 +4679,9 @@ class Dot(Binary):
 
         parts.reverse()
         return parts
+
+
+DATA_TYPE = t.Union[str, Identifier, Dot, DataType, DataType.Type]
 
 
 class DPipe(Binary):
@@ -4991,10 +4729,6 @@ class ILike(Binary, Predicate):
     pass
 
 
-class ILikeAny(Binary, Predicate):
-    pass
-
-
 class IntDiv(Binary):
     pass
 
@@ -5011,7 +4745,7 @@ class Like(Binary, Predicate):
     pass
 
 
-class LikeAny(Binary, Predicate):
+class Match(Binary, Predicate):
     pass
 
 
@@ -5044,11 +4778,13 @@ class SimilarTo(Binary, Predicate):
     pass
 
 
-class Slice(Binary):
-    arg_types = {"this": False, "expression": False}
-
-
 class Sub(Binary):
+    pass
+
+
+# https://www.postgresql.org/docs/current/functions-range.html
+# Represents range adjacency operator: -|-
+class Adjacent(Binary):
     pass
 
 
@@ -5120,8 +4856,18 @@ class FromTimeZone(Expression):
     arg_types = {"this": True, "zone": True}
 
 
+class FormatPhrase(Expression):
+    """Format override for a column in Teradata.
+    Can be expanded to additional dialects as needed
+
+    https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/SQL-Data-Types-and-Literals/Data-Type-Formats-and-Format-Phrases/FORMAT
+    """
+
+    arg_types = {"this": True, "format": True}
+
+
 class Between(Predicate):
-    arg_types = {"this": True, "low": True, "high": True}
+    arg_types = {"this": True, "low": True, "high": True, "symmetric": False}
 
 
 class Bracket(Condition):
@@ -5184,7 +4930,7 @@ class TimeUnit(Expression):
 
     def __init__(self, **args):
         unit = args.get("unit")
-        if isinstance(unit, self.VAR_LIKE):
+        if type(unit) in self.VAR_LIKE and not (isinstance(unit, Column) and len(unit.parts) != 1):
             args["unit"] = Var(
                 this=(self.UNABBREVIATED_UNIT_NAME.get(unit.name) or unit.name).upper()
             )
@@ -5247,6 +4993,7 @@ class Func(Condition):
     """
 
     is_var_len_args = False
+    is_func = True
 
     @classmethod
     def from_arg_list(cls, args):
@@ -5275,15 +5022,192 @@ class Func(Condition):
 
     @classmethod
     def sql_name(cls):
-        return cls.sql_names()[0]
+        sql_names = cls.sql_names()
+        assert sql_names, f"Expected non-empty 'sql_names' for Func: {cls.__name__}."
+        return sql_names[0]
 
     @classmethod
     def default_parser_mappings(cls):
         return {name: cls.from_arg_list for name in cls.sql_names()}
 
 
+# Function returns NULL instead of error
+# https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/functions-reference#safe_prefix
+class SafeFunc(Func):
+    pass
+
+
+class Typeof(Func):
+    pass
+
+
+class Acos(Func):
+    pass
+
+
+class Acosh(Func):
+    pass
+
+
+class Asin(Func):
+    pass
+
+
+class Asinh(Func):
+    pass
+
+
+class Atan(Func):
+    arg_types = {"this": True, "expression": False}
+
+
+class Atanh(Func):
+    pass
+
+
+class Atan2(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class Cot(Func):
+    pass
+
+
+class Coth(Func):
+    pass
+
+
+class Cos(Func):
+    pass
+
+
+class Csc(Func):
+    pass
+
+
+class Csch(Func):
+    pass
+
+
+class Sec(Func):
+    pass
+
+
+class Sech(Func):
+    pass
+
+
+class Sin(Func):
+    pass
+
+
+class Sinh(Func):
+    pass
+
+
+class Tan(Func):
+    pass
+
+
+class Tanh(Func):
+    pass
+
+
+class Degrees(Func):
+    pass
+
+
+class Cosh(Func):
+    pass
+
+
+class CosineDistance(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class DotProduct(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class EuclideanDistance(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class ManhattanDistance(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class JarowinklerSimilarity(Func):
+    arg_types = {"this": True, "expression": True, "case_insensitive": False}
+
+
 class AggFunc(Func):
     pass
+
+
+class BitwiseAndAgg(AggFunc):
+    pass
+
+
+class BitwiseOrAgg(AggFunc):
+    pass
+
+
+class BitwiseXorAgg(AggFunc):
+    pass
+
+
+class BoolxorAgg(AggFunc):
+    pass
+
+
+class BitwiseCount(Func):
+    pass
+
+
+class BitmapBucketNumber(Func):
+    pass
+
+
+class BitmapCount(Func):
+    pass
+
+
+class BitmapBitPosition(Func):
+    pass
+
+
+class BitmapConstructAgg(AggFunc):
+    pass
+
+
+class BitmapOrAgg(AggFunc):
+    pass
+
+
+class ByteLength(Func):
+    pass
+
+
+class Boolnot(Func):
+    arg_types = {"this": True, "round_input": False}
+
+
+class Booland(Func):
+    arg_types = {"this": True, "expression": True, "round_input": False}
+
+
+class Boolor(Func):
+    arg_types = {"this": True, "expression": True, "round_input": False}
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#bool_for_json
+class JSONBool(Func):
+    pass
+
+
+class ArrayRemove(Func):
+    arg_types = {"this": True, "expression": True, "null_propagation": False}
 
 
 class ParameterizedAgg(AggFunc):
@@ -5308,13 +5232,81 @@ class ApproxTopK(AggFunc):
     arg_types = {"this": True, "expression": False, "counters": False}
 
 
+# https://docs.snowflake.com/en/sql-reference/functions/approx_top_k_accumulate
+# https://spark.apache.org/docs/preview/api/sql/index.html#approx_top_k_accumulate
+class ApproxTopKAccumulate(AggFunc):
+    arg_types = {"this": True, "expression": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/approx_top_k_combine
+class ApproxTopKCombine(AggFunc):
+    arg_types = {"this": True, "expression": False}
+
+
+class ApproxTopKEstimate(Func):
+    arg_types = {"this": True, "expression": False}
+
+
+class ApproxTopSum(AggFunc):
+    arg_types = {"this": True, "expression": True, "count": True}
+
+
+class ApproxQuantiles(AggFunc):
+    arg_types = {"this": True, "expression": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/approx_percentile_combine
+class ApproxPercentileCombine(AggFunc):
+    pass
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/minhash
+class Minhash(AggFunc):
+    arg_types = {"this": True, "expressions": True}
+    is_var_len_args = True
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/minhash_combine
+class MinhashCombine(AggFunc):
+    pass
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/approximate_similarity
+class ApproximateSimilarity(AggFunc):
+    _sql_names = ["APPROXIMATE_SIMILARITY", "APPROXIMATE_JACCARD_INDEX"]
+
+
+class FarmFingerprint(Func):
+    arg_types = {"expressions": True}
+    is_var_len_args = True
+    _sql_names = ["FARM_FINGERPRINT", "FARMFINGERPRINT64"]
+
+
 class Flatten(Func):
     pass
+
+
+class Float64(Func):
+    arg_types = {"this": True, "expression": False}
 
 
 # https://spark.apache.org/docs/latest/api/sql/index.html#transform
 class Transform(Func):
     arg_types = {"this": True, "expression": True}
+
+
+class Translate(Func):
+    arg_types = {"this": True, "from_": True, "to": True}
+
+
+class Grouping(AggFunc):
+    arg_types = {"expressions": True}
+    is_var_len_args = True
+
+
+class GroupingId(AggFunc):
+    arg_types = {"expressions": False}
+    is_var_len_args = True
 
 
 class Anonymous(Func):
@@ -5340,6 +5332,12 @@ class CombinedParameterizedAgg(ParameterizedAgg):
     arg_types = {"this": True, "expressions": True, "params": True}
 
 
+# https://docs.snowflake.com/en/sql-reference/functions/hash_agg
+class HashAgg(AggFunc):
+    arg_types = {"this": True, "expressions": False}
+    is_var_len_args = True
+
+
 # https://docs.snowflake.com/en/sql-reference/functions/hll
 # https://docs.aws.amazon.com/redshift/latest/dg/r_HLL_function.html
 class Hll(AggFunc):
@@ -5357,13 +5355,25 @@ class Apply(Func):
 
 
 class Array(Func):
-    arg_types = {"expressions": False, "bracket_notation": False}
+    arg_types = {
+        "expressions": False,
+        "bracket_notation": False,
+        "struct_name_inheritance": False,
+    }
     is_var_len_args = True
+
+
+class Ascii(Func):
+    pass
 
 
 # https://docs.snowflake.com/en/sql-reference/functions/to_array
 class ToArray(Func):
     pass
+
+
+class ToBoolean(Func):
+    arg_types = {"this": True, "safe": False}
 
 
 # https://materialize.com/docs/sql/types/list/
@@ -5380,7 +5390,16 @@ class Pad(Func):
 # https://docs.snowflake.com/en/sql-reference/functions/to_char
 # https://docs.oracle.com/en/database/oracle/oracle-database/23/sqlrf/TO_CHAR-number.html
 class ToChar(Func):
-    arg_types = {"this": True, "format": False, "nlsparam": False}
+    arg_types = {
+        "this": True,
+        "format": False,
+        "nlsparam": False,
+        "is_numeric": False,
+    }
+
+
+class ToCodePoints(Func):
+    pass
 
 
 # https://docs.snowflake.com/en/sql-reference/functions/to_decimal
@@ -5392,6 +5411,8 @@ class ToNumber(Func):
         "nlsparam": False,
         "precision": False,
         "scale": False,
+        "safe": False,
+        "safe_name": False,
     }
 
 
@@ -5400,7 +5421,37 @@ class ToDouble(Func):
     arg_types = {
         "this": True,
         "format": False,
+        "safe": False,
     }
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/to_decfloat
+class ToDecfloat(Func):
+    arg_types = {
+        "this": True,
+        "format": False,
+    }
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/try_to_decfloat
+class TryToDecfloat(Func):
+    arg_types = {
+        "this": True,
+        "format": False,
+    }
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/to_file
+class ToFile(Func):
+    arg_types = {
+        "this": True,
+        "path": False,
+        "safe": False,
+    }
+
+
+class CodePointsToBytes(Func):
+    pass
 
 
 class Columns(Func):
@@ -5409,11 +5460,25 @@ class Columns(Func):
 
 # https://learn.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#syntax
 class Convert(Func):
-    arg_types = {"this": True, "expression": True, "style": False}
+    arg_types = {"this": True, "expression": True, "style": False, "safe": False}
+
+
+# https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/CONVERT.html
+class ConvertToCharset(Func):
+    arg_types = {"this": True, "dest": True, "source": False}
 
 
 class ConvertTimezone(Func):
-    arg_types = {"source_tz": False, "target_tz": True, "timestamp": True}
+    arg_types = {
+        "source_tz": False,
+        "target_tz": True,
+        "timestamp": True,
+        "options": False,
+    }
+
+
+class CodePointsToString(Func):
+    pass
 
 
 class GenerateSeries(Func):
@@ -5427,12 +5492,31 @@ class ExplodingGenerateSeries(GenerateSeries):
     pass
 
 
+# https://docs.snowflake.com/en/sql-reference/functions/generator
+class Generator(Func, UDTF):
+    arg_types = {"rowcount": False, "timelimit": False}
+
+
 class ArrayAgg(AggFunc):
     arg_types = {"this": True, "nulls_excluded": False}
 
 
 class ArrayUniqueAgg(AggFunc):
     pass
+
+
+class AIAgg(AggFunc):
+    arg_types = {"this": True, "expression": True}
+    _sql_names = ["AI_AGG"]
+
+
+class AISummarizeAgg(AggFunc):
+    _sql_names = ["AI_SUMMARIZE_AGG"]
+
+
+class AIClassify(Func):
+    arg_types = {"this": True, "categories": True, "config": False}
+    _sql_names = ["AI_CLASSIFY"]
 
 
 class ArrayAll(Func):
@@ -5444,18 +5528,43 @@ class ArrayAny(Func):
     arg_types = {"this": True, "expression": True}
 
 
+class ArrayAppend(Func):
+    arg_types = {"this": True, "expression": True, "null_propagation": False}
+
+
+class ArrayPrepend(Func):
+    arg_types = {"this": True, "expression": True, "null_propagation": False}
+
+
 class ArrayConcat(Func):
     _sql_names = ["ARRAY_CONCAT", "ARRAY_CAT"]
-    arg_types = {"this": True, "expressions": False}
+    arg_types = {"this": True, "expressions": False, "null_propagation": False}
     is_var_len_args = True
 
 
+class ArrayConcatAgg(AggFunc):
+    pass
+
+
+class ArrayCompact(Func):
+    pass
+
+
+class ArrayInsert(Func):
+    arg_types = {"this": True, "position": True, "expression": True, "offset": False}
+
+
+class ArrayRemoveAt(Func):
+    arg_types = {"this": True, "position": True}
+
+
 class ArrayConstructCompact(Func):
-    arg_types = {"expressions": True}
+    arg_types = {"expressions": False}
     is_var_len_args = True
 
 
 class ArrayContains(Binary, Func):
+    arg_types = {"this": True, "expression": True, "ensure_variant": False, "check_null": False}
     _sql_names = ["ARRAY_CONTAINS", "ARRAY_HAS"]
 
 
@@ -5468,9 +5577,44 @@ class ArrayFilter(Func):
     _sql_names = ["FILTER", "ARRAY_FILTER"]
 
 
+class ArrayFirst(Func):
+    pass
+
+
+class ArrayLast(Func):
+    pass
+
+
+class ArrayReverse(Func):
+    pass
+
+
+class ArraySlice(Func):
+    arg_types = {"this": True, "start": True, "end": False, "step": False}
+
+
 class ArrayToString(Func):
     arg_types = {"this": True, "expression": True, "null": False}
     _sql_names = ["ARRAY_TO_STRING", "ARRAY_JOIN"]
+
+
+class ArrayIntersect(Func):
+    arg_types = {"expressions": True}
+    is_var_len_args = True
+    _sql_names = ["ARRAY_INTERSECT", "ARRAY_INTERSECTION"]
+
+
+class ArrayExcept(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class StPoint(Func):
+    arg_types = {"this": True, "expression": True, "null": False}
+    _sql_names = ["ST_POINT", "ST_MAKEPOINT"]
+
+
+class StDistance(Func):
+    arg_types = {"this": True, "expression": True, "use_spheroid": False}
 
 
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string
@@ -5479,8 +5623,8 @@ class String(Func):
 
 
 class StringToArray(Func):
-    arg_types = {"this": True, "expression": True, "null": False}
-    _sql_names = ["STRING_TO_ARRAY", "SPLIT_BY_STRING"]
+    arg_types = {"this": True, "expression": False, "null": False}
+    _sql_names = ["STRING_TO_ARRAY", "SPLIT_BY_STRING", "STRTOK_TO_ARRAY"]
 
 
 class ArrayOverlaps(Binary, Func):
@@ -5500,8 +5644,25 @@ class ArraySum(Func):
     arg_types = {"this": True, "expression": False}
 
 
+class ArrayDistinct(Func):
+    arg_types = {"this": True, "check_null": False}
+
+
+class ArrayMax(Func):
+    pass
+
+
+class ArrayMin(Func):
+    pass
+
+
 class ArrayUnionAgg(AggFunc):
     pass
+
+
+class ArraysZip(Func):
+    arg_types = {"expressions": False}
+    is_var_len_args = True
 
 
 class Avg(AggFunc):
@@ -5523,11 +5684,11 @@ class Lead(AggFunc):
 # some dialects have a distinction between first and first_value, usually first is an aggregate func
 # and first_value is a window func
 class First(AggFunc):
-    pass
+    arg_types = {"this": True, "expression": False}
 
 
 class Last(AggFunc):
-    pass
+    arg_types = {"this": True, "expression": False}
 
 
 class FirstValue(AggFunc):
@@ -5539,7 +5700,11 @@ class LastValue(AggFunc):
 
 
 class NthValue(AggFunc):
-    arg_types = {"this": True, "offset": True}
+    arg_types = {"this": True, "offset": True, "from_first": False}
+
+
+class ObjectAgg(AggFunc):
+    arg_types = {"this": True, "expression": True}
 
 
 class Case(Func):
@@ -5600,11 +5765,23 @@ class Cast(Func):
 
 
 class TryCast(Cast):
-    pass
+    arg_types = {**Cast.arg_types, "requires_string": False}
 
 
 # https://clickhouse.com/docs/sql-reference/data-types/newjson#reading-json-paths-as-sub-columns
 class JSONCast(Cast):
+    pass
+
+
+class JustifyDays(Func):
+    pass
+
+
+class JustifyHours(Func):
+    pass
+
+
+class JustifyInterval(Func):
     pass
 
 
@@ -5616,7 +5793,24 @@ class CastToStrType(Func):
     arg_types = {"this": True, "to": True}
 
 
+class CheckJson(Func):
+    arg_types = {"this": True}
+
+
+class CheckXml(Func):
+    arg_types = {"this": True, "disable_auto_convert": False}
+
+
+# https://docs.teradata.com/r/Enterprise_IntelliFlex_VMware/SQL-Functions-Expressions-and-Predicates/String-Operators-and-Functions/TRANSLATE/TRANSLATE-Function-Syntax
+class TranslateCharacters(Expression):
+    arg_types = {"this": True, "expression": True, "with_error": False}
+
+
 class Collate(Binary, Func):
+    pass
+
+
+class Collation(Func):
     pass
 
 
@@ -5626,7 +5820,7 @@ class Ceil(Func):
 
 
 class Coalesce(Func):
-    arg_types = {"this": True, "expressions": False, "is_nvl": False}
+    arg_types = {"this": True, "expressions": False, "is_nvl": False, "is_null": False}
     is_var_len_args = True
     _sql_names = ["COALESCE", "IFNULL", "NVL"]
 
@@ -5646,8 +5840,9 @@ class ConcatWs(Concat):
     _sql_names = ["CONCAT_WS"]
 
 
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr
 class Contains(Func):
-    arg_types = {"this": True, "expression": True}
+    arg_types = {"this": True, "expression": True, "json_scope": False}
 
 
 # https://docs.oracle.com/cd/B13789_01/server.101/b10759/operators004.htm#i1035022
@@ -5669,6 +5864,58 @@ class Cbrt(Func):
     pass
 
 
+class CurrentAccount(Func):
+    arg_types = {}
+
+
+class CurrentAccountName(Func):
+    arg_types = {}
+
+
+class CurrentAvailableRoles(Func):
+    arg_types = {}
+
+
+class CurrentClient(Func):
+    arg_types = {}
+
+
+class CurrentIpAddress(Func):
+    arg_types = {}
+
+
+class CurrentDatabase(Func):
+    arg_types = {}
+
+
+class CurrentSchemas(Func):
+    arg_types = {"this": False}
+
+
+class CurrentSecondaryRoles(Func):
+    arg_types = {}
+
+
+class CurrentSession(Func):
+    arg_types = {}
+
+
+class CurrentStatement(Func):
+    arg_types = {}
+
+
+class CurrentVersion(Func):
+    arg_types = {}
+
+
+class CurrentTransaction(Func):
+    arg_types = {}
+
+
+class CurrentWarehouse(Func):
+    arg_types = {}
+
+
 class CurrentDate(Func):
     arg_types = {"this": False}
 
@@ -5681,8 +5928,34 @@ class CurrentTime(Func):
     arg_types = {"this": False}
 
 
+# https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT
+# In Postgres, the difference between CURRENT_TIME vs LOCALTIME etc is that the latter does not have tz
+class Localtime(Func):
+    arg_types = {"this": False}
+
+
+class Localtimestamp(Func):
+    arg_types = {"this": False}
+
+
+class Systimestamp(Func):
+    arg_types = {"this": False}
+
+
 class CurrentTimestamp(Func):
     arg_types = {"this": False, "sysdate": False}
+
+
+class CurrentTimestampLTZ(Func):
+    arg_types = {}
+
+
+class CurrentTimezone(Func):
+    arg_types = {}
+
+
+class CurrentOrganizationName(Func):
+    arg_types = {}
 
 
 class CurrentSchema(Func):
@@ -5693,12 +5966,48 @@ class CurrentUser(Func):
     arg_types = {"this": False}
 
 
+class CurrentCatalog(Func):
+    arg_types = {}
+
+
+class CurrentRegion(Func):
+    arg_types = {}
+
+
+class CurrentRole(Func):
+    arg_types = {}
+
+
+class CurrentRoleType(Func):
+    arg_types = {}
+
+
+class CurrentOrganizationUser(Func):
+    arg_types = {}
+
+
+class SessionUser(Func):
+    arg_types = {}
+
+
+class UtcDate(Func):
+    arg_types = {}
+
+
+class UtcTime(Func):
+    arg_types = {"this": False}
+
+
+class UtcTimestamp(Func):
+    arg_types = {"this": False}
+
+
 class DateAdd(Func, IntervalOp):
     arg_types = {"this": True, "expression": True, "unit": False}
 
 
 class DateBin(Func, IntervalOp):
-    arg_types = {"this": True, "expression": True, "unit": False, "zone": False}
+    arg_types = {"this": True, "expression": True, "unit": False, "zone": False, "origin": False}
 
 
 class DateSub(Func, IntervalOp):
@@ -5707,11 +6016,18 @@ class DateSub(Func, IntervalOp):
 
 class DateDiff(Func, TimeUnit):
     _sql_names = ["DATEDIFF", "DATE_DIFF"]
-    arg_types = {"this": True, "expression": True, "unit": False}
+    arg_types = {
+        "this": True,
+        "expression": True,
+        "unit": False,
+        "zone": False,
+        "big_int": False,
+        "date_part_boundary": False,
+    }
 
 
 class DateTrunc(Func):
-    arg_types = {"unit": True, "this": True, "zone": False}
+    arg_types = {"unit": True, "this": True, "zone": False, "input_type_preserved": False}
 
     def __init__(self, **args):
         # Across most dialects it's safe to unabbreviate the unit (e.g. 'Q' -> 'QUARTER') except Oracle
@@ -5719,14 +6035,14 @@ class DateTrunc(Func):
         unabbreviate = args.pop("unabbreviate", True)
 
         unit = args.get("unit")
-        if isinstance(unit, TimeUnit.VAR_LIKE):
+        if isinstance(unit, TimeUnit.VAR_LIKE) and not (
+            isinstance(unit, Column) and len(unit.parts) != 1
+        ):
             unit_name = unit.name.upper()
             if unabbreviate and unit_name in TimeUnit.UNABBREVIATED_UNIT_NAME:
                 unit_name = TimeUnit.UNABBREVIATED_UNIT_NAME[unit_name]
 
             args["unit"] = Literal.string(unit_name)
-        elif isinstance(unit, Week):
-            unit.set("this", Literal.string(unit.this.name.upper()))
 
         super().__init__(**args)
 
@@ -5757,6 +6073,10 @@ class DatetimeTrunc(Func, TimeUnit):
     arg_types = {"this": True, "unit": True, "zone": False}
 
 
+class DateFromUnixDate(Func):
+    pass
+
+
 class DayOfWeek(Func):
     _sql_names = ["DAY_OF_WEEK", "DAYOFWEEK"]
 
@@ -5775,12 +6095,24 @@ class DayOfYear(Func):
     _sql_names = ["DAY_OF_YEAR", "DAYOFYEAR"]
 
 
+class Dayname(Func):
+    arg_types = {"this": True, "abbreviated": False}
+
+
 class ToDays(Func):
     pass
 
 
 class WeekOfYear(Func):
     _sql_names = ["WEEK_OF_YEAR", "WEEKOFYEAR"]
+
+
+class YearOfWeek(Func):
+    _sql_names = ["YEAR_OF_WEEK", "YEAROFWEEK"]
+
+
+class YearOfWeekIso(Func):
+    _sql_names = ["YEAR_OF_WEEK_ISO", "YEAROFWEEKISO"]
 
 
 class MonthsBetween(Func):
@@ -5791,6 +6123,7 @@ class MakeInterval(Func):
     arg_types = {
         "year": False,
         "month": False,
+        "week": False,
         "day": False,
         "hour": False,
         "minute": False,
@@ -5803,12 +6136,37 @@ class LastDay(Func, TimeUnit):
     arg_types = {"this": True, "unit": False}
 
 
+class PreviousDay(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class LaxBool(Func):
+    pass
+
+
+class LaxFloat64(Func):
+    pass
+
+
+class LaxInt64(Func):
+    pass
+
+
+class LaxString(Func):
+    pass
+
+
 class Extract(Func):
     arg_types = {"this": True, "expression": True}
 
 
 class Exists(Func, SubqueryPredicate):
     arg_types = {"this": True, "expression": False}
+
+
+class Elt(Func):
+    arg_types = {"this": True, "expressions": True}
+    is_var_len_args = True
 
 
 class Timestamp(Func):
@@ -5829,7 +6187,11 @@ class TimestampDiff(Func, TimeUnit):
 
 
 class TimestampTrunc(Func, TimeUnit):
-    arg_types = {"this": True, "unit": True, "zone": False}
+    arg_types = {"this": True, "unit": True, "zone": False, "input_type_preserved": False}
+
+
+class TimeSlice(Func, TimeUnit):
+    arg_types = {"this": True, "expression": True, "unit": True, "kind": False}
 
 
 class TimeAdd(Func, TimeUnit):
@@ -5850,7 +6212,7 @@ class TimeTrunc(Func, TimeUnit):
 
 class DateFromParts(Func):
     _sql_names = ["DATE_FROM_PARTS", "DATEFROMPARTS"]
-    arg_types = {"year": True, "month": True, "day": True}
+    arg_types = {"year": True, "month": False, "day": False, "allow_overflow": False}
 
 
 class TimeFromParts(Func):
@@ -5862,6 +6224,7 @@ class TimeFromParts(Func):
         "nano": False,
         "fractions": False,
         "precision": False,
+        "overflow": False,
     }
 
 
@@ -5891,6 +6254,40 @@ class Decode(Func):
     arg_types = {"this": True, "charset": True, "replace": False}
 
 
+class DecodeCase(Func):
+    arg_types = {"expressions": True}
+    is_var_len_args = True
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/decrypt
+class Decrypt(Func):
+    arg_types = {
+        "this": True,
+        "passphrase": True,
+        "aad": False,
+        "encryption_method": False,
+        "safe": False,
+    }
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/decrypt_raw
+class DecryptRaw(Func):
+    arg_types = {
+        "this": True,
+        "key": True,
+        "iv": True,
+        "aad": False,
+        "encryption_method": False,
+        "aead": False,
+        "safe": False,
+    }
+
+
+class DenseRank(AggFunc):
+    arg_types = {"expressions": False}
+    is_var_len_args = True
+
+
 class DiToDate(Func):
     pass
 
@@ -5899,7 +6296,25 @@ class Encode(Func):
     arg_types = {"this": True, "charset": True}
 
 
+# https://docs.snowflake.com/en/sql-reference/functions/encrypt
+class Encrypt(Func):
+    arg_types = {"this": True, "passphrase": True, "aad": False, "encryption_method": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/encrypt_raw
+class EncryptRaw(Func):
+    arg_types = {"this": True, "key": True, "iv": True, "aad": False, "encryption_method": False}
+
+
+class EqualNull(Func):
+    arg_types = {"this": True, "expression": True}
+
+
 class Exp(Func):
+    pass
+
+
+class Factorial(Func):
     pass
 
 
@@ -5926,6 +6341,10 @@ class PosexplodeOuter(Posexplode, ExplodeOuter):
     pass
 
 
+class PositionalColumn(Expression):
+    pass
+
+
 class Unnest(Func, UDTF):
     arg_types = {
         "expressions": True,
@@ -5947,15 +6366,58 @@ class Floor(Func):
     arg_types = {"this": True, "decimals": False, "to": False}
 
 
+class FromBase32(Func):
+    pass
+
+
 class FromBase64(Func):
     pass
 
 
-class FeaturesAtTime(Func):
-    arg_types = {"this": True, "time": False, "num_rows": False, "ignore_feature_nulls": False}
+class ToBase32(Func):
+    pass
 
 
 class ToBase64(Func):
+    pass
+
+
+class ToBinary(Func):
+    arg_types = {"this": True, "format": False, "safe": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/base64_decode_binary
+class Base64DecodeBinary(Func):
+    arg_types = {"this": True, "alphabet": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/base64_decode_string
+class Base64DecodeString(Func):
+    arg_types = {"this": True, "alphabet": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/base64_encode
+class Base64Encode(Func):
+    arg_types = {"this": True, "max_line_length": False, "alphabet": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/try_base64_decode_binary
+class TryBase64DecodeBinary(Func):
+    arg_types = {"this": True, "alphabet": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/try_base64_decode_string
+class TryBase64DecodeString(Func):
+    arg_types = {"this": True, "alphabet": False}
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/try_hex_decode_binary
+class TryHexDecodeBinary(Func):
+    pass
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/try_hex_decode_string
+class TryHexDecodeString(Func):
     pass
 
 
@@ -5986,8 +6448,19 @@ class GenerateTimestampArray(Func):
     arg_types = {"start": True, "end": True, "step": True}
 
 
+# https://docs.snowflake.com/en/sql-reference/functions/get
+class GetExtract(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class Getbit(Func):
+    _sql_names = ["GETBIT", "GET_BIT"]
+    # zero_is_msb means the most significant bit is indexed 0
+    arg_types = {"this": True, "expression": True, "zero_is_msb": False}
+
+
 class Greatest(Func):
-    arg_types = {"this": True, "expressions": False}
+    arg_types = {"this": True, "expressions": False, "ignore_nulls": True}
     is_var_len_args = True
 
 
@@ -6005,6 +6478,44 @@ class Hex(Func):
     pass
 
 
+# https://docs.snowflake.com/en/sql-reference/functions/hex_decode_string
+class HexDecodeString(Func):
+    pass
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/hex_encode
+class HexEncode(Func):
+    arg_types = {"this": True, "case": False}
+
+
+class Hour(Func):
+    pass
+
+
+class Minute(Func):
+    pass
+
+
+class Second(Func):
+    pass
+
+
+# T-SQL: https://learn.microsoft.com/en-us/sql/t-sql/functions/compress-transact-sql?view=sql-server-ver17
+# Snowflake: https://docs.snowflake.com/en/sql-reference/functions/compress
+class Compress(Func):
+    arg_types = {"this": True, "method": False}
+
+
+# Snowflake: https://docs.snowflake.com/en/sql-reference/functions/decompress_binary
+class DecompressBinary(Func):
+    arg_types = {"this": True, "method": True}
+
+
+# Snowflake: https://docs.snowflake.com/en/sql-reference/functions/decompress_string
+class DecompressString(Func):
+    arg_types = {"this": True, "method": True}
+
+
 class LowerHex(Hex):
     pass
 
@@ -6018,7 +6529,8 @@ class Or(Connector, Func):
 
 
 class Xor(Connector, Func):
-    arg_types = {"this": False, "expression": False, "expressions": False}
+    arg_types = {"this": False, "expression": False, "expressions": False, "round_input": False}
+    is_var_len_args = True
 
 
 class If(Func):
@@ -6051,9 +6563,17 @@ class IsInf(Func):
     _sql_names = ["IS_INF", "ISINF"]
 
 
+class IsNullValue(Func):
+    pass
+
+
+class IsArray(Func):
+    pass
+
+
 # https://www.postgresql.org/docs/current/functions-json.html
 class JSON(Expression):
-    arg_types = {"this": False, "with": False, "unique": False}
+    arg_types = {"this": False, "with_": False, "unique": False}
 
 
 class JSONPath(Expression):
@@ -6113,8 +6633,24 @@ class FormatJson(Expression):
     pass
 
 
+class Format(Func):
+    arg_types = {"this": True, "expressions": False}
+    is_var_len_args = True
+
+
+class JSONKeys(Func):
+    arg_types = {"this": True, "expression": False, "expressions": False}
+    is_var_len_args = True
+    _sql_names = ["JSON_KEYS"]
+
+
 class JSONKeyValue(Expression):
     arg_types = {"this": True, "expression": True}
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys
+class JSONKeysAtDepth(Func):
+    arg_types = {"this": True, "expression": False, "mode": False}
 
 
 class JSONObject(Func):
@@ -6145,7 +6681,7 @@ class JSONBObjectAgg(AggFunc):
 # https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/JSON_ARRAY.html
 class JSONArray(Func):
     arg_types = {
-        "expressions": True,
+        "expressions": False,
         "null_handling": False,
         "return_type": False,
         "strict": False,
@@ -6153,7 +6689,7 @@ class JSONArray(Func):
 
 
 # https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/JSON_ARRAYAGG.html
-class JSONArrayAgg(Func):
+class JSONArrayAgg(AggFunc):
     arg_types = {
         "this": True,
         "order": False,
@@ -6164,17 +6700,46 @@ class JSONArrayAgg(Func):
 
 
 class JSONExists(Func):
-    arg_types = {"this": True, "path": True, "passing": False, "on_condition": False}
+    arg_types = {
+        "this": True,
+        "path": True,
+        "passing": False,
+        "on_condition": False,
+        "from_dcolonqmark": False,
+    }
 
 
 # https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/JSON_TABLE.html
 # Note: parsing of JSON column definitions is currently incomplete.
 class JSONColumnDef(Expression):
-    arg_types = {"this": False, "kind": False, "path": False, "nested_schema": False}
+    arg_types = {
+        "this": False,
+        "kind": False,
+        "path": False,
+        "nested_schema": False,
+        "ordinality": False,
+    }
 
 
 class JSONSchema(Expression):
     arg_types = {"expressions": True}
+
+
+class JSONSet(Func):
+    arg_types = {"this": True, "expressions": True}
+    is_var_len_args = True
+    _sql_names = ["JSON_SET"]
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls
+class JSONStripNulls(Func):
+    arg_types = {
+        "this": True,
+        "expression": False,
+        "include_arrays": False,
+        "remove_empty": False,
+    }
+    _sql_names = ["JSON_STRIP_NULLS"]
 
 
 # https://dev.mysql.com/doc/refman/8.4/en/json-search-functions.html#function_json-value
@@ -6191,7 +6756,13 @@ class JSONValueArray(Func):
     arg_types = {"this": True, "expression": False}
 
 
-# # https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/JSON_TABLE.html
+class JSONRemove(Func):
+    arg_types = {"this": True, "expressions": True}
+    is_var_len_args = True
+    _sql_names = ["JSON_REMOVE"]
+
+
+# https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/JSON_TABLE.html
 class JSONTable(Func):
     arg_types = {
         "this": True,
@@ -6200,6 +6771,13 @@ class JSONTable(Func):
         "error_handling": False,
         "empty_handling": False,
     }
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type
+# https://doris.apache.org/docs/sql-manual/sql-functions/scalar-functions/json-functions/json-type#description
+class JSONType(Func):
+    arg_types = {"this": True, "expression": False}
+    _sql_names = ["JSON_TYPE"]
 
 
 # https://docs.snowflake.com/en/sql-reference/functions/object_insert
@@ -6220,13 +6798,32 @@ class OpenJSON(Func):
     arg_types = {"this": True, "path": False, "expressions": False}
 
 
+class ObjectId(Func):
+    arg_types = {"this": True, "expression": False}
+
+
 class JSONBContains(Binary, Func):
     _sql_names = ["JSONB_CONTAINS"]
+
+
+# https://www.postgresql.org/docs/9.5/functions-json.html
+class JSONBContainsAnyTopKeys(Binary, Func):
+    pass
+
+
+# https://www.postgresql.org/docs/9.5/functions-json.html
+class JSONBContainsAllTopKeys(Binary, Func):
+    pass
 
 
 class JSONBExists(Func):
     arg_types = {"this": True, "path": True}
     _sql_names = ["JSONB_EXISTS"]
+
+
+# https://www.postgresql.org/docs/9.5/functions-json.html
+class JSONBDeleteAtPath(Binary, Func):
+    pass
 
 
 class JSONExtract(Binary, Func):
@@ -6240,6 +6837,7 @@ class JSONExtract(Binary, Func):
         "option": False,
         "quote": False,
         "on_condition": False,
+        "requires_json": False,
     }
     _sql_names = ["JSON_EXTRACT"]
     is_var_len_args = True
@@ -6263,7 +6861,14 @@ class JSONExtractArray(Func):
 
 
 class JSONExtractScalar(Binary, Func):
-    arg_types = {"this": True, "expression": True, "only_json_types": False, "expressions": False}
+    arg_types = {
+        "this": True,
+        "expression": True,
+        "only_json_types": False,
+        "expressions": False,
+        "json_type": False,
+        "scalar_only": False,
+    }
     _sql_names = ["JSON_EXTRACT_SCALAR"]
     is_var_len_args = True
 
@@ -6277,17 +6882,39 @@ class JSONBExtract(Binary, Func):
 
 
 class JSONBExtractScalar(Binary, Func):
+    arg_types = {"this": True, "expression": True, "json_type": False}
     _sql_names = ["JSONB_EXTRACT_SCALAR"]
 
 
 class JSONFormat(Func):
-    arg_types = {"this": False, "options": False}
+    arg_types = {"this": False, "options": False, "is_json": False, "to_json": False}
     _sql_names = ["JSON_FORMAT"]
+
+
+class JSONArrayAppend(Func):
+    arg_types = {"this": True, "expressions": True}
+    is_var_len_args = True
+    _sql_names = ["JSON_ARRAY_APPEND"]
 
 
 # https://dev.mysql.com/doc/refman/8.0/en/json-search-functions.html#operator_member-of
 class JSONArrayContains(Binary, Predicate, Func):
+    arg_types = {"this": True, "expression": True, "json_type": False}
     _sql_names = ["JSON_ARRAY_CONTAINS"]
+
+
+class JSONArrayInsert(Func):
+    arg_types = {"this": True, "expressions": True}
+    is_var_len_args = True
+    _sql_names = ["JSON_ARRAY_INSERT"]
+
+
+class ParseBignumeric(Func):
+    pass
+
+
+class ParseNumeric(Func):
+    pass
 
 
 class ParseJSON(Func):
@@ -6297,8 +6924,26 @@ class ParseJSON(Func):
     arg_types = {"this": True, "expression": False, "safe": False}
 
 
+# Snowflake: https://docs.snowflake.com/en/sql-reference/functions/parse_url
+# Databricks: https://docs.databricks.com/aws/en/sql/language-manual/functions/parse_url
+class ParseUrl(Func):
+    arg_types = {"this": True, "part_to_extract": False, "key": False, "permissive": False}
+
+
+class ParseIp(Func):
+    arg_types = {"this": True, "type": True, "permissive": False}
+
+
+class ParseTime(Func):
+    arg_types = {"this": True, "format": True}
+
+
+class ParseDatetime(Func):
+    arg_types = {"this": True, "format": False, "zone": False}
+
+
 class Least(Func):
-    arg_types = {"this": True, "expressions": False}
+    arg_types = {"this": True, "expressions": False, "ignore_nulls": True}
     is_var_len_args = True
 
 
@@ -6310,9 +6955,21 @@ class Right(Func):
     arg_types = {"this": True, "expression": True}
 
 
+class Reverse(Func):
+    pass
+
+
 class Length(Func):
     arg_types = {"this": True, "binary": False, "encoding": False}
     _sql_names = ["LENGTH", "LEN", "CHAR_LENGTH", "CHARACTER_LENGTH"]
+
+
+class RtrimmedLength(Func):
+    pass
+
+
+class BitLength(Func):
+    pass
 
 
 class Levenshtein(Func):
@@ -6369,9 +7026,43 @@ class MapFromEntries(Func):
     pass
 
 
+class MapCat(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class MapContainsKey(Func):
+    arg_types = {"this": True, "key": True}
+
+
+class MapDelete(Func):
+    arg_types = {"this": True, "expressions": True}
+    is_var_len_args = True
+
+
+class MapInsert(Func):
+    arg_types = {"this": True, "key": False, "value": True, "update_flag": False}
+
+
+class MapKeys(Func):
+    pass
+
+
+class MapPick(Func):
+    arg_types = {"this": True, "expressions": True}
+    is_var_len_args = True
+
+
+class MapSize(Func):
+    pass
+
+
 # https://learn.microsoft.com/en-us/sql/t-sql/language-elements/scope-resolution-operator-transact-sql?view=sql-server-ver16
 class ScopeResolution(Expression):
     arg_types = {"this": False, "expression": True}
+
+
+class Slice(Expression):
+    arg_types = {"this": False, "expression": False, "step": False}
 
 
 class Stream(Expression):
@@ -6410,12 +7101,30 @@ class MD5(Func):
 
 
 # Represents the variant of the MD5 function that returns a binary value
+# Var len args due to Exasol:
+# https://docs.exasol.com/db/latest/sql_references/functions/alphabeticallistfunctions/hashtype_md5.htm
 class MD5Digest(Func):
+    arg_types = {"this": True, "expressions": False}
+    is_var_len_args = True
     _sql_names = ["MD5_DIGEST"]
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/md5_number_lower64
+class MD5NumberLower64(Func):
+    pass
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/md5_number_upper64
+class MD5NumberUpper64(Func):
+    pass
 
 
 class Median(AggFunc):
     pass
+
+
+class Mode(AggFunc):
+    arg_types = {"this": False, "deterministic": False}
 
 
 class Min(AggFunc):
@@ -6427,25 +7136,94 @@ class Month(Func):
     pass
 
 
+class Monthname(Func):
+    arg_types = {"this": True, "abbreviated": False}
+
+
 class AddMonths(Func):
-    arg_types = {"this": True, "expression": True}
+    arg_types = {"this": True, "expression": True, "preserve_end_of_month": False}
 
 
 class Nvl2(Func):
     arg_types = {"this": True, "true": True, "false": False}
 
 
+class Ntile(AggFunc):
+    arg_types = {"this": False}
+
+
 class Normalize(Func):
-    arg_types = {"this": True, "form": False}
+    arg_types = {"this": True, "form": False, "is_casefold": False}
+
+
+class Normal(Func):
+    arg_types = {"this": True, "stddev": True, "gen": True}
+
+
+# https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/net_functions
+class NetFunc(Func):
+    pass
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost
+class Host(Func):
+    pass
+
+
+# https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netreg_domain
+class RegDomain(Func):
+    pass
 
 
 class Overlay(Func):
-    arg_types = {"this": True, "expression": True, "from": True, "for": False}
+    arg_types = {"this": True, "expression": True, "from_": True, "for_": False}
 
 
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-predict#mlpredict_function
 class Predict(Func):
     arg_types = {"this": True, "expression": True, "params_struct": False}
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-translate#mltranslate_function
+class MLTranslate(Func):
+    arg_types = {"this": True, "expression": True, "params_struct": True}
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-feature-time
+class FeaturesAtTime(Func):
+    arg_types = {"this": True, "time": False, "num_rows": False, "ignore_feature_nulls": False}
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-generate-embedding
+class GenerateEmbedding(Func):
+    arg_types = {"this": True, "expression": True, "params_struct": False, "is_text": False}
+
+
+class MLForecast(Func):
+    arg_types = {"this": True, "expression": False, "params_struct": False}
+
+
+# Represents Snowflake's <model>!<attribute> syntax. For example: SELECT model!PREDICT(INPUT_DATA => {*})
+# See: https://docs.snowflake.com/en/guides-overview-ml-functions
+class ModelAttribute(Expression):
+    arg_types = {"this": True, "expression": True}
+
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#vector_search
+class VectorSearch(Func):
+    arg_types = {
+        "this": True,
+        "column_to_search": True,
+        "query_table": True,
+        "query_column_to_search": False,
+        "top_k": False,
+        "distance_type": False,
+        "options": False,
+    }
+
+
+class Pi(Func):
+    arg_types = {}
 
 
 class Pow(Binary, Func):
@@ -6460,12 +7238,33 @@ class PercentileDisc(AggFunc):
     arg_types = {"this": True, "expression": False}
 
 
+class PercentRank(AggFunc):
+    arg_types = {"expressions": False}
+    is_var_len_args = True
+
+
 class Quantile(AggFunc):
     arg_types = {"this": True, "quantile": True}
 
 
 class ApproxQuantile(Quantile):
-    arg_types = {"this": True, "quantile": True, "accuracy": False, "weight": False}
+    arg_types = {
+        "this": True,
+        "quantile": True,
+        "accuracy": False,
+        "weight": False,
+        "error_tolerance": False,
+    }
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/approx_percentile_accumulate
+class ApproxPercentileAccumulate(AggFunc):
+    pass
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/approx_percentile_estimate
+class ApproxPercentileEstimate(Func):
+    arg_types = {"this": True, "percentile": True}
 
 
 class Quarter(Func):
@@ -6483,14 +7282,32 @@ class Randn(Func):
     arg_types = {"this": False}
 
 
+class Randstr(Func):
+    arg_types = {"this": True, "generator": False}
+
+
 class RangeN(Func):
     arg_types = {"this": True, "expressions": True, "each": False}
+
+
+class RangeBucket(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class Rank(AggFunc):
+    arg_types = {"expressions": False}
+    is_var_len_args = True
 
 
 class ReadCSV(Func):
     _sql_names = ["READ_CSV"]
     is_var_len_args = True
     arg_types = {"this": True, "expressions": False}
+
+
+class ReadParquet(Func):
+    is_var_len_args = True
+    arg_types = {"expressions": True}
 
 
 class Reduce(Func):
@@ -6505,6 +7322,7 @@ class RegexpExtract(Func):
         "occurrence": False,
         "parameters": False,
         "group": False,
+        "null_if_pos_overflow": False,  # for transpilation target behavior
     }
 
 
@@ -6512,10 +7330,10 @@ class RegexpExtractAll(Func):
     arg_types = {
         "this": True,
         "expression": True,
+        "group": False,
+        "parameters": False,
         "position": False,
         "occurrence": False,
-        "parameters": False,
-        "group": False,
     }
 
 
@@ -6527,15 +7345,32 @@ class RegexpReplace(Func):
         "position": False,
         "occurrence": False,
         "modifiers": False,
+        "single_replace": False,
     }
 
 
 class RegexpLike(Binary, Func):
-    arg_types = {"this": True, "expression": True, "flag": False}
+    arg_types = {"this": True, "expression": True, "flag": False, "full_match": False}
 
 
 class RegexpILike(Binary, Func):
     arg_types = {"this": True, "expression": True, "flag": False}
+
+
+class RegexpFullMatch(Binary, Func):
+    arg_types = {"this": True, "expression": True, "options": False}
+
+
+class RegexpInstr(Func):
+    arg_types = {
+        "this": True,
+        "expression": True,
+        "position": False,
+        "occurrence": False,
+        "option": False,
+        "parameters": False,
+        "group": False,
+    }
 
 
 # https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.split.html
@@ -6544,22 +7379,133 @@ class RegexpSplit(Func):
     arg_types = {"this": True, "expression": True, "limit": False}
 
 
+class RegexpCount(Func):
+    arg_types = {
+        "this": True,
+        "expression": True,
+        "position": False,
+        "parameters": False,
+    }
+
+
+class RegrValx(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrValy(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrAvgy(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrAvgx(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrCount(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrIntercept(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrR2(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrSxx(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrSxy(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrSyy(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class RegrSlope(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
 class Repeat(Func):
     arg_types = {"this": True, "times": True}
+
+
+# Some dialects like Snowflake support two argument replace
+class Replace(Func):
+    arg_types = {"this": True, "expression": True, "replacement": False}
+
+
+class Radians(Func):
+    pass
 
 
 # https://learn.microsoft.com/en-us/sql/t-sql/functions/round-transact-sql?view=sql-server-ver16
 # tsql third argument function == trunctaion if not 0
 class Round(Func):
-    arg_types = {"this": True, "decimals": False, "truncate": False}
+    arg_types = {
+        "this": True,
+        "decimals": False,
+        "truncate": False,
+        "casts_non_integer_decimals": False,
+    }
+
+
+# Numeric truncation - distinct from DateTrunc/TimestampTrunc
+# Most dialects: TRUNC(number, decimals) or TRUNCATE(number, decimals)
+# T-SQL: ROUND(number, decimals, 1) - handled in generator
+class Trunc(Func):
+    arg_types = {"this": True, "decimals": False}
+    _sql_names = ["TRUNC", "TRUNCATE"]
 
 
 class RowNumber(Func):
     arg_types = {"this": False}
 
 
+class Seq1(Func):
+    arg_types = {"this": False}
+
+
+class Seq2(Func):
+    arg_types = {"this": False}
+
+
+class Seq4(Func):
+    arg_types = {"this": False}
+
+
+class Seq8(Func):
+    arg_types = {"this": False}
+
+
+class SafeAdd(Func):
+    arg_types = {"this": True, "expression": True}
+
+
 class SafeDivide(Func):
     arg_types = {"this": True, "expression": True}
+
+
+class SafeMultiply(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class SafeNegate(Func):
+    pass
+
+
+class SafeSubtract(Func):
+    arg_types = {"this": True, "expression": True}
+
+
+class SafeConvertBytesToString(Func):
+    pass
 
 
 class SHA(Func):
@@ -6571,12 +7517,31 @@ class SHA2(Func):
     arg_types = {"this": True, "length": False}
 
 
+# Represents the variant of the SHA1 function that returns a binary value
+class SHA1Digest(Func):
+    pass
+
+
+# Represents the variant of the SHA2 function that returns a binary value
+class SHA2Digest(Func):
+    arg_types = {"this": True, "length": False}
+
+
 class Sign(Func):
     _sql_names = ["SIGN", "SIGNUM"]
 
 
 class SortArray(Func):
-    arg_types = {"this": True, "asc": False}
+    arg_types = {"this": True, "asc": False, "nulls_first": False}
+
+
+class Soundex(Func):
+    pass
+
+
+# https://docs.snowflake.com/en/sql-reference/functions/soundex_p123
+class SoundexP123(Func):
+    pass
 
 
 class Split(Func):
@@ -6584,8 +7549,10 @@ class Split(Func):
 
 
 # https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.split_part.html
+# https://docs.snowflake.com/en/sql-reference/functions/split_part
+# https://docs.snowflake.com/en/sql-reference/functions/strtok
 class SplitPart(Func):
-    arg_types = {"this": True, "delimiter": True, "part_index": True}
+    arg_types = {"this": True, "delimiter": False, "part_index": False}
 
 
 # Start may be omitted in the case of postgres
@@ -6595,12 +7562,28 @@ class Substring(Func):
     arg_types = {"this": True, "start": False, "length": False}
 
 
+class SubstringIndex(Func):
+    """
+    SUBSTRING_INDEX(str, delim, count)
+
+    *count* > 0  → left slice before the *count*-th delimiter
+    *count* < 0  → right slice after the |count|-th delimiter
+    """
+
+    arg_types = {"this": True, "delimiter": True, "count": True}
+
+
 class StandardHash(Func):
     arg_types = {"this": True, "expression": False}
 
 
 class StartsWith(Func):
     _sql_names = ["STARTS_WITH", "STARTSWITH"]
+    arg_types = {"this": True, "expression": True}
+
+
+class EndsWith(Func):
+    _sql_names = ["ENDS_WITH", "ENDSWITH"]
     arg_types = {"this": True, "expression": True}
 
 
@@ -6613,16 +7596,34 @@ class StrPosition(Func):
     }
 
 
+# Snowflake: https://docs.snowflake.com/en/sql-reference/functions/search
+# BigQuery: https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#search
+class Search(Func):
+    arg_types = {
+        "this": True,  # data_to_search / search_data
+        "expression": True,  # search_query / search_string
+        "json_scope": False,  # BigQuery: JSON_VALUES | JSON_KEYS | JSON_KEYS_AND_VALUES
+        "analyzer": False,  # Both: analyzer / ANALYZER
+        "analyzer_options": False,  # BigQuery: analyzer_options_values
+        "search_mode": False,  # Snowflake: OR | AND
+    }
+
+
+# Snowflake: https://docs.snowflake.com/en/sql-reference/functions/search_ip
+class SearchIp(Func):
+    arg_types = {"this": True, "expression": True}
+
+
 class StrToDate(Func):
     arg_types = {"this": True, "format": False, "safe": False}
 
 
 class StrToTime(Func):
-    arg_types = {"this": True, "format": True, "zone": False, "safe": False}
+    arg_types = {"this": True, "format": True, "zone": False, "safe": False, "target_type": False}
 
 
 # Spark allows unix_timestamp()
-# https://spark.apache.org/docs/3.1.3/api/python/reference/api/pyspark.sql.functions.unix_timestamp.html
+# https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.unix_timestamp.html
 class StrToUnix(Func):
     arg_types = {"this": False, "format": False}
 
@@ -6644,6 +7645,14 @@ class NumberToStr(Func):
 
 class FromBase(Func):
     arg_types = {"this": True, "expression": True}
+
+
+class Space(Func):
+    """
+    SPACE(n) → string consisting of n blank characters
+    """
+
+    pass
 
 
 class Struct(Func):
@@ -6765,6 +7774,10 @@ class Unicode(Func):
     pass
 
 
+class Uniform(Func):
+    arg_types = {"this": True, "expression": True, "gen": False, "seed": False}
+
+
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#unix_date
 class UnixDate(Func):
     pass
@@ -6784,6 +7797,7 @@ class UnixToTime(Func):
         "hours": False,
         "minutes": False,
         "format": False,
+        "target_type": False,
     }
 
     SECONDS = Literal.number(0)
@@ -6806,24 +7820,52 @@ class UnixSeconds(Func):
     pass
 
 
+class UnixMicros(Func):
+    pass
+
+
+class UnixMillis(Func):
+    pass
+
+
 class Uuid(Func):
     _sql_names = ["UUID", "GEN_RANDOM_UUID", "GENERATE_UUID", "UUID_STRING"]
 
-    arg_types = {"this": False, "name": False}
+    arg_types = {"this": False, "name": False, "is_string": False}
+
+
+TIMESTAMP_PARTS = {
+    "year": False,
+    "month": False,
+    "day": False,
+    "hour": False,
+    "min": False,
+    "sec": False,
+    "nano": False,
+}
 
 
 class TimestampFromParts(Func):
     _sql_names = ["TIMESTAMP_FROM_PARTS", "TIMESTAMPFROMPARTS"]
     arg_types = {
-        "year": True,
-        "month": True,
-        "day": True,
-        "hour": True,
-        "min": True,
-        "sec": True,
-        "nano": False,
+        **TIMESTAMP_PARTS,
         "zone": False,
         "milli": False,
+        "this": False,
+        "expression": False,
+    }
+
+
+class TimestampLtzFromParts(Func):
+    _sql_names = ["TIMESTAMP_LTZ_FROM_PARTS", "TIMESTAMPLTZFROMPARTS"]
+    arg_types = TIMESTAMP_PARTS.copy()
+
+
+class TimestampTzFromParts(Func):
+    _sql_names = ["TIMESTAMP_TZ_FROM_PARTS", "TIMESTAMPTZFROMPARTS"]
+    arg_types = {
+        **TIMESTAMP_PARTS,
+        "zone": False,
     }
 
 
@@ -6832,7 +7874,16 @@ class Upper(Func):
 
 
 class Corr(Binary, AggFunc):
-    pass
+    # Correlation divides by variance(column). If a column has 0 variance, the denominator
+    # is 0 - some dialects return NaN (DuckDB) while others return NULL (Snowflake).
+    # `null_on_zero_variance` is set to True at parse time for dialects that return NULL.
+    arg_types = {"this": True, "expression": True, "null_on_zero_variance": False}
+
+
+# https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/CUME_DIST.html
+class CumeDist(AggFunc):
+    arg_types = {"expressions": False}
+    is_var_len_args = True
 
 
 class Variance(AggFunc):
@@ -6843,21 +7894,52 @@ class VariancePop(AggFunc):
     _sql_names = ["VARIANCE_POP", "VAR_POP"]
 
 
-class CovarSamp(Binary, AggFunc):
+class Kurtosis(AggFunc):
     pass
 
 
-class CovarPop(Binary, AggFunc):
+class Skewness(AggFunc):
     pass
+
+
+class WidthBucket(Func):
+    arg_types = {
+        "this": True,
+        "min_value": False,
+        "max_value": False,
+        "num_buckets": False,
+        "threshold": False,
+    }
+
+
+class CovarSamp(AggFunc):
+    arg_types = {"this": True, "expression": True}
+
+
+class CovarPop(AggFunc):
+    arg_types = {"this": True, "expression": True}
 
 
 class Week(Func):
     arg_types = {"this": True, "mode": False}
 
 
+class WeekStart(Expression):
+    pass
+
+
+class NextDay(Func):
+    arg_types = {"this": True, "expression": True}
+
+
 class XMLElement(Func):
     _sql_names = ["XMLELEMENT"]
-    arg_types = {"this": True, "expressions": False}
+    arg_types = {"this": True, "expressions": False, "evalname": False}
+
+
+class XMLGet(Func):
+    _sql_names = ["XMLGET"]
+    arg_types = {"this": True, "expression": True, "instance": False}
 
 
 class XMLTable(Func):
@@ -6874,8 +7956,17 @@ class XMLNamespace(Expression):
     pass
 
 
+# https://learn.microsoft.com/en-us/sql/t-sql/queries/select-for-clause-transact-sql?view=sql-server-ver17#syntax
+class XMLKeyValueOption(Expression):
+    arg_types = {"this": True, "expression": False}
+
+
 class Year(Func):
     pass
+
+
+class Zipf(Func):
+    arg_types = {"this": True, "elementcount": True, "gen": True}
 
 
 class Use(Expression):
@@ -6886,9 +7977,10 @@ class Merge(DML):
     arg_types = {
         "this": True,
         "using": True,
-        "on": True,
+        "on": False,
+        "using_cond": False,
         "whens": True,
-        "with": False,
+        "with_": False,
         "returning": False,
     }
 
@@ -6915,14 +8007,52 @@ class Semicolon(Expression):
     arg_types = {}
 
 
-def _norm_arg(arg):
-    return arg.lower() if type(arg) is str else arg
+# BigQuery allows SELECT t FROM t and treats the projection as a struct value. This expression
+# type is intended to be constructed by qualify so that we can properly annotate its type later
+class TableColumn(Expression):
+    pass
 
 
-ALL_FUNCTIONS = subclasses(__name__, Func, (AggFunc, Anonymous, Func))
+# https://www.postgresql.org/docs/current/typeconv-func.html
+# https://www.postgresql.org/docs/current/xfunc-sql.html
+class Variadic(Expression):
+    pass
+
+
+class StoredProcedure(Expression):
+    arg_types = {"this": True, "expressions": False, "wrapped": False}
+
+
+class Block(Expression):
+    arg_types = {"expressions": True}
+
+
+class IfBlock(Expression):
+    arg_types = {"this": True, "true": True, "false": False}
+
+
+class WhileBlock(Expression):
+    arg_types = {"this": True, "body": True}
+
+
+class EndStatement(Expression):
+    arg_types = {}
+
+
+class Execute(Expression):
+    arg_types = {"this": True, "expressions": False}
+
+    @property
+    def name(self) -> str:
+        return self.this.name
+
+
+class ExecuteSql(Execute):
+    pass
+
+
+ALL_FUNCTIONS = subclasses(__name__, Func, {AggFunc, Anonymous, Func})
 FUNCTION_BY_NAME = {name: func for func in ALL_FUNCTIONS for name in func.sql_names()}
-
-JSON_PATH_PARTS = subclasses(__name__, JSONPathPart, (JSONPathPart,))
 
 PERCENTILES = (PercentileCont, PercentileDisc)
 
@@ -7012,7 +8142,7 @@ def maybe_copy(instance, copy=True):
     return instance.copy() if copy and instance else instance
 
 
-def _to_s(node: t.Any, verbose: bool = False, level: int = 0) -> str:
+def _to_s(node: t.Any, verbose: bool = False, level: int = 0, repr_str: bool = False) -> str:
     """Generate a textual representation of an Expression tree"""
     indent = "\n" + ("  " * (level + 1))
     delim = f",{indent}"
@@ -7033,13 +8163,20 @@ def _to_s(node: t.Any, verbose: bool = False, level: int = 0) -> str:
             indent = ""
             delim = ", "
 
-        items = delim.join([f"{k}={_to_s(v, verbose, level + 1)}" for k, v in args.items()])
+        repr_str = node.is_string or (isinstance(node, Identifier) and node.quoted)
+        items = delim.join(
+            [f"{k}={_to_s(v, verbose, level + 1, repr_str=repr_str)}" for k, v in args.items()]
+        )
         return f"{node.__class__.__name__}({indent}{items})"
 
     if isinstance(node, list):
         items = delim.join(_to_s(i, verbose, level + 1) for i in node)
         items = f"{indent}{items}" if items else ""
         return f"[{items}]"
+
+    # We use the representation of the string to avoid stripping out important whitespace
+    if repr_str and isinstance(node, str):
+        node = repr(node)
 
     # Indent multiline strings to match the current level
     return indent.join(textwrap.dedent(str(node).strip("\n")).splitlines())
@@ -7188,7 +8325,7 @@ def _apply_cte_builder(
     append: bool = True,
     dialect: DialectType = None,
     copy: bool = True,
-    scalar: bool = False,
+    scalar: t.Optional[bool] = None,
     **opts,
 ) -> E:
     alias_expression = maybe_parse(alias, dialect=dialect, into=TableAlias, **opts)
@@ -7200,11 +8337,11 @@ def _apply_cte_builder(
     return _apply_child_list_builder(
         cte,
         instance=instance,
-        arg="with",
+        arg="with_",
         append=append,
         copy=copy,
         into=With,
-        properties={"recursive": recursive or False},
+        properties={"recursive": recursive} if recursive else {},
     )
 
 
@@ -7252,7 +8389,7 @@ def _apply_set_operation(
     **opts,
 ) -> S:
     return reduce(
-        lambda x, y: set_operation(this=x, expression=y, distinct=distinct),
+        lambda x, y: set_operation(this=x, expression=y, distinct=distinct, **opts),
         (maybe_parse(e, dialect=dialect, copy=copy, **opts) for e in expressions),
     )
 
@@ -7433,7 +8570,7 @@ def update(
         )
     if from_:
         update_expr.set(
-            "from",
+            "from_",
             maybe_parse(from_, into=From, dialect=dialect, prefix="FROM", **opts),
         )
     if isinstance(where, Condition):
@@ -7449,7 +8586,7 @@ def update(
             for alias, qry in with_.items()
         ]
         update_expr.set(
-            "with",
+            "with_",
             With(expressions=cte_list),
         )
     return update_expr
@@ -7577,6 +8714,9 @@ def merge(
     )
     if returning:
         merge = merge.returning(returning, dialect=dialect, copy=False, **opts)
+
+    if isinstance(using_clause := merge.args.get("using"), Alias):
+        using_clause.replace(alias_(using_clause.this, using_clause.args["alias"], table=True))
 
     return merge
 
@@ -7813,7 +8953,20 @@ def parse_identifier(name: str | Identifier, dialect: DialectType = None) -> Ide
     return expression
 
 
-INTERVAL_STRING_RE = re.compile(r"\s*([0-9]+)\s*([a-zA-Z]+)\s*")
+INTERVAL_STRING_RE = re.compile(r"\s*(-?[0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)\s*")
+
+# Matches day-time interval strings that contain
+# - A number of days (possibly negative or with decimals)
+# - At least one space
+# - Portions of a time-like signature, potentially negative
+#   - Standard format                   [-]h+:m+:s+[.f+]
+#   - Just minutes/seconds/frac seconds [-]m+:s+.f+
+#   - Just hours, minutes, maybe colon  [-]h+:m+[:]
+#   - Just hours, maybe colon           [-]h+[:]
+#   - Just colon                        :
+INTERVAL_DAY_TIME_RE = re.compile(
+    r"\s*-?\s*\d+(?:\.\d+)?\s+(?:-?(?:\d+:)?\d+:\d+(?:\.\d+)?|-?(?:\d+:){1,2}|:)\s*"
+)
 
 
 def to_interval(interval: str | Literal) -> Interval:
@@ -7848,7 +9001,15 @@ def to_table(
     if isinstance(sql_path, Table):
         return maybe_copy(sql_path, copy=copy)
 
-    table = maybe_parse(sql_path, into=Table, dialect=dialect)
+    try:
+        table = maybe_parse(sql_path, into=Table, dialect=dialect)
+    except ParseError:
+        catalog, db, this = split_num_words(sql_path, ".", 3)
+
+        if not this:
+            raise
+
+        table = table_(this, db=db, catalog=catalog)
 
     for k, v in kwargs.items():
         table.set(k, v)
@@ -7996,7 +9157,7 @@ def column(
 
 @t.overload
 def column(
-    col: str | Identifier,
+    col: str | Identifier | Star,
     table: t.Optional[str | Identifier] = None,
     db: t.Optional[str | Identifier] = None,
     catalog: t.Optional[str | Identifier] = None,
@@ -8033,8 +9194,11 @@ def column(
     Returns:
         The new Column instance.
     """
+    if not isinstance(col, Star):
+        col = to_identifier(col, quoted=quoted, copy=copy)
+
     this = Column(
-        this=to_identifier(col, quoted=quoted, copy=copy),
+        this=col,
         table=to_identifier(table, quoted=quoted, copy=copy),
         db=to_identifier(db, quoted=quoted, copy=copy),
         catalog=to_identifier(catalog, quoted=quoted, copy=copy),
@@ -8277,6 +9441,9 @@ def convert(value: t.Any, copy: bool = False) -> Expression:
     if isinstance(value, datetime.date):
         date_literal = Literal.string(value.strftime("%Y-%m-%d"))
         return DateStrToDate(this=date_literal)
+    if isinstance(value, datetime.time):
+        time_literal = Literal.string(value.isoformat())
+        return TsOrDsToTime(this=time_literal)
     if isinstance(value, tuple):
         if hasattr(value, "_fields"):
             return Struct(
@@ -8349,6 +9516,26 @@ def replace_tree(
                 stack.append(new_node)
 
     return new_node
+
+
+def find_tables(expression: Expression) -> t.Set[Table]:
+    """
+    Find all tables referenced in a query.
+
+    Args:
+        expressions: The query to find the tables in.
+
+    Returns:
+        A set of all the tables.
+    """
+    from sqlglot.optimizer.scope import traverse_scope
+
+    return {
+        table
+        for scope in traverse_scope(expression)
+        for table in scope.tables
+        if table.name and table.name not in scope.cte_sources
+    }
 
 
 def column_table_names(expression: Expression, exclude: str = "") -> t.Set[str]:
@@ -8721,3 +9908,37 @@ CONSTANTS = (
     Boolean,
     Null,
 )
+
+
+def apply_index_offset(
+    this: Expression,
+    expressions: t.List[E],
+    offset: int,
+    dialect: DialectType = None,
+) -> t.List[E]:
+    if not offset or len(expressions) != 1:
+        return expressions
+
+    expression = expressions[0]
+
+    from sqlglot.optimizer.annotate_types import annotate_types
+    from sqlglot.optimizer.simplify import simplify
+
+    if not this.type:
+        annotate_types(this, dialect=dialect)
+
+    if t.cast(DataType, this.type).this not in (
+        DataType.Type.UNKNOWN,
+        DataType.Type.ARRAY,
+    ):
+        return expressions
+
+    if not expression.type:
+        annotate_types(expression, dialect=dialect)
+
+    if t.cast(DataType, expression.type).this in DataType.INTEGER_TYPES:
+        logger.info("Applying array index offset (%s)", offset)
+        expression = simplify(expression + offset)
+        return [expression]
+
+    return expressions
