@@ -2385,3 +2385,73 @@ func TestPipeline_ValidateCatchupMode(t *testing.T) {
 		})
 	}
 }
+
+func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		assetTags  pipeline.EmptyStringArray
+		columnTags pipeline.EmptyStringArray
+		wantAsset  pipeline.EmptyStringArray
+		wantColumn pipeline.EmptyStringArray
+	}{
+		{
+			name:       "exact duplicate tags",
+			assetTags:  pipeline.EmptyStringArray{"marketing", "marketing", "sales"},
+			columnTags: pipeline.EmptyStringArray{"pii", "pii"},
+			wantAsset:  pipeline.EmptyStringArray{"marketing", "sales"},
+			wantColumn: pipeline.EmptyStringArray{"pii"},
+		},
+		{
+			name:       "case-insensitive duplicate tags",
+			assetTags:  pipeline.EmptyStringArray{"Marketing", "marketing", "MARKETING"},
+			columnTags: pipeline.EmptyStringArray{"PII", "pii", "Pii"},
+			wantAsset:  pipeline.EmptyStringArray{"Marketing"},
+			wantColumn: pipeline.EmptyStringArray{"PII"},
+		},
+		{
+			name:       "no duplicates unchanged",
+			assetTags:  pipeline.EmptyStringArray{"marketing", "sales"},
+			columnTags: pipeline.EmptyStringArray{"pii", "sensitive"},
+			wantAsset:  pipeline.EmptyStringArray{"marketing", "sales"},
+			wantColumn: pipeline.EmptyStringArray{"pii", "sensitive"},
+		},
+		{
+			name:       "nil tags unchanged",
+			assetTags:  nil,
+			columnTags: nil,
+			wantAsset:  nil,
+			wantColumn: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			asset := &pipeline.Asset{
+				Name: "test-asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Tags: tt.assetTags,
+				Columns: []pipeline.Column{
+					{
+						Name: "col1",
+						Type: "string",
+						Tags: tt.columnTags,
+					},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Path:    "test.sql",
+					Content: "SELECT 1",
+				},
+			}
+
+			_, err := asset.FormatContent()
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantAsset, asset.Tags)
+			assert.Equal(t, tt.wantColumn, asset.Columns[0].Tags)
+		})
+	}
+}
