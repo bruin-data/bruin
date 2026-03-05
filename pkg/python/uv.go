@@ -646,6 +646,7 @@ func (u *UvPythonRunner) ensureIngestrInstalled(ctx context.Context, extraPackag
 // recently written data. When the buffer is flushed after an error, a notice
 // is prepended if earlier output was dropped.
 type tailBuffer struct {
+	mu        sync.Mutex
 	data      []byte
 	maxBytes  int
 	truncated bool
@@ -656,6 +657,8 @@ func newTailBuffer(maxBytes int) *tailBuffer {
 }
 
 func (t *tailBuffer) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if len(p) >= t.maxBytes {
 		// Single write larger than cap: keep only the tail.
 		t.data = append(t.data[:0], p[len(p)-t.maxBytes:]...)
