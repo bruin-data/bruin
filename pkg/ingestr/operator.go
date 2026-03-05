@@ -118,6 +118,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		if mode := asset.Parameters["cdc_mode"]; mode != "" {
 			q.Set("mode", mode)
 		}
+		if destSchema := asset.Parameters["cdc_dest_schema"]; destSchema != "" {
+			q.Set("dest_schema", destSchema)
+		}
 		parsedURI.RawQuery = q.Encode()
 
 		sourceURI = parsedURI.String()
