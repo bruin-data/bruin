@@ -37,10 +37,11 @@ var AvailablePythonVersions = map[string]bool{
 	"3.11": true,
 	"3.12": true,
 	"3.13": true,
+	"3.14": true,
 }
 
 // SortedPythonVersions is the list of available Python versions sorted ascending.
-var SortedPythonVersions = []string{"3.8", "3.9", "3.10", "3.11", "3.12", "3.13"}
+var SortedPythonVersions = []string{"3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"}
 
 const (
 	pythonVersionForIngestr = "3.11"

@@ -87,9 +87,12 @@ ENV LDFLAGS="-L/usr/lib"
 
 # Bootstrap ingestr installation
 RUN cd /tmp && /home/bruin/.local/bin/bruin init bootstrap --in-place && /home/bruin/.local/bin/bruin run bootstrap
-RUN /home/bruin/.bruin/uv python install 3.11.9
-RUN /home/bruin/.bruin/uv python install 3.10.14
-RUN /home/bruin/.bruin/uv python install 3.9.19
+RUN /home/bruin/.bruin/uv python install 3.9
+RUN /home/bruin/.bruin/uv python install 3.10
+RUN /home/bruin/.bruin/uv python install 3.11
+RUN /home/bruin/.bruin/uv python install 3.12
+RUN /home/bruin/.bruin/uv python install 3.13
+RUN /home/bruin/.bruin/uv python install 3.14
 
 
 RUN rm -rf /tmp/bootstrap
