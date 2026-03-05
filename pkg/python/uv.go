@@ -541,11 +541,22 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
+	ingestrCtx := ctx
+	showLogs := asset.Parameters["show_ingestr_logs"] == "true"
+	var logBuffer *tailBuffer
+	if !showLogs {
+		logBuffer = newTailBuffer(1 << 20) // 1MB cap
+		ingestrCtx = context.WithValue(ctx, executor.KeyPrinter, io.Writer(logBuffer))
+	}
+
+	err = u.Cmd.Run(ingestrCtx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: runArgs,
 	})
 	if err != nil {
+		if logBuffer != nil {
+			logBuffer.flushTo(output)
+		}
 		return errors.Wrap(err, "failed to run load the data into the destination")
 	}
 
@@ -629,6 +640,43 @@ func (u *UvPythonRunner) ensureIngestrInstalled(ctx context.Context, extraPackag
 
 	ingestrInstalledPackages[packageKey] = true
 	return nil
+}
+
+// tailBuffer is a bounded io.Writer that retains at most maxBytes of the most
+// recently written data. When the buffer is flushed after an error, a notice
+// is prepended if earlier output was dropped.
+type tailBuffer struct {
+	data      []byte
+	maxBytes  int
+	truncated bool
+}
+
+func newTailBuffer(maxBytes int) *tailBuffer {
+	return &tailBuffer{maxBytes: maxBytes}
+}
+
+func (t *tailBuffer) Write(p []byte) (int, error) {
+	if len(p) >= t.maxBytes {
+		// Single write larger than cap: keep only the tail.
+		t.data = append(t.data[:0], p[len(p)-t.maxBytes:]...)
+		t.truncated = true
+		return len(p), nil
+	}
+	t.data = append(t.data, p...)
+	if len(t.data) > t.maxBytes {
+		excess := len(t.data) - t.maxBytes
+		copy(t.data, t.data[excess:])
+		t.data = t.data[:t.maxBytes]
+		t.truncated = true
+	}
+	return len(p), nil
+}
+
+func (t *tailBuffer) flushTo(w io.Writer) {
+	if t.truncated {
+		_, _ = w.Write([]byte("[earlier ingestr output omitted]\n"))
+	}
+	_, _ = w.Write(t.data)
 }
 
 // ResetIngestrInstallCache resets the ingestr installation cache.
