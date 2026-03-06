@@ -359,16 +359,16 @@ func TestResolvePythonVersion(t *testing.T) {
 			want:           "3.8",
 		},
 		{
-			name:           ">=3.14 returns error",
+			name:           ">=3.14 returns 3.14",
 			requiresPython: ">=3.14",
 			defaultVersion: "3.11",
-			wantErr:        true,
+			want:           "3.14",
 		},
 		{
-			name:           "==3.14 returns error",
+			name:           "==3.14 returns 3.14",
 			requiresPython: "==3.14",
 			defaultVersion: "3.11",
-			wantErr:        true,
+			want:           "3.14",
 		},
 		{
 			name:           "handles spaces in specifier",

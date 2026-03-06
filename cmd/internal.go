@@ -1572,7 +1572,7 @@ func LockAssetDependencies() *cli.Command {
 
 			// Validate Python version
 			if !python.AvailablePythonVersions[pythonVersion] {
-				printErrorJSON(errors2.Errorf("unsupported Python version: %s. Supported versions: 3.8, 3.9, 3.10, 3.11, 3.12, 3.13", pythonVersion))
+				printErrorJSON(errors2.Errorf("unsupported Python version: %s. Supported versions: %s", pythonVersion, strings.Join(python.SortedPythonVersions, ", ")))
 				return cli.Exit("", 1)
 			}
 

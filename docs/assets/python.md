@@ -150,7 +150,7 @@ You can define Python versions using the `image` key:
 ```bruin-python
 """@bruin
 name: tier1.my_custom_api
-image: python:3.11
+image: python:3.13
 @bruin"""
 
 print('hello world')
@@ -374,7 +374,7 @@ By default, ingestr infers column types from the dataframe. If you want to enfor
 ```bruin-python
 """@bruin
 name: tier1.users_api
-image: python:3.11
+image: python:3.13
 connection: bigquery
 
 materialization:
