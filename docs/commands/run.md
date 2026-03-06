@@ -47,6 +47,7 @@ table td:first-child {
 | `--exclude-tag` | str | - | Exclude assets with the given tag. |
 | `--only` | []str | `'main', 'checks', 'push-metadata'` | Limit the types of execution steps to run. By default it runs `main` and `checks`, while `push-metadata` is optional if defined in the pipeline definition. |
 | `--exp-use-winget-for-uv` | bool | `false` | Use PowerShell to manage and install `uv` on Windows. Has no effect on non-Windows systems. |
+| `--use-pip` | bool | `false` | Deprecated compatibility flag; passing it now returns an explicit deprecation error. Python execution is uv-only. |
 | `--debug-ingestr-src` | str | - | Use ingestr from the given path instead of the builtin version. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
 | `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |

@@ -74,6 +74,8 @@ var pythonCacheGitignorePatterns = []string{
 	"*.py[cod]",
 }
 
+var errUsePipDeprecated = errors.New("flag --use-pip is no longer supported: Bruin now always runs Python assets with uv")
+
 type PipelineInfo struct {
 	Pipeline           *pipeline.Pipeline
 	RunningForAnAsset  bool
@@ -572,6 +574,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "exp-use-winget-for-uv",
 				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
 			},
+			&cli.BoolFlag{
+				Name:   "use-pip",
+				Usage:  "deprecated compatibility flag; passing this flag returns an explicit deprecation error",
+				Hidden: true,
+			},
 			&cli.StringFlag{
 				Name:  "debug-ingestr-src",
 				Usage: "Use ingestr from the given path instead of the builtin version.",
@@ -642,6 +649,9 @@ func Run(isDebug *bool) *cli.Command {
 			defer RecoverFromPanic()
 
 			logger := makeLogger(*isDebug)
+			if c.IsSet("use-pip") {
+				return cli.Exit(errUsePipDeprecated, 1)
+			}
 			fullRefresh := c.Bool("full-refresh")
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
