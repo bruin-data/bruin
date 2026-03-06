@@ -108,7 +108,7 @@ func NewClient(c Config) (*Client, error) {
 	}
 
 	if c.APIVersion == "" {
-		c.APIVersion = "3.21" // Updated to more recent API version for better compatibility
+		c.APIVersion = "3.28" // Updated to more recent API version for better compatibility
 	}
 
 	return &Client{
@@ -192,11 +192,11 @@ func (c *Client) authenticate(ctx context.Context) error {
 }
 
 func (c *Client) RefreshDataSource(ctx context.Context, datasourceID string, incremental bool, timeout time.Duration) error {
-	return c.refreshResource(ctx, "datasources", datasourceID, "datasource", incremental, timeout)
+	return c.refreshResource(ctx, "datasources", datasourceID, incremental, timeout)
 }
 
 func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string, incremental bool, timeout time.Duration) error {
-	return c.refreshResource(ctx, "workbooks", workbookID, "workbook", incremental, timeout)
+	return c.refreshResource(ctx, "workbooks", workbookID, incremental, timeout)
 }
 
 func (c *Client) pollJobStatus(ctx context.Context, jobID string, timeout time.Duration) error {
@@ -262,7 +262,7 @@ func (c *Client) pollJobStatus(ctx context.Context, jobID string, timeout time.D
 	}
 }
 
-func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, payloadKey string, incremental bool, timeout time.Duration) error {
+func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID string, incremental bool, timeout time.Duration) error {
 	if err := c.authenticate(ctx); err != nil {
 		return errors.Wrap(err, "failed to authenticate with Tableau")
 	}
@@ -270,7 +270,7 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 	refreshURL := fmt.Sprintf("https://%s/api/%s/sites/%s/%s/%s/refresh",
 		c.config.Host, c.config.APIVersion, c.siteID, resourceType, resourceID)
 
-	statusCode, responseBody, err := c.sendRefreshRequest(ctx, refreshURL, payloadKey, resourceID, incremental)
+	statusCode, responseBody, err := c.sendRefreshRequest(ctx, refreshURL, incremental)
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 		}
 		fmt.Fprintf(writer, "Incremental refresh failed (status %d), retrying with full refresh\n", statusCode)
 
-		statusCode, responseBody, err = c.sendRefreshRequest(ctx, refreshURL, payloadKey, resourceID, false)
+		statusCode, responseBody, err = c.sendRefreshRequest(ctx, refreshURL, false)
 		if err != nil {
 			return err
 		}
@@ -308,28 +308,21 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 	return errors.Errorf("refresh failed with status %d: %s", statusCode, string(responseBody))
 }
 
-func (c *Client) sendRefreshRequest(ctx context.Context, refreshURL, payloadKey, resourceID string, incremental bool) (int, []byte, error) {
-	refreshPayload := map[string]interface{}{
-		payloadKey: map[string]interface{}{
-			"id": resourceID,
-		},
-	}
+func (c *Client) sendRefreshRequest(ctx context.Context, refreshURL string, incremental bool) (int, []byte, error) {
+	var payload string
 	if incremental {
-		refreshPayload[payloadKey].(map[string]interface{})["incremental"] = true
+		payload = `<tsRequest><extractRefresh incremental="true"></extractRefresh></tsRequest>`
+	} else {
+		payload = `<tsRequest><extractRefresh></extractRefresh></tsRequest>`
 	}
 
-	payloadBytes, err := json.Marshal(refreshPayload)
-	if err != nil {
-		return 0, nil, errors.Wrap(err, "failed to marshal refresh payload")
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, refreshURL, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, refreshURL, bytes.NewBufferString(payload))
 	if err != nil {
 		return 0, nil, errors.Wrap(err, "failed to create refresh request")
 	}
 
 	req.Header.Set("X-Tableau-Auth", c.authToken)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/xml")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)

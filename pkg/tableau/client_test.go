@@ -117,7 +117,7 @@ func TestNewClient_DefaultAPIVersion(t *testing.T) {
 	client, err := NewClient(config)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	require.Equal(t, "3.21", client.config.APIVersion)
+	require.Equal(t, "3.28", client.config.APIVersion)
 }
 
 func TestFindDatasourceIDByName(t *testing.T) {
