@@ -132,6 +132,22 @@ If possible, infer and document:
 - whether the dataset is append-only or mutable
 - potential performance concerns
 
+## Validation (Required)
+
+After making changes, you MUST validate your work before finishing:
+
+1. Run: bruin internal parse-asset <path-to-asset-file>
+   - This ensures the asset YAML/SQL is syntactically valid and can be parsed by Bruin.
+   - If it fails, fix the issues and re-run until it passes.
+
+2. Run: bruin validate <path-to-asset-file>
+   - This runs lint and quality check validation on the asset.
+   - If it fails, fix the issues and re-run until it passes.
+
+Common validation pitfalls to avoid:
+- Only use quality checks that pass the "bruin validate" check
+- Keep YAML indentation consistent (2 spaces).
+
 ## Guardrails
 - Do not hallucinate business meaning.
 - If unsure, leave the field unchanged.

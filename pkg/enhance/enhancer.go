@@ -2,6 +2,7 @@ package enhance
 
 import (
 	"context"
+	"io"
 
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -56,6 +57,11 @@ func (e *Enhancer) SetAPIKey(apiKey string) {
 // SetDebug enables or disables debug output.
 func (e *Enhancer) SetDebug(debug bool) {
 	e.provider.SetDebug(debug)
+}
+
+// SetOutput sets a writer for streaming CLI output.
+func (e *Enhancer) SetOutput(w io.Writer) {
+	e.provider.SetOutput(w)
 }
 
 // EnsureCLI checks if the provider's CLI is available.
