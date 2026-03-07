@@ -188,10 +188,8 @@ func TestRenderDDLCommand_Run(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			f := &fields{
 				extractor:      new(mockExtractor),
 				bqMaterializer: new(mockMaterializer),
