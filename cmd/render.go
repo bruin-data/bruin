@@ -379,7 +379,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 
 		return nil
 	} else {
-		_, err = r.writer.Write([]byte(fmt.Sprintf("%s\n", qq)))
+		_, err = fmt.Fprintf(r.writer, "%s\n", qq)
 	}
 
 	return err

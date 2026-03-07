@@ -816,12 +816,12 @@ func (s *Scheduler) hasPipelineFinished() bool {
 }
 
 func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfig, runID, statePath string) error {
-	state := make([]*PipelineAssetState, 0)
 	dict := make(map[string][]TaskInstanceStatus)
 	for _, task := range s.taskInstances {
 		dict[task.GetAsset().Name] = append(dict[task.GetAsset().Name], task.GetStatus())
 	}
 
+	state := make([]*PipelineAssetState, 0, len(dict))
 	for key, status := range dict {
 		result := GetStatusForTask(status)
 		state = append(state, &PipelineAssetState{

@@ -1,118 +1,199 @@
+version: "2"
 run:
   allow-parallel-runners: true
-
-issues:
-  exclude-dirs:
-    - vendor
-    - .git
-    - .idea
-    - dist
-    - .github
-    - resources
-    - bin
-    - internal/data
-  exclude-rules:
-    - path: 'pkg/connection/connection.go'
-      linters:
-        - dupl
-    - path: (.+)_test.go
-      linters:
-        - gosec
-        - dupl
-
 linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - decorder
+    - dogsled
+    - dupword
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exptostd
+    - fatcontext
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - gochecksumtype
+    - goconst
+    - gocritic
+    - godot
+    - goheader
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosmopolitan
+    - grouper
+    - iface
+    - importas
+    - inamedparam
+    - intrange
+    - ireturn
+    - loggercheck
+    - makezero
+    - mirror
+    - misspell
+    - nakedret
+    - nilerr
+    - nilnesserr
+    - noctx
+    - nosprintfhostport
+    - paralleltest
+    - perfsprint
+    - prealloc
+    - predeclared
+    - promlinter
+    - protogetter
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - testableexamples
+    - testifylint
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+    - zerologlint
   disable:
+    - cyclop
+    - depguard
     - dupl
     - err113
-    - err113
-    - mnd
-    - wrapcheck
+    - exhaustruct
+    - forbidigo
+    - forcetypeassert
     - funlen
     - gochecknoglobals
-    - lll
-    - wsl
-    - thelper
-    - testpackage
-    - typecheck
-    - nlreturn
-    - nolintlint
-    - nilnil
-    - varnamelen
-    - forcetypeassert
-    - exhaustruct
     - gocognit
-    - tagliatelle
-    - forbidigo
-    - musttag
-    - interfacebloat
-    - cyclop
-    - tparallel
-    - depguard
-    - tagalign
     - gocyclo
     - godox
-    - nonamedreturns
+    - interfacebloat
+    - lll
     - maintidx
+    - mnd
+    - musttag
     - nestif
-  presets:
-    - bugs
-    - comment
-    - complexity
-    - error
-    - import
-    - metalinter
-    - module
-    - performance
-    - sql
-    - style
-    - test
-    - unused
-linters-settings:
-  revive:
+    - nilnil
+    - nlreturn
+    - nolintlint
+    - nonamedreturns
+    - tagalign
+    - tagliatelle
+    - testpackage
+    - thelper
+    - tparallel
+    - varnamelen
+    - wrapcheck
+    - wsl
+  settings:
+    goconst:
+      min-len: 5
+      min-occurrences: 5
+    gosec:
+      excludes:
+        - G601
+    ireturn:
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - (or|er)$
+        - bigquery.DB
+        - snowflake.SfClient
+        - postgres.PgClient
+        - mssql.MsClient
+        - databricks.Client
+        - athena.Client
+        - duckdb.DuckDBClient
+        - clickhouse.ClickHouseClient
+        - tea.Model
+        - driver.Rows
+        - driver.Row
+        - driver.Batch
+    exhaustive:
+      default-signifies-exhaustive: true
+    maintidx:
+      under: 2
+    nestif:
+      min-complexity: 10
+    revive:
+      rules:
+        - name: unexported-return
+          disabled: true
+    testifylint:
+      enable:
+        - bool-compare
+        - compares
+        - empty
+        - error-is-as
+        - error-nil
+        - expected-actual
+        - float-compare
+        - len
+        - suite-dont-use-pkg
+        - suite-extra-assert-call
+        - suite-thelper
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: unexported-return
-        disabled: true
-  maintidx:
-    under: 2
-
-  ireturn:
-    allow:
-      - anon
-      - error
-      - empty
-      - stdlib
-      - (or|er)$
-      - bigquery.DB
-      - snowflake.SfClient
-      - postgres.PgClient
-      - mssql.MsClient
-      - databricks.Client
-      - athena.Client
-      - duckdb.DuckDBClient
-      - clickhouse.ClickHouseClient
-      - tea.Model
-      - driver.Rows
-      - driver.Row
-      - driver.Batch
-  goconst:
-    min-len: 5
-    min-occurrences: 5
-  nestif:
-    min-complexity: 10
-  testifylint:
-    enable:
-      - "bool-compare"
-      - "compares"
-      - "empty"
-      - "error-is-as"
-      - "error-nil"
-      - "expected-actual"
-      - "float-compare"
-      - "len"
-      - "suite-dont-use-pkg"
-      - "suite-extra-assert-call"
-      - "suite-thelper"
-
-  gosec:
-    excludes:
-      - G601
+      - linters:
+          - dupl
+        path: pkg/connection/connection.go
+      - linters:
+          - dupl
+          - gosec
+        path: (.+)_test.go
+    paths:
+      - vendor
+      - .git
+      - .idea
+      - dist
+      - .github
+      - resources
+      - bin
+      - internal/data
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - vendor
+      - .git
+      - .idea
+      - dist
+      - .github
+      - resources
+      - bin
+      - internal/data
+      - third_party$
+      - builtin$
+      - examples$

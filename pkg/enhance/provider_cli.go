@@ -78,18 +78,19 @@ func (p *CLIProvider) EnsureCLI() error {
 	}
 
 	// Search common installation locations
-	commonPaths := []string{
+	commonPaths := make([]string, 0, 4+len(p.config.CommonSearchPaths))
+	commonPaths = append(commonPaths,
 		filepath.Join(os.Getenv("HOME"), ".local", "bin", p.config.BinaryName),
 		filepath.Join(os.Getenv("HOME"), ".npm-global", "bin", p.config.BinaryName),
-		"/usr/local/bin/" + p.config.BinaryName,
-		"/usr/bin/" + p.config.BinaryName,
-	}
+		"/usr/local/bin/"+p.config.BinaryName,
+		"/usr/bin/"+p.config.BinaryName,
+	)
 
 	// Add provider-specific paths
 	commonPaths = append(commonPaths, p.config.CommonSearchPaths...)
 
 	for _, path := range commonPaths {
-		if _, statErr := os.Stat(path); statErr == nil {
+		if _, statErr := os.Stat(path); statErr == nil { //nolint:gosec // G703: paths come from hardcoded search paths, not user input
 			p.cliPath = path
 			return nil
 		}

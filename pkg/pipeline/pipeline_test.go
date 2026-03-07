@@ -1371,7 +1371,7 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 				},
 			},
 			expected: func() string {
-				var parts []string
+				parts := make([]string, 0, 5)
 				parts = append(parts, "test-pipeline")
 				parts = append(parts, ":asset1{")
 				parts = append(parts, ":upstream1:type1:")
@@ -1403,7 +1403,7 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 				},
 			},
 			expected: func() string {
-				var parts []string
+				parts := make([]string, 0, 9)
 				parts = append(parts, "complex-pipeline")
 				parts = append(parts, ":asset1{")
 				parts = append(parts, ":upstream1:type1:")
@@ -1425,7 +1425,7 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 				Assets: []*pipeline.Asset{},
 			},
 			expected: func() string {
-				var parts []string
+				parts := make([]string, 0, 2)
 				parts = append(parts, "empty-pipeline")
 				parts = append(parts, ":")
 				hash := sha256.New()

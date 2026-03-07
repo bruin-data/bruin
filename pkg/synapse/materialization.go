@@ -161,7 +161,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 		return nil, errors.New("time_granularity is required for time_interval strategy")
 	}
 
-	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp || asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
+	if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp && asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate {
 		return nil, errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 	startVar := "{{start_timestamp}}"

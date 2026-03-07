@@ -1,6 +1,7 @@
 package duck
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -836,10 +837,7 @@ func TestLakehouseAttacher_GenerateAttachStatements(t *testing.T) {
 			assert.GreaterOrEqual(t, len(statements), tt.wantMinLen)
 
 			// Join all statements to check for expected content
-			allStatements := ""
-			for _, s := range statements {
-				allStatements += s + "\n"
-			}
+			allStatements := strings.Join(statements, "\n") + "\n"
 
 			for _, want := range tt.wantContains {
 				assert.Contains(t, allStatements, want, "Expected statement to contain: %s", want)
