@@ -1935,8 +1935,9 @@ func TestAnalyzeResults(t *testing.T) {
 			err := ApplyAllFilters(t.Context(), tt.filter, s, p)
 			require.NoError(t, err)
 
-			results := make([]*scheduler.TaskExecutionResult, 0)
-			for _, instance := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+			pending := s.GetTaskInstancesByStatus(scheduler.Pending)
+			results := make([]*scheduler.TaskExecutionResult, 0, len(pending))
+			for _, instance := range pending {
 				results = append(results, &scheduler.TaskExecutionResult{
 					Instance: instance,
 					Error:    nil,
@@ -2013,8 +2014,9 @@ func TestAnalyzeResults_MultiAssetWithUpstreamFailure(t *testing.T) {
 		{
 			name: "all succeed",
 			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
-				var results []*scheduler.TaskExecutionResult
-				for _, inst := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+				pending := s.GetTaskInstancesByStatus(scheduler.Pending)
+				results := make([]*scheduler.TaskExecutionResult, 0, len(pending))
+				for _, inst := range pending {
 					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
 					results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
 				}
@@ -2027,7 +2029,7 @@ func TestAnalyzeResults_MultiAssetWithUpstreamFailure(t *testing.T) {
 		{
 			name: "B fails - C and its checks are upstream-failed",
 			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
-				var results []*scheduler.TaskExecutionResult
+				results := make([]*scheduler.TaskExecutionResult, 0, len(s.GetTaskInstances()))
 
 				// A succeeds (main task only, no checks)
 				for _, inst := range helperFindInstances(s, "assetA", nil) {
@@ -2072,8 +2074,9 @@ func TestAnalyzeResults_MultiAssetWithUpstreamFailure(t *testing.T) {
 		{
 			name: "B succeeds but check fails - C unaffected",
 			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
-				var results []*scheduler.TaskExecutionResult
-				for _, inst := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+				pending := s.GetTaskInstancesByStatus(scheduler.Pending)
+				results := make([]*scheduler.TaskExecutionResult, 0, len(pending))
+				for _, inst := range pending {
 					assetName := inst.GetAsset().Name
 					instType := inst.GetType()
 
@@ -2156,8 +2159,9 @@ func TestCollectAssetResults(t *testing.T) {
 		{
 			name: "all succeed - no upstream failed",
 			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
-				var results []*scheduler.TaskExecutionResult
-				for _, inst := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+				pending := s.GetTaskInstancesByStatus(scheduler.Pending)
+				results := make([]*scheduler.TaskExecutionResult, 0, len(pending))
+				for _, inst := range pending {
 					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
 					results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
 				}
@@ -2172,7 +2176,8 @@ func TestCollectAssetResults(t *testing.T) {
 		{
 			name: "B fails - C is upstream-failed and appears in list",
 			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
-				var results []*scheduler.TaskExecutionResult
+				pending := s.GetTaskInstancesByStatus(scheduler.Pending)
+				results := make([]*scheduler.TaskExecutionResult, 0, len(pending))
 
 				// A succeeds
 				for _, inst := range helperFindInstances(s, "assetA", nil) {
@@ -2212,8 +2217,9 @@ func TestCollectAssetResults(t *testing.T) {
 		{
 			name: "B check fails - B marked as checkFailed",
 			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
-				var results []*scheduler.TaskExecutionResult
-				for _, inst := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+				pending := s.GetTaskInstancesByStatus(scheduler.Pending)
+				results := make([]*scheduler.TaskExecutionResult, 0, len(pending))
+				for _, inst := range pending {
 					var err error
 					if inst.GetAsset().Name == "assetB" && inst.GetType() == scheduler.TaskInstanceTypeColumnCheck {
 						err = errors.New("check failed")

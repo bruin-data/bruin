@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -24,10 +25,13 @@ func TestGetLineageForRunner(t *testing.T) {
 
 	// Create a long query by appending a fixed string multiple times
 	baseQuery := `SELECT * FROM (SELECT * FROM table1) t1 JOIN (SELECT * FROM table2) t2`
-	longQuery := baseQuery
+	var longQueryBuilder strings.Builder
+	longQueryBuilder.WriteString(baseQuery)
 	for range [100]int{} {
-		longQuery += " UNION ALL " + baseQuery // Linear growth
+		longQueryBuilder.WriteString(" UNION ALL ")
+		longQueryBuilder.WriteString(baseQuery)
 	}
+	longQuery := longQueryBuilder.String()
 
 	tests := []struct {
 		name    string

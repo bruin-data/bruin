@@ -12,7 +12,7 @@ import (
 func TestCheckLint(t *testing.T) {
 	t.Parallel()
 	var testDatadir string
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		testDatadir = "testdata\\unformatted-pipeline\\assets"
 	} else {
 		testDatadir = "testdata/unformatted-pipeline/assets"

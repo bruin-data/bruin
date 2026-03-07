@@ -39,8 +39,8 @@ type model struct {
 
 // getTerminalHeight returns the current terminal height or a default value of 24 if unable to determine.
 func getTerminalHeight() int {
-	if term.IsTerminal(int(os.Stdout.Fd())) {
-		_, h, err := term.GetSize(int(os.Stdout.Fd()))
+	if term.IsTerminal(int(os.Stdout.Fd())) { //nolint:gosec // Fd() returns uintptr, safe to convert to int for terminal check
+		_, h, err := term.GetSize(int(os.Stdout.Fd())) //nolint:gosec // Fd() returns uintptr, safe to convert to int for terminal size
 		if err == nil {
 			return h
 		}
@@ -138,17 +138,17 @@ func (m model) View() string {
 	}
 
 	if visibleCount == 1 {
-		s.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&s,
 			"\ndisplaying options %d of %d\n",
 			end, len(choices),
-		))
+		)
 	}
 
 	if visibleCount > 1 {
-		s.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&s,
 			"\ndisplaying options %d-%d of %d\n",
 			m.pageStart+1, end, len(choices),
-		))
+		)
 	}
 
 	s.WriteString("\n(press q to quit)\n")
@@ -307,7 +307,7 @@ func Init() *cli.Command {
 				}
 
 				// Initialize git repository in the target directory
-				cmd := exec.Command("git", "init")
+				cmd := exec.CommandContext(ctx, "git", "init")
 				cmd.Dir = targetDir
 				out, err := cmd.CombinedOutput()
 				if err != nil {
@@ -386,7 +386,7 @@ func Init() *cli.Command {
 				}
 
 				// ignore the error
-				err = os.MkdirAll(absolutePath, os.ModePerm)
+				err = os.MkdirAll(absolutePath, os.ModePerm) //nolint:gosec // G122: path is constructed from embedded template names, not user input; safe in this CLI context
 				if err != nil {
 					errorPrinter.Printf("Could not create the %s folder: %v\n", absolutePath, err)
 					return err

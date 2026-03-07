@@ -152,10 +152,10 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
 	mat := asset.Materialization
-	switch {
-	case asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
+	switch asset.Materialization.Strategy {
+	case pipeline.MaterializationStrategySCD2ByTime:
 		return buildSCD2ByTimefullRefresh(asset, query)
-	case asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
+	case pipeline.MaterializationStrategySCD2ByColumn:
 		return buildSCD2ByColumnfullRefresh(asset, query)
 	default:
 		partitionClause := ""
@@ -181,7 +181,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		return "", errors.New("time_granularity is required for time_interval strategy")
 	}
 
-	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp || asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
+	if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp && asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate {
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 	startVar := "{{start_timestamp}}"

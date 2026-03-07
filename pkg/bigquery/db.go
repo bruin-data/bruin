@@ -700,7 +700,7 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 
 		if isAPIErr && apiErr.Code == 404 {
 			if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
-				var createApiErr *googleapi.Error //nolint:stylecheck
+				var createApiErr *googleapi.Error //nolint:staticcheck
 				if errors.As(err, &createApiErr) && createApiErr.Code == 409 {
 					// Dataset already exists (created by another process), ignore this error
 				} else {
@@ -1345,7 +1345,7 @@ func (d *Client) getTableMetadata(ctx context.Context, datasetID, tableID string
 		result.LastModified = &lastModified
 	}
 	if meta.NumRows > 0 {
-		rowCount := int64(meta.NumRows)
+		rowCount := int64(meta.NumRows) //nolint:gosec // G115: BigQuery row count uint64->int64 is safe; row counts won't exceed int64 max
 		result.RowCount = &rowCount
 	}
 	if meta.NumBytes > 0 {

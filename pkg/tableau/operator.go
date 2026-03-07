@@ -48,14 +48,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return nil
 	}
 
-	switch {
-	case t.Type == pipeline.AssetTypeTableauDatasource:
+	switch t.Type {
+	case pipeline.AssetTypeTableauDatasource:
 		return o.handleDatasourceRefresh(ctx, client, t)
-	case t.Type == pipeline.AssetTypeTableauWorkbook:
+	case pipeline.AssetTypeTableauWorkbook:
 		return o.handleWorkbookRefresh(ctx, client, t)
-	case t.Type == pipeline.AssetTypeTableauWorksheet || t.Type == pipeline.AssetTypeTableauDashboard:
+	case pipeline.AssetTypeTableauWorksheet, pipeline.AssetTypeTableauDashboard:
 		return nil
-	case t.Type == pipeline.AssetTypeTableau:
+	case pipeline.AssetTypeTableau:
 		return o.handleWorkbookRefresh(ctx, client, t)
 	default:
 		return errors.Errorf("unsupported Tableau asset type: %s", t.Type)

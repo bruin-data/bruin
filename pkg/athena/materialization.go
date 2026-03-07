@@ -130,10 +130,10 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]string, error) {
-	switch {
-	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
+	switch task.Materialization.Strategy {
+	case pipeline.MaterializationStrategySCD2ByTime:
 		return buildSCD2ByTimeFullRefresh(task, query, location)
-	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
+	case pipeline.MaterializationStrategySCD2ByColumn:
 		return buildSCD2ByColumnFullRefresh(task, query, location)
 	default:
 		query = strings.TrimSuffix(query, ";")
@@ -167,7 +167,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string, location string
 	if asset.Materialization.TimeGranularity == "" {
 		return nil, errors.New("time_granularity is required for time_interval strategy")
 	}
-	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp || asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
+	if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp && asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate {
 		return nil, errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 

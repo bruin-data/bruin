@@ -1026,7 +1026,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			// Use the interactive TUI only when explicitly requested via --interactive flag
 			useTUI := c.Bool("interactive") &&
-				term.IsTerminal(int(os.Stdout.Fd())) &&
+				term.IsTerminal(int(os.Stdout.Fd())) && //nolint:gosec // G115: safe uintptr->int for terminal check
 				runConfig.Output != "json" &&
 				!noColor
 
@@ -1115,7 +1115,7 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("\n%s\n\n", executionStartLog)
 			}
 			if runConfig.SensorMode != "" {
-				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
+				if runConfig.SensorMode != "skip" && runConfig.SensorMode != "once" && runConfig.SensorMode != "wait" {
 					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
 					return cli.Exit("", 1)
 				}
