@@ -1,6 +1,6 @@
 module github.com/bruin-data/bruin
 
-go 1.25.4
+go 1.25.0
 
 tool (
 	github.com/daixiang0/gci

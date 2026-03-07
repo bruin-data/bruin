@@ -2,6 +2,7 @@ package enhance
 
 import (
 	"context"
+	"io"
 
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -58,6 +59,11 @@ func (e *Enhancer) SetDebug(debug bool) {
 	e.provider.SetDebug(debug)
 }
 
+// SetOutput sets a writer for streaming CLI output.
+func (e *Enhancer) SetOutput(w io.Writer) {
+	e.provider.SetOutput(w)
+}
+
 // EnsureCLI checks if the provider's CLI is available.
 func (e *Enhancer) EnsureCLI() error {
 	return e.provider.EnsureCLI()
@@ -75,7 +81,7 @@ func (e *Enhancer) EnhanceAsset(ctx context.Context, asset *pipeline.Asset, pipe
 
 	// Build prompt with file path and optional pre-fetched stats
 	prompt := BuildEnhancePrompt(asset.DefinitionFile.Path, asset.Name, pipelineName, tableSummaryJSON)
-	systemPrompt := GetSystemPrompt(tableSummaryJSON != "", customSystemPrompt)
+	systemPrompt := customSystemPrompt
 
 	// Call the provider CLI to enhance the asset
 	if err := e.provider.Enhance(ctx, prompt, systemPrompt); err != nil {

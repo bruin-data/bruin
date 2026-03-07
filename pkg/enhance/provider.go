@@ -2,6 +2,7 @@ package enhance
 
 import (
 	"context"
+	"io"
 )
 
 // ProviderType represents the AI provider type.
@@ -20,4 +21,5 @@ type Provider interface {
 	Enhance(ctx context.Context, prompt, systemPrompt string) error
 	SetDebug(debug bool)
 	SetAPIKey(apiKey string) // May be no-op for some providers
+	SetOutput(w io.Writer)   // Sets a writer for streaming CLI output
 }
