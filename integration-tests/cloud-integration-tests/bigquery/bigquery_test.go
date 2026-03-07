@@ -1,6 +1,7 @@
 package bigquery
 
 import (
+	"context"
 	"io"
 	"os"
 	"os/exec"
@@ -1440,7 +1441,7 @@ func copyDir(src string, dst string) error {
 
 func runGitInitInTempPipelines(t *testing.T, tempDir string) {
 	gitDir := filepath.Join(tempDir, "test-pipelines")
-	cmd := exec.Command("git", "init")
+	cmd := exec.CommandContext(context.Background(), "git", "init")
 	cmd.Dir = gitDir
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "Failed to run 'git init' in %s: %s", gitDir, string(output))

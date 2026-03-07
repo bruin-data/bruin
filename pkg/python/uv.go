@@ -264,7 +264,8 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 		return err
 	}
 
-	flags := []string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}
+	flags := make([]string, 0, 8+len(args))
+	flags = append(flags, "tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr")
 	flags = append(flags, args...)
 
 	noDependencyCommand := &CommandInstance{
@@ -938,24 +939,24 @@ func convertTomlConfigToIni(config map[string]any, prefix string) string {
 		switch v := value.(type) {
 		case map[string]any:
 			// Nested section
-			result.WriteString(fmt.Sprintf("[sqlfluff:%s]\n", sectionName))
+			fmt.Fprintf(&result, "[sqlfluff:%s]\n", sectionName)
 			result.WriteString(convertTomlConfigToIni(v, sectionName))
 			result.WriteString("\n")
 		case string:
-			result.WriteString(fmt.Sprintf("%s = %s\n", key, v))
+			fmt.Fprintf(&result, "%s = %s\n", key, v)
 		case bool:
-			result.WriteString(fmt.Sprintf("%s = %t\n", key, v))
+			fmt.Fprintf(&result, "%s = %t\n", key, v)
 		case int, int64, float64:
-			result.WriteString(fmt.Sprintf("%s = %v\n", key, v))
+			fmt.Fprintf(&result, "%s = %v\n", key, v)
 		case []any:
 			// Handle arrays like exclude_rules
-			var items []string
+			items := make([]string, 0, len(v))
 			for _, item := range v {
 				items = append(items, fmt.Sprintf("%v", item))
 			}
-			result.WriteString(fmt.Sprintf("%s = %s\n", key, strings.Join(items, ",")))
+			fmt.Fprintf(&result, "%s = %s\n", key, strings.Join(items, ","))
 		default:
-			result.WriteString(fmt.Sprintf("%s = %v\n", key, v))
+			fmt.Fprintf(&result, "%s = %v\n", key, v)
 		}
 	}
 
@@ -1003,41 +1004,43 @@ func (s *SqlfluffRunner) createSqlfluffConfigWithJinjaContext(sqlFilePath string
 	}
 
 	// Start with basic sqlfluff config
-	configContent := "[sqlfluff]\ntemplater = jinja\n\n"
+	var configBuilder strings.Builder
+	configBuilder.WriteString("[sqlfluff]\ntemplater = jinja\n\n")
 
 	// Merge user's existing sqlfluff configuration if available
 	if userSqlfluffConfig != nil {
 		// Convert user's TOML config to INI format and append
 		userConfigSection := convertTomlConfigToIni(userSqlfluffConfig, "")
 		if userConfigSection != "" {
-			configContent += userConfigSection + "\n"
+			configBuilder.WriteString(userConfigSection)
+			configBuilder.WriteString("\n")
 		}
 	}
 
 	// Add Jinja context section
-	configContent += "[sqlfluff:templater:jinja:context]\n"
+	configBuilder.WriteString("[sqlfluff:templater:jinja:context]\n")
 
 	// Add pipeline variables under var namespace
 	for varName, varValue := range pipelineVars {
 		if strValue, ok := varValue.(string); ok {
-			configContent += fmt.Sprintf("var.%s = %s\n", varName, strValue)
+			fmt.Fprintf(&configBuilder, "var.%s = %s\n", varName, strValue)
 		} else {
-			configContent += fmt.Sprintf("var.%s = placeholder\n", varName)
+			fmt.Fprintf(&configBuilder, "var.%s = placeholder\n", varName)
 		}
 	}
 
 	// Add standard Bruin variables
-	configContent += "end_date = 2024-01-01\n"
-	configContent += "start_date = 2024-01-01\n"
-	configContent += "start_datetime = 2024-01-01 00:00:00\n"
-	configContent += "end_datetime = 2024-01-01 00:00:00\n"
-	configContent += "start_timestamp = 2024-01-01 00:00:00\n"
-	configContent += "end_timestamp = 2024-01-01 00:00:00\n"
-	configContent += "pipeline = placeholder\n"
-	configContent += "run_id = placeholder\n"
-	configContent += fmt.Sprintf("this = %s\n", filepath.Base(strings.TrimSuffix(sqlFilePath, filepath.Ext(sqlFilePath))))
+	configBuilder.WriteString("end_date = 2024-01-01\n")
+	configBuilder.WriteString("start_date = 2024-01-01\n")
+	configBuilder.WriteString("start_datetime = 2024-01-01 00:00:00\n")
+	configBuilder.WriteString("end_datetime = 2024-01-01 00:00:00\n")
+	configBuilder.WriteString("start_timestamp = 2024-01-01 00:00:00\n")
+	configBuilder.WriteString("end_timestamp = 2024-01-01 00:00:00\n")
+	configBuilder.WriteString("pipeline = placeholder\n")
+	configBuilder.WriteString("run_id = placeholder\n")
+	fmt.Fprintf(&configBuilder, "this = %s\n", filepath.Base(strings.TrimSuffix(sqlFilePath, filepath.Ext(sqlFilePath))))
 
-	return configContent
+	return configBuilder.String()
 }
 
 func (s *SqlfluffRunner) formatSQLFileWithDialect(ctx context.Context, sqlFile, dialect string, repo *git.Repo) error {

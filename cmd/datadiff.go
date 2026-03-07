@@ -946,7 +946,7 @@ func getColumnTypesComparisonTable(schemaComparison diff.SchemaComparisonResult,
 		value2     string
 	}
 
-	allRows := make([]tableRow, 0)
+	allRows := make([]tableRow, 0, 3*len(columnNames))
 
 	// Add rows for each column with detailed properties
 	for _, columnName := range columnNames {

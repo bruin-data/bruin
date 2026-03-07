@@ -32,7 +32,7 @@ type MockRows struct {
 }
 
 func (r MockRows) ColumnTypes() []driver.ColumnType {
-	result := make([]driver.ColumnType, 0)
+	result := make([]driver.ColumnType, 0, len(r.types))
 	for _, col := range r.types {
 		result = append(result, col)
 	}

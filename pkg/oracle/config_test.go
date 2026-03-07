@@ -312,7 +312,7 @@ func TestConfig_GetIngestrURI_Error(t *testing.T) {
 
 	uri, err := config.GetIngestrURI()
 	require.Error(t, err)
-	assert.Equal(t, "", uri)
+	assert.Empty(t, uri)
 	assert.Contains(t, err.Error(), "either ServiceName or SID must be specified")
 }
 

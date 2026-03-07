@@ -105,7 +105,7 @@ func printErrorJSON(err error) {
 
 func printErrors(errs []error, output string, message string) {
 	if output == "json" {
-		errorList := []string{}
+		errorList := make([]string, 0, len(errs))
 		for _, v := range errs {
 			errorList = append(errorList, v.Error())
 		}

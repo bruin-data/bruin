@@ -26,7 +26,7 @@ func Docs() *cli.Command {
 			openFlag := c.Bool("open")
 
 			if openFlag {
-				err := openBrowser(docsURL)
+				err := openBrowser(ctx, docsURL)
 				if err != nil {
 					return errors.Wrap(err, "failed to open the browser")
 				}
@@ -41,15 +41,15 @@ func Docs() *cli.Command {
 	}
 }
 
-func openBrowser(url string) error {
+func openBrowser(ctx context.Context, url string) error {
 	var err error
 	switch runtime.GOOS {
 	case "linux":
-		err = exec.Command("xdg-open", url).Start()
-	case "windows":
-		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		err = exec.CommandContext(ctx, "xdg-open", url).Start()
+	case osWindows:
+		err = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", url).Start()
 	case "darwin":
-		err = exec.Command("open", url).Start()
+		err = exec.CommandContext(ctx, "open", url).Start()
 	default:
 		return errors.New("unsupported platform")
 	}

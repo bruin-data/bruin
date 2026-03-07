@@ -102,19 +102,20 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	}
 
 	scanner := bufio.NewScanner(file)
-	content := ""
+	var contentBuilder strings.Builder
 	for range commentRowEnd {
 		scanner.Scan()
 	}
 
 	for scanner.Scan() {
-		content += scanner.Text() + "\n"
+		contentBuilder.WriteString(scanner.Text())
+		contentBuilder.WriteByte('\n')
 	}
 
 	task.ExecutableFile = ExecutableFile{
 		Name:    filepath.Base(filePath),
 		Path:    absFilePath,
-		Content: strings.TrimSpace(content),
+		Content: strings.TrimSpace(contentBuilder.String()),
 	}
 
 	return task, nil
@@ -123,7 +124,7 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 func readUntilComments(file afero.File, prefixes, suffixes []string) (string, int) {
 	scanner := bufio.NewScanner(file)
 	defer func() { _, _ = file.Seek(0, io.SeekStart) }()
-	rows := ""
+	var rowsBuilder strings.Builder
 	rowCount := 0
 
 	seenPrefix := false
@@ -154,10 +155,11 @@ OUTER:
 		}
 
 		// Add the content line
-		rows += rowText + "\n"
+		rowsBuilder.WriteString(rowText)
+		rowsBuilder.WriteByte('\n')
 	}
 
-	return strings.TrimSpace(rows), rowCount
+	return strings.TrimSpace(rowsBuilder.String()), rowCount
 }
 
 func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath string) (*Asset, error) {

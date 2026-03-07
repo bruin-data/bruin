@@ -35,14 +35,17 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 	var queryString string
 	var err error
 
-	if a.Type == pipeline.AssetTypeBigqueryQuery {
+	switch a.Type {
+	case pipeline.AssetTypeBigqueryQuery:
 		queryString = a.ExecutableFile.Content
-	} else if a.Type == pipeline.AssetTypeBigqueryQuerySensor {
+	case pipeline.AssetTypeBigqueryQuerySensor:
 		queryParam, ok := a.Parameters["query"]
 		if !ok {
 			return nil, errors.New("query sensor requires a parameter named 'query'")
 		}
 		queryString = queryParam
+	default:
+		return nil, errors.New("asset-metadata is only available for BigQuery SQL assets and BigQuery query sensors")
 	}
 
 	queries, err := r.QueryExtractor.ExtractQueriesFromString(queryString)

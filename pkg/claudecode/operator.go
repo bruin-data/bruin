@@ -133,7 +133,7 @@ func (o *ClaudeCodeOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 	if err != nil {
 		logger.Debug("Claude CLI not found, attempting to install...")
 		log(ctx, "Claude CLI not found, installing...")
-		claudePath, err = o.installClaudeCLI(logger)
+		claudePath, err = o.installClaudeCLI(logger) //nolint:contextcheck
 		if err != nil {
 			return errors.Wrap(err, "failed to install Claude CLI")
 		}
@@ -481,7 +481,7 @@ func (o *ClaudeCodeOperator) installClaudeCLI(logger logger.Logger) (string, err
 	// Run the official installation script
 	// Note: This requires bash and curl to be available, which may not be the case on Windows.
 	// Windows users should install Claude CLI manually or use WSL.
-	installCmd := exec.Command("bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash")
+	installCmd := exec.CommandContext(context.Background(), "bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash")
 
 	var stdout, stderr bytes.Buffer
 	installCmd.Stdout = &stdout

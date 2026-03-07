@@ -309,7 +309,7 @@ func validateFlags(connection, query, asset string) error {
 
 	switch {
 	case hasConnection:
-		if !(hasConnection && hasQuery) {
+		if !hasConnection || !hasQuery {
 			return errors.New("direct query mode requires both --connection and --query flags")
 		}
 		if hasAsset {
