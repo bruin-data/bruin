@@ -16,5 +16,7 @@ type Parser interface {
 	Close() error
 }
 
-var _ Parser = (*SQLParser)(nil)
-var _ Parser = (*RustSQLParser)(nil)
+var (
+	_ Parser = (*SQLParser)(nil)
+	_ Parser = (*RustSQLParser)(nil)
+)
