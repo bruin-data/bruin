@@ -29,6 +29,7 @@ deps:
 
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
+	@$(MAKE) rustsqlparser-lib
 	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 build-no-duckdb: deps
@@ -81,7 +82,12 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
+	@$(MAKE) rustsqlparser-lib
 	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
+
+rustsqlparser-lib:
+	@echo "$(OK_COLOR)==> Building Rust SQL parser static library$(NO_COLOR)"
+	@cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 
 format: lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \

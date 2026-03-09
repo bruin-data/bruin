@@ -43,6 +43,8 @@ func Internal() *cli.Command {
 		Commands: []*cli.Command{
 			ParseAsset(),
 			ParsePipeline(),
+			InternalSQLGlot(),
+			InternalPolyglot(),
 			PatchAsset(),
 			PatchPipeline(),
 			ParseGlossary(),
