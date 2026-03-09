@@ -208,7 +208,7 @@ func splitTopLevelCSV(selectList string) []string {
 	inDoubleQuote := false
 	inBacktick := false
 
-	for i := 0; i < len(selectList); i++ {
+	for i := range len(selectList) {
 		switch {
 		case inSingleQuote:
 			if selectList[i] == '\'' && !isEscaped(selectList, i) {
@@ -373,9 +373,7 @@ func lastTopLevelToken(expression string) string {
 func normalizeIdentifier(value string) string {
 	value = strings.TrimSpace(value)
 	value = strings.Trim(value, "`\"")
-	if strings.HasSuffix(value, ".*") {
-		value = strings.TrimSuffix(value, ".*")
-	}
+	value = strings.TrimSuffix(value, ".*")
 	if index := strings.LastIndex(value, "."); index != -1 {
 		value = value[index+1:]
 	}

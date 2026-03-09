@@ -9,6 +9,8 @@ import (
 )
 
 func TestRustSQLParserSmoke(t *testing.T) {
+	t.Parallel()
+
 	parser, err := NewRustSQLParser(false)
 	require.NoError(t, err)
 

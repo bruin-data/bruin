@@ -1012,7 +1012,6 @@ join t2
 	normalize := newNormalizer(t)
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
-		parser := parser
 		t.Run(parser.name, func(t *testing.T) {
 			for _, tt := range tests { //nolint
 				t.Run(tt.name, func(t *testing.T) {
@@ -1435,7 +1434,6 @@ func TestSqlParser_IsSingleSelectQuery(t *testing.T) {
 	}
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
-		parser := parser
 		t.Run(parser.name, func(t *testing.T) {
 			for _, tt := range tests { //nolint
 				t.Run(tt.name, func(t *testing.T) {
@@ -1622,7 +1620,6 @@ func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
 	cases := loadFixture[pythonMainLineageCase](t, "python_main_lineage_cases.json")
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
-		parser := parser
 		t.Run(parser.name, func(t *testing.T) {
 			for idx, testCase := range cases { //nolint:paralleltest
 				t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
@@ -1639,7 +1636,6 @@ func TestExtractNonSelectColumn_PythonMainCases(t *testing.T) {
 	cases := loadFixture[pythonMainNonSelectedCase](t, "python_main_non_selected_cases.json")
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
-		parser := parser
 		t.Run(parser.name, func(t *testing.T) {
 			for idx, testCase := range cases { //nolint:paralleltest
 				t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
@@ -1729,7 +1725,6 @@ select * from SOME_OTHER_DWH.dbo.my_table;
 	}
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
-		parser := parser
 		t.Run(parser.name, func(t *testing.T) {
 			for _, tt := range tests { //nolint
 				t.Run(tt.name, func(t *testing.T) {
@@ -2004,7 +1999,6 @@ LIMIT 10
 	}
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
-		parser := parser
 		t.Run(parser.name, func(t *testing.T) {
 			for _, tt := range tests { //nolint
 				t.Run(tt.name, func(t *testing.T) {
