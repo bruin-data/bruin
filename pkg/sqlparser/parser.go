@@ -415,8 +415,11 @@ func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error
 }
 
 func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
-	err := s.Start()
-	if err != nil {
+	return getMissingDependenciesForAsset(s, asset, pipeline, renderer)
+}
+
+func getMissingDependenciesForAsset(p Parser, asset *pipeline.Asset, pl *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
+	if err := p.Start(); err != nil {
 		return []string{}, errors.Wrap(err, "failed to start sql parser")
 	}
 
@@ -425,12 +428,12 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 		return []string{}, nil //nolint:nilerr
 	}
 
-	renderedQ, err := renderer.Render(mergeMacrosWithQuery(asset.ExecutableFile.Content, pipeline.Macros))
+	renderedQ, err := renderer.Render(mergeMacrosWithQuery(asset.ExecutableFile.Content, pl.Macros))
 	if err != nil {
 		return []string{}, errors.New("failed to render the query before parsing the SQL")
 	}
 
-	tables, err := s.UsedTables(renderedQ, dialect)
+	tables, err := p.UsedTables(renderedQ, dialect)
 	if err != nil {
 		return []string{}, errors.Wrap(err, "failed to get used tables")
 	}
@@ -439,8 +442,8 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 		return []string{}, nil
 	}
 
-	pipelineAssetNames := make(map[string]bool, len(pipeline.Assets))
-	for _, a := range pipeline.Assets {
+	pipelineAssetNames := make(map[string]bool, len(pl.Assets))
+	for _, a := range pl.Assets {
 		pipelineAssetNames[strings.ToLower(a.Name)] = true
 	}
 
@@ -464,17 +467,14 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 			continue
 		}
 
-		// if the table is in the dependency list already, move on
 		if _, ok := depsNameMap[usedTable]; ok {
 			continue
 		}
 
-		// report this issue only if there's an asset with the same name, otherwise ignore
 		if _, ok := pipelineAssetNames[usedTable]; !ok {
 			continue
 		}
 
-		// otherwise, report the issue
 		missingDependencies = append(missingDependencies, actualReferenceName)
 	}
 

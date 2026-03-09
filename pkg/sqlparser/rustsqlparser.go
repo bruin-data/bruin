@@ -3,7 +3,6 @@ package sqlparser
 import (
 	"encoding/json"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -13,7 +12,6 @@ import (
 
 type RustSQLParser struct {
 	started        bool
-	randomize      bool
 	MaxQueryLength int
 
 	mutex      sync.Mutex
@@ -24,9 +22,8 @@ func NewRustSQLParser(randomize bool) (*RustSQLParser, error) {
 	return NewRustSQLParserWithConfig(randomize, 10000)
 }
 
-func NewRustSQLParserWithConfig(randomize bool, maxQueryLength int) (*RustSQLParser, error) {
+func NewRustSQLParserWithConfig(_ bool, maxQueryLength int) (*RustSQLParser, error) {
 	return &RustSQLParser{
-		randomize:      randomize,
 		MaxQueryLength: maxQueryLength,
 	}, nil
 }
@@ -217,66 +214,7 @@ func (s *RustSQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, e
 }
 
 func (s *RustSQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
-	if err := s.Start(); err != nil {
-		return []string{}, errors.Wrap(err, "failed to start rust sql parser")
-	}
-
-	dialect, err := AssetTypeToDialect(asset.Type)
-	if err != nil {
-		return []string{}, nil //nolint:nilerr
-	}
-
-	renderedQ, err := renderer.Render(mergeMacrosWithQuery(asset.ExecutableFile.Content, pipeline.Macros))
-	if err != nil {
-		return []string{}, errors.New("failed to render the query before parsing the SQL")
-	}
-
-	tables, err := s.UsedTables(renderedQ, dialect)
-	if err != nil {
-		return []string{}, errors.Wrap(err, "failed to get used tables")
-	}
-
-	if len(tables) == 0 && len(asset.Upstreams) == 0 {
-		return []string{}, nil
-	}
-
-	pipelineAssetNames := make(map[string]bool, len(pipeline.Assets))
-	for _, a := range pipeline.Assets {
-		pipelineAssetNames[strings.ToLower(a.Name)] = true
-	}
-
-	usedTableNameMap := make(map[string]string, len(tables))
-	for _, table := range tables {
-		usedTableNameMap[strings.ToLower(table)] = table
-	}
-
-	depsNameMap := make(map[string]string, len(asset.Upstreams))
-	for _, upstream := range asset.Upstreams {
-		if upstream.Type != "asset" {
-			continue
-		}
-
-		depsNameMap[strings.ToLower(upstream.Value)] = upstream.Value
-	}
-
-	missingDependencies := make([]string, 0)
-	for usedTable, actualReferenceName := range usedTableNameMap {
-		if usedTable == asset.Name || actualReferenceName == asset.Name {
-			continue
-		}
-
-		if _, ok := depsNameMap[usedTable]; ok {
-			continue
-		}
-
-		if _, ok := pipelineAssetNames[usedTable]; !ok {
-			continue
-		}
-
-		missingDependencies = append(missingDependencies, actualReferenceName)
-	}
-
-	return missingDependencies, nil
+	return getMissingDependenciesForAsset(s, asset, pipeline, renderer)
 }
 
 func (s *RustSQLParser) Close() error {

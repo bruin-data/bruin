@@ -1009,6 +1009,8 @@ join t2
 		},
 	}
 
+	normalize := newNormalizer(t)
+
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
 		parser := parser
 		t.Run(parser.name, func(t *testing.T) {
@@ -1027,7 +1029,7 @@ join t2
 
 					expected := tt.want
 					if tt.normalizeExpected {
-						expected = normalizeQueryWithSQLParser(t, tt.want, "bigquery")
+						expected = normalize(tt.want, "bigquery")
 					}
 
 					require.Equal(t, expected, got)
@@ -1526,17 +1528,6 @@ func startParsersForParity(t *testing.T) []startedParser {
 	return started
 }
 
-func rawSchemaToSchema(t *testing.T, raw map[string]interface{}) Schema {
-	t.Helper()
-
-	payload, err := json.Marshal(raw)
-	require.NoError(t, err)
-
-	var schema Schema
-	require.NoError(t, json.Unmarshal(payload, &schema))
-	return schema
-}
-
 func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string, schema map[string]interface{}) *Lineage {
 	t.Helper()
 
@@ -1566,7 +1557,9 @@ func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string,
 	return &result
 }
 
-func normalizeQueryWithSQLParser(t *testing.T, query, dialect string) string {
+// newNormalizer returns a function that normalizes SQL through the sqlglot parser.
+// It creates a single parser instance that is cleaned up when the test finishes.
+func newNormalizer(t *testing.T) func(query, dialect string) string {
 	t.Helper()
 
 	parser, err := NewSQLParser(true)
@@ -1576,9 +1569,12 @@ func normalizeQueryWithSQLParser(t *testing.T, query, dialect string) string {
 		require.NoError(t, parser.Close())
 	})
 
-	normalized, err := parser.RenameTables(query, dialect, map[string]string{})
-	require.NoError(t, err)
-	return normalized
+	return func(query, dialect string) string {
+		t.Helper()
+		normalized, err := parser.RenameTables(query, dialect, map[string]string{})
+		require.NoError(t, err)
+		return normalized
+	}
 }
 
 func flattenNonSelectedColumns(columns []ColumnLineage) []pythonSelectedColumn {
