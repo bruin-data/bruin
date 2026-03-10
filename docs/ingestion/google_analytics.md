@@ -22,7 +22,7 @@ Follow the steps below to correctly set up Google Analytics as a data source and
 ```
 
 - `service_account_file`: The path to the service account JSON file
-- `property_id`: It is a unique number that identifies a particular property on Google Analytics. Follow this guide to know about [property ID](https://developers.google.com/analytics/devguides/reporting/data/v1/property-id#what_is_my_property_id).
+- `property_id`: It is a unique number that identifies a particular property on Google Analytics. You can also provide multiple property IDs separated by commas (e.g., `"1234,5678"`). Follow this guide to know about [property ID](https://developers.google.com/analytics/devguides/reporting/data/v1/property-id#what_is_my_property_id).
 
 ### Step 2: Create an asset file for data ingestion
 
