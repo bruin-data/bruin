@@ -6,7 +6,6 @@ use polyglot_sql::{generate, parse, parse_one, DialectType, Expression};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::str::FromStr;
 
 type SchemaLookup = HashMap<String, HashMap<String, String>>;
 
@@ -25,7 +24,7 @@ struct ColumnLineage {
 }
 
 #[derive(Debug, Clone, Serialize)]
-struct LineageResponse {
+pub(crate) struct LineageResponse {
     columns: Vec<ColumnLineage>,
     non_selected_columns: Vec<ColumnLineage>,
     errors: Vec<String>,
@@ -37,75 +36,7 @@ struct SelectedOutput {
     expr: Option<Value>,
 }
 
-pub fn lineage_command(contents: &Value) -> Result<Value, String> {
-    let query = required_str(contents, "query")?;
-    let dialect = parse_dialect(required_str(contents, "dialect")?)?;
-    let schema = contents.get("schema").cloned().unwrap_or_else(empty_object);
-
-    serde_json::to_value(get_column_lineage(query, &schema, dialect)).map_err(|err| err.to_string())
-}
-
-pub fn get_tables_command(contents: &Value) -> Result<Value, String> {
-    let query = required_str(contents, "query")?;
-    let dialect = parse_dialect(required_str(contents, "dialect")?)?;
-    Ok(get_tables(query, dialect))
-}
-
-pub fn replace_table_references_command(contents: &Value) -> Result<Value, String> {
-    let query = required_str(contents, "query")?;
-    let dialect = parse_dialect(required_str(contents, "dialect")?)?;
-    let table_mapping = contents
-        .get("table_mapping")
-        .and_then(Value::as_object)
-        .ok_or_else(|| "missing table_mapping".to_string())?;
-
-    let mapping = table_mapping
-        .iter()
-        .map(|(key, value)| {
-            value
-                .as_str()
-                .map(|value| (key.clone(), value.to_string()))
-                .ok_or_else(|| format!("table_mapping value for {key} must be a string"))
-        })
-        .collect::<Result<HashMap<_, _>, _>>()?;
-
-    Ok(replace_table_references(query, dialect, &mapping))
-}
-
-pub fn add_limit_command(contents: &Value) -> Result<Value, String> {
-    let query = required_str(contents, "query")?;
-    let limit = contents
-        .get("limit")
-        .and_then(Value::as_i64)
-        .ok_or_else(|| "missing limit".to_string())?;
-    let dialect = parse_optional_dialect(contents.get("dialect"))?;
-
-    Ok(add_limit(query, limit as usize, dialect))
-}
-
-pub fn is_single_select_command(contents: &Value) -> Result<Value, String> {
-    let query = required_str(contents, "query")?;
-    let dialect = parse_optional_dialect(contents.get("dialect"))?;
-    Ok(is_single_select_query(query, dialect))
-}
-
-fn required_str<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
-    value
-        .get(key)
-        .and_then(Value::as_str)
-        .ok_or_else(|| format!("missing {key}"))
-}
-
-fn parse_dialect(value: &str) -> Result<DialectType, String> {
-    DialectType::from_str(value).map_err(|err| err.to_string())
-}
-
-fn parse_optional_dialect(value: Option<&Value>) -> Result<DialectType, String> {
-    match value.and_then(Value::as_str) {
-        Some(value) if !value.trim().is_empty() => parse_dialect(value),
-        _ => Ok(DialectType::Generic),
-    }
-}
+// Core functions called directly from FFI entry points in lib.rs.
 
 fn expression_to_value(expression: &Expression) -> Value {
     serde_json::to_value(expression).expect("expression should serialize")
@@ -1766,7 +1697,7 @@ fn tsql_function_table_names(ast_node: &Value) -> Vec<String> {
     names
 }
 
-fn get_tables(query: &str, dialect: DialectType) -> Value {
+pub fn get_tables(query: &str, dialect: DialectType) -> Value {
     let parsed = match parse(query, dialect) {
         Ok(parsed) => parsed,
         Err(err) => return json!({ "tables": [], "error": err.to_string() }),
@@ -1823,7 +1754,7 @@ fn get_tables(query: &str, dialect: DialectType) -> Value {
     json!({ "tables": tables.into_iter().collect::<Vec<_>>() })
 }
 
-fn replace_table_references(
+pub fn replace_table_references(
     query: &str,
     dialect: DialectType,
     table_references: &HashMap<String, String>,
@@ -1967,7 +1898,7 @@ fn rewrite_table_object(table_value: &mut Value, table_references: &HashMap<Stri
     }
 }
 
-fn add_limit(query: &str, limit_value: usize, dialect: DialectType) -> Value {
+pub fn add_limit(query: &str, limit_value: usize, dialect: DialectType) -> Value {
     let parsed = match parse_one(query, dialect) {
         Ok(parsed) => parsed,
         Err(_) => return json!({ "error": "cannot parse query" }),
@@ -2006,7 +1937,7 @@ fn add_limit(query: &str, limit_value: usize, dialect: DialectType) -> Value {
     }
 }
 
-fn is_single_select_query(query: &str, dialect: DialectType) -> Value {
+pub fn is_single_select_query(query: &str, dialect: DialectType) -> Value {
     if query.trim().is_empty() {
         return json!({ "is_single_select": false, "error": "cannot parse query" });
     }
@@ -2081,7 +2012,7 @@ fn update_table_object(
     }
 }
 
-fn get_column_lineage(query: &str, schema: &Value, dialect: DialectType) -> LineageResponse {
+pub fn get_column_lineage(query: &str, schema: &Value, dialect: DialectType) -> LineageResponse {
     let parsed = match parse_one(query, dialect) {
         Ok(parsed) => parsed,
         Err(err) => {

@@ -1526,25 +1526,26 @@ func startParsersForParity(t *testing.T) []startedParser {
 	return started
 }
 
-func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string, schema map[string]interface{}) *Lineage {
+func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string, schema map[string]any) *Lineage {
 	t.Helper()
 
-	command := &parserCommand{
-		Command: "lineage",
-		Contents: map[string]interface{}{
-			"query":   query,
-			"dialect": dialect,
-			"schema":  schema,
-		},
-	}
+	schemaJSON, err := json.Marshal(schema)
+	require.NoError(t, err)
 
 	var responsePayload string
-	var err error
-	switch parser := parser.(type) {
+	switch p := parser.(type) {
 	case *SQLParser:
-		responsePayload, err = parser.sendCommand(command)
+		command := &parserCommand{
+			Command: "lineage",
+			Contents: map[string]any{
+				"query":   query,
+				"dialect": dialect,
+				"schema":  schema,
+			},
+		}
+		responsePayload, err = p.sendCommand(command)
 	case *RustSQLParser:
-		responsePayload, err = parser.sendCommand(command)
+		responsePayload, err = p.columnLineageRawJSON(query, dialect, string(schemaJSON))
 	default:
 		t.Fatalf("unsupported parser type %T", parser)
 	}

@@ -3,7 +3,6 @@ package sqlparser
 import (
 	"encoding/json"
 	"sort"
-	"sync"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -11,15 +10,11 @@ import (
 )
 
 type RustSQLParser struct {
-	started        bool
 	MaxQueryLength int
-
-	mutex      sync.Mutex
-	startMutex sync.Mutex
 }
 
-func NewRustSQLParser(randomize bool) (*RustSQLParser, error) {
-	return NewRustSQLParserWithConfig(randomize, 10000)
+func NewRustSQLParser(_ bool) (*RustSQLParser, error) {
+	return NewRustSQLParserWithConfig(false, 10000)
 }
 
 func NewRustSQLParserWithConfig(_ bool, maxQueryLength int) (*RustSQLParser, error) {
@@ -29,22 +24,7 @@ func NewRustSQLParserWithConfig(_ bool, maxQueryLength int) (*RustSQLParser, err
 }
 
 func (s *RustSQLParser) Start() error {
-	s.startMutex.Lock()
-	defer s.startMutex.Unlock()
-	if s.started {
-		return nil
-	}
-
-	if err := ensureRustSQLParserFFI(); err != nil {
-		return err
-	}
-
-	if _, err := s.sendCommand(&parserCommand{Command: "init"}); err != nil {
-		return err
-	}
-
-	s.started = true
-	return nil
+	return ensureRustSQLParserFFI()
 }
 
 func (s *RustSQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
@@ -56,16 +36,12 @@ func (s *RustSQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Line
 		}, nil
 	}
 
-	command := parserCommand{
-		Command: "lineage",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"dialect": dialect,
-			"schema":  schema,
-		},
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal schema")
 	}
 
-	resp, err := s.sendCommand(&command)
+	resp, err := rustFFIColumnLineage(sql, dialect, string(schemaJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -78,22 +54,14 @@ func (s *RustSQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Line
 	return &lineage, nil
 }
 
+func (s *RustSQLParser) columnLineageRawJSON(sql, dialect string, schemaJSON string) (string, error) {
+	return rustFFIColumnLineage(sql, dialect, schemaJSON)
+}
+
 func (s *RustSQLParser) UsedTables(sql, dialect string) ([]string, error) {
-	if err := s.Start(); err != nil {
-		return nil, errors.Wrap(err, "failed to start rust sql parser")
-	}
-
-	command := parserCommand{
-		Command: "get-tables",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"dialect": dialect,
-		},
-	}
-
-	resp, err := s.sendCommand(&command)
+	resp, err := rustFFIGetTables(sql, dialect)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to send command")
+		return nil, errors.Wrap(err, "failed to get tables")
 	}
 
 	var tables struct {
@@ -113,22 +81,14 @@ func (s *RustSQLParser) UsedTables(sql, dialect string) ([]string, error) {
 }
 
 func (s *RustSQLParser) RenameTables(sql string, dialect string, tableMapping map[string]string) (string, error) {
-	if err := s.Start(); err != nil {
-		return "", errors.Wrap(err, "failed to start rust sql parser")
-	}
-
-	command := parserCommand{
-		Command: "replace-table-references",
-		Contents: map[string]interface{}{
-			"query":         sql,
-			"dialect":       dialect,
-			"table_mapping": tableMapping,
-		},
-	}
-
-	responsePayload, err := s.sendCommand(&command)
+	mappingJSON, err := json.Marshal(tableMapping)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to send command")
+		return "", errors.Wrap(err, "failed to marshal table mapping")
+	}
+
+	responsePayload, err := rustFFIRenameTables(sql, dialect, string(mappingJSON))
+	if err != nil {
+		return "", errors.Wrap(err, "failed to rename tables")
 	}
 
 	var resp struct {
@@ -147,22 +107,9 @@ func (s *RustSQLParser) RenameTables(sql string, dialect string, tableMapping ma
 }
 
 func (s *RustSQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
-	if err := s.Start(); err != nil {
-		return "", errors.Wrap(err, "failed to start rust sql parser")
-	}
-
-	command := parserCommand{
-		Command: "add-limit",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"limit":   limit,
-			"dialect": dialect,
-		},
-	}
-
-	responsePayload, err := s.sendCommand(&command)
+	responsePayload, err := rustFFIAddLimit(sql, limit, dialect)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to send command")
+		return "", errors.Wrap(err, "failed to add limit")
 	}
 
 	var resp struct {
@@ -181,21 +128,9 @@ func (s *RustSQLParser) AddLimit(sql string, limit int, dialect string) (string,
 }
 
 func (s *RustSQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error) {
-	if err := s.Start(); err != nil {
-		return false, errors.Wrap(err, "failed to start rust sql parser")
-	}
-
-	command := parserCommand{
-		Command: "is-single-select",
-		Contents: map[string]interface{}{
-			"query":   sql,
-			"dialect": dialect,
-		},
-	}
-
-	responsePayload, err := s.sendCommand(&command)
+	responsePayload, err := rustFFIIsSingleSelect(sql, dialect)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to send command")
+		return false, errors.Wrap(err, "failed to check single select")
 	}
 
 	var resp struct {
@@ -218,29 +153,5 @@ func (s *RustSQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pi
 }
 
 func (s *RustSQLParser) Close() error {
-	if !s.started {
-		return nil
-	}
-
-	_, _ = s.sendCommand(&parserCommand{Command: "exit"})
-	s.started = false
 	return nil
-}
-
-func (s *RustSQLParser) sendCommand(pc *parserCommand) (string, error) {
-	if !s.started && pc.Command != "init" && pc.Command != "exit" {
-		if err := s.Start(); err != nil {
-			return "", err
-		}
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	jsonCommand, err := json.Marshal(pc)
-	if err != nil {
-		return "", err
-	}
-
-	return rustSQLParserFFIExecute(string(jsonCommand))
 }
