@@ -2,6 +2,15 @@
 
 This document provides comprehensive information for AI agents to understand and contribute to the Bruin project effectively.
 
+## Before You Finish: Mandatory Checks
+
+**You MUST run these commands before completing any task that modifies code:**
+
+1. **Format the code**: Run `make format` in the project root. Check `git diff` afterward — if there are formatting changes, stage and include them in your work.
+2. **Run the tests**: Run `make test` in the project root. If any tests fail, fix the issues before finishing.
+
+Do not consider your task complete until both checks pass. Use the `/format-fix` and `/test` commands if needed.
+
 ## Table of Contents
 
 1. [Project Overview](#project-overview)
