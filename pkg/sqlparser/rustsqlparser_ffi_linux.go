@@ -5,10 +5,11 @@ package sqlparser
 /*
 #cgo LDFLAGS: -L${SRCDIR}/rustffi/target/release -lbruin_rustsqlparser -ldl -lpthread -lm -lc
 #include <stdlib.h>
+#include <stdint.h>
 
 char* bruin_rustsqlparser_get_tables(const char* query, const char* dialect);
 char* bruin_rustsqlparser_rename_tables(const char* query, const char* dialect, const char* table_mapping_json);
-char* bruin_rustsqlparser_add_limit(const char* query, long long limit, const char* dialect);
+char* bruin_rustsqlparser_add_limit(const char* query, int64_t limit, const char* dialect);
 char* bruin_rustsqlparser_is_single_select(const char* query, const char* dialect);
 char* bruin_rustsqlparser_column_lineage(const char* query, const char* dialect, const char* schema_json);
 void bruin_rustsqlparser_free_string(char* value);
@@ -56,7 +57,7 @@ func rustFFIAddLimit(query string, limit int, dialect string) (string, error) {
 	cDialect := C.CString(dialect)
 	defer C.free(unsafe.Pointer(cQuery))
 	defer C.free(unsafe.Pointer(cDialect))
-	return ffiCall(C.bruin_rustsqlparser_add_limit(cQuery, C.longlong(limit), cDialect))
+	return ffiCall(C.bruin_rustsqlparser_add_limit(cQuery, C.int64_t(limit), cDialect))
 }
 
 func rustFFIIsSingleSelect(query, dialect string) (string, error) {
