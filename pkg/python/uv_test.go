@@ -22,6 +22,15 @@ func (m *mockUvInstaller) EnsureUvInstalled(ctx context.Context) (string, error)
 	return called.String(0), called.Error(1)
 }
 
+type mockCmd struct {
+	mock.Mock
+}
+
+func (m *mockCmd) Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
+	args := m.Called(ctx, repo, command)
+	return args.Error(0)
+}
+
 func Test_uvPythonRunner_Run(t *testing.T) {
 	t.Parallel()
 

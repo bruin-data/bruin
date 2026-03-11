@@ -132,13 +132,11 @@ func SendEventWithAssetStats(event string, stats map[string]int, cmd *cli.Comman
 		properties["downstream"] = cmd.Bool("downstream")
 		properties["push_metadata"] = cmd.Bool("push-metadata")
 		properties["full_refresh"] = cmd.Bool("full-refresh")
-		properties["use_pip"] = cmd.Bool("use-pip")
 		properties["force"] = cmd.Bool("force")
 	} else {
 		properties["downstream"] = false
 		properties["push_metadata"] = false
 		properties["full_refresh"] = false
-		properties["use_pip"] = false
 		properties["force"] = false
 	}
 
