@@ -1609,6 +1609,9 @@
         "service_account_file": {
           "type": "string"
         },
+        "service_account_json": {
+          "type": "string"
+        },
         "property_id": {
           "type": "string"
         }
@@ -1617,7 +1620,6 @@
       "type": "object",
       "required": [
         "name",
-        "service_account_file",
         "property_id"
       ]
     },
