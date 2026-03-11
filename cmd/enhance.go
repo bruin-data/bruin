@@ -130,7 +130,10 @@ func enhanceSingleAssetWithTUI(ctx context.Context, c *cli.Command, inputPath st
 	// Save the real terminal and redirect all output so only the TUI writes to the terminal.
 	// color.Output/color.Error are reassigned intentionally to suppress color printer output.
 	realTerminal := os.Stderr
-	devNull, _ := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "failed to open /dev/null"))
+	}
 	savedStdout := os.Stdout
 	savedColorOutput := color.Output
 	savedColorError := color.Error //nolint:reassign
@@ -139,16 +142,16 @@ func enhanceSingleAssetWithTUI(ctx context.Context, c *cli.Command, inputPath st
 	color.Output = devNull //nolint:reassign
 	color.Error = devNull  //nolint:reassign
 
-	tui := NewEnhanceTUI(realTerminal, []string{name})
+	tui := NewEnhanceTUI(realTerminal, []string{inputPath}, []string{name})
 	tui.Start()
-	tui.MarkRunning(name)
+	tui.MarkRunning(inputPath)
 
 	enhErr := enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug, tui)
 
 	if enhErr != nil {
-		tui.MarkFailed(name)
+		tui.MarkFailed(inputPath)
 	} else {
-		tui.MarkDone(name)
+		tui.MarkDone(inputPath)
 	}
 
 	// Brief pause so the user can see the final state
@@ -180,10 +183,10 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 		return printEnhanceError(output, errors.New("no assets found in the given folder"))
 	}
 
-	// Build asset names for the TUI
-	assetNames := make([]string, len(assetPaths))
+	// Build display names for the TUI (base filenames), keys are full paths for uniqueness
+	assetDisplayNames := make([]string, len(assetPaths))
 	for i, ap := range assetPaths {
-		assetNames[i] = filepath.Base(ap)
+		assetDisplayNames[i] = filepath.Base(ap)
 	}
 
 	var tui *EnhanceTUI
@@ -195,7 +198,10 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 		// We must also redirect color.Output and color.Error since the fatih/color package
 		// caches its own writers at init time and doesn't follow os.Stdout/os.Stderr changes.
 		realTerminal := os.Stderr
-		devNull, _ := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		devNull, devNullErr := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		if devNullErr != nil {
+			return printEnhanceError(output, errors.Wrap(devNullErr, "failed to open /dev/null"))
+		}
 		savedStdout := os.Stdout
 		savedColorOutput := color.Output
 		savedColorError := color.Error //nolint:reassign
@@ -211,7 +217,7 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 			devNull.Close()
 		}
 
-		tui = NewEnhanceTUI(realTerminal, assetNames)
+		tui = NewEnhanceTUI(realTerminal, assetPaths, assetDisplayNames)
 		tui.Start()
 	} else if output != "json" {
 		infoPrinter.Printf("Found %d assets in '%s', enhancing with concurrency %d...\n\n", len(assetPaths), folderPath, concurrency)
@@ -228,13 +234,13 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 	p := pool.New().WithMaxGoroutines(concurrency)
 	for _, ap := range assetPaths {
 		p.Go(func() {
-			name := filepath.Base(ap)
+			displayName := filepath.Base(ap)
 
 			if tui != nil {
-				tui.MarkRunning(name)
+				tui.MarkRunning(ap)
 			} else if output != "json" {
 				mu.Lock()
-				infoPrinter.Printf("Starting enhancement for '%s'...\n", name)
+				infoPrinter.Printf("Starting enhancement for '%s'...\n", displayName)
 				mu.Unlock()
 			}
 
@@ -242,15 +248,15 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 
 			if tui != nil {
 				if err != nil {
-					tui.MarkFailed(name)
+					tui.MarkFailed(ap)
 				} else {
-					tui.MarkDone(name)
+					tui.MarkDone(ap)
 				}
 			}
 
 			mu.Lock()
 			defer mu.Unlock()
-			results = append(results, assetResult{name: name, err: err})
+			results = append(results, assetResult{name: displayName, err: err})
 		})
 	}
 
@@ -340,7 +346,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	}
 
 	logPrefix := filepath.Base(assetPath)
-	tuiKey := logPrefix // stable key for TUI lookups (always filepath.Base)
+	tuiKey := assetPath // full path as TUI key to avoid collisions with same-named assets
 
 	// Read original file content before any modifications (for diff display)
 	originalContent, err := afero.ReadFile(fs, absAssetPath)

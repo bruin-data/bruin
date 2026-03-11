@@ -50,17 +50,19 @@ type EnhanceTUI struct {
 }
 
 // NewEnhanceTUI creates a new enhance TUI renderer.
-func NewEnhanceTUI(terminal *os.File, assetNames []string) *EnhanceTUI {
+// assetKeys are unique identifiers (e.g. relative paths) used for map lookups.
+// displayNames are the human-readable names shown in the TUI (e.g. base filenames).
+func NewEnhanceTUI(terminal *os.File, assetKeys, displayNames []string) *EnhanceTUI {
 	t := &EnhanceTUI{
 		terminal:  terminal,
 		assetMap:  make(map[string]*enhanceAssetRow),
 		done:      make(chan struct{}),
 		startTime: time.Now(),
 	}
-	for _, name := range assetNames {
-		row := &enhanceAssetRow{name: name, status: enhancePending}
+	for i, key := range assetKeys {
+		row := &enhanceAssetRow{name: displayNames[i], status: enhancePending}
 		t.assets = append(t.assets, row)
-		t.assetMap[name] = row
+		t.assetMap[key] = row
 	}
 	return t
 }
