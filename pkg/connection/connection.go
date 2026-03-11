@@ -2056,6 +2056,7 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 
 	client, err := googleanalytics.NewClient(googleanalytics.Config{
 		ServiceAccountFile: connection.ServiceAccountFile,
+		ServiceAccountJSON: connection.ServiceAccountJSON,
 		PropertyID:         connection.PropertyID,
 	})
 	if err != nil {
