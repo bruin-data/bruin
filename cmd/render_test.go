@@ -335,7 +335,7 @@ func TestRenderCommand_Run(t *testing.T) {
 	}
 }
 
-func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest
+func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 	tests := []struct {
 		name     string
 		task     *pipeline.Asset
@@ -462,7 +462,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest
 		},
 	}
 
-	for _, tt := range tests { //nolint:paralleltest
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			extractor := new(mockExtractor)
 			materializer := new(mockMaterializer)
