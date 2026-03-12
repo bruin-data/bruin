@@ -81,7 +81,7 @@ func (m *mockGongInstaller) EnsureGongInstalled(ctx context.Context) (string, er
 // contextCapturingRunner captures the context passed to RunIngestr for assertion.
 type contextCapturingRunner struct {
 	mock.Mock
-	capturedCtx context.Context
+	capturedCtx context.Context //nolint
 }
 
 func (m *contextCapturingRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
@@ -1139,7 +1139,7 @@ func TestBasicOperator_UseGong(t *testing.T) {
 		runner := new(mockRunner)
 
 		gongInst := new(mockGongInstaller)
-		gongInst.On("EnsureGongInstalled", mock.Anything).Return("", fmt.Errorf("download failed"))
+		gongInst.On("EnsureGongInstalled", mock.Anything).Return("", fmt.Errorf("download failed")) //nolint
 
 		startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 		endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
