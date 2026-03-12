@@ -166,7 +166,6 @@ linters:
       - linters:
           - dupl
           - gosec
-          - paralleltest
         path: (.+)_test.go
     paths:
       - vendor

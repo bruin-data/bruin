@@ -386,7 +386,7 @@ func TestDetermineAssetTypeFromConnection(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -500,7 +500,7 @@ func TestFillAssetColumnsFromDB(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
