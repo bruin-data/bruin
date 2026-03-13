@@ -15,6 +15,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSQLParserCloseResetsStarted(t *testing.T) {
+	parser := &SQLParser{started: true}
+
+	require.NoError(t, parser.Close())
+	require.False(t, parser.started)
+	require.NoError(t, parser.Close())
+}
+
 func TestGetLineageForRunner(t *testing.T) {
 	lineage, err := NewSQLParser(true)
 	defer lineage.Close() //nolint

@@ -276,6 +276,11 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 }
 
 func (s *SQLParser) Close() error {
+	s.startMutex.Lock()
+	defer s.startMutex.Unlock()
+
+	s.started = false
+
 	if s.stdin != nil {
 		s.sendCommand(&parserCommand{ //nolint
 			Command: "exit",
