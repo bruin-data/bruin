@@ -122,6 +122,10 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			if commitHash, commitErr := git.CurrentCommit(filepath.Dir(pipelineDefinitionFullPath)); commitErr == nil {
+				pl.Commit = commitHash
+			}
+
 			pl, err = DefaultPipelineBuilder.MutatePipeline(ctx, pl)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to mutate the pipeline:")

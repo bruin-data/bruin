@@ -1329,7 +1329,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		}
 	}
 
-	opts = append(opts, pipeline.WithMutate())
+	opts = append(opts, pipeline.WithMutate(), pipeline.WithGitMetadata())
 	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
 	if err != nil {
 		errorPrinter.Println("Failed to build pipeline: ", err.Error())
