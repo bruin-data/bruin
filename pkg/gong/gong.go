@@ -69,7 +69,7 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 	}
 
 	installedVersion := ""
-	cmd := exec.Command(gongBinaryPath, "--version")
+	cmd := exec.CommandContext(ctx, gongBinaryPath, "--version")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		installedVersion = parseVersionOutput(strings.TrimSpace(string(output)))

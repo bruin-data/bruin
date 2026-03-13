@@ -23,7 +23,7 @@ func NewClaudeProvider(model string, fs afero.Fs) Provider {
 		return args
 	}
 
-	config := CLIProviderConfig{
+	config := CLIProviderConfig{ //nolint:gosec // G101: APIKeyEnvVar is an env var name, not a hardcoded credential
 		Name:         "claude",
 		BinaryName:   "claude",
 		DefaultModel: "claude-sonnet-4-20250514",

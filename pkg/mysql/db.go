@@ -283,7 +283,7 @@ ORDER BY t.table_schema, t.table_name;
 				rc := int64(v)
 				rowCount = &rc
 			case uint64:
-				rc := int64(v)
+				rc := int64(v) //nolint:gosec // G115: MySQL row count uint64->int64 is safe; table row counts won't exceed int64 max
 				rowCount = &rc
 			}
 		}
@@ -297,7 +297,7 @@ ORDER BY t.table_schema, t.table_name;
 				sb := int64(v)
 				sizeBytes = &sb
 			case uint64:
-				sb := int64(v)
+				sb := int64(v) //nolint:gosec // G115: MySQL data size uint64->int64 is safe; table sizes won't exceed int64 max
 				sizeBytes = &sb
 			}
 		}

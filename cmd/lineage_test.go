@@ -29,7 +29,7 @@ func (m *mockPrinter) Println(a ...interface{}) (int, error) {
 func (m *mockPrinter) Printf(format string, a ...interface{}) (int, error) {
 	m.m.Lock()
 	defer m.m.Unlock()
-	return m.buf.Write([]byte(fmt.Sprintf(format, a...)))
+	return fmt.Fprintf(m.buf, format, a...)
 }
 
 func (m *mockPrinter) Print(a ...interface{}) (int, error) {
@@ -137,7 +137,7 @@ Asset has no downstream dependencies.
 			tt.wantErr(t, res)
 			if tt.want != "" {
 				want := tt.want
-				if runtime.GOOS == "windows" {
+				if runtime.GOOS == osWindows {
 					want = strings.ReplaceAll(want, "assets/", "assets\\")
 					want = strings.ReplaceAll(want, "nested/", "nested\\")
 				}

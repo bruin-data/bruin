@@ -182,7 +182,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	// Omit --source-table for CDC wildcard mode so ingestr replicates all tables
-	if !(asset.Parameters["cdc"] == "true" && sourceTable == "*") {
+	if asset.Parameters["cdc"] != "true" || sourceTable != "*" {
 		baseArgs = append(baseArgs, "--source-table", sourceTable)
 	}
 

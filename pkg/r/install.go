@@ -22,7 +22,7 @@ func (v RVersion) String() string {
 
 // GetInstalledRVersion returns the version of R that is currently installed.
 func GetInstalledRVersion() (*RVersion, error) {
-	cmd := exec.Command("R", "--version")
+	cmd := exec.CommandContext(context.Background(), "R", "--version") //nolint:contextcheck
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get R version - is R installed?")
@@ -116,7 +116,7 @@ func CheckRVersion(ctx context.Context, requestedVersion *RVersion) error {
 		return nil
 	}
 
-	installedVersion, err := GetInstalledRVersion()
+	installedVersion, err := GetInstalledRVersion() //nolint:contextcheck
 	if err != nil {
 		return err
 	}
