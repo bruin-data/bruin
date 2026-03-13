@@ -83,7 +83,7 @@ func NewRendererWithMacros(context Context, macroContent string) *Renderer {
 	}
 }
 
-func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]string {
+func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineName, runID string, fullRefresh bool, commitHash string) map[string]string {
 	vars := map[string]string{
 		"BRUIN_START_DATE":          startDate.Format("2006-01-02"),
 		"BRUIN_START_DATETIME":      startDate.Format("2006-01-02T15:04:05"),
@@ -97,7 +97,7 @@ func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineNa
 		"BRUIN_RUN_ID":              runID,
 		"BRUIN_PIPELINE":            pipelineName,
 		"BRUIN_FULL_REFRESH":        "",
-		"BRUIN_COMMIT_HASH":         "",
+		"BRUIN_COMMIT_HASH":         commitHash,
 		"PYTHONUNBUFFERED":          "1",
 	}
 
