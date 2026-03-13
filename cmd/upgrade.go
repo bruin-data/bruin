@@ -25,6 +25,7 @@ const (
 	binaryName     = "bruin"
 	githubReleases = "https://github.com/bruin-data/bruin/releases"
 	githubDownload = "https://github.com/bruin-data/bruin/releases/download"
+	osWindows      = "windows"
 )
 
 var (
@@ -91,7 +92,7 @@ func getOSName() string {
 		return "Darwin"
 	case "linux":
 		return "Linux"
-	case "windows":
+	case osWindows:
 		return "Windows"
 	default:
 		return runtime.GOOS
@@ -114,7 +115,7 @@ func getArchName() string {
 
 // getFormat returns the archive format based on OS.
 func getFormat() string {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		return "zip"
 	}
 	return "tar.gz"
@@ -293,7 +294,7 @@ func extractTarGz(archivePath, destDir string) error {
 				return err
 			}
 		case tar.TypeReg:
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)) //nolint:gosec // G115: tar header mode int64->uint32 is safe for file permissions
 			if err != nil {
 				return err
 			}
@@ -393,19 +394,19 @@ func getBinaryInstallPath() (string, error) {
 // installBinary installs the binary from extracted archive to the bin directory.
 // Returns (deferred, error) where deferred=true means the upgrade will complete
 // after the current process exits (used on Windows due to file locking).
-func installBinary(srcDir, binDir string) (bool, error) {
+func installBinary(ctx context.Context, srcDir, binDir string) (bool, error) {
 	// Ensure bin directory exists
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return false, errors.Wrap(err, "failed to create bin directory")
 	}
 
 	srcBinary := filepath.Join(srcDir, binaryName)
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		srcBinary += ".exe"
 	}
 
 	dstBinary := filepath.Join(binDir, binaryName)
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		dstBinary += ".exe"
 	}
 
@@ -417,8 +418,8 @@ func installBinary(srcDir, binDir string) (bool, error) {
 
 	// On Windows, we cannot overwrite a running executable due to file locking.
 	// Use a batch script to perform the replacement after this process exits.
-	if runtime.GOOS == "windows" {
-		return installBinaryWindows(data, dstBinary)
+	if runtime.GOOS == osWindows {
+		return installBinaryWindows(ctx, data, dstBinary)
 	}
 
 	// Non-Windows: atomic replacement via temp file + rename.
@@ -466,7 +467,7 @@ func installBinary(srcDir, binDir string) (bool, error) {
 // installBinaryWindows handles Windows-specific binary installation.
 // On Windows, we cannot overwrite a running executable, so we write the new
 // binary to a temp file and use a batch script to replace it after exit.
-func installBinaryWindows(data []byte, dstBinary string) (bool, error) {
+func installBinaryWindows(ctx context.Context, data []byte, dstBinary string) (bool, error) {
 	// Write new binary to temporary location next to destination
 	tempBinary := dstBinary + ".new"
 	if err := os.WriteFile(tempBinary, data, 0o755); err != nil { //nolint:gosec
@@ -490,7 +491,7 @@ del "%%~f0"
 	}
 
 	// Start the script in background using 'start /b'
-	cmd := exec.Command("cmd", "/C", "start", "/b", "", scriptPath)
+	cmd := exec.CommandContext(ctx, "cmd", "/C", "start", "/b", "", scriptPath)
 	if err := cmd.Start(); err != nil {
 		os.Remove(tempBinary)
 		os.Remove(scriptPath)
@@ -598,7 +599,7 @@ func Upgrade() *cli.Command {
 
 			// Install
 			fmt.Printf("%s  Installing to %s...\n", boxVertical, faintText.Render(binDir))
-			deferred, err := installBinary(tmpDir, binDir)
+			deferred, err := installBinary(ctx, tmpDir, binDir)
 			if err != nil {
 				return errors.Wrap(err, "failed to install binary")
 			}

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -67,7 +68,7 @@ func (s *Task) Run() error {
 }
 
 func (s *Task) runAttempt() error {
-	cmd := exec.Command(s.Command, s.Args...) //nolint:gosec
+	cmd := exec.CommandContext(context.Background(), s.Command, s.Args...) //nolint:gosec,contextcheck
 	cmd.Env = append(os.Environ(), s.Env...)
 	if s.WorkingDir != "" {
 		cmd.Dir = s.WorkingDir

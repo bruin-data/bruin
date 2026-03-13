@@ -381,8 +381,8 @@ func flattenErrors(err error) []string {
 		unwrapped = errors.Unwrap(unwrapped)
 	}
 
-	var foundErrors []string
 	allErrors := flattenErrors(unwrapped)
+	foundErrors := make([]string, 0, len(allErrors)+1)
 	foundErrors = append(foundErrors, allErrors...)
 	foundErrors = append(foundErrors, err.Error())
 

@@ -255,7 +255,7 @@ func (l *LakehouseAttacher) generatePostgresSecret(name string, catalog config.C
 		port = 5432
 	}
 
-	var parts []string
+	parts := make([]string, 0, 8)
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE postgres")
 	parts = append(parts, ",   HOST "+quoteSQLStringLiteral(catalog.Host))

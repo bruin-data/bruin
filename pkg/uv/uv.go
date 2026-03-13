@@ -59,7 +59,7 @@ func (u *Checker) EnsureUvInstalled(ctx context.Context) (string, error) {
 	var uvVersion struct {
 		Version string `json:"version"`
 	}
-	cmd := exec.Command(uvBinaryPath, "self", "version", "--output-format", "json")
+	cmd := exec.CommandContext(ctx, uvBinaryPath, "self", "version", "--output-format", "json")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		_ = json.Unmarshal(output, &uvVersion)
@@ -83,15 +83,15 @@ func (u *Checker) installUvCommand(ctx context.Context, dest string) error {
 	}
 
 	_, _ = output.Write([]byte("===============================\n"))
-	_, _ = output.Write([]byte(fmt.Sprintf("Installing uv v%s...\n", Version)))
+	_, _ = fmt.Fprintf(output, "Installing uv v%s...\n", Version)
 	_, _ = output.Write([]byte("This is a one-time operation.\n"))
 	_, _ = output.Write([]byte("\n"))
 
 	var commandInstance *exec.Cmd
 	if runtime.GOOS == "windows" {
-		commandInstance = exec.Command("powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("$env:NO_MODIFY_PATH=1 ; $env:UV_INSTALL_DIR='~/.bruin' ; irm https://astral.sh/uv/%s/install.ps1 | iex", Version)) //nolint:gosec
+		commandInstance = exec.CommandContext(ctx, "powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("$env:NO_MODIFY_PATH=1 ; $env:UV_INSTALL_DIR='~/.bruin' ; irm https://astral.sh/uv/%s/install.ps1 | iex", Version)) //nolint:gosec
 	} else {
-		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("set -e; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", Version, dest)) //nolint:gosec
+		commandInstance = exec.CommandContext(ctx, Shell, ShellSubcommandFlag, fmt.Sprintf("set -e; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", Version, dest)) //nolint:gosec
 	}
 
 	commandInstance.Stdout = output
@@ -101,7 +101,7 @@ func (u *Checker) installUvCommand(ctx context.Context, dest string) error {
 	}
 
 	_, _ = output.Write([]byte("\n"))
-	_, _ = output.Write([]byte(fmt.Sprintf("Installed uv v%s, continuing...\n", Version)))
+	_, _ = fmt.Fprintf(output, "Installed uv v%s, continuing...\n", Version)
 	_, _ = output.Write([]byte("===============================\n"))
 	_, _ = output.Write([]byte("\n"))
 

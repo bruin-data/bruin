@@ -128,7 +128,7 @@ func EnsureTaskNameIsUnique(ctx context.Context, p *pipeline.Pipeline) ([]*Issue
 }
 
 func EnsureTaskNameIsUniqueForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
+	issues := make([]*Issue, 0, 1)
 	if asset.Name == "" {
 		return issues, nil
 	}
@@ -523,7 +523,7 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 }
 
 func ValidateScriptAssetHooksUnsupported(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
+	issues := make([]*Issue, 0, 1)
 
 	if asset.Type != pipeline.AssetTypePython && asset.Type != pipeline.AssetTypeR {
 		return issues, nil

@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -24,11 +25,16 @@ type ingestrRunner interface {
 	RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error
 }
 
+type gongInstaller interface {
+	EnsureGongInstalled(ctx context.Context) (string, error)
+}
+
 type BasicOperator struct {
 	conn          config.ConnectionGetter
 	runner        ingestrRunner
 	finder        repoFinder
 	jinjaRenderer jinja.RendererInterface
+	gong          gongInstaller
 }
 
 type SeedOperator struct {
@@ -36,6 +42,7 @@ type SeedOperator struct {
 	runner        ingestrRunner
 	finder        repoFinder
 	jinjaRenderer jinja.RendererInterface
+	gong          gongInstaller
 }
 
 type pipelineConnection interface {
@@ -48,7 +55,7 @@ func NewBasicOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (
 		Cmd:         &python.CommandRunner{},
 	}
 
-	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}, jinjaRenderer: j}, nil
+	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}, jinjaRenderer: j, gong: &gong.Checker{}}, nil
 }
 
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -175,7 +182,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 
 	// Omit --source-table for CDC wildcard mode so ingestr replicates all tables
-	if !(asset.Parameters["cdc"] == "true" && sourceTable == "*") {
+	if asset.Parameters["cdc"] != "true" || sourceTable != "*" {
 		baseArgs = append(baseArgs, "--source-table", sourceTable)
 	}
 
@@ -211,6 +218,17 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	if strings.HasPrefix(sourceURI, "duckdb://") && sourceURI != destURI {
 		duck.LockDatabase(sourceURI)
 		defer duck.UnlockDatabase(sourceURI)
+	}
+
+	if asset.Parameters["use_gong"] == "true" && ctx.Value(python.CtxGongPath) == nil {
+		if o.gong == nil {
+			return errors.New("use_gong is set but gong installer is not available")
+		}
+		gongPath, err := o.gong.EnsureGongInstalled(ctx)
+		if err != nil {
+			return fmt.Errorf("use_gong is set but failed to install gong: %w", err)
+		}
+		ctx = context.WithValue(ctx, python.CtxGongPath, gongPath)
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
@@ -253,6 +271,7 @@ func NewSeedOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*
 		runner:        uvRunner,
 		finder:        &git.RepoFinder{},
 		jinjaRenderer: j,
+		gong:          &gong.Checker{},
 	}, nil
 }
 
@@ -339,6 +358,17 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	repo, err := o.finder.Repo(path)
 	if err != nil {
 		return errors.Wrap(err, "failed to find repo to run Ingestr")
+	}
+
+	if asset.Parameters["use_gong"] == "true" && ctx.Value(python.CtxGongPath) == nil {
+		if o.gong == nil {
+			return errors.New("use_gong is set but gong installer is not available")
+		}
+		gongPath, err := o.gong.EnsureGongInstalled(ctx)
+		if err != nil {
+			return fmt.Errorf("use_gong is set but failed to install gong: %w", err)
+		}
+		ctx = context.WithValue(ctx, python.CtxGongPath, gongPath)
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)

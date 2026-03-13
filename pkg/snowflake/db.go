@@ -82,7 +82,7 @@ func logSnowflakeQueryID(ctx context.Context, ch <-chan string) {
 	select {
 	case qid := <-ch:
 		if qid != "" {
-			_, _ = writer.Write([]byte(fmt.Sprintf("Snowflake query ID: %s\n", qid)))
+			_, _ = fmt.Fprintf(writer, "Snowflake query ID: %s\n", qid)
 		}
 	default:
 	}

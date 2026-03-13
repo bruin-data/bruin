@@ -11,6 +11,7 @@ CURRENT_DIR=$(pwd)
 TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
 OS_ARCH:=$(shell go env GOOS)_$(shell go env GOARCH)
+GOLANGCI_LINT_VERSION=v2.11.1
 
 # Suppress CGO linker warnings on macOS (not needed on Linux/Windows)
 ifeq ($(shell go env GOOS),darwin)
@@ -100,12 +101,12 @@ format: lint-python
 	go tool gofumpt -w cmd pkg &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	go tool golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
+	golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...  & \
 	wait
 
 tools-update:
 	go get github.com/daixiang0/gci@latest
-	go get github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION)
 	go get mvdan.cc/gofumpt@latest
 	@go mod tidy
 

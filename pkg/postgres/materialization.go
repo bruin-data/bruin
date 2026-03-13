@@ -226,10 +226,10 @@ func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
-	switch {
-	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
+	switch task.Materialization.Strategy {
+	case pipeline.MaterializationStrategySCD2ByTime:
 		return buildSCD2ByTimefullRefresh(task, query)
-	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
+	case pipeline.MaterializationStrategySCD2ByColumn:
 		return buildSCD2ByColumnfullRefresh(task, query)
 	default:
 		query = strings.TrimSuffix(query, ";")
@@ -256,7 +256,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		startVar = "{{start_date}}"
 		endVar = "{{end_date}}"
 	}
-	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp || asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
+	if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp && asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate {
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)

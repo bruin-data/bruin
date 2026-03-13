@@ -40,7 +40,7 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 }
 
 func ensureDriverInstalledInternal(ctx context.Context) error {
-	if err := tryLoadDriver(); err == nil {
+	if err := tryLoadDriver(); err == nil { //nolint:contextcheck
 		return nil
 	}
 
@@ -61,7 +61,7 @@ func ensureDriverInstalledInternal(ctx context.Context) error {
 		return fmt.Errorf("dbc install duckdb failed: %w", err)
 	}
 
-	if err := tryLoadDriver(); err != nil {
+	if err := tryLoadDriver(); err != nil { //nolint:contextcheck
 		return fmt.Errorf("DuckDB ADBC driver still not available after installation: %w", err)
 	}
 
@@ -75,7 +75,7 @@ func tryLoadDriver() error {
 	}
 	defer db.Close()
 
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		return fmt.Errorf("failed to ping duckdb adbc driver: %w", err)
 	}
 

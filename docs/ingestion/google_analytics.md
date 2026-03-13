@@ -6,13 +6,15 @@ ingestr supports Google Analytics as a source.
 
 Bruin supports Google Analytics as a source for [ingestr assets](/assets/ingestr), and you can use it to ingest data from Google Analytics into your data warehouse.
 
-To set up a Google Analytics connection, you need to add a configuration item in the `.bruin.yml` file and the `asset` file. You will need path to `service_account_file` and `property_id`.
+To set up a Google Analytics connection, you need to add a configuration item in the `.bruin.yml` file and the `asset` file. You will need either `service_account_file` or `service_account_json`, and a `property_id`.
 
 Follow the steps below to correctly set up Google Analytics as a data source and run ingestion.
 
 ## Configuration
 
 ### Step 1: Add a connection to .bruin.yml file
+
+You can use either `service_account_file` to point to a JSON key file, or `service_account_json` to provide the JSON content directly:
 
 ```yaml
     googleanalytics:
@@ -21,7 +23,22 @@ Follow the steps below to correctly set up Google Analytics as a data source and
           property_id: "1234"
 ```
 
+Alternatively, you can use `service_account_json` to embed the credentials directly:
+
+```yaml
+    googleanalytics:
+        - name: "googleanalytics"
+          service_account_json: |
+            {
+              "type": "service_account",
+              "project_id": "your-project-id",
+              ...
+            }
+          property_id: "1234"
+```
+
 - `service_account_file`: The path to the service account JSON file
+- `service_account_json`: The content of the service account JSON as a string (use this when you don't have a file, e.g. when using secrets management)
 - `property_id`: It is a unique number that identifies a particular property on Google Analytics. Follow this guide to know about [property ID](https://developers.google.com/analytics/devguides/reporting/data/v1/property-id#what_is_my_property_id).
 
 ### Step 2: Create an asset file for data ingestion

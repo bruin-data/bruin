@@ -1602,11 +1602,28 @@
       ]
     },
     "GoogleAnalyticsConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "service_account_file"
+          ],
+          "title": "service_account_file"
+        },
+        {
+          "required": [
+            "service_account_json"
+          ],
+          "title": "service_account_json"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
         },
         "service_account_file": {
+          "type": "string"
+        },
+        "service_account_json": {
           "type": "string"
         },
         "property_id": {
@@ -1617,7 +1634,6 @@
       "type": "object",
       "required": [
         "name",
-        "service_account_file",
         "property_id"
       ]
     },

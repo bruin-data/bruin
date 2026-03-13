@@ -209,7 +209,7 @@ func (c *Client) pollJobStatus(ctx context.Context, jobID string, timeout time.D
 			writer = wr
 		}
 	}
-	if _, err := writer.Write([]byte(fmt.Sprintf("Refresh started asynchronously, waiting for job to complete, job ID: %s\n", jobID))); err != nil {
+	if _, err := fmt.Fprintf(writer, "Refresh started asynchronously, waiting for job to complete, job ID: %s\n", jobID); err != nil {
 		return errors.Wrap(err, "failed to write log output")
 	}
 	for {

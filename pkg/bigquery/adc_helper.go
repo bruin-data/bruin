@@ -77,8 +77,8 @@ func ensureADCCredentialsWithPrompt(ctx context.Context, connName string, conn D
 	// Run gcloud command
 	fmt.Fprintf(os.Stderr, "Running: gcloud auth application-default login\n")
 
-	cmd := exec.Command("gcloud", "auth", "application-default", "login")
-	cmd.Stdout = os.Stderr // gcloud output to stderr for visibility
+	cmd := exec.CommandContext(context.Background(), "gcloud", "auth", "application-default", "login") //nolint:contextcheck
+	cmd.Stdout = os.Stderr                                                                             // gcloud output to stderr for visibility
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 

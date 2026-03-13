@@ -655,7 +655,7 @@ func Test_convertPKCS1ToPKCS8(t *testing.T) {
 			input:    "",
 			expected: "",
 			validate: func(t *testing.T, result string) {
-				assert.Equal(t, "", result)
+				assert.Empty(t, result)
 			},
 		},
 		{
