@@ -78,6 +78,7 @@ Bruin injects various variables by default:
 | `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
 | `run_id` | The unique identifier for the current pipeline run | `run_1234567890` |
 | `full_refresh` | Boolean indicating whether the `--full-refresh` flag was used | `True` or `False` |
+| `commit_hash` | The current git commit hash of the repository containing the pipeline | `"abc1234def5678..."` |
 
 You can use these variables in your SQL queries by referencing them with the `{{ }}` syntax:
 

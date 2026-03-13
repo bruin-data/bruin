@@ -24,6 +24,8 @@ func SetupVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset
 		return nil, err
 	}
 
+	env["BRUIN_COMMIT_HASH"] = p.Commit
+
 	return env, nil
 }
 
