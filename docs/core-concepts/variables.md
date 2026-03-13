@@ -52,7 +52,7 @@ vars = json.loads(os.environ.get("BRUIN_VARS", "{}"))
 segment = vars.get("target_segment", "default")
 ```
 
-Other built-in environment variables include `BRUIN_START_DATETIME`, `BRUIN_START_TIMESTAMP`, `BRUIN_END_DATE`, `BRUIN_END_DATETIME`, `BRUIN_END_TIMESTAMP`, `BRUIN_EXECUTION_DATE`, `BRUIN_EXECUTION_DATETIME`, `BRUIN_EXECUTION_TIMESTAMP`, and `BRUIN_RUN_ID`.
+Other built-in environment variables include `BRUIN_START_DATETIME`, `BRUIN_START_TIMESTAMP`, `BRUIN_END_DATE`, `BRUIN_END_DATETIME`, `BRUIN_END_TIMESTAMP`, `BRUIN_EXECUTION_DATE`, `BRUIN_EXECUTION_DATETIME`, `BRUIN_EXECUTION_TIMESTAMP`, `BRUIN_RUN_ID`, and `BRUIN_COMMIT_HASH`.
 
 ### YAML Assets (Sensor, Ingestr)
 
@@ -92,6 +92,7 @@ Bruin automatically injects these variables into the Jinja context for templated
 | `pipeline` | Name of the currently executing pipeline | `"my_pipeline"` |
 | `run_id` | Unique identifier for the current pipeline run | `"run_1234567890"` |
 | `full_refresh` | Whether the run is a full refresh | `true` |
+| `commit_hash` | The current git commit hash of the pipeline's repository | `"abc1234def5678..."` |
 
 ### Using Built-in Variables in SQL
 

@@ -57,7 +57,7 @@ func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.A
 	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
 
-	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, &executionDate, p.Name, runID, fullRefresh), nil
+	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, &executionDate, p.Name, runID, fullRefresh, p.Commit), nil
 }
 
 func envInjectVariables(env map[string]string, variables map[string]any, schema map[string]any) (map[string]string, error) {

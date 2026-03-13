@@ -1138,7 +1138,7 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser)
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, foundPipeline.Commit)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1544,6 +1544,7 @@ func SetupExecutors(
 	sensorMode string,
 	renderer *jinja.Renderer,
 	parser *sqlparser.SQLParser,
+	commitHash string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -1556,7 +1557,7 @@ func SetupExecutors(
 		return nil, err
 	}
 
-	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh)
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
 	}
