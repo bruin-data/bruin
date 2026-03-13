@@ -98,7 +98,7 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 	}
 
 	isDebugMode := isDebug != nil && *isDebug
-	useTUI := output != "json" && !isDebugMode && term.IsTerminal(int(os.Stderr.Fd()))
+	useTUI := output != "json" && !isDebugMode && term.IsTerminal(int(os.Stderr.Fd())) //nolint:gosec // G115: fd is always safe to convert
 
 	if isPathReferencingAsset(inputPath) {
 		if useTUI {

@@ -195,7 +195,7 @@ func (t *EnhanceTUI) clearLastRender() {
 }
 
 func (t *EnhanceTUI) getTerminalSize() (int, int) {
-	w, h, err := term.GetSize(int(t.terminal.Fd()))
+	w, h, err := term.GetSize(int(t.terminal.Fd())) //nolint:gosec // G115: fd is always safe to convert
 	if err != nil {
 		return 80, 24
 	}
