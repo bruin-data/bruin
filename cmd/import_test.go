@@ -313,52 +313,71 @@ func TestBuildImportMetadataOptionalFields(t *testing.T) {
 	assert.Empty(t, metadata["last_modified"])
 }
 
-func TestReimportUpdatesMetadata(t *testing.T) {
+func TestMergeImportMetadata(t *testing.T) {
 	t.Parallel()
 
-	// Simulate an existing asset with old metadata and a user-added custom key
-	existingAsset := &pipeline.Asset{
-		Name:  "public.users",
-		Owner: "old_owner",
-		Metadata: pipeline.EmptyStringMap{
-			"extracted_at":    "2024-01-01T00:00:00Z",
-			"row_count":       "100",
-			"custom_user_key": "should_be_preserved",
-		},
-	}
+	t.Run("refreshes metadata and owner, preserves custom keys", func(t *testing.T) {
+		t.Parallel()
 
-	// Simulate a freshly created asset from re-import with updated metadata
-	createdAsset := &pipeline.Asset{
-		Name:  "public.users",
-		Owner: "new_owner",
-		Metadata: pipeline.EmptyStringMap{
-			"extracted_at": "2025-06-01T00:00:00Z",
-			"row_count":    "200",
-			"size":         "512.00 MB",
-		},
-	}
-
-	// Apply the same merge logic used in the re-import branch
-	if createdAsset.Metadata != nil {
-		if existingAsset.Metadata == nil {
-			existingAsset.Metadata = make(pipeline.EmptyStringMap)
+		existing := &pipeline.Asset{
+			Name:  "public.users",
+			Owner: "old_owner",
+			Metadata: pipeline.EmptyStringMap{
+				"extracted_at":    "2024-01-01T00:00:00Z",
+				"row_count":       "100",
+				"custom_user_key": "should_be_preserved",
+			},
 		}
-		for k, v := range createdAsset.Metadata {
-			existingAsset.Metadata[k] = v
+
+		created := &pipeline.Asset{
+			Name:  "public.users",
+			Owner: "new_owner",
+			Metadata: pipeline.EmptyStringMap{
+				"extracted_at": "2025-06-01T00:00:00Z",
+				"row_count":    "200",
+				"size":         "512.00 MB",
+			},
 		}
-	}
-	if createdAsset.Owner != "" {
-		existingAsset.Owner = createdAsset.Owner
-	}
 
-	// Import-generated keys should be refreshed
-	assert.Equal(t, "new_owner", existingAsset.Owner)
-	assert.Equal(t, "200", existingAsset.Metadata["row_count"])
-	assert.Equal(t, "512.00 MB", existingAsset.Metadata["size"])
-	assert.Equal(t, "2025-06-01T00:00:00Z", existingAsset.Metadata["extracted_at"])
+		mergeImportMetadata(existing, created)
 
-	// User-added custom key should be preserved
-	assert.Equal(t, "should_be_preserved", existingAsset.Metadata["custom_user_key"])
+		assert.Equal(t, "new_owner", existing.Owner)
+		assert.Equal(t, "200", existing.Metadata["row_count"])
+		assert.Equal(t, "512.00 MB", existing.Metadata["size"])
+		assert.Equal(t, "2025-06-01T00:00:00Z", existing.Metadata["extracted_at"])
+		assert.Equal(t, "should_be_preserved", existing.Metadata["custom_user_key"])
+	})
+
+	t.Run("clears stale import keys when DB stops reporting them", func(t *testing.T) {
+		t.Parallel()
+
+		existing := &pipeline.Asset{
+			Name: "public.users",
+			Metadata: pipeline.EmptyStringMap{
+				"extracted_at":    "2024-01-01T00:00:00Z",
+				"row_count":       "100",
+				"size":            "256.00 MB",
+				"created_at":      "2023-01-01T00:00:00Z",
+				"custom_user_key": "keep_me",
+			},
+		}
+
+		// Second import: DB no longer reports row_count, size, or created_at
+		created := &pipeline.Asset{
+			Name: "public.users",
+			Metadata: pipeline.EmptyStringMap{
+				"extracted_at": "2025-06-01T00:00:00Z",
+			},
+		}
+
+		mergeImportMetadata(existing, created)
+
+		assert.Equal(t, "2025-06-01T00:00:00Z", existing.Metadata["extracted_at"])
+		assert.Empty(t, existing.Metadata["row_count"], "stale row_count should be cleared")
+		assert.Empty(t, existing.Metadata["size"], "stale size should be cleared")
+		assert.Empty(t, existing.Metadata["created_at"], "stale created_at should be cleared")
+		assert.Equal(t, "keep_me", existing.Metadata["custom_user_key"])
+	})
 }
 
 func TestDetermineAssetTypeFromConnection(t *testing.T) {

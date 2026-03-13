@@ -309,21 +309,8 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 					}
 				}
 
-				// Always refresh metadata so it stays current on re-import.
-				// We merge key-by-key to preserve any user-added custom metadata keys.
-				if createdAsset.Metadata != nil {
-					if existingAsset.Metadata == nil {
-						existingAsset.Metadata = make(pipeline.EmptyStringMap)
-					}
-					for k, v := range createdAsset.Metadata {
-						existingAsset.Metadata[k] = v
-					}
-				}
-
-				// Update owner if the database reports one
-				if createdAsset.Owner != "" {
-					existingAsset.Owner = createdAsset.Owner
-				}
+				// Refresh metadata and owner so they stay current on re-import
+				mergeImportMetadata(existingAsset, createdAsset)
 
 				err = existingAsset.Persist(fs)
 				mergedTableCount++
@@ -633,6 +620,31 @@ func buildImportMetadata(table *ansisql.DBTable) (string, map[string]string, str
 	}
 
 	return table.Description, metadata, table.Owner
+}
+
+// importMetadataKeys are the keys written by buildImportMetadata.
+// These are cleared before re-merging so that absent metrics don't linger.
+var importMetadataKeys = []string{"extracted_at", "created_at", "last_modified", "row_count", "size"}
+
+// mergeImportMetadata refreshes the import-generated metadata on an existing asset.
+// It clears known import keys first (so absent metrics are removed), then copies
+// all keys from src. Any user-added custom keys on dst are preserved.
+func mergeImportMetadata(dst, src *pipeline.Asset) {
+	if src.Metadata != nil {
+		if dst.Metadata == nil {
+			dst.Metadata = make(pipeline.EmptyStringMap)
+		}
+		for _, k := range importMetadataKeys {
+			delete(dst.Metadata, k)
+		}
+		for k, v := range src.Metadata {
+			dst.Metadata[k] = v
+		}
+	}
+
+	if src.Owner != "" {
+		dst.Owner = src.Owner
+	}
 }
 
 // formatBytes formats a byte count into a human-readable string.
