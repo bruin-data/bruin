@@ -297,6 +297,8 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 				totalTables++
 			} else {
 				existingAsset := existingAssets[assetName]
+
+				// Merge new columns — only add columns that don't already exist
 				existingColumns := make(map[string]pipeline.Column, len(existingAsset.Columns))
 				for _, column := range existingAsset.Columns {
 					existingColumns[column.Name] = column
@@ -306,6 +308,23 @@ func runImport(ctx context.Context, log logger.Logger, pipelinePath, connectionN
 						existingAsset.Columns = append(existingAsset.Columns, c)
 					}
 				}
+
+				// Always refresh metadata so it stays current on re-import.
+				// We merge key-by-key to preserve any user-added custom metadata keys.
+				if createdAsset.Metadata != nil {
+					if existingAsset.Metadata == nil {
+						existingAsset.Metadata = make(pipeline.EmptyStringMap)
+					}
+					for k, v := range createdAsset.Metadata {
+						existingAsset.Metadata[k] = v
+					}
+				}
+
+				// Update owner if the database reports one
+				if createdAsset.Owner != "" {
+					existingAsset.Owner = createdAsset.Owner
+				}
+
 				err = existingAsset.Persist(fs)
 				mergedTableCount++
 				if err != nil {
@@ -530,8 +549,9 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 		actualAssetType = convertSourceTypeToQueryType(assetType)
 	}
 
-	// Build enhanced description with metadata
-	description := buildEnhancedDescription(table, schemaName, tableName)
+	// Extract structured metadata from the table — metadata goes to the Metadata field
+	// so it can be refreshed on re-import, while description holds only the DB comment.
+	description, metadata, owner := buildImportMetadata(table)
 
 	// Build asset name as <schema>.<table>
 	assetName := fmt.Sprintf("%s.%s", strings.ToLower(schemaName), strings.ToLower(tableName))
@@ -545,6 +565,8 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 			Content: content,
 		},
 		Description: description,
+		Metadata:    metadata,
+		Owner:       owner,
 	}
 
 	// Set materialization for views
@@ -584,76 +606,33 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 	return asset, ""
 }
 
-// getTableTypeDescription returns a human-readable description for the table type.
-func getTableTypeDescription(tableType ansisql.DBTableType) string {
-	if tableType == ansisql.DBTableTypeView {
-		return "view"
-	}
-	return "table"
-}
+// buildImportMetadata extracts structured metadata from a database table for import.
+// Returns the DB description, a metadata map for the Metadata field, and the table owner.
+// This keeps operational data (timestamps, sizes) in metadata where it can be refreshed
+// on re-import, while the description holds only the actual database comment.
+func buildImportMetadata(table *ansisql.DBTable) (string, map[string]string, string) {
+	metadata := make(map[string]string)
 
-// buildEnhancedDescription creates a rich description for imported assets with metadata.
-func buildEnhancedDescription(table *ansisql.DBTable, schemaName, tableName string) string {
-	var parts []string
+	// Always record when this import was performed
+	metadata["extracted_at"] = time.Now().UTC().Format(time.RFC3339)
 
-	// Start with the original database description if available
-	if table.Description != "" {
-		parts = append(parts, table.Description)
-		parts = append(parts, "") // Empty line for separation
-	}
-
-	// Add import metadata section
-	parts = append(parts, "Imported "+getTableTypeDescription(table.Type)+": "+schemaName+"."+tableName)
-
-	// Add extraction timestamp (current time)
-	extractedAt := time.Now().UTC().Format(time.RFC3339)
-	parts = append(parts, "Extracted at: "+extractedAt)
-
-	// Add creation timestamp if available
 	if table.CreatedAt != nil {
-		parts = append(parts, "Created at: "+table.CreatedAt.UTC().Format(time.RFC3339))
+		metadata["created_at"] = table.CreatedAt.UTC().Format(time.RFC3339)
 	}
 
-	// Add last modification timestamp if available
 	if table.LastModified != nil {
-		parts = append(parts, "Last modified: "+table.LastModified.UTC().Format(time.RFC3339))
+		metadata["last_modified"] = table.LastModified.UTC().Format(time.RFC3339)
 	}
 
-	// Add row count if available
 	if table.RowCount != nil {
-		parts = append(parts, "Row count: "+formatNumber(*table.RowCount))
+		metadata["row_count"] = strconv.FormatInt(*table.RowCount, 10)
 	}
 
-	// Add size if available
 	if table.SizeBytes != nil {
-		parts = append(parts, "Size: "+formatBytes(*table.SizeBytes))
+		metadata["size"] = formatBytes(*table.SizeBytes)
 	}
 
-	// Add owner if available
-	if table.Owner != "" {
-		parts = append(parts, "Owner: "+table.Owner)
-	}
-
-	return strings.Join(parts, "\n")
-}
-
-// formatNumber formats a number with commas for readability.
-func formatNumber(n int64) string {
-	if n < 1000 {
-		return strconv.FormatInt(n, 10)
-	}
-
-	s := strconv.FormatInt(n, 10)
-	var result strings.Builder
-
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			result.WriteRune(',')
-		}
-		result.WriteRune(c)
-	}
-
-	return result.String()
+	return table.Description, metadata, table.Owner
 }
 
 // formatBytes formats a byte count into a human-readable string.
