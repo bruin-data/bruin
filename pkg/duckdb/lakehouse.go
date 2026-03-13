@@ -40,11 +40,17 @@ func validateIcebergForDuckDB(lh config.LakehouseConfig) error {
 		return errors.New("DuckDB iceberg with glue catalog requires access_key and secret_key")
 	}
 
-	if lh.Storage.Type != config.StorageTypeS3 {
-		return fmt.Errorf("DuckDB iceberg does not support storage type: '%s' (supported: s3)", lh.Storage.Type)
-	}
-	if !lh.Storage.Auth.IsS3() {
-		return errors.New("DuckDB iceberg with s3 storage requires access_key and secret_key")
+	switch lh.Storage.Type {
+	case config.StorageTypeS3:
+		if !lh.Storage.Auth.IsS3() {
+			return errors.New("DuckDB iceberg with s3 storage requires access_key and secret_key")
+		}
+	case config.StorageTypeGCS:
+		if !lh.Storage.Auth.IsGCS() {
+			return errors.New("DuckDB iceberg with gcs storage requires access_key and secret_key")
+		}
+	default:
+		return fmt.Errorf("DuckDB iceberg does not support storage type: '%s' (supported: s3, gcs)", lh.Storage.Type)
 	}
 
 	return nil
@@ -70,14 +76,23 @@ func validateDuckLakeForDuckDB(lh config.LakehouseConfig) error {
 		return fmt.Errorf("DuckDB ducklake does not support catalog type: '%s' (supported: postgres, duckdb, sqlite)", lh.Catalog.Type)
 	}
 
-	if lh.Storage.Type != config.StorageTypeS3 {
-		return fmt.Errorf("DuckDB ducklake does not support storage type: '%s' (supported: s3)", lh.Storage.Type)
-	}
-	if lh.Storage.Path == "" {
-		return errors.New("DuckDB ducklake with s3 storage requires path")
-	}
-	if !lh.Storage.Auth.IsS3() {
-		return errors.New("DuckDB ducklake with s3 storage requires access_key and secret_key")
+	switch lh.Storage.Type {
+	case config.StorageTypeS3:
+		if lh.Storage.Path == "" {
+			return errors.New("DuckDB ducklake with s3 storage requires path")
+		}
+		if !lh.Storage.Auth.IsS3() {
+			return errors.New("DuckDB ducklake with s3 storage requires access_key and secret_key")
+		}
+	case config.StorageTypeGCS:
+		if lh.Storage.Path == "" {
+			return errors.New("DuckDB ducklake with gcs storage requires path")
+		}
+		if !lh.Storage.Auth.IsGCS() {
+			return errors.New("DuckDB ducklake with gcs storage requires access_key and secret_key")
+		}
+	default:
+		return fmt.Errorf("DuckDB ducklake does not support storage type: '%s' (supported: s3, gcs)", lh.Storage.Type)
 	}
 
 	return nil
@@ -135,6 +150,9 @@ func (l *LakehouseAttacher) getRequiredExtensions(lh config.LakehouseConfig) []s
 	if lh.Storage.Type == config.StorageTypeS3 {
 		extensions = append(extensions, "aws", "httpfs")
 	}
+	if lh.Storage.Type == config.StorageTypeGCS {
+		extensions = append(extensions, "httpfs")
+	}
 
 	switch lh.Catalog.Type {
 	case config.CatalogTypeGlue:
@@ -165,11 +183,15 @@ func (l *LakehouseAttacher) deduplicateExtensions(extensions []string) []string 
 func (l *LakehouseAttacher) generateSecretStatements(lh config.LakehouseConfig, alias string) []string {
 	var statements []string
 
-	if lh.Storage.Auth.IsS3() {
-		storageSecret := l.generateS3Secret(defaultSecretName(alias, "storage"), lh.Storage)
-		if storageSecret != "" {
-			statements = append(statements, storageSecret)
-		}
+	var storageSecret string
+	switch lh.Storage.Type {
+	case config.StorageTypeS3:
+		storageSecret = l.generateS3Secret(defaultSecretName(alias, "storage"), lh.Storage)
+	case config.StorageTypeGCS:
+		storageSecret = l.generateGCSSecret(defaultSecretName(alias, "storage"), lh.Storage)
+	}
+	if storageSecret != "" {
+		statements = append(statements, storageSecret)
 	}
 
 	catalogSecret := l.generateCatalogSecret(defaultSecretName(alias, "catalog"), lh.Catalog)
@@ -200,6 +222,28 @@ func (l *LakehouseAttacher) generateS3Secret(name string, storage config.Storage
 		parts = append(parts, ",   REGION "+quoteSQLStringLiteral(storage.Region))
 	}
 	scope := "s3://"
+	if storage.Path != "" {
+		scope = storage.Path
+	}
+	parts = append(parts, ",   SCOPE "+quoteSQLStringLiteral(scope))
+
+	parts = append(parts, ")")
+	return strings.Join(parts, "\n")
+}
+
+func (l *LakehouseAttacher) generateGCSSecret(name string, storage config.StorageConfig) string {
+	auth := storage.Auth
+	if !auth.IsGCS() {
+		return ""
+	}
+
+	var parts []string
+	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
+	parts = append(parts, "    TYPE gcs")
+	parts = append(parts, ",   KEY_ID "+quoteSQLStringLiteral(auth.AccessKey))
+	parts = append(parts, ",   SECRET "+quoteSQLStringLiteral(auth.SecretKey))
+
+	scope := "gs://"
 	if storage.Path != "" {
 		scope = storage.Path
 	}
