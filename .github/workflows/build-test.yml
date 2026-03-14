@@ -49,11 +49,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Go 
+      - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache: false
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
       - run: make test
 
 
@@ -72,6 +74,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: false
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
       - name: Install R
         run: |
           sudo apt-get update
@@ -146,6 +150,10 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust SQL parser library
+        run: cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 
       - name: Run GoReleaser
         run: |
