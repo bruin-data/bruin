@@ -113,6 +113,22 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
+	// Check for duplicate injected keys across all secret mappings
+	seenKeys := make(map[string]string) // env var name -> secret key that first claimed it
+	for _, mapping := range t.Secrets {
+		if prev, exists := seenKeys[mapping.InjectedKey]; exists && prev != mapping.SecretKey {
+			return fmt.Errorf("duplicate env var name '%s': secrets '%s' and '%s' both inject as '%s'", mapping.InjectedKey, prev, mapping.SecretKey, mapping.InjectedKey)
+		}
+		seenKeys[mapping.InjectedKey] = mapping.SecretKey
+
+		if mapping.SecretKey != mapping.InjectedKey {
+			if prev, exists := seenKeys[mapping.SecretKey]; exists && prev != mapping.SecretKey {
+				return fmt.Errorf("secret key '%s' conflicts with env var already claimed by secret '%s'", mapping.SecretKey, prev)
+			}
+			seenKeys[mapping.SecretKey] = mapping.SecretKey
+		}
+	}
+
 	// Create a copy of environment variables to avoid race conditions when multiple goroutines
 	// are running concurrently and modifying the same map
 	envCopy := make(map[string]string, len(o.envVariables))

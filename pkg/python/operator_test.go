@@ -307,6 +307,279 @@ func TestLocalOperator_RunTask(t *testing.T) {
 			},
 			wantErr: assert.Error,
 		},
+		{
+			name: "should return error for duplicate inject_as across secrets",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "key1",
+						InjectedKey: "MY_VAR",
+					},
+					{
+						SecretKey:   "key2",
+						InjectedKey: "MY_VAR",
+					},
+				},
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+			},
+			wantErr: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.ErrorContains(t, err, "duplicate env var name 'MY_VAR'")
+			},
+		},
+		{
+			name: "should return error when inject_as conflicts with another secret key",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "key1",
+						InjectedKey: "key1",
+					},
+					{
+						SecretKey:   "key2",
+						InjectedKey: "key1",
+					},
+				},
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+			},
+			wantErr: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.ErrorContains(t, err, "duplicate env var name 'key1'")
+			},
+		},
+		{
+			name: "should return error when secret key conflicts with inject_as of another secret",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "key1",
+						InjectedKey: "INJECTED_NAME",
+					},
+					{
+						SecretKey:   "INJECTED_NAME",
+						InjectedKey: "INJECTED_NAME",
+					},
+				},
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+			},
+			wantErr: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.ErrorContains(t, err, "duplicate env var name 'INJECTED_NAME'")
+			},
+		},
+		{
+			name: "should return error when secret key collides with another secrets inject_as expansion",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "conn-a",
+						InjectedKey: "conn-b",
+					},
+					{
+						SecretKey:   "conn-b",
+						InjectedKey: "SOME_OTHER_VAR",
+					},
+				},
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+			},
+			wantErr: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.ErrorContains(t, err, "secret key 'conn-b' conflicts with env var already claimed by secret 'conn-a'")
+			},
+		},
+		{
+			name: "should support same secret key with different inject_as values",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "gcp-default",
+						InjectedKey: "GOOGLE_APPLICATION_CREDENTIALS",
+					},
+					{
+						SecretKey:   "gcp-default",
+						InjectedKey: "GCP_CREDS",
+					},
+				},
+			},
+			pipeline: &pipeline.Pipeline{Name: "test-pipeline"},
+			ctx: func(t *testing.T) context.Context {
+				ctx := t.Context()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+				return ctx
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+
+				msf.On("GetConnectionDetails", "gcp-default").Return(&config.GenericConnection{
+					Value: "cred-value",
+				})
+				msf.On("GetConnectionType", "gcp-default").Return("google_cloud_platform")
+
+				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
+					return ec.envVariables["GOOGLE_APPLICATION_CREDENTIALS"] == "cred-value" &&
+						ec.envVariables["GCP_CREDS"] == "cred-value" &&
+						ec.envVariables["gcp-default"] == "cred-value"
+				})).Return(nil)
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "should return error when secret connection does not exist",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "nonexistent",
+						InjectedKey: "MY_SECRET",
+					},
+				},
+			},
+			pipeline: &pipeline.Pipeline{Name: "test-pipeline"},
+			ctx: func(t *testing.T) context.Context {
+				ctx := t.Context()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+				return ctx
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+
+				msf.On("GetConnectionDetails", "nonexistent").Return(nil)
+			},
+			wantErr: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.ErrorContains(t, err, "there's no secret with the name 'nonexistent'")
+			},
+		},
+		{
+			name: "should inject non-generic connection as JSON with both keys",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "my-bq",
+						InjectedKey: "BQ_CONN",
+					},
+				},
+			},
+			pipeline: &pipeline.Pipeline{Name: "test-pipeline"},
+			ctx: func(t *testing.T) context.Context {
+				ctx := t.Context()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+				return ctx
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+
+				// Return a non-GenericConnection (a map will be JSON-marshaled)
+				connDetails := map[string]string{"project": "my-project", "dataset": "my-dataset"}
+				msf.On("GetConnectionDetails", "my-bq").Return(connDetails)
+				msf.On("GetConnectionType", "my-bq").Return("bigquery")
+
+				runner.On("Run", mock.Anything, mock.MatchedBy(func(ec *executionContext) bool {
+					return ec.envVariables["BQ_CONN"] != "" &&
+						ec.envVariables["my-bq"] != "" &&
+						ec.envVariables["BQ_CONN"] == ec.envVariables["my-bq"]
+				})).Return(nil)
+			},
+			wantErr: assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
