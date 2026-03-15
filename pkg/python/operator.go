@@ -158,11 +158,17 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		connType := o.config.GetConnectionType(mapping.SecretKey)
 		if connType != "" {
 			connectionTypes[mapping.InjectedKey] = connType
+			if mapping.SecretKey != mapping.InjectedKey {
+				connectionTypes[mapping.SecretKey] = connType
+			}
 		}
 
 		val, ok := conn.(*config.GenericConnection)
 		if ok {
 			envVariables[mapping.InjectedKey] = val.Value
+			if mapping.SecretKey != mapping.InjectedKey {
+				envVariables[mapping.SecretKey] = val.Value
+			}
 			continue
 		}
 
@@ -171,6 +177,9 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 			return errors.Wrapf(err, "failed to marshal connection")
 		}
 		envVariables[mapping.InjectedKey] = string(res)
+		if mapping.SecretKey != mapping.InjectedKey {
+			envVariables[mapping.SecretKey] = string(res)
+		}
 	}
 
 	if len(connectionTypes) > 0 {
