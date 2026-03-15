@@ -209,8 +209,9 @@ func TestLocalOperator_RunTask(t *testing.T) {
 						ec.requirementsTxt == "" &&
 						ec.dependencyConfig.Type == DependencyTypeNone &&
 						ec.envVariables["key1_injected"] == "value1" &&
+						ec.envVariables["key1"] == "value1" &&
 						ec.envVariables["key2"] == "value2" &&
-						ec.envVariables["BRUIN_CONNECTION_TYPES"] == `{"key1_injected":"generic","key2":"generic"}`
+						ec.envVariables["BRUIN_CONNECTION_TYPES"] == `{"key1":"generic","key1_injected":"generic","key2":"generic"}`
 				})).Return(assert.AnError)
 			},
 			wantErr: assert.Error,
