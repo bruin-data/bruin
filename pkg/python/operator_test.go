@@ -308,6 +308,72 @@ func TestLocalOperator_RunTask(t *testing.T) {
 			wantErr: assert.Error,
 		},
 		{
+			name: "should return error when default inject_as conflicts with explicit inject_as of another secret",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "key1",
+						InjectedKey: "key1", // defaulted from key
+					},
+					{
+						SecretKey:   "key2",
+						InjectedKey: "key1", // explicit inject_as collides
+					},
+				},
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+			},
+			wantErr: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.ErrorContains(t, err, "duplicate env var name 'key1'")
+			},
+		},
+		{
+			name: "should return error when same key defined twice without inject_as",
+			task: &pipeline.Asset{
+				Name: "my-asset",
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/path/to/file.py",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "key1",
+						InjectedKey: "key1", // defaulted from key
+					},
+					{
+						SecretKey:   "key1",
+						InjectedKey: "key1", // defaulted from key, duplicate
+					},
+				},
+			},
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return(testModule, nil)
+
+				mf.On("FindDependencyConfig", repo.Path, mock.Anything).
+					Return(&DependencyConfig{Type: DependencyTypeNone}, nil)
+			},
+			wantErr: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.ErrorContains(t, err, "duplicate secret mapping: secret 'key1' is injected as 'key1' more than once")
+			},
+		},
+		{
 			name: "should return error for duplicate inject_as across secrets",
 			task: &pipeline.Asset{
 				Name: "my-asset",
