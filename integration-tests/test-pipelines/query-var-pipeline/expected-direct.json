@@ -1,0 +1,15 @@
+{
+  "columns": [
+    {
+      "name": "val",
+      "type": "VARCHAR"
+    }
+  ],
+  "rows": [
+    [
+      "test-value"
+    ]
+  ],
+  "connectionName": "duckdb-query-var",
+  "query": "SELECT 'test-value' AS val;"
+}

@@ -1,0 +1,15 @@
+{
+  "columns": [
+    {
+      "name": "greeting",
+      "type": "VARCHAR"
+    }
+  ],
+  "rows": [
+    [
+      "hello-world"
+    ]
+  ],
+  "connectionName": "duckdb-query-var",
+  "query": "SELECT 'hello-world' AS greeting;"
+}
