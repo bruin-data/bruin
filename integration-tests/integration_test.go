@@ -705,7 +705,7 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "query-var-direct",
 				Command: binary,
-				Args:    []string{"query", "--env", "env-query-var", "--connection", "duckdb-query-var", "--query", "SELECT '{{ my_var }}' AS val;", "--var", "my_var=test-value", "--output", "json"},
+				Args:    []string{"query", "--env", "env-query-var", "--connection", "duckdb-query-var", "--query", "SELECT '{{ my_var }}' AS val;", "--var", `my_var="test-value"`, "--output", "json"},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -722,7 +722,7 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "query-var-asset",
 				Command: binary,
-				Args:    []string{"query", "--env", "env-query-var", "--output", "json", "--asset", filepath.Join(currentFolder, "test-pipelines/query-var-pipeline/assets/greet.sql"), "--var", "greeting=hello-world"},
+				Args:    []string{"query", "--env", "env-query-var", "--output", "json", "--asset", filepath.Join(currentFolder, "test-pipelines/query-var-pipeline/assets/greet.sql"), "--var", `greeting="hello-world"`},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -739,7 +739,7 @@ func TestIndividualTasks(t *testing.T) {
 			task: e2e.Task{
 				Name:    "query-var-multi",
 				Command: binary,
-				Args:    []string{"query", "--env", "env-query-var", "--connection", "duckdb-query-var", "--query", "SELECT '{{ var1 }}' AS first, '{{ var2 }}' AS second;", "--var", "var1=aaa", "--var", "var2=bbb", "--output", "json"},
+				Args:    []string{"query", "--env", "env-query-var", "--connection", "duckdb-query-var", "--query", "SELECT '{{ var1 }}' AS first, '{{ var2 }}' AS second;", "--var", `var1="aaa"`, "--var", `var2="bbb"`, "--output", "json"},
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
