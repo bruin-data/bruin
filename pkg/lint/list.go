@@ -25,6 +25,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 	}
 
 	yamlFileValidator := WarnRegularYamlFiles{fs: fs}
+	unknownFieldsValidator := validateUnknownPipelineFields{fs: fs}
 
 	rules := []Rule{
 		&SimpleRule{
@@ -250,6 +251,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsurePipelineMaxActiveStepsIsValid,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
+			Identifier:       "unknown-pipeline-fields",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			Validator:        unknownFieldsValidator.Validate,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
