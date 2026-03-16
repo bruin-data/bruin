@@ -933,7 +933,8 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Re-determine start date based on pipeline configuration and full-refresh flag
-			startDate, err = DetermineStartDate(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			startDateStr := resolveStartDateStr(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, c.IsSet("start-date"))
+			startDate, err = date.ParseTime(startDateStr)
 			if err != nil {
 				return err
 			}
@@ -1373,39 +1374,11 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 	return startDate, endDate, nil
 }
 
-func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, error) {
-	var startDate time.Time
-	var err error
-
-	// Start date logic
-	switch {
-	case !fullRefresh:
-		startDate, err = date.ParseTime(cliStartDate)
-		if err != nil {
-			return time.Time{}, err
-		}
-		logger.Debug("Using CLI start_date: ", cliStartDate)
-	case pipeline == nil:
-		startDate, err = date.ParseTime(cliStartDate)
-		if err != nil {
-			return time.Time{}, err
-		}
-		logger.Debug("Using CLI start_date: ", cliStartDate)
-	case pipeline.StartDate == "":
-		startDate, err = date.ParseTime(cliStartDate)
-		if err != nil {
-			return time.Time{}, err
-		}
-		logger.Debug("Using CLI start_date: ", cliStartDate)
-	default:
-		startDate, err = date.ParseTime(pipeline.StartDate)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
-		}
-		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
+func resolveStartDateStr(cliStartDate string, p *pipeline.Pipeline, fullRefresh bool, cliStartDateSet bool) string {
+	if fullRefresh && !cliStartDateSet && p != nil && p.StartDate != "" {
+		return p.StartDate
 	}
-
-	return startDate, nil
+	return cliStartDate
 }
 
 func ValidateDateRange(startDate, endDate time.Time) error {

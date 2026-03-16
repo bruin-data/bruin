@@ -1579,6 +1579,7 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 		pipelineStartDate string
 		flagStartDate     string
 		flagEndDate       string
+		cliStartDateSet   bool
 		expectedStartDate time.Time
 		expectedEndDate   time.Time
 		expectedError     bool
@@ -1720,30 +1721,43 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 		// 5. Most complex - full data with edge cases
 		{
 			fullRefresh:       true,
-			name:              "full refresh: both flags + pipeline -> pipeline start, flag end",
+			name:              "full refresh: both flags + pipeline, cli set -> cli start wins",
 			pipelineStartDate: "2023-01-01",
 			flagStartDate:     "2024-01-01",
 			flagEndDate:       "2024-01-31",
+			cliStartDateSet:   true,
+			expectedStartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedEndDate:   time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			fullRefresh:       true,
+			name:              "full refresh: both flags + pipeline, cli not set -> pipeline start wins",
+			pipelineStartDate: "2023-01-01",
+			flagStartDate:     "2024-01-01",
+			flagEndDate:       "2024-01-31",
+			cliStartDateSet:   false,
 			expectedStartDate: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
 			expectedEndDate:   time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC),
 		},
 		{
 			fullRefresh:       true,
-			name:              "full refresh: pipeline start overrides flag dates",
+			name:              "full refresh: pipeline start overrides when cli not set",
 			pipelineStartDate: "2024-05-01",
 			flagStartDate:     "2024-03-01",
 			flagEndDate:       "2024-03-31",
+			cliStartDateSet:   false,
 			expectedStartDate: time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			expectedEndDate:   time.Date(2024, 3, 31, 0, 0, 0, 0, time.UTC),
 			expectedError:     true, // end date is older than start date
 		},
 		{
 			fullRefresh:       true,
-			name:              "full refresh: pipeline start always wins over flags",
+			name:              "full refresh: cli start wins when explicitly set",
 			pipelineStartDate: "2024-01-01",
 			flagStartDate:     "2024-05-01",
 			flagEndDate:       "2024-05-31",
-			expectedStartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			cliStartDateSet:   true,
+			expectedStartDate: time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			expectedEndDate:   time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
 		},
 	}
@@ -1760,9 +1774,6 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 				Concurrency: 1,
 			}
 
-			// Test the actual implementation
-			logger := zaptest.NewLogger(t).Sugar()
-
 			// Set default flag values if not provided
 			cliStartDate := tt.flagStartDate
 			cliEndDate := tt.flagEndDate
@@ -1776,7 +1787,8 @@ func TestFullRefreshWithStartDateFlags(t *testing.T) {
 			}
 
 			// Call the actual implementation
-			actualStartDate, err := DetermineStartDate(cliStartDate, testPipeline, tt.fullRefresh, logger)
+			startDateStr := resolveStartDateStr(cliStartDate, testPipeline, tt.fullRefresh, tt.cliStartDateSet)
+			actualStartDate, err := date.ParseTime(startDateStr)
 
 			// Parse end date separately
 			actualEndDate, endDateErr := date.ParseTime(cliEndDate)
@@ -2716,7 +2728,6 @@ func TestGenerateLogFileName(t *testing.T) {
 func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 	t.Parallel()
 
-	logger := zaptest.NewLogger(t).Sugar()
 	now := time.Now()
 	futureDate := now.AddDate(0, 0, 1) // Tomorrow
 	futureDateStr := futureDate.Format("2006-01-02 15:04:05.000000")
@@ -2807,7 +2818,8 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			startDate, err := DetermineStartDate(tt.cliStartDate, tt.pipeline, tt.fullRefresh, logger)
+			startDateStr := resolveStartDateStr(tt.cliStartDate, tt.pipeline, tt.fullRefresh, tt.cliStartDate != "")
+			startDate, err := date.ParseTime(startDateStr)
 
 			if tt.expectedError {
 				require.Error(t, err, "Expected error")

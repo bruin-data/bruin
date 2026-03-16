@@ -129,7 +129,8 @@ func Render() *cli.Command {
 			}
 
 			// Determine start date based on full-refresh flag and pipeline configuration
-			startDate, err := DetermineStartDate(c.String("start-date"), pl, fullRefresh, logger)
+			startDateStr := resolveStartDateStr(c.String("start-date"), pl, fullRefresh, c.IsSet("start-date"))
+			startDate, err := date.ParseTime(startDateStr)
 			if err != nil {
 				if c.String("output") == "json" {
 					printErrorJSON(errors.New("Please give a valid start date: bruin render --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
@@ -173,7 +174,7 @@ func Render() *cli.Command {
 			}
 
 			// If asset has its own start_date, use it instead of pipeline's start_date
-			if asset.StartDate != "" && fullRefresh {
+			if asset.StartDate != "" && fullRefresh && !c.IsSet("start-date") {
 				startDate, err = date.ParseTime(asset.StartDate)
 				if err != nil {
 					if c.String("output") == "json" {

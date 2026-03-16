@@ -340,9 +340,9 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "render-full-refresh-uses-pipeline-start-date",
+			name: "render-full-refresh-with-explicit-start-date-uses-flag",
 			task: e2e.Task{
-				Name:    "render-full-refresh-uses-pipeline-start-date",
+				Name:    "render-full-refresh-with-explicit-start-date-uses-flag",
 				Command: binary,
 				Args: []string{
 					"render",
@@ -354,7 +354,7 @@ func TestIndividualTasks(t *testing.T) {
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{`'2023-06-15'`, `'2024-01-31'`},
+					Contains: []string{`'2024-01-15'`, `'2024-01-31'`},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
