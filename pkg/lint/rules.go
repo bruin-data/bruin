@@ -24,6 +24,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
 	"github.com/yourbasic/graph"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -1771,6 +1772,49 @@ func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline
 			Task:        asset,
 			Description: fmt.Sprintf("start date %v is after end date %v for asset %v", parsedStartDate, parsedEndDate, asset.Name),
 		})
+	}
+
+	return issues, nil
+}
+
+var pipelineKnownYAMLFields = func() map[string]bool {
+	known := make(map[string]bool)
+	t := reflect.TypeOf(pipeline.Pipeline{})
+	for i := 0; i < t.NumField(); i++ {
+		tag := t.Field(i).Tag.Get("yaml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		name := strings.SplitN(tag, ",", 2)[0]
+		if name != "" && name != "-" {
+			known[name] = true
+		}
+	}
+	return known
+}()
+
+func ValidateUnknownPipelineFields(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	if p.DefinitionFile.Path == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(p.DefinitionFile.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read pipeline file at %s", p.DefinitionFile.Path)
+	}
+
+	var rawFields map[string]interface{}
+	if err := yaml.Unmarshal(data, &rawFields); err != nil {
+		return nil, nil
+	}
+
+	var issues []*Issue
+	for field := range rawFields {
+		if !pipelineKnownYAMLFields[field] {
+			issues = append(issues, &Issue{
+				Description: fmt.Sprintf("unknown field '%s' in pipeline definition", field),
+			})
+		}
 	}
 
 	return issues, nil

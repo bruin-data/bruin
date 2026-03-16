@@ -253,6 +253,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
+			Identifier:       "unknown-pipeline-fields",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			Validator:        ValidateUnknownPipelineFields,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
 			Identifier:             "cross-pipeline-uri-dependencies",
 			Fast:                   true,
 			Severity:               ValidatorSeverityWarning,
