@@ -1,5 +1,3 @@
-//go:build !cgo || !(darwin || linux)
-
 package sqlparser
 
 import "github.com/pkg/errors"
