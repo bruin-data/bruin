@@ -6,7 +6,11 @@ ARG VERSION=dev
 ARG BRANCH_NAME=unknown
 
 # Install build dependencies including C++ standard library for DuckDB
-RUN apt-get update && apt-get install -y git gcc g++ libc6-dev
+RUN apt-get update && apt-get install -y git gcc g++ libc6-dev curl
+
+# Install Rust toolchain for the SQL parser FFI
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Set working directory
 WORKDIR /src
@@ -19,6 +23,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build go mod download
 
 # Copy source code
 COPY . .
+
+# Build the Rust SQL parser static library
+RUN cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 
 # Build the application with version information from build args (with build cache for incremental builds)
 RUN --mount=type=cache,target=/root/.cache/go-build \

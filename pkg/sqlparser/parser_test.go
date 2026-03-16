@@ -16,6 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSQLParserCloseResetsStarted(t *testing.T) {
+	parser := &SQLParser{started: true}
+
+	require.NoError(t, parser.Close())
+	require.False(t, parser.started)
+	require.NoError(t, parser.Close())
+}
+
 func TestGetLineageForRunner(t *testing.T) {
 	lineage, err := NewSQLParser(true)
 	defer lineage.Close() //nolint
@@ -839,19 +847,14 @@ COMMIT;`,
 }
 
 func TestSqlParser_RenameTables(t *testing.T) {
-	s, err := NewSQLParser(true)
-	defer s.Close() //nolint
-	require.NoError(t, err)
-
-	err = s.Start()
-	require.NoError(t, err)
-
 	tests := []struct {
-		name          string
-		query         string
-		tableMappings map[string]string
-		want          string
-		wantErr       bool
+		name              string
+		query             string
+		tableMappings     map[string]string
+		want              string
+		normalizeExpected bool
+		runForRust        bool
+		wantErr           bool
 	}{
 		{
 			name:  "simple select should get an alias if table names are different",
@@ -870,6 +873,145 @@ func TestSqlParser_RenameTables(t *testing.T) {
 			want: "SELECT * FROM raw_dev.items",
 		},
 		{
+			name:  "python parity simple single table select",
+			query: `SELECT * FROM items`,
+			tableMappings: map[string]string{
+				"items": "t1",
+			},
+			want:              "SELECT * FROM t1 AS items",
+			normalizeExpected: true,
+			runForRust:        true,
+		},
+		{
+			name:  "python parity multi table with schemas",
+			query: `SELECT * FROM raw.items join raw.orders on items.item_id = orders.item_id`,
+			tableMappings: map[string]string{
+				"raw.items": "t1",
+				"orders":    "raw_dev.t2",
+			},
+			want:              "SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
+			normalizeExpected: true,
+			runForRust:        true,
+		},
+		{
+			name:  "python parity multiple queries",
+			query: `DELETE FROM raw.items WHERE item_id = 1; SELECT * FROM raw.items join raw.orders on items.item_id = orders.item_id`,
+			tableMappings: map[string]string{
+				"raw.items": "t1",
+				"orders":    "raw_dev.t2",
+			},
+			want:              "DELETE FROM t1 AS items WHERE item_id = 1; SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
+			normalizeExpected: true,
+			runForRust:        true,
+		},
+		{
+			name: "python parity table name in select",
+			query: `
+             SELECT
+                 items.item_id as item_id,
+                 CASE
+                     WHEN price > 1000 AND t2.somecol < 250 THEN 'high'
+                     WHEN price > 100 THEN 'medium'
+                     ELSE 'low'
+                 END as price_category
+             FROM raw.items
+             JOIN raw.orders as t2 on items.item_id = t2.item_id
+             WHERE in_stock = true
+         `,
+			tableMappings: map[string]string{
+				"raw.items":  "t1",
+				"raw.orders": "raw_dev.orders",
+			},
+			want:              "SELECT items.item_id AS item_id, CASE WHEN price > 1000 AND t2.somecol < 250 THEN 'high' WHEN price > 100 THEN 'medium' ELSE 'low' END AS price_category FROM t1 AS items JOIN raw_dev.orders AS t2 ON items.item_id = t2.item_id WHERE in_stock = TRUE",
+			normalizeExpected: true,
+			runForRust:        true,
+		},
+		{
+			name: "python parity subquery",
+			query: `
+             SELECT
+                 emp_id,
+                 (SELECT AVG(salary) FROM raw.salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary
+             FROM raw.employees
+         `,
+			tableMappings: map[string]string{
+				"raw.salaries":  "raw_dev.salaries",
+				"raw.employees": "raw_dev.employees",
+			},
+			want:              "SELECT emp_id, (SELECT AVG(salary) FROM raw_dev.salaries WHERE salaries.emp_id = employees.emp_id) AS avg_salary FROM raw_dev.employees",
+			normalizeExpected: true,
+			runForRust:        true,
+		},
+		{
+			name: "python parity complex ctes",
+			query: `
+WITH ufd AS (
+    SELECT
+        user_id,
+        MIN(date_utc) as my_date_col
+    FROM fact.some_other_table
+    GROUP BY 1
+),
+user_retention AS (
+    SELECT
+        d.user_id,
+        MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) as some_day1_metric,
+    FROM fact.some_daily_metrics d
+    INNER JOIN ufd f ON d.user_id = f.user_id
+    GROUP BY 1
+)
+SELECT
+    d.user_id,
+    DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) as recency,
+    COUNT(DISTINCT d.date_utc) as active_days,
+    MIN_BY(d.first_device_type, d.first_activity_timestamp) as first_device_type,
+    AVG(NULLIF(d.estimated_session_duration, 0)) as avg_session_duration,
+    SUM(d.event_start) as total_event_start,
+    MAX(r.some_day1_metric) as some_day1_metric,
+    case when sum(d.event_start) > 0 then 'Player' else 'Visitor' end as user_type,
+FROM fact.some_daily_metrics d
+LEFT JOIN user_retention r ON d.user_id = r.user_id
+GROUP BY 1`,
+			tableMappings: map[string]string{
+				"fact.some_daily_metrics": "fact_dev.some_daily_metrics",
+				"fact.some_other_table":   "fact_dev.some_other_table",
+			},
+			want:              "WITH ufd AS (SELECT user_id, MIN(date_utc) AS my_date_col FROM fact_dev.some_other_table GROUP BY 1), user_retention AS (SELECT d.user_id, MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) AS some_day1_metric FROM fact_dev.some_daily_metrics AS d INNER JOIN ufd AS f ON d.user_id = f.user_id GROUP BY 1) SELECT d.user_id, DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) AS recency, COUNT(DISTINCT d.date_utc) AS active_days, MIN_BY(d.first_device_type, d.first_activity_timestamp) AS first_device_type, AVG(NULLIF(d.estimated_session_duration, 0)) AS avg_session_duration, SUM(d.event_start) AS total_event_start, MAX(r.some_day1_metric) AS some_day1_metric, CASE WHEN sum(d.event_start) > 0 THEN 'Player' ELSE 'Visitor' END AS user_type FROM fact_dev.some_daily_metrics AS d LEFT JOIN user_retention AS r ON d.user_id = r.user_id GROUP BY 1",
+			normalizeExpected: true,
+			runForRust:        true,
+		},
+		{
+			name: "python parity cte with similar names",
+			query: `
+with
+t1 as
+(
+	select t1.col1, col2
+	from raw.table1 as t1
+),
+t2 as
+(
+	select t2.col1, col3
+	from raw.table1 t2
+),
+t3 as
+(
+	select table1.col1, col3
+	from raw.table1
+)
+select *
+from t1
+join t2
+	using(col1)
+        `,
+			tableMappings: map[string]string{
+				"raw.table1": "raw_dev.table1",
+			},
+			want:              "WITH t1 AS (SELECT t1.col1, col2 FROM raw_dev.table1 AS t1), t2 AS (SELECT t2.col1, col3 FROM raw_dev.table1 AS t2), t3 AS (SELECT table1.col1, col3 FROM raw_dev.table1) SELECT * FROM t1 JOIN t2 USING (col1)",
+			normalizeExpected: true,
+			runForRust:        true,
+		},
+		{
 			name:  `SELECT from unnest`,
 			query: "SELECT d FROM `raw.mytable` join unnest(json_extract_array(values.domains)) as d",
 			tableMappings: map[string]string{
@@ -879,21 +1021,33 @@ func TestSqlParser_RenameTables(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests { //nolint
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := s.RenameTables(tt.query, "bigquery", tt.tableMappings)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+	normalize := newNormalizer(t)
 
-			require.Equal(t, tt.want, got)
+	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
+		t.Run(parser.name, func(t *testing.T) {
+			for _, tt := range tests { //nolint
+				t.Run(tt.name, func(t *testing.T) {
+					if parser.name == "rust" && !tt.runForRust {
+						t.Skip("non-python rename case")
+					}
+
+					got, err := parser.parser.RenameTables(tt.query, "bigquery", tt.tableMappings)
+					if tt.wantErr {
+						require.Error(t, err)
+					} else {
+						require.NoError(t, err)
+					}
+
+					expected := tt.want
+					if tt.normalizeExpected {
+						expected = normalize(tt.want, "bigquery")
+					}
+
+					require.Equal(t, expected, got)
+				})
+			}
 		})
 	}
-
-	s.Close()
-	require.NoError(t, err)
 }
 
 func TestSqlParser_AddLimit(t *testing.T) { //nolint
@@ -1291,21 +1445,18 @@ func TestSqlParser_IsSingleSelectQuery(t *testing.T) {
 		},
 	}
 
-	parser, err := NewSQLParser(true)
-	require.NoError(t, err)
-	defer parser.Close()
-
-	err = parser.Start()
-	require.NoError(t, err)
-
-	for _, tt := range tests { //nolint
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parser.IsSingleSelectQuery(tt.query, tt.dialect)
-			if tt.expectedError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedIsSelect, got)
+	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
+		t.Run(parser.name, func(t *testing.T) {
+			for _, tt := range tests { //nolint
+				t.Run(tt.name, func(t *testing.T) {
+					got, err := parser.parser.IsSingleSelectQuery(tt.query, tt.dialect)
+					if tt.expectedError {
+						require.Error(t, err)
+					} else {
+						require.NoError(t, err)
+						require.Equal(t, tt.expectedIsSelect, got)
+					}
+				})
 			}
 		})
 	}
@@ -1333,6 +1484,11 @@ type pythonSelectedColumn struct {
 	Table string `json:"table"`
 }
 
+type startedParser struct {
+	name   string
+	parser Parser
+}
+
 func fixturePath(t *testing.T, filename string) string {
 	t.Helper()
 
@@ -1353,22 +1509,83 @@ func loadFixture[T any](t *testing.T, filename string) []T {
 	return result
 }
 
-func getLineageWithRawSchema(t *testing.T, parser *SQLParser, query, dialect string, schema map[string]interface{}) *Lineage {
+func startParsersForParity(t *testing.T) []startedParser {
 	t.Helper()
 
-	responsePayload, err := parser.sendCommand(&parserCommand{
-		Command: "lineage",
-		Contents: map[string]interface{}{
-			"query":   query,
-			"dialect": dialect,
-			"schema":  schema,
-		},
+	started := make([]startedParser, 0, 2)
+
+	sqlglotParser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	require.NoError(t, sqlglotParser.Start())
+	t.Cleanup(func() {
+		require.NoError(t, sqlglotParser.Close())
 	})
+	started = append(started, startedParser{name: "sqlglot", parser: sqlglotParser})
+
+	if err := ensureRustSQLParserFFI(); err != nil {
+		t.Logf("skipping rust parser parity tests: %v", err)
+		return started
+	}
+
+	rustParser, err := NewRustSQLParser(true)
+	require.NoError(t, err)
+	require.NoError(t, rustParser.Start())
+	t.Cleanup(func() {
+		require.NoError(t, rustParser.Close())
+	})
+	started = append(started, startedParser{name: "rust", parser: rustParser})
+
+	return started
+}
+
+func getLineageWithRawSchema(t *testing.T, parser Parser, query, dialect string, schema map[string]any) *Lineage {
+	t.Helper()
+
+	schemaJSON, err := json.Marshal(schema)
+	require.NoError(t, err)
+
+	var responsePayload string
+	switch p := parser.(type) {
+	case *SQLParser:
+		command := &parserCommand{
+			Command: "lineage",
+			Contents: map[string]any{
+				"query":   query,
+				"dialect": dialect,
+				"schema":  schema,
+			},
+		}
+		responsePayload, err = p.sendCommand(command)
+	case *RustSQLParser:
+		responsePayload, err = p.columnLineageRawJSON(query, dialect, string(schemaJSON))
+	default:
+		t.Fatalf("unsupported parser type %T", parser)
+	}
 	require.NoError(t, err)
 
 	var result Lineage
 	require.NoError(t, json.Unmarshal([]byte(responsePayload), &result))
 	return &result
+}
+
+// newNormalizer returns a function that normalizes SQL through the sqlglot parser.
+// It creates a single parser instance that is cleaned up when the test finishes.
+func newNormalizer(t *testing.T) func(query, dialect string) string {
+	t.Helper()
+
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	require.NoError(t, parser.Start())
+	t.Cleanup(func() {
+		require.NoError(t, parser.Close())
+	})
+
+	return func(query, dialect string) string {
+		t.Helper()
+		normalized, err := parser.RenameTables(query, dialect, map[string]string{})
+		require.NoError(t, err)
+		return normalized
+	}
 }
 
 func flattenNonSelectedColumns(columns []ColumnLineage) []pythonSelectedColumn {
@@ -1415,17 +1632,15 @@ func normalizeLineageTypes(columns []ColumnLineage) []ColumnLineage {
 func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
 	cases := loadFixture[pythonMainLineageCase](t, "python_main_lineage_cases.json")
 
-	parser, err := NewSQLParser(true)
-	require.NoError(t, err)
-	defer parser.Close()
-
-	require.NoError(t, parser.Start())
-
-	for idx, testCase := range cases { //nolint:paralleltest
-		t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
-			got := getLineageWithRawSchema(t, parser, testCase.Query, testCase.Dialect, testCase.Schema)
-			require.Equal(t, normalizeLineageTypes(testCase.Expected), normalizeLineageTypes(got.Columns))
-			require.Equal(t, testCase.ExpectedNonSelected, got.NonSelectedColumns)
+	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
+		t.Run(parser.name, func(t *testing.T) {
+			for idx, testCase := range cases { //nolint:paralleltest
+				t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
+					got := getLineageWithRawSchema(t, parser.parser, testCase.Query, testCase.Dialect, testCase.Schema)
+					require.Equal(t, normalizeLineageTypes(testCase.Expected), normalizeLineageTypes(got.Columns))
+					require.Equal(t, testCase.ExpectedNonSelected, got.NonSelectedColumns)
+				})
+			}
 		})
 	}
 }
@@ -1433,36 +1648,28 @@ func TestGetLineageForRunner_PythonMainCases(t *testing.T) {
 func TestExtractNonSelectColumn_PythonMainCases(t *testing.T) {
 	cases := loadFixture[pythonMainNonSelectedCase](t, "python_main_non_selected_cases.json")
 
-	parser, err := NewSQLParser(true)
-	require.NoError(t, err)
-	defer parser.Close()
+	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
+		t.Run(parser.name, func(t *testing.T) {
+			for idx, testCase := range cases { //nolint:paralleltest
+				t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
+					got := getLineageWithRawSchema(t, parser.parser, testCase.Query, testCase.Dialect, testCase.Schema)
 
-	require.NoError(t, parser.Start())
+					expected := append([]pythonSelectedColumn(nil), testCase.Expected...)
+					sort.Slice(expected, func(i, j int) bool {
+						if expected[i].Name == expected[j].Name {
+							return expected[i].Table < expected[j].Table
+						}
+						return expected[i].Name < expected[j].Name
+					})
 
-	for idx, testCase := range cases { //nolint:paralleltest
-		t.Run(fmt.Sprintf("%03d_%s", idx+1, testCase.Name), func(t *testing.T) {
-			got := getLineageWithRawSchema(t, parser, testCase.Query, testCase.Dialect, testCase.Schema)
-
-			expected := append([]pythonSelectedColumn(nil), testCase.Expected...)
-			sort.Slice(expected, func(i, j int) bool {
-				if expected[i].Name == expected[j].Name {
-					return expected[i].Table < expected[j].Table
-				}
-				return expected[i].Name < expected[j].Name
-			})
-
-			require.ElementsMatch(t, expected, flattenNonSelectedColumns(got.NonSelectedColumns))
+					require.ElementsMatch(t, expected, flattenNonSelectedColumns(got.NonSelectedColumns))
+				})
+			}
 		})
 	}
 }
 
 func TestSqlParser_GetTables_PythonMainParity(t *testing.T) {
-	parser, err := NewSQLParser(true)
-	require.NoError(t, err)
-	defer parser.Close()
-
-	require.NoError(t, parser.Start())
-
 	tests := []struct {
 		name    string
 		dialect string
@@ -1530,11 +1737,15 @@ select * from SOME_OTHER_DWH.dbo.my_table;
 		},
 	}
 
-	for _, tt := range tests { //nolint
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parser.UsedTables(tt.query, tt.dialect)
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
+		t.Run(parser.name, func(t *testing.T) {
+			for _, tt := range tests { //nolint
+				t.Run(tt.name, func(t *testing.T) {
+					got, err := parser.parser.UsedTables(tt.query, tt.dialect)
+					require.NoError(t, err)
+					require.Equal(t, tt.want, got)
+				})
+			}
 		})
 	}
 }
@@ -1632,12 +1843,6 @@ SELECT * FROM
 }
 
 func TestSqlParser_AddLimit_PythonMainParity(t *testing.T) {
-	parser, err := NewSQLParser(true)
-	require.NoError(t, err)
-	defer parser.Close()
-
-	require.NoError(t, parser.Start())
-
 	tests := []struct {
 		name          string
 		dialect       string
@@ -1806,14 +2011,18 @@ LIMIT 10
 		},
 	}
 
-	for _, tt := range tests { //nolint
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parser.AddLimit(tt.query, tt.limit, tt.dialect)
-			require.NoError(t, err)
+	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
+		t.Run(parser.name, func(t *testing.T) {
+			for _, tt := range tests { //nolint
+				t.Run(tt.name, func(t *testing.T) {
+					got, err := parser.parser.AddLimit(tt.query, tt.limit, tt.dialect)
+					require.NoError(t, err)
 
-			expected, err := parser.AddLimit(tt.expectedQuery, tt.limit, tt.dialect)
-			require.NoError(t, err)
-			require.Equal(t, expected, got)
+					expected, err := parser.parser.AddLimit(tt.expectedQuery, tt.limit, tt.dialect)
+					require.NoError(t, err)
+					require.Equal(t, expected, got)
+				})
+			}
 		})
 	}
 }
