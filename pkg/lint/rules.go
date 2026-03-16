@@ -1780,7 +1780,7 @@ func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline
 var pipelineKnownYAMLFields = func() map[string]bool {
 	known := make(map[string]bool)
 	t := reflect.TypeOf(pipeline.Pipeline{})
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		tag := t.Field(i).Tag.Get("yaml")
 		if tag == "" || tag == "-" {
 			continue
@@ -1793,19 +1793,23 @@ var pipelineKnownYAMLFields = func() map[string]bool {
 	return known
 }()
 
-func ValidateUnknownPipelineFields(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+type validateUnknownPipelineFields struct {
+	fs afero.Fs
+}
+
+func (v *validateUnknownPipelineFields) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	if p.DefinitionFile.Path == "" {
 		return nil, nil
 	}
 
-	data, err := os.ReadFile(p.DefinitionFile.Path)
+	data, err := afero.ReadFile(v.fs, p.DefinitionFile.Path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read pipeline file at %s", p.DefinitionFile.Path)
 	}
 
 	var rawFields map[string]interface{}
 	if err := yaml.Unmarshal(data, &rawFields); err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr
 	}
 
 	var issues []*Issue
