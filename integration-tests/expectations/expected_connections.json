@@ -250,6 +250,17 @@
       },
       "schema_prefix": ""
     },
+    "env-query-var": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-var",
+            "path": "duckdb-files/query-var.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-render-template-this": {
       "connections": {
         "duckdb": [

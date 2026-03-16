@@ -269,3 +269,9 @@ environments:
       duckdb:
         - name: "duckdb-validate-asset-time-interval"
           path: "duckdb-files/validate-asset-time-interval.db"
+
+  env-query-var:
+    connections:
+      duckdb:
+        - name: "duckdb-query-var"
+          path: "duckdb-files/query-var.db"

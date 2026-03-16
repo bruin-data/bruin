@@ -1,0 +1,4 @@
+name: duckdb-query-var
+
+default_connections:
+  duckdb: "duckdb-query-var"

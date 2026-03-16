@@ -118,6 +118,13 @@ func NewRendererWithStartEndDates(startDate, endDate, executionDate *time.Time, 
 	}
 }
 
+// SetContextValue sets a top-level variable in the Jinja rendering context.
+// Note: values set this way are NOT preserved across CloneForAsset calls;
+// callers must re-apply them on the cloned renderer.
+func (r *Renderer) SetContextValue(key string, value any) {
+	r.context.Set(key, value)
+}
+
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
 func NewRendererWithStartEndDatesAndMacros(startDate, endDate, executionDate *time.Time, pipelineName, runID string, vars Context, macroContent string) *Renderer {
 	ctx := defaultContext(startDate, endDate, executionDate, pipelineName, runID, false)
