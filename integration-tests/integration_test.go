@@ -8,11 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/stretchr/testify/require"
 )
 
 // loadPipelineState loads a pipeline state from a JSON expectation file.
