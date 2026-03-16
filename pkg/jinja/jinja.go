@@ -8,11 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 type Renderer struct {
@@ -116,6 +117,11 @@ func NewRendererWithStartEndDates(startDate, endDate, executionDate *time.Time, 
 		queryRenderLock: &sync.Mutex{},
 		macroContent:    "",
 	}
+}
+
+// SetContextValue sets a top-level variable in the Jinja rendering context.
+func (r *Renderer) SetContextValue(key string, value any) {
+	r.context.Set(key, value)
 }
 
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
