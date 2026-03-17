@@ -244,7 +244,6 @@ jobs:
   dockerBuild:
     runs-on: depot-ubuntu-latest
     name: Docker Build
-    needs: [release-windows, release-unix]
     permissions:
       # allow issuing OIDC tokens for this workflow run
       id-token: write
