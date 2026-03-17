@@ -58,6 +58,12 @@ bruin validate --help
 | [`patch`](/commands/patch) | Apply patches to asset definitions |
 | [`ai-enhance`](/commands/ai-enhance) | Enhance asset metadata using AI |
 
+### Bruin Cloud
+
+| Command | Description |
+|---------|-------------|
+| [`cloud`](/commands/cloud) | Interact with Bruin Cloud: list projects, manage pipelines, diagnose runs, and more |
+
 ## Common Workflows
 
 ### Running a Pipeline
@@ -151,5 +157,6 @@ The [Bruin VS Code Extension](/vscode-extension/overview) provides a visual inte
 
 - [Run Command](/commands/run) - Detailed execution options
 - [Validate Command](/commands/validate) - Pipeline validation
+- [Cloud Command](/commands/cloud) - Bruin Cloud CLI
 - [VS Code Extension](/vscode-extension/overview) - Visual interface
 - [Bruin MCP](/getting-started/bruin-mcp) - AI agent integration
