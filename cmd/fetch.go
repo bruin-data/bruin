@@ -939,7 +939,11 @@ func parseQueryVars(rawVars []string) (map[string]any, error) {
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid variable %q: must be in key=value format", v)
 		}
-		vars[strings.TrimSpace(parts[0])] = parts[1]
+		key := strings.TrimSpace(parts[0])
+		if key == "" {
+			return nil, fmt.Errorf("invalid variable %q: key must not be empty", v)
+		}
+		vars[key] = strings.TrimSpace(parts[1])
 	}
 
 	return vars, nil

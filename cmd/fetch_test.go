@@ -67,6 +67,16 @@ func TestParseQueryVars(t *testing.T) {
 			expected: map[string]any{"x": "second"},
 		},
 		{
+			name:     "value with spaces is trimmed",
+			rawVars:  []string{"key = hello "},
+			expected: map[string]any{"key": "hello"},
+		},
+		{
+			name:    "empty key errors",
+			rawVars: []string{"=value"},
+			wantErr: `invalid variable "=value": key must not be empty`,
+		},
+		{
 			name:    "missing equals sign errors",
 			rawVars: []string{"invalid"},
 			wantErr: `invalid variable "invalid": must be in key=value format`,
