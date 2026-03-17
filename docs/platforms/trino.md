@@ -6,6 +6,7 @@ Bruin supports Trino as a distributed SQL query engine.
 
 In order to set up a Trino connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
 
+
 ```yaml
     connections:
       trino:
@@ -26,8 +27,8 @@ Runs a materialized Trino asset or a Trino script. For detailed parameters, you 
 
 > [!IMPORTANT]
 > Use a single SQL statement per `trino.sql` asset. Multi-statement queires are not supported by Trino.
-
 #### Example: Create a table using table materialization
+
 
 ```bruin-sql
 /* @bruin
@@ -44,6 +45,7 @@ WHERE event_name = 'install'
 
 #### Example: Run a Trino script
 
+
 ```bruin-sql
 /* @bruin
 name: hive.events.install
@@ -59,6 +61,7 @@ WHERE event_name = 'install'
 ### `trino.sensor.query`
 
 Checks if a query returns any results in Trino, runs every 30 seconds until this query returns any results.
+
 
 ```yaml
 name: string
@@ -77,6 +80,7 @@ parameters:
 
 Checks if the data available in upstream table for end date of the run.
 
+
 ```yaml
 name: analytics_123456789.events
 type: trino.sensor.query
@@ -88,6 +92,7 @@ parameters:
 
 Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
 
+
 ```yaml
 name: analytics_123456789.events
 type: trino.sensor.query
@@ -95,12 +100,14 @@ parameters:
     query: select exists(select 1 from upstream_table where inserted_at > '{{ end_timestamp }}')
 ```
 
-
 ## Lakehouse Support
+
 Trino lakehouse integration is configured in Trino itself (catalog/connector settings). The Bruin Trino connection format stays the same.
 
 ### Supported Lakehouse Formats
+
 #### Iceberg Format
+
 | Catalog \ Storage | S3 | GCS |
 |-------------------|----|-----|
 | Glue | <span class="lh-check" aria-label="supported"></span> | Not supported |
@@ -113,6 +120,7 @@ Trino lakehouse integration is configured in Trino itself (catalog/connector set
 - For GCS storage, you have a GCP service account key file and a bucket prefix (for example `gs://example-lakehouse/warehouse`).
 
 Local config file structure:
+
 
 ```text
 └── trino
@@ -128,16 +136,18 @@ Local config file structure:
 
 `trino/etc/node.properties`:
 
+
 ```properties
 node.environment=dev
 node.id=00000000-0000-0000-0000-000000000000
 node.data-dir=/data/trino
 ```
+
 - `node.environment` must be the same on all Trino nodes in a cluster.
 - `node.id` must be unique per node and stable across restarts/upgrades.
 - `node.data-dir` must be writable by Trino.
 
-<br>
+<br>&#8203;
 
 ### Guide: Iceberg + Glue + S3 {#guide-glue-s3}
 
@@ -145,6 +155,7 @@ Use this when you want AWS Glue as the Iceberg catalog.
 The Docker setup below is an example for local testing purposes.
 
 `docker-compose.yml`:
+
 
 ```yaml
 services:
@@ -161,10 +172,10 @@ services:
       - ./trino/etc:/etc/trino
 ```
 
-
 `trino/etc/catalog/analytics_catalog.properties`:
 
 This file configures a Trino catalog to use Iceberg connector with AWS Glue as the metadata catalog and S3 as the storage location for table data.
+
 
 ```properties
 connector.name=iceberg
@@ -179,12 +190,13 @@ fs.native-s3.enabled=true
 s3.region=us-east-1
 ```
 
-<br>
+<br>&#8203;
 
 ### Guide: Iceberg + Nessie (In-Memory) + S3 {#guide-nessie-in-memory-s3}
 
 Use this for local testing with ephemeral Nessie metadata.
 The Docker setup below is an example for local testing and documentation purposes.
+
 
 ```yaml
 services:
@@ -212,13 +224,15 @@ services:
     depends_on:
       - nessie
 ```
+
 note that `IN_MEMORY` does not persist Nessie metadata across restarts.
 
-<br>
+<br>&#8203;
 
 `trino/etc/catalog/analytics_catalog.properties`:
 
 This file tells Trino to use Iceberg tables with Nessie as the metadata catalog and S3 as the data warehouse.
+
 
 ```properties
 connector.name=iceberg
@@ -231,11 +245,12 @@ iceberg.nessie-catalog.default-warehouse-dir=s3://example-lakehouse/warehouse
 fs.native-s3.enabled=true
 s3.region=us-east-1
 ```
-- `iceberg.nessie-catalog.uri` points to the Nessie API, 
-- `iceberg.nessie-catalog.ref` selects the active branch/ref, and 
+
+- `iceberg.nessie-catalog.uri` points to the Nessie API,
+- `iceberg.nessie-catalog.ref` selects the active branch/ref, and
 - `iceberg.nessie-catalog.default-warehouse-dir` sets where Iceberg data files are written in S3.
 
-<br>
+<br>&#8203;
 
 ### Guide: Iceberg + Nessie (In-Memory) + GCS {#guide-nessie-in-memory-gcs}
 
@@ -243,6 +258,7 @@ Use this for local testing with ephemeral Nessie metadata and GCS object storage
 The Docker setup below is an example for local testing and documentation purposes.
 
 `docker-compose.yml`:
+
 
 ```yaml
 services:
@@ -271,6 +287,7 @@ services:
 
 This file tells Trino to use Iceberg tables with Nessie as the metadata catalog and GCS as the data warehouse.
 
+
 ```properties
 connector.name=iceberg
 
@@ -286,14 +303,14 @@ gcs.json-key-file-path=/etc/trino/gcs-key.json
 
 - `iceberg.nessie-catalog.default-warehouse-dir` is required for Nessie catalogs.
 
-
-<br>
+<br>&#8203;
 
 ### Validate With Bruin
 
 Bruin connection config stays unchanged; point to the Trino catalog and schema you configured.
 
 `pipeline.yml`:
+
 
 ```yaml
 name: trino-iceberg-smoke
@@ -303,6 +320,7 @@ default_connections:
 ```
 
 `.bruin.yml`:
+
 
 ```yaml
 default_environment: default
@@ -321,6 +339,7 @@ environments:
 
 `assets/smoke_test.sql`:
 
+
 ```sql
 /* @bruin
 name: analytics.smoke_test
@@ -331,6 +350,7 @@ SELECT * FROM sample_users ORDER BY id;
 ```
 
 Run:
+
 
 ```bash
 bruin run my-pipeline
