@@ -7,7 +7,7 @@
   ],
   "rows": [
     [
-      "2026-01-23"
+      "2026-01-23T00:00:00Z"
     ]
   ],
   "connectionName": "duckdb-query-var",
