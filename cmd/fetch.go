@@ -113,7 +113,7 @@ func Query() *cli.Command {
 			},
 			&cli.StringSliceFlag{
 				Name:    "var",
-				Usage:   "set Jinja variables for query rendering (e.g. --var key=value)",
+				Usage:   "set Jinja template variables for query rendering (e.g. --var key=value)",
 				Sources: cli.EnvVars("BRUIN_VARS"),
 			},
 		},
@@ -123,15 +123,9 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
-			vars := map[string]any{}
-			for _, v := range c.StringSlice("var") {
-				parsed, err := parseVariable(v)
-				if err != nil {
-					return handleError(c.String("output"), errors.Wrapf(err, "invalid variable %q", v))
-				}
-				for key, value := range parsed {
-					vars[key] = value
-				}
+			vars, err := parseQueryVars(c.StringSlice("var"))
+			if err != nil {
+				return handleError(c.String("output"), err)
 			}
 
 			connName, conn, queryStr, assetType, pipelineInfo, err := prepareQueryExecution(ctx, c, fs, vars)
@@ -933,6 +927,22 @@ func formatBigRatAsDecimal(rat *big.Rat) string {
 
 	// BigQuery NUMERIC/BIGNUMERIC scale is up to 38 decimal points.
 	return trimDecimalString(rat.FloatString(38))
+}
+
+// parseQueryVars parses --var flags into a map of string values.
+// Values are always treated as literal strings, matching how pipeline variables work in YAML.
+func parseQueryVars(rawVars []string) (map[string]any, error) {
+	vars := make(map[string]any)
+
+	for _, v := range rawVars {
+		parts := strings.SplitN(v, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid variable %q: must be in key=value format", v)
+		}
+		vars[strings.TrimSpace(parts[0])] = parts[1]
+	}
+
+	return vars, nil
 }
 
 func trimDecimalString(value string) string {
