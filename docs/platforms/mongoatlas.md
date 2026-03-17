@@ -2,10 +2,10 @@
 
 MongoDB Atlas is a fully-managed cloud database service built on MongoDB. It provides automated backups, monitoring, and scaling capabilities across major cloud providers.
 
-Bruin supports MongoDB Atlas as a data platform for ingestion destinations.
+Bruin supports MongoDB Atlas as a data platform for both ingestion sources and destinations.
 
 > [!NOTE]
-> MongoDB Atlas is only supported as a destination for ingestion using [Ingestr Assets](../assets/ingestr.md). It cannot be used for SQL-based transformations or other asset types.
+> MongoDB Atlas is supported as both a source and destination for ingestion using [Ingestr Assets](../assets/ingestr.md). It cannot be used for SQL-based transformations or other asset types.
 
 ## Connection
 
@@ -55,3 +55,26 @@ This configuration will:
 
 1. Extract data from the `public.users` table in PostgreSQL
 2. Load the data into the `users` collection in your MongoDB Atlas database
+
+## Using MongoDB Atlas as a Source
+
+MongoDB Atlas can also be used as a source for [Ingestr Assets](../assets/ingestr.md). This allows you to ingest data from your MongoDB Atlas cluster into various destinations such as data warehouses.
+
+### Example: Load data from MongoDB Atlas to PostgreSQL
+
+```yaml
+name: public.atlas_users
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: mongo_atlas
+  source_table: 'users.details'
+
+  destination: postgres
+```
+
+This configuration will:
+
+1. Extract data from the `users.details` collection in your MongoDB Atlas database
+2. Load the data into the `public.atlas_users` table in PostgreSQL
