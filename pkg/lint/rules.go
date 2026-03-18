@@ -1793,7 +1793,58 @@ var pipelineKnownYAMLFields = func() map[string]bool {
 	return known
 }()
 
+// assetYAMLTopLevelStruct mirrors the top-level YAML keys of pipeline's taskDefinition for known-fields validation.
+type assetYAMLTopLevelStruct struct {
+	Name              string `yaml:"name"`
+	URI               string `yaml:"uri"`
+	Description       string `yaml:"description"`
+	Type              string `yaml:"type"`
+	RunFile           string `yaml:"run"`
+	Depends           string `yaml:"depends"`
+	Parameters        string `yaml:"parameters"`
+	Connections       string `yaml:"connections"`
+	Secrets           string `yaml:"secrets"`
+	Connection        string `yaml:"connection"`
+	Image             string `yaml:"image"`
+	Instance          string `yaml:"instance"`
+	Materialization   string `yaml:"materialization"`
+	Owner             string `yaml:"owner"`
+	StartDate         string `yaml:"start_date"`
+	Extends           string `yaml:"extends"`
+	Columns           string `yaml:"columns"`
+	CustomChecks      string `yaml:"custom_checks"`
+	Hooks             string `yaml:"hooks"`
+	Tags              string `yaml:"tags"`
+	Snowflake         string `yaml:"snowflake"`
+	Athena            string `yaml:"athena"`
+	IntervalModifiers string `yaml:"interval_modifiers"`
+	Domains           string `yaml:"domains"`
+	Meta              string `yaml:"meta"`
+	RerunCooldown     string `yaml:"rerun_cooldown"`
+	RefreshRestricted string `yaml:"refresh_restricted,omitempty"`
+}
+
+var assetKnownYAMLFields = func() map[string]bool {
+	known := make(map[string]bool)
+	t := reflect.TypeOf(assetYAMLTopLevelStruct{})
+	for i := range t.NumField() {
+		tag := t.Field(i).Tag.Get("yaml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		name := strings.SplitN(tag, ",", 2)[0]
+		if name != "" && name != "-" {
+			known[name] = true
+		}
+	}
+	return known
+}()
+
 type validateUnknownPipelineFields struct {
+	fs afero.Fs
+}
+
+type validateUnknownAssetFields struct {
 	fs afero.Fs
 }
 
@@ -1817,6 +1868,34 @@ func (v *validateUnknownPipelineFields) Validate(ctx context.Context, p *pipelin
 		if !pipelineKnownYAMLFields[field] {
 			issues = append(issues, &Issue{
 				Description: fmt.Sprintf("unknown field '%s' in pipeline definition", field),
+			})
+		}
+	}
+
+	return issues, nil
+}
+
+func (v *validateUnknownAssetFields) Validate(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.DefinitionFile.Type != pipeline.YamlTask || asset.DefinitionFile.Path == "" {
+		return nil, nil
+	}
+
+	data, err := afero.ReadFile(v.fs, asset.DefinitionFile.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read asset file at %s", asset.DefinitionFile.Path)
+	}
+
+	var rawFields map[string]interface{}
+	if err := yaml.Unmarshal(data, &rawFields); err != nil {
+		return nil, nil //nolint:nilerr
+	}
+
+	var issues []*Issue
+	for field := range rawFields {
+		if !assetKnownYAMLFields[field] {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("unknown field '%s' in asset definition", field),
 			})
 		}
 	}

@@ -4229,3 +4229,47 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateUnknownPipelineFields(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, fs.MkdirAll("/project", 0o755))
+	require.NoError(t, afero.WriteFile(fs, "/project/pipeline.yml", []byte("name: my-pipeline\ntypo_schedule: daily\n"), 0o644))
+
+	v := validateUnknownPipelineFields{fs: fs}
+	p := &pipeline.Pipeline{
+		Name:           "my-pipeline",
+		DefinitionFile: pipeline.DefinitionFile{Path: "/project/pipeline.yml"},
+	}
+
+	issues, err := v.Validate(t.Context(), p)
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Equal(t, "unknown field 'typo_schedule' in pipeline definition", issues[0].Description)
+}
+
+func TestValidateUnknownAssetFields(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	assetDir := "/project/assets"
+	require.NoError(t, fs.MkdirAll(assetDir, 0o755))
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(assetDir, "task.yml"), []byte("name: my-task\ntype: bq.sql\ntypo_column: x\n"), 0o644))
+
+	v := validateUnknownAssetFields{fs: fs}
+	p := &pipeline.Pipeline{Name: "p"}
+	asset := &pipeline.Asset{
+		Name: "my-task",
+		DefinitionFile: pipeline.TaskDefinitionFile{
+			Path: filepath.Join(assetDir, "task.yml"),
+			Type: pipeline.YamlTask,
+		},
+	}
+
+	issues, err := v.Validate(t.Context(), p, asset)
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Equal(t, "unknown field 'typo_column' in asset definition", issues[0].Description)
+	assert.Same(t, asset, issues[0].Task)
+}

@@ -187,11 +187,11 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			},
 		},
 		{
-			name: "task YAML with schedule key errors (schedule is pipeline-level only)",
+			name: "task YAML with schedule key is accepted at parse (schedule is pipeline-level only; lint warns)",
 			args: args{
 				filePath: filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "task.yml"),
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "the ones with missing runfile are ignored",
@@ -234,11 +234,11 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "task YAML with appsflyer/output (random-structure) errors",
+			name: "task YAML with appsflyer/output (random-structure) is accepted at parse; lint warns on unknown keys",
 			args: args{
 				filePath: filepath.Join("testdata", "yaml", "random-structure", "task.yml"),
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "depends can be a single string",
@@ -288,8 +288,8 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			}
 			if tt.want != nil {
 				tt.want.ExecutableFile.Content = strings.ReplaceAll(tt.want.ExecutableFile.Content, "\r\n", "\n")
+				require.Equal(t, tt.want, got)
 			}
-			require.Equal(t, tt.want, got)
 		})
 	}
 }

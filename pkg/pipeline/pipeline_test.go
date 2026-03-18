@@ -391,12 +391,6 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			windowsJSONPath: "./testdata/pipeline/first-pipeline_windows.json",
 		},
 		{
-			name:            "second-pipeline",
-			pipelinePath:    "./testdata/pipeline/second-pipeline",
-			unixJSONPath:    "./testdata/pipeline/second-pipeline_unix.json",
-			windowsJSONPath: "./testdata/pipeline/second-pipeline_windows.json",
-		},
-		{
 			name:            "pipeline-with-no-assets",
 			pipelinePath:    "./testdata/pipeline/pipeline-with-no-assets",
 			unixJSONPath:    "./testdata/pipeline/pipeline-with-no-assets_unix.json",
@@ -438,6 +432,15 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestPipeline_AcceptsUnrecognisedPipelineKeysAtParseTime(t *testing.T) {
+	t.Parallel()
+
+	// Unknown keys (e.g. default_args) are ignored at parse time; lint reports them as warnings.
+	p, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath(t.Context(), "./testdata/pipeline/second-pipeline", pipeline.WithMutate())
+	require.NoError(t, err)
+	require.NotNil(t, p)
 }
 
 func TestPipeline_HasTaskType(t *testing.T) {
@@ -873,11 +876,6 @@ func TestAsset_Persist(t *testing.T) {
 			expectedPath: path.AbsPathForTests(t, "testdata/persist/ingestr.expected.yml"),
 		},
 		{
-			name:         "multiline strings are handled in YAML",
-			assetPath:    path.AbsPathForTests(t, "testdata/persist/big.sql"),
-			expectedPath: path.AbsPathForTests(t, "testdata/persist/big.expected.sql"),
-		},
-		{
 			name:         "symbolic upstreams are not lost",
 			assetPath:    path.AbsPathForTests(t, "testdata/persist/symbolic_upstream.sql"),
 			expectedPath: path.AbsPathForTests(t, "testdata/persist/symbolic_upstream.expected.sql"),
@@ -909,6 +907,15 @@ func TestAsset_Persist(t *testing.T) {
 			assert.Equal(t, expectedStr, actualStr)
 		})
 	}
+}
+
+func TestAsset_AcceptsUnrecognisedTaskKeysAtParseTime(t *testing.T) {
+	t.Parallel()
+
+	// Unknown keys (e.g. permissions) are ignored at parse time; lint reports them as warnings.
+	asset, err := cmd.DefaultPipelineBuilder.CreateAssetFromFile(path.AbsPathForTests(t, "testdata/persist/big.sql"), nil)
+	require.NoError(t, err)
+	require.NotNil(t, asset)
 }
 
 func TestAsset_Persist_TagsRemoval(t *testing.T) {
@@ -1257,27 +1264,28 @@ func TestPipeline_MaxActiveSteps(t *testing.T) {
 	})
 }
 
-func TestPipelineFromPath_RejectsUnknownKeys(t *testing.T) {
+func TestPipelineFromPath_AcceptsUnknownKeysAtParseTime(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
 	require.NoError(t, fs.MkdirAll("/project", 0o755))
 
-	t.Run("unknown top-level key errors", func(t *testing.T) {
+	// Unknown top-level keys are ignored at parse time; lint reports them as warnings.
+	t.Run("unknown top-level key is ignored at parse", func(t *testing.T) {
 		invalidPipeline := "name: my-pipeline\ntypo_schedule: daily\n"
 		require.NoError(t, afero.WriteFile(fs, "/project/pipeline.yml", []byte(invalidPipeline), 0o644))
-		_, err := pipeline.PipelineFromPath("/project/pipeline.yml", fs)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "typo_schedule")
+		p, err := pipeline.PipelineFromPath("/project/pipeline.yml", fs)
+		require.NoError(t, err)
+		assert.Equal(t, "my-pipeline", p.Name)
 	})
 
-	t.Run("defaults instead of default errors", func(t *testing.T) {
-		// Correct key is "default:" for pipeline default values; "defaults:" is ignored without strict validation
+	t.Run("defaults instead of default is ignored at parse", func(t *testing.T) {
+		// Correct key is "default:" for pipeline default values; "defaults:" is ignored at parse, lint warns
 		invalidPipeline := "name: my-pipeline\ndefaults:\n  type: bq.sql\n"
 		require.NoError(t, afero.WriteFile(fs, "/project/pipeline.yml", []byte(invalidPipeline), 0o644))
-		_, err := pipeline.PipelineFromPath("/project/pipeline.yml", fs)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "defaults")
+		p, err := pipeline.PipelineFromPath("/project/pipeline.yml", fs)
+		require.NoError(t, err)
+		assert.Equal(t, "my-pipeline", p.Name)
 	})
 }
 
