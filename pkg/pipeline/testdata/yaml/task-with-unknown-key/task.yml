@@ -1,0 +1,4 @@
+name: test-asset
+type: bq.sql
+run: query.sql
+invalid_top_level_key: should cause error

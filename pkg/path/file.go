@@ -1,6 +1,8 @@
 package path
 
 import (
+	"bytes"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -48,6 +50,33 @@ func ConvertYamlToObject(buf []byte, out interface{}) error {
 	}
 
 	return nil
+}
+
+// UnmarshalStrict unmarshals YAML into out and errors on unrecognized or invalid
+// configuration keys at any level (including nested objects). Use this for
+// pipeline and asset config so typos and invalid keys fail fast instead of being
+// silently ignored.
+func UnmarshalStrict(buf []byte, out interface{}) error {
+	if len(bytes.TrimSpace(buf)) == 0 {
+		return nil
+	}
+	dec := yaml.NewDecoder(bytes.NewReader(buf))
+	dec.KnownFields(true)
+	err := dec.Decode(out)
+	if err != nil && err != io.EOF {
+		return &YamlParseError{msg: err.Error()}
+	}
+	return nil
+}
+
+// ReadYamlStrict reads a YAML file and unmarshals it with strict key validation.
+// Unrecognized or invalid keys at any level cause an error.
+func ReadYamlStrict(fs afero.Fs, path string, out interface{}) error {
+	buf, err := afero.ReadFile(fs, path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read file %s", path)
+	}
+	return UnmarshalStrict(buf, out)
 }
 
 // ExcludeSubItemsInDirectoryContainingFile cleans up the list to remove sub-paths that are in the same directory as

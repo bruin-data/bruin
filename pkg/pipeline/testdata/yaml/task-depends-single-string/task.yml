@@ -1,0 +1,3 @@
+name: hello-world
+type: type1
+depends: task1

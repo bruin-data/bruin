@@ -355,7 +355,7 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 
 		yamlError := new(path.YamlParseError)
 		var definition taskDefinition
-		err = path.ReadYaml(fs, filePath, &definition)
+		err = path.ReadYamlStrict(fs, filePath, &definition)
 		if err != nil && errors.As(err, &yamlError) {
 			return nil, &ParseError{Msg: err.Error()}
 		}
@@ -402,7 +402,7 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 
 func ConvertYamlToTask(content []byte) (*Asset, error) {
 	var definition taskDefinition
-	err := path.ConvertYamlToObject(content, &definition)
+	err := path.UnmarshalStrict(content, &definition)
 	if err != nil {
 		return nil, err
 	}

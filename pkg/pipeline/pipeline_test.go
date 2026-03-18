@@ -1257,6 +1257,30 @@ func TestPipeline_MaxActiveSteps(t *testing.T) {
 	})
 }
 
+func TestPipelineFromPath_RejectsUnknownKeys(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, fs.MkdirAll("/project", 0o755))
+
+	t.Run("unknown top-level key errors", func(t *testing.T) {
+		invalidPipeline := "name: my-pipeline\ntypo_schedule: daily\n"
+		require.NoError(t, afero.WriteFile(fs, "/project/pipeline.yml", []byte(invalidPipeline), 0o644))
+		_, err := pipeline.PipelineFromPath("/project/pipeline.yml", fs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "typo_schedule")
+	})
+
+	t.Run("defaults instead of default errors", func(t *testing.T) {
+		// Correct key is "default:" for pipeline default values; "defaults:" is ignored without strict validation
+		invalidPipeline := "name: my-pipeline\ndefaults:\n  type: bq.sql\n"
+		require.NoError(t, afero.WriteFile(fs, "/project/pipeline.yml", []byte(invalidPipeline), 0o644))
+		_, err := pipeline.PipelineFromPath("/project/pipeline.yml", fs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "defaults")
+	})
+}
+
 func TestClearSpacesAtLineEndings(t *testing.T) {
 	t.Parallel()
 

@@ -1475,9 +1475,9 @@ func (a *EmptyStringArray) UnmarshalJSON(data []byte) error {
 func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 	yamlError := new(path.YamlParseError)
 	var pl Pipeline
-	err := path.ReadYaml(fs, filePath, &pl)
+	err := path.ReadYamlStrict(fs, filePath, &pl)
 	if err != nil && errors.As(err, &yamlError) {
-		return nil, &ParseError{Msg: "error parsing bruin pipeline definition :" + err.Error()}
+		return nil, &ParseError{Msg: "error parsing bruin pipeline definition: " + err.Error()}
 	}
 
 	if err != nil {

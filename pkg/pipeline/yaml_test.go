@@ -156,7 +156,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 		{
 			name: "top-level runfile paths are still joined correctly",
 			args: args{
-				filePath: filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "task.yml"),
+				filePath: filepath.Join("testdata", "yaml", "task-with-toplevel-runfile-valid", "task.yml"),
 			},
 			want: &pipeline.Asset{
 				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
@@ -165,8 +165,8 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bash",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sh",
-					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
-					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile-valid", "hello.sh")),
+					Content: strings.TrimRight(mustRead(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile-valid", "hello.sh")), "\n") + "\n",
 				},
 				Parameters: map[string]string{
 					"param1": "value1",
@@ -185,6 +185,13 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Columns:      make([]pipeline.Column, 0),
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
+		},
+		{
+			name: "task YAML with schedule key errors (schedule is pipeline-level only)",
+			args: args{
+				filePath: filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "task.yml"),
+			},
+			wantErr: true,
 		},
 		{
 			name: "the ones with missing runfile are ignored",
@@ -220,9 +227,23 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			},
 		},
 		{
-			name: "depends can be a single string",
+			name: "unknown keys in task YAML error",
+			args: args{
+				filePath: filepath.Join("testdata", "yaml", "task-with-unknown-key", "task.yml"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "task YAML with appsflyer/output (random-structure) errors",
 			args: args{
 				filePath: filepath.Join("testdata", "yaml", "random-structure", "task.yml"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "depends can be a single string",
+			args: args{
+				filePath: filepath.Join("testdata", "yaml", "task-depends-single-string", "task.yml"),
 			},
 			want: &pipeline.Asset{
 				ID:           "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
@@ -233,8 +254,8 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				CustomChecks: []pipeline.CustomCheck{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "task.yml",
-					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "random-structure", "task.yml")),
-					Content: mustRead(t, filepath.Join("testdata", "yaml", "random-structure", "task.yml")) + "\n",
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-depends-single-string", "task.yml")),
+					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-depends-single-string", "task.yml")) + "\n",
 				},
 				Upstreams: []pipeline.Upstream{
 					{
