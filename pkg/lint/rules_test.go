@@ -4255,7 +4255,76 @@ func TestValidateUnknownAssetFields(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	assetDir := "/project/assets"
 	require.NoError(t, fs.MkdirAll(assetDir, 0o755))
-	require.NoError(t, afero.WriteFile(fs, filepath.Join(assetDir, "task.yml"), []byte("name: my-task\ntype: bq.sql\ntypo_column: x\n"), 0o644))
+
+	v := validateUnknownAssetFields{fs: fs}
+	p := &pipeline.Pipeline{Name: "p"}
+
+	t.Run("single unknown field is reported", func(t *testing.T) {
+		t.Parallel()
+		taskPath := filepath.Join(assetDir, "task1.yml")
+		require.NoError(t, afero.WriteFile(fs, taskPath, []byte("name: my-task\ntype: bq.sql\ntypo_column: x\n"), 0o644))
+		asset := &pipeline.Asset{
+			Name: "my-task",
+			DefinitionFile: pipeline.TaskDefinitionFile{
+				Path: taskPath,
+				Type: pipeline.YamlTask,
+			},
+		}
+		issues, err := v.Validate(t.Context(), p, asset)
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "unknown field 'typo_column' in asset definition", issues[0].Description)
+		assert.Same(t, asset, issues[0].Task)
+	})
+
+	t.Run("multiple unknown fields produce multiple issues", func(t *testing.T) {
+		t.Parallel()
+		taskPath := filepath.Join(assetDir, "task2.yml")
+		require.NoError(t, afero.WriteFile(fs, taskPath, []byte("name: my-task\ntype: bq.sql\ntypo_column: x\nanother_typo: y\n"), 0o644))
+		asset := &pipeline.Asset{
+			Name: "my-task",
+			DefinitionFile: pipeline.TaskDefinitionFile{
+				Path: taskPath,
+				Type: pipeline.YamlTask,
+			},
+		}
+		issues, err := v.Validate(t.Context(), p, asset)
+		require.NoError(t, err)
+		require.Len(t, issues, 2)
+		descriptions := []string{issues[0].Description, issues[1].Description}
+		sort.Strings(descriptions)
+		assert.Equal(t, "unknown field 'another_typo' in asset definition", descriptions[0])
+		assert.Equal(t, "unknown field 'typo_column' in asset definition", descriptions[1])
+	})
+
+	t.Run("task-with-unknown-key fixture content yields one warning", func(t *testing.T) {
+		t.Parallel()
+		// Content matches pkg/pipeline/testdata/yaml/task-with-unknown-key/task.yml
+		taskPath := filepath.Join(assetDir, "task3.yml")
+		fixtureContent := "name: test-asset\ntype: bq.sql\nrun: query.sql\ninvalid_top_level_key: should cause error\n"
+		require.NoError(t, afero.WriteFile(fs, taskPath, []byte(fixtureContent), 0o644))
+		asset := &pipeline.Asset{
+			Name: "test-asset",
+			DefinitionFile: pipeline.TaskDefinitionFile{
+				Path: taskPath,
+				Type: pipeline.YamlTask,
+			},
+		}
+		issues, err := v.Validate(t.Context(), p, asset)
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "unknown field 'invalid_top_level_key' in asset definition", issues[0].Description)
+	})
+}
+
+func TestValidateUnknownAssetFields_OnlyKnownKeysProduceNoIssues(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	assetDir := "/project/assets"
+	require.NoError(t, fs.MkdirAll(assetDir, 0o755))
+	// Only known keys: name, type, run. Must not produce unknown-field issues.
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(assetDir, "task.yml"), []byte("name: my-task\ntype: bq.sql\nrun: query.sql\n"), 0o644))
 
 	v := validateUnknownAssetFields{fs: fs}
 	p := &pipeline.Pipeline{Name: "p"}
@@ -4269,7 +4338,5 @@ func TestValidateUnknownAssetFields(t *testing.T) {
 
 	issues, err := v.Validate(t.Context(), p, asset)
 	require.NoError(t, err)
-	require.Len(t, issues, 1)
-	assert.Equal(t, "unknown field 'typo_column' in asset definition", issues[0].Description)
-	assert.Same(t, asset, issues[0].Task)
+	require.Empty(t, issues, "YAML with only known keys should produce no unknown-field issues; keep assetKnownYAMLFields in sync with pkg/pipeline/yaml.go taskDefinition")
 }

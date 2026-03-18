@@ -1793,7 +1793,7 @@ var pipelineKnownYAMLFields = func() map[string]bool {
 	return known
 }()
 
-// assetYAMLTopLevelStruct mirrors the top-level YAML keys of pipeline's taskDefinition for known-fields validation.
+// assetYAMLTopLevelStruct mirrors the top-level YAML keys of pipeline.taskDefinition (pkg/pipeline/yaml.go). Keep in sync when adding new task YAML keys.
 type assetYAMLTopLevelStruct struct {
 	Name              string `yaml:"name"`
 	URI               string `yaml:"uri"`
