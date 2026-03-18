@@ -227,11 +227,11 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			},
 		},
 		{
-			name: "unknown keys in task YAML error",
+			name: "task YAML with unknown key is accepted at parse; lint warns on unknown keys",
 			args: args{
 				filePath: filepath.Join("testdata", "yaml", "task-with-unknown-key", "task.yml"),
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "task YAML with appsflyer/output (random-structure) is accepted at parse; lint warns on unknown keys",
