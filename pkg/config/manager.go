@@ -120,6 +120,7 @@ type Connections struct {
 	Indeed              []IndeedConnection              `yaml:"indeed,omitempty" json:"indeed,omitempty" mapstructure:"indeed"`
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
+	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -1119,6 +1120,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Vertica = append(env.Connections.Vertica, conn)
+	case "dune":
+		var conn DuneConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Dune = append(env.Connections.Dune, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1332,6 +1340,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.CustomerIo = removeConnection(env.Connections.CustomerIo, connectionName)
 	case "vertica":
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
+	case "dune":
+		env.Connections.Dune = removeConnection(env.Connections.Dune, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

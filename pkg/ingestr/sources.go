@@ -208,6 +208,31 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// DynamoDB - AWS NoSQL database (user-defined tables)
 	"dynamodb": {},
 
+	// Dune - Blockchain analytics platform
+	"dune": {
+		{Name: "contacts"},
+		{Name: "companies"},
+		{Name: "deals"},
+		{Name: "tickets"},
+		{Name: "products"},
+		{Name: "quotes"},
+		{Name: "calls"},
+		{Name: "emails"},
+		{Name: "feedback_submissions"},
+		{Name: "line_items"},
+		{Name: "meetings"},
+		{Name: "notes"},
+		{Name: "tasks"},
+		{Name: "carts"},
+		{Name: "discounts"},
+		{Name: "fees"},
+		{Name: "invoices"},
+		{Name: "commerce_payments"},
+		{Name: "taxes"},
+		{Name: "owners"},
+		{Name: "schemas"},
+	},
+
 	// Elasticsearch - Search and analytics engine (user-defined indices)
 	"elasticsearch": {},
 

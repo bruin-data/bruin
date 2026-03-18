@@ -975,6 +975,12 @@
             "$ref": "#/$defs/VerticaConnection"
           },
           "type": "array"
+        },
+        "dune": {
+          "items": {
+            "$ref": "#/$defs/DuneConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -2931,6 +2937,22 @@
       ]
     },
     "StripeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "DuneConnection": {
       "properties": {
         "name": {
           "type": "string"

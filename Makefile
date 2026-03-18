@@ -44,7 +44,7 @@ integration-test: build
 	@touch integration-tests/bruin
 	@rm -rf integration-tests/.git
 	@rm integration-tests/bruin
-	@rm -rf integration-tests/logs
+	@rm -rf integration-tests/logs 
 	@mkdir -p integration-tests/logs
 	@mkdir -p integration-tests/logs/exports
 	@mkdir -p integration-tests/logs/runs
