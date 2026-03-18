@@ -4338,5 +4338,5 @@ func TestValidateUnknownAssetFields_OnlyKnownKeysProduceNoIssues(t *testing.T) {
 
 	issues, err := v.Validate(t.Context(), p, asset)
 	require.NoError(t, err)
-	require.Empty(t, issues, "YAML with only known keys should produce no unknown-field issues; keep assetKnownYAMLFields in sync with pkg/pipeline/yaml.go taskDefinition")
+	require.Empty(t, issues, "YAML with only known keys should produce no unknown-field issues; known fields come from pipeline.KnownAssetYAMLTopLevelFields()")
 }

@@ -1793,52 +1793,7 @@ var pipelineKnownYAMLFields = func() map[string]bool {
 	return known
 }()
 
-// assetYAMLTopLevelStruct mirrors the top-level YAML keys of pipeline.taskDefinition (pkg/pipeline/yaml.go). Keep in sync when adding new task YAML keys.
-type assetYAMLTopLevelStruct struct {
-	Name              string `yaml:"name"`
-	URI               string `yaml:"uri"`
-	Description       string `yaml:"description"`
-	Type              string `yaml:"type"`
-	RunFile           string `yaml:"run"`
-	Depends           string `yaml:"depends"`
-	Parameters        string `yaml:"parameters"`
-	Connections       string `yaml:"connections"`
-	Secrets           string `yaml:"secrets"`
-	Connection        string `yaml:"connection"`
-	Image             string `yaml:"image"`
-	Instance          string `yaml:"instance"`
-	Materialization   string `yaml:"materialization"`
-	Owner             string `yaml:"owner"`
-	StartDate         string `yaml:"start_date"`
-	Extends           string `yaml:"extends"`
-	Columns           string `yaml:"columns"`
-	CustomChecks      string `yaml:"custom_checks"`
-	Hooks             string `yaml:"hooks"`
-	Tags              string `yaml:"tags"`
-	Snowflake         string `yaml:"snowflake"`
-	Athena            string `yaml:"athena"`
-	IntervalModifiers string `yaml:"interval_modifiers"`
-	Domains           string `yaml:"domains"`
-	Meta              string `yaml:"meta"`
-	RerunCooldown     string `yaml:"rerun_cooldown"`
-	RefreshRestricted string `yaml:"refresh_restricted,omitempty"`
-}
-
-var assetKnownYAMLFields = func() map[string]bool {
-	known := make(map[string]bool)
-	t := reflect.TypeOf(assetYAMLTopLevelStruct{})
-	for i := range t.NumField() {
-		tag := t.Field(i).Tag.Get("yaml")
-		if tag == "" || tag == "-" {
-			continue
-		}
-		name := strings.SplitN(tag, ",", 2)[0]
-		if name != "" && name != "-" {
-			known[name] = true
-		}
-	}
-	return known
-}()
+var assetKnownYAMLFields = pipeline.KnownAssetYAMLTopLevelFields()
 
 type validateUnknownPipelineFields struct {
 	fs afero.Fs

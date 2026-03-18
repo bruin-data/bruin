@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -344,6 +345,24 @@ type taskDefinition struct {
 	Meta              map[string]string `yaml:"meta"`
 	RerunCooldown     *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted *bool             `yaml:"refresh_restricted,omitempty"`
+}
+
+// KnownAssetYAMLTopLevelFields returns the set of known top-level YAML keys for asset (task) definitions.
+// Used by lint for unknown-field validation; single source of truth derived from taskDefinition.
+func KnownAssetYAMLTopLevelFields() map[string]bool {
+	known := make(map[string]bool)
+	t := reflect.TypeOf(taskDefinition{})
+	for i := range t.NumField() {
+		tag := t.Field(i).Tag.Get("yaml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		name := strings.SplitN(tag, ",", 2)[0]
+		if name != "" && name != "-" {
+			known[name] = true
+		}
+	}
+	return known
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
