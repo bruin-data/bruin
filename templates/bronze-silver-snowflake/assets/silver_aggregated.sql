@@ -110,7 +110,7 @@ SELECT
   r.base_currency,
   l.latest_date,
   l.latest_rate,
-  COALESCE(r.avg_rate_7d, r.avg_rate_30d) AS avg_rate_7d,
+  r.avg_rate_7d,
   r.avg_rate_30d,
   r.observations_7d,
   r.observations_30d

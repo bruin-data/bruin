@@ -58,10 +58,10 @@ Before running the pipeline, configure your Snowflake connection in `.bruin.yml`
 snowflake:
   - name: "snowflake-default"
     account: "YOUR_ACCOUNT"
-    username: "YOUR_USERNAME"
+    user: "YOUR_USERNAME"
     password: "YOUR_PASSWORD"
     database: "YOUR_DATABASE"
-    warehouse: "COMPUTE_WH"
+    warehouse: "COMPUTE_WAREHOUSE"
     schema: "PUBLIC"
 ```
 Replace placeholders with your Snowflake credentials for local testing.
