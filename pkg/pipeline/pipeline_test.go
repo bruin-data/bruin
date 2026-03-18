@@ -1278,11 +1278,11 @@ func TestPipeline_MaxActiveSteps(t *testing.T) {
 func TestPipelineFromPath_AcceptsUnknownKeysAtParseTime(t *testing.T) {
 	t.Parallel()
 
-	fs := afero.NewMemMapFs()
-	require.NoError(t, fs.MkdirAll("/project", 0o755))
-
 	// Unknown top-level keys are ignored at parse time; lint reports them as warnings.
 	t.Run("unknown top-level key is ignored at parse", func(t *testing.T) {
+		t.Parallel()
+		fs := afero.NewMemMapFs()
+		require.NoError(t, fs.MkdirAll("/project", 0o755))
 		invalidPipeline := "name: my-pipeline\ntypo_schedule: daily\n"
 		require.NoError(t, afero.WriteFile(fs, "/project/pipeline.yml", []byte(invalidPipeline), 0o644))
 		p, err := pipeline.PipelineFromPath("/project/pipeline.yml", fs)
@@ -1291,7 +1291,10 @@ func TestPipelineFromPath_AcceptsUnknownKeysAtParseTime(t *testing.T) {
 	})
 
 	t.Run("defaults instead of default is ignored at parse", func(t *testing.T) {
+		t.Parallel()
 		// Correct key is "default:" for pipeline default values; "defaults:" is ignored at parse, lint warns
+		fs := afero.NewMemMapFs()
+		require.NoError(t, fs.MkdirAll("/project", 0o755))
 		invalidPipeline := "name: my-pipeline\ndefaults:\n  type: bq.sql\n"
 		require.NoError(t, afero.WriteFile(fs, "/project/pipeline.yml", []byte(invalidPipeline), 0o644))
 		p, err := pipeline.PipelineFromPath("/project/pipeline.yml", fs)
