@@ -391,6 +391,12 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			windowsJSONPath: "./testdata/pipeline/first-pipeline_windows.json",
 		},
 		{
+			name:            "second-pipeline",
+			pipelinePath:    "./testdata/pipeline/second-pipeline",
+			unixJSONPath:    "./testdata/pipeline/second-pipeline_unix.json",
+			windowsJSONPath: "./testdata/pipeline/second-pipeline_windows.json",
+		},
+		{
 			name:            "pipeline-with-no-assets",
 			pipelinePath:    "./testdata/pipeline/pipeline-with-no-assets",
 			unixJSONPath:    "./testdata/pipeline/pipeline-with-no-assets_unix.json",
@@ -874,6 +880,11 @@ func TestAsset_Persist(t *testing.T) {
 			name:         "YAML assets are handled",
 			assetPath:    path.AbsPathForTests(t, "testdata/persist/ingestr.asset.yml"),
 			expectedPath: path.AbsPathForTests(t, "testdata/persist/ingestr.expected.yml"),
+		},
+		{
+			name:         "multiline strings are handled in YAML",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/big.sql"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/big.expected.sql"),
 		},
 		{
 			name:         "symbolic upstreams are not lost",
