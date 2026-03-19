@@ -32,8 +32,8 @@ default_connections:
 
 tags: [ "daily", "analytics" ]
 domains: [ "marketing" ]
+owner: data-platform
 meta:
-  owner: data-platform
   cost_center: 1234
 
 notifications:
@@ -229,19 +229,31 @@ domains: [ "marketing" ]
 
 ### Meta
 
-Add custom key/value annotations for ownership, cost attribution, or anything your team tracks. Great for search,
+Add custom key/value annotations for cost attribution, or anything your team tracks. Great for search,
 dashboards, and lightweight governance.
 
 Example:
 
 ```yaml
 meta:
-  owner: data-platform
   cost_center: 1234
 ```
 
 - **Type:** `Object (map[string]string)`
 - **Default:** `{}`
+
+### Owner
+
+Specify the owner of the pipeline. Useful for tracking responsibility and accountability.
+
+Example:
+
+```yaml
+owner: data-platform
+```
+
+- **Type:** `String`
+- **Default:** `""`
 
 ### Notifications
 
