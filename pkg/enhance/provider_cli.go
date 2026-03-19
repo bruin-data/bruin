@@ -228,6 +228,10 @@ func parseClaudeStreamJSON(r io.Reader, w io.Writer) {
 
 		var event map[string]interface{}
 		if err := json.Unmarshal(line, &event); err != nil {
+			// Non-JSON output (e.g. raw error text) — pass through
+			if text := strings.TrimSpace(string(line)); text != "" {
+				fmt.Fprintf(w, "%s\n", text)
+			}
 			continue
 		}
 
@@ -256,9 +260,23 @@ func parseClaudeStreamJSON(r io.Reader, w io.Writer) {
 				}
 			}
 		case "result":
-			// Final result
-			if sub, _ := event["subtype"].(string); sub == "success" {
+			// Claude may return subtype:"success" with is_error:true (e.g. auth failures)
+			isError, _ := event["is_error"].(bool)
+			sub, _ := event["subtype"].(string)
+			if isError || sub == "error" {
+				if errMsg, _ := event["result"].(string); errMsg != "" {
+					fmt.Fprintf(w, "error: %s\n", errMsg)
+				} else if errMsg := extractErrorMessage(event); errMsg != "" {
+					fmt.Fprintf(w, "error: %s\n", errMsg)
+				} else {
+					fmt.Fprintln(w, "enhancement failed")
+				}
+			} else if sub == "success" {
 				fmt.Fprintln(w, "enhancement complete")
+			}
+		case "error":
+			if errMsg := extractErrorMessage(event); errMsg != "" {
+				fmt.Fprintf(w, "error: %s\n", errMsg)
 			}
 		}
 	}
@@ -329,6 +347,10 @@ func parseCodexStreamJSON(r io.Reader, w io.Writer) {
 
 		var event map[string]interface{}
 		if err := json.Unmarshal(line, &event); err != nil {
+			// Non-JSON output (e.g. raw error text) — pass through
+			if text := strings.TrimSpace(string(line)); text != "" {
+				fmt.Fprintf(w, "%s\n", text)
+			}
 			continue
 		}
 
@@ -367,6 +389,10 @@ func parseCodexStreamJSON(r io.Reader, w io.Writer) {
 			}
 		case "turn.completed":
 			fmt.Fprintln(w, "enhancement complete")
+		case "error":
+			if errMsg := extractErrorMessage(event); errMsg != "" {
+				fmt.Fprintf(w, "error: %s\n", errMsg)
+			}
 		}
 	}
 }
@@ -385,6 +411,10 @@ func parseOpenCodeStreamJSON(r io.Reader, w io.Writer) {
 
 		var event map[string]interface{}
 		if err := json.Unmarshal(line, &event); err != nil {
+			// Non-JSON output (e.g. raw error text) — pass through
+			if text := strings.TrimSpace(string(line)); text != "" {
+				fmt.Fprintf(w, "%s\n", text)
+			}
 			continue
 		}
 
@@ -414,6 +444,30 @@ func parseOpenCodeStreamJSON(r io.Reader, w io.Writer) {
 					fmt.Fprintln(w, "enhancement complete")
 				}
 			}
+		case "error":
+			if errMsg := extractErrorMessage(event); errMsg != "" {
+				fmt.Fprintf(w, "error: %s\n", errMsg)
+			}
 		}
 	}
+}
+
+// extractErrorMessage tries to extract a human-readable error message from a stream event.
+// It handles common patterns: {"error": "msg"}, {"error": {"message": "msg"}}, {"message": "msg"}.
+func extractErrorMessage(event map[string]interface{}) string {
+	// Try "error" field as string
+	if msg, ok := event["error"].(string); ok && msg != "" {
+		return msg
+	}
+	// Try "error" field as object with "message"
+	if errObj, ok := event["error"].(map[string]interface{}); ok {
+		if msg, ok := errObj["message"].(string); ok && msg != "" {
+			return msg
+		}
+		// Try "error.type" as fallback
+		if errType, ok := errObj["type"].(string); ok && errType != "" {
+			return errType
+		}
+	}
+	return ""
 }
