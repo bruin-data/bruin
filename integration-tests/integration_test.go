@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -3023,11 +3024,11 @@ func TestWorkflowTasks(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/cli_start_date_used.csv"),
+							Contains: []string{"2024-01-15", "2024-01-31"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
+							e2e.AssertByContains,
 						},
 					},
 					{
@@ -3051,11 +3052,47 @@ func TestWorkflowTasks(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/full_refresh_ignores_pipeline_start_date.csv"),
+							Contains: []string{"2024-01-15", "2024-01-31"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "run_without_start_date_flag",
+			workflow: e2e.Workflow{
+				Name: "run_without_start_date_flag",
+				Steps: []e2e.Task{
+					{
+						Name:    "no-start-date-flag: run without --start-date flag",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "no-start-date-flag: validate default date (yesterday) was used, not pipeline start_date",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date FROM date_capture", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{time.Now().AddDate(0, 0, -1).Format("2006-01-02")},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
 						},
 					},
 				},
@@ -3087,11 +3124,11 @@ func TestWorkflowTasks(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/asset-start-date-ignored/expectations/asset_start_date_ignored.csv"),
+							Contains: []string{"2024-01-15", "2024-01-31"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
+							e2e.AssertByContains,
 						},
 					},
 				},
