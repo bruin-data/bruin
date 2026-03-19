@@ -1,6 +1,8 @@
 package claudecode
 
 import (
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -133,7 +135,7 @@ func TestExtractParameters(t *testing.T) {
 			},
 			expected: &ClaudeParameters{
 				Prompt:         "Test prompt",
-				WorkingDir:     "/path/to/project",
+				WorkingDir:     filepath.FromSlash("/path/to/project"),
 				OutputFormat:   "text",
 				PermissionMode: "default",
 			},
@@ -153,7 +155,7 @@ func TestExtractParameters(t *testing.T) {
 			},
 			expected: &ClaudeParameters{
 				Prompt:         "Test prompt",
-				WorkingDir:     "/pipelines/data",
+				WorkingDir:     filepath.FromSlash("/pipelines/data"),
 				OutputFormat:   "text",
 				PermissionMode: "default",
 			},
@@ -173,7 +175,7 @@ func TestExtractParameters(t *testing.T) {
 			},
 			expected: &ClaudeParameters{
 				Prompt:         "Test prompt",
-				WorkingDir:     "/pipelines/assets/subdir",
+				WorkingDir:     filepath.FromSlash("/pipelines/assets/subdir"),
 				OutputFormat:   "text",
 				PermissionMode: "default",
 			},
@@ -363,6 +365,9 @@ func TestClaudeCodeOperator_Run_InvalidTaskInstance(t *testing.T) {
 }
 
 func TestClaudeCodeOperator_Run_MissingPrompt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on Windows: requires claude CLI to be installed")
+	}
 	t.Parallel()
 	renderer := jinja.NewRenderer(make(map[string]interface{}))
 
