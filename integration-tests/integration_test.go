@@ -344,6 +344,74 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-without-start-date-flag",
+			task: e2e.Task{
+				Name:    "render-without-start-date-flag",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{time.Now().AddDate(0, 0, -1).Format("2006-01-02")},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-asset-with-start-date-uses-cli-date",
+			task: e2e.Task{
+				Name:    "render-asset-with-start-date-uses-cli-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/asset-start-date-ignored/assets/asset_with_start_date.sql"),
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`'2024-01-15'`, `'2024-01-31'`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-full-refresh-ignores-pipeline-start-date",
+			task: e2e.Task{
+				Name:    "render-full-refresh-ignores-pipeline-start-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--full-refresh",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`'2024-01-15'`, `'2024-01-31'`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "render-is-full-refresh-false",
 			task: e2e.Task{
 				Name:    "render-is-full-refresh-false",
