@@ -2997,6 +2997,106 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "pipeline_start_date_ignored",
+			workflow: e2e.Workflow{
+				Name: "pipeline_start_date_ignored",
+				Steps: []e2e.Task{
+					{
+						Name:    "start-date-ignored: run with explicit start-date and end-date",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "start-date-ignored: validate CLI start-date was used, not pipeline start_date",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date, captured_end_date FROM date_capture", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/cli_start_date_used.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "start-date-ignored: run with full-refresh uses CLI start-date, not pipeline start_date",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "start-date-ignored: validate full-refresh also uses CLI start-date",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date, captured_end_date FROM date_capture", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/full_refresh_ignores_pipeline_start_date.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "asset_start_date_ignored",
+			workflow: e2e.Workflow{
+				Name: "asset_start_date_ignored",
+				Steps: []e2e.Task{
+					{
+						Name:    "asset-start-date-ignored: run asset with start_date defined",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/asset-start-date-ignored/assets/asset_with_start_date.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: asset_with_start_date"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "asset-start-date-ignored: validate CLI start-date was used, not asset start_date",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date, captured_end_date FROM asset_with_start_date", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/asset-start-date-ignored/expectations/asset_start_date_ignored.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

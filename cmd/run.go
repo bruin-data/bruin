@@ -932,17 +932,8 @@ func Run(isDebug *bool) *cli.Command {
 				singleCheckID = ""
 			}
 
-			// Re-determine start date based on pipeline configuration and full-refresh flag
-			startDate, err = DetermineStartDate(runConfig.StartDate, logger)
-			if err != nil {
-				return err
-			}
 
-			// Parse end date directly from CLI
-			endDate, err = date.ParseTime(runConfig.EndDate)
-			if err != nil {
-				return err
-			}
+
 
 			// Validate date range
 			if err := ValidateDateRange(startDate, endDate); err != nil {
