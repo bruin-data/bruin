@@ -42,7 +42,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest ]
+        platform: [ depot-ubuntu-latest, windows-2022 ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -56,7 +56,11 @@ jobs:
           cache: false
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      - run: make test
+      - name: Run tests
+        shell: bash
+        run: |
+          [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          make test
 
 
   end2end:
