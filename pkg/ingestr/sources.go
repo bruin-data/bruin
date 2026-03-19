@@ -732,6 +732,11 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	},
 }
 
+// gongSources is the set of source names that require gong to be enabled.
+var gongSources = map[string]bool{
+	"dune": true,
+}
+
 // GetSourceTables returns the available tables for a specific ingestr source.
 func GetSourceTables(sourceName string) (*Source, error) {
 	tables, ok := SourceTablesRegistry[sourceName]
