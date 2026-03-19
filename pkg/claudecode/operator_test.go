@@ -14,6 +14,18 @@ import (
 
 func TestExtractParameters(t *testing.T) {
 	t.Parallel()
+	// Use platform-appropriate absolute paths for test cases
+	absAssetPath := filepath.FromSlash("/pipelines/assets/test.asset.yml")
+	absWorkingDir := filepath.FromSlash("/path/to/project")
+	absRelativeResult := filepath.FromSlash("/pipelines/data")
+	absRelativeDotResult := filepath.FromSlash("/pipelines/assets/subdir")
+	if runtime.GOOS == "windows" {
+		absAssetPath = `C:\pipelines\assets\test.asset.yml`
+		absWorkingDir = `C:\path\to\project`
+		absRelativeResult = `C:\pipelines\data`
+		absRelativeDotResult = `C:\pipelines\assets\subdir`
+	}
+
 	tests := []struct {
 		name        string
 		asset       *pipeline.Asset
@@ -28,7 +40,7 @@ func TestExtractParameters(t *testing.T) {
 					"prompt": "Test prompt",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/pipelines/assets/test.asset.yml",
+					Path: absAssetPath,
 				},
 			},
 			expected: &ClaudeParameters{
@@ -43,7 +55,7 @@ func TestExtractParameters(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_asset",
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/pipelines/assets/test.asset.yml",
+					Path: absAssetPath,
 				},
 				Parameters: map[string]string{
 					"prompt":              "Test prompt",
@@ -86,7 +98,7 @@ func TestExtractParameters(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_asset",
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/pipelines/assets/test.asset.yml",
+					Path: absAssetPath,
 				},
 				Parameters: map[string]string{
 					"model": "sonnet",
@@ -100,7 +112,7 @@ func TestExtractParameters(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_asset",
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/pipelines/assets/test.asset.yml",
+					Path: absAssetPath,
 				},
 				Parameters: map[string]string{
 					"prompt": "  ",
@@ -114,7 +126,7 @@ func TestExtractParameters(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_asset",
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/pipelines/assets/test.asset.yml",
+					Path: absAssetPath,
 				},
 				Parameters: nil,
 			},
@@ -127,15 +139,15 @@ func TestExtractParameters(t *testing.T) {
 				Name: "test_asset",
 				Parameters: map[string]string{
 					"prompt":      "Test prompt",
-					"working_dir": "/path/to/project",
+					"working_dir": absWorkingDir,
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/pipelines/assets/test.asset.yml",
+					Path: absAssetPath,
 				},
 			},
 			expected: &ClaudeParameters{
 				Prompt:         "Test prompt",
-				WorkingDir:     filepath.FromSlash("/path/to/project"),
+				WorkingDir:     absWorkingDir,
 				OutputFormat:   "text",
 				PermissionMode: "default",
 			},
@@ -150,12 +162,12 @@ func TestExtractParameters(t *testing.T) {
 					"working_dir": "../data",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/pipelines/assets/test.asset.yml",
+					Path: absAssetPath,
 				},
 			},
 			expected: &ClaudeParameters{
 				Prompt:         "Test prompt",
-				WorkingDir:     filepath.FromSlash("/pipelines/data"),
+				WorkingDir:     absRelativeResult,
 				OutputFormat:   "text",
 				PermissionMode: "default",
 			},
@@ -170,12 +182,12 @@ func TestExtractParameters(t *testing.T) {
 					"working_dir": "./subdir",
 				},
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/pipelines/assets/test.asset.yml",
+					Path: absAssetPath,
 				},
 			},
 			expected: &ClaudeParameters{
 				Prompt:         "Test prompt",
-				WorkingDir:     filepath.FromSlash("/pipelines/assets/subdir"),
+				WorkingDir:     absRelativeDotResult,
 				OutputFormat:   "text",
 				PermissionMode: "default",
 			},
