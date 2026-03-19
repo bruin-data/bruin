@@ -19,6 +19,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+	"github.com/xlab/treeprint"
+	"go.uber.org/zap"
+	"golang.org/x/term"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -58,13 +66,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/vertica"
-	"github.com/fatih/color"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
-	"github.com/xlab/treeprint"
-	"go.uber.org/zap"
-	"golang.org/x/term"
 )
 
 const LogsFolder = "logs"
@@ -931,9 +932,6 @@ func Run(isDebug *bool) *cli.Command {
 				// Clear local variable to prevent incorrect output formatting
 				singleCheckID = ""
 			}
-
-
-
 
 			// Validate date range
 			if err := ValidateDateRange(startDate, endDate); err != nil {

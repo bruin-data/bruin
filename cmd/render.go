@@ -12,6 +12,11 @@ import (
 	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/muesli/termenv"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v3"
+
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
@@ -29,10 +34,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
-	"github.com/muesli/termenv"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v3"
 )
 
 type ModifierInfo struct {
@@ -171,8 +172,6 @@ func Render() *cli.Command {
 				printError(errors.New("no asset found"), c.String("output"), "Failed to read the asset definition file:")
 				return cli.Exit("", 1)
 			}
-
-
 
 			resultsLocation := "s3://{destination-bucket}"
 			if asset.Type == pipeline.AssetTypeAthenaQuery {
