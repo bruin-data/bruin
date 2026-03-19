@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -104,7 +105,10 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 		if useTUI {
 			return enhanceSingleAssetWithTUI(ctx, c, inputPath, fs, output, isDebug)
 		}
-		return enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug, nil)
+		if err := enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug, nil); err != nil {
+			return printEnhanceError(output, err)
+		}
+		return nil
 	}
 
 	if isDir(inputPath) {
@@ -166,6 +170,15 @@ func enhanceSingleAssetWithTUI(ctx context.Context, c *cli.Command, inputPath st
 	devNull.Close()
 
 	if enhErr != nil {
+		// Show collected agent events for the failed asset
+		logs := tui.GetLogs(inputPath)
+		if len(logs) > 0 {
+			warningPrinter.Printf("\nAgent events for '%s':\n", name)
+			for _, log := range logs {
+				fmt.Printf("  %s\n", log)
+			}
+			fmt.Println()
+		}
 		return printEnhanceError(output, enhErr)
 	}
 
@@ -224,6 +237,7 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 	}
 
 	type assetResult struct {
+		key  string // asset path, used as TUI key
 		name string
 		err  error
 	}
@@ -256,7 +270,7 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 
 			mu.Lock()
 			defer mu.Unlock()
-			results = append(results, assetResult{name: displayName, err: err})
+			results = append(results, assetResult{key: ap, name: displayName, err: err})
 		})
 	}
 
@@ -324,8 +338,21 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 	if failed > 0 {
 		fmt.Println()
 		warningPrinter.Printf("\n%d assets failed:\n", failed)
-		for _, e := range enhanceErrors {
-			warningPrinter.Printf("  - %s\n", e)
+		for _, r := range results {
+			if r.err == nil {
+				continue
+			}
+			warningPrinter.Printf("  - %s: %v\n", r.name, r.err)
+			if tui != nil {
+				logs := tui.GetLogs(r.key)
+				if len(logs) > 0 {
+					dimPrinter := color.New(color.Faint)
+					dimPrinter.Println("    Agent events:")
+					for _, log := range logs {
+						dimPrinter.Printf("      %s\n", log)
+					}
+				}
+			}
 		}
 		return cli.Exit("", 1)
 	}
@@ -339,10 +366,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 
 	absAssetPath, err := filepath.Abs(assetPath)
 	if err != nil {
-		if quiet {
-			return errors.Wrap(err, "failed to get absolute path")
-		}
-		return printEnhanceError(output, errors.Wrap(err, "failed to get absolute path"))
+		return errors.Wrap(err, "failed to get absolute path")
 	}
 
 	logPrefix := filepath.Base(assetPath)
@@ -351,10 +375,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	// Read original file content before any modifications (for diff display)
 	originalContent, err := afero.ReadFile(fs, absAssetPath)
 	if err != nil {
-		if quiet {
-			return errors.Wrap(err, "failed to read original file content")
-		}
-		return printEnhanceError(output, errors.Wrap(err, "failed to read original file content"))
+		return errors.Wrap(err, "failed to read original file content")
 	}
 
 	// Step 1: Fill columns from DB
@@ -389,18 +410,12 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 
 	pp, err = GetPipelineAndAsset(ctx, assetPath, fs, "")
 	if err != nil {
-		if quiet {
-			return errors.Wrap(err, "failed to load asset")
-		}
-		return printEnhanceError(output, errors.Wrap(err, "failed to load asset"))
+		return errors.Wrap(err, "failed to load asset")
 	}
 
 	inferredName, nameErr := pp.Asset.GetNameIfItWasSetFromItsPath(pp.Pipeline)
 	if nameErr != nil {
-		if quiet {
-			return errors.Wrap(nameErr, "failed to infer asset name from path")
-		}
-		return printEnhanceError(output, errors.Wrap(nameErr, "failed to infer asset name from path"))
+		return errors.Wrap(nameErr, "failed to infer asset name from path")
 	}
 	if inferredName != "" && pp.Asset.Name == inferredName {
 		pp.Asset.Name = inferredName
@@ -408,10 +423,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 			infoPrinter.Printf("[%s]   Inferred asset name from path: %s\n", logPrefix, inferredName)
 		}
 		if persistErr := pp.Asset.Persist(fs); persistErr != nil {
-			if quiet {
-				return errors.Wrap(persistErr, "failed to persist asset with inferred name")
-			}
-			return printEnhanceError(output, errors.Wrap(persistErr, "failed to persist asset with inferred name"))
+			return errors.Wrap(persistErr, "failed to persist asset with inferred name")
 		}
 	}
 
@@ -430,10 +442,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		providerType = enhance.ProviderCodex
 	}
 	if flagCount > 1 {
-		if quiet {
-			return errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex)")
-		}
-		return printEnhanceError(output, errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex)"))
+		return errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex)")
 	}
 
 	enhancer := enhance.NewEnhancer(providerType, c.String("model"))
@@ -441,11 +450,15 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	isDebugMode := isDebug != nil && *isDebug
 	enhancer.SetDebug(isDebugMode)
 
-	// Set TUI log writer for streaming output
+	// Set streaming output capture: TUI mode uses the TUI log writer, non-TUI mode
+	// uses a buffer so we can show agent events on failure.
 	var logWriter *enhanceLogWriter
+	var streamBuf bytes.Buffer
 	if tui != nil && !isDebugMode {
 		logWriter = tui.LogWriter(tuiKey)
 		enhancer.SetOutput(logWriter)
+	} else if !isDebugMode {
+		enhancer.SetOutput(&streamBuf)
 	}
 
 	if apiKey := getAnthropicAPIKey(fs, assetPath); apiKey != "" {
@@ -458,10 +471,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	}
 
 	if err := enhancer.EnsureCLI(); err != nil {
-		if quiet {
-			return err
-		}
-		return printEnhanceError(output, err)
+		return err
 	}
 
 	// Pre-fetch table statistics
@@ -489,10 +499,21 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	}
 
 	if err != nil {
-		if quiet {
-			return errors.Wrap(err, "failed to enhance asset")
+		// Show collected agent events on failure (non-TUI mode only; TUI logs are shown after TUI stops)
+		if !quiet && output != "json" {
+			events := strings.TrimSpace(streamBuf.String())
+			if events != "" {
+				fmt.Println()
+				warningPrinter.Printf("[%s] Agent events:\n", logPrefix)
+				for _, line := range strings.Split(events, "\n") {
+					if strings.TrimSpace(line) != "" {
+						fmt.Printf("  %s\n", line)
+					}
+				}
+				fmt.Println()
+			}
 		}
-		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
+		return err
 	}
 
 	// Step 3: Validate
@@ -510,15 +531,9 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	// stdout/stderr are already redirected to /dev/null when TUI is active (set up in enhanceFolder/enhanceSingleAssetWithTUI)
 	if err := validateCmd.Run(ctx, args); err != nil {
 		if writeErr := afero.WriteFile(fs, absAssetPath, originalContent, 0o644); writeErr != nil {
-			if quiet {
-				return errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err))
-			}
-			return printEnhanceError(output, errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err)))
+			return errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err))
 		}
-		if quiet {
-			return errors.Wrap(err, "validation failed, original file restored")
-		}
-		return printEnhanceError(output, errors.Wrap(err, "validation failed, original file restored"))
+		return errors.Wrap(err, "validation failed, original file restored")
 	}
 
 	// Display results (only when not using TUI — TUI caller handles output)
@@ -533,7 +548,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 			}
 			jsonBytes, err := json.Marshal(result)
 			if err != nil {
-				return printEnhanceError(output, errors.Wrap(err, "failed to marshal result"))
+				return errors.Wrap(err, "failed to marshal result")
 			}
 			fmt.Println(string(jsonBytes))
 		} else {

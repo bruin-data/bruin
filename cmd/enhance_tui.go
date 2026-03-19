@@ -30,7 +30,8 @@ type enhanceAssetRow struct {
 	step     string // current step label, e.g. "filling columns", "enhancing..."
 	startAt  time.Time
 	duration time.Duration
-	logs     []string // last N streaming lines from the agent
+	logs     []string // last N streaming lines from the agent (for TUI display)
+	allLogs  []string // all streaming lines (for post-failure reporting)
 }
 
 // EnhanceTUI manages a live-updating terminal display for asset enhancement.
@@ -95,6 +96,7 @@ func (t *EnhanceTUI) MarkDone(name string) {
 		row.step = "done"
 		row.duration = time.Since(row.startAt)
 		row.logs = nil
+		row.allLogs = nil
 	}
 }
 
@@ -116,10 +118,23 @@ func (t *EnhanceTUI) addLog(asset, line string) {
 	if !ok {
 		return
 	}
+	row.allLogs = append(row.allLogs, line)
 	row.logs = append(row.logs, line)
 	if len(row.logs) > maxLogsPerAsset {
 		row.logs = row.logs[len(row.logs)-maxLogsPerAsset:]
 	}
+}
+
+// GetLogs returns all collected log lines for the given asset key.
+func (t *EnhanceTUI) GetLogs(name string) []string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if row, ok := t.assetMap[name]; ok {
+		result := make([]string, len(row.allLogs))
+		copy(result, row.allLogs)
+		return result
+	}
+	return nil
 }
 
 // LogWriter returns an io.Writer that captures output lines for the named asset.
