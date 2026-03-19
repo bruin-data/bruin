@@ -247,6 +247,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "stripekey",
 				},
 			},
+			Dune: []DuneConnection{
+				{
+					Name:   "dune-1",
+					APIKey: "dune-api-key-123",
+				},
+			},
 			InfluxDB: []InfluxDBConnection{
 				{
 					Name:   "influxdb-1",

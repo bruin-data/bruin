@@ -208,6 +208,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// DynamoDB - AWS NoSQL database (user-defined tables)
 	"dynamodb": {},
 
+	// Dune - Blockchain analytics platform
+	"dune": {
+		{Name: "queries"},
+		{Name: "query:<id>"},
+		{Name: "query:<id>:<params>"},
+		{Name: "sql:<raw SQL>"},
+	},
+
 	// Elasticsearch - Search and analytics engine (user-defined indices)
 	"elasticsearch": {},
 
@@ -323,13 +331,27 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// HubSpot - CRM platform
 	"hubspot": {
-		{Name: "companies", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "contacts", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "deals", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "tickets", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "products", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "quotes", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "schemas", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "contacts"},
+		{Name: "companies"},
+		{Name: "deals"},
+		{Name: "tickets"},
+		{Name: "products"},
+		{Name: "quotes"},
+		{Name: "calls"},
+		{Name: "emails"},
+		{Name: "feedback_submissions"},
+		{Name: "line_items"},
+		{Name: "meetings"},
+		{Name: "notes"},
+		{Name: "tasks"},
+		{Name: "carts"},
+		{Name: "discounts"},
+		{Name: "fees"},
+		{Name: "invoices"},
+		{Name: "commerce_payments"},
+		{Name: "taxes"},
+		{Name: "owners"},
+		{Name: "schemas"},
 	},
 
 	// Indeed - Job search platform

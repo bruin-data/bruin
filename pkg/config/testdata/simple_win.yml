@@ -152,6 +152,9 @@ environments:
       stripe:
         - name: conn18
           api_key: "stripekey"
+      dune:
+        - name: "dune-1"
+          api_key: "dune-api-key-123"
       appsflyer:
         - name: conn19
           api_key: "appsflyerkey"
