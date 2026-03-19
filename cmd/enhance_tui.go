@@ -23,6 +23,7 @@ const (
 )
 
 const maxLogsPerAsset = 5
+const maxAllLogsPerAsset = 500
 
 type enhanceAssetRow struct {
 	name     string
@@ -119,6 +120,9 @@ func (t *EnhanceTUI) addLog(asset, line string) {
 		return
 	}
 	row.allLogs = append(row.allLogs, line)
+	if len(row.allLogs) > maxAllLogsPerAsset {
+		row.allLogs = row.allLogs[len(row.allLogs)-maxAllLogsPerAsset:]
+	}
 	row.logs = append(row.logs, line)
 	if len(row.logs) > maxLogsPerAsset {
 		row.logs = row.logs[len(row.logs)-maxLogsPerAsset:]

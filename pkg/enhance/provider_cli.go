@@ -469,9 +469,5 @@ func extractErrorMessage(event map[string]interface{}) string {
 			return errType
 		}
 	}
-	// Try top-level "message"
-	if msg, ok := event["message"].(string); ok && msg != "" {
-		return msg
-	}
 	return ""
 }

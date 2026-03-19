@@ -1,14 +1,11 @@
 /* @bruin
-
 name: people
 type: duckdb.sql
-
 materialization:
-  type: table
+   type: table
 
 depends:
   - users
-
 @bruin */
 
 select 

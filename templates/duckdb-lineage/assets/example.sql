@@ -1,10 +1,8 @@
 /* @bruin
-
 name: example
 type: duckdb.sql
-
 materialization:
-  type: table
+   type: table
 
 depends:
   - country
