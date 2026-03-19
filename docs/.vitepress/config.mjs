@@ -394,6 +394,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Render", link: "/commands/render"},
                     {text: "Query", link: "/commands/query"},
                     {text: "AI Enhance", link: "/commands/ai-enhance"},
+                    {text: "Cloud", link: "/commands/cloud"},
                 ],
 
             },

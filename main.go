@@ -77,6 +77,7 @@ func main() {
 			cmd.DataDiffCmd(),
 			cmd.Import(&isDebug),
 			cmd.Upgrade(),
+			cmd.Cloud(&isDebug),
 			mcp.MCPCmd(),
 			versionCommand,
 		},
