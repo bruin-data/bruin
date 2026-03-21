@@ -1,7 +1,9 @@
 package s3
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -252,7 +254,11 @@ func TestKeySensor_RunTask_AwsConnectionUsesCorrectCredentials(t *testing.T) {
 		},
 	}
 
-	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
+	// Use a short context timeout to avoid waiting for AWS SDK retries against fake credentials.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Millisecond)
+	defer cancel()
+
+	err := ks.RunTask(ctx, &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "does not exist")
 	assert.NotContains(t, err.Error(), "not an AWS/S3 connection")
@@ -278,7 +284,11 @@ func TestKeySensor_RunTask_S3ConnectionUsesCorrectCredentials(t *testing.T) {
 		},
 	}
 
-	err := ks.RunTask(t.Context(), &pipeline.Pipeline{}, asset)
+	// Use a short context timeout to avoid waiting for AWS SDK retries against a non-existent endpoint.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Millisecond)
+	defer cancel()
+
+	err := ks.RunTask(ctx, &pipeline.Pipeline{}, asset)
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "does not exist")
 	assert.NotContains(t, err.Error(), "not an AWS/S3 connection")
