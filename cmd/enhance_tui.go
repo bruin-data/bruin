@@ -22,8 +22,10 @@ const (
 	enhanceFailed
 )
 
-const maxLogsPerAsset = 5
-const maxAllLogsPerAsset = 500
+const (
+	maxLogsPerAsset    = 5
+	maxAllLogsPerAsset = 500
+)
 
 type enhanceAssetRow struct {
 	name     string
