@@ -127,6 +127,19 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "archives", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// PostHog - Product analytics platform
+	"posthog": {
+		{Name: "persons", PrimaryKey: "id", IncKey: "last_seen_at", IncStrategy: "merge"},
+		{Name: "feature_flags", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "id", IncKey: "timestamp", IncStrategy: "append"},
+		{Name: "cohorts", PrimaryKey: "id", IncKey: "last_calculation", IncStrategy: "merge"},
+		{Name: "event_definitions", PrimaryKey: "id", IncKey: "last_updated_at", IncStrategy: "merge"},
+		{Name: "property_definitions:event", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "property_definitions:person", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "property_definitions:session", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "annotations", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// ClickUp - Productivity platform
 	"clickup": {
 		{Name: "user", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
@@ -734,7 +747,8 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 // gongSources is the set of source names that require gong to be enabled.
 var gongSources = map[string]bool{
-	"dune": true,
+	"dune":    true,
+	"posthog": true,
 }
 
 // GetSourceTables returns the available tables for a specific ingestr source.

@@ -308,6 +308,10 @@ environments:
       clickup:
         - name: "clickup-1"
           api_token: "token_123"
+      posthog:
+        - name: "posthog-1"
+          personal_api_key: "phx_test123"
+          project_id: "12345"
       mixpanel:
         - name: "mixpanel-1"
           username: "user-123"

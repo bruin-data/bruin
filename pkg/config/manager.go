@@ -83,6 +83,7 @@ type Connections struct {
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
+	Posthog             []PosthogConnection             `yaml:"posthog,omitempty" json:"posthog,omitempty" mapstructure:"posthog"`
 	Pinterest           []PinterestConnection           `yaml:"pinterest,omitempty" json:"pinterest,omitempty" mapstructure:"pinterest"`
 	Trustpilot          []TrustpilotConnection          `yaml:"trustpilot,omitempty" json:"trustpilot,omitempty" mapstructure:"trustpilot"`
 	QuickBooks          []QuickBooksConnection          `yaml:"quickbooks,omitempty" json:"quickbooks,omitempty" mapstructure:"quickbooks"`
@@ -859,6 +860,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Clickup = append(env.Connections.Clickup, conn)
+	case "posthog":
+		var conn PosthogConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Posthog = append(env.Connections.Posthog, conn)
 	case "mailchimp":
 		var conn MailchimpConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1266,6 +1274,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
 	case "clickup":
 		env.Connections.Clickup = removeConnection(env.Connections.Clickup, connectionName)
+	case "posthog":
+		env.Connections.Posthog = removeConnection(env.Connections.Posthog, connectionName)
 	case "mailchimp":
 		env.Connections.Mailchimp = removeConnection(env.Connections.Mailchimp, connectionName)
 	case "mixpanel":
