@@ -1,0 +1,3 @@
+name: asset-start-date-ignored
+default_connections:
+    duckdb: "duckdb-start-date-flags"

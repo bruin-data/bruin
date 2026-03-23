@@ -80,7 +80,6 @@ func Render() *cli.Command {
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fullRefresh := c.Bool("full-refresh")
-			logger := makeLogger(c.Bool("debug"))
 
 			if vars := c.StringSlice("var"); len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
@@ -129,7 +128,7 @@ func Render() *cli.Command {
 			}
 
 			// Determine start date based on full-refresh flag and pipeline configuration
-			startDate, err := DetermineStartDate(c.String("start-date"), pl, fullRefresh, logger)
+			startDate, err := date.ParseTime(c.String("start-date"))
 			if err != nil {
 				if c.String("output") == "json" {
 					printErrorJSON(errors.New("Please give a valid start date: bruin render --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
@@ -170,20 +169,6 @@ func Render() *cli.Command {
 			if asset == nil {
 				printError(errors.New("no asset found"), c.String("output"), "Failed to read the asset definition file:")
 				return cli.Exit("", 1)
-			}
-
-			// If asset has its own start_date, use it instead of pipeline's start_date
-			if asset.StartDate != "" && fullRefresh {
-				startDate, err = date.ParseTime(asset.StartDate)
-				if err != nil {
-					if c.String("output") == "json" {
-						printErrorJSON(errors.New("Please give a valid start date in asset: A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
-					} else {
-						errorPrinter.Printf("Invalid start date in asset '%s': %s\n", asset.Name, asset.StartDate)
-					}
-					return cli.Exit("", 1)
-				}
-				logger.Debug("Using asset-level start_date: ", asset.StartDate)
 			}
 
 			resultsLocation := "s3://{destination-bucket}"
