@@ -866,6 +866,16 @@ func (c ClickupConnection) GetName() string {
 	return c.Name
 }
 
+type PosthogConnection struct {
+	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	PersonalAPIKey string `yaml:"personal_api_key,omitempty" json:"personal_api_key" mapstructure:"personal_api_key"`
+	ProjectID      string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+}
+
+func (c PosthogConnection) GetName() string {
+	return c.Name
+}
+
 type PinterestConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`

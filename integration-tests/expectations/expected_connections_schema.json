@@ -392,6 +392,26 @@
         "api_token"
       ]
     },
+    "PosthogConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "personal_api_key": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "personal_api_key",
+        "project_id"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -751,6 +771,12 @@
         "clickup": {
           "items": {
             "$ref": "#/$defs/ClickupConnection"
+          },
+          "type": "array"
+        },
+        "posthog": {
+          "items": {
+            "$ref": "#/$defs/PosthogConnection"
           },
           "type": "array"
         },

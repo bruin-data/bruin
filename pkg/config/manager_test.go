@@ -499,6 +499,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "token_123",
 				},
 			},
+			Posthog: []PosthogConnection{
+				{
+					Name:           "posthog-1",
+					PersonalAPIKey: "phx_test123",
+					ProjectID:      "12345",
+				},
+			},
 			QuickBooks: []QuickBooksConnection{
 				{
 					Name:         "quickbooks-1",

@@ -26,6 +26,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/clickup"
+	"github.com/bruin-data/bruin/pkg/posthog"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/couchbase"
 	"github.com/bruin-data/bruin/pkg/cursor"
@@ -167,6 +168,7 @@ type Manager struct {
 	Pipedrive            map[string]*pipedrive.Client
 	Mixpanel             map[string]*mixpanel.Client
 	Clickup              map[string]*clickup.Client
+	Posthog              map[string]*posthog.Client
 	Pinterest            map[string]*pinterest.Client
 	Trustpilot           map[string]*trustpilot.Client
 	QuickBooks           map[string]*quickbooks.Client
@@ -1865,6 +1867,28 @@ func (m *Manager) AddClickupConnectionFromConfig(connection *config.ClickupConne
 	return nil
 }
 
+func (m *Manager) AddPosthogConnectionFromConfig(connection *config.PosthogConnection) error {
+	m.mutex.Lock()
+	if m.Posthog == nil {
+		m.Posthog = make(map[string]*posthog.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := posthog.NewClient(posthog.Config{
+		PersonalAPIKey: connection.PersonalAPIKey,
+		ProjectID:      connection.ProjectID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Posthog[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBooksConnection) error {
 	m.mutex.Lock()
 	if m.QuickBooks == nil {
@@ -2811,6 +2835,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Clickup, connectionManager.AddClickupConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Posthog, connectionManager.AddPosthogConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
