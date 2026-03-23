@@ -106,6 +106,15 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
 	}
 
+	// Auto-enable gong for sources that require it
+	parsed, err := url.Parse(sourceURI)
+	if err != nil {
+		return fmt.Errorf("failed to parse source URI: %w", err)
+	}
+	if _, ok := gongSources[parsed.Scheme]; ok {
+		asset.Parameters["use_gong"] = "true"
+	}
+
 	// Handle CDC mode - transform PostgreSQL URI to CDC format and auto-set merge strategy
 	if asset.Parameters["cdc"] == "true" {
 		parsedURI, err := url.Parse(sourceURI)
