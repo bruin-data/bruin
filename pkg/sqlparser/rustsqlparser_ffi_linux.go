@@ -1,9 +1,10 @@
-//go:build cgo && linux && never
+//go:build cgo && linux
 
 package sqlparser
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/rustffi/target/release -lbruin_rustsqlparser -ldl -lpthread -lm -lc
+#cgo amd64 LDFLAGS: -L${SRCDIR}/rustffi/target/release -L${SRCDIR}/rustffi/target/x86_64-unknown-linux-gnu/release -lbruin_rustsqlparser -ldl -lpthread -lm -lc
+#cgo arm64 LDFLAGS: -L${SRCDIR}/rustffi/target/release -L${SRCDIR}/rustffi/target/aarch64-unknown-linux-gnu/release -lbruin_rustsqlparser -ldl -lpthread -lm -lc
 #include <stdlib.h>
 #include <stdint.h>
 

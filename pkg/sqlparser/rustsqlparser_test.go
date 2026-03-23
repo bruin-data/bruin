@@ -1,4 +1,4 @@
-//go:build cgo && (darwin || linux) && never
+//go:build cgo && (darwin || linux)
 
 package sqlparser
 

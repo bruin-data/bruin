@@ -1,9 +1,10 @@
-//go:build cgo && darwin && never
+//go:build cgo && darwin
 
 package sqlparser
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/rustffi/target/release -lbruin_rustsqlparser
+#cgo amd64 LDFLAGS: -L${SRCDIR}/rustffi/target/release -L${SRCDIR}/rustffi/target/x86_64-apple-darwin/release -lbruin_rustsqlparser
+#cgo arm64 LDFLAGS: -L${SRCDIR}/rustffi/target/release -L${SRCDIR}/rustffi/target/aarch64-apple-darwin/release -lbruin_rustsqlparser
 #include <stdlib.h>
 #include <stdint.h>
 

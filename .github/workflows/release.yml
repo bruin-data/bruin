@@ -23,11 +23,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Go 
+      - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
           cache: true
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
       - name: Install R (Ubuntu)
         if: startsWith(matrix.platform, 'depot-ubuntu')
         run: |
@@ -61,6 +63,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build Bruin
         run: make build
@@ -104,7 +108,7 @@ jobs:
       - name: Workaround Git Security Warning
         run: |
           # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" 
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
@@ -133,7 +137,7 @@ jobs:
       - name: Workaround Git Security Warning
         run: |
           # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" 
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'

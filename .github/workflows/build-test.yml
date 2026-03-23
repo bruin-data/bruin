@@ -143,18 +143,31 @@ jobs:
         run: golangci-lint run --timeout 10m60s ./...
 
   goreleaser-unix:
+    if: ${{ !fromJSON(env.IS_FORK) }}
     runs-on: depot-ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Workaround Git Security Warning
+        run: |
+          # Workaround a bug in github actions:
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Build Rust SQL parser library
-        run: cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
-
-      - name: Run GoReleaser
+          cache: false
+      - name: Run GoReleaser Darwin snapshot
         run: |
-          docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }}  -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.25 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
+          docker run --privileged \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e GGOOS=darwin \
+            -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} \
+            -e GITHUB_TOKEN=${{ github.token }} \
+            -e VERSION=0.0.0 \
+            -e COMMIT_SHA=${{ github.sha }} \
+            -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} \
+            -v $(pwd):/src -w /src \
+            goreleaser/goreleaser-cross-pro:v1.23 \
+            release --snapshot --clean --split --verbose

@@ -18,6 +18,10 @@ builds:
       - CXX=o64-clang++
       - CGO_ENABLED=1
       - MACOSX_DEPLOYMENT_TARGET=10.15
+    hooks:
+      pre:
+        - cmd: ./scripts/build_rustsqlparser_release_lib.sh {{ if eq .Arch "amd64" }}x86_64-apple-darwin{{ else }}aarch64-apple-darwin{{ end }}
+          output: true
     flags:
       - -trimpath
  
@@ -28,6 +32,10 @@ builds:
       - CC=x86_64-linux-gnu-gcc
       - CXX=x86_64-linux-gnu-g++
       - CGO_ENABLED=1
+    hooks:
+      pre:
+        - cmd: ./scripts/build_rustsqlparser_release_lib.sh x86_64-unknown-linux-gnu
+          output: true
     goarch:
       - amd64
     goos:
@@ -47,6 +55,10 @@ builds:
       - CC=aarch64-linux-gnu-gcc
       - CXX=aarch64-linux-gnu-g++
       - CGO_ENABLED=1
+    hooks:
+      pre:
+        - cmd: ./scripts/build_rustsqlparser_release_lib.sh aarch64-unknown-linux-gnu
+          output: true
     flags:
       - -trimpath
     ldflags:
