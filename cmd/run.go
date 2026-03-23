@@ -1361,19 +1361,6 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 	return startDate, endDate, nil
 }
 
-func DetermineStartDate(cliStartDate string, logger logger.Logger) (time.Time, error) {
-	var startDate time.Time
-	var err error
-
-	startDate, err = date.ParseTime(cliStartDate)
-	if err != nil {
-		return time.Time{}, err
-	}
-	logger.Debug("Using CLI start_date: ", cliStartDate)
-
-	return startDate, nil
-}
-
 func ValidateDateRange(startDate, endDate time.Time) error {
 	if startDate.After(endDate) {
 		errorPrinter.Printf("Start date cannot be after end date. Given start date: %s, end date: %s\n", startDate.Format("2006-01-02 15:04:05"), endDate.Format("2006-01-02 15:04:05"))

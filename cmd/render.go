@@ -80,7 +80,6 @@ func Render() *cli.Command {
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fullRefresh := c.Bool("full-refresh")
-			logger := makeLogger(c.Bool("debug"))
 
 			if vars := c.StringSlice("var"); len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
@@ -129,7 +128,7 @@ func Render() *cli.Command {
 			}
 
 			// Determine start date based on full-refresh flag and pipeline configuration
-			startDate, err := DetermineStartDate(c.String("start-date"), logger)
+			startDate, err := date.ParseTime(c.String("start-date"))
 			if err != nil {
 				if c.String("output") == "json" {
 					printErrorJSON(errors.New("Please give a valid start date: bruin render --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
