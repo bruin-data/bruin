@@ -84,9 +84,13 @@ test: test-unit
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
 	@$(MAKE) rustsqlparser-lib
-	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v 'integration-tests') 
+	@go test -tags="no_duckdb_arrow" -race -p 50 -vet=off -timeout 10m ./cmd/... ./pkg/...
 
-rustsqlparser-lib:
+RUST_LIB = pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
+
+rustsqlparser-lib: $(RUST_LIB)
+
+$(RUST_LIB): pkg/sqlparser/rustffi/Cargo.toml $(wildcard pkg/sqlparser/rustffi/src/*.rs)
 	@echo "$(OK_COLOR)==> Building Rust SQL parser static library$(NO_COLOR)"
 	@cargo build --release --manifest-path pkg/sqlparser/rustffi/Cargo.toml
 

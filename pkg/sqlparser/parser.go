@@ -44,6 +44,13 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 	return NewSQLParserWithConfig(randomize, 10000)
 }
 
+// NewSQLParserCached creates a SQLParser that reuses previously extracted embedded files
+// from a stable temp directory path. This is significantly faster when files already exist
+// (skips ~3s of file extraction) and is safe for concurrent reads across test packages.
+func NewSQLParserCached() (*SQLParser, error) {
+	return newSQLParserInternal("bruin-cli-embedded-cached", false, 10000)
+}
+
 func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, error) {
 	randomInt := 0
 	if randomize {
@@ -54,19 +61,25 @@ func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, err
 		}
 		randomInt = int(b[0])
 	}
-	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded_%d", randomInt))
+	tmpDirName := fmt.Sprintf("bruin-cli-embedded_%d", randomInt)
+	return newSQLParserInternal(tmpDirName, randomize, maxQueryLength)
+}
 
-	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
+func newSQLParserInternal(tmpDirName string, randomize bool, maxQueryLength int) (*SQLParser, error) {
+	tmpDir := filepath.Join(os.TempDir(), tmpDirName)
+	recreate := randomize // only recreate when using random dirs (production); reuse for cached dirs
+
+	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", recreate)
 	if err != nil {
 		return nil, err
 	}
-	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, tmpDir+"-sqlglot-lib", true)
+	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, tmpDir+"-sqlglot-lib", recreate)
 	if err != nil {
 		return nil, err
 	}
 	ep.AddPythonPath(sqlglotDir.GetExtractedPath())
 
-	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, tmpDir+"-jinja2-renderer", true)
+	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, tmpDir+"-jinja2-renderer", recreate)
 	if err != nil {
 		return nil, err
 	}
