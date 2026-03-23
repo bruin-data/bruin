@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -32,6 +33,9 @@ func execTestDuckDB(t *testing.T, db *sql.DB, query string) {
 
 // TestAlterStatementsExecutability tests that generated ALTER statements can be executed successfully.
 func TestAlterStatementsExecutability(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on Windows due to DuckDB file locking")
+	}
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -412,6 +416,9 @@ func TestAlterStatementsWithRealConfig(t *testing.T) {
 // TestSchemaOnlyVsFullComparison tests that schema-only mode (default) skips statistics
 // while full mode (--full flag) includes detailed column statistics.
 func TestSchemaOnlyVsFullComparison(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on Windows due to DuckDB file locking")
+	}
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}

@@ -89,7 +89,8 @@ func (u *Checker) installUvCommand(ctx context.Context, dest string) error {
 
 	var commandInstance *exec.Cmd
 	if runtime.GOOS == "windows" {
-		commandInstance = exec.CommandContext(ctx, "powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("$env:NO_MODIFY_PATH=1 ; $env:UV_INSTALL_DIR='~/.bruin' ; irm https://astral.sh/uv/%s/install.ps1 | iex", Version)) //nolint:gosec
+		shell := windowsShell()
+		commandInstance = exec.CommandContext(ctx, shell, "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("$env:NO_MODIFY_PATH=1 ; $env:UV_INSTALL_DIR='~/.bruin' ; irm https://astral.sh/uv/%s/install.ps1 | iex", Version)) //nolint:gosec
 	} else {
 		commandInstance = exec.CommandContext(ctx, Shell, ShellSubcommandFlag, fmt.Sprintf("set -e; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", Version, dest)) //nolint:gosec
 	}
@@ -106,4 +107,12 @@ func (u *Checker) installUvCommand(ctx context.Context, dest string) error {
 	_, _ = output.Write([]byte("\n"))
 
 	return nil
+}
+
+// windowsShell returns "pwsh" if available, otherwise falls back to "powershell".
+func windowsShell() string {
+	if _, err := exec.LookPath("pwsh"); err == nil {
+		return "pwsh"
+	}
+	return "powershell"
 }
