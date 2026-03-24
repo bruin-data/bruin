@@ -1,0 +1,15 @@
+{
+  "columns": [
+    {
+      "name": "table_name",
+      "type": "VARCHAR"
+    }
+  ],
+  "rows": [
+    [
+      "products"
+    ]
+  ],
+  "connectionName": "duckdb-run-with-filters",
+  "query": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name;"
+}

@@ -1882,6 +1882,146 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "selector_intersection",
+			workflow: e2e.Workflow{
+				Name: "selector_intersection",
+				Steps: []e2e.Task{
+					{
+						Name:    "selector_intersection: run intersection selector",
+						Command: binary,
+						Args: []string{
+							"run",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-intersection",
+							"--selector", "tag:include,file:products",
+							"--start-date", "2024-01-01",
+							"--end-date", "2024-12-31",
+							filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline"),
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "selector_intersection: query created tables",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-intersection",
+							"--connection", "duckdb-run-with-filters",
+							"--query", "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name;",
+							"--output", "json",
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline/expectations/selector_intersection_tables.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "selector_path_with_exclude_tag",
+			workflow: e2e.Workflow{
+				Name: "selector_path_with_exclude_tag",
+				Steps: []e2e.Task{
+					{
+						Name:    "selector_path_with_exclude_tag: run path selector",
+						Command: binary,
+						Args: []string{
+							"run",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-path",
+							"--selector", "path:assets",
+							"--exclude-tag", "exclude",
+							"--start-date", "2024-01-01",
+							"--end-date", "2024-12-31",
+							filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline"),
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "selector_path_with_exclude_tag: query created tables",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-path",
+							"--connection", "duckdb-run-with-filters",
+							"--query", "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name;",
+							"--output", "json",
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline/expectations/selector_path_tables.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "selector_downstream",
+			workflow: e2e.Workflow{
+				Name: "selector_downstream",
+				Steps: []e2e.Task{
+					{
+						Name:    "selector_downstream: run graph selector",
+						Command: binary,
+						Args: []string{
+							"run",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-downstream",
+							"--selector", "products+",
+							filepath.Join(currentFolder, "test-pipelines/run-with-downstream-pipeline"),
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "selector_downstream: query created tables",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-downstream",
+							"--connection", "duckdb-run-with-downstream",
+							"--query", "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name;",
+							"--output", "json",
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-with-downstream-pipeline/expectations/selector_downstream_tables.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "interval_modifiers",
 			workflow: e2e.Workflow{
 				Name: "interval_modifiers",

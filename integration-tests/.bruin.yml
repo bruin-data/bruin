@@ -103,6 +103,21 @@ environments:
       generic:
         - name: KEY1
           value: value1
+  env-selector-intersection:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-filters"
+          path: "duckdb-files/run-selector-intersection.db"
+  env-selector-path:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-filters"
+          path: "duckdb-files/run-selector-path.db"
+  env-selector-downstream:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-downstream"
+          path: "duckdb-files/run-selector-downstream.db"
   env-push-metadata:
     connections:
       duckdb:
