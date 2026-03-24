@@ -9,13 +9,14 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/notify"
+	"github.com/bruin-data/bruin/pkg/secrets"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
 )
 
-func Notify() *cli.Command {
+func Notify(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "notify",
 		Usage:     "Send a notification via Slack, Discord, MS Teams, or a generic webhook",
@@ -30,7 +31,7 @@ func Notify() *cli.Command {
 			&cli.StringFlag{
 				Name:     "connection",
 				Aliases:  []string{"c"},
-				Usage:    "connection name from .bruin.yml",
+				Usage:    "connection name from .bruin.yml or secrets backend",
 				Required: true,
 			},
 			&cli.StringFlag{
@@ -73,6 +74,11 @@ func Notify() *cli.Command {
 				Name:    "config-file",
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
+			},
+			&cli.StringFlag{
+				Name:    "secrets-backend",
+				Sources: cli.EnvVars("BRUIN_SECRETS_BACKEND"),
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault', 'doppler', 'aws', 'azure'",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -126,9 +132,43 @@ func Notify() *cli.Command {
 				}
 			}
 
-			connManager, errs := connection.NewManagerFromConfig(cm)
-			if len(errs) > 0 {
-				printErrors(errs, output, "failed to initialize connections")
+			l := makeLogger(*isDebug)
+
+			var connManager config.ConnectionAndDetailsGetter
+			var connErrs []error
+
+			secretsBackend := c.String("secrets-backend")
+			switch secretsBackend {
+			case "vault":
+				var sErr error
+				connManager, sErr = secrets.NewVaultClientFromEnv(l) //nolint:contextcheck
+				if sErr != nil {
+					connErrs = append(connErrs, errors2.Wrap(sErr, "failed to initialize vault client"))
+				}
+			case "doppler":
+				var sErr error
+				connManager, sErr = secrets.NewDopplerClientFromEnv(l)
+				if sErr != nil {
+					connErrs = append(connErrs, errors2.Wrap(sErr, "failed to initialize doppler client"))
+				}
+			case "aws":
+				var sErr error
+				connManager, sErr = secrets.NewAWSSecretsManagerClientFromEnv(l)
+				if sErr != nil {
+					connErrs = append(connErrs, errors2.Wrap(sErr, "failed to initialize AWS Secrets Manager client"))
+				}
+			case "azure":
+				var sErr error
+				connManager, sErr = secrets.NewAzureKeyVaultClientFromEnv(l)
+				if sErr != nil {
+					connErrs = append(connErrs, errors2.Wrap(sErr, "failed to initialize Azure Key Vault client"))
+				}
+			default:
+				connManager, connErrs = connection.NewManagerFromConfigWithContext(ctx, cm)
+			}
+
+			if len(connErrs) > 0 {
+				printErrors(connErrs, output, "failed to initialize connections")
 				return cli.Exit("", 1)
 			}
 
