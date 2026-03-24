@@ -11,8 +11,6 @@ import (
 func TestResolveSelectorAssets_Methods(t *testing.T) {
 	t.Parallel()
 
-	p := newSelectorTestPipeline(t)
-
 	tests := []struct {
 		name     string
 		selector string
@@ -59,6 +57,7 @@ func TestResolveSelectorAssets_Methods(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			p := newSelectorTestPipeline(t)
 			assets, err := ResolveSelectorAssets(tt.selector, p)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, selectorAssetNames(assets))
@@ -68,8 +67,6 @@ func TestResolveSelectorAssets_Methods(t *testing.T) {
 
 func TestResolveSelectorAssets_GraphOperators(t *testing.T) {
 	t.Parallel()
-
-	p := newSelectorTestPipeline(t)
 
 	tests := []struct {
 		name     string
@@ -112,6 +109,7 @@ func TestResolveSelectorAssets_GraphOperators(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			p := newSelectorTestPipeline(t)
 			assets, err := ResolveSelectorAssets(tt.selector, p)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, selectorAssetNames(assets))
@@ -121,8 +119,6 @@ func TestResolveSelectorAssets_GraphOperators(t *testing.T) {
 
 func TestResolveSelectorAssets_SetOperators(t *testing.T) {
 	t.Parallel()
-
-	p := newSelectorTestPipeline(t)
 
 	tests := []struct {
 		name     string
@@ -150,6 +146,7 @@ func TestResolveSelectorAssets_SetOperators(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			p := newSelectorTestPipeline(t)
 			assets, err := ResolveSelectorAssets(tt.selector, p)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, selectorAssetNames(assets))

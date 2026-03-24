@@ -2685,6 +2685,7 @@ func TestGenerateLogFileName(t *testing.T) {
 		})
 	}
 }
+
 func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 	t.Parallel()
 
