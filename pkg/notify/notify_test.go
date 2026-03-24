@@ -122,11 +122,16 @@ func TestMSTeamsSender_Send(t *testing.T) {
 
 		var payload map[string]any
 		require.NoError(t, json.Unmarshal(body, &payload))
-		assert.Equal(t, "MessageCard", payload["@type"])
+		assert.Equal(t, "message", payload["type"])
 
-		sections := payload["sections"].([]any)
-		section := sections[0].(map[string]any)
-		assert.Contains(t, section["activityTitle"], "successfully")
+		attachments := payload["attachments"].([]any)
+		attachment := attachments[0].(map[string]any)
+		content := attachment["content"].(map[string]any)
+		assert.Equal(t, "AdaptiveCard", content["type"])
+
+		bodyItems := content["body"].([]any)
+		titleBlock := bodyItems[0].(map[string]any)
+		assert.Contains(t, titleBlock["text"], "successfully")
 
 		w.WriteHeader(http.StatusOK)
 	}))

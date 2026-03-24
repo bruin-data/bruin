@@ -160,32 +160,44 @@ func Notify() *cli.Command {
 }
 
 func buildSender(cm config.ConnectionAndDetailsGetter, notifType, connName, channel string) (notify.Sender, error) {
-	conn := cm.GetConnection(connName)
-	if conn == nil {
-		return nil, fmt.Errorf("connection '%s' not found", connName)
-	}
-
 	switch notifType {
 	case "slack":
+		// Slack connections store a *slack.Client in availableConnections but we need the
+		// raw config to get the API key, so we use GetConnectionDetails instead.
 		connDetails := cm.GetConnectionDetails(connName)
+		if connDetails == nil {
+			return nil, fmt.Errorf("connection '%s' not found", connName)
+		}
 		slackConn, ok := connDetails.(*config.SlackConnection)
 		if !ok {
 			return nil, fmt.Errorf("connection '%s' is not a slack connection", connName)
 		}
 		return notify.NewSlackSender(slackConn.APIKey, channel), nil
 	case "discord":
+		conn := cm.GetConnection(connName)
+		if conn == nil {
+			return nil, fmt.Errorf("connection '%s' not found", connName)
+		}
 		discordConn, ok := conn.(*config.DiscordConnection)
 		if !ok {
 			return nil, fmt.Errorf("connection '%s' is not a discord connection", connName)
 		}
 		return notify.NewDiscordSender(discordConn.WebhookURL), nil
 	case "ms_teams":
+		conn := cm.GetConnection(connName)
+		if conn == nil {
+			return nil, fmt.Errorf("connection '%s' not found", connName)
+		}
 		teamsConn, ok := conn.(*config.MSTeamsConnection)
 		if !ok {
 			return nil, fmt.Errorf("connection '%s' is not an ms_teams connection", connName)
 		}
 		return notify.NewMSTeamsSender(teamsConn.WebhookURL), nil
 	case "webhook":
+		conn := cm.GetConnection(connName)
+		if conn == nil {
+			return nil, fmt.Errorf("connection '%s' not found", connName)
+		}
 		webhookConn, ok := conn.(*config.WebhookConnection)
 		if !ok {
 			return nil, fmt.Errorf("connection '%s' is not a webhook connection", connName)

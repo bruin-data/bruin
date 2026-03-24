@@ -9,7 +9,8 @@ import (
 	"net/http"
 )
 
-// MSTeamsSender sends notifications to Microsoft Teams via webhook.
+// MSTeamsSender sends notifications to Microsoft Teams via Workflows webhook
+// using the Adaptive Card format.
 type MSTeamsSender struct {
 	WebhookURL string
 	client     *http.Client
@@ -25,7 +26,7 @@ func NewMSTeamsSender(webhookURL string) *MSTeamsSender {
 func (m *MSTeamsSender) Type() string { return "ms_teams" }
 
 func (m *MSTeamsSender) Send(ctx context.Context, payload Payload) error {
-	card := m.buildMessageCard(payload)
+	card := m.buildAdaptiveCard(payload)
 
 	jsonBody, err := json.Marshal(card)
 	if err != nil {
@@ -53,50 +54,70 @@ func (m *MSTeamsSender) Send(ctx context.Context, payload Payload) error {
 	return nil
 }
 
-func (m *MSTeamsSender) buildMessageCard(p Payload) map[string]any {
-	var title string
+func (m *MSTeamsSender) buildAdaptiveCard(p Payload) map[string]any {
+	var title, color string
 	if p.Status == "success" {
-		title = "&#x2705; Pipeline has finished successfully"
+		title = "\u2705 Pipeline has finished successfully"
+		color = "good"
 	} else {
-		title = "&#x1F53A; Pipeline has failed"
+		title = "\U0001F53A Pipeline has failed"
+		color = "attention"
 	}
 
-	facts := []map[string]string{}
-	if p.Pipeline != "" {
-		facts = append(facts, map[string]string{"name": "Pipeline", "value": fmt.Sprintf("`%s`", p.Pipeline)})
-	}
-	if p.Asset != "" {
-		facts = append(facts, map[string]string{"name": "Asset", "value": fmt.Sprintf("`%s`", p.Asset)})
-	}
-	if p.Column != "" {
-		facts = append(facts, map[string]string{"name": "Column", "value": fmt.Sprintf("`%s`", p.Column)})
-	}
-	if p.Check != "" {
-		facts = append(facts, map[string]string{"name": "Check", "value": fmt.Sprintf("`%s`", p.Check)})
-	}
-	if p.RunID != "" {
-		facts = append(facts, map[string]string{"name": "Run ID", "value": fmt.Sprintf("`%s`", p.RunID)})
-	}
-	if p.Message != "" {
-		facts = append(facts, map[string]string{"name": "Message", "value": p.Message})
+	bodyItems := []map[string]any{
+		{
+			"type":   "TextBlock",
+			"size":   "Medium",
+			"weight": "Bolder",
+			"text":   title,
+			"color":  color,
+		},
 	}
 
-	summary := title
-	if p.Pipeline != "" {
-		summary = fmt.Sprintf("Pipeline: `%s`", p.Pipeline)
+	facts := m.buildFacts(p)
+	if len(facts) > 0 {
+		bodyItems = append(bodyItems, map[string]any{
+			"type":  "FactSet",
+			"facts": facts,
+		})
 	}
 
 	return map[string]any{
-		"@type":    "MessageCard",
-		"@context": "http://schema.org/extensions",
-		"summary":  summary,
-		"sections": []map[string]any{
+		"type": "message",
+		"attachments": []map[string]any{
 			{
-				"activityTitle":    title,
-				"activitySubtitle": "",
-				"facts":            facts,
-				"text":             "",
+				"contentType": "application/vnd.microsoft.card.adaptive",
+				"contentUrl":  nil,
+				"content": map[string]any{
+					"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+					"type":    "AdaptiveCard",
+					"version": "1.4",
+					"body":    bodyItems,
+				},
 			},
 		},
 	}
+}
+
+func (m *MSTeamsSender) buildFacts(p Payload) []map[string]string {
+	var facts []map[string]string
+	if p.Pipeline != "" {
+		facts = append(facts, map[string]string{"title": "Pipeline", "value": p.Pipeline})
+	}
+	if p.Asset != "" {
+		facts = append(facts, map[string]string{"title": "Asset", "value": p.Asset})
+	}
+	if p.Column != "" {
+		facts = append(facts, map[string]string{"title": "Column", "value": p.Column})
+	}
+	if p.Check != "" {
+		facts = append(facts, map[string]string{"title": "Check", "value": p.Check})
+	}
+	if p.RunID != "" {
+		facts = append(facts, map[string]string{"title": "Run ID", "value": p.RunID})
+	}
+	if p.Message != "" {
+		facts = append(facts, map[string]string{"title": "Message", "value": p.Message})
+	}
+	return facts
 }

@@ -30,7 +30,7 @@ func (w *WebhookSender) Type() string { return "webhook" }
 
 func (w *WebhookSender) Send(ctx context.Context, payload Payload) error {
 	body := map[string]any{
-		"pipeline": payload.Pipeline,
+		"pipeline": nilIfEmpty(payload.Pipeline),
 		"asset":    nilIfEmpty(payload.Asset),
 		"column":   nilIfEmpty(payload.Column),
 		"check":    nilIfEmpty(payload.Check),

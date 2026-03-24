@@ -30,7 +30,7 @@ func (d *DiscordSender) Send(ctx context.Context, payload Payload) error {
 	body := map[string]any{
 		"content":    message,
 		"username":   "Bruin",
-		"avatar_url": "https://ca.slack-edge.com/T05CD4YH8EM-U06APGYBG2C-42bf22da7d0f-512",
+		"avatar_url": "https://avatars.githubusercontent.com/u/107880688",
 	}
 
 	jsonBody, err := json.Marshal(body)
