@@ -656,6 +656,35 @@ func (c SlackConnection) GetName() string {
 	return c.Name
 }
 
+type DiscordConnection struct {
+	Name       string `yaml:"name" json:"name" mapstructure:"name"`
+	WebhookURL string `yaml:"webhook_url" json:"webhook_url" mapstructure:"webhook_url"`
+}
+
+func (c DiscordConnection) GetName() string {
+	return c.Name
+}
+
+type MSTeamsConnection struct {
+	Name       string `yaml:"name" json:"name" mapstructure:"name"`
+	WebhookURL string `yaml:"webhook_url" json:"webhook_url" mapstructure:"webhook_url"`
+}
+
+func (c MSTeamsConnection) GetName() string {
+	return c.Name
+}
+
+type WebhookConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	URL      string `yaml:"url" json:"url" mapstructure:"url"`
+	Login    string `yaml:"login,omitempty" json:"login,omitempty" mapstructure:"login"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+}
+
+func (c WebhookConnection) GetName() string {
+	return c.Name
+}
+
 type SocrataConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Domain   string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`

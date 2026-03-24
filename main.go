@@ -75,6 +75,7 @@ func main() {
 			cmd.Query(),
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
+			cmd.Notify(),
 			cmd.Import(&isDebug),
 			cmd.Upgrade(),
 			cmd.Cloud(&isDebug),

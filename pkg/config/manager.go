@@ -66,6 +66,9 @@ type Connections struct {
 	SnapchatAds         []SnapchatAdsConnection         `yaml:"snapchatads,omitempty" json:"snapchatads,omitempty" mapstructure:"snapchatads"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
+	Discord             []DiscordConnection             `yaml:"discord,omitempty" json:"discord,omitempty" mapstructure:"discord"`
+	MSTeams             []MSTeamsConnection             `yaml:"ms_teams,omitempty" json:"ms_teams,omitempty" mapstructure:"ms_teams"`
+	Webhook             []WebhookConnection             `yaml:"webhook,omitempty" json:"webhook,omitempty" mapstructure:"webhook"`
 	Socrata             []SocrataConnection             `yaml:"socrata,omitempty" json:"socrata,omitempty" mapstructure:"socrata"`
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
 	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
@@ -720,6 +723,27 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Slack = append(env.Connections.Slack, conn)
+	case "discord":
+		var conn DiscordConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Discord = append(env.Connections.Discord, conn)
+	case "ms_teams":
+		var conn MSTeamsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.MSTeams = append(env.Connections.MSTeams, conn)
+	case "webhook":
+		var conn WebhookConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Webhook = append(env.Connections.Webhook, conn)
 	case "duckdb":
 		var conn DuckDBConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1234,6 +1258,12 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.S3 = removeConnection(env.Connections.S3, connectionName)
 	case "slack":
 		env.Connections.Slack = removeConnection(env.Connections.Slack, connectionName)
+	case "discord":
+		env.Connections.Discord = removeConnection(env.Connections.Discord, connectionName)
+	case "ms_teams":
+		env.Connections.MSTeams = removeConnection(env.Connections.MSTeams, connectionName)
+	case "webhook":
+		env.Connections.Webhook = removeConnection(env.Connections.Webhook, connectionName)
 	case "zendesk":
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
 	case "duckdb":
