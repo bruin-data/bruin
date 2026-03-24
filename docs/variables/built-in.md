@@ -76,3 +76,6 @@ print(f"Processing {pipeline_name} for {start_date} to {end_date}")
 | `run_id` | `BRUIN_RUN_ID` |
 | `full_refresh` | `BRUIN_FULL_REFRESH` (`"1"` or `"0"`) |
 | `commit_hash` | `BRUIN_COMMIT_HASH` |
+
+> [!NOTE]
+> The `_nodash` variants (`start_date_nodash`, `end_date_nodash`, `execution_date_nodash`) are only available in the Jinja context for SQL assets. They are not exposed as Python environment variables. If you need a nodash format in Python, derive it from the date string: `start_date.replace("-", "")`.

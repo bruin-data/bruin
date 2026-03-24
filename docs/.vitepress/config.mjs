@@ -102,6 +102,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
                             {text: "Load Notion to PostgreSQL", link: "/getting-started/tutorials/load-notion-postgres"},
                             {text: "Oracle to DuckDB", link: "/getting-started/tutorials/oracle-duckdb"},
+                            {text: "Using Templates", link: "/getting-started/tutorials/template-tutorial"},
                         ],
                     },
                 ],
@@ -115,6 +116,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Scheduling", link: "/pipelines/definition#schedule"},
                     {text: "Default Connections", link: "/pipelines/definition#default-connections"},
                     {text: "Pipeline Defaults", link: "/pipelines/definition#default-pipeline-level-defaults"},
+                    {text: "Concurrency", link: "/getting-started/concurrency"},
                 ],
             },
             {
@@ -303,13 +305,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Query", link: "/commands/query"},
                     {text: "AI Enhance", link: "/commands/ai-enhance"},
                     {text: "Cloud", link: "/commands/cloud"},
-                ],
-            },
-            {
-                text: "Orchestration",
-                collapsed: true,
-                items: [
-                    {text: "Concurrency", link: "/getting-started/concurrency"},
                 ],
             },
             {
