@@ -156,7 +156,7 @@ jobs:
         run: golangci-lint run --timeout 10m60s ./...
 
   goreleaser-unix:
-    if: ${{ !fromJSON(env.IS_FORK) }}
+    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
     runs-on: depot-ubuntu-latest
 
     steps:
