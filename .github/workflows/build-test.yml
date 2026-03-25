@@ -33,7 +33,6 @@ concurrency:
 
 
 env:
-  IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
@@ -69,7 +68,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Go 
+      - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
@@ -142,32 +141,3 @@ jobs:
       - name: Run golangci-lint
         run: golangci-lint run --timeout 10m60s ./...
 
-  goreleaser-unix:
-    if: ${{ !fromJSON(env.IS_FORK) }}
-    runs-on: depot-ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Workaround Git Security Warning
-        run: |
-          # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: 'go.mod'
-          cache: false
-      - name: Run GoReleaser Darwin snapshot
-        run: |
-          docker run --privileged \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -e GGOOS=darwin \
-            -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} \
-            -e GITHUB_TOKEN=${{ github.token }} \
-            -e VERSION=0.0.0 \
-            -e COMMIT_SHA=${{ github.sha }} \
-            -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} \
-            -v $(pwd):/src -w /src \
-            goreleaser/goreleaser-cross-pro:v1.23 \
-            release --snapshot --clean --split --verbose
