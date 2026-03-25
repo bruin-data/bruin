@@ -33,7 +33,6 @@ concurrency:
 
 
 env:
-  IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
@@ -42,7 +41,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest, windows-2022 ]
+        platform: [ depot-ubuntu-latest ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -56,17 +55,13 @@ jobs:
           cache: false
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Run tests
-        shell: bash
-        run: |
-          [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
-          make test
+      - run: make test
 
 
   end2end:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest, windows-2022 ]
+        platform: [ depot-ubuntu-latest ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -80,21 +75,12 @@ jobs:
           cache: false
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Install R (Ubuntu)
-        if: startsWith(matrix.platform, 'depot-ubuntu')
+      - name: Install R
         run: |
           sudo apt-get update
           sudo apt-get install -y r-base
-      - name: Install R (Windows)
-        if: matrix.platform == 'windows-2022'
-        shell: bash
-        run: |
-          choco install r.project -y
       - name: Run integration tests
-        shell: bash
-        run: |
-          [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
-          make integration-test
+        run: make integration-test
 
   dockerBuild:
     runs-on: depot-ubuntu-latest
@@ -155,32 +141,3 @@ jobs:
       - name: Run golangci-lint
         run: golangci-lint run --timeout 10m60s ./...
 
-  goreleaser-unix:
-    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
-    runs-on: depot-ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Workaround Git Security Warning
-        run: |
-          # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: 'go.mod'
-          cache: false
-      - name: Run GoReleaser Darwin snapshot
-        run: |
-          docker run --privileged \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -e GGOOS=darwin \
-            -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} \
-            -e GITHUB_TOKEN=${{ github.token }} \
-            -e VERSION=0.0.0 \
-            -e COMMIT_SHA=${{ github.sha }} \
-            -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} \
-            -v $(pwd):/src -w /src \
-            goreleaser/goreleaser-cross-pro:v1.23 \
-            release --snapshot --clean --split --verbose
