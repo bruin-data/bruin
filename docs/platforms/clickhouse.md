@@ -221,3 +221,57 @@ name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
 ```
+
+### `clickhouse.source`
+
+Defines Clickhouse source assets for documenting existing tables and views in your Clickhouse database. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing Clickhouse tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing Clickhouse table
+
+```yaml
+name: analytics.page_views
+type: clickhouse.source
+description: "Page view events tracked across all web properties"
+connection: clickhouse-default
+
+tags:
+  - analytics
+  - web
+  - events
+domains:
+  - web-analytics
+
+meta:
+  business_owner: "Data Team"
+  data_steward: "data@company.com"
+  refresh_frequency: "real-time"
+
+depends:
+  - analytics.users
+
+columns:
+  - name: view_id
+    type: "UInt64"
+    description: "Unique identifier for each page view"
+
+  - name: user_id
+    type: "String"
+    description: "Identifier of the user who viewed the page"
+
+  - name: page_url
+    type: "String"
+    description: "URL of the page that was viewed"
+
+  - name: view_timestamp
+    type: "DateTime"
+    description: "Timestamp when the page was viewed"
+
+  - name: duration_seconds
+    type: "UInt32"
+    description: "Time spent on the page in seconds"
+```

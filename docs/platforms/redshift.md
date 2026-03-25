@@ -96,7 +96,7 @@ parameters:
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
 
-### `redshift.sensor.table`
+### `rs.sensor.table`
 
 Sensors are a special type of assets that are used to wait on certain external signals.
 
@@ -176,4 +176,53 @@ Example CSV:
 name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
+```
+
+### `rs.source`
+
+Defines Redshift source assets for documenting existing tables and views in your Redshift data warehouse. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing Redshift tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing Redshift table
+
+```yaml
+name: public.user_sessions
+type: rs.source
+description: "Tracks user session activity across the platform"
+connection: redshift-default
+
+tags:
+  - analytics
+  - user-behavior
+domains:
+  - product
+
+meta:
+  business_owner: "Product Analytics Team"
+  data_steward: "analytics@company.com"
+  refresh_frequency: "daily"
+
+depends:
+  - public.users
+
+columns:
+  - name: session_id
+    type: "VARCHAR(64)"
+    description: "Unique identifier for each user session"
+  - name: user_id
+    type: "INTEGER"
+    description: "Foreign key referencing the users table"
+  - name: started_at
+    type: "TIMESTAMP"
+    description: "Timestamp when the session began"
+  - name: ended_at
+    type: "TIMESTAMP"
+    description: "Timestamp when the session ended"
+  - name: device_type
+    type: "VARCHAR(50)"
+    description: "Type of device used during the session such as desktop, mobile, or tablet"
 ```

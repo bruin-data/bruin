@@ -256,3 +256,58 @@ name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
 ```
+
+### `databricks.source`
+
+Defines Databricks source assets for documenting existing tables and views in your Databricks database. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing Databricks tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing Databricks table
+
+```yaml
+name: catalog.schema.sales_transactions
+type: databricks.source
+description: "Sales transaction records from all channels"
+connection: databricks-default
+
+tags:
+  - sales
+  - transactions
+  - raw-data
+domains:
+  - revenue
+
+meta:
+  business_owner: "Sales Analytics"
+  data_steward: "sales-data@company.com"
+  refresh_frequency: "daily"
+
+depends:
+  - catalog.schema.customers
+  - catalog.schema.products
+
+columns:
+  - name: transaction_id
+    type: "STRING"
+    description: "Unique identifier for each transaction"
+
+  - name: customer_id
+    type: "STRING"
+    description: "Identifier of the customer who made the purchase"
+
+  - name: amount
+    type: "DECIMAL(10,2)"
+    description: "Total transaction amount"
+
+  - name: transaction_date
+    type: "TIMESTAMP"
+    description: "Date and time of the transaction"
+
+  - name: status
+    type: "STRING"
+    description: "Transaction status (completed, pending, refunded)"
+```

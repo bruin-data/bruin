@@ -89,3 +89,60 @@ B,LinkedIn,SDE 2,2024-01-01
 ```
 
 This operation will load the CSV into a table called `dashboard.hello` in the MySQL database.
+
+### `my.sensor.table`
+
+Sensors are a special type of assets that are used to wait on certain external signals.
+
+Checks if a table exists in MySQL, runs by default every 30 seconds until this table is available.
+
+```yaml
+name: string
+type: string
+parameters:
+    table: string
+    poke_interval: int (optional)
+```
+
+**Parameters**:
+
+- `table`: `database.table` format, requires the database and table identifiers as a full name.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
+
+#### Examples
+
+```yaml
+# Check if a daily summary table exists
+name: analytics.daily_summary
+type: my.sensor.table
+parameters:
+    table: "analytics.daily_summary_{{ end_date | date_format('%Y%m%d') }}"
+```
+
+### `my.sensor.query`
+
+Checks if a query returns any results in MySQL, runs by default every 30 seconds until this query returns any results.
+
+```yaml
+name: string
+type: string
+parameters:
+    query: string
+    poke_interval: int (optional)
+```
+
+**Parameters**:
+
+- `query`: Query you expect to return any results.
+- `poke_interval`: The interval between retries in seconds (default 30 seconds).
+
+#### Example: Check if data exists for a specific date
+
+Checks if data is available in an upstream table for the end date of the run.
+
+```yaml
+name: analytics.daily_orders
+type: my.sensor.query
+parameters:
+    query: select exists(select 1 from orders where order_date = "{{ end_date }}")
+```

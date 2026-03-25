@@ -265,3 +265,52 @@ name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
 ```
+
+### `sf.source`
+
+Defines Snowflake source assets for documenting existing tables and views in your Snowflake database. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing Snowflake tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing Snowflake table
+
+```yaml
+name: RAW.CUSTOMER_DATA
+type: sf.source
+description: "Raw customer data ingested from the CRM system"
+connection: snowflake-default
+
+tags:
+  - raw
+  - crm
+domains:
+  - customers
+
+meta:
+  business_owner: "Customer Success Team"
+  data_steward: "data-eng@company.com"
+  refresh_frequency: "daily"
+
+depends:
+  - RAW.CRM_SYNC
+
+columns:
+  - name: CUSTOMER_ID
+    type: "NUMBER"
+    description: "Unique identifier for each customer"
+  - name: FIRST_NAME
+    type: "VARCHAR"
+    description: "Customer first name"
+  - name: LAST_NAME
+    type: "VARCHAR"
+    description: "Customer last name"
+  - name: SIGNUP_DATE
+    type: "TIMESTAMP_NTZ"
+    description: "Date and time the customer signed up"
+  - name: ACCOUNT_STATUS
+    type: "VARCHAR"
+    description: "Current account status such as active, inactive, or suspended"
+```
