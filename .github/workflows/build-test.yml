@@ -42,7 +42,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest ]
+        platform: [ depot-ubuntu-latest, windows-2022 ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -56,32 +56,45 @@ jobs:
           cache: false
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      - run: make test
+      - name: Run tests
+        shell: bash
+        run: |
+          [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          make test
 
 
   end2end:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest ]
+        platform: [ depot-ubuntu-latest, windows-2022 ]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Go 
+      - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache: false
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Install R
+      - name: Install R (Ubuntu)
+        if: startsWith(matrix.platform, 'depot-ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y r-base
+      - name: Install R (Windows)
+        if: matrix.platform == 'windows-2022'
+        shell: bash
+        run: |
+          choco install r.project -y
       - name: Run integration tests
-        run: make integration-test
+        shell: bash
+        run: |
+          [[ "${{runner.os}}" != 'Windows' ]] || export PATH="/c/mingw64/bin:$PATH"
+          make integration-test
 
   dockerBuild:
     runs-on: depot-ubuntu-latest
