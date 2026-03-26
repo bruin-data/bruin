@@ -24,7 +24,6 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
 	"github.com/yourbasic/graph"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -1777,23 +1776,11 @@ func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline
 	return issues, nil
 }
 
-var pipelineKnownYAMLFields = func() map[string]bool {
-	known := make(map[string]bool)
-	t := reflect.TypeOf(pipeline.Pipeline{})
-	for i := range t.NumField() {
-		tag := t.Field(i).Tag.Get("yaml")
-		if tag == "" || tag == "-" {
-			continue
-		}
-		name := strings.SplitN(tag, ",", 2)[0]
-		if name != "" && name != "-" {
-			known[name] = true
-		}
-	}
-	return known
-}()
-
 type validateUnknownPipelineFields struct {
+	fs afero.Fs
+}
+
+type validateUnknownAssetFields struct {
 	fs afero.Fs
 }
 
@@ -1807,18 +1794,42 @@ func (v *validateUnknownPipelineFields) Validate(ctx context.Context, p *pipelin
 		return nil, errors.Wrapf(err, "failed to read pipeline file at %s", p.DefinitionFile.Path)
 	}
 
-	var rawFields map[string]interface{}
-	if err := yaml.Unmarshal(data, &rawFields); err != nil {
+	unknownPaths, err := unknownYAMLFieldPaths(data, reflect.TypeOf(pipeline.Pipeline{}))
+	if err != nil {
 		return nil, nil //nolint:nilerr
 	}
 
 	var issues []*Issue
-	for field := range rawFields {
-		if !pipelineKnownYAMLFields[field] {
-			issues = append(issues, &Issue{
-				Description: fmt.Sprintf("unknown field '%s' in pipeline definition", field),
-			})
-		}
+	for _, field := range unknownPaths {
+		issues = append(issues, &Issue{
+			Description: fmt.Sprintf("unknown field '%s' in pipeline definition", field),
+		})
+	}
+
+	return issues, nil
+}
+
+func (v *validateUnknownAssetFields) Validate(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.DefinitionFile.Type != pipeline.YamlTask || asset.DefinitionFile.Path == "" {
+		return nil, nil
+	}
+
+	data, err := afero.ReadFile(v.fs, asset.DefinitionFile.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read asset file at %s", asset.DefinitionFile.Path)
+	}
+
+	unknownPaths, err := pipeline.UnknownAssetYAMLFieldPaths(data)
+	if err != nil {
+		return nil, nil //nolint:nilerr
+	}
+
+	var issues []*Issue
+	for _, field := range unknownPaths {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("unknown field '%s' in asset definition", field),
+		})
 	}
 
 	return issues, nil

@@ -4229,3 +4229,75 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateUnknownPipelineFields(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	require.NoError(t, fs.MkdirAll("/project", 0o755))
+	require.NoError(t, afero.WriteFile(fs, "/project/pipeline.yml", []byte("name: my-pipeline\ntypo_schedule: daily\nnotifications:\n  typo_nested: true\n"), 0o644))
+
+	v := validateUnknownPipelineFields{fs: fs}
+	p := &pipeline.Pipeline{
+		Name:           "my-pipeline",
+		DefinitionFile: pipeline.DefinitionFile{Path: "/project/pipeline.yml"},
+	}
+
+	issues, err := v.Validate(t.Context(), p)
+	require.NoError(t, err)
+	require.Len(t, issues, 2)
+	descriptions := []string{issues[0].Description, issues[1].Description}
+	sort.Strings(descriptions)
+	assert.Equal(t, "unknown field 'notifications.typo_nested' in pipeline definition", descriptions[0])
+	assert.Equal(t, "unknown field 'typo_schedule' in pipeline definition", descriptions[1])
+}
+
+func TestValidateUnknownAssetFields(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	assetDir := "/project/assets"
+	require.NoError(t, fs.MkdirAll(assetDir, 0o755))
+
+	v := validateUnknownAssetFields{fs: fs}
+	p := &pipeline.Pipeline{Name: "p"}
+
+	t.Run("single unknown top-level field is reported", func(t *testing.T) {
+		t.Parallel()
+		taskPath := filepath.Join(assetDir, "task1.yml")
+		require.NoError(t, afero.WriteFile(fs, taskPath, []byte("name: my-task\ntype: bq.sql\ntypo_column: x\n"), 0o644))
+		asset := &pipeline.Asset{
+			Name: "my-task",
+			DefinitionFile: pipeline.TaskDefinitionFile{
+				Path: taskPath,
+				Type: pipeline.YamlTask,
+			},
+		}
+		issues, err := v.Validate(t.Context(), p, asset)
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "unknown field 'typo_column' in asset definition", issues[0].Description)
+		assert.Same(t, asset, issues[0].Task)
+	})
+
+	t.Run("unknown nested fields are reported with full path", func(t *testing.T) {
+		t.Parallel()
+		taskPath := filepath.Join(assetDir, "task2.yml")
+		content := "name: my-task\ntype: bq.sql\nmaterialization:\n  type: table\n  typo_nested: y\ncolumns:\n  - name: id\n    type: int\n    typo_in_column: true\n"
+		require.NoError(t, afero.WriteFile(fs, taskPath, []byte(content), 0o644))
+		asset := &pipeline.Asset{
+			Name: "my-task",
+			DefinitionFile: pipeline.TaskDefinitionFile{
+				Path: taskPath,
+				Type: pipeline.YamlTask,
+			},
+		}
+		issues, err := v.Validate(t.Context(), p, asset)
+		require.NoError(t, err)
+		require.Len(t, issues, 2)
+		descriptions := []string{issues[0].Description, issues[1].Description}
+		sort.Strings(descriptions)
+		assert.Equal(t, "unknown field 'columns.typo_in_column' in asset definition", descriptions[0])
+		assert.Equal(t, "unknown field 'materialization.typo_nested' in asset definition", descriptions[1])
+	})
+}

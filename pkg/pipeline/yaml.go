@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -344,6 +345,138 @@ type taskDefinition struct {
 	Meta              map[string]string `yaml:"meta"`
 	RerunCooldown     *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted *bool             `yaml:"refresh_restricted,omitempty"`
+}
+
+type assetYAMLFieldSchema struct {
+	children     map[string]*assetYAMLFieldSchema
+	allowUnknown bool
+}
+
+func UnknownAssetYAMLFieldPaths(content []byte) ([]string, error) {
+	var root yaml.Node
+	if err := yaml.Unmarshal(content, &root); err != nil {
+		return nil, errors.Wrap(err, "failed to parse asset YAML")
+	}
+
+	schema := buildAssetYAMLFieldSchema(reflect.TypeOf(taskDefinition{}), map[reflect.Type]*assetYAMLFieldSchema{})
+	unknown := make([]string, 0)
+	collectUnknownAssetYAMLPaths(&root, schema, "", &unknown)
+	return unknown, nil
+}
+
+func buildAssetYAMLFieldSchema(t reflect.Type, cache map[reflect.Type]*assetYAMLFieldSchema) *assetYAMLFieldSchema {
+	if t == nil {
+		return &assetYAMLFieldSchema{children: map[string]*assetYAMLFieldSchema{}}
+	}
+
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t == nil {
+		return &assetYAMLFieldSchema{children: map[string]*assetYAMLFieldSchema{}}
+	}
+
+	if schema, ok := cache[t]; ok {
+		return schema
+	}
+
+	switch t.Kind() {
+	case reflect.Map, reflect.Interface:
+		schema := &assetYAMLFieldSchema{allowUnknown: true, children: map[string]*assetYAMLFieldSchema{}}
+		cache[t] = schema
+		return schema
+	case reflect.Slice, reflect.Array:
+		schema := buildAssetYAMLFieldSchema(t.Elem(), cache)
+		cache[t] = schema
+		return schema
+	case reflect.Struct:
+		schema := &assetYAMLFieldSchema{children: map[string]*assetYAMLFieldSchema{}}
+		cache[t] = schema
+
+		for i := range t.NumField() {
+			field := t.Field(i)
+			tag := field.Tag.Get("yaml")
+			if tag == "-" {
+				continue
+			}
+
+			name, inline := parseAssetYAMLTag(tag, field.Name)
+			child := buildAssetYAMLFieldSchema(field.Type, cache)
+
+			if inline {
+				for k, v := range child.children {
+					schema.children[k] = v
+				}
+				continue
+			}
+			if name == "" {
+				continue
+			}
+
+			schema.children[name] = child
+		}
+
+		return schema
+	default:
+		schema := &assetYAMLFieldSchema{children: map[string]*assetYAMLFieldSchema{}}
+		cache[t] = schema
+		return schema
+	}
+}
+
+func parseAssetYAMLTag(tag string, fallback string) (name string, inline bool) {
+	if tag == "" {
+		return strings.ToLower(fallback), false
+	}
+
+	parts := strings.Split(tag, ",")
+	fieldName := parts[0]
+	for _, opt := range parts[1:] {
+		if opt == "inline" {
+			return fieldName, true
+		}
+	}
+	return fieldName, false
+}
+
+func collectUnknownAssetYAMLPaths(node *yaml.Node, schema *assetYAMLFieldSchema, prefix string, out *[]string) {
+	if node == nil || schema == nil {
+		return
+	}
+
+	switch node.Kind {
+	case yaml.DocumentNode:
+		if len(node.Content) > 0 {
+			collectUnknownAssetYAMLPaths(node.Content[0], schema, prefix, out)
+		}
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			keyNode := node.Content[i]
+			valueNode := node.Content[i+1]
+			field := keyNode.Value
+
+			path := field
+			if prefix != "" {
+				path = prefix + "." + field
+			}
+
+			child, ok := schema.children[field]
+			if !ok {
+				*out = append(*out, path)
+				continue
+			}
+			if child.allowUnknown {
+				continue
+			}
+			collectUnknownAssetYAMLPaths(valueNode, child, path, out)
+		}
+	case yaml.SequenceNode:
+		for _, item := range node.Content {
+			collectUnknownAssetYAMLPaths(item, schema, prefix, out)
+		}
+	case yaml.ScalarNode, yaml.AliasNode:
+		return
+	}
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {

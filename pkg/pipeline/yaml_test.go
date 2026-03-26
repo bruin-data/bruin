@@ -422,3 +422,24 @@ hooks:
 		})
 	}
 }
+
+func TestUnknownAssetYAMLFieldPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns nested unknown paths", func(t *testing.T) {
+		t.Parallel()
+		content := []byte("name: test\ntype: bq.sql\nmaterialization:\n  type: table\n  typo_nested: true\ncolumns:\n  - name: id\n    type: int\n    typo_in_column: x\n")
+		unknown, err := pipeline.UnknownAssetYAMLFieldPaths(content)
+		require.NoError(t, err)
+		require.Len(t, unknown, 2)
+		require.ElementsMatch(t, []string{"materialization.typo_nested", "columns.typo_in_column"}, unknown)
+	})
+
+	t.Run("allows dynamic keys in map-like fields", func(t *testing.T) {
+		t.Parallel()
+		content := []byte("name: test\ntype: bq.sql\nparameters:\n  any_dynamic_key: any_value\nmeta:\n  owner: data\n")
+		unknown, err := pipeline.UnknownAssetYAMLFieldPaths(content)
+		require.NoError(t, err)
+		require.Empty(t, unknown)
+	})
+}
