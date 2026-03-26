@@ -726,7 +726,6 @@ def import_module_from_path(module_path: str, module_name: str):
 
 def convert_and_write(df):
     if df is None:
-        print("WARNING: materialize() returned None, skipping materialization", file=sys.stderr)
         return
 
     import pyarrow as pa
@@ -750,10 +749,15 @@ def convert_and_write(df):
     elif pl is not None and isinstance(df, pl.DataFrame):
         table = df.to_arrow()
     elif isinstance(df, (list, tuple)):
+        if not df:
+            return
         table = pa.Table.from_pylist(list(df))
     elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
         # Handle generators and other iterables (but not strings/bytes)
-        table = pa.Table.from_pylist(list(df))
+        rows = list(df)
+        if not rows:
+            return
+        table = pa.Table.from_pylist(rows)
     else:
         # Fallback: check type module/name for pandas/polars if isinstance failed
         # This handles edge cases where pandas/polars might not be importable
