@@ -358,9 +358,11 @@ def materialize(**kwargs):
 
 ### Using generators
 
-You can use `yield` in your `materialize()` function to produce data incrementally. This is useful when fetching data from paginated APIs or processing data in chunks.
+You can use `yield` in your `materialize()` function to produce data incrementally. This is useful when fetching data from paginated APIs or processing data in chunks. You can yield individual dicts or batches (lists of dicts):
 
-```bruin-python
+::: code-group
+
+```bruin-python [Yielding individual dicts]
 """@bruin
 name: tier1.paginated_api
 image: python:3.13
@@ -384,6 +386,32 @@ def materialize():
             yield item
         page += 1
 ```
+
+```bruin-python [Yielding batches]
+"""@bruin
+name: tier1.paginated_api_batch
+image: python:3.13
+connection: bigquery
+
+materialization:
+  type: table
+  strategy: append
+@bruin"""
+
+import requests
+
+def materialize():
+    page = 1
+    while True:
+        resp = requests.get(f"https://api.example.com/data?page={page}")
+        items = resp.json()["items"]
+        if not items:
+            break
+        yield items  # yield the entire page as a batch
+        page += 1
+```
+
+:::
 
 > [!NOTE]
 > All yielded items are collected into memory before being uploaded to the destination. For very large datasets, consider returning a pandas or polars DataFrame instead, which gives you more control over memory usage.
