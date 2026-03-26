@@ -3208,9 +3208,9 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "duckdb_query_show_list_columns",
 				Steps: []e2e.Task{
 					{
-						Name:    "duckdb-show-01: create table so SHOW returns rows with LIST-typed metadata",
+						Name:    "duckdb-show-01: run pipeline so SHOW returns rows with LIST-typed metadata",
 						Command: binary,
-						Args:    []string{"query", "--env", "env-duckdb-show-query", "--connection", "duckdb-show-query", "--query", "CREATE TABLE bruin_show_int_test (id INT);"},
+						Args:    []string{"run", "--env", "env-duckdb-show-query", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/duckdb-query-show-pipeline")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
