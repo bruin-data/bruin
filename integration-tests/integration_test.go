@@ -3202,6 +3202,46 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "duckdb_query_show_list_columns",
+			workflow: e2e.Workflow{
+				Name: "duckdb_query_show_list_columns",
+				Steps: []e2e.Task{
+					{
+						Name:    "duckdb-show-01: create table so SHOW returns rows with LIST-typed metadata",
+						Command: binary,
+						Args:    []string{"query", "--env", "env-duckdb-show-query", "--connection", "duckdb-show-query", "--query", "CREATE TABLE bruin_show_int_test (id INT);"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "duckdb-show-02: SHOW succeeds via bruin query (Arrow LIST columns)",
+						Command: binary,
+						Args:    []string{"query", "--env", "env-duckdb-show-query", "--connection", "duckdb-show-query", "--query", "SHOW;", "--output", "json"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{
+								`"name":"column_names"`,
+								`"name":"column_types"`,
+								`"type":"VARCHAR"`,
+								"bruin_show_int_test",
+								"[id]",
+							},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

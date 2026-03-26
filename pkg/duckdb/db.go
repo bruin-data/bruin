@@ -248,6 +248,11 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 		// Scan the result into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
+			if isUnsupportedComplexTypeScanError(err) {
+				// Release the first result set before issuing the fallback query on the same connection.
+				_ = rows.Close()
+				return c.selectWithCastedColumns(ctx, query.String(), cols)
+			}
 			return nil, err
 		}
 
@@ -323,6 +328,16 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 
 		// Scan the result into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
+			if isUnsupportedComplexTypeScanError(err) {
+				// Release the first result set before issuing the fallback query on the same connection.
+				_ = rows.Close()
+				rowsFallback, fallbackErr := c.selectWithCastedColumns(ctx, queryObject.String(), cols)
+				if fallbackErr != nil {
+					return nil, fallbackErr
+				}
+				result.Rows = rowsFallback
+				return result, nil
+			}
 			return nil, err
 		}
 
@@ -332,6 +347,72 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 		}
 
 		result.Rows = append(result.Rows, columns)
+	}
+
+	return result, nil
+}
+
+func isUnsupportedComplexTypeScanError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "not yet implemented populating from columns of type list<") ||
+		strings.Contains(msg, "not yet implemented populating from columns of type struct<") ||
+		strings.Contains(msg, "not yet implemented populating from columns of type map<")
+}
+
+func buildCastedColumnsQuery(queryText string, columns []string) string {
+	trimmedQuery := strings.TrimSpace(queryText)
+	trimmedQuery = strings.TrimSuffix(trimmedQuery, ";")
+
+	if len(columns) == 0 {
+		return trimmedQuery
+	}
+
+	projections := make([]string, len(columns))
+	for i, col := range columns {
+		quoted := quoteIdentifier(col)
+		projections[i] = fmt.Sprintf("CAST(%s AS VARCHAR) AS %s", quoted, quoted)
+	}
+
+	return fmt.Sprintf("SELECT %s FROM (%s) AS __bruin_complex_type_query", strings.Join(projections, ", "), trimmedQuery)
+}
+
+func quoteIdentifier(identifier string) string {
+	return `"` + strings.ReplaceAll(identifier, `"`, `""`) + `"`
+}
+
+func (c *Client) selectWithCastedColumns(ctx context.Context, queryText string, columns []string) ([][]interface{}, error) {
+	castedQuery := buildCastedColumnsQuery(queryText, columns)
+	rows, err := c.connection.QueryContext(ctx, castedQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([][]interface{}, 0)
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		pointers := make([]interface{}, len(columns))
+		for i := range values {
+			pointers[i] = &values[i]
+		}
+
+		if err := rows.Scan(pointers...); err != nil {
+			return nil, err
+		}
+
+		for i, val := range values {
+			values[i] = c.convertValueWithType(val, columnTypes[i])
+		}
+		result = append(result, values)
 	}
 
 	return result, nil
