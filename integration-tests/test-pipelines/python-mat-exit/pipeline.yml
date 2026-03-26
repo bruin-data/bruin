@@ -1,6 +1,0 @@
-name: python-mat-exit
-schedule: daily
-start_date: "2023-03-20"
-
-default_connections:
-    duckdb: duckdb-python-mat-exit

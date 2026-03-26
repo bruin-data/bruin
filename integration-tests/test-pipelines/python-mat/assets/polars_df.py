@@ -2,7 +2,7 @@
 name: mat.polars_df
 materialization:
     type: table
-connection: duckdb-python-mat-polars
+connection: duckdb-python-mat
 @bruin """
 
 import polars as pl

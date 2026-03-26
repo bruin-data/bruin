@@ -2,7 +2,7 @@
 name: mat.exception
 materialization:
     type: table
-connection: duckdb-python-mat-exception
+connection: duckdb-python-mat-errors
 @bruin """
 
 

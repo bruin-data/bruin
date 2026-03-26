@@ -469,12 +469,23 @@
       },
       "schema_prefix": ""
     },
-    "env-run-python-materialization": {
+    "env-python-mat": {
       "connections": {
         "duckdb": [
           {
-            "name": "duckdb-run-python-materialization",
-            "path": "duckdb-files/run-python-materialization.db"
+            "name": "duckdb-python-mat",
+            "path": "duckdb-files/python-mat.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-python-mat-errors": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-python-mat-errors",
+            "path": "duckdb-files/python-mat-errors.db"
           }
         ]
       },

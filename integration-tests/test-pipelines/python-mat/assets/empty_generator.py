@@ -2,7 +2,7 @@
 name: mat.empty_generator
 materialization:
     type: table
-connection: duckdb-python-mat-empty-generator
+connection: duckdb-python-mat
 @bruin """
 
 

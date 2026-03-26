@@ -2,7 +2,7 @@
 name: mat.exit
 materialization:
     type: table
-connection: duckdb-python-mat-exit
+connection: duckdb-python-mat-errors
 @bruin """
 
 import sys
