@@ -52,7 +52,11 @@ type mockWriter struct {
 }
 
 func (m *mockWriter) Write(p []byte) (int, error) {
-	res := m.Called(p)
+	// Copy the byte slice to avoid a data race: fmt.Fprintf reuses its internal
+	// buffer, and testify's AssertExpectations reads stored arguments concurrently.
+	cp := make([]byte, len(p))
+	copy(cp, p)
+	res := m.Called(cp)
 	return res.Int(0), res.Error(1)
 }
 
