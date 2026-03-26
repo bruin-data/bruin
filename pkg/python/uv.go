@@ -753,10 +753,18 @@ def convert_and_write(df):
             return
         table = pa.Table.from_pylist(list(df))
     elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
-        # Handle generators and other iterables (but not strings/bytes)
+        # Handle generators and other iterables (but not strings/bytes).
+        # Generators can yield in two ways:
+        #   1. yield individual dicts:  yield {"col": val}
+        #   2. yield batches (lists of dicts): yield [{"col": val}, ...]
+        # The second pattern is common with paginated APIs where each page
+        # returns a list of records. We detect this by checking if the first
+        # collected element is a list/tuple and flatten one level if so.
         rows = list(df)
         if not rows:
             return
+        if isinstance(rows[0], (list, tuple)):
+            rows = [item for batch in rows for item in batch]
         table = pa.Table.from_pylist(rows)
     else:
         # Fallback: check type module/name for pandas/polars if isinstance failed
