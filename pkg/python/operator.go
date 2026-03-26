@@ -126,6 +126,31 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		logger.Debugf("no dependency configuration found, running without dependencies")
 	}
 
+	// Check for duplicate injected keys across all secret mappings.
+	// seenInjected tracks which env var names have been claimed and by which secret key.
+	// seenMappings tracks exact (SecretKey, InjectedKey) pairs to detect full duplicates.
+	seenInjected := make(map[string]string)   // env var name -> secret key that first claimed it
+	seenMappings := make(map[string]struct{}) // "SecretKey:InjectedKey" -> exists
+	for _, mapping := range t.Secrets {
+		mappingKey := mapping.SecretKey + ":" + mapping.InjectedKey
+		if _, exists := seenMappings[mappingKey]; exists {
+			return fmt.Errorf("duplicate secret mapping: secret '%s' is injected as '%s' more than once", mapping.SecretKey, mapping.InjectedKey)
+		}
+		seenMappings[mappingKey] = struct{}{}
+
+		if prev, exists := seenInjected[mapping.InjectedKey]; exists && prev != mapping.SecretKey {
+			return fmt.Errorf("duplicate env var name '%s': secrets '%s' and '%s' both inject as '%s'", mapping.InjectedKey, prev, mapping.SecretKey, mapping.InjectedKey)
+		}
+		seenInjected[mapping.InjectedKey] = mapping.SecretKey
+
+		if mapping.SecretKey != mapping.InjectedKey {
+			if prev, exists := seenInjected[mapping.SecretKey]; exists && prev != mapping.SecretKey {
+				return fmt.Errorf("secret key '%s' conflicts with env var already claimed by secret '%s'", mapping.SecretKey, prev)
+			}
+			seenInjected[mapping.SecretKey] = mapping.SecretKey
+		}
+	}
+
 	// Create a copy of environment variables to avoid race conditions when multiple goroutines
 	// are running concurrently and modifying the same map
 	envCopy := make(map[string]string, len(o.envVariables))
@@ -158,11 +183,17 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		connType := o.config.GetConnectionType(mapping.SecretKey)
 		if connType != "" {
 			connectionTypes[mapping.InjectedKey] = connType
+			if mapping.SecretKey != mapping.InjectedKey {
+				connectionTypes[mapping.SecretKey] = connType
+			}
 		}
 
 		val, ok := conn.(*config.GenericConnection)
 		if ok {
 			envVariables[mapping.InjectedKey] = val.Value
+			if mapping.SecretKey != mapping.InjectedKey {
+				envVariables[mapping.SecretKey] = val.Value
+			}
 			continue
 		}
 
@@ -171,6 +202,9 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 			return errors.Wrapf(err, "failed to marshal connection")
 		}
 		envVariables[mapping.InjectedKey] = string(res)
+		if mapping.SecretKey != mapping.InjectedKey {
+			envVariables[mapping.SecretKey] = string(res)
+		}
 	}
 
 	if len(connectionTypes) > 0 {
