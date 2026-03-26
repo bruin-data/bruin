@@ -491,6 +491,17 @@
       },
       "schema_prefix": ""
     },
+    "env-python-mat-merge": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-python-mat-merge",
+            "path": "duckdb-files/python-mat-merge.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-run-seed-data": {
       "connections": {
         "duckdb": [
