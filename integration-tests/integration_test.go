@@ -3210,7 +3210,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "python_mat: run all success/skip assets",
 						Command: binary,
-						Args:    []string{"run", "--env", "env-python-mat", filepath.Join(currentFolder, "test-pipelines/python-mat")},
+						Args:    []string{"run", "--workers", "1", "--env", "env-python-mat", filepath.Join(currentFolder, "test-pipelines/python-mat")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -3236,6 +3236,7 @@ func TestWorkflowTasks(t *testing.T) {
 						Command: binary,
 						Args: []string{
 							"query",
+							"--env", "env-python-mat",
 							"--connection", "duckdb-python-mat",
 							"--query", "SELECT count(*) AS cnt FROM mat.yield_dicts",
 						},
@@ -3254,6 +3255,7 @@ func TestWorkflowTasks(t *testing.T) {
 						Command: binary,
 						Args: []string{
 							"query",
+							"--env", "env-python-mat",
 							"--connection", "duckdb-python-mat",
 							"--query", "SELECT count(*) AS cnt FROM mat.yield_batches",
 						},
@@ -3272,6 +3274,7 @@ func TestWorkflowTasks(t *testing.T) {
 						Command: binary,
 						Args: []string{
 							"query",
+							"--env", "env-python-mat",
 							"--connection", "duckdb-python-mat",
 							"--query", "SELECT count(*) AS cnt FROM mat.pandas_df",
 						},
@@ -3290,6 +3293,7 @@ func TestWorkflowTasks(t *testing.T) {
 						Command: binary,
 						Args: []string{
 							"query",
+							"--env", "env-python-mat",
 							"--connection", "duckdb-python-mat",
 							"--query", "SELECT count(*) AS cnt FROM mat.polars_df",
 						},
@@ -3366,6 +3370,7 @@ func TestWorkflowTasks(t *testing.T) {
 						Command: binary,
 						Args: []string{
 							"query",
+							"--env", "env-python-mat-merge",
 							"--connection", "duckdb-python-mat-merge",
 							"--query", "SELECT count(*) AS cnt FROM mat.merge_test",
 						},

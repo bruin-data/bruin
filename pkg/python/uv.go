@@ -726,7 +726,7 @@ def import_module_from_path(module_path: str, module_name: str):
 
 def convert_and_write(df):
     if df is None:
-        return
+        return  # Go-side will detect missing arrow file and log a warning
 
     import pyarrow as pa
     import pyarrow.ipc as ipc
