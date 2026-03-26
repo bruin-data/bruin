@@ -2,7 +2,7 @@
 name: mat.yield_batches
 materialization:
     type: table
-connection: duckdb-python-mat-yield-batches
+connection: duckdb-python-mat
 @bruin """
 
 

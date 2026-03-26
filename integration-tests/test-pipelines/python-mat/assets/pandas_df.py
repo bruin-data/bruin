@@ -2,7 +2,7 @@
 name: mat.pandas_df
 materialization:
     type: table
-connection: duckdb-python-mat-pandas
+connection: duckdb-python-mat
 @bruin """
 
 import pandas as pd

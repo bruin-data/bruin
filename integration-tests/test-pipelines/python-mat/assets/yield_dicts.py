@@ -2,7 +2,7 @@
 name: mat.yield_dicts
 materialization:
     type: table
-connection: duckdb-python-mat-yield-dicts
+connection: duckdb-python-mat
 @bruin """
 
 

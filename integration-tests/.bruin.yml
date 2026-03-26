@@ -156,11 +156,17 @@ environments:
           players:
             - "MagnusCarlsen"
             - "Hikaru"
-  env-run-python-materialization:
+  env-python-mat:
     connections:
       duckdb:
-        - name: "duckdb-run-python-materialization"
-          path: "duckdb-files/run-python-materialization.db"
+        - name: "duckdb-python-mat"
+          path: "duckdb-files/python-mat.db"
+
+  env-python-mat-errors:
+    connections:
+      duckdb:
+        - name: "duckdb-python-mat-errors"
+          path: "duckdb-files/python-mat-errors.db"
 
   env-python-pyproject-materialization:
     connections:
@@ -275,60 +281,6 @@ environments:
       duckdb:
         - name: "duckdb-query-var"
           path: "duckdb-files/query-var.db"
-
-  env-python-mat-yield-dicts:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-yield-dicts"
-          path: "duckdb-files/python-mat-yield-dicts.db"
-
-  env-python-mat-yield-batches:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-yield-batches"
-          path: "duckdb-files/python-mat-yield-batches.db"
-
-  env-python-mat-none:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-none"
-          path: "duckdb-files/python-mat-none.db"
-
-  env-python-mat-empty-generator:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-empty-generator"
-          path: "duckdb-files/python-mat-empty-generator.db"
-
-  env-python-mat-empty-list:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-empty-list"
-          path: "duckdb-files/python-mat-empty-list.db"
-
-  env-python-mat-exception:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-exception"
-          path: "duckdb-files/python-mat-exception.db"
-
-  env-python-mat-exit:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-exit"
-          path: "duckdb-files/python-mat-exit.db"
-
-  env-python-mat-pandas:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-pandas"
-          path: "duckdb-files/python-mat-pandas.db"
-
-  env-python-mat-polars:
-    connections:
-      duckdb:
-        - name: "duckdb-python-mat-polars"
-          path: "duckdb-files/python-mat-polars.db"
 
   env-python-mat-merge:
     connections:
