@@ -413,9 +413,6 @@ def materialize():
 
 :::
 
-> [!NOTE]
-> All yielded items are collected into memory before being uploaded to the destination. For very large datasets, consider returning a pandas or polars DataFrame instead, which gives you more control over memory usage.
-
 If `materialize()` returns `None`, Bruin will skip materialization with a warning instead of failing the pipeline. This is useful when there is no data to materialize for a given run.
 
 ### Under the hood
