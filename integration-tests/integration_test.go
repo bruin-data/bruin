@@ -3612,6 +3612,159 @@ func TestIngestrTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "run-python-mat-yield-dicts",
+			task: e2e.Task{
+				Name:    "run-python-mat-yield-dicts",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-yield-dicts", filepath.Join(currentFolder, "test-pipelines/python-mat-yield-dicts")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: mat.yield_dicts"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-mat-yield-batches",
+			task: e2e.Task{
+				Name:    "run-python-mat-yield-batches",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-yield-batches", filepath.Join(currentFolder, "test-pipelines/python-mat-yield-batches")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: mat.yield_batches"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-mat-none",
+			task: e2e.Task{
+				Name:    "run-python-mat-none",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-none", filepath.Join(currentFolder, "test-pipelines/python-mat-none")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: mat.none_return", "materialize() returned None, skipping materialization"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-mat-empty-generator",
+			task: e2e.Task{
+				Name:    "run-python-mat-empty-generator",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-empty-generator", filepath.Join(currentFolder, "test-pipelines/python-mat-empty-generator")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: mat.empty_generator", "materialize() returned None, skipping materialization"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-mat-empty-list",
+			task: e2e.Task{
+				Name:    "run-python-mat-empty-list",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-empty-list", filepath.Join(currentFolder, "test-pipelines/python-mat-empty-list")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: mat.empty_list", "materialize() returned None, skipping materialization"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-mat-exception",
+			task: e2e.Task{
+				Name:    "run-python-mat-exception",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-exception", filepath.Join(currentFolder, "test-pipelines/python-mat-exception")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{"Failed: mat.exception", "failed to run asset code"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-mat-exit",
+			task: e2e.Task{
+				Name:    "run-python-mat-exit",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-exit", filepath.Join(currentFolder, "test-pipelines/python-mat-exit")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{"Failed: mat.exit", "failed to run asset code"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-mat-pandas",
+			task: e2e.Task{
+				Name:    "run-python-mat-pandas",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-pandas", filepath.Join(currentFolder, "test-pipelines/python-mat-pandas")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: mat.pandas_df"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "run-python-mat-polars",
+			task: e2e.Task{
+				Name:    "run-python-mat-polars",
+				Command: binary,
+				Args:    []string{"run", "--env", "env-python-mat-polars", filepath.Join(currentFolder, "test-pipelines/python-mat-polars")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: mat.polars_df"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "run-python-pyproject-materialization",
 			task: e2e.Task{
 				Name:    "run-python-pyproject-materialization",
