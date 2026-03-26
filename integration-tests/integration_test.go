@@ -3406,6 +3406,60 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "python_mat_merge",
+			workflow: e2e.Workflow{
+				Name: "python_mat_merge",
+				Steps: []e2e.Task{
+					{
+						Name:    "merge: first run (creates table)",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-python-mat-merge", filepath.Join(currentFolder, "test-pipelines/python-mat-merge")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: mat.merge_test"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "merge: second run (merges same data)",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-python-mat-merge", filepath.Join(currentFolder, "test-pipelines/python-mat-merge")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: mat.merge_test"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "merge: verify no duplicates after merge",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--connection", "duckdb-python-mat-merge",
+							"--query", "SELECT count(*) AS cnt FROM mat.merge_test",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 3   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
