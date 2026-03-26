@@ -262,3 +262,52 @@ parameters:
   destination: bigquery
   cdc: "true"
 ```
+
+### `pg.source`
+
+Defines PostgreSQL source assets for documenting existing tables and views in your PostgreSQL database. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing PostgreSQL tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing PostgreSQL table
+
+```yaml
+name: public.orders
+type: pg.source
+description: "All customer orders with their current status and totals"
+connection: postgres-default
+
+tags:
+  - ecommerce
+  - transactions
+domains:
+  - sales
+
+meta:
+  business_owner: "Sales Team"
+  data_steward: "data-eng@company.com"
+  refresh_frequency: "daily"
+
+depends:
+  - public.customers
+
+columns:
+  - name: order_id
+    type: "SERIAL"
+    description: "Auto-incrementing unique identifier for each order"
+  - name: customer_id
+    type: "INTEGER"
+    description: "Foreign key referencing the customers table"
+  - name: total_amount
+    type: "NUMERIC(12,2)"
+    description: "Total monetary value of the order"
+  - name: order_date
+    type: "TIMESTAMPTZ"
+    description: "Timestamp when the order was placed"
+  - name: status
+    type: "VARCHAR(50)"
+    description: "Current order status such as pending, shipped, or delivered"
+```

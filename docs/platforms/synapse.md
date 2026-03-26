@@ -58,7 +58,7 @@ from temp_orders
 group by customer_id;
 ```
 
-### `ms.sensor.table`
+### `synapse.sensor.table`
 
 Sensors are a special type of assets that are used to wait on certain external signals.
 
@@ -155,4 +155,53 @@ Example CSV:
 name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
+```
+
+### `synapse.source`
+
+Defines Synapse source assets for documenting existing tables and views in your Synapse database. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing Synapse tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing Synapse table
+
+```yaml
+name: dbo.inventory
+type: synapse.source
+description: "Current inventory levels across all warehouses"
+connection: synapse-default
+
+tags:
+  - inventory
+  - logistics
+domains:
+  - supply-chain
+
+meta:
+  business_owner: "Logistics Team"
+  data_steward: "warehouse-ops@company.com"
+  refresh_frequency: "daily"
+
+depends:
+  - dbo.products
+
+columns:
+  - name: item_id
+    type: "INT"
+    description: "Unique identifier for each inventory item"
+  - name: product_name
+    type: "NVARCHAR(300)"
+    description: "Name of the product"
+  - name: quantity
+    type: "INT"
+    description: "Current quantity in stock"
+  - name: last_updated
+    type: "DATETIME2"
+    description: "Timestamp of the last inventory update"
+  - name: warehouse_code
+    type: "VARCHAR(20)"
+    description: "Code identifying the warehouse location"
 ```

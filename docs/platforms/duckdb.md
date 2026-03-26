@@ -318,3 +318,56 @@ connection: example-conn
 SELECT SUM(amount) as total_sales
 FROM orders;
 ```
+
+### `duckdb.source`
+
+Defines DuckDB source assets for documenting existing tables and views in your DuckDB database. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing DuckDB tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing DuckDB table
+
+```yaml
+name: main.raw_events
+type: duckdb.source
+description: "Raw event data loaded from external sources"
+connection: duckdb-default
+
+tags:
+  - raw-data
+  - events
+domains:
+  - analytics
+
+meta:
+  business_owner: "Data Team"
+  data_steward: "data@company.com"
+  refresh_frequency: "daily"
+
+depends:
+  - main.event_types
+
+columns:
+  - name: event_id
+    type: "VARCHAR"
+    description: "Unique identifier for each event"
+
+  - name: user_id
+    type: "VARCHAR"
+    description: "Identifier of the user who triggered the event"
+
+  - name: event_type
+    type: "VARCHAR"
+    description: "Type of event"
+
+  - name: created_at
+    type: "TIMESTAMP"
+    description: "Timestamp when the event was created"
+
+  - name: payload
+    type: "JSON"
+    description: "Event payload data"
+```
