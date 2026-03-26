@@ -329,3 +329,9 @@ environments:
       duckdb:
         - name: "duckdb-python-mat-polars"
           path: "duckdb-files/python-mat-polars.db"
+
+  env-python-mat-merge:
+    connections:
+      duckdb:
+        - name: "duckdb-python-mat-merge"
+          path: "duckdb-files/python-mat-merge.db"
