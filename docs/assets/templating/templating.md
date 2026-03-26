@@ -40,7 +40,7 @@ GROUP BY 1,2
 :::
 
 > [!TIP]
-> Need enumerations, numeric bounds, or nested structures for your variables? Consult the [Variables documentation](/core-concepts/variables#custom-variables) for the full list of `type` values and examples of arrays-of-objects and object-of-arrays patterns you can reuse in templated SQL.
+> Need enumerations, numeric bounds, or nested structures for your variables? Consult the [Variables documentation](/variables/custom) for the full list of `type` values and examples of arrays-of-objects and object-of-arrays patterns you can reuse in templated SQL.
 
 This will render into the following SQL query:
 
@@ -62,23 +62,9 @@ You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/
 
 ## Builtin variables
 
-Bruin injects various variables by default:
+Bruin injects various variables by default, including date/time values (`start_date`, `end_date`, `execution_date` and their `_datetime`, `_timestamp`, and `_nodash` variants), pipeline metadata (`pipeline`, `run_id`, `commit_hash`), and the `full_refresh` flag.
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `start_date` | The start date in YYYY-MM-DD format | "2023-12-01" |
-| `start_datetime` | The start date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-01T15:30:00" |
-| `start_timestamp` | The start timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-01T15:30:00.000000+07:00" |
-| `end_date` | The end date in YYYY-MM-DD format | "2023-12-02" |
-| `end_datetime` | The end date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-02T15:30:00" |
-| `end_timestamp` | The end timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-02T15:30:00.000000Z07:00" |
-| `execution_date` | The execution date in YYYY-MM-DD format | "2023-12-01" |
-| `execution_datetime` | The execution date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-01T15:30:00" |
-| `execution_timestamp` | The execution timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-01T15:30:00.000000Z07:00" |
-| `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
-| `run_id` | The unique identifier for the current pipeline run | `run_1234567890` |
-| `full_refresh` | Boolean indicating whether the `--full-refresh` flag was used | `True` or `False` |
-| `commit_hash` | The current git commit hash of the repository containing the pipeline | `"abc1234def5678..."` |
+See the **[complete built-in variables reference](/variables/built-in)** for the full list with descriptions and examples.
 
 You can use these variables in your SQL queries by referencing them with the `{{ }}` syntax:
 
@@ -186,4 +172,4 @@ You can read more about [Jinja conditionals](https://jinja.palletsprojects.com/e
 
 ## Custom variables
 
-You can define your own variables and use them across your Assets. See [Variables](/core-concepts/variables) for more information.
+You can define your own variables and use them across your Assets. See [Variables](/variables/overview) for more information.

@@ -233,7 +233,7 @@ The following environment variables are available in every Python asset executio
 | `BRUIN_CONNECTION`       | The connection name configured for the asset (only set if the asset has a `connection` defined)                   |
 | `BRUIN_CONNECTION_TYPES` | JSON object mapping secret injection keys to their connection types (e.g., `{"DATABASE": "postgres"}`). Only set if secrets are defined |
 | `BRUIN_VARS`            | JSON document containing all pipeline variables (see [Pipeline Variables](#pipeline) section below)              |
-| `BRUIN_VARS_SCHEMA`     | JSON document containing the schema definition for pipeline variables (see [Variables](/core-concepts/variables)) |
+| `BRUIN_VARS_SCHEMA`     | JSON document containing the schema definition for pipeline variables (see [Variables](/variables/overview)) |
 | `PYTHONUNBUFFERED`      | Set to `1` to enable unbuffered Python output for real-time logging                                               |
 
 ### Pipeline
@@ -242,7 +242,7 @@ Bruin supports user-defined variables at a pipeline level. These become availabl
 - `BRUIN_VARS`: Contains the actual variable values
 - `BRUIN_VARS_SCHEMA`: Contains the JSON Schema definition for the variables (useful for validation and type checking)
 
-When no variables exist, both `BRUIN_VARS` and `BRUIN_VARS_SCHEMA` are set to `{}`. See [Variables](/core-concepts/variables) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/core-concepts/variables#custom-variables).
+When no variables exist, both `BRUIN_VARS` and `BRUIN_VARS_SCHEMA` are set to `{}`. See [Variables](/variables/overview) for more information on how to define and override them, including the [full list of JSON Schema `type` options and complementary keywords](/variables/custom).
 
 Here's a short example:
 ::: code-group

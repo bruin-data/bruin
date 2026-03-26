@@ -413,11 +413,6 @@ Secrets item:
 ### Variables
 
 Define pipeline-scoped parameters with safe defaults so you can change behavior without editing code.
-Great for steering business logic (e.g., targeting a customer segment) or tuning data science parameters (e.g., forecast horizons).
-
-See also: [Variables](/core-concepts/variables).
-
-Example:
 
 ```yaml
 variables:
@@ -430,41 +425,10 @@ variables:
     minimum: 7
     maximum: 90
     default: 30
-  experiment_cohorts:
-    type: array
-    items:
-      type: object
-      required: [name, weight, channels]
-      properties:
-        name:
-          type: string
-        weight:
-          type: number
-        channels:
-          type: array
-          items:
-            type: string
-    default:
-      - name: enterprise_baseline
-        weight: 0.6
-        channels: ["email", "customer_success"]
-  channel_overrides:
-    type: object
-    properties:
-      email:
-        type: array
-        items:
-          type: string
-    default:
-      email: ["enterprise_newsletter"]
 ```
 
 - **Type:** `Object (map[string]variable-schema)`
 
-Variable schema fields (subset):
+Each variable must include a `default` value. Variables are defined using [JSON Schema draft-07](https://json-schema.org/draft-07/json-schema-release-notes.html) keywords.
 
-| Field   | Type   | Required | Notes                                                                                   |
-|---------|--------|----------|-----------------------------------------------------------------------------------------|
-| type    | String | no       | JSON Schema type: string, integer, number, boolean, object, array, null. See [Variables](/core-concepts/variables#custom-variables) for details and examples. |
-| default | any    | yes      | REQUIRED. Must be present; used as the variable value unless overridden                 |
-| enum    | Array  | no       | Restrict values to a fixed list (e.g. `enum: ["self_serve", "enterprise", "partner"]`). See [Variables documentation](/core-concepts/variables#custom-variables) for more JSON Schema keywords you can use. |
+See the **[Variables reference](/variables/overview)** for the full list of supported types, keywords (`enum`, `minimum`, `pattern`, etc.), complex type examples, and runtime overrides.
