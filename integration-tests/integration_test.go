@@ -3412,9 +3412,9 @@ func TestWorkflowTasks(t *testing.T) {
 				Name: "python_mat_merge",
 				Steps: []e2e.Task{
 					{
-						Name:    "merge: first run (creates table)",
+						Name:    "merge: first run (Jan 1-15, inserts ids 1,2,3)",
 						Command: binary,
-						Args:    []string{"run", "--env", "env-python-mat-merge", filepath.Join(currentFolder, "test-pipelines/python-mat-merge")},
+						Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-01-15", "--env", "env-python-mat-merge", filepath.Join(currentFolder, "test-pipelines/python-mat-merge")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -3426,9 +3426,9 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "merge: second run (merges same data)",
+						Name:    "merge: second run (Jan 10-31, merges ids 2,3 and inserts 4,5)",
 						Command: binary,
-						Args:    []string{"run", "--env", "env-python-mat-merge", filepath.Join(currentFolder, "test-pipelines/python-mat-merge")},
+						Args:    []string{"run", "--start-date", "2024-01-10", "--end-date", "2024-01-31", "--env", "env-python-mat-merge", filepath.Join(currentFolder, "test-pipelines/python-mat-merge")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -3440,7 +3440,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "merge: verify no duplicates after merge",
+						Name:    "merge: verify 5 unique rows (no duplicates from overlapping ids 2,3)",
 						Command: binary,
 						Args: []string{
 							"query",
@@ -3450,7 +3450,7 @@ func TestWorkflowTasks(t *testing.T) {
 						WorkingDir: currentFolder,
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 3   │\n└─────┘\n",
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 5   │\n└─────┘\n",
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
