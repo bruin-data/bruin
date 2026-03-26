@@ -455,6 +455,12 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		output = ctx.Value(executor.KeyPrinter).(io.Writer)
 	}
 
+	// Check if the arrow file was created (materialize() may return None)
+	if _, err := os.Stat(arrowFilePath); os.IsNotExist(err) {
+		_, _ = output.Write([]byte("WARNING: materialize() returned None, skipping materialization\n"))
+		return nil
+	}
+
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
 	if len(asset.Parameters) == 0 {
@@ -718,61 +724,66 @@ def import_module_from_path(module_path: str, module_name: str):
 
     return importlib.import_module(module_name)
 
-module = import_module_from_path("$REPO_ROOT", "$MODULE_PATH")
-df = module.materialize()
+def convert_and_write(df):
+    if df is None:
+        print("WARNING: materialize() returned None, skipping materialization", file=sys.stderr)
+        return
 
-import pyarrow as pa
-import pyarrow.ipc as ipc
+    import pyarrow as pa
+    import pyarrow.ipc as ipc
 
-# Try importing pandas and polars for isinstance checks
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
+    # Try importing pandas and polars for isinstance checks
+    try:
+        import pandas as pd
+    except ImportError:
+        pd = None
 
-try:
-    import polars as pl
-except ImportError:
-    pl = None
+    try:
+        import polars as pl
+    except ImportError:
+        pl = None
 
-# Use isinstance() for robust type checking across pandas/polars versions
-# This works across all pandas versions (including 3.0+) regardless of string representation
-if pd is not None and isinstance(df, pd.DataFrame):
-    table = pa.Table.from_pandas(df)
-elif pl is not None and isinstance(df, pl.DataFrame):
-    table = df.to_arrow()
-elif isinstance(df, (list, tuple)):
-    table = pa.Table.from_pylist(list(df))
-elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
-    # Handle generators and other iterables (but not strings/bytes)
-    table = pa.Table.from_pylist(list(df))
-else:
-    # Fallback: check type module/name for pandas/polars if isinstance failed
-    # This handles edge cases where pandas/polars might not be importable
-    type_name = type(df).__name__
-    type_module = type(df).__module__
-    if 'pandas' in type_module and type_name == 'DataFrame':
-        # Try to import pandas if not already imported
-        try:
-            import pandas as pd
-            table = pa.Table.from_pandas(df)
-        except ImportError:
-            raise TypeError(f"Unsupported return type: {type(df)}. pandas DataFrame detected but pandas cannot be imported.")
-    elif 'polars' in type_module and type_name == 'DataFrame':
-        # Try to import polars if not already imported
-        try:
-            import polars as pl
-            table = df.to_arrow()
-        except ImportError:
-            raise TypeError(f"Unsupported return type: {type(df)}. polars DataFrame detected but polars cannot be imported.")
+    # Use isinstance() for robust type checking across pandas/polars versions
+    # This works across all pandas versions (including 3.0+) regardless of string representation
+    if pd is not None and isinstance(df, pd.DataFrame):
+        table = pa.Table.from_pandas(df)
+    elif pl is not None and isinstance(df, pl.DataFrame):
+        table = df.to_arrow()
+    elif isinstance(df, (list, tuple)):
+        table = pa.Table.from_pylist(list(df))
+    elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
+        # Handle generators and other iterables (but not strings/bytes)
+        table = pa.Table.from_pylist(list(df))
     else:
-        raise TypeError(f"Unsupported return type: {type(df)}")
+        # Fallback: check type module/name for pandas/polars if isinstance failed
+        # This handles edge cases where pandas/polars might not be importable
+        type_name = type(df).__name__
+        type_module = type(df).__module__
+        if 'pandas' in type_module and type_name == 'DataFrame':
+            # Try to import pandas if not already imported
+            try:
+                import pandas as pd
+                table = pa.Table.from_pandas(df)
+            except ImportError:
+                raise TypeError(f"Unsupported return type: {type(df)}. pandas DataFrame detected but pandas cannot be imported.")
+        elif 'polars' in type_module and type_name == 'DataFrame':
+            # Try to import polars if not already imported
+            try:
+                import polars as pl
+                table = df.to_arrow()
+            except ImportError:
+                raise TypeError(f"Unsupported return type: {type(df)}. polars DataFrame detected but polars cannot be imported.")
+        else:
+            raise TypeError(f"Unsupported return type: {type(df)}")
 
-# Write to memory mapped file
-with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
-	writer = ipc.new_file(f, table.schema)
-	writer.write_table(table)
-	writer.close()
+    # Write to memory mapped file
+    with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
+        writer = ipc.new_file(f, table.schema)
+        writer.write_table(table)
+        writer.close()
+
+module = import_module_from_path("$REPO_ROOT", "$MODULE_PATH")
+convert_and_write(module.materialize())
 `
 
 type SqlfluffRunner struct {
