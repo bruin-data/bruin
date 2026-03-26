@@ -153,8 +153,8 @@ func bufferRows(ctx context.Context, db *sql.DB, originalQuery string, rows *sql
 			if err2 != nil {
 				return nil, err2
 			}
-			// Keep db so a second fallback can run if the driver still reports complex Arrow types for CAST output.
-			return bufferRows(ctx, db, casted, rows2)
+			// Pass nil for db so we only retry once; avoids unbounded recursion if the casted query still fails.
+			return bufferRows(ctx, nil, casted, rows2)
 		}
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func bufferRows(ctx context.Context, db *sql.DB, originalQuery string, rows *sql
 				if err2 != nil {
 					return nil, err2
 				}
-				return bufferRows(ctx, db, casted, rows2)
+				return bufferRows(ctx, nil, casted, rows2)
 			}
 			return nil, err
 		}
@@ -194,7 +194,7 @@ func bufferRows(ctx context.Context, db *sql.DB, originalQuery string, rows *sql
 			if err2 != nil {
 				return nil, err2
 			}
-			return bufferRows(ctx, db, casted, rows2)
+			return bufferRows(ctx, nil, casted, rows2)
 		}
 		return nil, err
 	}

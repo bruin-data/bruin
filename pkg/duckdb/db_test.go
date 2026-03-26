@@ -313,6 +313,7 @@ func TestDB_SelectWithSchema_ListColumnScanErrorFallsBackToCastedQuery(t *testin
 	result, err := db.SelectWithSchema(t.Context(), &query.Query{Query: "SHOW;"})
 	require.NoError(t, err)
 	require.Equal(t, []string{"result"}, result.Columns)
+	require.Equal(t, []string{"VARCHAR"}, result.ColumnTypes)
 	require.Equal(t, [][]interface{}{{"main"}}, result.Rows)
 	require.Len(t, conn.queries, 2)
 	require.Equal(t, "SHOW;", conn.queries[0])

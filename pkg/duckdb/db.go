@@ -336,6 +336,9 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 					return nil, fallbackErr
 				}
 				result.Rows = rowsFallback
+				for i := range result.ColumnTypes {
+					result.ColumnTypes[i] = "VARCHAR"
+				}
 				return result, nil
 			}
 			return nil, err
@@ -413,6 +416,10 @@ func (c *Client) selectWithCastedColumns(ctx context.Context, queryText string, 
 			values[i] = c.convertValueWithType(val, columnTypes[i])
 		}
 		result = append(result, values)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return result, nil
