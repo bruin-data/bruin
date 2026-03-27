@@ -560,11 +560,15 @@ func PingConnection() *cli.Command {
 
 // printConnectionTestErrorJSON outputs a connection test error in JSON format.
 func printConnectionTestErrorJSON(name string, errMsg string) {
-	jsonOutput := map[string]interface{}{
+	jsonOutput := map[string]string{
 		"status":     "error",
 		"connection": name,
 		"error":      errMsg,
 	}
-	jsonBytes, _ := json.Marshal(jsonOutput)
+	jsonBytes, err := json.Marshal(jsonOutput)
+	if err != nil {
+		errorPrinter.Printf("failed to marshal error JSON: %v\n", err)
+		return
+	}
 	fmt.Println(string(jsonBytes))
 }

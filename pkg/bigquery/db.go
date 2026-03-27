@@ -642,7 +642,7 @@ Or provide explicit credentials by adding service_account_file to your connectio
 	// Generic fallback with helpful context
 	return &BigQueryConnectionError{
 		ProjectID:   projectID,
-		Issue:       fmt.Sprintf("Failed to connect to BigQuery: %s", errStr),
+		Issue:       "Failed to connect to BigQuery: " + errStr,
 		Hint:        "Run 'bruin connections test --name <connection-name>' to debug connection issues.",
 		OriginalErr: err,
 	}
