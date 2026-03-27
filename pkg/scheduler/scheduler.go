@@ -369,14 +369,18 @@ func (s *Scheduler) MarkAll(status TaskInstanceStatus) {
 	}
 }
 
-func (s *Scheduler) MarkAsset(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) {
+func (s *Scheduler) MarkAsset(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) bool {
 	instancesByType := s.taskNameMap[task.Name]
+	if len(instancesByType) == 0 {
+		return false
+	}
 	visited := make(map[TaskInstance]struct{})
 	for _, instance := range instancesByType {
 		for _, i := range instance {
 			s.markTaskInstance(i, status, downstream, visited)
 		}
 	}
+	return true
 }
 
 func (s *Scheduler) MarkPendingInstancesByType(instanceType TaskInstanceType, status TaskInstanceStatus) {
