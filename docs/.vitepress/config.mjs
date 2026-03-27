@@ -72,7 +72,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         nav: [{text: "Home", link: "/"}],
         sidebar: [
             {
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {
                         text: "Introduction",
@@ -96,7 +96,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Design Principles", link: "/getting-started/design-principles"},
                     {
                         text: "Learning Material",
-                        collapsed: true,
+                        collapsed: false,
                         items: [
                             {text: "Bruin Academy", link: "https://getbruin.com/learn/"},
                             {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
@@ -110,7 +110,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             {
                 text: "Pipelines",
                 link: "/pipelines/definition",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {text: "Definition", link: "/pipelines/definition"},
                     {text: "Scheduling", link: "/pipelines/definition#schedule"},
@@ -122,7 +122,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             {
                 text: "Assets",
                 link: "/assets/definition-schema",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {text: "Definition Schema", link: "/assets/definition-schema"},
                     {
@@ -156,7 +156,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             {
                 text: "Variables",
                 link: "/variables/overview",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {text: "Built-in Variables", link: "/variables/built-in"},
                     {text: "Custom Variables", link: "/variables/custom"},
@@ -165,11 +165,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             {
                 text: "Connections & Platforms",
                 link: "/connections/overview",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {
                         text: "Warehouses & Lakes",
-                        collapsed: true,
+                        collapsed: false,
                         items: [
                             {text: "Lakehouse Support", link: "/getting-started/lakehouse"},
                             {text: "AWS Athena", link: "/platforms/athena"},
@@ -194,12 +194,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     },
                     {
                         text: "Data Ingestion",
-                        collapsed: true,
+                        collapsed: false,
                         items: [
                             {text: "Overview", link: "/ingestion/overview"},
                             {
                                 text: "Sources",
-                                collapsed: true,
+                                collapsed: false,
                                 items: [
                                     {text: "Adjust", link: "/ingestion/adjust"},
                                     {text: "Airtable", link: "/ingestion/airtable"},
@@ -287,7 +287,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             {
                 text: "Commands",
                 link: "/commands/overview",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {text: "Overview", link: "/commands/overview"},
                     {text: "Run", link: "/commands/run"},
@@ -309,13 +309,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             },
             {
                 text: "Data Governance",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {text: "Glossary", link: "/getting-started/glossary"},
                     {text: "Policies", link: "/getting-started/policies"},
                     {
                         text: "Quality Checks",
-                        collapsed: true,
+                        collapsed: false,
                         items: [
                             {text: "Overview", link: "/quality/overview"},
                             {text: "Column Checks", link: "/quality/available_checks"},
@@ -326,11 +326,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             },
             {
                 text: "Deployment & CI/CD",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {
                         text: "Deployment",
-                        collapsed: true,
+                        collapsed: false,
                         items: [
                             {text: "Ubuntu VM with Cron", link: "/deployment/vm-deployment"},
                             {text: "Apache Airflow", link: "/deployment/airflow"},
@@ -338,7 +338,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "GitLab CI/CD", link: "/deployment/cloud/gitlab-cicd"},
                             {
                                 text: "AWS",
-                                collapsed: true,
+                                collapsed: false,
                                 items: [
                                     {text: "Lambda", link: "/deployment/cloud/aws-lambda"},
                                     {text: "ECS", link: "/deployment/cloud/aws-ecs"}
@@ -346,7 +346,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             },
                             {
                                 text: "Google Cloud",
-                                collapsed: true,
+                                collapsed: false,
                                 items: [
                                     {text: "Cloud Run", link: "/deployment/cloud/google-cloud-run"}
                                 ]
@@ -355,7 +355,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     },
                     {
                         text: "CI/CD Integration",
-                        collapsed: true,
+                        collapsed: false,
                         items: [
                             {text: "GitHub Actions", link: "/cicd/github-action"},
                             {text: "GitLab CI/CD", link: "/cicd/gitlab-ci"},
@@ -369,7 +369,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             {
                 text: "Secret Providers",
                 link: "/secrets/overview",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {text: "File Backend (.bruin.yml)", link: "/secrets/bruinyml"},
                     {text: "Hashicorp Vault", link: "/secrets/vault"},
@@ -380,7 +380,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             {
                 text: "Templates",
                 link: "/getting-started/templates",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {text: "athena", link: "/getting-started/templates-docs/athena-README"},
                     {text: "clickhouse", link: "/getting-started/templates-docs/clickhouse-README"},
@@ -399,12 +399,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             },
             {
                 text: "Developer Tools",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {
                         text: "VS Code Extension",
                         link: "/vscode-extension/overview",
-                        collapsed: true,
+                        collapsed: false,
                         items: [
                             {text: "Getting Started", link: "/vscode-extension/getting-started"},
                             {text: "Configuration", link: "/vscode-extension/configuration"},
@@ -427,7 +427,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             },
             {
                 text: "Bruin Cloud",
-                collapsed: true,
+                collapsed: false,
                 items: [
                     {text: "Overview", link: "/cloud/overview"},
                     {text: "Developer Environments", link: "/cloud/developer-environments"},
