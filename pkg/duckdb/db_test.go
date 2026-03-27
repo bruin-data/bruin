@@ -320,6 +320,81 @@ func TestDB_SelectWithSchema_ListColumnScanErrorFallsBackToCastedQuery(t *testin
 	assert.Contains(t, conn.queries[1], `CAST("result" AS VARCHAR) AS "result"`)
 }
 
+func TestDB_Select_ListColumnScanErrorFallsBackToCastedQuery(t *testing.T) {
+	t.Parallel()
+
+	conn := &listScanErrorThenCastConnection{}
+	db := Client{
+		connection: conn,
+		config:     Config{Path: "some/path.db"},
+	}
+
+	rows, err := db.Select(t.Context(), &query.Query{Query: "SHOW;"})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{"main"}}, rows)
+	require.Len(t, conn.queries, 2)
+	require.Equal(t, "SHOW;", conn.queries[0])
+	assert.Contains(t, conn.queries[1], `CAST("result" AS VARCHAR) AS "result"`)
+}
+
+func TestEphemeralConnection_QueryContext_SHOW_UsesBufferedFallbackForListColumns(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip()
+	}
+
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "ephemeral-show-proof.db")
+
+	client, err := NewClient(Config{Path: path})
+	require.NoError(t, err)
+	err = client.RunQueryWithoutResult(ctx, &query.Query{Query: "CREATE TABLE t1 (id INT);"})
+	require.NoError(t, err)
+
+	ephemeral, err := NewEphemeralConnection(Config{Path: path})
+	require.NoError(t, err)
+
+	rows, err := ephemeral.QueryContext(ctx, "SHOW;")
+	require.NoError(t, err)
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	require.NoError(t, err)
+	require.NotEmpty(t, columns)
+
+	columnTypes, err := rows.ColumnTypes()
+	require.NoError(t, err)
+	require.NotEmpty(t, columnTypes)
+
+	foundTable := false
+	foundListMetadata := false
+	for rows.Next() {
+		scanned := make([]interface{}, len(columns))
+		ptrs := make([]interface{}, len(columns))
+		for i := range scanned {
+			ptrs[i] = &scanned[i]
+		}
+		require.NoError(t, rows.Scan(ptrs...))
+
+		for _, v := range scanned {
+			strVal, ok := v.(string)
+			if !ok {
+				continue
+			}
+			if strVal == "t1" {
+				foundTable = true
+			}
+			if strVal == "[id]" {
+				foundListMetadata = true
+			}
+		}
+	}
+
+	require.NoError(t, rows.Err())
+	assert.True(t, foundTable, "expected SHOW output to include created table")
+	assert.True(t, foundListMetadata, "expected SHOW output to include list metadata serialized as string")
+}
+
 func TestIsUnsupportedComplexTypeScanError_MatchesDriverMessage(t *testing.T) {
 	t.Parallel()
 	e := errors.New("Not Implemented: not yet implemented populating from columns of type list<l: utf8, nullable>")
