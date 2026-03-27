@@ -934,7 +934,7 @@ func TestScheduler_MarkAssetWithCustomChecks(t *testing.T) {
 	}
 
 	// There should be 2 instances: 1 main + 1 custom check
-	assert.Equal(t, 2, len(allInstances), "Expected 2 instances (main + custom check)")
+	assert.Len(t, allInstances, 2, "Expected 2 instances (main + custom check)")
 
 	// Now simulate what HandleSingleTask does:
 	// 1. Mark all as Skipped
@@ -943,7 +943,13 @@ func TestScheduler_MarkAssetWithCustomChecks(t *testing.T) {
 
 	// 2. Mark the asset as Pending using a DIFFERENT pointer with same name
 	differentPointer := &pipeline.Asset{Name: "my_schema.my_events"}
-	s.MarkAsset(differentPointer, Pending, false)
+	found := s.MarkAsset(differentPointer, Pending, false)
+	assert.True(t, found, "MarkAsset should return true for a matching asset name")
+
+	// Verify unknown asset returns false
+	unknownAsset := &pipeline.Asset{Name: "nonexistent.asset"}
+	notFound := s.MarkAsset(unknownAsset, Pending, false)
+	assert.False(t, notFound, "MarkAsset should return false for an unknown asset name")
 
 	// 3. Mark main as Skipped (simulating --only checks)
 	s.MarkPendingInstancesByType(TaskInstanceTypeMain, Skipped)
@@ -955,7 +961,7 @@ func TestScheduler_MarkAssetWithCustomChecks(t *testing.T) {
 		t.Logf("  %s (type=%d)", inst.GetHumanID(), inst.GetType())
 	}
 
-	assert.Equal(t, 1, len(pending), "Expected 1 pending custom check")
+	assert.Len(t, pending, 1, "Expected 1 pending custom check")
 	if len(pending) > 0 {
 		assert.Equal(t, TaskInstanceTypeCustomCheck, pending[0].GetType())
 	}
