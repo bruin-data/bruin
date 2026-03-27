@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -360,10 +361,28 @@ func isUnsupportedComplexTypeScanError(err error) bool {
 		return false
 	}
 
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "not yet implemented populating from columns of type list<") ||
-		strings.Contains(msg, "not yet implemented populating from columns of type struct<") ||
-		strings.Contains(msg, "not yet implemented populating from columns of type map<")
+	var adbcErr *adbc.Error
+	if errors.As(err, &adbcErr) {
+		if adbcErr.Code != adbc.StatusNotImplemented {
+			return false
+		}
+		return isComplexTypePopulationMessage(adbcErr.Msg)
+	}
+
+	// Keep a fallback for non-ADBC errors so tests/mocks and future wrappers
+	// that lose typed metadata can still trigger the casted-query path.
+	return isComplexTypePopulationMessage(err.Error())
+}
+
+func isComplexTypePopulationMessage(msg string) bool {
+	normalized := strings.ToLower(msg)
+	if !strings.Contains(normalized, "populating from columns of type") {
+		return false
+	}
+
+	return strings.Contains(normalized, "list<") ||
+		strings.Contains(normalized, "struct<") ||
+		strings.Contains(normalized, "map<")
 }
 
 func buildCastedColumnsQuery(queryText string, columns []string) string {

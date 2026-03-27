@@ -6,12 +6,14 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
@@ -397,8 +399,39 @@ func TestEphemeralConnection_QueryContext_SHOW_UsesBufferedFallbackForListColumn
 
 func TestIsUnsupportedComplexTypeScanError_MatchesDriverMessage(t *testing.T) {
 	t.Parallel()
-	e := errors.New("Not Implemented: not yet implemented populating from columns of type list<l: utf8, nullable>")
-	assert.True(t, isUnsupportedComplexTypeScanError(e))
+
+	t.Run("typed adbc error", func(t *testing.T) {
+		t.Parallel()
+		e := &adbc.Error{
+			Code: adbc.StatusNotImplemented,
+			Msg:  "not yet implemented populating from columns of type list<l: utf8, nullable>",
+		}
+		assert.True(t, isUnsupportedComplexTypeScanError(e))
+	})
+
+	t.Run("wrapped typed adbc error", func(t *testing.T) {
+		t.Parallel()
+		e := fmt.Errorf("wrapped: %w", &adbc.Error{
+			Code: adbc.StatusNotImplemented,
+			Msg:  "not yet implemented populating from columns of type struct<a: utf8>",
+		})
+		assert.True(t, isUnsupportedComplexTypeScanError(e))
+	})
+
+	t.Run("fallback string matching", func(t *testing.T) {
+		t.Parallel()
+		e := errors.New("Not Implemented: not yet implemented populating from columns of type map<k: utf8, v: int64>")
+		assert.True(t, isUnsupportedComplexTypeScanError(e))
+	})
+
+	t.Run("typed error with different status", func(t *testing.T) {
+		t.Parallel()
+		e := &adbc.Error{
+			Code: adbc.StatusInvalidArgument,
+			Msg:  "not yet implemented populating from columns of type list<l: utf8, nullable>",
+		}
+		assert.False(t, isUnsupportedComplexTypeScanError(e))
+	})
 }
 
 func TestClient_SelectWithSchema_SHOW_AfterCreateTable(t *testing.T) {
