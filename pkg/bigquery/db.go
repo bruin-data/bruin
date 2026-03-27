@@ -535,10 +535,117 @@ func (d *Client) Ping(ctx context.Context) error {
 	// Use the existing RunQueryWithoutResult method
 	err := d.RunQueryWithoutResult(ctx, &q)
 	if err != nil {
-		return errors.Wrap(err, "failed to run test query on Bigquery connection")
+		return wrapPingError(err, d.config.ProjectID)
 	}
 
-	return nil // Return nil if the query runs successfully
+	return nil
+}
+
+// BigQueryConnectionError provides detailed error information for BigQuery connection issues.
+type BigQueryConnectionError struct {
+	ProjectID   string
+	Issue       string
+	Hint        string
+	OriginalErr error
+}
+
+func (e *BigQueryConnectionError) Error() string {
+	var result string
+	result = e.Issue
+
+	if e.Hint != "" {
+		result += "\n\nHint: " + e.Hint
+	}
+
+	return result
+}
+
+func (e *BigQueryConnectionError) Unwrap() error {
+	return e.OriginalErr
+}
+
+// wrapPingError wraps ping errors with helpful hints based on common error patterns.
+func wrapPingError(err error, projectID string) error {
+	errStr := err.Error()
+
+	// Check for permission denied errors
+	if strings.Contains(errStr, "Access Denied") || strings.Contains(errStr, "403") || strings.Contains(errStr, "permission") {
+		return &BigQueryConnectionError{
+			ProjectID: projectID,
+			Issue:     "Permission denied when connecting to BigQuery",
+			Hint: `Your service account may be missing required IAM roles. Required roles:
+  - BigQuery Data Viewer (roles/bigquery.dataViewer) - to read data
+  - BigQuery Job User (roles/bigquery.jobUser) - to run queries
+  - BigQuery Data Editor (roles/bigquery.dataEditor) - to write data (if needed)
+
+To add roles in Google Cloud Console:
+  1. Go to IAM & Admin > IAM
+  2. Find your service account email
+  3. Click Edit (pencil icon) and add the required roles
+
+Alternatively, grant 'BigQuery Admin' (roles/bigquery.admin) for full access.`,
+			OriginalErr: err,
+		}
+	}
+
+	// Check for project not found errors
+	if strings.Contains(errStr, "notFound") || strings.Contains(errStr, "404") || strings.Contains(errStr, "project") && strings.Contains(errStr, "not found") {
+		return &BigQueryConnectionError{
+			ProjectID: projectID,
+			Issue:     fmt.Sprintf("Project '%s' not found or not accessible", projectID),
+			Hint: `Check that:
+  1. The project_id in .bruin.yml matches your Google Cloud project ID exactly
+  2. The BigQuery API is enabled in your project (APIs & Services > Enable APIs)
+  3. Your service account has access to this project`,
+			OriginalErr: err,
+		}
+	}
+
+	// Check for invalid credentials
+	if strings.Contains(errStr, "invalid_grant") || strings.Contains(errStr, "Invalid JWT") || strings.Contains(errStr, "credentials") {
+		return &BigQueryConnectionError{
+			ProjectID: projectID,
+			Issue:     "Invalid or expired credentials",
+			Hint: `Your service account key may be invalid or expired. Try:
+  1. Generate a new service account key in Google Cloud Console
+     (IAM & Admin > Service Accounts > Keys > Add Key > Create new key > JSON)
+  2. Update the service_account_file path in .bruin.yml
+  3. Re-run 'bruin connections test' to verify`,
+			OriginalErr: err,
+		}
+	}
+
+	// Check for ADC not configured
+	if strings.Contains(errStr, "could not find default credentials") || strings.Contains(errStr, "ADC") {
+		return &BigQueryConnectionError{
+			ProjectID: projectID,
+			Issue:     "Application Default Credentials not found",
+			Hint: `Run the following command to set up Application Default Credentials:
+  gcloud auth application-default login
+
+Or provide explicit credentials by adding service_account_file to your connection in .bruin.yml`,
+			OriginalErr: err,
+		}
+	}
+
+	// Check for billing not enabled
+	if strings.Contains(errStr, "billing") || strings.Contains(errStr, "Billing") {
+		return &BigQueryConnectionError{
+			ProjectID: projectID,
+			Issue:     "Billing may not be enabled for this project",
+			Hint: `BigQuery requires billing to be enabled. Go to:
+  Google Cloud Console > Billing > Link a billing account to your project`,
+			OriginalErr: err,
+		}
+	}
+
+	// Generic fallback with helpful context
+	return &BigQueryConnectionError{
+		ProjectID:   projectID,
+		Issue:       fmt.Sprintf("Failed to connect to BigQuery: %s", errStr),
+		Hint:        "Run 'bruin connections test --name <connection-name>' to debug connection issues.",
+		OriginalErr: err,
+	}
 }
 
 func (d *Client) IsPartitioningOrClusteringMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
