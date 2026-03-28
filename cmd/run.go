@@ -2255,7 +2255,7 @@ func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p 
 	s.MarkAll(scheduler.Skipped)
 	found := s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
 	if !found {
-		return fmt.Errorf("asset '%s' was not found among the pipeline's scheduled task instances, this may indicate a name mismatch between the asset file and the pipeline definition", f.SingleTask.Name)
+		return fmt.Errorf("asset '%s' was not found among the pipeline's scheduled task instances; the asset name in the file may have been transformed differently during pipeline construction", f.SingleTask.Name)
 	}
 	if f.IncludeTag != "" {
 		return errors.New("you cannot use the '--tag' flag when running a single asset")
