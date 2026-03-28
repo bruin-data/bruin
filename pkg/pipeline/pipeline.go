@@ -2162,8 +2162,12 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 		task.Type = AssetTypeR
 	}
 
-	task.DefinitionFile.Name = filepath.Base(filePath)
-	task.DefinitionFile.Path = filePath
+	absPath, absErr := filepath.Abs(filePath)
+	if absErr != nil {
+		absPath = filePath
+	}
+	task.DefinitionFile.Name = filepath.Base(absPath)
+	task.DefinitionFile.Path = absPath
 	task.DefinitionFile.Type = CommentTask
 	if isSeparateDefinitionFile {
 		task.DefinitionFile.Type = YamlTask
