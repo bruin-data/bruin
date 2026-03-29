@@ -59,6 +59,29 @@ Must consist of letters and dot `.` character.
 
 - **Type:** `String`
 
+### Automatic Name Inference from File Path
+
+The `name` field is **optional**. If not provided, Bruin automatically infers the asset name from the file path relative to the `assets/` folder:
+
+- Each directory level becomes a segment of the name, separated by dots (`.`)
+- The file name (without extension) becomes the final segment
+
+**Examples:**
+
+| File Path | Inferred Name |
+|-----------|---------------|
+| `assets/raw/trips.sql` | `raw.trips` |
+| `assets/staging/orders.py` | `staging.orders` |
+| `assets/mart/finance/revenue.asset.yml` | `mart.finance.revenue` |
+| `assets/layer/schema/table.sql` | `layer.schema.table` |
+
+This allows you to organize assets in folders that naturally mirror your schema structure without redundantly specifying the name.
+
+**When to explicitly set `name`:**
+- When your desired asset name differs from the file path structure
+- When following a naming convention that doesn't match your folder layout
+- When migrating existing assets with established names
+
 ## `uri`
 
 We use `uri` (Universal Resource Identifier) as another way to identify assets. URIs must be unique across all your pipelines and can be used to define [cross pipeline dependencies](../cloud/cross-pipeline).
