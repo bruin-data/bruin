@@ -59,7 +59,7 @@ func runQuickSightImport(ctx context.Context, pipelinePath, connectionName, envi
 
 	fmt.Println("Fetching QuickSight datasets, dashboards, and data sources...")
 
-	datasets, dashboards, _, err := fetchQuickSightAssets(ctx, client)
+	datasets, dashboards, err := fetchQuickSightAssets(ctx, client)
 	if err != nil {
 		return errors2.Wrap(err, "failed to fetch QuickSight assets")
 	}
@@ -108,15 +108,14 @@ func runQuickSightImport(ctx context.Context, pipelinePath, connectionName, envi
 	return importSelectedQuickSightAssets(ctx, pipelinePath, selected, fs, client, datasets)
 }
 
-func fetchQuickSightAssets(ctx context.Context, client *quicksight.Client) ([]quicksight.DataSetSummary, []quicksight.DashboardSummary, []quicksight.DataSourceSummary, error) {
+func fetchQuickSightAssets(ctx context.Context, client *quicksight.Client) ([]quicksight.DataSetSummary, []quicksight.DashboardSummary, error) {
 	var (
-		datasets    []quicksight.DataSetSummary
-		dashboards  []quicksight.DashboardSummary
-		dataSources []quicksight.DataSourceSummary
-		mu          sync.Mutex
+		datasets   []quicksight.DataSetSummary
+		dashboards []quicksight.DashboardSummary
+		mu         sync.Mutex
 	)
 
-	p := pool.New().WithMaxGoroutines(3).WithContext(ctx)
+	p := pool.New().WithMaxGoroutines(2).WithContext(ctx)
 
 	p.Go(func(ctx context.Context) error {
 		ds, err := client.ListDataSets(ctx)
@@ -140,29 +139,17 @@ func fetchQuickSightAssets(ctx context.Context, client *quicksight.Client) ([]qu
 		return nil
 	})
 
-	p.Go(func(ctx context.Context) error {
-		s, err := client.ListDataSources(ctx)
-		if err != nil {
-			fmt.Printf("  Warning: Could not fetch data sources: %v\n", err)
-			return nil
-		}
-		mu.Lock()
-		dataSources = s
-		mu.Unlock()
-		return nil
-	})
-
 	if err := p.Wait(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	return datasets, dashboards, dataSources, nil
+	return datasets, dashboards, nil
 }
 
 func showQuickSightSelector(items []QuickSightAssetItem) ([]QuickSightAssetItem, error) {
 	listItems := make([]list.Item, len(items))
 	for i, item := range items {
-		listItems[i] = quickSightListItem{item: item, selected: false}
+		listItems[i] = quickSightListItem{item: item}
 	}
 
 	delegate := customDelegate{
@@ -206,8 +193,7 @@ func showQuickSightSelector(items []QuickSightAssetItem) ([]QuickSightAssetItem,
 }
 
 type quickSightListItem struct {
-	item     QuickSightAssetItem
-	selected bool
+	item QuickSightAssetItem
 }
 
 func (i quickSightListItem) Title() string       { return i.item.Title() }
@@ -238,18 +224,21 @@ func (m *quickSightSelectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			i := m.list.Index()
 			m.selected[i] = !m.selected[i]
 			m.delegate.selectedItems[i] = m.selected[i]
+			m.list.SetDelegate(m.delegate)
 			return m, nil
 		case "a":
 			for i := range m.items {
 				m.selected[i] = true
 				m.delegate.selectedItems[i] = true
 			}
+			m.list.SetDelegate(m.delegate)
 			return m, nil
 		case "n":
 			for i := range m.items {
 				m.selected[i] = false
 				m.delegate.selectedItems[i] = false
 			}
+			m.list.SetDelegate(m.delegate)
 			return m, nil
 		case "enter":
 			m.confirmed = true
@@ -364,6 +353,13 @@ func importSelectedQuickSightAssets(
 	datasetsPath := filepath.Join(pipelinePath, "assets", "quicksight", "datasets")
 	dashboardsPath := filepath.Join(pipelinePath, "assets", "quicksight", "dashboards")
 
+	if err := fs.MkdirAll(datasetsPath, 0o755); err != nil {
+		return errors2.Wrapf(err, "failed to create datasets directory %s", datasetsPath)
+	}
+	if err := fs.MkdirAll(dashboardsPath, 0o755); err != nil {
+		return errors2.Wrapf(err, "failed to create dashboards directory %s", dashboardsPath)
+	}
+
 	importedCount := 0
 	skippedCount := 0
 
@@ -388,10 +384,6 @@ func importSelectedQuickSightAssets(
 			fmt.Printf("  Dataset asset '%s' already exists, skipping...\n", fullAssetName)
 			skippedCount++
 			continue
-		}
-
-		if err := fs.MkdirAll(datasetsPath, 0o755); err != nil {
-			return errors2.Wrapf(err, "failed to create datasets directory %s", datasetsPath)
 		}
 
 		asset := createQuickSightDatasetAsset(detail, datasetsPath)
@@ -421,10 +413,6 @@ func importSelectedQuickSightAssets(
 			fmt.Printf("  Dashboard asset '%s' already exists, skipping...\n", fullAssetName)
 			skippedCount++
 			continue
-		}
-
-		if err := fs.MkdirAll(dashboardsPath, 0o755); err != nil {
-			return errors2.Wrapf(err, "failed to create dashboards directory %s", dashboardsPath)
 		}
 
 		asset := createQuickSightDashboardAsset(detail, dashboardsPath, datasetArnMap, datasetAssetNames)

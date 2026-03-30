@@ -1977,13 +1977,9 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTableau][scheduler.TaskInstanceTypeMain] = tableauOperator
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDataset) {
+	if s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDataset) || s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDashboard) {
 		qsOperator := qs.NewBasicOperator(conn)
 		mainExecutors[pipeline.AssetTypeQuicksightDataset][scheduler.TaskInstanceTypeMain] = qsOperator
-	}
-
-	if s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDashboard) {
-		qsOperator := qs.NewBasicOperator(conn)
 		mainExecutors[pipeline.AssetTypeQuicksightDashboard][scheduler.TaskInstanceTypeMain] = qsOperator
 	}
 

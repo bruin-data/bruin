@@ -428,26 +428,10 @@ func extractFieldWells(fw *qstypes.BarChartFieldWells) (dims []string, metrics [
 	}
 	agg := fw.BarChartAggregatedFieldWells
 	for _, d := range agg.Category {
-		switch {
-		case d.CategoricalDimensionField != nil:
-			dims = append(dims, aws.ToString(d.CategoricalDimensionField.Column.ColumnName))
-		case d.DateDimensionField != nil:
-			dims = append(dims, aws.ToString(d.DateDimensionField.Column.ColumnName))
-		case d.NumericalDimensionField != nil:
-			dims = append(dims, aws.ToString(d.NumericalDimensionField.Column.ColumnName))
-		}
+		dims = append(dims, extractDimensionFieldName(d))
 	}
 	for _, m := range agg.Values {
-		switch {
-		case m.NumericalMeasureField != nil:
-			metrics = append(metrics, aws.ToString(m.NumericalMeasureField.Column.ColumnName))
-		case m.CategoricalMeasureField != nil:
-			metrics = append(metrics, aws.ToString(m.CategoricalMeasureField.Column.ColumnName))
-		case m.DateMeasureField != nil:
-			metrics = append(metrics, aws.ToString(m.DateMeasureField.Column.ColumnName))
-		case m.CalculatedMeasureField != nil:
-			metrics = append(metrics, aws.ToString(m.CalculatedMeasureField.FieldId))
-		}
+		metrics = append(metrics, extractMeasureFieldName(m))
 	}
 	return dims, metrics
 }
