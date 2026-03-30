@@ -47,7 +47,8 @@ def replace_table_references(
 
                 table_node.this.set("this", dest_table)
                 table_node.set("db", dest_schema)
-                table_node.set("catalog", dest_catalog)
+                if dest_catalog is not None:
+                    table_node.set("catalog", dest_catalog)
                 if not table_node.alias and source_table != dest_table:
                     table_node.set("alias", source_table)
 

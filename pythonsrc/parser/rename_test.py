@@ -199,6 +199,14 @@ test_cases_rename_tsql_three_part = [
         },
         "expected": "SELECT * FROM mydb.dev_myschema.mytable AS t1 JOIN dev_otherschema.othertable AS t2 ON t1.id = t2.id",
     },
+    {
+        "name": "2-part mapping does not strip catalog from 3-part SQL reference",
+        "query": "SELECT * FROM mydb.myschema.mytable",
+        "table_references": {
+            "myschema.mytable": "dev_myschema.mytable",
+        },
+        "expected": "SELECT * FROM mydb.dev_myschema.mytable",
+    },
 ]
 
 

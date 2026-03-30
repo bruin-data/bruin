@@ -127,6 +127,12 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 			database := parts[0]
 			schema := parts[1]
 			table := parts[2]
+
+			// only rewrite if the database matches the connection's database
+			if database != dbSummary.Name {
+				continue
+			}
+
 			devSchema := env.SchemaPrefix + schema
 			devTable := fmt.Sprintf("%s.%s.%s", database, devSchema, table)
 

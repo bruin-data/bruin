@@ -1098,6 +1098,14 @@ func TestSqlParser_RenameTables_TSQL_ThreePartNames(t *testing.T) {
 			},
 			want: "SELECT * FROM mydb.dev_myschema.mytable AS t1 JOIN dev_otherschema.othertable AS t2 ON t1.id = t2.id",
 		},
+		{
+			name:  "2-part mapping does not strip catalog from 3-part SQL reference",
+			query: "SELECT * FROM mydb.myschema.mytable",
+			tableMappings: map[string]string{
+				"myschema.mytable": "dev_myschema.mytable",
+			},
+			want: "SELECT * FROM mydb.dev_myschema.mytable",
+		},
 	}
 
 	for _, parser := range startParsersForParity(t) { //nolint:paralleltest

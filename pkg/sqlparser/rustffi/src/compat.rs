@@ -2019,12 +2019,12 @@ fn update_table_object(
             .map(|schema| json!({"name": schema, "quoted": false, "trailing_comments": []}))
             .unwrap_or(Value::Null),
     );
-    table_object.insert(
-        "catalog".to_string(),
-        destination_catalog
-            .map(|catalog| json!({"name": catalog, "quoted": false, "trailing_comments": []}))
-            .unwrap_or(Value::Null),
-    );
+    if let Some(catalog) = destination_catalog {
+        table_object.insert(
+            "catalog".to_string(),
+            json!({"name": catalog, "quoted": false, "trailing_comments": []}),
+        );
+    }
 
     if (table_object.get("alias").is_none()
         || table_object.get("alias").is_some_and(Value::is_null))
