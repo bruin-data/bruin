@@ -46,6 +46,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
+	qs "github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/r"
 	"github.com/bruin-data/bruin/pkg/redshift"
 	"github.com/bruin-data/bruin/pkg/s3"
@@ -1974,6 +1975,16 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeTableau) {
 		tableauOperator := tableau.NewBasicOperator(conn)
 		mainExecutors[pipeline.AssetTypeTableau][scheduler.TaskInstanceTypeMain] = tableauOperator
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDataset) {
+		qsOperator := qs.NewBasicOperator(conn)
+		mainExecutors[pipeline.AssetTypeQuicksightDataset][scheduler.TaskInstanceTypeMain] = qsOperator
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDashboard) {
+		qsOperator := qs.NewBasicOperator(conn)
+		mainExecutors[pipeline.AssetTypeQuicksightDashboard][scheduler.TaskInstanceTypeMain] = qsOperator
 	}
 
 	emrServerlessAssetTypes := []pipeline.AssetType{
