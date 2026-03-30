@@ -677,6 +677,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeVerticaQuerySensor:        "vertica",
 	AssetTypeVerticaTableSensor:        "vertica",
 	AssetTypeVerticaSource:             "vertica",
+	AssetTypeQuicksightDataset:         "quicksight",
+	AssetTypeQuicksightDashboard:       "quicksight",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
