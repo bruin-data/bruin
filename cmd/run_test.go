@@ -2013,6 +2013,280 @@ func TestValidateDateRange(t *testing.T) {
 	}
 }
 
+func TestHandleModifiedAssets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		pipeline        *pipeline.Pipeline
+		filter          *Filter
+		expectedPending []string
+		expectError     bool
+		expectedError   string
+	}{
+		{
+			name: "Run modified assets",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			filter: &Filter{
+				ModifiedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			expectedPending: []string{"Task1", "Task3"},
+			expectError:     false,
+		},
+		{
+			name: "Run modified assets with downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task1"}}},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task2"}}},
+				},
+			},
+			filter: &Filter{
+				ModifiedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task1", "Task2", "Task3"},
+			expectError:     false,
+		},
+		{
+			name: "Cannot use modified with single asset",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			filter: &Filter{
+				ModifiedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+				SingleTask: &pipeline.Asset{Name: "Task1"},
+			},
+			expectError:   true,
+			expectedError: "cannot use --modified when running a single asset file directly",
+		},
+		{
+			name: "Cannot use modified with tag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"tag1"}},
+				},
+			},
+			filter: &Filter{
+				ModifiedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+				IncludeTag: "tag1",
+			},
+			expectError:   true,
+			expectedError: "cannot use --modified with --tag flag",
+		},
+		{
+			name: "Cannot use modified with selected assets",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			filter: &Filter{
+				ModifiedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+				SelectedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+			},
+			expectError:   true,
+			expectedError: "cannot use --modified when specifying assets",
+		},
+		{
+			name: "Modified assets with exclude tag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+					{Name: "Task2", Type: pipeline.AssetTypePython, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task1"}}},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task2"}}},
+				},
+			},
+			filter: &Filter{
+				ModifiedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+				},
+				ExcludeTag:        "exclude",
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task2", "Task3"},
+			expectError:     false,
+		},
+		{
+			name: "Empty modified assets is no-op",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython},
+				},
+			},
+			filter: &Filter{
+				ModifiedAssets: []*pipeline.Asset{},
+			},
+			expectedPending: []string{"Task1", "Task2"},
+			expectError:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			logger := zap.NewNop().Sugar()
+			s := scheduler.NewScheduler(logger, tt.pipeline, "test")
+
+			// Map filter's modified assets to actual pipeline assets
+			if len(tt.filter.ModifiedAssets) > 0 {
+				actualAssets := make([]*pipeline.Asset, 0)
+				for _, modified := range tt.filter.ModifiedAssets {
+					for _, pAsset := range tt.pipeline.Assets {
+						if pAsset.Name == modified.Name {
+							actualAssets = append(actualAssets, pAsset)
+							break
+						}
+					}
+				}
+				tt.filter.ModifiedAssets = actualAssets
+			}
+
+			err := ApplyAllFilters(t.Context(), tt.filter, s, tt.pipeline)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				markedTasks := s.GetTaskInstancesByStatus(scheduler.Pending)
+
+				taskNames := []string{}
+				for _, task := range markedTasks {
+					taskNames = append(taskNames, task.GetHumanID())
+				}
+
+				for _, name := range tt.expectedPending {
+					assert.Contains(t, taskNames, name)
+				}
+			}
+		})
+	}
+}
+
+func TestFindAssetsFromChangedFiles(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		changedFiles   []string
+		pipeline       *pipeline.Pipeline
+		repoRoot       string
+		expectedAssets []string
+	}{
+		{
+			name:         "Match by definition file path",
+			changedFiles: []string{"pipelines/assets/task1.sql"},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name:           "Task1",
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task1.sql"},
+					},
+					{
+						Name:           "Task2",
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task2.sql"},
+					},
+				},
+			},
+			repoRoot:       "/repo",
+			expectedAssets: []string{"Task1"},
+		},
+		{
+			name:         "Match by executable file path",
+			changedFiles: []string{"pipelines/assets/task1.py"},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name:           "Task1",
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task1.asset.yml"},
+						ExecutableFile: pipeline.ExecutableFile{Path: "/repo/pipelines/assets/task1.py"},
+					},
+				},
+			},
+			repoRoot:       "/repo",
+			expectedAssets: []string{"Task1"},
+		},
+		{
+			name:         "No matching assets",
+			changedFiles: []string{"README.md", "pkg/something.go"},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name:           "Task1",
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task1.sql"},
+					},
+				},
+			},
+			repoRoot:       "/repo",
+			expectedAssets: nil,
+		},
+		{
+			name:         "Deduplicate assets matched by both paths",
+			changedFiles: []string{"pipelines/assets/task1.asset.yml", "pipelines/assets/task1.py"},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name:           "Task1",
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task1.asset.yml"},
+						ExecutableFile: pipeline.ExecutableFile{Path: "/repo/pipelines/assets/task1.py"},
+					},
+				},
+			},
+			repoRoot:       "/repo",
+			expectedAssets: []string{"Task1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := findAssetsFromChangedFiles(tt.changedFiles, tt.pipeline, tt.repoRoot)
+
+			if tt.expectedAssets == nil {
+				assert.Empty(t, result)
+			} else {
+				names := make([]string, len(result))
+				for i, a := range result {
+					names[i] = a.Name
+				}
+				assert.Equal(t, tt.expectedAssets, names)
+			}
+		})
+	}
+}
+
 func TestHandleMultipleAssets(t *testing.T) {
 	t.Parallel()
 

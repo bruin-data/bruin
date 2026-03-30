@@ -53,6 +53,47 @@ func TestRepo(t *testing.T) {
 	}
 }
 
+func TestDefaultBranch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("detects default branch from current repo", func(t *testing.T) {
+		t.Parallel()
+		repoRoot := path.AbsPathForTests(t, "../../.")
+		branch, err := DefaultBranch(repoRoot)
+		require.NoError(t, err)
+		assert.Contains(t, []string{"main", "master"}, branch)
+	})
+
+	t.Run("returns error for non-repo path", func(t *testing.T) {
+		t.Parallel()
+		_, err := DefaultBranch("/tmp")
+		require.Error(t, err)
+	})
+}
+
+func TestChangedFilesFromBase(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns no error for current repo", func(t *testing.T) {
+		t.Parallel()
+		repoRoot := path.AbsPathForTests(t, "../../.")
+		branch, err := DefaultBranch(repoRoot)
+		require.NoError(t, err)
+
+		files, err := ChangedFilesFromBase(repoRoot, branch)
+		require.NoError(t, err)
+		// Files may be empty or non-empty depending on branch state, just check no error
+		_ = files
+	})
+
+	t.Run("returns error for invalid base branch", func(t *testing.T) {
+		t.Parallel()
+		repoRoot := path.AbsPathForTests(t, "../../.")
+		_, err := ChangedFilesFromBase(repoRoot, "nonexistent-branch-xyz-123")
+		require.Error(t, err)
+	})
+}
+
 func BenchmarkFindRepoFromPath(b *testing.B) {
 	// Reset the timer to exclude setup time
 	b.ResetTimer()
