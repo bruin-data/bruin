@@ -74,6 +74,10 @@ The `name` field is **optional**. If not provided, Bruin automatically infers th
 | `assets/staging/trips.py` | `staging.trips` |
 | `assets/my_project/finance/revenue.asset.yml` | `my_project.finance.revenue` |
 
+::: warning
+If you rely on name inference (i.e. the asset definition does not explicitly set `name`), files placed directly under `assets/` (e.g. `assets/orders.sql`) will infer a single-segment name like `orders`, which most databases will reject since they require at least `schema.table`. Always use at least one folder level under `assets/` when using name inference.
+:::
+
 This allows you to organize assets in folders that naturally mirror your database structure without redundantly specifying the name.
 
 ### How name segments map to your database
