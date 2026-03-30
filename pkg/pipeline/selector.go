@@ -58,6 +58,11 @@ func newAssetSelectorResolver(p *Pipeline) *assetSelectorResolver {
 		upstream:   make(map[*Asset][]*Asset, len(p.Assets)),
 		downstream: make(map[*Asset][]*Asset, len(p.Assets)),
 	}
+	assetsByName := make(map[string]*Asset, len(p.Assets))
+
+	for _, asset := range p.Assets {
+		assetsByName[asset.Name] = asset
+	}
 
 	if p.DefinitionFile.Path != "" {
 		resolver.pipelineDir = filepath.Dir(p.DefinitionFile.Path)
@@ -69,26 +74,12 @@ func newAssetSelectorResolver(p *Pipeline) *assetSelectorResolver {
 				continue
 			}
 
-			parent := p.GetAssetByName(upstream.Value)
+			parent := assetsByName[upstream.Value]
 			if parent == nil {
 				continue
 			}
 
 			resolver.link(parent, asset)
-		}
-
-		for _, parent := range asset.GetUpstream() {
-			if parent == nil {
-				continue
-			}
-			resolver.link(parent, asset)
-		}
-
-		for _, child := range asset.GetDownstream() {
-			if child == nil {
-				continue
-			}
-			resolver.link(asset, child)
 		}
 	}
 
@@ -501,11 +492,32 @@ func matchPathSelector(pattern, candidate string) bool {
 	}
 
 	matched, err := stdpath.Match(pattern, candidate)
-	return err == nil && matched
+	if err == nil && matched {
+		return true
+	}
+
+	for _, prefix := range pathSelectorPrefixes(candidate) {
+		matched, err = stdpath.Match(pattern, prefix)
+		if err == nil && matched {
+			return true
+		}
+	}
+
+	return false
 }
 
 func hasSelectorWildcard(pattern string) bool {
 	return strings.ContainsAny(pattern, "*?[")
+}
+
+func pathSelectorPrefixes(candidate string) []string {
+	prefixes := make([]string, 0, strings.Count(candidate, "/"))
+
+	for prefix := stdpath.Dir(candidate); prefix != "." && prefix != "/" && prefix != candidate; prefix = stdpath.Dir(prefix) {
+		prefixes = append(prefixes, prefix)
+	}
+
+	return prefixes
 }
 
 func (r *assetSelectorResolver) expand(base assetSet, graph map[*Asset][]*Asset, depth int) assetSet {
@@ -545,6 +557,7 @@ func (r *assetSelectorResolver) expandAt(base assetSet) assetSet {
 	resolved := cloneAssetSet(base)
 	descendants := r.expand(base, r.downstream, -1)
 	mergeAssetSets(resolved, descendants)
+	mergeAssetSets(resolved, r.expand(base, r.upstream, -1))
 	mergeAssetSets(resolved, r.expand(descendants, r.upstream, -1))
 	return resolved
 }

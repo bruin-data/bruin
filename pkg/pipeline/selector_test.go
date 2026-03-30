@@ -32,6 +32,11 @@ func TestResolveSelectorAssets_Methods(t *testing.T) {
 			expected: []string{"fct_orders", "audit_orders"},
 		},
 		{
+			name:     "recursive wildcard path selector",
+			selector: "path:assets/*",
+			expected: []string{"stg_orders", "int_orders", "fct_orders", "audit_orders", "external_seed"},
+		},
+		{
 			name:     "file selector",
 			selector: "file:external_seed",
 			expected: []string{"external_seed"},
@@ -101,6 +106,11 @@ func TestResolveSelectorAssets_GraphOperators(t *testing.T) {
 		{
 			name:     "at operator includes ancestors of descendants",
 			selector: "@fct_orders",
+			expected: []string{"stg_orders", "int_orders", "fct_orders", "audit_orders", "external_seed"},
+		},
+		{
+			name:     "at operator includes ancestors of leaf nodes",
+			selector: "@audit_orders",
 			expected: []string{"stg_orders", "int_orders", "fct_orders", "audit_orders", "external_seed"},
 		},
 	}
