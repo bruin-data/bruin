@@ -392,26 +392,6 @@
         "api_token"
       ]
     },
-    "PosthogConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "personal_api_key": {
-          "type": "string"
-        },
-        "project_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "personal_api_key",
-        "project_id"
-      ]
-    },
     "Connections": {
       "properties": {
         "aws": {
@@ -924,6 +904,12 @@
           },
           "type": "array"
         },
+        "quicksight": {
+          "items": {
+            "$ref": "#/$defs/QuickSightConnection"
+          },
+          "type": "array"
+        },
         "trino": {
           "items": {
             "$ref": "#/$defs/TrinoConnection"
@@ -1273,6 +1259,22 @@
       "required": [
         "name",
         "path"
+      ]
+    },
+    "DuneConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "DynamoDBConnection": {
@@ -2483,6 +2485,26 @@
         "database"
       ]
     },
+    "PosthogConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "personal_api_key": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "personal_api_key",
+        "project_id"
+      ]
+    },
     "PrimerConnection": {
       "properties": {
         "name": {
@@ -2531,6 +2553,38 @@
         "client_id",
         "client_secret",
         "refresh_token"
+      ]
+    },
+    "QuickSightConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "aws_access_key_id": {
+          "type": "string"
+        },
+        "aws_secret_access_key": {
+          "type": "string"
+        },
+        "aws_session_token": {
+          "type": "string"
+        },
+        "aws_region": {
+          "type": "string"
+        },
+        "aws_account_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_session_token",
+        "aws_region",
+        "aws_account_id"
       ]
     },
     "RedshiftConnection": {
@@ -2963,22 +3017,6 @@
       ]
     },
     "StripeConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_key"
-      ]
-    },
-    "DuneConnection": {
       "properties": {
         "name": {
           "type": "string"

@@ -228,6 +228,17 @@
       },
       "schema_prefix": ""
     },
+    "env-python-pyproject-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-python-pyproject-materialization",
+            "path": "duckdb-files/python-pyproject-materialization.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-query-asset": {
       "connections": {
         "duckdb": [
@@ -408,17 +419,6 @@
           {
             "name": "duckdb-run-python-materialization",
             "path": "duckdb-files/run-python-materialization.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
-    "env-python-pyproject-materialization": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-python-pyproject-materialization",
-            "path": "duckdb-files/python-pyproject-materialization.db"
           }
         ]
       },
