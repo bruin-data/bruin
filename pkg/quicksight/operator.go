@@ -4,11 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
+	qstypes "github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+)
+
+const (
+	defaultRefreshTimeout = 60 * time.Minute
+	pollInterval          = 5 * time.Second
 )
 
 type BasicOperator struct {
@@ -61,10 +72,135 @@ func (o BasicOperator) handleDatasetRefresh(ctx context.Context, client *Client,
 		return errors.New("quicksight.dataset asset requires 'dataset_id' parameter when 'refresh' is true")
 	}
 
-	ingestionID := fmt.Sprintf("bruin-%s-%d", datasetID, time.Now().Unix())
-	if err := client.CreateIngestion(ctx, datasetID, ingestionID); err != nil {
-		return fmt.Errorf("failed to refresh QuickSight dataset: %w", err)
+	writer := writerFromContext(ctx)
+
+	incremental := resolveIncrementalRefresh(ctx, t.Parameters)
+	timeout := resolveRefreshTimeout(t.Parameters)
+
+	ingestionType := qstypes.IngestionTypeFullRefresh
+	ingestionLabel := "full"
+	if incremental {
+		ingestionType = qstypes.IngestionTypeIncrementalRefresh
+		ingestionLabel = "incremental"
 	}
 
-	return nil
+	ingestionID := fmt.Sprintf("bruin-%s-%d", datasetID, time.Now().Unix())
+
+	fmt.Fprintf(writer, "Starting %s SPICE refresh for dataset '%s'...\n", ingestionLabel, datasetID)
+
+	if err := client.CreateIngestion(ctx, datasetID, ingestionID, ingestionType); err != nil {
+		if incremental && isIncrementalNotSupported(err) {
+			fmt.Fprintf(writer, "Incremental refresh not supported, retrying with full refresh...\n")
+			ingestionID = fmt.Sprintf("bruin-%s-%d-full", datasetID, time.Now().Unix())
+			if err := client.CreateIngestion(ctx, datasetID, ingestionID, qstypes.IngestionTypeFullRefresh); err != nil {
+				return fmt.Errorf("failed to create full refresh ingestion: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to create %s ingestion: %w", ingestionLabel, err)
+		}
+	}
+
+	fmt.Fprintf(writer, "Ingestion started (id: %s), polling for completion...\n", ingestionID)
+
+	return pollIngestionStatus(ctx, client, datasetID, ingestionID, timeout, writer)
+}
+
+func pollIngestionStatus(ctx context.Context, client *Client, datasetID, ingestionID string, timeout time.Duration, writer io.Writer) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for QuickSight ingestion to complete (dataset: %s, ingestion: %s)", datasetID, ingestionID)
+		default:
+			status, err := client.DescribeIngestion(ctx, datasetID, ingestionID)
+			if err != nil {
+				return err
+			}
+
+			switch status.Status {
+			case "COMPLETED":
+				fmt.Fprintf(writer, "SPICE refresh completed successfully.\n")
+				return nil
+			case "FAILED":
+				if status.ErrorMessage != "" {
+					return fmt.Errorf("SPICE refresh failed: %s", status.ErrorMessage)
+				}
+				return fmt.Errorf("SPICE refresh failed (dataset: %s)", datasetID)
+			case "CANCELLED":
+				return fmt.Errorf("SPICE refresh was cancelled (dataset: %s)", datasetID)
+			default:
+				// INITIALIZED, QUEUED, RUNNING — keep polling
+				time.Sleep(pollInterval)
+			}
+		}
+	}
+}
+
+func resolveIncrementalRefresh(ctx context.Context, params map[string]string) bool {
+	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	if fullRefresh {
+		return false
+	}
+
+	if incremental, ok := getBoolParam(params, "incremental"); ok {
+		return incremental
+	}
+
+	return true
+}
+
+func resolveRefreshTimeout(params map[string]string) time.Duration {
+	timeoutMinutes, ok := getIntParam(params, "refresh_timeout_minutes")
+	if !ok || timeoutMinutes <= 0 {
+		return defaultRefreshTimeout
+	}
+	return time.Duration(timeoutMinutes) * time.Minute
+}
+
+func writerFromContext(ctx context.Context) io.Writer {
+	if w := ctx.Value(executor.KeyPrinter); w != nil {
+		if wr, ok := w.(io.Writer); ok {
+			return wr
+		}
+	}
+	return os.Stdout
+}
+
+func isIncrementalNotSupported(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "incremental")
+}
+
+func getBoolParam(params map[string]string, key string) (bool, bool) {
+	value, ok := params[key]
+	if !ok {
+		return false, false
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false, false
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, false
+	}
+	return parsed, true
+}
+
+func getIntParam(params map[string]string, key string) (int, bool) {
+	value, ok := params[key]
+	if !ok {
+		return 0, false
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
 }

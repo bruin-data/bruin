@@ -641,14 +641,40 @@ func extractDataSourceParameters(params qstypes.DataSourceParameters, detail *Da
 	}
 }
 
-func (c *Client) CreateIngestion(ctx context.Context, dataSetID, ingestionID string) error {
+func (c *Client) CreateIngestion(ctx context.Context, dataSetID, ingestionID string, ingestionType qstypes.IngestionType) error {
 	_, err := c.awsClient.CreateIngestion(ctx, &quicksight.CreateIngestionInput{
-		AwsAccountId: aws.String(c.accountID),
-		DataSetId:    aws.String(dataSetID),
-		IngestionId:  aws.String(ingestionID),
+		AwsAccountId:  aws.String(c.accountID),
+		DataSetId:     aws.String(dataSetID),
+		IngestionId:   aws.String(ingestionID),
+		IngestionType: ingestionType,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create ingestion for dataset '%s': %w", dataSetID, err)
 	}
 	return nil
+}
+
+// IngestionStatus holds the status of an ingestion.
+type IngestionStatus struct {
+	Status       string
+	ErrorMessage string
+}
+
+func (c *Client) DescribeIngestion(ctx context.Context, dataSetID, ingestionID string) (*IngestionStatus, error) {
+	out, err := c.awsClient.DescribeIngestion(ctx, &quicksight.DescribeIngestionInput{
+		AwsAccountId: aws.String(c.accountID),
+		DataSetId:    aws.String(dataSetID),
+		IngestionId:  aws.String(ingestionID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe ingestion '%s' for dataset '%s': %w", ingestionID, dataSetID, err)
+	}
+
+	status := &IngestionStatus{
+		Status: string(out.Ingestion.IngestionStatus),
+	}
+	if out.Ingestion.ErrorInfo != nil {
+		status.ErrorMessage = aws.ToString(out.Ingestion.ErrorInfo.Message)
+	}
+	return status, nil
 }
