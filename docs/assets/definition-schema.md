@@ -70,12 +70,31 @@ The `name` field is **optional**. If not provided, Bruin automatically infers th
 
 | File Path | Inferred Name |
 |-----------|---------------|
-| `assets/raw/trips.sql` | `raw.trips` |
-| `assets/staging/orders.py` | `staging.orders` |
-| `assets/mart/finance/revenue.asset.yml` | `mart.finance.revenue` |
-| `assets/layer/schema/table.sql` | `layer.schema.table` |
+| `assets/analytics/orders.sql` | `analytics.orders` |
+| `assets/staging/trips.py` | `staging.trips` |
+| `assets/my_project/finance/revenue.asset.yml` | `my_project.finance.revenue` |
 
-This allows you to organize assets in folders that naturally mirror your schema structure without redundantly specifying the name.
+This allows you to organize assets in folders that naturally mirror your database structure without redundantly specifying the name.
+
+### How name segments map to your database
+
+The inferred name is passed directly to your database, so the segments must match your database's naming convention. Different platforms interpret two-segment and three-segment names differently:
+
+| Platform | Two segments (`a.b`) | Three segments (`a.b.c`) |
+|----------|---------------------|-------------------------|
+| **BigQuery** | `dataset.table` | `project.dataset.table` |
+| **Snowflake** | `schema.table` | `database.schema.table` |
+| **PostgreSQL** | `schema.table` | Not supported |
+| **MSSQL** | `schema.table` | Not supported |
+| **Redshift** | `schema.table` | Not supported |
+| **Databricks** | `schema.table` | Not supported |
+| **DuckDB** | `schema.table` | Not supported |
+
+For example, if you are using **BigQuery** and your folder structure is `assets/my_project/finance/revenue.sql`, the inferred name `my_project.finance.revenue` will be interpreted as project `my_project`, dataset `finance`, table `revenue`.
+
+If you are using **Snowflake** with the same structure, it would be interpreted as database `my_project`, schema `finance`, table `revenue`.
+
+For databases that only support two segments (like PostgreSQL or MSSQL), use a single folder level under `assets/` (e.g. `assets/public/users.sql` → `public.users`).
 
 **When to explicitly set `name`:**
 - When your desired asset name differs from the file path structure
