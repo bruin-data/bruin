@@ -491,7 +491,10 @@ func createQuickSightDatasetAsset(
 		}
 	}
 
+	fullAssetName := "quicksight.datasets." + assetName
+
 	asset := &pipeline.Asset{
+		Name: fullAssetName,
 		Type: pipeline.AssetTypeQuicksightDataset,
 		ExecutableFile: pipeline.ExecutableFile{
 			Name: fileName,
@@ -622,7 +625,10 @@ func createQuickSightDashboardAsset(
 		}
 	}
 
+	fullAssetName := "quicksight.dashboards." + assetName
+
 	asset := &pipeline.Asset{
+		Name: fullAssetName,
 		Type: pipeline.AssetTypeQuicksightDashboard,
 		ExecutableFile: pipeline.ExecutableFile{
 			Name: fileName,
