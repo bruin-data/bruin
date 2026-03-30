@@ -41,6 +41,7 @@ func Import(isDebug *bool) *cli.Command {
 			ImportDatabase(isDebug),
 			ImportScheduledQueries(),
 			ImportTableauDashboards(),
+			ImportQuickSightAssets(),
 		},
 	}
 }
