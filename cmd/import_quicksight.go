@@ -473,24 +473,6 @@ func createQuickSightDatasetAsset(
 		}
 	}
 
-	// Add column-level upstreams
-	for i, col := range columns {
-		for _, pt := range detail.PhysicalTableMaps {
-			if pt.TableName == "" {
-				continue
-			}
-			tableName := buildTableReference(pt.SchemaName, pt.TableName)
-			for _, ptCol := range pt.Columns {
-				if strings.EqualFold(ptCol.Name, col.Name) {
-					columns[i].Upstreams = append(columns[i].Upstreams, &pipeline.UpstreamColumn{
-						Column: ptCol.Name,
-						Table:  tableName,
-					})
-				}
-			}
-		}
-	}
-
 	fullAssetName := "quicksight.datasets." + assetName
 
 	asset := &pipeline.Asset{
@@ -602,24 +584,6 @@ func createQuickSightDashboardAsset(
 				upstreams = append(upstreams, pipeline.Upstream{
 					Type:  "asset",
 					Value: name,
-				})
-			}
-		}
-	}
-
-	// Add column-level upstreams linking to dataset columns
-	for i, col := range columns {
-		for _, dsArn := range detail.DataSetArns {
-			dsAssetName := ""
-			if name, exists := datasetAssetNames[dsArn]; exists {
-				dsAssetName = name
-			} else if dsSummary, exists := datasetArnMap[dsArn]; exists {
-				dsAssetName = "quicksight.datasets.dataset_" + sanitizeQuickSightName(dsSummary.Name)
-			}
-			if dsAssetName != "" {
-				columns[i].Upstreams = append(columns[i].Upstreams, &pipeline.UpstreamColumn{
-					Column: col.Name,
-					Table:  dsAssetName,
 				})
 			}
 		}
