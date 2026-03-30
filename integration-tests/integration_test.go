@@ -630,6 +630,70 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-schema-prefix-default-empty",
+			task: e2e.Task{
+				Name:    "render-schema-prefix-default-empty",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--start-date", "2024-01-01",
+					"--end-date", "2024-01-02",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-test/assets/check_prefix_sql.sql"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`'' as prefix`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "schema-prefix-sql",
+			task: e2e.Task{
+				Name:    "schema-prefix-sql",
+				Command: binary,
+				Args: []string{
+					"run",
+					"--env", "env-schema-prefix",
+					"--start-date", "2024-01-01",
+					"--end-date", "2024-01-02",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-test/assets/check_prefix_sql.sql"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+		},
+		{
+			name: "schema-prefix-python",
+			task: e2e.Task{
+				Name:    "schema-prefix-python",
+				Command: binary,
+				Args: []string{
+					"run",
+					"--env", "env-schema-prefix",
+					"--start-date", "2024-01-01",
+					"--end-date", "2024-01-02",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-test/assets/check_prefix_py.py"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"schema_prefix: test_"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "run-with-tags",
 			task: e2e.Task{
 				Name:    "run-with-tags",

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
@@ -154,6 +155,7 @@ func defaultContext(startDate, endDate, executionDate *time.Time, pipelineName, 
 		"run_id":                runID,
 		"full_refresh":          fullRefresh,
 		"commit_hash":           "",
+		"schema_prefix":         "",
 	}
 }
 
@@ -277,6 +279,9 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	jinjaContext["this"] = asset.Name
 	jinjaContext["var"] = pipe.Variables.Value()
 	jinjaContext["commit_hash"] = pipe.Commit
+	if env, ok := ctx.Value(config.EnvironmentContextKey).(*config.Environment); ok && env != nil {
+		jinjaContext["schema_prefix"] = env.SchemaPrefix
+	}
 
 	return &Renderer{
 		context:         exec.NewContext(jinjaContext),
