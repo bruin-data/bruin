@@ -110,16 +110,31 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 
 	for _, tableReference := range usedTables {
 		parts := strings.Split(tableReference, ".")
-		if len(parts) != 2 {
-			continue
-		}
-		schema := parts[0]
-		table := parts[1]
-		devSchema := env.SchemaPrefix + schema
-		devTable := fmt.Sprintf("%s.%s", devSchema, table)
 
-		if dbSummary.TableExists(devSchema, table) {
-			renameMapping[tableReference] = devTable
+		switch len(parts) {
+		case 2:
+			// schema.table -> dev_schema.table
+			schema := parts[0]
+			table := parts[1]
+			devSchema := env.SchemaPrefix + schema
+			devTable := fmt.Sprintf("%s.%s", devSchema, table)
+
+			if dbSummary.TableExists(devSchema, table) {
+				renameMapping[tableReference] = devTable
+			}
+		case 3:
+			// database.schema.table -> database.dev_schema.table
+			database := parts[0]
+			schema := parts[1]
+			table := parts[2]
+			devSchema := env.SchemaPrefix + schema
+			devTable := fmt.Sprintf("%s.%s.%s", database, devSchema, table)
+
+			if dbSummary.TableExists(devSchema, table) {
+				renameMapping[tableReference] = devTable
+			}
+		default:
+			continue
 		}
 	}
 

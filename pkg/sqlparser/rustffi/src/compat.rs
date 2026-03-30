@@ -1860,39 +1860,57 @@ fn rewrite_table_object(table_value: &mut Value, table_references: &HashMap<Stri
     let table_schema = table_value
         .as_object()
         .and_then(|object| identifier_name(object.get("schema")));
+    let table_catalog = table_value
+        .as_object()
+        .and_then(|object| identifier_name(object.get("catalog")));
     let Some(table_name) = table_name else {
         return;
     };
 
     for (source, destination) in table_references {
         let source_parts: Vec<_> = source.split('.').collect();
-        let source_schema = if source_parts.len() > 1 {
-            Some(source_parts[..source_parts.len() - 1].join("."))
-        } else {
-            None
+        let (source_catalog, source_schema, source_table) = match source_parts.len() {
+            3 => (
+                Some(source_parts[0]),
+                Some(source_parts[1]),
+                source_parts[2],
+            ),
+            2 => (None, Some(source_parts[0]), source_parts[1]),
+            _ => (None, None, source_parts[0]),
         };
-        let source_table = source_parts.last().copied().unwrap_or_default();
 
         if table_name != source_table {
             continue;
         }
-        if source_schema.as_deref() != table_schema.as_deref() && source_schema.is_some() {
+        if source_schema.is_some() && source_schema != table_schema.as_deref() {
+            continue;
+        }
+        if source_catalog.is_some() && source_catalog != table_catalog.as_deref() {
             continue;
         }
 
         let destination_parts: Vec<_> = destination.split('.').collect();
-        let destination_schema = if destination_parts.len() > 1 {
-            Some(destination_parts[..destination_parts.len() - 1].join("."))
-        } else {
-            None
-        };
-        let destination_table = destination_parts.last().copied().unwrap_or_default();
+        let (destination_catalog, destination_schema, destination_table) =
+            match destination_parts.len() {
+                3 => (
+                    Some(destination_parts[0].to_string()),
+                    Some(destination_parts[1].to_string()),
+                    destination_parts[2],
+                ),
+                2 => (
+                    None,
+                    Some(destination_parts[0].to_string()),
+                    destination_parts[1],
+                ),
+                _ => (None, None, destination_parts[0]),
+            };
 
         update_table_object(
             table_value,
             source_table,
             destination_table,
             destination_schema,
+            destination_catalog,
         );
         return;
     }
@@ -1985,6 +2003,7 @@ fn update_table_object(
     source_table: &str,
     destination_table: &str,
     destination_schema: Option<String>,
+    destination_catalog: Option<String>,
 ) {
     let Some(table_object) = table_value.as_object_mut() else {
         return;
@@ -1998,6 +2017,12 @@ fn update_table_object(
         "schema".to_string(),
         destination_schema
             .map(|schema| json!({"name": schema, "quoted": false, "trailing_comments": []}))
+            .unwrap_or(Value::Null),
+    );
+    table_object.insert(
+        "catalog".to_string(),
+        destination_catalog
+            .map(|catalog| json!({"name": catalog, "quoted": false, "trailing_comments": []}))
             .unwrap_or(Value::Null),
     );
 
