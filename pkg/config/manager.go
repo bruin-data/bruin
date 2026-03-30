@@ -108,6 +108,7 @@ type Connections struct {
 	ISOCPulse           []ISOCPulseConnection           `yaml:"isoc_pulse,omitempty" json:"isoc_pulse,omitempty" mapstructure:"isoc_pulse"`
 	InfluxDB            []InfluxDBConnection            `yaml:"influxdb,omitempty" json:"influxdb,omitempty" mapstructure:"influxdb"`
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
+	QuickSight          []QuickSightConnection          `yaml:"quicksight,omitempty" json:"quicksight,omitempty" mapstructure:"quicksight"`
 	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
@@ -1065,6 +1066,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Tableau = append(env.Connections.Tableau, conn)
+	case "quicksight":
+		var conn QuickSightConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.QuickSight = append(env.Connections.QuickSight, conn)
 	case "fluxx":
 		var conn FluxxConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1332,6 +1340,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.InfluxDB = removeConnection(env.Connections.InfluxDB, connectionName)
 	case "tableau":
 		env.Connections.Tableau = removeConnection(env.Connections.Tableau, connectionName)
+	case "quicksight":
+		env.Connections.QuickSight = removeConnection(env.Connections.QuickSight, connectionName)
 	case "fluxx":
 		env.Connections.Fluxx = removeConnection(env.Connections.Fluxx, connectionName)
 	case "fundraiseup":
@@ -1468,6 +1478,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Attio, source.Attio)
 	mergeConnectionList(&c.ISOCPulse, source.ISOCPulse)
 	mergeConnectionList(&c.Tableau, source.Tableau)
+	mergeConnectionList(&c.QuickSight, source.QuickSight)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
 	mergeConnectionList(&c.Fireflies, source.Fireflies)

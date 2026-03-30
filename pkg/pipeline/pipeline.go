@@ -96,6 +96,8 @@ const (
 	AssetTypeQlikSense                 = AssetType("qliksense")
 	AssetTypeQlikView                  = AssetType("qlikview")
 	AssetTypeQuicksight                = AssetType("quicksight")
+	AssetTypeQuicksightDashboard       = AssetType("quicksight.dashboard")
+	AssetTypeQuicksightDataset         = AssetType("quicksight.dataset")
 	AssetTypeR                         = AssetType("r")
 	AssetTypeRedash                    = AssetType("redash")
 	AssetTypeRedshiftQuery             = AssetType("rs.sql")
