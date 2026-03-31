@@ -389,3 +389,33 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 
 	return nil
 }
+
+// ExtractAssetYAML returns the raw YAML bytes for an asset file.
+// Returns nil for single-line comment assets (not YAML-parseable).
+func ExtractAssetYAML(fs afero.Fs, filePath string, defType TaskDefinitionType) ([]byte, error) {
+	if defType == YamlTask {
+		data, err := afero.ReadFile(fs, filePath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read file %s", filePath)
+		}
+		return data, nil
+	}
+
+	file, err := fs.Open(filePath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open file %s", filePath)
+	}
+	defer file.Close()
+
+	if !isEmbeddedYamlComment(file, possiblePrefixesForCommentBlocks) {
+		// Single-line comment assets are not YAML, skip validation
+		return nil, nil
+	}
+
+	rows, _ := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
+	if rows == "" {
+		return nil, nil
+	}
+
+	return []byte(rows), nil
+}
