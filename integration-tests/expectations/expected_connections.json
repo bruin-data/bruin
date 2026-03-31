@@ -47,7 +47,7 @@
         {
           "name": "chess-default",
           "players": [
-            "MagnusCarlsen",
+            "FabianoCaruana",
             "Hikaru"
           ]
         }
@@ -102,7 +102,7 @@
           {
             "name": "chess-default",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }
@@ -198,7 +198,7 @@
           {
             "name": "chess-ingestr",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }
@@ -305,7 +305,7 @@
           {
             "name": "chess-run-default-option",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }
@@ -331,7 +331,7 @@
           {
             "name": "chess-run-main-with-downstream",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }
@@ -357,7 +357,7 @@
           {
             "name": "chess-run-main-with-filters",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }
@@ -383,7 +383,7 @@
           {
             "name": "chess-run-malformed-sql",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }
@@ -453,7 +453,7 @@
           {
             "name": "chess-run-with-downstream",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }
@@ -479,7 +479,7 @@
           {
             "name": "chess-run-with-filters",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }
@@ -505,7 +505,7 @@
           {
             "name": "chess-run-with-tags",
             "players": [
-              "MagnusCarlsen",
+              "FabianoCaruana",
               "Hikaru"
             ]
           }

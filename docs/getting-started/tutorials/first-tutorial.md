@@ -54,7 +54,7 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
 
 ```
@@ -114,7 +114,7 @@ After executing the query, you will see the following results displayed in your 
 │ USERNAME      │ AID                                            │ TOTAL_GAMES │ WHITE_WINS │ BLACK_WINS │ WHITE_GAMES │ BLACK_GAMES │ WHITE_WIN_RATE │ BLACK_WIN_RATE │
 ├───────────────┼────────────────────────────────────────────────┼─────────────┼────────────┼────────────┼─────────────┼─────────────┼────────────────┼────────────────┤
 │ hikaru        │ https://api.chess.com/pub/player/hikaru        │ 102         │ 39         │ 41         │ 50          │ 52          │ 78             │ 78.85          │
-│ magnuscarlsen │ https://api.chess.com/pub/player/magnuscarlsen │ 17          │ 6          │ 6          │ 9           │ 8           │ 66.67          │ 75             │
+│ FabianoCaruana │ https://api.chess.com/pub/player/FabianoCaruana │ 17          │ 6          │ 6          │ 9           │ 8           │ 66.67          │ 75             │
 └───────────────┴────────────────────────────────────────────────┴─────────────┴────────────┴────────────┴─────────────┴─────────────┴────────────────┴────────────────┘
 ```
 
