@@ -46,6 +46,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
+	qs "github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/r"
 	"github.com/bruin-data/bruin/pkg/redshift"
 	"github.com/bruin-data/bruin/pkg/s3"
@@ -571,6 +572,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:       "limit the types of tasks to run. By default it will run main and checks, while push-metadata is optional if defined in the pipeline definition",
 			},
 			&cli.BoolFlag{
+				Name:  "modified",
+				Usage: "run only assets whose files have been modified compared to the default branch",
+			},
+			&cli.BoolFlag{
 				Name:  "exp-use-winget-for-uv",
 				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
 			},
@@ -932,6 +937,43 @@ func Run(isDebug *bool) *cli.Command {
 				singleCheckID = ""
 			}
 
+			// Handle --modified flag: detect changed files and map to assets
+			if c.Bool("modified") {
+				if pipelineInfo.RunningForAnAsset {
+					errorPrinter.Printf("Cannot use --modified when running a single asset file directly\n")
+					return cli.Exit("", 1)
+				}
+				if len(filter.SelectedAssets) > 0 {
+					errorPrinter.Printf("Cannot use --modified when specifying assets\n")
+					return cli.Exit("", 1)
+				}
+
+				baseBranch, err := git.DefaultBranch(repoRoot.Path)
+				if err != nil {
+					errorPrinter.Printf("Failed to detect default branch: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				changedFiles, err := git.ChangedFilesFromBase(repoRoot.Path, baseBranch)
+				if err != nil {
+					errorPrinter.Printf("Failed to get changed files: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				if len(changedFiles) == 0 {
+					infoPrinter.Printf("No files changed compared to '%s', nothing to run.\n", baseBranch)
+					return nil
+				}
+
+				modifiedAssets := findAssetsFromChangedFiles(changedFiles, pipelineInfo.Pipeline, repoRoot.Path)
+				if len(modifiedAssets) == 0 {
+					infoPrinter.Printf("No assets matched the %d changed file(s) compared to '%s', nothing to run.\n", len(changedFiles), baseBranch)
+					return nil
+				}
+
+				filter.ModifiedAssets = modifiedAssets
+			}
+
 			// Validate date range
 			if err := ValidateDateRange(startDate, endDate); err != nil {
 				return err
@@ -956,9 +998,20 @@ func Run(isDebug *bool) *cli.Command {
 			if !c.Bool("minimal-logs") {
 				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
-				if pipelineInfo.RunningForAnAsset {
+				switch {
+				case pipelineInfo.RunningForAnAsset:
 					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-				} else if len(filter.SelectedAssets) > 0 {
+				case len(filter.ModifiedAssets) > 0:
+					assetNames := make([]string, len(filter.ModifiedAssets))
+					for i, asset := range filter.ModifiedAssets {
+						assetNames[i] = asset.Name
+					}
+					msg := fmt.Sprintf("Running %d modified asset(s): %s", len(filter.ModifiedAssets), strings.Join(assetNames, ", "))
+					if filter.IncludeDownstream {
+						msg += " (with downstream)"
+					}
+					infoPrinter.Println(msg)
+				case len(filter.SelectedAssets) > 0:
 					assetNames := make([]string, len(filter.SelectedAssets))
 					for i, asset := range filter.SelectedAssets {
 						assetNames[i] = asset.Name
@@ -1692,7 +1745,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseTableSensor) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: mssql.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
 			Mat: synapse.NewMaterializer(fullRefresh),
 		})
@@ -1976,6 +2029,12 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTableau][scheduler.TaskInstanceTypeMain] = tableauOperator
 	}
 
+	if s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDataset) || s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDashboard) {
+		qsOperator := qs.NewBasicOperator(conn)
+		mainExecutors[pipeline.AssetTypeQuicksightDataset][scheduler.TaskInstanceTypeMain] = qsOperator
+		mainExecutors[pipeline.AssetTypeQuicksightDashboard][scheduler.TaskInstanceTypeMain] = qsOperator
+	}
+
 	emrServerlessAssetTypes := []pipeline.AssetType{
 		pipeline.AssetTypeEMRServerlessSpark,
 		pipeline.AssetTypeEMRServerlessPyspark,
@@ -2184,6 +2243,7 @@ type Filter struct {
 	PushMetaData      bool
 	SingleTask        *pipeline.Asset   // Single asset (from running asset file directly)
 	SelectedAssets    []*pipeline.Asset // Multiple assets specified as positional arguments
+	ModifiedAssets    []*pipeline.Asset // Assets whose files have been modified vs default branch (from `--modified`)
 	ExcludeTag        string
 	singleCheckID     scheduler.CheckUniqueID // ID of the single check to run, if any
 }
@@ -2197,6 +2257,46 @@ func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Sche
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func HandleModifiedAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if len(f.ModifiedAssets) == 0 {
+		return nil
+	}
+
+	// Cannot use with single asset mode
+	if f.SingleTask != nil {
+		return errors.New("cannot use --modified when running a single asset file directly")
+	}
+
+	// Cannot use with tags
+	if f.IncludeTag != "" {
+		return errors.New("cannot use --modified with --tag flag")
+	}
+
+	// Cannot use with selected assets
+	if len(f.SelectedAssets) > 0 {
+		return errors.New("cannot use --modified when specifying assets")
+	}
+
+	// Mark all as skipped first
+	s.MarkAll(scheduler.Skipped)
+
+	// Mark modified assets as pending
+	for _, asset := range f.ModifiedAssets {
+		s.MarkAsset(asset, scheduler.Pending, f.IncludeDownstream)
+	}
+
+	// Handle exclude-tag if specified
+	if f.ExcludeTag != "" {
+		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
+		if len(excludedAssets) == 0 {
+			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		}
+		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	}
+
 	return nil
 }
 
@@ -2240,8 +2340,8 @@ func HandleMultipleAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler
 
 func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if f.SingleTask == nil {
-		// Allow downstream with selected assets, but not for whole pipeline
-		if f.IncludeDownstream && len(f.SelectedAssets) == 0 {
+		// Allow downstream with selected assets or modified assets, but not for whole pipeline
+		if f.IncludeDownstream && len(f.SelectedAssets) == 0 && len(f.ModifiedAssets) == 0 {
 			return errors.New("cannot use the --downstream flag when running the whole pipeline")
 		}
 		return nil
@@ -2344,7 +2444,8 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 	s.MarkAll(scheduler.Pending)
 
 	funcs := []FilterMutator{
-		HandleMultipleAssets, // Check for multiple assets first
+		HandleModifiedAssets, // Check for modified assets first
+		HandleMultipleAssets, // Check for multiple assets
 		HandleSingleTask,     // Then single asset
 		HandleIncludeTags,    // Then tags
 		HandleExcludeTags,
@@ -2493,6 +2594,30 @@ func loadAssetsFromPaths(assetPaths []string, p *pipeline.Pipeline, repoRoot, cw
 	}
 
 	return assets, nil
+}
+
+// findAssetsFromChangedFiles maps changed file paths (relative to repo root) to pipeline assets.
+func findAssetsFromChangedFiles(changedFiles []string, p *pipeline.Pipeline, repoRoot string) []*pipeline.Asset {
+	seen := make(map[string]bool)
+	var assets []*pipeline.Asset
+
+	for _, relPath := range changedFiles {
+		absPath := filepath.Join(repoRoot, relPath)
+
+		// Try matching by definition file path
+		asset := p.GetAssetByPath(absPath)
+		if asset == nil {
+			// Try matching by executable file path
+			asset = findAssetByExecutablePath(p, absPath)
+		}
+
+		if asset != nil && !seen[asset.Name] {
+			seen[asset.Name] = true
+			assets = append(assets, asset)
+		}
+	}
+
+	return assets
 }
 
 // findAssetByExecutablePath finds an asset by its executable file path.

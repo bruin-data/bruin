@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -17,6 +18,12 @@ func SetupVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset
 	env, err := envMutateIntervals(ctx, p, t, env)
 	if err != nil {
 		return nil, err
+	}
+
+	if selectedEnv, ok := ctx.Value(config.EnvironmentContextKey).(*config.Environment); ok && selectedEnv != nil {
+		env["BRUIN_SCHEMA_PREFIX"] = selectedEnv.SchemaPrefix
+	} else {
+		env["BRUIN_SCHEMA_PREFIX"] = ""
 	}
 
 	env, err = envInjectVariables(env, p.Variables.Value(), p.Variables.SchemaMap())

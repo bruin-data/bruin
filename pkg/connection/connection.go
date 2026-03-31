@@ -83,6 +83,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/posthog"
 	"github.com/bruin-data/bruin/pkg/primer"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
+	"github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
@@ -203,6 +204,7 @@ type Manager struct {
 	ISOCPulse            map[string]*isocpulse.Client
 	InfluxDB             map[string]*influxdb.Client
 	Tableau              map[string]*tableau.Client
+	QuickSight           map[string]*quicksight.Client
 	Trino                map[string]*trino.Client
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
@@ -2654,6 +2656,34 @@ func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConne
 	return nil
 }
 
+func (m *Manager) AddQuickSightConnectionFromConfig(connection *config.QuickSightConnection) error {
+	m.mutex.Lock()
+	if m.QuickSight == nil {
+		m.QuickSight = make(map[string]*quicksight.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := quicksight.NewClient(quicksight.Config{
+		Name:               connection.Name,
+		AwsAccessKeyID:     connection.AwsAccessKeyID,
+		AwsSecretAccessKey: connection.AwsSecretAccessKey,
+		AwsSessionToken:    connection.AwsSessionToken,
+		AwsRegion:          connection.AwsRegion,
+		AwsAccountID:       connection.AwsAccountID,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.QuickSight[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddTrinoConnectionFromConfig(connection *config.TrinoConnection) error {
 	m.mutex.Lock()
 	if m.Trino == nil {
@@ -2871,6 +2901,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.ISOCPulse, connectionManager.AddISOCPulseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.InfluxDB, connectionManager.AddInfluxDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.QuickSight, connectionManager.AddQuickSightConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)

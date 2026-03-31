@@ -25,7 +25,7 @@ environments:
             chess:
                 - name: "chess-connection"
                   players:
-                      - "MagnusCarlsen"
+                      - "FabianoCaruana"
                       - "Hikaru"
 ```
 

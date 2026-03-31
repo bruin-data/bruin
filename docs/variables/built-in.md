@@ -22,6 +22,7 @@ Bruin automatically injects these variables into the Jinja context for templated
 | `run_id` | Unique identifier for the current pipeline run | `"run_1234567890"` |
 | `full_refresh` | Whether the run is a full refresh | `true` |
 | `commit_hash` | The current git commit hash of the pipeline's repository | `"abc1234def5678..."` |
+| `schema_prefix` | The schema prefix from the selected environment configuration (empty string if not set) | `"dev_"` |
 
 ## Using Built-in Variables in SQL
 
@@ -76,6 +77,7 @@ print(f"Processing {pipeline_name} for {start_date} to {end_date}")
 | `run_id` | `BRUIN_RUN_ID` |
 | `full_refresh` | `BRUIN_FULL_REFRESH` (`"1"` or `"0"`) |
 | `commit_hash` | `BRUIN_COMMIT_HASH` |
+| `schema_prefix` | `BRUIN_SCHEMA_PREFIX` |
 
 > [!NOTE]
 > The `_nodash` variants (`start_date_nodash`, `end_date_nodash`, `execution_date_nodash`) are only available in the Jinja context for SQL assets. They are not exposed as Python environment variables. If you need a nodash format in Python, derive it from the date string: `start_date.replace("-", "")`.

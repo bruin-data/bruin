@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -388,4 +389,38 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 	}
 
 	return nil
+}
+
+// ValidateAssetYAML extracts the YAML from an asset file and strict-decodes it,
+// returning an error if unknown fields are found.
+// Returns nil for single-line comment assets that are not YAML-parseable.
+func ValidateAssetYAML(fs afero.Fs, filePath string, defType TaskDefinitionType) error {
+	var data []byte
+
+	if defType == YamlTask {
+		var err error
+		data, err = afero.ReadFile(fs, filePath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read file %s", filePath)
+		}
+	} else {
+		file, err := fs.Open(filePath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to open file %s", filePath)
+		}
+		defer file.Close()
+
+		if !isEmbeddedYamlComment(file, possiblePrefixesForCommentBlocks) {
+			return nil
+		}
+
+		rows, _ := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
+		if rows == "" {
+			return nil
+		}
+		data = []byte(rows)
+	}
+
+	var td taskDefinition
+	return path.ConvertYamlToObjectStrict(data, &td)
 }

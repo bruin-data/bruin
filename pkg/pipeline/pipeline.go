@@ -96,6 +96,8 @@ const (
 	AssetTypeQlikSense                 = AssetType("qliksense")
 	AssetTypeQlikView                  = AssetType("qlikview")
 	AssetTypeQuicksight                = AssetType("quicksight")
+	AssetTypeQuicksightDashboard       = AssetType("quicksight.dashboard")
+	AssetTypeQuicksightDataset         = AssetType("quicksight.dataset")
 	AssetTypeR                         = AssetType("r")
 	AssetTypeRedash                    = AssetType("redash")
 	AssetTypeRedshiftQuery             = AssetType("rs.sql")
@@ -675,6 +677,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeVerticaQuerySensor:        "vertica",
 	AssetTypeVerticaTableSensor:        "vertica",
 	AssetTypeVerticaSource:             "vertica",
+	AssetTypeQuicksightDataset:         "quicksight",
+	AssetTypeQuicksightDashboard:       "quicksight",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -1540,6 +1544,7 @@ type Pipeline struct {
 	Tags               EmptyStringArray       `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	Domains            EmptyStringArray       `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
 	Meta               EmptyStringMap         `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
+	Owner              string                 `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
 	Schedule           Schedule               `json:"schedule" yaml:"schedule,omitempty" mapstructure:"schedule"`
 	StartDate          string                 `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
 	DefinitionFile     DefinitionFile         `json:"definition_file" yaml:"-"`

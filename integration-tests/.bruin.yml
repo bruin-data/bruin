@@ -22,7 +22,7 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
       generic:
         - name: KEY1
@@ -35,7 +35,7 @@ environments:
       chess:
         - name: "chess-run-with-filters"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
       generic:
         - name: KEY1
@@ -48,7 +48,7 @@ environments:
       chess:
         - name: "chess-run-with-tags"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
       generic:
         - name: KEY1
@@ -61,7 +61,7 @@ environments:
       chess:
         - name: "chess-run-main-with-filters"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
       generic:
         - name: KEY1
@@ -85,7 +85,7 @@ environments:
       chess:
         - name: "chess-run-with-downstream"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
       generic:
         - name: KEY1
@@ -98,7 +98,7 @@ environments:
       chess:
         - name: "chess-run-main-with-downstream"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
       generic:
         - name: KEY1
@@ -116,7 +116,7 @@ environments:
       chess:
         - name: "chess-run-default-option"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
       generic:
         - name: KEY1
@@ -131,7 +131,7 @@ environments:
       chess:
         - name: "chess-run-malformed-sql"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
       generic:
         - name: KEY1
@@ -154,7 +154,7 @@ environments:
       chess:
         - name: "chess-ingestr"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
   env-run-python-materialization:
     connections:
@@ -275,3 +275,10 @@ environments:
       duckdb:
         - name: "duckdb-query-var"
           path: "duckdb-files/query-var.db"
+
+  env-schema-prefix:
+    schema_prefix: "test"
+    connections:
+      duckdb:
+        - name: "duckdb-schema-prefix"
+          path: "duckdb-files/schema-prefix.db"
