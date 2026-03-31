@@ -4229,3 +4229,188 @@ func TestValidateTableSensorTableParameter(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateUnknownYAMLFields_Pipeline(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no definition file path returns no issues", func(t *testing.T) {
+		t.Parallel()
+		v := validateUnknownYAMLFields{fs: afero.NewMemMapFs()}
+		issues, err := v.ValidatePipeline(t.Context(), &pipeline.Pipeline{})
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	tests := []struct {
+		name     string
+		yaml     string
+		hasIssue bool
+	}{
+		{
+			name: "valid pipeline with known fields",
+			yaml: `name: test-pipeline
+schedule: daily
+start_date: "2024-01-01"
+`,
+			hasIssue: false,
+		},
+		{
+			name: "unknown top-level field",
+			yaml: `name: test-pipeline
+unknown_field: some-value
+`,
+			hasIssue: true,
+		},
+		{
+			name: "unknown nested field in notifications",
+			yaml: `name: test-pipeline
+notifications:
+  slack:
+    - channel: test
+      unknown_nested: true
+`,
+			hasIssue: true,
+		},
+		{
+			name:     "empty pipeline file",
+			yaml:     "{}",
+			hasIssue: false,
+		},
+		{
+			name:     "truly empty file",
+			yaml:     "",
+			hasIssue: false,
+		},
+		{
+			name: "type mismatch is not reported as unknown field",
+			yaml: `name: [1, 2, 3]
+`,
+			hasIssue: false,
+		},
+	}
+
+	ctx := t.Context()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fs := afero.NewMemMapFs()
+			pipelinePath := "/test/pipeline.yml"
+			err := afero.WriteFile(fs, pipelinePath, []byte(tt.yaml), 0o644)
+			require.NoError(t, err)
+
+			v := validateUnknownYAMLFields{fs: fs}
+			p := &pipeline.Pipeline{
+				DefinitionFile: pipeline.DefinitionFile{
+					Name: "pipeline.yml",
+					Path: pipelinePath,
+				},
+			}
+
+			issues, err := v.ValidatePipeline(ctx, p)
+			require.NoError(t, err)
+
+			if tt.hasIssue {
+				assert.NotEmpty(t, issues)
+			} else {
+				assert.Empty(t, issues)
+			}
+		})
+	}
+}
+
+func TestValidateUnknownYAMLFields_Asset(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no definition file path returns no issues", func(t *testing.T) {
+		t.Parallel()
+		v := validateUnknownYAMLFields{fs: afero.NewMemMapFs()}
+		issues, err := v.ValidateAsset(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{})
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	tests := []struct {
+		name     string
+		yaml     string
+		defType  pipeline.TaskDefinitionType
+		hasIssue bool
+	}{
+		{
+			name: "valid asset yaml",
+			yaml: `name: test-asset
+type: bq.sql
+materialization:
+  type: table
+  strategy: merge
+`,
+			defType:  pipeline.YamlTask,
+			hasIssue: false,
+		},
+		{
+			name: "unknown top-level field in asset",
+			yaml: `name: test-asset
+type: bq.sql
+some_unknown: value
+`,
+			defType:  pipeline.YamlTask,
+			hasIssue: true,
+		},
+		{
+			name: "unknown nested field in materialization",
+			yaml: `name: test-asset
+type: bq.sql
+materialization:
+  type: table
+  unknown_mat_field: value
+`,
+			defType:  pipeline.YamlTask,
+			hasIssue: true,
+		},
+		{
+			name: "valid asset with columns",
+			yaml: `name: test-asset
+type: bq.sql
+columns:
+  - name: id
+    type: integer
+    checks:
+      - name: not_null
+`,
+			defType:  pipeline.YamlTask,
+			hasIssue: false,
+		},
+	}
+
+	ctx := t.Context()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fs := afero.NewMemMapFs()
+			assetPath := "/test/assets/task.yml"
+
+			err := afero.WriteFile(fs, assetPath, []byte(tt.yaml), 0o644)
+			require.NoError(t, err)
+
+			v := validateUnknownYAMLFields{fs: fs}
+			p := &pipeline.Pipeline{}
+			asset := &pipeline.Asset{
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Name: "task.yml",
+					Path: assetPath,
+					Type: tt.defType,
+				},
+			}
+
+			issues, err := v.ValidateAsset(ctx, p, asset)
+			require.NoError(t, err)
+
+			if tt.hasIssue {
+				assert.NotEmpty(t, issues)
+			} else {
+				assert.Empty(t, issues)
+			}
+		})
+	}
+}
