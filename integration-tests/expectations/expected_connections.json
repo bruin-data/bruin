@@ -557,6 +557,39 @@
       },
       "schema_prefix": "test"
     },
+    "env-selector-downstream": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-downstream",
+            "path": "duckdb-files/run-selector-downstream.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-selector-intersection": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-filters",
+            "path": "duckdb-files/run-selector-intersection.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-selector-path": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-filters",
+            "path": "duckdb-files/run-selector-path.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-start-date-flags": {
       "connections": {
         "duckdb": [

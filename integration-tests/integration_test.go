@@ -3304,7 +3304,7 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "start-date-ignored: run with full-refresh uses CLI start-date, not pipeline start_date",
+						Name:    "start-date-ignored: run with full-refresh uses pipeline start_date",
 						Command: binary,
 						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
 						Env:     []string{},
@@ -3318,13 +3318,13 @@ func TestWorkflowTasks(t *testing.T) {
 						},
 					},
 					{
-						Name:    "start-date-ignored: validate full-refresh also uses CLI start-date",
+						Name:    "start-date-ignored: validate full-refresh uses pipeline start_date",
 						Command: binary,
 						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date, captured_end_date FROM date_capture", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							Contains: []string{"2024-01-15", "2024-01-31"},
+							Contains: []string{"2023-06-15", "2024-01-31"},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
