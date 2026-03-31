@@ -4281,6 +4281,12 @@ notifications:
 			yaml:     "",
 			hasIssue: false,
 		},
+		{
+			name: "type mismatch is not reported as unknown field",
+			yaml: `name: [1, 2, 3]
+`,
+			hasIssue: false,
+		},
 	}
 
 	ctx := t.Context()

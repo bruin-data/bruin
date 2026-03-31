@@ -1781,6 +1781,27 @@ type validateUnknownYAMLFields struct {
 	fs afero.Fs
 }
 
+// unknownFieldIssues filters a strict-decode error to only the lines about unknown fields,
+// ignoring type mismatches and other YAML errors that are handled elsewhere.
+func unknownFieldIssues(err error, task *pipeline.Asset) []*Issue {
+	if err == nil {
+		return nil
+	}
+
+	var issues []*Issue
+	for _, line := range strings.Split(err.Error(), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "not found in type") {
+			issues = append(issues, &Issue{
+				Task:        task,
+				Description: line,
+			})
+		}
+	}
+
+	return issues
+}
+
 func (v *validateUnknownYAMLFields) ValidatePipeline(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	if p.DefinitionFile.Path == "" {
 		return nil, nil
@@ -1792,13 +1813,9 @@ func (v *validateUnknownYAMLFields) ValidatePipeline(ctx context.Context, p *pip
 	}
 
 	var target pipeline.Pipeline
-	if err := path.ConvertYamlToObjectStrict(data, &target); err != nil {
-		return []*Issue{ //nolint:nilerr
-			{Description: "pipeline definition has an issue: " + err.Error()},
-		}, nil
-	}
+	strictErr := path.ConvertYamlToObjectStrict(data, &target)
 
-	return nil, nil
+	return unknownFieldIssues(strictErr, nil), nil
 }
 
 func (v *validateUnknownYAMLFields) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -1815,14 +1832,7 @@ func (v *validateUnknownYAMLFields) ValidateAsset(ctx context.Context, p *pipeli
 		return nil, nil
 	}
 
-	if err := pipeline.ValidateTaskDefinitionYAML(data); err != nil {
-		return []*Issue{ //nolint:nilerr
-			{
-				Task:        asset,
-				Description: "asset definition has an issue: " + err.Error(),
-			},
-		}, nil
-	}
+	strictErr := pipeline.ValidateTaskDefinitionYAML(data)
 
-	return nil, nil
+	return unknownFieldIssues(strictErr, asset), nil
 }

@@ -59,7 +59,7 @@ func ConvertYamlToObjectStrict(buf []byte, out interface{}) error {
 	decoder.KnownFields(true)
 	err := decoder.Decode(out)
 	if err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil // empty document is valid, same as yaml.Unmarshal behaviour
 		}
 		return &YamlParseError{msg: err.Error()}
