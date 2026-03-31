@@ -213,7 +213,7 @@ func DefaultBranch(repoPath string) (string, error) {
 		ref := strings.TrimSpace(stdout.String())
 		// ref looks like "refs/remotes/origin/main"
 		parts := strings.Split(ref, "/")
-		if len(parts) > 0 {
+		if len(parts) > 0 && parts[len(parts)-1] != "" {
 			return parts[len(parts)-1], nil
 		}
 	}
