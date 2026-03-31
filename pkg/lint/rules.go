@@ -1823,16 +1823,7 @@ func (v *validateUnknownYAMLFields) ValidateAsset(ctx context.Context, p *pipeli
 		return nil, nil
 	}
 
-	data, err := pipeline.ExtractAssetYAML(v.fs, asset.DefinitionFile.Path, asset.DefinitionFile.Type)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to extract YAML from asset file %s", asset.DefinitionFile.Path)
-	}
-
-	if data == nil {
-		return nil, nil
-	}
-
-	strictErr := pipeline.ValidateTaskDefinitionYAML(data)
+	strictErr := pipeline.ValidateAssetYAML(v.fs, asset.DefinitionFile.Path, asset.DefinitionFile.Type)
 
 	return unknownFieldIssues(strictErr, asset), nil
 }

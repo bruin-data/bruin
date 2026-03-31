@@ -550,12 +550,6 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	return &task, nil
 }
 
-// ValidateTaskDefinitionYAML strict-decodes asset YAML and returns an error on unknown fields.
-func ValidateTaskDefinitionYAML(data []byte) error {
-	var td taskDefinition
-	return path.ConvertYamlToObjectStrict(data, &td)
-}
-
 func hash(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
 }
