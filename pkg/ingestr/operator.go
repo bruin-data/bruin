@@ -100,6 +100,13 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("source uri is empty, which means the source connection is not configured correctly")
 	}
 
+	// Ensure the URI has the authority separator "//" after the scheme.
+	// Some source configs build URIs without a Host, causing Go's url.URL.String()
+	// to produce "scheme:?params" instead of "scheme://?params".
+	if parts := strings.SplitN(sourceURI, ":", 2); len(parts) == 2 && !strings.HasPrefix(parts[1], "//") {
+		sourceURI = parts[0] + "://" + parts[1]
+	}
+
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
 	// always feasible. In the case of GSheets, we have to reuse the same GCP credentials, but change the prefix with gsheets://
 	if asset.Parameters["source"] == "gsheets" {
