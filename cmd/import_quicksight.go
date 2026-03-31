@@ -447,6 +447,14 @@ func createQuickSightDatasetAsset(
 		"refresh":      "false",
 	}
 
+	// If any physical table uses CustomSql, store the query
+	for _, pt := range detail.PhysicalTableMaps {
+		if pt.SqlQuery != "" {
+			parameters["custom_sql"] = pt.SqlQuery
+			break
+		}
+	}
+
 	// Build columns
 	columns := make([]pipeline.Column, 0, len(detail.Columns))
 	for _, col := range detail.Columns {

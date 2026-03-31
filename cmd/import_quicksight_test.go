@@ -3,6 +3,7 @@ package cmd
 import (
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -128,4 +129,61 @@ func TestMapQuickSightColumnType(t *testing.T) {
 			assert.Equal(t, tt.expected, mapQuickSightColumnType(tt.input))
 		})
 	}
+}
+
+func TestCreateQuickSightDatasetAsset_RelationalTable(t *testing.T) {
+	t.Parallel()
+
+	detail := &quicksight.DataSetDetail{
+		ID:         "ds-001",
+		Name:       "Sales Data",
+		ImportMode: "SPICE",
+		Columns: []quicksight.DataSetColumn{
+			{Name: "id", Type: "INTEGER"},
+			{Name: "name", Type: "STRING"},
+		},
+		PhysicalTableMaps: map[string]quicksight.PhysicalTable{
+			"table1": {
+				SchemaName: "public",
+				TableName:  "orders",
+			},
+		},
+	}
+
+	asset := createQuickSightDatasetAsset(detail, "/tmp/assets")
+
+	assert.Equal(t, "quicksight.datasets.dataset_sales_data", asset.Name)
+	assert.Equal(t, "SPICE", asset.Parameters["import_mode"])
+	assert.Empty(t, asset.Parameters["custom_sql"])
+	assert.Len(t, asset.Columns, 2)
+	assert.Len(t, asset.Upstreams, 1)
+	assert.Equal(t, "public.orders", asset.Upstreams[0].Value)
+}
+
+func TestCreateQuickSightDatasetAsset_CustomSql(t *testing.T) {
+	t.Parallel()
+
+	detail := &quicksight.DataSetDetail{
+		ID:         "ds-002",
+		Name:       "Issues Query",
+		ImportMode: "SPICE",
+		Columns: []quicksight.DataSetColumn{
+			{Name: "id", Type: "INTEGER"},
+			{Name: "title", Type: "STRING"},
+		},
+		PhysicalTableMaps: map[string]quicksight.PhysicalTable{
+			"custom1": {
+				SqlQuery: "select * from issues where true",
+				SqlName:  "issues_query",
+			},
+		},
+	}
+
+	asset := createQuickSightDatasetAsset(detail, "/tmp/assets")
+
+	assert.Equal(t, "quicksight.datasets.dataset_issues_query", asset.Name)
+	assert.Equal(t, "SPICE", asset.Parameters["import_mode"])
+	assert.Equal(t, "select * from issues where true", asset.Parameters["custom_sql"])
+	assert.Len(t, asset.Columns, 2)
+	assert.Empty(t, asset.Upstreams) // CustomSql has no table-based upstreams
 }

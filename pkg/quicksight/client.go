@@ -85,6 +85,8 @@ type PhysicalTable struct {
 	TableName    string
 	Columns      []DataSetColumn
 	DataSourceID string
+	SqlQuery     string // CustomSql query text, empty for relational/S3 tables
+	SqlName      string // CustomSql alias name
 }
 
 // DashboardSummary holds summary info for a dashboard.
@@ -224,6 +226,8 @@ func extractPhysicalTable(ptm qstypes.PhysicalTable) PhysicalTable {
 		}
 	case *qstypes.PhysicalTableMemberCustomSql:
 		pt.DataSourceID = aws.ToString(v.Value.DataSourceArn)
+		pt.SqlQuery = aws.ToString(v.Value.SqlQuery)
+		pt.SqlName = aws.ToString(v.Value.Name)
 		for _, col := range v.Value.Columns {
 			pt.Columns = append(pt.Columns, DataSetColumn{
 				Name: aws.ToString(col.Name),
