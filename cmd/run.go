@@ -2321,13 +2321,13 @@ func sendTelemetry(s *scheduler.Scheduler, c *cli.Command) {
 }
 
 type Filter struct {
-	IncludeTag        string   // Tag to include assets (from `--tag`)
-	OnlyTaskTypes     []string // Task types to include (from `--only`)
-	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
-	PushMetaData      bool
-	SingleTask        *pipeline.Asset   // Single asset (from running asset file directly)
-	SelectedAssets    []*pipeline.Asset // Multiple assets specified as positional arguments
-	ModifiedAssets    []*pipeline.Asset // Assets whose files have been modified vs default branch (from `--modified`)
+	IncludeTag         string   // Tag to include assets (from `--tag`)
+	OnlyTaskTypes      []string // Task types to include (from `--only`)
+	IncludeDownstream  bool     // Whether to include downstream tasks (from `--downstream`)
+	PushMetaData       bool
+	SingleTask         *pipeline.Asset   // Single asset (from running asset file directly)
+	SelectedAssets     []*pipeline.Asset // Multiple assets specified as positional arguments
+	ModifiedAssets     []*pipeline.Asset // Assets whose files have been modified vs default branch (from `--modified`)
 	Selector           string
 	ExcludeTag         string
 	selectedBySelector bool
