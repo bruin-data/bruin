@@ -4276,6 +4276,11 @@ notifications:
 			yaml:     "{}",
 			hasIssue: false,
 		},
+		{
+			name:     "truly empty file",
+			yaml:     "",
+			hasIssue: false,
+		},
 	}
 
 	ctx := t.Context()

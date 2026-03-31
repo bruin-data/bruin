@@ -2,6 +2,7 @@ package path
 
 import (
 	"bytes"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -58,6 +59,9 @@ func ConvertYamlToObjectStrict(buf []byte, out interface{}) error {
 	decoder.KnownFields(true)
 	err := decoder.Decode(out)
 	if err != nil {
+		if err == io.EOF {
+			return nil // empty document is valid, same as yaml.Unmarshal behaviour
+		}
 		return &YamlParseError{msg: err.Error()}
 	}
 
