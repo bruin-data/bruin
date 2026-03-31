@@ -42,6 +42,7 @@ table td:first-child {
 | `--full-refresh` | bool | `false` | Truncate the table before running. Also sets the `full_refresh` jinja variable to `True` and `BRUIN_FULL_REFRESH` environment variable to `1`. |
 | `--apply-interval-modifiers` | bool | `false` | Apply interval modifiers. |
 | `--continue` | bool | `false` | Continue from the last failed asset. |
+| `--selector` | str | - | Select assets with dbt-style syntax. Supports `tag:`, `path:`, `file:`, `fqn:`, `+`, `n+`, `@`, space unions, and comma intersections. |
 | `--tag` | str | - | Pick assets with the given tag. |
 | `--single-check` | str | - | Run a single column or custom check by ID. |
 | `--exclude-tag` | str | - | Exclude assets with the given tag. |
@@ -74,6 +75,26 @@ bruin run --continue
 As detailed in the flag section above, the  `--tag`, `--downstream`, `--exclude-tag`, and `--only` flags provide powerful ways to filter and control which assets and execution steps in your pipeline are executed. These flags can also be combined to fine-tune pipeline runs, allowing you to execute specific subsets of assets based on tags, include their downstream dependencies, and restrict execution to certain execution types.
 
 Let's explore how combining these flags enables highly targeted pipeline execution scenarios:
+
+### dbt-style Selectors
+
+Use `--selector` when you want dbt-like asset targeting in a Bruin pipeline:
+
+```bash
+bruin run --selector "tag:nightly"
+bruin run --selector "+fct_orders"
+bruin run --selector "path:assets/marts,tag:finance"
+bruin run --selector "@fct_orders"
+```
+
+`--selector` supports:
+
+- `tag:`, `path:`, `file:`, and `fqn:` methods
+- `+asset`, `asset+`, and `2+asset+1` graph expansion
+- `@asset` to include descendants and the ancestors they need
+- Space-delimited unions and comma-delimited intersections
+
+`--selector` cannot be combined with `--tag`, `--downstream`, positional asset arguments, or single-asset runs. Use selector syntax directly for those cases.
 
 ### Combining Tags and Execution Types
 
@@ -163,6 +184,12 @@ Run the assets in the pipeline that contain a specific tag:
 
 ```bash
 bruin run --tag my_tag
+```
+
+Run a dbt-style selector:
+
+```bash
+bruin run --selector "+fct_orders,tag:finance"
 ```
 
 Run only the quality checks:

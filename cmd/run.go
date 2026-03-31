@@ -553,6 +553,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage: "use continue to run the pipeline from the last failed asset",
 			},
 			&cli.StringFlag{
+				Name:  "selector",
+				Usage: "select assets using dbt-style selector syntax, including tag:, path:, file:, fqn:, +, n+, @, space unions, and comma intersections",
+			},
+			&cli.StringFlag{
 				Name:    "tag",
 				Aliases: []string{"t"},
 				Usage:   "pick the assets with the given tag",
@@ -698,6 +702,7 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetadata:           c.Bool("push-metadata"),
 				NoLogFile:              c.Bool("no-log-file"),
 				FullRefresh:            fullRefresh,
+				Selector:               c.String("selector"),
 				Tag:                    c.String("tag"),
 				ExcludeTag:             c.String("exclude-tag"),
 				Only:                   c.StringSlice("only"),
@@ -811,6 +816,7 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				SelectedAssets:    selectedAssets,
+				Selector:          runConfig.Selector,
 				ExcludeTag:        runConfig.ExcludeTag,
 				singleCheckID: scheduler.CheckUniqueID{
 					ID:    singleCheckID,
@@ -974,6 +980,49 @@ func Run(isDebug *bool) *cli.Command {
 				filter.ModifiedAssets = modifiedAssets
 			}
 
+			if filter.Selector != "" {
+				switch {
+				case preview.RunningForAnAsset:
+					errorPrinter.Printf("Cannot use --selector when running a single asset file directly.\n")
+					return cli.Exit("", 1)
+				case len(assetPaths) > 0:
+					errorPrinter.Printf("Cannot use --selector together with positional asset arguments.\n")
+					return cli.Exit("", 1)
+				case runConfig.Tag != "":
+					errorPrinter.Printf("Cannot use --selector together with --tag. Use tag: selectors instead.\n")
+					return cli.Exit("", 1)
+				case runConfig.Downstream:
+					errorPrinter.Printf("Cannot use --selector together with --downstream. Use +, n+, or @ in the selector instead.\n")
+					return cli.Exit("", 1)
+				case singleCheckID != "":
+					errorPrinter.Printf("Cannot use --selector together with --single-check.\n")
+					return cli.Exit("", 1)
+				case c.Bool("modified"):
+					errorPrinter.Printf("Cannot use --selector together with --modified.\n")
+					return cli.Exit("", 1)
+				}
+
+				selectedAssets, err = pipeline.ResolveSelectorAssets(filter.Selector, pipelineInfo.Pipeline)
+				if err != nil {
+					errorPrinter.Printf("Failed to resolve selector: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				filter.SelectedAssets = selectedAssets
+				filter.selectedBySelector = true
+			}
+
+			// Re-determine start date based on pipeline configuration and full-refresh flag
+			startDate, err = DetermineStartDate(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
+			if err != nil {
+				return err
+			}
+
+			// Parse end date directly from CLI
+			endDate, err = date.ParseTime(runConfig.EndDate)
+			if err != nil {
+				return err
+			}
 			// Validate date range
 			if err := ValidateDateRange(startDate, endDate); err != nil {
 				return err
@@ -1344,6 +1393,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	filter.IncludeTag = pipelineState.Parameters.Tag
 	filter.OnlyTaskTypes = pipelineState.Parameters.Only
 	filter.PushMetaData = pipelineState.Parameters.PushMetadata
+	filter.Selector = pipelineState.Parameters.Selector
 	filter.ExcludeTag = pipelineState.Parameters.ExcludeTag
 	return pipelineState, nil
 }
@@ -1412,6 +1462,40 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 	}
 
 	return startDate, endDate, nil
+}
+
+func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRefresh bool, logger logger.Logger) (time.Time, error) {
+	var startDate time.Time
+	var err error
+
+	switch {
+	case !fullRefresh:
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	case pipeline == nil:
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	case pipeline.StartDate == "":
+		startDate, err = date.ParseTime(cliStartDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+		logger.Debug("Using CLI start_date: ", cliStartDate)
+	default:
+		startDate, err = date.ParseTime(pipeline.StartDate)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("invalid pipeline start_date '%s': %w", pipeline.StartDate, err)
+		}
+		logger.Debug("Using pipeline start_date: ", pipeline.StartDate)
+	}
+
+	return startDate, nil
 }
 
 func ValidateDateRange(startDate, endDate time.Time) error {
@@ -2237,15 +2321,17 @@ func sendTelemetry(s *scheduler.Scheduler, c *cli.Command) {
 }
 
 type Filter struct {
-	IncludeTag        string   // Tag to include assets (from `--tag`)
-	OnlyTaskTypes     []string // Task types to include (from `--only`)
-	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
-	PushMetaData      bool
-	SingleTask        *pipeline.Asset   // Single asset (from running asset file directly)
-	SelectedAssets    []*pipeline.Asset // Multiple assets specified as positional arguments
-	ModifiedAssets    []*pipeline.Asset // Assets whose files have been modified vs default branch (from `--modified`)
-	ExcludeTag        string
-	singleCheckID     scheduler.CheckUniqueID // ID of the single check to run, if any
+	IncludeTag         string   // Tag to include assets (from `--tag`)
+	OnlyTaskTypes      []string // Task types to include (from `--only`)
+	IncludeDownstream  bool     // Whether to include downstream tasks (from `--downstream`)
+	PushMetaData       bool
+	SingleTask         *pipeline.Asset   // Single asset (from running asset file directly)
+	SelectedAssets     []*pipeline.Asset // Multiple assets specified as positional arguments
+	ModifiedAssets     []*pipeline.Asset // Assets whose files have been modified vs default branch (from `--modified`)
+	Selector           string
+	ExcludeTag         string
+	selectedBySelector bool
+	singleCheckID      scheduler.CheckUniqueID // ID of the single check to run, if any
 }
 
 func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -2325,7 +2411,7 @@ func HandleMultipleAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler
 
 	// Handle exclude-tag if specified
 	if f.ExcludeTag != "" {
-		if !f.IncludeDownstream {
+		if !f.IncludeDownstream && !f.selectedBySelector {
 			return errors.New("when specifying assets with --exclude-tag, you must also use --downstream flag")
 		}
 		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)

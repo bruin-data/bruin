@@ -2683,3 +2683,185 @@ func TestGenerateLogFileName(t *testing.T) {
 		})
 	}
 }
+
+func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
+	t.Parallel()
+
+	logger := zaptest.NewLogger(t).Sugar()
+	now := time.Now()
+	futureDate := now.AddDate(0, 0, 1) // Tomorrow
+	futureDateStr := futureDate.Format("2006-01-02 15:04:05.000000")
+
+	tests := []struct {
+		name          string
+		cliStartDate  string
+		pipeline      *pipeline.Pipeline
+		fullRefresh   bool
+		expectedError bool
+	}{
+		{
+			name:         "future CLI start date with full refresh false should succeed",
+			cliStartDate: futureDateStr,
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: "",
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   false,
+			expectedError: false,
+		},
+		{
+			name:          "future CLI start date with nil pipeline should succeed",
+			cliStartDate:  futureDateStr,
+			pipeline:      nil,
+			fullRefresh:   true,
+			expectedError: false,
+		},
+		{
+			name:         "future CLI start date with empty pipeline start date should succeed",
+			cliStartDate: futureDateStr,
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: "",
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   true,
+			expectedError: false,
+		},
+		{
+			name:         "future pipeline start date should succeed",
+			cliStartDate: "",
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: futureDate.Format("2006-01-02"),
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   true,
+			expectedError: false,
+		},
+		{
+			name:         "past CLI start date should succeed",
+			cliStartDate: now.AddDate(0, 0, -1).Format("2006-01-02 15:04:05.000000"),
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: "",
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   false,
+			expectedError: false,
+		},
+		{
+			name:         "past pipeline start date should succeed",
+			cliStartDate: "",
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: now.AddDate(0, 0, -1).Format("2006-01-02"),
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   true,
+			expectedError: false,
+		},
+		{
+			name:         "current date (date only) should succeed",
+			cliStartDate: now.Format("2006-01-02"),
+			pipeline: &pipeline.Pipeline{
+				Name:      "TestPipeline",
+				StartDate: "",
+				Assets:    []*pipeline.Asset{},
+			},
+			fullRefresh:   false,
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			startDate, err := DetermineStartDate(tt.cliStartDate, tt.pipeline, tt.fullRefresh, logger)
+
+			if tt.expectedError {
+				require.Error(t, err, "Expected error")
+				assert.True(t, startDate.IsZero(), "Start date should be zero time on error")
+			} else {
+				require.NoError(t, err, "Should not error for any valid date (past, present, or future)")
+				assert.False(t, startDate.IsZero(), "Start date should not be zero time on success")
+			}
+		})
+	}
+}
+
+func TestApplyAllFilters_SelectorAllowsExcludeTagWithoutDownstream(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	p := &pipeline.Pipeline{
+		Name: "selector_pipeline",
+		DefinitionFile: pipeline.DefinitionFile{
+			Path: filepath.Join(root, "pipeline.yml"),
+		},
+		Assets: []*pipeline.Asset{
+			{
+				Name: "stg_orders",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Tags: []string{"nightly"},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: filepath.Join(root, "assets", "staging", "stg_orders.sql"),
+				},
+			},
+			{
+				Name: "int_orders",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Tags: []string{"nightly", "finance"},
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "stg_orders"},
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: filepath.Join(root, "assets", "staging", "int_orders.sql"),
+				},
+			},
+			{
+				Name: "fct_orders",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Tags: []string{"finance"},
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "int_orders"},
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: filepath.Join(root, "assets", "marts", "fct_orders.sql"),
+				},
+			},
+			{
+				Name: "audit_orders",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Tags: []string{"qa"},
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "fct_orders"},
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: filepath.Join(root, "assets", "marts", "audit_orders.sql"),
+				},
+			},
+		},
+	}
+
+	selectedAssets, err := pipeline.ResolveSelectorAssets("tag:nightly+", p)
+	require.NoError(t, err)
+
+	filter := &Filter{
+		SelectedAssets:     selectedAssets,
+		ExcludeTag:         "qa",
+		selectedBySelector: true,
+	}
+
+	s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+	err = ApplyAllFilters(t.Context(), filter, s, p)
+	require.NoError(t, err)
+
+	pendingAssets := getPendingAssets(s)
+	names := make([]string, len(pendingAssets))
+	for i, asset := range pendingAssets {
+		names[i] = asset.Name
+	}
+	assert.Equal(t, []string{"stg_orders", "int_orders", "fct_orders"}, names)
+}

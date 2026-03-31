@@ -135,6 +135,7 @@ type RunConfig struct {
 	PushMetadata           bool     `json:"pushMetadata"`
 	NoLogFile              bool     `json:"noLogFile"`
 	FullRefresh            bool     `json:"fullRefresh"`
+	Selector               string   `json:"selector"`
 	Tag                    string   `json:"tag"`
 	ExcludeTag             string   `json:"excludeTag"`
 	Only                   []string `json:"only"`
