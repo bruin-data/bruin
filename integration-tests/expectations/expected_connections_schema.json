@@ -326,7 +326,7 @@
           },
           "type": "array",
           "default": [
-            "MagnusCarlsen",
+            "FabianoCaruana",
             "Hikaru"
           ]
         }

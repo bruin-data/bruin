@@ -13,9 +13,14 @@ def replace_table_references(
         for table_node in parsed_query.find_all(exp.Table):
             for table_name, new_table_name in table_references.items():
                 parts = table_name.split(".")
+                source_catalog = None
                 source_schema = None
                 source_table = table_name
-                if len(parts) > 1:
+                if len(parts) == 3:
+                    source_catalog = parts[0]
+                    source_schema = parts[1]
+                    source_table = parts[2]
+                elif len(parts) == 2:
                     source_schema = parts[0]
                     source_table = parts[1]
 
@@ -25,15 +30,25 @@ def replace_table_references(
                 if source_schema is not None and source_schema != table_node.db:
                     continue
 
+                if source_catalog is not None and source_catalog != table_node.catalog:
+                    continue
+
                 parts = new_table_name.split(".")
+                dest_catalog = None
                 dest_schema = None
                 dest_table = new_table_name
-                if len(parts) > 1:
+                if len(parts) == 3:
+                    dest_catalog = parts[0]
+                    dest_schema = parts[1]
+                    dest_table = parts[2]
+                elif len(parts) == 2:
                     dest_schema = parts[0]
                     dest_table = parts[1]
 
                 table_node.this.set("this", dest_table)
                 table_node.set("db", dest_schema)
+                if dest_catalog is not None:
+                    table_node.set("catalog", dest_catalog)
                 if not table_node.alias and source_table != dest_table:
                     table_node.set("alias", source_table)
 

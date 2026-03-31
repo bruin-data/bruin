@@ -1057,6 +1057,70 @@ join t2
 	}
 }
 
+func TestSqlParser_RenameTables_TSQL_ThreePartNames(t *testing.T) {
+	tests := []struct {
+		name          string
+		query         string
+		tableMappings map[string]string
+		want          string
+	}{
+		{
+			name:  "3-part name schema rewrite",
+			query: "SELECT * FROM mydb.myschema.mytable",
+			tableMappings: map[string]string{
+				"mydb.myschema.mytable": "mydb.dev_myschema.mytable",
+			},
+			want: "SELECT * FROM mydb.dev_myschema.mytable",
+		},
+		{
+			name:  "3-part name schema rewrite with join",
+			query: "SELECT * FROM db1.schema1.table1 t1 JOIN db1.schema2.table2 t2 ON t1.id = t2.id",
+			tableMappings: map[string]string{
+				"db1.schema1.table1": "db1.dev_schema1.table1",
+				"db1.schema2.table2": "db1.dev_schema2.table2",
+			},
+			want: "SELECT * FROM db1.dev_schema1.table1 AS t1 JOIN db1.dev_schema2.table2 AS t2 ON t1.id = t2.id",
+		},
+		{
+			name:  "3-part name partial rewrite only rewrites mapped tables",
+			query: "SELECT * FROM db1.schema1.table1 t1 JOIN db2.schema2.table2 t2 ON t1.id = t2.id",
+			tableMappings: map[string]string{
+				"db1.schema1.table1": "db1.dev_schema1.table1",
+			},
+			want: "SELECT * FROM db1.dev_schema1.table1 AS t1 JOIN db2.schema2.table2 AS t2 ON t1.id = t2.id",
+		},
+		{
+			name:  "mix of 2-part and 3-part name rewrites",
+			query: "SELECT * FROM mydb.myschema.mytable t1 JOIN otherschema.othertable t2 ON t1.id = t2.id",
+			tableMappings: map[string]string{
+				"mydb.myschema.mytable":  "mydb.dev_myschema.mytable",
+				"otherschema.othertable": "dev_otherschema.othertable",
+			},
+			want: "SELECT * FROM mydb.dev_myschema.mytable AS t1 JOIN dev_otherschema.othertable AS t2 ON t1.id = t2.id",
+		},
+		{
+			name:  "2-part mapping does not strip catalog from 3-part SQL reference",
+			query: "SELECT * FROM mydb.myschema.mytable",
+			tableMappings: map[string]string{
+				"myschema.mytable": "dev_myschema.mytable",
+			},
+			want: "SELECT * FROM mydb.dev_myschema.mytable",
+		},
+	}
+
+	for _, parser := range startParsersForParity(t) { //nolint:paralleltest
+		t.Run(parser.name, func(t *testing.T) {
+			for _, tt := range tests { //nolint
+				t.Run(tt.name, func(t *testing.T) {
+					got, err := parser.parser.RenameTables(tt.query, "tsql", tt.tableMappings)
+					require.NoError(t, err)
+					require.Equal(t, tt.want, got)
+				})
+			}
+		})
+	}
+}
+
 func TestSqlParser_AddLimit(t *testing.T) { //nolint
 	tests := []struct {
 		name     string

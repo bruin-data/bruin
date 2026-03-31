@@ -1693,7 +1693,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseTableSensor) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: mssql.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
 			Mat: synapse.NewMaterializer(fullRefresh),
 		})

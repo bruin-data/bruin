@@ -1,0 +1,3 @@
+name: schema-prefix-test
+default_connections:
+    duckdb: "duckdb-schema-prefix"
