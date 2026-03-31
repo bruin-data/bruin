@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/microsoft/go-mssqldb"
@@ -137,6 +138,84 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 		Rows:        resultRows,
 		ColumnTypes: typeNames,
 	}, rows.Err()
+}
+
+func fromFabricValue(value any) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case []byte:
+		return string(v), true
+	case nil:
+		return "", false
+	default:
+		return "", false
+	}
+}
+
+func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	currentDB := db.config.Database
+	if currentDB == "" {
+		return nil, errors.New("database name not configured")
+	}
+
+	const schemaQuery = `
+SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+FROM information_schema.tables
+WHERE TABLE_SCHEMA NOT IN ('dbo', 'sys', 'INFORMATION_SCHEMA')
+`
+
+	tables, err := db.Select(ctx, &query.Query{Query: schemaQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query information_schema.tables: %w", err)
+	}
+
+	summary := &ansisql.DBDatabase{
+		Name:    currentDB,
+		Schemas: []*ansisql.DBSchema{},
+	}
+	schemaCache := make(map[string]*ansisql.DBSchema)
+
+	for _, row := range tables {
+		if len(row) < 3 {
+			continue
+		}
+
+		schemaName, ok := fromFabricValue(row[0])
+		if !ok {
+			continue
+		}
+		tableName, ok := fromFabricValue(row[1])
+		if !ok {
+			continue
+		}
+		tableType, ok := fromFabricValue(row[2])
+		if !ok {
+			continue
+		}
+
+		schema, ok := schemaCache[schemaName]
+		if !ok {
+			schema = &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+			schemaCache[schemaName] = schema
+			summary.Schemas = append(summary.Schemas, schema)
+		}
+
+		dbTableType := ansisql.DBTableTypeTable
+		if strings.EqualFold(tableType, "VIEW") || strings.EqualFold(tableType, "MATERIALIZED VIEW") {
+			dbTableType = ansisql.DBTableTypeView
+		}
+
+		schema.Tables = append(schema.Tables, &ansisql.DBTable{
+			Name: tableName,
+			Type: dbTableType,
+		})
+	}
+
+	return summary, nil
 }
 
 func (db *DB) GetIngestrURI() (string, error) {
