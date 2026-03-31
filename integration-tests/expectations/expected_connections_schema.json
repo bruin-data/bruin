@@ -392,26 +392,6 @@
         "api_token"
       ]
     },
-    "PosthogConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "personal_api_key": {
-          "type": "string"
-        },
-        "project_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "personal_api_key",
-        "project_id"
-      ]
-    },
     "Connections": {
       "properties": {
         "aws": {
@@ -1273,6 +1253,22 @@
       "required": [
         "name",
         "path"
+      ]
+    },
+    "DuneConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "DynamoDBConnection": {
@@ -2483,6 +2479,26 @@
         "database"
       ]
     },
+    "PosthogConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "personal_api_key": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "personal_api_key",
+        "project_id"
+      ]
+    },
     "PrimerConnection": {
       "properties": {
         "name": {
@@ -2963,22 +2979,6 @@
       ]
     },
     "StripeConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_key"
-      ]
-    },
-    "DuneConnection": {
       "properties": {
         "name": {
           "type": "string"

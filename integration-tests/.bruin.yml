@@ -275,3 +275,10 @@ environments:
       duckdb:
         - name: "duckdb-query-var"
           path: "duckdb-files/query-var.db"
+
+  env-schema-prefix:
+    schema_prefix: "test"
+    connections:
+      duckdb:
+        - name: "duckdb-schema-prefix"
+          path: "duckdb-files/schema-prefix.db"

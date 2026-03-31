@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -299,5 +300,30 @@ func TestSetupVariables(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "{}", result["BRUIN_VARS_SCHEMA"])
+	})
+
+	t.Run("BRUIN_SCHEMA_PREFIX is empty when no environment in context", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := t.Context()
+		ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
+
+		result, err := env.SetupVariables(ctx, &pipeline.Pipeline{Name: "test-pipeline"}, &pipeline.Asset{}, map[string]string{})
+		require.NoError(t, err)
+
+		assert.Empty(t, result["BRUIN_SCHEMA_PREFIX"])
+	})
+
+	t.Run("BRUIN_SCHEMA_PREFIX is set from environment", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := t.Context()
+		ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
+		ctx = context.WithValue(ctx, config.EnvironmentContextKey, &config.Environment{SchemaPrefix: "dev_"})
+
+		result, err := env.SetupVariables(ctx, &pipeline.Pipeline{Name: "test-pipeline"}, &pipeline.Asset{}, map[string]string{})
+		require.NoError(t, err)
+
+		assert.Equal(t, "dev_", result["BRUIN_SCHEMA_PREFIX"])
 	})
 }
