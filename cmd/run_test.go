@@ -2197,11 +2197,13 @@ func TestHandleModifiedAssets(t *testing.T) {
 func TestFindAssetsFromChangedFiles(t *testing.T) {
 	t.Parallel()
 
+	// Use a temp dir so paths are valid absolute OS-native paths (fixes Windows).
+	repoRoot := t.TempDir()
+
 	tests := []struct {
 		name           string
 		changedFiles   []string
 		pipeline       *pipeline.Pipeline
-		repoRoot       string
 		expectedAssets []string
 	}{
 		{
@@ -2211,15 +2213,14 @@ func TestFindAssetsFromChangedFiles(t *testing.T) {
 				Assets: []*pipeline.Asset{
 					{
 						Name:           "Task1",
-						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task1.sql"},
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: filepath.Join(repoRoot, "pipelines", "assets", "task1.sql")},
 					},
 					{
 						Name:           "Task2",
-						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task2.sql"},
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: filepath.Join(repoRoot, "pipelines", "assets", "task2.sql")},
 					},
 				},
 			},
-			repoRoot:       "/repo",
 			expectedAssets: []string{"Task1"},
 		},
 		{
@@ -2229,12 +2230,11 @@ func TestFindAssetsFromChangedFiles(t *testing.T) {
 				Assets: []*pipeline.Asset{
 					{
 						Name:           "Task1",
-						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task1.asset.yml"},
-						ExecutableFile: pipeline.ExecutableFile{Path: "/repo/pipelines/assets/task1.py"},
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: filepath.Join(repoRoot, "pipelines", "assets", "task1.asset.yml")},
+						ExecutableFile: pipeline.ExecutableFile{Path: filepath.Join(repoRoot, "pipelines", "assets", "task1.py")},
 					},
 				},
 			},
-			repoRoot:       "/repo",
 			expectedAssets: []string{"Task1"},
 		},
 		{
@@ -2244,11 +2244,10 @@ func TestFindAssetsFromChangedFiles(t *testing.T) {
 				Assets: []*pipeline.Asset{
 					{
 						Name:           "Task1",
-						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task1.sql"},
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: filepath.Join(repoRoot, "pipelines", "assets", "task1.sql")},
 					},
 				},
 			},
-			repoRoot:       "/repo",
 			expectedAssets: nil,
 		},
 		{
@@ -2258,12 +2257,11 @@ func TestFindAssetsFromChangedFiles(t *testing.T) {
 				Assets: []*pipeline.Asset{
 					{
 						Name:           "Task1",
-						DefinitionFile: pipeline.TaskDefinitionFile{Path: "/repo/pipelines/assets/task1.asset.yml"},
-						ExecutableFile: pipeline.ExecutableFile{Path: "/repo/pipelines/assets/task1.py"},
+						DefinitionFile: pipeline.TaskDefinitionFile{Path: filepath.Join(repoRoot, "pipelines", "assets", "task1.asset.yml")},
+						ExecutableFile: pipeline.ExecutableFile{Path: filepath.Join(repoRoot, "pipelines", "assets", "task1.py")},
 					},
 				},
 			},
-			repoRoot:       "/repo",
 			expectedAssets: []string{"Task1"},
 		},
 	}
@@ -2272,7 +2270,7 @@ func TestFindAssetsFromChangedFiles(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := findAssetsFromChangedFiles(tt.changedFiles, tt.pipeline, tt.repoRoot)
+			result := findAssetsFromChangedFiles(tt.changedFiles, tt.pipeline, repoRoot)
 
 			if tt.expectedAssets == nil {
 				assert.Empty(t, result)
