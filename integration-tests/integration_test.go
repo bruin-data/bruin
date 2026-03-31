@@ -3333,7 +3333,7 @@ func TestModifiedFlag(t *testing.T) {
 			{
 				Name:       "modified: git init and create main branch with initial commit",
 				Command:    "bash",
-				Args:       []string{"-c", "git init && git checkout -b main && git add -A && git commit -m 'initial commit'"},
+				Args:       []string{"-c", "git init -b main && git config user.name 'test' && git config user.email 'test@test.com' && git add -A && git commit -m 'initial commit'"},
 				WorkingDir: modifiedTestDir,
 				Expected: e2e.Output{
 					ExitCode: 0,

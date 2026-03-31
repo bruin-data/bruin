@@ -1,6 +1,9 @@
 package git
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -53,15 +56,44 @@ func TestRepo(t *testing.T) {
 	}
 }
 
+// setupTempGitRepo creates a temporary git repository with a main branch and an initial commit.
+func setupTempGitRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	cmds := [][]string{
+		{"git", "init", "-b", "main"},
+		{"git", "config", "user.name", "test"},
+		{"git", "config", "user.email", "test@test.com"},
+	}
+	for _, args := range cmds {
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		require.NoError(t, cmd.Run(), "failed to run: %v", args)
+	}
+
+	// Create a file and commit it
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("hello"), 0o644))
+	addCmd := exec.Command("git", "add", "-A")
+	addCmd.Dir = dir
+	require.NoError(t, addCmd.Run())
+
+	commitCmd := exec.Command("git", "commit", "-m", "initial commit")
+	commitCmd.Dir = dir
+	require.NoError(t, commitCmd.Run())
+
+	return dir
+}
+
 func TestDefaultBranch(t *testing.T) {
 	t.Parallel()
 
-	t.Run("detects default branch from current repo", func(t *testing.T) {
+	t.Run("detects default branch from temp repo", func(t *testing.T) {
 		t.Parallel()
-		repoRoot := path.AbsPathForTests(t, "../../.")
-		branch, err := DefaultBranch(repoRoot)
+		repoDir := setupTempGitRepo(t)
+		branch, err := DefaultBranch(repoDir)
 		require.NoError(t, err)
-		assert.Contains(t, []string{"main", "master"}, branch)
+		assert.Equal(t, "main", branch)
 	})
 
 	t.Run("returns error for non-repo path", func(t *testing.T) {
@@ -74,22 +106,33 @@ func TestDefaultBranch(t *testing.T) {
 func TestChangedFilesFromBase(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns no error for current repo", func(t *testing.T) {
+	t.Run("returns changed files on feature branch", func(t *testing.T) {
 		t.Parallel()
-		repoRoot := path.AbsPathForTests(t, "../../.")
-		branch, err := DefaultBranch(repoRoot)
-		require.NoError(t, err)
+		repoDir := setupTempGitRepo(t)
 
-		files, err := ChangedFilesFromBase(repoRoot, branch)
+		// Create a feature branch and modify a file
+		checkoutCmd := exec.Command("git", "checkout", "-b", "feature")
+		checkoutCmd.Dir = repoDir
+		require.NoError(t, checkoutCmd.Run())
+
+		require.NoError(t, os.WriteFile(filepath.Join(repoDir, "new.txt"), []byte("new"), 0o644))
+		addCmd := exec.Command("git", "add", "-A")
+		addCmd.Dir = repoDir
+		require.NoError(t, addCmd.Run())
+
+		commitCmd := exec.Command("git", "commit", "-m", "add new file")
+		commitCmd.Dir = repoDir
+		require.NoError(t, commitCmd.Run())
+
+		files, err := ChangedFilesFromBase(repoDir, "main")
 		require.NoError(t, err)
-		// Files may be empty or non-empty depending on branch state, just check no error
-		_ = files
+		assert.Equal(t, []string{"new.txt"}, files)
 	})
 
 	t.Run("returns error for invalid base branch", func(t *testing.T) {
 		t.Parallel()
-		repoRoot := path.AbsPathForTests(t, "../../.")
-		_, err := ChangedFilesFromBase(repoRoot, "nonexistent-branch-xyz-123")
+		repoDir := setupTempGitRepo(t)
+		_, err := ChangedFilesFromBase(repoDir, "nonexistent-branch-xyz-123")
 		require.Error(t, err)
 	})
 }
