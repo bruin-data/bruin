@@ -16,10 +16,12 @@ connections:
     - name: "posthog"
       personal_api_key: "phx_1234567890abcdef"
       project_id: "12345"
+      base_url: "https://eu.posthog.com"  # optional, defaults to https://us.posthog.com
 ```
 
 - `personal_api_key`: Personal API key used to authenticate with the PostHog API.
 - `project_id`: The ID of the PostHog project to ingest data from.
+- `base_url` (optional): The PostHog instance URL. Defaults to `https://us.posthog.com`. Use `https://eu.posthog.com` for the EU cloud.
 
 ### Step 2: Create an asset file for data ingestion
 
