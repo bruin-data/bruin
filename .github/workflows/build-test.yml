@@ -153,6 +153,13 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
+      - name: Cache golangci-lint analysis
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            golangci-lint-${{ runner.os }}-${{ hashFiles('go.sum') }}-
       - name: Install golangci-lint
         run: |
           VERSION=$(grep '^GOLANGCI_LINT_VERSION=' Makefile | cut -d= -f2)
