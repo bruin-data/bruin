@@ -32,6 +32,7 @@ type Pipeline struct {
 	Commit             *string         `json:"commit"`
 	Variables          json.RawMessage `json:"variables"`
 	OxrScheduling      *bool           `json:"oxrScheduling"`
+	Status             *string         `json:"status"`
 }
 
 // PipelineRun represents a pipeline run.
