@@ -298,13 +298,17 @@ func cloudPipelinesList() *cli.Command {
 
 			t := table.NewWriter()
 			t.SetOutputMirror(os.Stdout)
-			t.AppendHeader(table.Row{"Project", "Name", "Schedule", "Start Date"})
+			t.AppendHeader(table.Row{"Project", "Name", "Schedule", "Start Date", "Status"})
 			for _, p := range pipelines {
 				schedule := ""
 				if p.Schedule != nil {
 					schedule = *p.Schedule
 				}
-				t.AppendRow(table.Row{p.Project, p.Name, schedule, p.StartDate})
+				status := ""
+				if p.Status != nil {
+					status = *p.Status
+				}
+				t.AppendRow(table.Row{p.Project, p.Name, schedule, p.StartDate, status})
 			}
 			t.Render()
 			return nil
@@ -363,11 +367,17 @@ func cloudPipelinesGet() *cli.Command {
 				desc = *p.Description
 			}
 
+			status := ""
+			if p.Status != nil {
+				status = *p.Status
+			}
+
 			infoPrinter.Printf("Pipeline: %s\n", p.Name)
 			fmt.Printf("  Project:     %s\n", p.Project)
 			fmt.Printf("  Description: %s\n", desc)
 			fmt.Printf("  Schedule:    %s\n", schedule)
 			fmt.Printf("  Start Date:  %s\n", p.StartDate)
+			fmt.Printf("  Status:      %s\n", status)
 			return nil
 		},
 	}
