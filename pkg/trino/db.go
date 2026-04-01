@@ -173,8 +173,8 @@ func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	tables, err := c.Select(ctx, &query.Query{Query: `
 SELECT table_schema, table_name, table_type
 FROM information_schema.tables
-WHERE table_schema NOT LIKE 'information_schema'
-AND table_schema NOT LIKE 'sys'
+WHERE table_schema <> 'information_schema'
+AND table_schema <> 'sys'
 `})
 	if err != nil {
 		return nil, fmt.Errorf("failed to query information_schema.tables: %w", err)

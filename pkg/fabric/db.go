@@ -162,7 +162,7 @@ func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, erro
 	const schemaQuery = `
 SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
 FROM information_schema.tables
-WHERE TABLE_SCHEMA NOT IN ('dbo', 'sys', 'INFORMATION_SCHEMA')
+WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 `
 
 	tables, err := db.Select(ctx, &query.Query{Query: schemaQuery})

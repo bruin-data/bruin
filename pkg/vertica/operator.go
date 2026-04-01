@@ -41,7 +41,7 @@ func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtract
 		extractor:    extractor,
 		materializer: materializer,
 		devEnv: &devenv.DevEnvQueryModifier{
-			Dialect: "redshift",
+			Dialect: "postgres",
 			Conn:    conn,
 			Parser:  parser,
 		},
