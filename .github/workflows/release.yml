@@ -386,8 +386,7 @@ jobs:
             rm -rf test-pipeline
             if curl -LsSf https://getbruin.com/install/cli | sh -s -- -d "${GITHUB_REF##*/}" \
               && ~/.local/bin/bruin.exe init chess test-pipeline \
-              && cd test-pipeline \
-              && ~/.local/bin/bruin.exe run .; then
+              && (cd test-pipeline && ~/.local/bin/bruin.exe run .); then
               exit 0
             fi
 
@@ -424,8 +423,7 @@ jobs:
             rm -rf test-pipeline
             if curl -LsSf https://getbruin.com/install/cli | sh -s -- -d "${{ env.tag }}" \
               && bruin init chess test-pipeline \
-              && cd test-pipeline \
-              && bruin run .; then
+              && (cd test-pipeline && bruin run .); then
               exit 0
             fi
 
