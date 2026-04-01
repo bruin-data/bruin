@@ -1879,6 +1879,7 @@ func (m *Manager) AddPosthogConnectionFromConfig(connection *config.PosthogConne
 	client, err := posthog.NewClient(posthog.Config{
 		PersonalAPIKey: connection.PersonalAPIKey,
 		ProjectID:      connection.ProjectID,
+		BaseURL:        connection.BaseURL,
 	})
 	if err != nil {
 		return err

@@ -870,6 +870,7 @@ type PosthogConnection struct {
 	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	PersonalAPIKey string `yaml:"personal_api_key,omitempty" json:"personal_api_key" mapstructure:"personal_api_key"`
 	ProjectID      string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	BaseURL        string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
 }
 
 func (c PosthogConnection) GetName() string {
