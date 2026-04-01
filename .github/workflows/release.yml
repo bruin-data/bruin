@@ -27,8 +27,24 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache: true
+          cache-dependency-path: "go.sum"
+      - name: Cache Rust artifacts
+        id: rust-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            pkg/sqlparser/rustffi/target
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml') }}
+          restore-keys: |
+            rust-${{ runner.os }}-
+      - name: Touch cached Rust lib
+        if: steps.rust-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
       - name: Setup Rust
+        if: steps.rust-cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
       - name: Install R (Ubuntu)
         if: startsWith(matrix.platform, 'depot-ubuntu')
@@ -62,8 +78,23 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache: true
+          cache-dependency-path: "go.sum"
+      - name: Cache Rust artifacts
+        id: rust-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            pkg/sqlparser/rustffi/target
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml') }}
+          restore-keys: |
+            rust-${{ runner.os }}-
+      - name: Touch cached Rust lib
+        if: steps.rust-cache.outputs.cache-hit == 'true'
+        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
       - name: Setup Rust
+        if: steps.rust-cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build Bruin
@@ -112,7 +143,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache: false
+          cache-dependency-path: "go.sum"
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache darwin
@@ -141,7 +172,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache: false
+          cache-dependency-path: "go.sum"
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache linux
@@ -281,6 +312,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
+          save: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
