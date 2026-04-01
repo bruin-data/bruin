@@ -38,7 +38,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [depot-ubuntu-24.04-4]
+        platform: [depot-ubuntu-24.04-8]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -107,6 +107,8 @@ jobs:
         run: |
           while ! command -v Rscript &>/dev/null; do sleep 1; done
       - name: Run integration tests
+        env:
+          ENABLE_PARALLEL: "1"
         run: make integration-test
   dockerBuild:
     runs-on: depot-ubuntu-latest
