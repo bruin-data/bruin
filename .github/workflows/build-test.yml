@@ -1,7 +1,5 @@
 # Depot CI Migration
 # Source: .github/workflows/build-test.yml
-#
-# No changes were necessary.
 
 name: CI Checks
 on:
