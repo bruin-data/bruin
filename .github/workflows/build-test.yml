@@ -74,13 +74,13 @@ jobs:
         platform: [depot-ubuntu-24.04-8]
     runs-on: ${{ matrix.platform }}
     steps:
+      - name: Install R (background)
+        run: |
+          nohup bash -c 'sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)' > /tmp/r_install.log 2>&1 &
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
           fetch-tags: true
-      - name: Install R (background)
-        run: |
-          nohup bash -c 'sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)' > /tmp/r_install.log 2>&1 &
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
