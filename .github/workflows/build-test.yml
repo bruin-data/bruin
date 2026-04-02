@@ -37,7 +37,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [depot-ubuntu-24.04-8]
+        platform: [depot-ubuntu-24.04-4]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +70,7 @@ jobs:
   end2end:
     strategy:
       matrix:
-        platform: [depot-ubuntu-24.04-8]
+        platform: [depot-ubuntu-24.04-4]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Install R (background)
