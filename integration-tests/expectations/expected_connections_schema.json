@@ -326,8 +326,8 @@
           },
           "type": "array",
           "default": [
-            "FabianoCaruana",
-            "Hikaru"
+            "simplechessplayer",
+            "mychessaccount1"
           ]
         }
       },
