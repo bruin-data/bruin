@@ -19,7 +19,7 @@ To connect to RabbitMQ, you need to add a configuration item to the connections 
       rabbitmq:
         - name: "my_rabbitmq"
           host: "localhost"
-          port: "5672"
+          port: 5672
           username: "guest"
           password: "guest"
           # vhost: "/"    # optional, defaults to /

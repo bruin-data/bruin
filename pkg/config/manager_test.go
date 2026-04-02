@@ -280,7 +280,7 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:     "conn21",
 					Host:     "localhost",
-					Port:     "5672",
+					Port:     5672,
 					Username: "guest",
 					Password: "guest",
 				},

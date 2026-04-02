@@ -1250,6 +1250,9 @@ func (m *Manager) AddRabbitMQConnectionFromConfig(connection *config.RabbitMQCon
 		return err
 	}
 
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	m.RabbitMQ[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection

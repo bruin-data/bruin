@@ -506,7 +506,7 @@ func (c KafkaConnection) GetName() string {
 type RabbitMQConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Port     string `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	Port     int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
 	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
 	Vhost    string `yaml:"vhost,omitempty" json:"vhost,omitempty" mapstructure:"vhost"`

@@ -1,10 +1,13 @@
 package rabbitmq
 
-import "net/url"
+import (
+	"fmt"
+	"net/url"
+)
 
 type Config struct {
 	Host     string
-	Port     string
+	Port     int
 	Username string
 	Password string
 	Vhost    string
@@ -18,14 +21,14 @@ func (c *Config) GetIngestrURI() string {
 	}
 
 	scheme := "amqp"
-	defaultPort := "5672"
+	defaultPort := 5672
 	if c.TLS {
 		scheme = "amqps"
-		defaultPort = "5671"
+		defaultPort = 5671
 	}
 
 	port := c.Port
-	if port == "" {
+	if port == 0 {
 		port = defaultPort
 	}
 
@@ -39,7 +42,7 @@ func (c *Config) GetIngestrURI() string {
 	u := &url.URL{
 		Scheme: scheme,
 		User:   userInfo,
-		Host:   host + ":" + port,
+		Host:   fmt.Sprintf("%s:%d", host, port),
 		Path:   vhost,
 	}
 
