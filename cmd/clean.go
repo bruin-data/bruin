@@ -135,6 +135,8 @@ func (r *CleanCommand) cleanOrphanTempFiles() {
 			}
 			if err := os.Remove(f); err == nil {
 				removed++
+			} else {
+				r.errorPrinter.Printf("Warning: could not remove %s: %v\n", f, err)
 			}
 		}
 	}
