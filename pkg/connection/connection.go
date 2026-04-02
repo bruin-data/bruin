@@ -84,6 +84,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/primer"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/quicksight"
+	"github.com/bruin-data/bruin/pkg/rabbitmq"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
@@ -140,6 +141,7 @@ type Manager struct {
 	Stripe               map[string]*stripe.Client
 	Appsflyer            map[string]*appsflyer.Client
 	Kafka                map[string]*kafka.Client
+	RabbitMQ             map[string]*rabbitmq.Client
 	Airtable             map[string]*airtable.Client
 	DuckDB               map[string]*duck.Client
 	Hubspot              map[string]*hubspot.Client
@@ -1223,6 +1225,32 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 	}
 
 	m.Kafka[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddRabbitMQConnectionFromConfig(connection *config.RabbitMQConnection) error {
+	m.mutex.Lock()
+	if m.RabbitMQ == nil {
+		m.RabbitMQ = make(map[string]*rabbitmq.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := rabbitmq.NewClient(rabbitmq.Config{
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Username: connection.Username,
+		Password: connection.Password,
+		Vhost:    connection.Vhost,
+		TLS:      connection.TLS,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.RabbitMQ[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2837,6 +2865,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kafka, connectionManager.AddKafkaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.RabbitMQ, connectionManager.AddRabbitMQConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleSheets, connectionManager.AddGoogleSheetsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DuckDB, connectionManager.AddDuckDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MotherDuck, connectionManager.AddMotherduckConnectionFromConfig, &wg, &errList, &mu)

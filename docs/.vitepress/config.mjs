@@ -261,6 +261,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Primer", link: "/ingestion/primer"},
                                     {text: "Trustpilot", link: "/ingestion/trustpilot"},
                                     {text: "QuickBooks", link: "/ingestion/quickbooks"},
+                                    {text: "RabbitMQ", link: "/ingestion/rabbitmq"},
                                     {text: "Revenuecat", link: "/ingestion/revenuecat"},
                                     {text: "Salesforce", link: "/ingestion/salesforce"},
                                     {text: "SAP HANA", link: "/ingestion/sap_hana"},

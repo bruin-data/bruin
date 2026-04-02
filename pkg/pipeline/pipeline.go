@@ -55,6 +55,7 @@ const (
 	AssetTypeDuckDBQuerySensor         = AssetType("duckdb.sensor.query")
 	AssetTypeDuckDBSeed                = AssetType("duckdb.seed")
 	AssetTypeDuckDBSource              = AssetType("duckdb.source")
+	AssetTypeDynamoDB                  = AssetType("dynamodb")
 	AssetTypeElasticsearch             = AssetType("elasticsearch")
 	AssetTypeEmpty                     = AssetType("empty")
 	AssetTypeEMRServerlessPyspark      = AssetType("emr_serverless.pyspark")
@@ -671,6 +672,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeOracleQuery:               "oracle",
 	AssetTypeOracleSource:              "oracle",
 	AssetTypeS3KeySensor:               "aws",
+	AssetTypeDynamoDB:                  "dynamodb",
 	AssetTypeElasticsearch:             "elasticsearch",
 	AssetTypeVerticaQuery:              "vertica",
 	AssetTypeVerticaSeed:               "vertica",
@@ -694,6 +696,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"clickhouse":    AssetTypeClickHouse,
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
+	"dynamodb":      AssetTypeDynamoDB,
 	"elasticsearch": AssetTypeElasticsearch,
 	"vertica":       AssetTypeVerticaQuery,
 }
