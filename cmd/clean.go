@@ -73,6 +73,8 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 		return errors.Wrap(err, "failed to recreate the home directory")
 	}
 
+	r.cleanOrphanTempFiles()
+
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
@@ -103,6 +105,34 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 	infoPrinter.Printf("Successfully removed %d log files.\n", len(contents))
 
 	return nil
+}
+
+// cleanOrphanTempFiles removes leftover temp files from crashed materialization runs.
+// When a Python asset crashes (e.g. OOM kill), Go's defer cleanup doesn't run,
+// leaving behind large .arrow files and wrapper scripts in the system temp directory.
+func (r *CleanCommand) cleanOrphanTempFiles() {
+	tmpDir := os.TempDir()
+	patterns := []string{
+		filepath.Join(tmpDir, "asset_data_*.arrow"),
+		filepath.Join(tmpDir, "bruin-arrow-*.py"),
+	}
+
+	var removed int
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, f := range matches {
+			if err := os.Remove(f); err == nil {
+				removed++
+			}
+		}
+	}
+
+	if removed > 0 {
+		r.infoPrinter.Printf("Removed %d orphan temp file(s) from %s.\n", removed, tmpDir)
+	}
 }
 
 func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
