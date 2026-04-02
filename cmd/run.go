@@ -737,7 +737,7 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 				return cli.Exit("", 1)
 			}
-			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
+			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin, runConfig.Only)
 			if err != nil {
 				return err
 			}

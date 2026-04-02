@@ -36,7 +36,7 @@ type WarningResponse struct {
 	Message string `json:"message"`
 }
 
-func switchEnvironment(env string, force bool, cm *config.Config, stdin io.ReadCloser) error {
+func switchEnvironment(env string, force bool, cm *config.Config, stdin io.ReadCloser, onlyTaskTypes ...[]string) error {
 	if env == "" {
 		return nil
 	}
@@ -47,8 +47,11 @@ func switchEnvironment(env string, force bool, cm *config.Config, stdin io.ReadC
 		return cli.Exit("", 1)
 	}
 
+	// skip confirmation when only running checks, since checks don't modify data
+	onlyChecks := len(onlyTaskTypes) > 0 && len(onlyTaskTypes[0]) == 1 && onlyTaskTypes[0][0] == "checks"
+
 	// if env name is similar to "prod" ask for confirmation
-	if !force && strings.Contains(strings.ToLower(env), "prod") {
+	if !force && !onlyChecks && strings.Contains(strings.ToLower(env), "prod") {
 		prompt := promptui.Prompt{
 			Label:     "You are using a production environment. Are you sure you want to continue?",
 			IsConfirm: true,
