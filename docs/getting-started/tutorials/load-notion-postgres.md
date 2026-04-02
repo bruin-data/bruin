@@ -19,7 +19,7 @@ To install the Bruin VS Code extension, follow the instructions [here](../../vsc
 To create the basic structure of a Bruin project, you can simply run:
 
    ```bash
-   bruin init {folder name} [template name]
+   bruin init [template name] [folder name]
    ```
 
 If you don't define the folder name and template name, it will create `default` template with folder name `bruin-pipeline`. This command will:

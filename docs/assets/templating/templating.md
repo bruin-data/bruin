@@ -12,7 +12,7 @@ Since `start_date` and `end_date` parameters are automatically passed to your as
 
 You can do more complex stuff such as looping over a list of values, or using conditional logic. Here's an example of a SQL asset that loops over a list of days and dynamically generates column names.
 ::: tip Example
-`pipeline.yaml`
+`pipeline.yml`
 
 ```yaml
 name: sql-pipeline

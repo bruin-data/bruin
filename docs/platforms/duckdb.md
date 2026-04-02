@@ -75,10 +75,10 @@ materialization:
     strategy: append
 @bruin */
 
-SELECT COUNT(*) as customers, region 
-    WHERE created_at >= {{ start_date }} 
-      AND created_at < {{ end_date }}
+SELECT COUNT(*) as customers, region
 FROM events.customers
+WHERE created_at >= {{ start_date }}
+  AND created_at < {{ end_date }}
 ```
 
 ### `duckdb.sensor.query`
@@ -104,7 +104,7 @@ Checks if the data available in upstream table for end date of the run.
 name: analytics_123456789.events
 type: duckdb.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}"
+    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}")
 ```
 
 #### Example: Streaming upstream table
@@ -115,7 +115,7 @@ Checks if there is any data after end timestamp, by assuming that older data is 
 name: analytics_123456789.events
 type: duckdb.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
+    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}")
 ```
 
 ### `duckdb.seed`

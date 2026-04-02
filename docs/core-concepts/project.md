@@ -38,8 +38,8 @@ environments:
     connections:
       postgres:
         - name: "postgres-staging"
-          username: "STAGING_POSTGRES_USER"
-          password: "STAGING_POSTGRES_PASSWORD"
+          username: "${STAGING_POSTGRES_USER}"
+          password: "${STAGING_POSTGRES_PASSWORD}"
           host: "staging-db.example.com"
           port: 5432
           database: "analytics"
@@ -48,8 +48,8 @@ environments:
     connections:
       postgres:
         - name: "postgres-prod"
-          username: "PROD_POSTGRES_USER"
-          password: "PROD_POSTGRES_PASSWORD"
+          username: "${PROD_POSTGRES_USER}"
+          password: "${PROD_POSTGRES_PASSWORD}"
           host: "prod-db.example.com"
           port: 5432
           database: "analytics"

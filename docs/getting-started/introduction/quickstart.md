@@ -60,8 +60,8 @@ parameters:
 The configuration in the YAML file has a few bits:
 
 - `name`: the name of the asset, also the table that will store the ingested data
-- `connection`: the destination that will be used to load the data
 - `parameters`: the configuration for ingestr
+  - `destination`: the destination platform to load data into
   - `source_connection`: the connection that will be used for the source data
   - `source_table`: the table that will be ingested
 

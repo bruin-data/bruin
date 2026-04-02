@@ -9,6 +9,18 @@ Bruin supports Azure Synapse as a data platform, which means you can use it to b
 
 Synapse connection is configured the same way as Microsoft SQL Server connection, check [SQL Server connection](mssql.md#connection) for more details.
 
+```yaml
+    connections:
+      synapse:
+        - name: "connection_name"
+          username: "synapse_user"
+          password: "XXXXXXXXXX"
+          host: "synapse_host.sql.azuresynapse.net"
+          port: 1433
+          database: "dev"
+          options: "encrypt=disable&TrustServerCertificate=true"  # optional
+```
+
 ## Synapse Assets
 
 ### `synapse.sql`
@@ -102,7 +114,7 @@ Checks if the data available in upstream table for end date of the run.
 name: analytics_123456789.events
 type: synapse.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}"
+    query: select case when exists(select 1 from upstream_table where dt = '{{ end_date }}') then 1 else 0 end
 ```
 
 #### Example: Streaming upstream table
@@ -113,7 +125,7 @@ Checks if there is any data after end timestamp, by assuming that older data is 
 name: analytics_123456789.events
 type: synapse.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
+    query: select case when exists(select 1 from upstream_table where inserted_at > '{{ end_timestamp }}') then 1 else 0 end
 ```
 
 ### `synapse.seed`

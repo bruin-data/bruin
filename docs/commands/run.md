@@ -51,13 +51,15 @@ table td:first-child {
 | `--use-pip` | bool | `false` | Deprecated compatibility flag; passing it now returns an explicit deprecation error. Python execution is uv-only. |
 | `--debug-ingestr-src` | str | - | Use ingestr from the given path instead of the builtin version. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
-| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
+| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`, `aws`, `azure`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
 | `--no-validation` | bool | `false` | Skip validation for this run. |
 | `--no-timestamp` | bool | `false` | Skip logging timestamps for this run. |
 | `--no-color` | bool | `false` | Plain log output for this run. |
-| `--minimal-logs` | bool | `false` | Skip initial pipeline analysis logs for this run. |
+| `--verbose` | bool | `false` | Print verbose output including SQL queries. |
+| `--interactive`, `-i` | bool | `false` | Use an interactive TUI that shows live progress of asset execution. |
+| `--timeout` | int | `604800` | Timeout for the entire pipeline run in seconds. |
 | `--var` | []str | - | Override pipeline [variables](/variables/overview) with custom values. |
-| `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. **BigQuery only.** |
+| `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
 
 ### Continue from the last failed asset
 

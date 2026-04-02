@@ -11,7 +11,7 @@ One of the most important aspects of this aligned approach to building data prod
 
 The list can go on further, but you get the idea: different teams have the same name for different concepts, and aligning on these concepts are a crucial part of building successful data products.
 
-In order to align on different teams on building on a shared language, Bruin has a feature called "glossary".
+In order to align different teams on building a shared language, Bruin has a feature called "glossary".
 
 > [!INFO]
 > Glossary is a beta feature, there may be unexpected behavior or mistakes while utilizing them in assets.

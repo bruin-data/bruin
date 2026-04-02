@@ -10,3 +10,4 @@ At the moment, Bruin supports the following:
 * [Hashicorp Vault](./vault)
 * [Doppler](./doppler)
 * [AWS Secrets Manager](./aws-secrets-manager)
+* Azure Key Vault (`--secrets-backend azure`)
