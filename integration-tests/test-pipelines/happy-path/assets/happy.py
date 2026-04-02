@@ -17,7 +17,7 @@ import os
 if os.getenv('INJECTED1') != "value1":
     raise Exception("KEY1 is not injected correctly")
 
-if os.getenv('chess-default') != '{"name":"chess-default","players":["simplechessplayer","mychessaccount1"]}':
+if os.getenv('chess-default') != '{"name":"chess-default","players":["testaccount2025","chessfan2023"]}':
     print( os.getenv('chess-default'))
     raise Exception("chess-default is not injected correctly")
 

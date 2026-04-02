@@ -326,8 +326,8 @@
           },
           "type": "array",
           "default": [
-            "simplechessplayer",
-            "mychessaccount1"
+            "testaccount2025",
+            "chessfan2023"
           ]
         }
       },

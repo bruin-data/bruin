@@ -26,8 +26,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "simplechessplayer"
-            - "mychessaccount1"
+            - "testaccount2025"
+            - "chessfan2023"
 ```
 
 You can simply switch the environment using the `--environment` flag, e.g.:
