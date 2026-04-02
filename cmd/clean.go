@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
@@ -110,13 +112,15 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 // cleanOrphanTempFiles removes leftover temp files from crashed materialization runs.
 // When a Python asset crashes (e.g. OOM kill), Go's defer cleanup doesn't run,
 // leaving behind large .arrow files and wrapper scripts in the system temp directory.
+// Files newer than 1 hour are skipped to avoid interfering with running processes.
 func (r *CleanCommand) cleanOrphanTempFiles() {
 	tmpDir := os.TempDir()
 	patterns := []string{
-		filepath.Join(tmpDir, "asset_data_*.arrow"),
-		filepath.Join(tmpDir, "bruin-arrow-*.py"),
+		filepath.Join(tmpDir, python.TempArrowFilePrefix+"*.arrow"),
+		filepath.Join(tmpDir, python.TempArrowScriptPrefix+"*.py"),
 	}
 
+	cutoff := time.Now().Add(-1 * time.Hour)
 	var removed int
 	for _, pattern := range patterns {
 		matches, err := filepath.Glob(pattern)
@@ -124,6 +128,13 @@ func (r *CleanCommand) cleanOrphanTempFiles() {
 			continue
 		}
 		for _, f := range matches {
+			info, err := os.Stat(f)
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(cutoff) {
+				continue
+			}
 			if err := os.Remove(f); err == nil {
 				removed++
 			}
