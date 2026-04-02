@@ -177,8 +177,8 @@ environments:
       chess:
         - name: conn24
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       airtable:
         - name: conn23
           base_id: "123"

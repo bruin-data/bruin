@@ -32,8 +32,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
 
   production:
     connections:
@@ -90,8 +90,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
 
   production:
     connections:

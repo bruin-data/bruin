@@ -22,8 +22,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       generic:
         - name: KEY1
           value: value1
@@ -35,8 +35,8 @@ environments:
       chess:
         - name: "chess-run-with-filters"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       generic:
         - name: KEY1
           value: value1
@@ -48,8 +48,8 @@ environments:
       chess:
         - name: "chess-run-with-tags"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       generic:
         - name: KEY1
           value: value1
@@ -61,8 +61,8 @@ environments:
       chess:
         - name: "chess-run-main-with-filters"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       generic:
         - name: KEY1
           value: value1
@@ -85,8 +85,8 @@ environments:
       chess:
         - name: "chess-run-with-downstream"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       generic:
         - name: KEY1
           value: value1
@@ -98,8 +98,8 @@ environments:
       chess:
         - name: "chess-run-main-with-downstream"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       generic:
         - name: KEY1
           value: value1
@@ -131,8 +131,8 @@ environments:
       chess:
         - name: "chess-run-default-option"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       generic:
         - name: KEY1
           value: value1
@@ -146,8 +146,8 @@ environments:
       chess:
         - name: "chess-run-malformed-sql"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
       generic:
         - name: KEY1
           value: value1
@@ -169,8 +169,8 @@ environments:
       chess:
         - name: "chess-ingestr"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
   env-run-python-materialization:
     connections:
       duckdb:

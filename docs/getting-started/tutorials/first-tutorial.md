@@ -54,8 +54,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
 
 ```
 
@@ -113,8 +113,8 @@ After executing the query, you will see the following results displayed in your 
 ┌───────────────┬────────────────────────────────────────────────┬─────────────┬────────────┬────────────┬─────────────┬─────────────┬────────────────┬────────────────┐
 │ USERNAME      │ AID                                            │ TOTAL_GAMES │ WHITE_WINS │ BLACK_WINS │ WHITE_GAMES │ BLACK_GAMES │ WHITE_WIN_RATE │ BLACK_WIN_RATE │
 ├───────────────┼────────────────────────────────────────────────┼─────────────┼────────────┼────────────┼─────────────┼─────────────┼────────────────┼────────────────┤
-│ hikaru        │ https://api.chess.com/pub/player/hikaru        │ 102         │ 39         │ 41         │ 50          │ 52          │ 78             │ 78.85          │
-│ FabianoCaruana │ https://api.chess.com/pub/player/FabianoCaruana │ 17          │ 6          │ 6          │ 9           │ 8           │ 66.67          │ 75             │
+│ legendisback1        │ https://api.chess.com/pub/player/legendisback1        │ 102         │ 39         │ 41         │ 50          │ 52          │ 78             │ 78.85          │
+│ rpragchess │ https://api.chess.com/pub/player/rpragchess │ 17          │ 6          │ 6          │ 9           │ 8           │ 66.67          │ 75             │
 └───────────────┴────────────────────────────────────────────────┴─────────────┴────────────┴────────────┴─────────────┴─────────────┴────────────────┴────────────────┘
 ```
 

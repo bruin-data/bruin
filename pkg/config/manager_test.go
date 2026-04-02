@@ -314,7 +314,7 @@ func TestLoadFromFile(t *testing.T) {
 			Chess: []ChessConnection{
 				{
 					Name:    "conn24",
-					Players: []string{"FabianoCaruana", "Hikaru"},
+					Players: []string{"rpragchess", "legendisback1"},
 				},
 			},
 			Airtable: []AirtableConnection{
