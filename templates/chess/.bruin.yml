@@ -8,5 +8,5 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "simplechessplayer"
+            - "mychessaccount1"
