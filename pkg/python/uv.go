@@ -25,6 +25,13 @@ import (
 	"github.com/spf13/afero"
 )
 
+const (
+	// TempArrowFilePrefix is the prefix used for temporary Arrow data files during materialization.
+	TempArrowFilePrefix = "asset_data_"
+	// TempArrowScriptPrefix is the prefix used for temporary Python wrapper scripts during materialization.
+	TempArrowScriptPrefix = "bruin-arrow-"
+)
+
 var (
 	ingestrInstallMutex      sync.Mutex
 	ingestrInstalledPackages = make(map[string]bool)
@@ -377,12 +384,12 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return errors.New("only table materialization is supported for Python assets")
 	}
 
-	arrowFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("asset_data_%d.arrow", time.Now().UnixNano()))
+	arrowFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("%s%d.arrow", TempArrowFilePrefix, time.Now().UnixNano()))
 	defer func(name string) {
 		_ = os.Remove(name)
 	}(arrowFilePath)
 
-	tempPyScript, err := os.CreateTemp("", "bruin-arrow-*.py")
+	tempPyScript, err := os.CreateTemp("", TempArrowScriptPrefix+"*.py")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
