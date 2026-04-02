@@ -109,9 +109,7 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 	return nil
 }
 
-// cleanOrphanTempFiles removes leftover temp files from crashed materialization runs.
-// When a Python asset crashes (e.g. OOM kill), Go's defer cleanup doesn't run,
-// leaving behind large .arrow files and wrapper scripts in the system temp directory.
+// cleanOrphanTempFiles removes leftover temp files from crashed Python materialization runs.
 // Files newer than 1 hour are skipped to avoid interfering with running processes.
 func (r *CleanCommand) cleanOrphanTempFiles() {
 	tmpDir := os.TempDir()
