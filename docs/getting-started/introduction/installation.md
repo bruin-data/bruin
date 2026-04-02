@@ -4,7 +4,7 @@ outline: deep
 
 # Installation
 
-Bruin has two high-level components that makes it work the best:
+Bruin has two high-level components that make it work best:
 
 - a command-line interface (CLI) application: [Bruin CLI](https://github.com/bruin-data/bruin)
 - a Visual Studio Code extension: [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=bruin.bruin)

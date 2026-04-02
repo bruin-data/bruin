@@ -3,9 +3,9 @@
 Quality checks are tests you can perform on your Bruin assets **after** they run to verify that the produced data satisfies your expectations. They are a great way to ensure your data is accurate, complete and consistent.
 
 Quality checks run after the asset has been executed. If a check fails and its
-`blocking` attribute is `true`, the rest of the checks are skipped and the asset
-is marked as failed. When `blocking` is `false` the asset still fails but the
-remaining checks continue to run. `blocking` defaults to `true`.
+`blocking` attribute is `true`, the asset is marked as failed and downstream
+assets are prevented from running. When `blocking` is `false`, the check failure
+is recorded but downstream assets are not blocked. `blocking` defaults to `true`.
 
 Below is a short example of attaching checks to columns:
 

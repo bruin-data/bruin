@@ -260,4 +260,13 @@ custom_checks:
       where client="client_x"
         and date_trunc(StartDateDt, month) = "2024-06-01"
         and credits_spent = 1
+    blocking: true
 ```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | str | - | A descriptive name for the check. |
+| `description` | str | `""` | A human-readable description of what the check validates. |
+| `query` | str | - | The SQL query to execute. |
+| `value` | int | `0` | The expected integer value the query should return to pass. |
+| `blocking` | bool | `false` | Whether a failure of this check should block downstream assets. |

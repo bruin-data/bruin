@@ -16,6 +16,7 @@ Mind that, despite the connection being at all effects a Postgres connection, th
           host: "redshift-cluster-1.xxxxxxxxx.eu-north-1.redshift.amazonaws.com"
           port: 5439
           database: "dev"
+          schema: "schema_name" # optional
           ssl_mode: "allow" # optional
 ```
 
@@ -123,7 +124,7 @@ Checks if the data available in upstream table for end date of the run.
 name: analytics_123456789.events
 type: rs.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}"
+    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}")
 ```
 
 #### Example: Streaming upstream table
@@ -134,7 +135,7 @@ Checks if there is any data after end timestamp, by assuming that older data is 
 name: analytics_123456789.events
 type: rs.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
+    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}")
 ```
 
 ### `rs.seed`

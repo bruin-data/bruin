@@ -58,7 +58,7 @@ The strategy used for the materialization, can be one of the following:
 - `append`: only append the new data to the table, never overwrite.
 - `merge`: merge the existing records with the new records, requires a primary key to be set.
 - `time_interval`: incrementally load time-based data within specific time windows.
-- `DDL`: create a new table using a DDL (Data Definition Language) statement.
+- `ddl`: create a new table using a DDL (Data Definition Language) statement.
 - `scd2_by_column`: implement SCD2 logic that tracks changes based on column value differences.
 - `scd2_by_time`: implement SCD2 logic that tracks changes based on time-based incremental key.
 
@@ -81,7 +81,7 @@ Define the columns that will be used for the clustering of the resulting table. 
 This is the column of the table that will be used for incremental updates of the table.
 
 - **Type:** `String`
-- **Default:** `[]`
+- **Default:** `""`
 
 ## Strategies
 
@@ -460,7 +460,7 @@ When `incremental_key` is specified:
 
 This is useful when you want the SCD2 timeline to reflect the actual business timestamps from your source data rather than the processing time.
 
-**NOTE:***
+**NOTE:**
 
 - Unless otherwise specified by `partition_by`, the SCD2 table will be partitioned by `_valid_from` for platforms which support partitioning (BigQuery, Athena, Snowflake).
 - Unless otherwise specified by `cluster_by`, the SCD2 table will be clustered using `_is_current` AND `primary key(s)` for platforms which support clustering (BigQuery, Snowflake).  

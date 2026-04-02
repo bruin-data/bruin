@@ -31,7 +31,7 @@ bruin clean
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--uv-cache` | str | - | clean uv caches |
+| `--uv-cache`, `--uv` | bool | `false` | Clean uv caches. |
 
 Adding the flag `uv-cache` will remove all cached uv packages and metadata that were stored during previous installs or dependency resolutions. You will be prompted to confirm whether you want to proceed:
 

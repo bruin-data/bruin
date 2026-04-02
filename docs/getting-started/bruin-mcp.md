@@ -116,11 +116,11 @@ bruin init
 
 This will create a new Bruin project with a DuckDB database as a starting point.
 
-You can
+You can:
 
-- [read more about project configuration](/core-concepts/project) for your data warehouse or other sources,
-- you can [programmatically add connections](/commands/connections#add-connection),
-- you can use our [VS Code / Cursor extension](/vscode-extension/overview) to add connections.
+- [Read more about project configuration](/core-concepts/project) for your data warehouse or other sources.
+- [Programmatically add connections](/commands/connections#add-connection).
+- Use our [VS Code / Cursor extension](/vscode-extension/overview) to add connections.
 
 Bruin allows you to use different environments for your projects. You can [read more about project configuration](/core-concepts/project) to learn more.
 

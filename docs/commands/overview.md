@@ -56,7 +56,13 @@ bruin validate --help
 |---------|-------------|
 | [`import`](/commands/import) | Import existing database tables as Bruin assets |
 | [`patch`](/commands/patch) | Apply patches to asset definitions |
-| [`ai-enhance`](/commands/ai-enhance) | Enhance asset metadata using AI |
+| [`ai enhance`](/commands/ai-enhance) | Enhance asset metadata using AI |
+
+### Maintenance
+
+| Command | Description |
+|---------|-------------|
+| [`upgrade`](/commands/update) | Upgrade Bruin CLI to the latest version or a specific version |
 
 ### Bruin Cloud
 
@@ -127,14 +133,15 @@ bruin render ./assets/my_query.sql --start-date 2024-01-01 --end-date 2024-01-02
 
 ## Global Flags
 
-These flags work with most commands:
+These flags are available on all commands:
 
 | Flag | Description |
 |------|-------------|
 | `--debug` | Enable debug logging |
-| `--environment` | Specify the environment to use |
-| `--config-file` | Path to a custom `.bruin.yml` file |
 | `--help` | Show help for the command |
+
+> [!NOTE]
+> The `--environment` and `--config-file` flags are available on most commands but are per-command options, not true global flags.
 
 ## VS Code Extension
 

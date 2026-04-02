@@ -17,6 +17,7 @@ Displays the environments defined in the `.bruin.yml` configuration file in the 
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
 
 ## Usage
@@ -33,8 +34,9 @@ Creates a new environment entry in the `.bruin.yml` configuration file.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--name` | str | - | Name of the environment to create. |
-| `--schema-prefix` | str | - | Optional schema prefix to use for the environment. |
+| `--name`, `-n` | str | - | Name of the environment to create. |
+| `--schema-prefix`, `-s` | str | - | Optional schema prefix to use for the environment. |
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
 
 ### Usage
@@ -85,4 +87,45 @@ Clone a specific environment with a schema prefix:
 
 ```bash
 bruin environments clone --source production --target dev --schema-prefix dev_
+```
+
+## `update` Subcommand
+
+Updates an existing environment in the `.bruin.yml` configuration file. You can rename the environment or change its schema prefix.
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--name`, `-n` | str | - | Name of the environment to update. |
+| `--new-name` | str | - | New name for the environment. |
+| `--schema-prefix`, `-s` | str | - | New schema prefix for the environment. |
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
+| `--config-file` | str | - | The path to the `.bruin.yml` file. |
+
+### Usage
+
+```bash
+bruin environments update --name dev --schema-prefix new_prefix_
+bruin environments update --name dev --new-name development
+```
+
+## `delete` Subcommand
+
+Deletes an environment from the `.bruin.yml` configuration file.
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--name`, `-n` | str | - | Name of the environment to delete. |
+| `--force`, `-f` | bool | `false` | Skip confirmation prompt. |
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
+| `--config-file` | str | - | The path to the `.bruin.yml` file. |
+
+### Usage
+
+```bash
+bruin environments delete --name dev
+bruin environments delete --name staging --force
 ```

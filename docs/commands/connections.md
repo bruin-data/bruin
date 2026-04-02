@@ -35,6 +35,8 @@ Environment: someother
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
+| `--environment`, `-e`, `--env` | str | - | The environment to list connections for. |
 | `--config-file` | str | - | The path to the .bruin.yml file. |
 
 ## Add Connection
@@ -115,11 +117,14 @@ bruin connections delete --env staging --name MY_SECRET <path-to-repo>
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--environment`, `-e`, `--env` | str | - | The environment to delete the connection from. |
+| `--name`, `-n` | str | - | The name of the connection to delete. |
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
 | `--config-file` | str | - | The path to the .bruin.yml file. |
 
 ### Example
 
-Delete a connection named "my-connection" from the "production" environment:
+Delete a connection named "test-connection" from the "staging" environment:
 
 ```bash
 bruin connections delete -e staging -n test-connection -o json
@@ -140,6 +145,9 @@ If no environment flag (`--env`) is provided, the default environment from our `
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--name`, `-n` | str | - | The name of the connection to test. |
+| `--environment`, `-e`, `--env` | str | - | The environment to use. |
+| `--output`, `-o` | str | `plain` | Output format: `plain` or `json`. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
 
 ### Examples

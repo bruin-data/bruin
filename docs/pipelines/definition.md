@@ -271,6 +271,14 @@ notifications:
   ms_teams:
     - connection: "teams-default"
       failure: false  # send only on success
+  discord:
+    - channel: "#data-alerts"
+      success: true
+      failure: true
+  webhook:
+    - connection: "webhook-default"
+      success: true
+      failure: true
 ```
 
 - **Type:** `Object`

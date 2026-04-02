@@ -25,10 +25,11 @@ A **platform** (also referred to as a warehouse or data lake) is the actual data
 
 Bruin supports a wide range of platforms:
 
-- **Cloud warehouses**: BigQuery, Snowflake, Databricks, Redshift, Athena
-- **Relational databases**: PostgreSQL, MySQL, Microsoft SQL Server, Oracle
+- **Cloud warehouses**: BigQuery, Snowflake, Databricks, Redshift, Athena, Synapse, Microsoft Fabric
+- **Relational databases**: PostgreSQL, MySQL, Microsoft SQL Server, Oracle, SAP HANA, SQLite, IBM DB2, Google Cloud Spanner, Vertica
 - **Analytical engines**: ClickHouse, DuckDB, MotherDuck, Trino
-- **Cloud storage**: S3
+- **Search & document stores**: Elasticsearch, MongoDB Atlas
+- **Cloud storage**: S3, GCS
 - **Compute engines**: AWS EMR Serverless, GCP Dataproc Serverless
 
 ## Data Ingestion

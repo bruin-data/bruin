@@ -9,7 +9,7 @@ Bruin uses a very basic form of **anonymous telemetry** to be able to keep track
 - It uses anonymous machine IDs that are hashed to keep track of the number of unique users.
 - It sends the following information:
   - Bruin version
-  - machine ID (Anomymous)
+  - machine ID (Anonymous)
   - OS info: OS, architecture
   - command executed
   - success/failure

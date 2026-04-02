@@ -53,22 +53,22 @@ type: pg.sql
 @bruin */
 
 create temp table first_installs as
-select 
+select distinct on (user_id)
     user_id, 
-    min(ts) as install_ts,
-    min_by(platform, ts) as platform,
-    min_by(country, ts) as country
+    ts as install_ts,
+    platform,
+    country
 from analytics.events
-where event_name = "install"
-group by 1;
+where event_name = 'install'
+order by user_id, ts;
 
-create or replace table events.install
+create table if not exists events.install as
 select
     user_id, 
     i.install_ts,
     i.platform, 
     i.country,
-    a.channel,
+    a.channel
 from first_installs as i
 join marketing.attribution as a
     using(user_id)
@@ -118,7 +118,7 @@ Checks if the data available in upstream table for end date of the run.
 name: analytics_123456789.events
 type: pg.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}"
+    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}")
 ```
 
 #### Example: Streaming upstream table
@@ -129,7 +129,7 @@ Checks if there is any data after end timestamp, by assuming that older data is 
 name: analytics_123456789.events
 type: pg.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
+    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}")
 ```
 
 ### `pg.seed`
