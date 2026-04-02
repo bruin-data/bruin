@@ -326,8 +326,8 @@
           },
           "type": "array",
           "default": [
-            "FabianoCaruana",
-            "Hikaru"
+            "rpragchess",
+            "legendisback1"
           ]
         }
       },

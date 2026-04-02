@@ -30,8 +30,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "FabianoCaruana"
-            - "Hikaru"
+            - "rpragchess"
+            - "legendisback1"
   
   staging:
     schema_prefix: "stg_"
