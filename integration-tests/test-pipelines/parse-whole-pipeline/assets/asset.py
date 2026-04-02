@@ -21,5 +21,5 @@ con = duckdb.connect(database = "duckdb.db", read_only = False)
 
 con.execute("SELECT * FROM chess_playground.player_summary")
 result = con.fetchall()
-if len(result) != 2:
+if len(result) != 10:
     raise Exception("Incorrect number of rows in player_summary")

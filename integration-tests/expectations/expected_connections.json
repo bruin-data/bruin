@@ -48,7 +48,15 @@
           "name": "chess-default",
           "players": [
             "FabianoCaruana",
-            "Hikaru"
+            "Hikaru",
+            "MagnusCarlsen",
+            "GothamChess",
+            "DanielNaroditsky",
+            "AnishGiri",
+            "Firouzja2003",
+            "LevonAronian",
+            "WesleySo",
+            "GarryKasparov"
           ]
         }
       ]
@@ -103,7 +111,15 @@
             "name": "chess-default",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -199,7 +215,15 @@
             "name": "chess-ingestr",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -306,7 +330,15 @@
             "name": "chess-run-default-option",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -332,7 +364,15 @@
             "name": "chess-run-main-with-downstream",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -358,7 +398,15 @@
             "name": "chess-run-main-with-filters",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -384,7 +432,15 @@
             "name": "chess-run-malformed-sql",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -454,7 +510,15 @@
             "name": "chess-run-with-downstream",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -480,7 +544,15 @@
             "name": "chess-run-with-filters",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -506,7 +578,15 @@
             "name": "chess-run-with-tags",
             "players": [
               "FabianoCaruana",
-              "Hikaru"
+              "Hikaru",
+              "MagnusCarlsen",
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]

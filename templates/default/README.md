@@ -28,6 +28,14 @@ environments:
           players:
             - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
 ```
 
 You can simply switch the environment using the `--environment` flag, e.g.:
