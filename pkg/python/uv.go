@@ -554,7 +554,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		ctx = context.WithValue(ctx, CtxGongPath, gongPath)
 	}
 
-	// Check if gong path is provided in context - if so, use gong binary directly
+	// Check if gong path is provided in context - if so, use gong binary
 	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
 		if path, ok := gongPath.(string); ok && path != "" {
 			if len(extraPackages) > 0 {
