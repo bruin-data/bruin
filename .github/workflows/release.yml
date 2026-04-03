@@ -20,6 +20,10 @@ jobs:
         suite: ["test", "integration-test"]
     runs-on: ${{ matrix.platform }}
     steps:
+      - name: Install R in background (Ubuntu)
+        if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-ubuntu')
+        run: |
+          nohup bash -c 'sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)' > /tmp/r_install.log 2>&1 &
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -47,10 +51,19 @@ jobs:
       - name: Setup Rust
         if: steps.rust-cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
-      - name: Install R (Ubuntu)
+      - name: Wait for R (Ubuntu)
         if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-ubuntu')
         run: |
-          sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)
+          timeout=120
+          while ! command -v Rscript &>/dev/null; do
+            timeout=$((timeout - 1))
+            if [ $timeout -le 0 ]; then
+              echo "::error::R installation timed out after 120s. Install log:"
+              cat /tmp/r_install.log 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
       - name: Install R (macOS)
         if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-macos')
         run: |
