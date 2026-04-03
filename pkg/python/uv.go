@@ -246,6 +246,13 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 			if len(extraPackages) > 0 {
 				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
 			}
+			// Pass --debug to gong when bruin is running in debug mode
+			if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
+				if boolVal, ok := debug.(*bool); ok && *boolVal {
+					args = append(args, "--debug")
+				}
+			}
+
 			// Use gong binary directly instead of ingestr
 			err := u.Cmd.Run(ctx, repo, &CommandInstance{
 				Name: path,
@@ -561,9 +568,10 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
 			}
 
+			// Pass --debug to gong when bruin is running in debug mode
 			if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
-				boolVal := debug.(*bool)
-				if *boolVal {
+				if boolVal, ok := debug.(*bool); ok && *boolVal {
+					cmdArgs = append(cmdArgs, "--debug")
 					_, _ = output.Write([]byte("Running CommandInstance: gong " + strings.Join(cmdArgs, " ") + "\n"))
 				}
 			}
