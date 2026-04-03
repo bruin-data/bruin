@@ -35,14 +35,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0
+          fetch-depth: 1
+          fetch-tags: true
 
       - name: Checkout manual tag
         if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/checkout@v4
         with:
           ref: refs/tags/${{ github.event.inputs.tag }}
-          fetch-depth: 0
+          fetch-depth: 1
+          fetch-tags: true
 
       - name: Determine release tag (workflow run)
         id: workflow_tag
@@ -85,9 +87,6 @@ jobs:
           tags: |
             type=raw,value=${{ steps.workflow_tag.outputs.tag || steps.manual_tag.outputs.tag }}
             type=raw,value=latest
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Set up Depot
         uses: depot/setup-action@v1

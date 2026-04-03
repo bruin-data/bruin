@@ -16,15 +16,20 @@ jobs:
   integration-tests:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-24.04, depot-macos-15, windows-2022 ]
+        platform: [ depot-ubuntu-latest-4, depot-macos-15, windows-2022 ]
         suite: ["test", "integration-test"]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          fetch-tags: true
+      - name: Install R in background (Ubuntu)
+        if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-ubuntu')
+        run: |
+          nohup bash -c 'sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)' > /tmp/r_install.log 2>&1 &
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
@@ -46,20 +51,19 @@ jobs:
       - name: Setup Rust
         if: steps.rust-cache.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
-      - name: Install R (Ubuntu)
-        if: startsWith(matrix.platform, 'depot-ubuntu')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y r-base
       - name: Install R (macOS)
-        if: startsWith(matrix.platform, 'depot-macos')
+        if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-macos')
         run: |
           brew install r
       - name: Install R (Windows)
-        if: matrix.platform == 'windows-2022'
+        if: matrix.suite == 'integration-test' && matrix.platform == 'windows-2022'
         shell: bash
         run: |
           choco install r.project -y
+      - name: Wait for R (Ubuntu)
+        if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-ubuntu')
+        run: |
+          while ! command -v Rscript &>/dev/null; do sleep 1; done
       - name: Run test suite
         shell: bash
         run: |
@@ -68,14 +72,15 @@ jobs:
 
   cloud-integration-tests:
     name: Cloud Integration Tests (BigQuery)
-    runs-on: depot-ubuntu-latest
+    runs-on: depot-ubuntu-latest-4
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          fetch-tags: true
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
@@ -129,25 +134,19 @@ jobs:
           go test -v -timeout 30m ./...
 
   prepare-darwin:
-    runs-on: depot-ubuntu-latest
+    runs-on: depot-ubuntu-latest-8
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Workaround Git Security Warning
-        run: |
-          # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache darwin
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: dist/darwin
           key: darwin-${{ env.sha_short }}
@@ -155,28 +154,22 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross-pro:v1.23 release --clean --split --verbose
-  
-        
+
+
   prepare-linux:
-    runs-on: depot-ubuntu-latest
+    runs-on: depot-ubuntu-latest-8
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Workaround Git Security Warning
-        run: |
-          # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache linux
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: dist/linux
           key: linux-${{ env.sha_short }}
@@ -190,22 +183,16 @@ jobs:
     runs-on: depot-ubuntu-latest
     needs: [prepare-linux, prepare-darwin, integration-tests]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Workaround Git Security Warning
-        run: |
-          # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" 
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: dist/linux
           key: linux-${{ env.sha_short }}
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: dist/darwin
           key: darwin-${{ env.sha_short }}
@@ -227,7 +214,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -240,10 +227,10 @@ jobs:
             mingw-w64-ucrt-x86_64-winpthreads
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache: true
+          cache-dependency-path: "go.sum"
 
       - name: Release
         uses: goreleaser/goreleaser-action@v6
@@ -299,9 +286,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Set up Depot
         uses: depot/setup-action@v1
@@ -403,76 +387,38 @@ jobs:
     name: Installer Script on Windows
     needs: [release-windows, release-unix]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Show directories
         shell: bash
         run: pwd && cd && pwd
       - name: Use install script
         shell: bash
-        run: |
-          set -euo pipefail
-          max_attempts=3
-          for attempt in $(seq 1 "${max_attempts}"); do
-            echo "Installer script test attempt ${attempt}/${max_attempts} (Windows)"
-            rm -rf test-pipeline
-            if curl -LsSf https://getbruin.com/install/cli | sh -s -- -d "${GITHUB_REF##*/}" \
-              && ~/.local/bin/bruin.exe init chess test-pipeline \
-              && (cd test-pipeline && ~/.local/bin/bruin.exe run .); then
-              exit 0
-            fi
-
-            if [ "${attempt}" -lt "${max_attempts}" ]; then
-              backoff_seconds=$((attempt * 15))
-              echo "Attempt ${attempt} failed, retrying in ${backoff_seconds}s..."
-              sleep "${backoff_seconds}"
-            fi
-          done
-
-          echo "Installer script tests failed after ${max_attempts} attempts on Windows." >&2
-          exit 1
+        run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${GITHUB_REF##*/}
+      - name: Test Pipeline
+        shell: bash
+        run: ~/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && ~/.local/bin/bruin.exe run .
 
   install-unix:
     runs-on: ubuntu-latest
     name: Installer Script on Linux
     needs: [release-windows, release-unix]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
       - name: Extract tag from ref
         id: extract_tag
         run: |
           ref_name="${GITHUB_REF##*/}"
           echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Use install script
-        run: |
-          set -euo pipefail
-          max_attempts=3
-          for attempt in $(seq 1 "${max_attempts}"); do
-            echo "Installer script test attempt ${attempt}/${max_attempts} (Linux)"
-            rm -rf test-pipeline
-            if curl -LsSf https://getbruin.com/install/cli | sh -s -- -d "${{ env.tag }}" \
-              && bruin init chess test-pipeline \
-              && (cd test-pipeline && bruin run .); then
-              exit 0
-            fi
-
-            if [ "${attempt}" -lt "${max_attempts}" ]; then
-              backoff_seconds=$((attempt * 15))
-              echo "Attempt ${attempt} failed, retrying in ${backoff_seconds}s..."
-              sleep "${backoff_seconds}"
-            fi
-          done
-
-          echo "Installer script tests failed after ${max_attempts} attempts on Linux." >&2
-          exit 1
+        run: curl -LsSf https://getbruin.com/install/cli | sh -s -- -d ${{ env.tag }}
+      - name: Test Pipeline
+        run: bruin init chess test-pipeline && cd test-pipeline && bruin run .
 
   release:
     runs-on: ubuntu-latest
     needs: [install-unix, install-windows]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Extract tag from ref
         id: extract_tag
         run: |
