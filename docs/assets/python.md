@@ -321,7 +321,7 @@ The requirements to get this working are:
 
 - define a `materialization` config in the asset definition
 - define a `connection` in the asset definition (required for Python assets with `materialization.type: table`)
-- have a function called `materialize` in your Python script that returns a pandas/polars dataframe, a list of dicts, or a generator that yields dicts.
+- have a function called `materialize` in your Python script that returns a pandas/polars dataframe, a PyArrow table, a list of dicts, a generator that yields dicts, or a generator that yields PyArrow tables.
 
 Supported materialization strategies for Python assets are: `create+replace`, `append`, `merge`, and `delete+insert`. The `time_interval` strategy is not supported for Python assets.
 
@@ -355,6 +355,54 @@ def materialize(**kwargs):
 
     return df
 ```
+
+### Returning Arrow data
+
+If your data is already in Apache Arrow form, you can return a `pyarrow.Table` directly. You can also yield multiple tables when data is produced in chunks:
+
+::: code-group
+
+```bruin-python [Returning a PyArrow table]
+"""@bruin
+name: tier1.arrow_table
+image: python:3.13
+connection: bigquery
+
+materialization:
+  type: table
+  strategy: append
+@bruin"""
+
+import pyarrow as pa
+
+def materialize():
+    return pa.table({
+        "id": [1, 2, 3],
+        "name": ["Alice", "Bob", "Charlie"],
+    })
+```
+
+```bruin-python [Yielding PyArrow tables]
+"""@bruin
+name: tier1.arrow_table_chunks
+image: python:3.13
+connection: bigquery
+
+materialization:
+  type: table
+  strategy: append
+@bruin"""
+
+import pyarrow as pa
+
+def materialize():
+    yield pa.table({"id": [1, 2], "name": ["Alice", "Bob"]})
+    yield pa.table({"id": [3, 4], "name": ["Charlie", "Diana"]})
+```
+
+:::
+
+When yielding multiple PyArrow tables, all yielded tables must have the same schema.
 
 ### Using generators
 

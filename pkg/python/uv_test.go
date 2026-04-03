@@ -169,6 +169,44 @@ func containsArg(args []string, value string) bool {
 	return false
 }
 
+func TestPythonArrowTemplate_UsesNativePolarsIPC(t *testing.T) {
+	t.Parallel()
+
+	polarsCheckIndex := strings.Index(PythonArrowTemplate, "if is_polars_dataframe(df):")
+	polarsWriteIndex := strings.Index(PythonArrowTemplate, `df.write_ipc("$ARROW_FILE_PATH")`)
+	pandasCheckIndex := strings.Index(PythonArrowTemplate, "if is_pandas_dataframe(df):")
+	arrowTableIndex := strings.Index(PythonArrowTemplate, "elif isinstance(df, pa.Table):")
+	arrowTablesWriterIndex := strings.Index(PythonArrowTemplate, "def write_arrow_tables(tables):")
+	pyarrowWriteIndex := strings.Index(PythonArrowTemplate, `with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:`)
+
+	require.NotEqual(t, -1, polarsCheckIndex)
+	require.NotEqual(t, -1, polarsWriteIndex)
+	require.NotEqual(t, -1, pandasCheckIndex)
+	require.NotEqual(t, -1, arrowTableIndex)
+	require.NotEqual(t, -1, arrowTablesWriterIndex)
+	require.NotEqual(t, -1, pyarrowWriteIndex)
+
+	assert.Less(t, arrowTablesWriterIndex, polarsCheckIndex)
+	assert.Less(t, arrowTablesWriterIndex, pyarrowWriteIndex)
+	assert.Less(t, pyarrowWriteIndex, polarsCheckIndex)
+	assert.Less(t, polarsCheckIndex, polarsWriteIndex)
+	assert.Less(t, polarsWriteIndex, pandasCheckIndex)
+	assert.Less(t, pandasCheckIndex, arrowTableIndex)
+	assert.NotContains(t, PythonArrowTemplate, "df.to_arrow()")
+	assert.Contains(t, PythonArrowTemplate, "write_arrow_tables(itertools.chain([first_row], iterator))")
+}
+
+func TestPythonArrowTemplate_PreservesNoDataAndIterableHandling(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, PythonArrowTemplate, "if df is None:")
+	assert.Contains(t, PythonArrowTemplate, "if not df:")
+	assert.Contains(t, PythonArrowTemplate, "first_row = next(iterator)")
+	assert.Contains(t, PythonArrowTemplate, "except StopIteration:")
+	assert.Contains(t, PythonArrowTemplate, "rows = [first_row, *iterator]")
+	assert.Contains(t, PythonArrowTemplate, "rows = [item for batch in rows for item in batch]")
+}
+
 func Test_uvPythonRunner_Run(t *testing.T) {
 	t.Parallel()
 
