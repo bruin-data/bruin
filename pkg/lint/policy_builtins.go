@@ -453,7 +453,7 @@ var builtinRules = map[string]validators{
 	},
 }
 
-func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+func QueryColumnsMatchColumnsPolicy(parser sqlparser.Parser) func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 		issues := make([]*Issue, 0)
 

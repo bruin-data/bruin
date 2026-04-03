@@ -11,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v3"
@@ -101,10 +102,10 @@ type Linter struct {
 	builder       pipelineBuilder
 	rules         []Rule
 	logger        logger.Logger
-	sqlParser     sqlParser
+	sqlParser     sqlparser.Parser
 }
 
-func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Rule, logger logger.Logger, sqlParser sqlParser) *Linter {
+func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Rule, logger logger.Logger, sqlParser sqlparser.Parser) *Linter {
 	return &Linter{
 		findPipelines: findPipelines,
 		builder:       builder,
@@ -440,7 +441,7 @@ func ContainsTag(tags []string, target string) bool {
 	return false
 }
 
-func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule, sqlParser sqlParser) (*PipelineIssues, error) {
+func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule, sqlParser sqlparser.Parser) (*PipelineIssues, error) {
 	pipelineResult := &PipelineIssues{
 		Pipeline: p,
 		Issues:   make(map[Rule][]*Issue),
