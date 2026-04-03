@@ -461,41 +461,87 @@ func PingConnection() *cli.Command {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
 				return cli.Exit("", 1)
 			}
+
+			if output != "json" {
+				infoPrinter.Printf("Testing connection '%s' in environment '%s'...\n", name, environment)
+			}
+
 			manager, errs := connection.NewManagerFromConfigWithContext(ctx, cm)
 			if len(errs) > 0 {
-				// Handle each error in the errs slice
+				// Check if the error is for the specific connection we're testing
 				for _, err := range errs {
-					printErrorForOutput(output, errors2.Wrap(err, "failed to create connection manager"))
+					errStr := err.Error()
+					if output == "json" {
+						printConnectionTestErrorJSON(name, errStr)
+					} else {
+						errorPrinter.Printf("\nConnection setup failed:\n%s\n", errStr)
+					}
 				}
 				return cli.Exit("", 1)
 			}
 
 			conn := manager.GetConnection(name)
 			if conn == nil {
-				printErrorForOutput(output, &config.MissingConnectionError{
+				missingErr := &config.MissingConnectionError{
 					Name:            name,
 					ConfigFilePath:  configFilePath,
 					EnvironmentName: cm.SelectedEnvironmentName,
-				})
+				}
+				if output == "json" {
+					printConnectionTestErrorJSON(name, missingErr.Error())
+				} else {
+					errorPrinter.Printf("\n%s\n", missingErr.Error())
+					fmt.Println()
+					infoPrinter.Println("Available connections in this environment:")
+					connTypes := cm.SelectedEnvironment.Connections.ConnectionsSummaryList()
+					if len(connTypes) == 0 {
+						fmt.Println("  (none)")
+					} else {
+						for connName, connType := range connTypes {
+							fmt.Printf("  - %s (%s)\n", connName, connType)
+						}
+					}
+					fmt.Println()
+					infoPrinter.Println("To add a new connection, run: bruin connections add")
+				}
 				return cli.Exit("", 1)
 			}
+
+			// Get connection type for better error messages
+			connType := manager.GetConnectionType(name)
 
 			if tester, ok := conn.(interface {
 				Ping(ctx context.Context) error
 			}); ok {
 				testErr := tester.Ping(ctx)
 				if testErr != nil {
-					printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to test connection '%s'", name)))
+					if output == "json" {
+						printConnectionTestErrorJSON(name, testErr.Error())
+					} else {
+						errorPrinter.Printf("\nConnection test failed for '%s' (%s):\n", name, connType)
+						fmt.Printf("\n%s\n", testErr.Error())
+					}
 					return cli.Exit("", 1)
 				}
 			} else {
-				infoPrinter.Printf("Connection '%s' does not support testing yet.\n", name)
+				if output == "json" {
+					jsonOutput := map[string]interface{}{
+						"status":  "skipped",
+						"message": fmt.Sprintf("Connection '%s' does not support testing yet", name),
+					}
+					jsonBytes, _ := json.Marshal(jsonOutput)
+					fmt.Println(string(jsonBytes))
+				} else {
+					warningPrinter.Printf("Connection '%s' (%s) does not support testing yet.\n", name, connType)
+				}
 				return nil
 			}
 
 			if output == "json" {
-				jsonOutput := map[string]string{
-					"status": "success",
+				jsonOutput := map[string]interface{}{
+					"status":     "success",
+					"connection": name,
+					"type":       connType,
 				}
 				jsonBytes, err := json.Marshal(jsonOutput)
 				if err != nil {
@@ -504,10 +550,25 @@ func PingConnection() *cli.Command {
 				}
 				fmt.Println(string(jsonBytes))
 			} else {
-				infoPrinter.Printf("Successfully tested connection '%s' in environment: %s\n", name, environment)
+				successPrinter.Printf("\nConnection '%s' (%s) is working correctly!\n", name, connType)
 			}
 
 			return nil
 		},
 	}
+}
+
+// printConnectionTestErrorJSON outputs a connection test error in JSON format.
+func printConnectionTestErrorJSON(name string, errMsg string) {
+	jsonOutput := map[string]string{
+		"status":     "error",
+		"connection": name,
+		"error":      errMsg,
+	}
+	jsonBytes, err := json.Marshal(jsonOutput)
+	if err != nil {
+		errorPrinter.Printf("failed to marshal error JSON: %v\n", err)
+		return
+	}
+	fmt.Println(string(jsonBytes))
 }
