@@ -52,6 +52,7 @@ type Connections struct {
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
+	RabbitMQ            []RabbitMQConnection            `yaml:"rabbitmq,omitempty" json:"rabbitmq,omitempty" mapstructure:"rabbitmq"`
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
 	MotherDuck          []MotherduckConnection          `yaml:"motherduck,omitempty" json:"motherduck,omitempty" mapstructure:"motherduck"`
 	ClickHouse          []ClickHouseConnection          `yaml:"clickhouse,omitempty" json:"clickhouse,omitempty" mapstructure:"clickhouse"`
@@ -672,6 +673,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Kafka = append(env.Connections.Kafka, conn)
+	case "rabbitmq":
+		var conn RabbitMQConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.RabbitMQ = append(env.Connections.RabbitMQ, conn)
 	case "hubspot":
 		var conn HubspotConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1230,6 +1238,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Jira = removeConnection(env.Connections.Jira, connectionName)
 	case "kafka":
 		env.Connections.Kafka = removeConnection(env.Connections.Kafka, connectionName)
+	case "rabbitmq":
+		env.Connections.RabbitMQ = removeConnection(env.Connections.RabbitMQ, connectionName)
 	case "hubspot":
 		env.Connections.Hubspot = removeConnection(env.Connections.Hubspot, connectionName)
 	case "google_sheets":
@@ -1442,6 +1452,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Stripe, source.Stripe)
 	mergeConnectionList(&c.Appsflyer, source.Appsflyer)
 	mergeConnectionList(&c.Kafka, source.Kafka)
+	mergeConnectionList(&c.RabbitMQ, source.RabbitMQ)
 	mergeConnectionList(&c.DuckDB, source.DuckDB)
 	mergeConnectionList(&c.ClickHouse, source.ClickHouse)
 	mergeConnectionList(&c.Hubspot, source.Hubspot)

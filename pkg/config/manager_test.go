@@ -276,6 +276,15 @@ func TestLoadFromFile(t *testing.T) {
 					GroupID:          "kafka123",
 				},
 			},
+			RabbitMQ: []RabbitMQConnection{
+				{
+					Name:     "conn21",
+					Host:     "localhost",
+					Port:     5672,
+					Username: "guest",
+					Password: "guest",
+				},
+			},
 			DuckDB: []DuckDBConnection{
 				{
 					Name: "conn20",

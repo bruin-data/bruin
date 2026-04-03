@@ -576,6 +576,12 @@
           },
           "type": "array"
         },
+        "rabbitmq": {
+          "items": {
+            "$ref": "#/$defs/RabbitMQConnection"
+          },
+          "type": "array"
+        },
         "duckdb": {
           "items": {
             "$ref": "#/$defs/DuckDBConnection"
@@ -1967,6 +1973,39 @@
         "name",
         "bootstrap_servers",
         "group_id"
+      ]
+    },
+    "RabbitMQConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "vhost": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username",
+        "password"
       ]
     },
     "KinesisConnection": {

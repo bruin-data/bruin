@@ -2,7 +2,7 @@
 
 Amazon [DynamoDB](https://aws.amazon.com/dynamodb/) is a managed NoSQL database service provided by Amazon Web Services (AWS). It supports key-value and document data structures and is designed to handle a wide range of applications requiring scalability and performance.
 
-Bruin supports DynamoDB as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from DynamoDB into your data warehouse.
+Bruin supports DynamoDB both as a source and as a destination for [Ingestr assets](/assets/ingestr). You can use it to ingest data from DynamoDB into your data warehouse, or load data from other sources into DynamoDB.
 
 In order to set up DynamoDB connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
@@ -58,3 +58,35 @@ bruin run assets/dynamodb_integration.asset.yml
 ```
 
 As a result of this command, Bruin will ingest data from the given DynamoDB table into your Postgres database.
+
+## Using DynamoDB as a Destination
+
+DynamoDB can also be used as a destination to load data from other sources. The supported incremental strategies are `replace`, `append`, and `merge`.
+
+### Example: Loading data into DynamoDB
+
+To use DynamoDB as a destination, create an asset file that specifies DynamoDB as the `destination`:
+
+```yaml
+name: dynamodb.my_table
+type: ingestr
+connection: my-dynamodb
+
+parameters:
+  source_connection: postgres
+  source_table: 'public.users'
+
+  destination: dynamodb
+```
+
+- `connection`: The name of the DynamoDB connection defined in `.bruin.yml`, used as the destination.
+- `source_connection`: The name of the source connection (e.g., Postgres).
+- `source_table`: The table from the source to ingest.
+- `destination`: Set to `dynamodb` to use DynamoDB as the destination.
+
+When you run this asset, Bruin will load data from the source into the specified DynamoDB table.
+
+**Important Notes:**
+
+- DynamoDB requires at least one primary key. You can specify it using the `primary_key` parameter in the asset file.
+- The `merge` strategy uses DynamoDB's `PutItem` operation, which naturally handles insert-or-update semantics.

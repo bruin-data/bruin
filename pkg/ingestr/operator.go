@@ -187,6 +187,15 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		destURI = applyClickHouseEngineParams(destURI, asset.Parameters)
 	}
 
+	// Also enable gong when the destination requires it
+	parsedDest, parseErr := url.Parse(destURI)
+	if parseErr != nil {
+		return fmt.Errorf("failed to parse destination URI: %w", parseErr)
+	}
+	if _, ok := gongDestinations[parsedDest.Scheme]; ok {
+		asset.Parameters["use_gong"] = "true"
+	}
+
 	destTable := asset.Name
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)

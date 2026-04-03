@@ -421,6 +421,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Kafka - Event streaming (user-defined topics)
 	"kafka": {},
 
+	// RabbitMQ - Message broker (user-defined queues)
+	"rabbitmq": {},
+
 	// Kinesis - AWS streaming (user-defined streams)
 	"kinesis": {},
 
@@ -747,8 +750,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 // gongSources is the set of source names that require gong to be enabled.
 var gongSources = map[string]bool{
-	"dune":    true,
-	"posthog": true,
+	"dune":     true,
+	"posthog":  true,
+	"rabbitmq": true,
+}
+
+// gongDestinations is the set of destination schemes that require gong.
+var gongDestinations = map[string]bool{
+	"dynamodb": true,
 }
 
 // GetSourceTables returns the available tables for a specific ingestr source.

@@ -162,6 +162,12 @@ environments:
         - name: conn20
           bootstrap_servers: "localhost:9093"
           group_id: "kafka123"
+      rabbitmq:
+        - name: conn21
+          host: "localhost"
+          port: 5672
+          username: "guest"
+          password: "guest"
       duckdb:
         - name: conn20
           path: "/path/to/duck.db"

@@ -503,6 +503,20 @@ func (c KafkaConnection) GetName() string {
 	return c.Name
 }
 
+type RabbitMQConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Vhost    string `yaml:"vhost,omitempty" json:"vhost,omitempty" mapstructure:"vhost"`
+	TLS      bool   `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls"`
+}
+
+func (c RabbitMQConnection) GetName() string {
+	return c.Name
+}
+
 type AirtableConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	BaseID      string `yaml:"base_id,omitempty" json:"base_id" mapstructure:"base_id"`
