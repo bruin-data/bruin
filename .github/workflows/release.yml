@@ -63,7 +63,16 @@ jobs:
       - name: Wait for R (Ubuntu)
         if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-ubuntu')
         run: |
-          while ! command -v Rscript &>/dev/null; do sleep 1; done
+          timeout=120
+          while ! command -v Rscript &>/dev/null; do
+            timeout=$((timeout - 1))
+            if [ $timeout -le 0 ]; then
+              echo "::error::R installation timed out. Install log:"
+              cat /tmp/r_install.log 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
       - name: Run test suite
         shell: bash
         run: |
