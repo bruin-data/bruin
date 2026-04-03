@@ -196,10 +196,15 @@ type pipelineConnection interface {
 	GetIngestrURI() (string, error)
 }
 
+type GongInstaller interface {
+	EnsureGongInstalled(ctx context.Context) (string, error)
+}
+
 type UvPythonRunner struct {
 	Cmd            cmd
 	UvInstaller    uvInstaller
 	conn           config.ConnectionGetter
+	Gong           GongInstaller
 	binaryFullPath string
 }
 
@@ -241,6 +246,13 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 			if len(extraPackages) > 0 {
 				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
 			}
+			// Pass --debug to gong when bruin is running in debug mode
+			if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
+				if boolVal, ok := debug.(*bool); ok && *boolVal {
+					args = append(args, "--debug")
+				}
+			}
+
 			// Use gong binary directly instead of ingestr
 			err := u.Cmd.Run(ctx, repo, &CommandInstance{
 				Name: path,
@@ -529,6 +541,57 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
+	ingestrCtx := ctx
+	showLogs := asset.Parameters["show_ingestr_logs"] == "true"
+	var logBuffer *tailBuffer
+	if !showLogs {
+		logBuffer = newTailBuffer(1 << 20) // 1MB cap
+		ingestrCtx = context.WithValue(ctx, executor.KeyPrinter, io.Writer(logBuffer))
+	}
+
+	// If use_gong parameter is set but gong path not yet in context, install gong
+	if asset.Parameters["use_gong"] == "true" && ctx.Value(CtxGongPath) == nil {
+		if u.Gong == nil {
+			return errors.New("use_gong is set but gong installer is not available")
+		}
+		gongPath, gongErr := u.Gong.EnsureGongInstalled(ingestrCtx)
+		if gongErr != nil {
+			return fmt.Errorf("use_gong is set but failed to install gong: %w", gongErr)
+		}
+		ctx = context.WithValue(ctx, CtxGongPath, gongPath)
+	}
+
+	// Check if gong path is provided in context - if so, use gong binary
+	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
+		if path, ok := gongPath.(string); ok && path != "" {
+			if len(extraPackages) > 0 {
+				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
+			}
+
+			// Pass --debug to gong when bruin is running in debug mode
+			if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
+				if boolVal, ok := debug.(*bool); ok && *boolVal {
+					cmdArgs = append(cmdArgs, "--debug")
+					_, _ = output.Write([]byte("Running CommandInstance: gong " + strings.Join(cmdArgs, " ") + "\n"))
+				}
+			}
+
+			err = u.Cmd.Run(ingestrCtx, execCtx.repo, &CommandInstance{
+				Name: path,
+				Args: cmdArgs,
+			})
+			if err != nil {
+				if logBuffer != nil {
+					logBuffer.flushTo(output)
+				}
+				return errors.Wrap(err, "failed to load the data into the destination")
+			}
+
+			_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
+			return nil
+		}
+	}
+
 	err = u.ensureIngestrInstalled(ctx, extraPackages, execCtx.repo)
 	if err != nil {
 		return err
@@ -543,14 +606,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	ingestrCtx := ctx
-	showLogs := asset.Parameters["show_ingestr_logs"] == "true"
-	var logBuffer *tailBuffer
-	if !showLogs {
-		logBuffer = newTailBuffer(1 << 20) // 1MB cap
-		ingestrCtx = context.WithValue(ctx, executor.KeyPrinter, io.Writer(logBuffer))
-	}
-
 	err = u.Cmd.Run(ingestrCtx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: runArgs,
@@ -559,7 +614,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		if logBuffer != nil {
 			logBuffer.flushTo(output)
 		}
-		return errors.Wrap(err, "failed to run load the data into the destination")
+		return errors.Wrap(err, "failed to load the data into the destination")
 	}
 
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
