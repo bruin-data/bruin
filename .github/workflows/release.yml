@@ -16,7 +16,7 @@ jobs:
   integration-tests:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest-4, depot-macos-15, depot-windows-latest ]
+        platform: [ depot-ubuntu-latest-4, depot-macos-15, depot-windows-latest-4 ]
         suite: ["test", "integration-test"]
     runs-on: ${{ matrix.platform }}
     steps:
