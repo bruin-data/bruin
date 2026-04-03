@@ -547,7 +547,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		if u.Gong == nil {
 			return errors.New("use_gong is set but gong installer is not available")
 		}
-		gongPath, gongErr := u.Gong.EnsureGongInstalled(ctx)
+		gongPath, gongErr := u.Gong.EnsureGongInstalled(ingestrCtx)
 		if gongErr != nil {
 			return fmt.Errorf("use_gong is set but failed to install gong: %w", gongErr)
 		}
@@ -576,7 +576,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 				if logBuffer != nil {
 					logBuffer.flushTo(output)
 				}
-				return errors.Wrap(err, "failed to run load the data into the destination")
+				return errors.Wrap(err, "failed to load the data into the destination")
 			}
 
 			_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
@@ -606,7 +606,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		if logBuffer != nil {
 			logBuffer.flushTo(output)
 		}
-		return errors.Wrap(err, "failed to run load the data into the destination")
+		return errors.Wrap(err, "failed to load the data into the destination")
 	}
 
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
