@@ -27,6 +27,7 @@ type ingestrRunner interface {
 
 type gongInstaller interface {
 	EnsureGongInstalled(ctx context.Context) (string, error)
+	EnsureDB2CliDriverInstalled(ctx context.Context, gongBinaryPath string) (string, error)
 }
 
 type BasicOperator struct {
@@ -245,6 +246,14 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 			return fmt.Errorf("use_gong is set but failed to install gong: %w", err)
 		}
 		ctx = context.WithValue(ctx, python.CtxGongPath, gongPath)
+
+		// Ensure the DB2 clidriver is present — the gong binary links libdb2 at startup,
+		// so it's needed for all sources, not just DB2.
+		cliDriverPath, err := o.gong.EnsureDB2CliDriverInstalled(ctx, gongPath)
+		if err != nil {
+			return fmt.Errorf("failed to install DB2 clidriver: %w", err)
+		}
+		ctx = context.WithValue(ctx, python.CtxCliDriverPath, cliDriverPath)
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)

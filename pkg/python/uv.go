@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -241,10 +242,48 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 			if len(extraPackages) > 0 {
 				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
 			}
+			// Set library path so the OS linker can find shared libraries next to the gong binary.
+			// The gong binary links libdb2 at compile time, so the clidriver's lib/ must be
+			// on the library path even for non-DB2 sources.
+			gongDir := filepath.Dir(path)
+			envVars := map[string]string{}
+
+			libDir := gongDir
+			cliDriverPath := filepath.Join(gongDir, "clidriver")
+			if info, err := os.Stat(cliDriverPath); err == nil && info.IsDir() {
+				libDir = filepath.Join(cliDriverPath, "lib")
+				if ibmDBHome := os.Getenv("IBM_DB_HOME"); ibmDBHome != "" {
+					envVars["IBM_DB_HOME"] = ibmDBHome
+				} else {
+					envVars["IBM_DB_HOME"] = cliDriverPath
+				}
+			}
+
+			switch runtime.GOOS {
+			case "darwin":
+				existing := os.Getenv("DYLD_LIBRARY_PATH")
+				if existing != "" {
+					envVars["DYLD_LIBRARY_PATH"] = libDir + ":" + existing
+				} else {
+					envVars["DYLD_LIBRARY_PATH"] = libDir
+				}
+			case "linux":
+				existing := os.Getenv("LD_LIBRARY_PATH")
+				if existing != "" {
+					envVars["LD_LIBRARY_PATH"] = libDir + ":" + existing
+				} else {
+					envVars["LD_LIBRARY_PATH"] = libDir
+				}
+			case "windows":
+				existing := os.Getenv("PATH")
+				envVars["PATH"] = libDir + ";" + existing
+			}
+
 			// Use gong binary directly instead of ingestr
 			err := u.Cmd.Run(ctx, repo, &CommandInstance{
-				Name: path,
-				Args: args,
+				Name:    path,
+				Args:    args,
+				EnvVars: envVars,
 			})
 			if err == nil && ctx.Err() != nil {
 				return ctx.Err()

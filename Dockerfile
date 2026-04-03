@@ -48,6 +48,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     unixodbc \
     libodbc2 \
+    libxml2 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -84,10 +85,40 @@ RUN SELECTED_RELEASE="${GONG_VERSION:-$(cat gong_version.txt)}" && \
     echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_URL}..." && \
     (curl -fsSL "${GONG_URL}" -o ${GONG_PATH}/gong && \
      chmod +x ${GONG_PATH}/gong && \
-     echo "Gong binaries downloaded successfully") || \
-    echo "Gong binary not available for ${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}, skipping"
+     echo "Gong binaries downloaded successfully" || \
+     echo "Gong binary not available for ${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}, skipping") && \
+    IBM_CLI_BASE="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli" && \
+    if [ "${TARGETOS}" = "linux" ] && [ "${TARGETARCH}" = "amd64" ]; then \
+        CLI_URL="${IBM_CLI_BASE}/v11.5.9/linuxx64_odbc_cli.tar.gz"; \
+    elif [ "${TARGETOS}" = "darwin" ] && [ "${TARGETARCH}" = "arm64" ]; then \
+        CLI_URL="${IBM_CLI_BASE}/macarm64_odbc_cli.tar.gz"; \
+    elif [ "${TARGETOS}" = "darwin" ] && [ "${TARGETARCH}" = "amd64" ]; then \
+        CLI_URL="${IBM_CLI_BASE}/macos64_odbc_cli.tar.gz"; \
+    elif [ "${TARGETOS}" = "windows" ] && [ "${TARGETARCH}" = "amd64" ]; then \
+        CLI_URL="${IBM_CLI_BASE}/ntx64_odbc_cli.zip"; \
+    else \
+        CLI_URL=""; \
+    fi && \
+    if [ -n "${CLI_URL}" ]; then \
+        echo "Downloading DB2 clidriver from ${CLI_URL}..." && \
+        if echo "${CLI_URL}" | grep -q '\.zip$'; then \
+            (curl -fsSL "${CLI_URL}" -o /tmp/clidriver.zip && \
+             unzip -q /tmp/clidriver.zip -d ${GONG_PATH} && \
+             rm -f /tmp/clidriver.zip && \
+             echo "DB2 clidriver installed successfully" || \
+             echo "DB2 clidriver not available, skipping"); \
+        else \
+            (curl -fsSL "${CLI_URL}" | tar xzf - -C ${GONG_PATH} && \
+             echo "DB2 clidriver installed successfully" || \
+             echo "DB2 clidriver not available, skipping"); \
+        fi; \
+    else \
+        echo "DB2 clidriver not supported for ${TARGETOS}/${TARGETARCH}, skipping"; \
+    fi
 
 ENV PATH="/home/bruin/.local/bin:${GONG_PATH}:/home/bruin/.bruin/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${GONG_PATH}/clidriver/lib:${LD_LIBRARY_PATH}"
+ENV IBM_DB_HOME="${GONG_PATH}/clidriver"
 ENV CC="/usr/bin/gcc"
 ENV CFLAGS="-I/usr/include"
 ENV LDFLAGS="-L/usr/lib"

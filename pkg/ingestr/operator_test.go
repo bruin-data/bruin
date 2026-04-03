@@ -78,6 +78,10 @@ func (m *mockGongInstaller) EnsureGongInstalled(ctx context.Context) (string, er
 	return res.String(0), res.Error(1)
 }
 
+func (m *mockGongInstaller) EnsureDB2CliDriverInstalled(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
 // contextCapturingRunner captures the context passed to RunIngestr for assertion.
 type contextCapturingRunner struct {
 	mock.Mock
