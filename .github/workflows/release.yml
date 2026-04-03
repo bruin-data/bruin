@@ -16,7 +16,7 @@ jobs:
   integration-tests:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest-4, depot-macos-15, windows-2022 ]
+        platform: [ depot-ubuntu-latest-4, depot-macos-15, depot-windows-latest-4 ]
         suite: ["test", "integration-test"]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -68,7 +68,7 @@ jobs:
         run: |
           brew install r
       - name: Install R (Windows)
-        if: matrix.suite == 'integration-test' && matrix.platform == 'windows-2022'
+        if: matrix.suite == 'integration-test' && startsWith(matrix.platform, 'depot-windows')
         shell: bash
         run: |
           choco install r.project -y
@@ -390,7 +390,7 @@ jobs:
           rm -rf /tmp/docker-test
 
   install-windows:
-    runs-on: windows-latest
+    runs-on: depot-windows-latest
     name: Installer Script on Windows
     needs: [release-windows, release-unix]
     steps:
