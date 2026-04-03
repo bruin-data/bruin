@@ -208,7 +208,7 @@ func (l *LakehouseAttacher) generateS3Secret(name string, storage config.Storage
 		return ""
 	}
 
-	var parts []string
+	parts := make([]string, 0, 6)
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE s3")
 	parts = append(parts, ",   PROVIDER config")
@@ -237,7 +237,7 @@ func (l *LakehouseAttacher) generateGCSSecret(name string, storage config.Storag
 		return ""
 	}
 
-	var parts []string
+	parts := make([]string, 0, 6)
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE gcs")
 	parts = append(parts, ",   KEY_ID "+quoteSQLStringLiteral(auth.AccessKey))
@@ -272,7 +272,7 @@ func (l *LakehouseAttacher) generateGlueSecret(name string, catalog config.Catal
 		return ""
 	}
 
-	var parts []string
+	parts := make([]string, 0, 6)
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE s3")
 	parts = append(parts, ",   PROVIDER config")
