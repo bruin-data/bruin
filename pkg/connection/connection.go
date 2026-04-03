@@ -211,6 +211,9 @@ type Manager struct {
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
+	Discord              map[string]*config.DiscordConnection
+	MSTeams              map[string]*config.MSTeamsConnection
+	Webhook              map[string]*config.WebhookConnection
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -1447,6 +1450,42 @@ func (m *Manager) AddSlackConnectionFromConfig(connection *config.SlackConnectio
 	defer m.mutex.Unlock()
 	m.Slack[connection.Name] = client
 	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddDiscordConnectionFromConfig(connection *config.DiscordConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Discord == nil {
+		m.Discord = make(map[string]*config.DiscordConnection)
+	}
+	m.Discord[connection.Name] = connection
+	m.availableConnections[connection.Name] = connection
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddMSTeamsConnectionFromConfig(connection *config.MSTeamsConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.MSTeams == nil {
+		m.MSTeams = make(map[string]*config.MSTeamsConnection)
+	}
+	m.MSTeams[connection.Name] = connection
+	m.availableConnections[connection.Name] = connection
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
+func (m *Manager) AddWebhookConnectionFromConfig(connection *config.WebhookConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Webhook == nil {
+		m.Webhook = make(map[string]*config.WebhookConnection)
+	}
+	m.Webhook[connection.Name] = connection
+	m.availableConnections[connection.Name] = connection
 	m.AllConnectionDetails[connection.Name] = connection
 	return nil
 }
@@ -2940,6 +2979,9 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Discord, connectionManager.AddDiscordConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.MSTeams, connectionManager.AddMSTeamsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Webhook, connectionManager.AddWebhookConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }
