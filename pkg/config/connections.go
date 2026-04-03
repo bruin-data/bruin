@@ -448,6 +448,15 @@ func (c StripeConnection) GetName() string {
 	return c.Name
 }
 
+type DuneConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c DuneConnection) GetName() string {
+	return c.Name
+}
+
 type NotionConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
@@ -491,6 +500,20 @@ type KafkaConnection struct {
 }
 
 func (c KafkaConnection) GetName() string {
+	return c.Name
+}
+
+type RabbitMQConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Vhost    string `yaml:"vhost,omitempty" json:"vhost,omitempty" mapstructure:"vhost"`
+	TLS      bool   `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls"`
+}
+
+func (c RabbitMQConnection) GetName() string {
 	return c.Name
 }
 
@@ -580,7 +603,7 @@ func (c GoogleSheetsConnection) GetName() string {
 
 type ChessConnection struct {
 	Name    string   `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Players []string `yaml:"players,omitempty" json:"players" mapstructure:"players" jsonschema:"default=MagnusCarlsen,default=Hikaru"`
+	Players []string `yaml:"players,omitempty" json:"players" mapstructure:"players" jsonschema:"default=FabianoCaruana,default=Hikaru,default=MagnusCarlsen,default=GothamChess,default=DanielNaroditsky,default=AnishGiri,default=Firouzja2003,default=LevonAronian,default=WesleySo,default=GarryKasparov"`
 }
 
 func (c ChessConnection) GetName() string {
@@ -857,6 +880,17 @@ func (c ClickupConnection) GetName() string {
 	return c.Name
 }
 
+type PosthogConnection struct {
+	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	PersonalAPIKey string `yaml:"personal_api_key,omitempty" json:"personal_api_key" mapstructure:"personal_api_key"`
+	ProjectID      string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	BaseURL        string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c PosthogConnection) GetName() string {
+	return c.Name
+}
+
 type PinterestConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
@@ -946,7 +980,8 @@ func (c DataprocServerlessConnection) GetName() string {
 
 type GoogleAnalyticsConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file" mapstructure:"service_account_file"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" jsonschema:"oneof_required=service_account_file" mapstructure:"service_account_file"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json" mapstructure:"service_account_json"`
 	PropertyID         string `yaml:"property_id,omitempty" json:"property_id" mapstructure:"property_id"`
 }
 
@@ -1133,6 +1168,19 @@ type TableauConnection struct {
 	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret" mapstructure:"personal_access_token_secret"`
 	SiteID                    string `yaml:"site_id,omitempty" json:"site_id" mapstructure:"site_id"`
 	APIVersion                string `yaml:"api_version,omitempty" json:"api_version" mapstructure:"api_version"`
+}
+
+type QuickSightConnection struct {
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AwsAccessKeyID     string `yaml:"aws_access_key_id,omitempty" json:"aws_access_key_id" mapstructure:"aws_access_key_id"`
+	AwsSecretAccessKey string `yaml:"aws_secret_access_key,omitempty" json:"aws_secret_access_key" mapstructure:"aws_secret_access_key"`
+	AwsSessionToken    string `yaml:"aws_session_token,omitempty" json:"aws_session_token" mapstructure:"aws_session_token"`
+	AwsRegion          string `yaml:"aws_region,omitempty" json:"aws_region" mapstructure:"aws_region"`
+	AwsAccountID       string `yaml:"aws_account_id,omitempty" json:"aws_account_id" mapstructure:"aws_account_id"`
+}
+
+func (c QuickSightConnection) GetName() string {
+	return c.Name
 }
 
 type TrinoConnection struct {

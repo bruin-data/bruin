@@ -35,6 +35,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/db2"
 	"github.com/bruin-data/bruin/pkg/docebo"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
+	"github.com/bruin-data/bruin/pkg/dune"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
@@ -79,8 +80,11 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/plusvibeai"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/posthog"
 	"github.com/bruin-data/bruin/pkg/primer"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
+	"github.com/bruin-data/bruin/pkg/quicksight"
+	"github.com/bruin-data/bruin/pkg/rabbitmq"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
@@ -137,6 +141,7 @@ type Manager struct {
 	Stripe               map[string]*stripe.Client
 	Appsflyer            map[string]*appsflyer.Client
 	Kafka                map[string]*kafka.Client
+	RabbitMQ             map[string]*rabbitmq.Client
 	Airtable             map[string]*airtable.Client
 	DuckDB               map[string]*duck.Client
 	Hubspot              map[string]*hubspot.Client
@@ -166,6 +171,7 @@ type Manager struct {
 	Pipedrive            map[string]*pipedrive.Client
 	Mixpanel             map[string]*mixpanel.Client
 	Clickup              map[string]*clickup.Client
+	Posthog              map[string]*posthog.Client
 	Pinterest            map[string]*pinterest.Client
 	Trustpilot           map[string]*trustpilot.Client
 	QuickBooks           map[string]*quickbooks.Client
@@ -200,7 +206,9 @@ type Manager struct {
 	ISOCPulse            map[string]*isocpulse.Client
 	InfluxDB             map[string]*influxdb.Client
 	Tableau              map[string]*tableau.Client
+	QuickSight           map[string]*quicksight.Client
 	Trino                map[string]*trino.Client
+	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
 	Generic              map[string]*config.GenericConnection
@@ -1223,6 +1231,35 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 	return nil
 }
 
+func (m *Manager) AddRabbitMQConnectionFromConfig(connection *config.RabbitMQConnection) error {
+	m.mutex.Lock()
+	if m.RabbitMQ == nil {
+		m.RabbitMQ = make(map[string]*rabbitmq.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := rabbitmq.NewClient(rabbitmq.Config{
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Username: connection.Username,
+		Password: connection.Password,
+		Vhost:    connection.Vhost,
+		TLS:      connection.TLS,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.RabbitMQ[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnection) error {
 	m.mutex.Lock()
 	if m.DuckDB == nil {
@@ -1863,6 +1900,29 @@ func (m *Manager) AddClickupConnectionFromConfig(connection *config.ClickupConne
 	return nil
 }
 
+func (m *Manager) AddPosthogConnectionFromConfig(connection *config.PosthogConnection) error {
+	m.mutex.Lock()
+	if m.Posthog == nil {
+		m.Posthog = make(map[string]*posthog.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := posthog.NewClient(posthog.Config{
+		PersonalAPIKey: connection.PersonalAPIKey,
+		ProjectID:      connection.ProjectID,
+		BaseURL:        connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Posthog[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBooksConnection) error {
 	m.mutex.Lock()
 	if m.QuickBooks == nil {
@@ -2056,6 +2116,7 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 
 	client, err := googleanalytics.NewClient(googleanalytics.Config{
 		ServiceAccountFile: connection.ServiceAccountFile,
+		ServiceAccountJSON: connection.ServiceAccountJSON,
 		PropertyID:         connection.PropertyID,
 	})
 	if err != nil {
@@ -2507,6 +2568,29 @@ func (m *Manager) AddCustomerIoConnectionFromConfig(connection *config.CustomerI
 	return nil
 }
 
+func (m *Manager) AddDuneConnectionFromConfig(connection *config.DuneConnection) error {
+	m.mutex.Lock()
+	if m.Dune == nil {
+		m.Dune = make(map[string]*dune.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := dune.NewClient(&dune.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Dune[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2598,6 +2682,34 @@ func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Tableau[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddQuickSightConnectionFromConfig(connection *config.QuickSightConnection) error {
+	m.mutex.Lock()
+	if m.QuickSight == nil {
+		m.QuickSight = make(map[string]*quicksight.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := quicksight.NewClient(quicksight.Config{
+		Name:               connection.Name,
+		AwsAccessKeyID:     connection.AwsAccessKeyID,
+		AwsSecretAccessKey: connection.AwsSecretAccessKey,
+		AwsSessionToken:    connection.AwsSessionToken,
+		AwsRegion:          connection.AwsRegion,
+		AwsAccountID:       connection.AwsAccountID,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.QuickSight[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2756,6 +2868,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kafka, connectionManager.AddKafkaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.RabbitMQ, connectionManager.AddRabbitMQConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleSheets, connectionManager.AddGoogleSheetsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DuckDB, connectionManager.AddDuckDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MotherDuck, connectionManager.AddMotherduckConnectionFromConfig, &wg, &errList, &mu)
@@ -2785,6 +2898,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Clickup, connectionManager.AddClickupConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Posthog, connectionManager.AddPosthogConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
@@ -2820,10 +2934,12 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.ISOCPulse, connectionManager.AddISOCPulseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.InfluxDB, connectionManager.AddInfluxDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.QuickSight, connectionManager.AddQuickSightConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

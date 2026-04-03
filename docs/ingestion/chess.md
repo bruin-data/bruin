@@ -19,8 +19,16 @@ To connect to Chess, you need to add a configuration item to the connections sec
       chess:
         - name: "my-chess"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
 ```
 
 - `players`: A list of players usernames for which you want to fetch data.

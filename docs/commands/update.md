@@ -5,7 +5,7 @@ The `bruin upgrade` command updates your Bruin CLI installation to the latest ve
 ## Usage
 
 ```shell
-bruin upgrade [flags]
+bruin upgrade [options] [version]
 ```
 
 ## Description
@@ -26,6 +26,12 @@ Upgrade to the latest version:
 
 ```shell
 bruin upgrade
+```
+
+### Upgrade to a Specific Version
+
+```shell
+bruin upgrade v0.20.0
 ```
 
 ## Prerequisites

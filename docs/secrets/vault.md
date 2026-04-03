@@ -1,8 +1,8 @@
-## Using HashiCorp Vault as a Secrets Backend
+# Using HashiCorp Vault as a Secrets Backend
 
 Bruin supports using [HashiCorp Vault](https://www.vaultproject.io/) with a **kv generic secrets engine** as a secrets backend for managing connection credentials. This is controlled via the `--secrets-backend` flag on the `run` command.
 
-### Enabling Vault
+## Enabling Vault
 
 To use Vault as your secrets backend, pass the flag:
 
@@ -16,18 +16,19 @@ You can also set the backend via environment variable:
 export BRUIN_SECRETS_BACKEND=vault
 ```
 
-### Configuring Vault Connection
+## Configuring Vault Connection
 
 Bruin connects to Vault using environment variables. The following are required:
 
 - `BRUIN_VAULT_HOST`: The URL of your Vault server (e.g., `https://vault.example.com:8200`)
 - `BRUIN_VAULT_MOUNT_PATH`: The path of the kv secrets engine
 - `BRUIN_VAULT_PATH`: The subpath within the engine to where the secrets are
-- either `BRUIN_VAULT_TOKEN` or `BRUIN_VAULT_ROLE`: The authentication token for Vault access or If you are running Bruin inside a Kubernetes cluster, you can use a Kubernetes role for authentication with Vault by setting the `BRUIN_VAULT_ROLE` environment variable in your pod or deployment.
+- either `BRUIN_VAULT_TOKEN` or `BRUIN_VAULT_ROLE`: The authentication token for Vault access, or if you are running Bruin inside a Kubernetes cluster, you can use a Kubernetes role for authentication with Vault by setting the `BRUIN_VAULT_ROLE` environment variable in your pod or deployment.
+- `BRUIN_VAULT_K8S_AUTH_MOUNT` (optional): The Kubernetes auth mount path in Vault. Defaults to `"kubernetes"` if not set.
 
-### Storing Secrets in Vault
+## Storing Secrets in Vault
 
-Bruin expects connection credentials to be stored in Vault using a path convention based on the connection name. By default, secrets are stored at `{BRUIN_VAULT_MOUNT_PATH}/data/{BRUIN_VAULT_PATH}/{secret/connection name}
+Bruin expects connection credentials to be stored in Vault using a path convention based on the connection name. By default, secrets are stored at `{BRUIN_VAULT_MOUNT_PATH}/data/{BRUIN_VAULT_PATH}/{secret/connection name}`.
 
 The content of the secret should follow a certain format. For example for a postgres connection it should be :
 

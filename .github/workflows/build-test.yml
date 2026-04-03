@@ -1,8 +1,9 @@
-name: CI Checks
+# CI Checks workflow
 
+name: CI Checks
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths-ignore:
       - 'docs/**'
       - 'examples/**'
@@ -14,7 +15,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths-ignore:
       - 'docs/**'
       - 'examples/**'
@@ -25,60 +26,87 @@ on:
       - 'Makefile'
       - 'package.json'
       - 'package-lock.json'
-
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.ref == 'refs/heads/main' && github.sha || github.ref) }}
   cancel-in-progress: true
-
-
 env:
-  IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
   DOCKER_BUILDKIT: 1
   REGISTRY: ghcr.io
   IMAGE_NAME: bruin-data/bruin
-
 jobs:
   test:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest ]
+        platform: [depot-ubuntu-latest-4]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - name: Setup Go 
+          fetch-depth: 1
+          fetch-tags: true
+      - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache: false
+          cache-dependency-path: "go.sum"
+      - name: Cache Rust artifacts
+        id: rust-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            pkg/sqlparser/rustffi/target
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml') }}
+          restore-keys: |
+            rust-${{ runner.os }}-
+      - name: Touch cached Rust lib
+        if: steps.rust-cache.outputs.cache-hit == 'true'
+        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
+      - name: Setup Rust
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
       - run: make test
-
-
   end2end:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-latest ]
+        platform: [depot-ubuntu-latest-4]
     runs-on: ${{ matrix.platform }}
     steps:
+      - name: Install R (background)
+        run: |
+          nohup bash -c 'sudo apt-get install -y --no-install-recommends r-base-core 2>/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base-core)' > /tmp/r_install.log 2>&1 &
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - name: Setup Go 
+          fetch-depth: 1
+          fetch-tags: true
+      - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-          cache: false
-      - name: Install R
+          cache-dependency-path: "go.sum"
+      - name: Cache Rust artifacts
+        id: rust-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            pkg/sqlparser/rustffi/target
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml') }}
+          restore-keys: |
+            rust-${{ runner.os }}-
+      - name: Touch cached Rust lib
+        if: steps.rust-cache.outputs.cache-hit == 'true'
+        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
+      - name: Setup Rust
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+      - name: Wait for R
         run: |
-          sudo apt-get update
-          sudo apt-get install -y r-base
+          while ! command -v Rscript &>/dev/null; do sleep 1; done
       - name: Run integration tests
         run: make integration-test
-
   dockerBuild:
     runs-on: depot-ubuntu-latest
     name: Docker Build
@@ -90,7 +118,6 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -102,14 +129,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Set up Depot
         uses: depot/setup-action@v1
-
-      - name: Build and push Docker image
+      - name: Build Docker image
         uses: depot/build-push-action@v1
         with:
           context: .
@@ -120,29 +142,24 @@ jobs:
           build-args: |
             VERSION=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
             BRANCH_NAME=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-
   lint:
-    runs-on: depot-ubuntu-latest
+    runs-on: depot-ubuntu-latest-8
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
-      - name: Run golangci-lint
-        run: go tool golangci-lint run --timeout 10m60s ./...
-
-  goreleaser-unix:
-    runs-on: depot-ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v6
+      - name: Cache golangci-lint analysis
+        uses: actions/cache@v4
         with:
-          go-version-file: 'go.mod'
-
-      - name: Run GoReleaser
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            golangci-lint-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+      - name: Install golangci-lint
         run: |
-          docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }}  -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.25 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
+          VERSION=$(grep '^GOLANGCI_LINT_VERSION=' Makefile | cut -d= -f2)
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${VERSION}
+      - name: Run golangci-lint
+        run: golangci-lint run --timeout 10m60s --build-tags="no_duckdb_arrow" ./...

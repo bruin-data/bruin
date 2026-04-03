@@ -133,6 +133,19 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "ducklake with sqlite catalog type and gcs storage is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeSQLite,
+				},
+				Storage: StorageConfig{
+					Type: StorageTypeGCS,
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -165,6 +178,7 @@ func TestTypeConstants(t *testing.T) {
 		{"catalog type duckdb", CatalogType("duckdb"), CatalogTypeDuckDB},
 		{"catalog type sqlite", CatalogType("sqlite"), CatalogTypeSQLite},
 		{"storage type", StorageType("s3"), StorageTypeS3},
+		{"storage type gcs", StorageType("gcs"), StorageTypeGCS},
 	}
 
 	for _, tt := range tests {
@@ -237,6 +251,27 @@ func TestStorageAuth_IsS3(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, tt.auth.IsS3())
+		})
+	}
+}
+
+func TestStorageAuth_IsGCS(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		auth StorageAuth
+		want bool
+	}{
+		{"empty auth", StorageAuth{}, false},
+		{"with access and secret key", StorageAuth{AccessKey: "GOOG...", SecretKey: "secret"}, true},
+		{"only access key", StorageAuth{AccessKey: "GOOG..."}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.auth.IsGCS())
 		})
 	}
 }

@@ -10,9 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestRenderDDLCommand_Run(t *testing.T) {
-	t.Parallel()
-
+func TestRenderDDLCommand_Run(t *testing.T) { //nolint:paralleltest
 	bqAsset := &pipeline.Asset{
 		Name: "asset1",
 		Type: pipeline.AssetTypeBigqueryQuery,
@@ -188,10 +186,8 @@ func TestRenderDDLCommand_Run(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			f := &fields{
 				extractor:      new(mockExtractor),
 				bqMaterializer: new(mockMaterializer),

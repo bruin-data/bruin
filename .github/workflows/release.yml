@@ -16,18 +16,36 @@ jobs:
   integration-tests:
     strategy:
       matrix:
-        platform: [ depot-ubuntu-24.04, depot-ubuntu-22.04, depot-macos-15, depot-macos-14 ]
+        platform: [ depot-ubuntu-24.04, depot-macos-15, windows-2022 ]
         suite: ["test", "integration-test"]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Go 
+      - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache: true
+          cache-dependency-path: "go.sum"
+      - name: Cache Rust artifacts
+        id: rust-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            pkg/sqlparser/rustffi/target
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml') }}
+          restore-keys: |
+            rust-${{ runner.os }}-
+      - name: Touch cached Rust lib
+        if: steps.rust-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
+      - name: Setup Rust
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
       - name: Install R (Ubuntu)
         if: startsWith(matrix.platform, 'depot-ubuntu')
         run: |
@@ -60,7 +78,24 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache: true
+          cache-dependency-path: "go.sum"
+      - name: Cache Rust artifacts
+        id: rust-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            pkg/sqlparser/rustffi/target
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml') }}
+          restore-keys: |
+            rust-${{ runner.os }}-
+      - name: Touch cached Rust lib
+        if: steps.rust-cache.outputs.cache-hit == 'true'
+        run: touch pkg/sqlparser/rustffi/target/release/libbruin_rustsqlparser.a
+      - name: Setup Rust
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build Bruin
         run: make build
@@ -104,11 +139,11 @@ jobs:
       - name: Workaround Git Security Warning
         run: |
           # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" 
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache: false
+          cache-dependency-path: "go.sum"
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache darwin
@@ -133,11 +168,11 @@ jobs:
       - name: Workaround Git Security Warning
         run: |
           # Workaround a bug in github actions:
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" 
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-          cache: false
+          cache-dependency-path: "go.sum"
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache linux
@@ -244,7 +279,6 @@ jobs:
   dockerBuild:
     runs-on: depot-ubuntu-latest
     name: Docker Build
-    needs: [release-windows, release-unix]
     permissions:
       # allow issuing OIDC tokens for this workflow run
       id-token: write

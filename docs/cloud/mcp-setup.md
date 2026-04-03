@@ -11,8 +11,8 @@ The Bruin Cloud MCP is exposed at:
 Create API token with MCP permission:
 
 1. Log in to the Bruin Cloud.
-2. Go to **Team settings** → **API Tokens**.
-3. Create a new token and grant it (`mcp:token`) permission.
+2. Go to **Team settings** → **Team Members** and scroll down.
+3. Create a new API token and grant it (`mcp:token`) permission.
 4. Copy the **plain-text token** once; it is not shown again.
 
 ## Cursor
@@ -90,6 +90,9 @@ Once the Bruin Cloud MCP server is connected, you can ask in natural language, f
 - "Show me validation errors."
 - "Cancel the currently running instance of pipeline X."
 - "Mark external dependencies in run id X as success."
+- "List all connections."
+- "Create a new generic connection called my-secret with value X."
+- "Delete the connection named my-secret."
 
 
 ## Troubleshooting

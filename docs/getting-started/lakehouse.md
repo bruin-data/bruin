@@ -19,11 +19,11 @@ DuckLake uses a DuckDB, SQLite, or Postgres catalog. The table shows supported s
 For more guidance, see DuckLake's [choosing a catalog database](https://ducklake.select/docs/stable/duckdb/usage/choosing_a_catalog_database).
 
 
-| Catalog | S3 |
-|-------------------|----|
-| DuckDB| <span class="lh-check" aria-label="supported"></span> |
-| SQLite | <span class="lh-check" aria-label="supported"></span> |
-| Postgres| <span class="lh-check" aria-label="supported"></span> |
+| Catalog | S3 | GCS |
+|-------------------|----|-----|
+| DuckDB| <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
+| SQLite | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
+| Postgres| <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
 
 MySQL catalogs are currently not supported for DuckLake in Bruin due to limitations in the DuckDB MySQL connector and incomplete MySQL support in the DuckLake DuckDB extension.
 
@@ -39,12 +39,12 @@ Iceberg uses the AWS Glue Data Catalog ([AWS Glue Data Catalog](https://docs.aws
 
 ### Trino [↗](../platforms/trino.md#lakehouse-support)
 
-Trino supports lakehouse access via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with [Glue](https://aws.amazon.com/glue/) and [Nessie](https://projectnessie.org/) catalogs. Configuration happens in Trino, while Bruin connection config remains unchanged. See [Trino lakehouse support](../platforms/trino.md#lakehouse-support), [Glue + S3 guide](../platforms/trino.md#guide-glue-s3), and [Nessie (in-memory) + S3 guide](../platforms/trino.md#guide-nessie-in-memory-s3).
+Trino supports lakehouse access via the [Iceberg connector](https://trino.io/docs/current/connector/iceberg.html) with [Glue](https://aws.amazon.com/glue/) and [Nessie](https://projectnessie.org/) catalogs. Configuration happens in Trino, while Bruin connection config remains unchanged. See [Trino lakehouse support](../platforms/trino.md#lakehouse-support), [Trino + GCS (general)](../platforms/trino.md#guide-trino-gcs-general), [Glue + S3 guide](../platforms/trino.md#guide-glue-s3), [Nessie (in-memory) + S3 guide](../platforms/trino.md#guide-nessie-in-memory-s3), and [Nessie (in-memory) + GCS guide](../platforms/trino.md#guide-nessie-in-memory-gcs).
 
-| Catalog | S3 |
-|-------------------|----|
-| Glue | <span class="lh-check" aria-label="supported"></span> |
-| Nessie | <span class="lh-check" aria-label="supported"></span> |
+| Catalog | S3 | GCS |
+|-------------------|----|-----|
+| Glue | <span class="lh-check" aria-label="supported"></span> | Not supported |
+| Nessie | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
 
 ## What is a Lakehouse?
 

@@ -41,6 +41,7 @@ func Import(isDebug *bool) *cli.Command {
 			ImportDatabase(isDebug),
 			ImportScheduledQueries(),
 			ImportTableauDashboards(),
+			ImportQuickSightAssets(),
 		},
 	}
 }
@@ -878,6 +879,12 @@ func (d customDelegate) Render(w io.Writer, m list.Model, index int, listItem li
 		return
 	}
 
+	// Try to render as quickSightListItem
+	if qsItem, ok := listItem.(quickSightListItem); ok {
+		d.renderQuickSightListItem(w, m, index, qsItem)
+		return
+	}
+
 	// Fallback to default rendering
 	d.DefaultDelegate.Render(w, m, index, listItem)
 }
@@ -972,6 +979,56 @@ func (d customDelegate) renderTableauDashboardItem(w io.Writer, m list.Model, in
 		fmt.Fprintf(w, "%s\n%s", styledLine, descLine)
 	} else {
 		// Non-current item
+		titleColor := colorGray
+		if isSelected {
+			titleColor = colorSuccess
+		}
+
+		titleLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(titleColor)).
+			Padding(0, 1).
+			MarginTop(1).
+			Render(fmt.Sprintf("%s %s", checkbox, title))
+
+		descLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9CA3AF")).
+			Padding(0, 5).
+			Render(desc)
+
+		fmt.Fprintf(w, "%s\n%s", titleLine, descLine)
+	}
+}
+
+func (d customDelegate) renderQuickSightListItem(w io.Writer, m list.Model, index int, item quickSightListItem) {
+	isSelected := d.selectedItems[index]
+	isCurrent := index == m.Index()
+
+	checkbox := "[ ]"
+	if isSelected {
+		checkbox = "[x]"
+	}
+
+	title := item.Title()
+	desc := item.Description()
+
+	if isCurrent {
+		styledLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(lipgloss.Color("#7C3AED")).
+			Width(m.Width()-4).
+			Padding(0, 1).
+			MarginTop(1).
+			Render(fmt.Sprintf("%s %s", checkbox, title))
+
+		descLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#D8B4FE")).
+			Background(lipgloss.Color("#7C3AED")).
+			Width(m.Width()-4).
+			Padding(0, 5).
+			Render(desc)
+
+		fmt.Fprintf(w, "%s\n%s", styledLine, descLine)
+	} else {
 		titleColor := colorGray
 		if isSelected {
 			titleColor = colorSuccess
@@ -1286,9 +1343,10 @@ func (m *scheduledQueryModel) View() string {
 	leftBorderColor := colorGray
 	rightBorderColor := colorGray
 
-	if m.focusedPane == 0 {
+	switch m.focusedPane {
+	case 0:
 		leftBorderColor = colorBlue
-	} else if m.focusedPane == 1 {
+	case 1:
 		rightBorderColor = colorOrange
 	}
 
@@ -1366,7 +1424,8 @@ func (m *scheduledQueryModel) View() string {
 		fillerLines[i] = ""
 	}
 
-	elements := []string{summary, "", content}
+	elements := make([]string, 0, 3+len(fillerLines)+1)
+	elements = append(elements, summary, "", content)
 	elements = append(elements, fillerLines...)
 	elements = append(elements, statusBar)
 
@@ -2261,9 +2320,10 @@ func (m *tableauDashboardModel) View() string {
 	leftBorderColor := colorGray
 	rightBorderColor := colorGray
 
-	if m.focusedPane == 0 {
+	switch m.focusedPane {
+	case 0:
 		leftBorderColor = colorBlue
-	} else if m.focusedPane == 1 {
+	case 1:
 		rightBorderColor = colorOrange
 	}
 
@@ -2328,7 +2388,8 @@ func (m *tableauDashboardModel) View() string {
 		fillerLines[i] = ""
 	}
 
-	elements := []string{summary, "", content}
+	elements := make([]string, 0, 3+len(fillerLines)+1)
+	elements = append(elements, summary, "", content)
 	elements = append(elements, fillerLines...)
 	elements = append(elements, statusBar)
 

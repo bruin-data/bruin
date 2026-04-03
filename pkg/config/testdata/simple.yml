@@ -152,6 +152,9 @@ environments:
       stripe:
         - name: conn18
           api_key: "stripekey"
+      dune:
+        - name: "dune-1"
+          api_key: "dune-api-key-123"
       appsflyer:
         - name: conn19
           api_key: "appsflyerkey"
@@ -159,6 +162,12 @@ environments:
         - name: conn20
           bootstrap_servers: "localhost:9093"
           group_id: "kafka123"
+      rabbitmq:
+        - name: conn21
+          host: "localhost"
+          port: 5672
+          username: "guest"
+          password: "guest"
       duckdb:
         - name: conn20
           path: "/path/to/duck.db"
@@ -174,8 +183,16 @@ environments:
       chess:
         - name: conn24
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       airtable:
         - name: conn23
           base_id: "123"
@@ -303,6 +320,10 @@ environments:
       clickup:
         - name: "clickup-1"
           api_token: "token_123"
+      posthog:
+        - name: "posthog-1"
+          personal_api_key: "phx_test123"
+          project_id: "12345"
       mixpanel:
         - name: "mixpanel-1"
           username: "user-123"

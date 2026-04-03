@@ -178,7 +178,7 @@ Checks if the data available in upstream table for end date of the run.
 name: analytics_123456789.events
 type: bq.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}"
+    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}")
 ```
 
 #### Example: Streaming upstream table
@@ -189,7 +189,7 @@ Checks if there is any data after end timestamp, by assuming that older data is 
 name: analytics_123456789.events
 type: bq.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
+    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}")
 ```
 
 ### `bq.seed`
@@ -231,4 +231,59 @@ Example CSV:
 name,networking_through,position,contact_date
 Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
+```
+
+### `bq.source`
+
+Defines BigQuery source assets for documenting existing tables and views in your BigQuery database. These assets are no-op (they don't execute), but are useful for:
+
+- Documenting existing BigQuery tables and views
+- Adding column descriptions and metadata
+- Establishing lineage relationships
+- Query preview functionality in the VSCode extension
+
+#### Example: Document an existing BigQuery table
+
+```yaml
+name: analytics.website_events
+type: bq.source
+description: "Raw website event data collected from tracking pixels"
+connection: google_cloud_platform-default
+
+tags:
+  - analytics
+  - raw-data
+  - events
+domains:
+  - web-analytics
+
+meta:
+  business_owner: "Analytics Team"
+  data_steward: "analytics@company.com"
+  refresh_frequency: "real-time"
+
+depends:
+  - analytics.users
+  - analytics.sessions
+
+columns:
+  - name: event_id
+    type: "STRING"
+    description: "Unique identifier for each event"
+
+  - name: user_id
+    type: "STRING"
+    description: "Identifier of the user who triggered the event"
+
+  - name: event_type
+    type: "STRING"
+    description: "Type of event (page_view, click, form_submit, etc.)"
+
+  - name: event_timestamp
+    type: "TIMESTAMP"
+    description: "Timestamp when the event occurred"
+
+  - name: page_url
+    type: "STRING"
+    description: "URL of the page where the event occurred"
 ```

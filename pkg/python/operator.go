@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
@@ -14,9 +12,7 @@ import (
 	logger2 "github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 	"go.uber.org/zap"
 )
 
@@ -36,7 +32,6 @@ type executionContext struct {
 
 type modulePathFinder interface {
 	FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error)
-	FindRequirementsTxtInPath(path string, executable *pipeline.ExecutableFile) (string, error)
 	FindDependencyConfig(path string, executable *pipeline.ExecutableFile) (*DependencyConfig, error)
 }
 
@@ -57,33 +52,6 @@ type LocalOperator struct {
 }
 
 func NewLocalOperator(config config.ConnectionAndDetailsGetter, envVariables map[string]string) *LocalOperator {
-	cmdRunner := &CommandRunner{}
-	fs := afero.NewOsFs()
-
-	pathToPython, err := findPathToExecutable([]string{"python3", "python"})
-	if err != nil {
-		panic("No executable found for Python, neither 'python3' nor 'python', are you sure Python is installed?")
-	}
-
-	return &LocalOperator{
-		repoFinder: &git.RepoFinder{},
-		module:     &ModulePathFinder{},
-		runner: &localPythonRunner{
-			cmd: cmdRunner,
-			requirementsInstaller: &installReqsToHomeDir{
-				fs:           fs,
-				cmd:          cmdRunner,
-				config:       user.NewConfigManager(fs),
-				pathToPython: pathToPython,
-			},
-			pathToPython: pathToPython,
-		},
-		envVariables: envVariables,
-		config:       config,
-	}
-}
-
-func NewLocalOperatorWithUv(config config.ConnectionAndDetailsGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 
 	return &LocalOperator{
@@ -142,7 +110,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		depConfig = &DependencyConfig{Type: DependencyTypeNone}
 	}
 
-	// Extract requirementsTxt for backward compatibility
+	// Extract requirements.txt for backward compatibility
 	var requirementsTxt string
 	if depConfig != nil && depConfig.Type == DependencyTypeRequirementsTxt {
 		requirementsTxt = depConfig.RequirementsTxt
@@ -227,15 +195,4 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 
 	return nil
-}
-
-func findPathToExecutable(alternatives []string) (string, error) {
-	for _, alternative := range alternatives {
-		path, err := exec.LookPath(alternative)
-		if err == nil {
-			return path, nil
-		}
-	}
-
-	return "", errors.New("no executable found for alternatives: " + strings.Join(alternatives, ", "))
 }

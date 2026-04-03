@@ -247,6 +247,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "stripekey",
 				},
 			},
+			Dune: []DuneConnection{
+				{
+					Name:   "dune-1",
+					APIKey: "dune-api-key-123",
+				},
+			},
 			InfluxDB: []InfluxDBConnection{
 				{
 					Name:   "influxdb-1",
@@ -268,6 +274,15 @@ func TestLoadFromFile(t *testing.T) {
 					Name:             "conn20",
 					BootstrapServers: "localhost:9093",
 					GroupID:          "kafka123",
+				},
+			},
+			RabbitMQ: []RabbitMQConnection{
+				{
+					Name:     "conn21",
+					Host:     "localhost",
+					Port:     5672,
+					Username: "guest",
+					Password: "guest",
 				},
 			},
 			DuckDB: []DuckDBConnection{
@@ -308,7 +323,7 @@ func TestLoadFromFile(t *testing.T) {
 			Chess: []ChessConnection{
 				{
 					Name:    "conn24",
-					Players: []string{"MagnusCarlsen", "Hikaru"},
+					Players: []string{"FabianoCaruana", "Hikaru", "MagnusCarlsen", "GothamChess", "DanielNaroditsky", "AnishGiri", "Firouzja2003", "LevonAronian", "WesleySo", "GarryKasparov"},
 				},
 			},
 			Airtable: []AirtableConnection{
@@ -491,6 +506,13 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:     "clickup-1",
 					APIToken: "token_123",
+				},
+			},
+			Posthog: []PosthogConnection{
+				{
+					Name:           "posthog-1",
+					PersonalAPIKey: "phx_test123",
+					ProjectID:      "12345",
 				},
 			},
 			QuickBooks: []QuickBooksConnection{

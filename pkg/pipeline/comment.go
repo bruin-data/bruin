@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -102,19 +103,20 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	}
 
 	scanner := bufio.NewScanner(file)
-	content := ""
+	var contentBuilder strings.Builder
 	for range commentRowEnd {
 		scanner.Scan()
 	}
 
 	for scanner.Scan() {
-		content += scanner.Text() + "\n"
+		contentBuilder.WriteString(scanner.Text())
+		contentBuilder.WriteByte('\n')
 	}
 
 	task.ExecutableFile = ExecutableFile{
 		Name:    filepath.Base(filePath),
 		Path:    absFilePath,
-		Content: strings.TrimSpace(content),
+		Content: strings.TrimSpace(contentBuilder.String()),
 	}
 
 	return task, nil
@@ -123,7 +125,7 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 func readUntilComments(file afero.File, prefixes, suffixes []string) (string, int) {
 	scanner := bufio.NewScanner(file)
 	defer func() { _, _ = file.Seek(0, io.SeekStart) }()
-	rows := ""
+	var rowsBuilder strings.Builder
 	rowCount := 0
 
 	seenPrefix := false
@@ -154,10 +156,11 @@ OUTER:
 		}
 
 		// Add the content line
-		rows += rowText + "\n"
+		rowsBuilder.WriteString(rowText)
+		rowsBuilder.WriteByte('\n')
 	}
 
-	return strings.TrimSpace(rows), rowCount
+	return strings.TrimSpace(rowsBuilder.String()), rowCount
 }
 
 func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath string) (*Asset, error) {
@@ -386,4 +389,38 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 	}
 
 	return nil
+}
+
+// ValidateAssetYAML extracts the YAML from an asset file and strict-decodes it,
+// returning an error if unknown fields are found.
+// Returns nil for single-line comment assets that are not YAML-parseable.
+func ValidateAssetYAML(fs afero.Fs, filePath string, defType TaskDefinitionType) error {
+	var data []byte
+
+	if defType == YamlTask {
+		var err error
+		data, err = afero.ReadFile(fs, filePath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read file %s", filePath)
+		}
+	} else {
+		file, err := fs.Open(filePath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to open file %s", filePath)
+		}
+		defer file.Close()
+
+		if !isEmbeddedYamlComment(file, possiblePrefixesForCommentBlocks) {
+			return nil
+		}
+
+		rows, _ := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
+		if rows == "" {
+			return nil
+		}
+		data = []byte(rows)
+	}
+
+	var td taskDefinition
+	return path.ConvertYamlToObjectStrict(data, &td)
 }

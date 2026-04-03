@@ -26,8 +26,16 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
 
   another_environment:
     connections:

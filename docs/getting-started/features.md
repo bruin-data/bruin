@@ -3,7 +3,7 @@
 > [!TIP]
 > This content has been reorganized. See [Core Concepts](/core-concepts/overview) for an updated guide to Bruin's features and concepts.
 
-Bruin is feature-packed and built to cover the majority needs of a data team, while staying extensible.
+Bruin is feature-packed and built to cover the majority of needs of a data team, while staying extensible.
 
 ## Data ingestion
 

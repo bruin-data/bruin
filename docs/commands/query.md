@@ -22,6 +22,7 @@ You can run it in three modes:
 | `--limit`            | `-l`  | Limit the number of rows returned.                                         |
 | `--timeout`          | `-t`  | Timeout for query execution in seconds (default: 1000).                    |
 | `--output [format]`  | `-o`  | Output type: `plain`, `json`, `csv`.                                       |
+| `--export`           |       | Export results to a CSV file.                                              |
 | `--config-file`      |       | The path to the `.bruin.yml` file.                                         |
 
 ## Example

@@ -1,6 +1,8 @@
 package path
 
 import (
+	"bytes"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -44,6 +46,22 @@ func WriteYaml(fs afero.Fs, path string, content interface{}) error {
 func ConvertYamlToObject(buf []byte, out interface{}) error {
 	err := yaml.Unmarshal(buf, out)
 	if err != nil {
+		return &YamlParseError{msg: err.Error()}
+	}
+
+	return nil
+}
+
+// ConvertYamlToObjectStrict is like ConvertYamlToObject but rejects unknown YAML fields.
+// Use for validation scenarios where unrecognized keys should be flagged.
+func ConvertYamlToObjectStrict(buf []byte, out interface{}) error {
+	decoder := yaml.NewDecoder(bytes.NewReader(buf))
+	decoder.KnownFields(true)
+	err := decoder.Decode(out)
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil // empty document is valid, same as yaml.Unmarshal behaviour
+		}
 		return &YamlParseError{msg: err.Error()}
 	}
 

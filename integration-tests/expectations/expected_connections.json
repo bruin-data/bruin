@@ -47,8 +47,16 @@
         {
           "name": "chess-default",
           "players": [
+            "FabianoCaruana",
+            "Hikaru",
             "MagnusCarlsen",
-            "Hikaru"
+            "GothamChess",
+            "DanielNaroditsky",
+            "AnishGiri",
+            "Firouzja2003",
+            "LevonAronian",
+            "WesleySo",
+            "GarryKasparov"
           ]
         }
       ]
@@ -102,8 +110,16 @@
           {
             "name": "chess-default",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -198,8 +214,16 @@
           {
             "name": "chess-ingestr",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -228,6 +252,17 @@
       },
       "schema_prefix": ""
     },
+    "env-python-pyproject-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-python-pyproject-materialization",
+            "path": "duckdb-files/python-pyproject-materialization.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-query-asset": {
       "connections": {
         "duckdb": [
@@ -245,6 +280,17 @@
           {
             "name": "duckdb-query-export",
             "path": "duckdb-files/env-query-export.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-query-var": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-var",
+            "path": "duckdb-files/query-var.db"
           }
         ]
       },
@@ -283,8 +329,16 @@
           {
             "name": "chess-run-default-option",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -309,8 +363,16 @@
           {
             "name": "chess-run-main-with-downstream",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -335,8 +397,16 @@
           {
             "name": "chess-run-main-with-filters",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -361,8 +431,16 @@
           {
             "name": "chess-run-malformed-sql",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -402,17 +480,6 @@
       },
       "schema_prefix": ""
     },
-    "env-python-pyproject-materialization": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-python-pyproject-materialization",
-            "path": "duckdb-files/python-pyproject-materialization.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
     "env-run-seed-data": {
       "connections": {
         "duckdb": [
@@ -442,8 +509,16 @@
           {
             "name": "chess-run-with-downstream",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -468,8 +543,16 @@
           {
             "name": "chess-run-with-filters",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -494,8 +577,16 @@
           {
             "name": "chess-run-with-tags",
             "players": [
+              "FabianoCaruana",
+              "Hikaru",
               "MagnusCarlsen",
-              "Hikaru"
+              "GothamChess",
+              "DanielNaroditsky",
+              "AnishGiri",
+              "Firouzja2003",
+              "LevonAronian",
+              "WesleySo",
+              "GarryKasparov"
             ]
           }
         ]
@@ -530,6 +621,50 @@
           {
             "name": "duckdb-scd2-by-time",
             "path": "duckdb-files/scd2-by-time.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-schema-prefix": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-schema-prefix",
+            "path": "duckdb-files/schema-prefix.db"
+          }
+        ]
+      },
+      "schema_prefix": "test"
+    },
+    "env-selector-downstream": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-downstream",
+            "path": "duckdb-files/run-selector-downstream.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-selector-intersection": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-filters",
+            "path": "duckdb-files/run-selector-intersection.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-selector-path": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-filters",
+            "path": "duckdb-files/run-selector-path.db"
           }
         ]
       },

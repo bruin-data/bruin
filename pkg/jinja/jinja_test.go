@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
 )
@@ -1336,7 +1337,7 @@ func TestPythonEnvVariables_FullRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			envVars := PythonEnvVariables(&startDate, &endDate, &executionDate, "test-pipeline", "test-run-id", tt.fullRefresh)
+			envVars := PythonEnvVariables(&startDate, &endDate, &executionDate, "test-pipeline", "test-run-id", tt.fullRefresh, "abc123")
 
 			// Verify BRUIN_FULL_REFRESH is set correctly
 			require.Equal(t, tt.expectedFullRefreshEnvVar, envVars["BRUIN_FULL_REFRESH"])
@@ -1347,6 +1348,69 @@ func TestPythonEnvVariables_FullRefresh(t *testing.T) {
 			require.Equal(t, "test-run-id", envVars["BRUIN_RUN_ID"])
 			require.Equal(t, "test-pipeline", envVars["BRUIN_PIPELINE"])
 			require.Equal(t, "1", envVars["PYTHONUNBUFFERED"])
+		})
+	}
+}
+
+func TestRenderer_SchemaPrefix(t *testing.T) {
+	t.Parallel()
+
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	basePipeline := &pipeline.Pipeline{
+		Name: "test-pipeline",
+	}
+
+	asset := &pipeline.Asset{
+		Name: "test-asset",
+	}
+
+	tests := []struct {
+		name           string
+		env            *config.Environment
+		expectedPrefix string
+	}{
+		{
+			name:           "schema_prefix is empty when no environment is set",
+			env:            nil,
+			expectedPrefix: "",
+		},
+		{
+			name:           "schema_prefix is empty when environment has no prefix",
+			env:            &config.Environment{},
+			expectedPrefix: "",
+		},
+		{
+			name:           "schema_prefix is set from environment",
+			env:            &config.Environment{SchemaPrefix: "dev_"},
+			expectedPrefix: "dev_",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+			ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, executionDate)
+			ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+			ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+			if tt.env != nil {
+				ctx = context.WithValue(ctx, config.EnvironmentContextKey, tt.env)
+			}
+
+			baseRenderer := NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, basePipeline.Name, "test-run-id", nil)
+			clonedRenderer, err := baseRenderer.CloneForAsset(ctx, basePipeline, asset)
+			require.NoError(t, err)
+			require.NotNil(t, clonedRenderer)
+
+			result, err := clonedRenderer.Render("{{ schema_prefix }}")
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedPrefix, result)
 		})
 	}
 }

@@ -127,6 +127,19 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "archives", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// PostHog - Product analytics platform
+	"posthog": {
+		{Name: "persons", PrimaryKey: "id", IncKey: "last_seen_at", IncStrategy: "merge"},
+		{Name: "feature_flags", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "id", IncKey: "timestamp", IncStrategy: "append"},
+		{Name: "cohorts", PrimaryKey: "id", IncKey: "last_calculation", IncStrategy: "merge"},
+		{Name: "event_definitions", PrimaryKey: "id", IncKey: "last_updated_at", IncStrategy: "merge"},
+		{Name: "property_definitions:event", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "property_definitions:person", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "property_definitions:session", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "annotations", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// ClickUp - Productivity platform
 	"clickup": {
 		{Name: "user", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
@@ -207,6 +220,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// DynamoDB - AWS NoSQL database (user-defined tables)
 	"dynamodb": {},
+
+	// Dune - Blockchain analytics platform
+	"dune": {
+		{Name: "queries"},
+		{Name: "query:<id>"},
+		{Name: "query:<id>:<params>"},
+		{Name: "sql:<raw SQL>"},
+	},
 
 	// Elasticsearch - Search and analytics engine (user-defined indices)
 	"elasticsearch": {},
@@ -323,13 +344,27 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// HubSpot - CRM platform
 	"hubspot": {
-		{Name: "companies", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "contacts", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "deals", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "tickets", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "products", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "quotes", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
-		{Name: "schemas", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "contacts"},
+		{Name: "companies"},
+		{Name: "deals"},
+		{Name: "tickets"},
+		{Name: "products"},
+		{Name: "quotes"},
+		{Name: "calls"},
+		{Name: "emails"},
+		{Name: "feedback_submissions"},
+		{Name: "line_items"},
+		{Name: "meetings"},
+		{Name: "notes"},
+		{Name: "tasks"},
+		{Name: "carts"},
+		{Name: "discounts"},
+		{Name: "fees"},
+		{Name: "invoices"},
+		{Name: "commerce_payments"},
+		{Name: "taxes"},
+		{Name: "owners"},
+		{Name: "schemas"},
 	},
 
 	// Indeed - Job search platform
@@ -385,6 +420,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// Kafka - Event streaming (user-defined topics)
 	"kafka": {},
+
+	// RabbitMQ - Message broker (user-defined queues)
+	"rabbitmq": {},
 
 	// Kinesis - AWS streaming (user-defined streams)
 	"kinesis": {},
@@ -708,6 +746,18 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "users", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
 		{Name: "participants", PrimaryKey: "id", IncKey: "join_time", IncStrategy: "merge"},
 	},
+}
+
+// gongSources is the set of source names that require gong to be enabled.
+var gongSources = map[string]bool{
+	"dune":     true,
+	"posthog":  true,
+	"rabbitmq": true,
+}
+
+// gongDestinations is the set of destination schemes that require gong.
+var gongDestinations = map[string]bool{
+	"dynamodb": true,
 }
 
 // GetSourceTables returns the available tables for a specific ingestr source.

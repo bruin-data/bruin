@@ -41,22 +41,25 @@ table td:first-child {
 | `--sensor-mode` | str | `'once'` | Set sensor mode: `skip`, `once`, or `wait`. |
 | `--full-refresh` | bool | `false` | Truncate the table before running. Also sets the `full_refresh` jinja variable to `True` and `BRUIN_FULL_REFRESH` environment variable to `1`. |
 | `--apply-interval-modifiers` | bool | `false` | Apply interval modifiers. |
-| `--use-pip` | bool | `false` | Use pip for managing Python dependencies. |
 | `--continue` | bool | `false` | Continue from the last failed asset. |
+| `--selector` | str | - | Select assets with dbt-style syntax. Supports `tag:`, `path:`, `file:`, `fqn:`, `+`, `n+`, `@`, space unions, and comma intersections. |
 | `--tag` | str | - | Pick assets with the given tag. |
 | `--single-check` | str | - | Run a single column or custom check by ID. |
 | `--exclude-tag` | str | - | Exclude assets with the given tag. |
 | `--only` | []str | `'main', 'checks', 'push-metadata'` | Limit the types of execution steps to run. By default it runs `main` and `checks`, while `push-metadata` is optional if defined in the pipeline definition. |
 | `--exp-use-winget-for-uv` | bool | `false` | Use PowerShell to manage and install `uv` on Windows. Has no effect on non-Windows systems. |
+| `--use-pip` | bool | `false` | Deprecated compatibility flag; passing it now returns an explicit deprecation error. Python execution is uv-only. |
 | `--debug-ingestr-src` | str | - | Use ingestr from the given path instead of the builtin version. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
-| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
+| `--secrets-backend` | str | - | The source of secrets if different from .bruin.yml. Possible values: `vault`, `doppler`, `aws`, `azure`. Can also be set via `BRUIN_SECRETS_BACKEND` environment variable. |
 | `--no-validation` | bool | `false` | Skip validation for this run. |
 | `--no-timestamp` | bool | `false` | Skip logging timestamps for this run. |
 | `--no-color` | bool | `false` | Plain log output for this run. |
-| `--minimal-logs` | bool | `false` | Skip initial pipeline analysis logs for this run. |
-| `--var` | []str | - | Override pipeline [variables](/core-concepts/variables) with custom values. |
-| `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. **BigQuery only.** |
+| `--verbose` | bool | `false` | Print verbose output including SQL queries. |
+| `--interactive`, `-i` | bool | `false` | Use an interactive TUI that shows live progress of asset execution. |
+| `--timeout` | int | `604800` | Timeout for the entire pipeline run in seconds. |
+| `--var` | []str | - | Override pipeline [variables](/variables/overview) with custom values. |
+| `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
 
 ### Continue from the last failed asset
 
@@ -74,6 +77,26 @@ bruin run --continue
 As detailed in the flag section above, the  `--tag`, `--downstream`, `--exclude-tag`, and `--only` flags provide powerful ways to filter and control which assets and execution steps in your pipeline are executed. These flags can also be combined to fine-tune pipeline runs, allowing you to execute specific subsets of assets based on tags, include their downstream dependencies, and restrict execution to certain execution types.
 
 Let's explore how combining these flags enables highly targeted pipeline execution scenarios:
+
+### dbt-style Selectors
+
+Use `--selector` when you want dbt-like asset targeting in a Bruin pipeline:
+
+```bash
+bruin run --selector "tag:nightly"
+bruin run --selector "+fct_orders"
+bruin run --selector "path:assets/marts,tag:finance"
+bruin run --selector "@fct_orders"
+```
+
+`--selector` supports:
+
+- `tag:`, `path:`, `file:`, and `fqn:` methods
+- `+asset`, `asset+`, and `2+asset+1` graph expansion
+- `@asset` to include descendants and the ancestors they need
+- Space-delimited unions and comma-delimited intersections
+
+`--selector` cannot be combined with `--tag`, `--downstream`, positional asset arguments, or single-asset runs. Use selector syntax directly for those cases.
 
 ### Combining Tags and Execution Types
 
@@ -163,6 +186,12 @@ Run the assets in the pipeline that contain a specific tag:
 
 ```bash
 bruin run --tag my_tag
+```
+
+Run a dbt-style selector:
+
+```bash
+bruin run --selector "+fct_orders,tag:finance"
 ```
 
 Run only the quality checks:

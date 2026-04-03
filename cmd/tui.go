@@ -241,7 +241,7 @@ func (t *TUIRenderer) clearLastRender() {
 }
 
 func (t *TUIRenderer) getTerminalSize() (int, int) {
-	w, h, err := term.GetSize(int(t.terminal.Fd()))
+	w, h, err := term.GetSize(int(t.terminal.Fd())) //nolint:gosec // G115: safe uintptr->int for terminal size
 	if err != nil {
 		return 80, 24
 	}

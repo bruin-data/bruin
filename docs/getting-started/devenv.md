@@ -32,8 +32,16 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
 
   production:
     connections:
@@ -90,8 +98,16 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
 
   production:
     connections:
@@ -117,7 +133,7 @@ depends:
 SELECT
   player,
   COUNT(*) AS games_played,
-  SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins,
+  SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins
 FROM raw.table1 t1
 JOIN raw.table2 t2
   ON t1.player_id = t2.player_id
@@ -142,7 +158,7 @@ flowchart LR
 When you run this asset in a schema-prefixed environments, Bruin will do a few things:
 
 - First of all, it will analyze the query and identify the used tables.
-  - In this example, it will identify that `chess.players` is found.
+  - In this example, it will identify that `raw.table1` and `raw.table2` are found.
 - In parallel, it will gather a list of available schemas and tables within the given database.
 - It will check which of the referenced schemas and tables exist with the prefix.
 - For each table that has a copy in a prefixed schema, Bruin will rewrite the query and the asset to use the prefixed schema names instead.
@@ -157,7 +173,7 @@ Bruin will check the database and identify that there is no `dev1_raw` schema, t
 SELECT
   player,
   COUNT(*) AS games_played,
-  SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins,
+  SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins
 FROM raw.table1 t1
 JOIN raw.table2 t2
   ON t1.player_id = t2.player_id
@@ -187,7 +203,7 @@ When analyzing the database, Bruin noticed that there is already a table called 
 SELECT
   player,
   COUNT(*) AS games_played,
-  SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins,
+  SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins
 FROM dev1_raw.table1 t1
 JOIN raw.table2 t2
   ON t1.player_id = t2.player_id
@@ -223,7 +239,7 @@ When analyzing the database, Bruin noticed that there are already tables called 
 SELECT
   player,
   COUNT(*) AS games_played,
-  SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins,
+  SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) AS wins
 FROM dev1_raw.table1 t1
 JOIN dev1_raw.table2 t2
   ON t1.player_id = t2.player_id

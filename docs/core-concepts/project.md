@@ -30,16 +30,24 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
   
   staging:
     schema_prefix: "stg_"
     connections:
       postgres:
         - name: "postgres-staging"
-          username: "STAGING_POSTGRES_USER"
-          password: "STAGING_POSTGRES_PASSWORD"
+          username: "staging_user"
+          password: "staging_pass"
           host: "staging-db.example.com"
           port: 5432
           database: "analytics"
@@ -48,8 +56,8 @@ environments:
     connections:
       postgres:
         - name: "postgres-prod"
-          username: "PROD_POSTGRES_USER"
-          password: "PROD_POSTGRES_PASSWORD"
+          username: "prod_user"
+          password: "prod_pass"
           host: "prod-db.example.com"
           port: 5432
           database: "analytics"

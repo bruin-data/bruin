@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+const testModule = "path.to.module"
+
 type mockRepoFinder struct {
 	mock.Mock
 }
@@ -27,11 +29,6 @@ type mockModuleFinder struct {
 
 func (m *mockModuleFinder) FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error) {
 	args := m.Called(repo, executable)
-	return args.Get(0).(string), args.Error(1)
-}
-
-func (m *mockModuleFinder) FindRequirementsTxtInPath(path string, executable *pipeline.ExecutableFile) (string, error) {
-	args := m.Called(path, executable)
 	return args.Get(0).(string), args.Error(1)
 }
 

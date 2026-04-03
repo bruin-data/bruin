@@ -25,7 +25,7 @@ In order to set up a Trino connection, you need to add a configuration item to `
 Runs a materialized Trino asset or a Trino script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page. For information about materialization strategies, see the [Materialization](../assets/materialization.md) page.
 
 > [!IMPORTANT]
-> Use a single SQL statement per `trino.sql` asset. Multi-statement queires are not supported by Trino.
+> Use a single SQL statement per `trino.sql` asset. Multi-statement queries are not supported by Trino.
 
 #### Example: Create a table using table materialization
 
@@ -101,16 +101,16 @@ Trino lakehouse integration is configured in Trino itself (catalog/connector set
 
 ### Supported Lakehouse Formats
 #### Iceberg Format
-| Catalog \ Storage | S3 |
-|-------------------|----|
-| Glue | <span class="lh-check" aria-label="supported"></span> |
-| Nessie | <span class="lh-check" aria-label="supported"></span> |
+| Catalog \ Storage | S3 | GCS |
+|-------------------|----|-----|
+| Glue | <span class="lh-check" aria-label="supported"></span> | Not supported |
+| Nessie | <span class="lh-check" aria-label="supported"></span> | <span class="lh-check" aria-label="supported"></span> |
 
 ### Prerequisites
 
 - Docker and Docker Compose are installed.
-- AWS credentials are available (exported) in your shell (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, optional `AWS_SESSION_TOKEN`, `AWS_REGION`).
-- You have an S3 warehouse prefix, for example `s3://example-lakehouse/warehouse`.
+- For S3 storage, AWS credentials are available (exported) in your shell (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, optional `AWS_SESSION_TOKEN`, `AWS_REGION`).
+- For GCS storage, you have a GCP service account key file and a bucket prefix (for example `gs://example-lakehouse/warehouse`).
 
 Local config file structure:
 
@@ -235,6 +235,56 @@ s3.region=us-east-1
 - `iceberg.nessie-catalog.ref` selects the active branch/ref, and 
 - `iceberg.nessie-catalog.default-warehouse-dir` sets where Iceberg data files are written in S3.
 
+<br>
+
+### Guide: Iceberg + Nessie (In-Memory) + GCS {#guide-nessie-in-memory-gcs}
+
+Use this for local testing with ephemeral Nessie metadata and GCS object storage.
+The Docker setup below is an example for local testing and documentation purposes.
+
+`docker-compose.yml`:
+
+```yaml
+services:
+  nessie:
+    image: ghcr.io/projectnessie/nessie:latest
+    container_name: nessie
+    ports:
+      - "19120:19120"
+    environment:
+      NESSIE_VERSION_STORE_TYPE: IN_MEMORY
+      QUARKUS_HTTP_PORT: 19120
+
+  trino:
+    image: trinodb/trino:latest
+    container_name: trino
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./trino/etc:/etc/trino
+      - ./gcs-key.json:/etc/trino/gcs-key.json:ro
+    depends_on:
+      - nessie
+```
+
+`trino/etc/catalog/analytics_catalog.properties`:
+
+This file tells Trino to use Iceberg tables with Nessie as the metadata catalog and GCS as the data warehouse.
+
+```properties
+connector.name=iceberg
+
+iceberg.catalog.type=nessie
+iceberg.nessie-catalog.uri=http://nessie:19120/api/v1
+iceberg.nessie-catalog.ref=main
+iceberg.nessie-catalog.default-warehouse-dir=gs://example-lakehouse/warehouse
+
+fs.native-gcs.enabled=true
+gcs.project-id=<your-gcp-project-id>
+gcs.json-key-file-path=/etc/trino/gcs-key.json
+```
+
+- `iceberg.nessie-catalog.default-warehouse-dir` is required for Nessie catalogs.
 
 
 <br>
@@ -290,5 +340,6 @@ bruin run my-pipeline
 
 - `Catalog analytics_catalog does not exist`: ensure `analytics_catalog.properties` is mounted under `/etc/trino/catalog/`.
 - S3 permission errors: verify AWS credentials and region in container env.
+- GCS permission errors: verify `gcs-key.json` mount path, `gcs.project-id`, and service account access to the bucket.
 - Glue errors: verify IAM permissions and `hive.metastore.glue.default-warehouse-dir`.
 - Nessie errors: verify `http://nessie:19120/api/v1` and Nessie mode (`IN_MEMORY` vs persistent backend).

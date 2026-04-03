@@ -46,6 +46,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
+	qs "github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/r"
 	"github.com/bruin-data/bruin/pkg/redshift"
 	"github.com/bruin-data/bruin/pkg/s3"
@@ -73,6 +74,8 @@ var pythonCacheGitignorePatterns = []string{
 	"__pycache__/",
 	"*.py[cod]",
 }
+
+var errUsePipDeprecated = errors.New("flag --use-pip is no longer supported: Bruin now always runs Python assets with uv")
 
 type PipelineInfo struct {
 	Pipeline           *pipeline.Pipeline
@@ -546,12 +549,12 @@ func Run(isDebug *bool) *cli.Command {
 				DefaultText: "false",
 			},
 			&cli.BoolFlag{
-				Name:  "use-pip",
-				Usage: "use pip for managing Python dependencies",
-			},
-			&cli.BoolFlag{
 				Name:  "continue",
 				Usage: "use continue to run the pipeline from the last failed asset",
+			},
+			&cli.StringFlag{
+				Name:  "selector",
+				Usage: "select assets using dbt-style selector syntax, including tag:, path:, file:, fqn:, +, n+, @, space unions, and comma intersections",
 			},
 			&cli.StringFlag{
 				Name:    "tag",
@@ -573,8 +576,17 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:       "limit the types of tasks to run. By default it will run main and checks, while push-metadata is optional if defined in the pipeline definition",
 			},
 			&cli.BoolFlag{
+				Name:  "modified",
+				Usage: "run only assets whose files have been modified compared to the default branch",
+			},
+			&cli.BoolFlag{
 				Name:  "exp-use-winget-for-uv",
 				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
+			},
+			&cli.BoolFlag{
+				Name:   "use-pip",
+				Usage:  "deprecated compatibility flag; passing this flag returns an explicit deprecation error",
+				Hidden: true,
 			},
 			&cli.StringFlag{
 				Name:  "debug-ingestr-src",
@@ -646,6 +658,9 @@ func Run(isDebug *bool) *cli.Command {
 			defer RecoverFromPanic()
 
 			logger := makeLogger(*isDebug)
+			if c.IsSet("use-pip") {
+				return cli.Exit(errUsePipDeprecated, 1)
+			}
 			fullRefresh := c.Bool("full-refresh")
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
@@ -687,7 +702,7 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetadata:           c.Bool("push-metadata"),
 				NoLogFile:              c.Bool("no-log-file"),
 				FullRefresh:            fullRefresh,
-				UsePip:                 c.Bool("use-pip"),
+				Selector:               c.String("selector"),
 				Tag:                    c.String("tag"),
 				ExcludeTag:             c.String("exclude-tag"),
 				Only:                   c.StringSlice("only"),
@@ -722,7 +737,7 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 				return cli.Exit("", 1)
 			}
-			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
+			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin, runConfig.Only)
 			if err != nil {
 				return err
 			}
@@ -801,6 +816,7 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				SelectedAssets:    selectedAssets,
+				Selector:          runConfig.Selector,
 				ExcludeTag:        runConfig.ExcludeTag,
 				singleCheckID: scheduler.CheckUniqueID{
 					ID:    singleCheckID,
@@ -927,6 +943,75 @@ func Run(isDebug *bool) *cli.Command {
 				singleCheckID = ""
 			}
 
+			// Handle --modified flag: detect changed files and map to assets
+			if c.Bool("modified") {
+				if pipelineInfo.RunningForAnAsset {
+					errorPrinter.Printf("Cannot use --modified when running a single asset file directly\n")
+					return cli.Exit("", 1)
+				}
+				if len(filter.SelectedAssets) > 0 {
+					errorPrinter.Printf("Cannot use --modified when specifying assets\n")
+					return cli.Exit("", 1)
+				}
+
+				baseBranch, err := git.DefaultBranch(repoRoot.Path)
+				if err != nil {
+					errorPrinter.Printf("Failed to detect default branch: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				changedFiles, err := git.ChangedFilesFromBase(repoRoot.Path, baseBranch)
+				if err != nil {
+					errorPrinter.Printf("Failed to get changed files: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				if len(changedFiles) == 0 {
+					infoPrinter.Printf("No files changed compared to '%s', nothing to run.\n", baseBranch)
+					return nil
+				}
+
+				modifiedAssets := findAssetsFromChangedFiles(changedFiles, pipelineInfo.Pipeline, repoRoot.Path)
+				if len(modifiedAssets) == 0 {
+					infoPrinter.Printf("No assets matched the %d changed file(s) compared to '%s', nothing to run.\n", len(changedFiles), baseBranch)
+					return nil
+				}
+
+				filter.ModifiedAssets = modifiedAssets
+			}
+
+			if filter.Selector != "" {
+				switch {
+				case preview.RunningForAnAsset:
+					errorPrinter.Printf("Cannot use --selector when running a single asset file directly.\n")
+					return cli.Exit("", 1)
+				case len(assetPaths) > 0:
+					errorPrinter.Printf("Cannot use --selector together with positional asset arguments.\n")
+					return cli.Exit("", 1)
+				case runConfig.Tag != "":
+					errorPrinter.Printf("Cannot use --selector together with --tag. Use tag: selectors instead.\n")
+					return cli.Exit("", 1)
+				case runConfig.Downstream:
+					errorPrinter.Printf("Cannot use --selector together with --downstream. Use +, n+, or @ in the selector instead.\n")
+					return cli.Exit("", 1)
+				case singleCheckID != "":
+					errorPrinter.Printf("Cannot use --selector together with --single-check.\n")
+					return cli.Exit("", 1)
+				case c.Bool("modified"):
+					errorPrinter.Printf("Cannot use --selector together with --modified.\n")
+					return cli.Exit("", 1)
+				}
+
+				selectedAssets, err = pipeline.ResolveSelectorAssets(filter.Selector, pipelineInfo.Pipeline)
+				if err != nil {
+					errorPrinter.Printf("Failed to resolve selector: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				filter.SelectedAssets = selectedAssets
+				filter.selectedBySelector = true
+			}
+
 			// Re-determine start date based on pipeline configuration and full-refresh flag
 			startDate, err = DetermineStartDate(runConfig.StartDate, pipelineInfo.Pipeline, runConfig.FullRefresh, logger)
 			if err != nil {
@@ -938,7 +1023,6 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return err
 			}
-
 			// Validate date range
 			if err := ValidateDateRange(startDate, endDate); err != nil {
 				return err
@@ -963,9 +1047,20 @@ func Run(isDebug *bool) *cli.Command {
 			if !c.Bool("minimal-logs") {
 				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
-				if pipelineInfo.RunningForAnAsset {
+				switch {
+				case pipelineInfo.RunningForAnAsset:
 					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-				} else if len(filter.SelectedAssets) > 0 {
+				case len(filter.ModifiedAssets) > 0:
+					assetNames := make([]string, len(filter.ModifiedAssets))
+					for i, asset := range filter.ModifiedAssets {
+						assetNames[i] = asset.Name
+					}
+					msg := fmt.Sprintf("Running %d modified asset(s): %s", len(filter.ModifiedAssets), strings.Join(assetNames, ", "))
+					if filter.IncludeDownstream {
+						msg += " (with downstream)"
+					}
+					infoPrinter.Println(msg)
+				case len(filter.SelectedAssets) > 0:
 					assetNames := make([]string, len(filter.SelectedAssets))
 					for i, asset := range filter.SelectedAssets {
 						assetNames[i] = asset.Name
@@ -1021,7 +1116,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			// Use the interactive TUI only when explicitly requested via --interactive flag
 			useTUI := c.Bool("interactive") &&
-				term.IsTerminal(int(os.Stdout.Fd())) &&
+				term.IsTerminal(int(os.Stdout.Fd())) && //nolint:gosec // G115: safe uintptr->int for terminal check
 				runConfig.Output != "json" &&
 				!noColor
 
@@ -1110,7 +1205,7 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("\n%s\n\n", executionStartLog)
 			}
 			if runConfig.SensorMode != "" {
-				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
+				if runConfig.SensorMode != "skip" && runConfig.SensorMode != "once" && runConfig.SensorMode != "wait" {
 					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
 					return cli.Exit("", 1)
 				}
@@ -1133,7 +1228,7 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, foundPipeline.Commit)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1298,6 +1393,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	filter.IncludeTag = pipelineState.Parameters.Tag
 	filter.OnlyTaskTypes = pipelineState.Parameters.Only
 	filter.PushMetaData = pipelineState.Parameters.PushMetadata
+	filter.Selector = pipelineState.Parameters.Selector
 	filter.ExcludeTag = pipelineState.Parameters.ExcludeTag
 	return pipelineState, nil
 }
@@ -1372,7 +1468,6 @@ func DetermineStartDate(cliStartDate string, pipeline *pipeline.Pipeline, fullRe
 	var startDate time.Time
 	var err error
 
-	// Start date logic
 	switch {
 	case !fullRefresh:
 		startDate, err = date.ParseTime(cliStartDate)
@@ -1536,10 +1631,10 @@ func SetupExecutors(
 	pipelineName string,
 	runID string,
 	fullRefresh bool,
-	usePipForPython bool,
 	sensorMode string,
 	renderer *jinja.Renderer,
 	parser *sqlparser.SQLParser,
+	commitHash string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -1552,13 +1647,9 @@ func SetupExecutors(
 		return nil, err
 	}
 
-	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh)
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, &executionDate, pipelineName, runID, fullRefresh, commitHash)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		if usePipForPython {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
-		} else {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(conn, jinjaVariables)
-		}
+		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeR) {
@@ -1681,7 +1772,7 @@ func SetupExecutors(
 		}
 		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: trino.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
@@ -1696,7 +1787,7 @@ func SetupExecutors(
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: snowflake.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
 
@@ -1738,10 +1829,10 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseTableSensor) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: mssql.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
 			Mat: synapse.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
 		synapseCheckRunner := synapse.NewColumnCheckOperator(conn)
@@ -1800,7 +1891,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeVerticaTableSensor) {
 		verticaOperator := vertica.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: vertica.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		verticaCheckRunner := vertica.NewColumnCheckOperator(conn)
 		verticaQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		verticaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -1835,7 +1926,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensorLegacy) {
 		fabricOperator := fabric.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: fabric.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 
 		fabricCheckRunner := fabric.NewColumnCheckOperator(conn)
 
@@ -1881,7 +1972,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksTableSensor) {
 		databricksOperator := databricks.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
 			Mat: databricks.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		databricksCheckRunner := databricks.NewColumnCheckOperator(conn)
 		databricksQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		databricksTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -1926,7 +2017,7 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerListWithLocation{
 			Mat: athena.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
 		athenaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
@@ -1953,7 +2044,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuerySensor) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: duck.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		duckDBCheckRunner := duck.NewColumnCheckOperator(conn)
 		duckDBQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 
@@ -1980,7 +2071,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSeed) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseTableSensor) {
 		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
 			Mat: clickhouse.NewMaterializer(fullRefresh),
-		})
+		}, parser)
 		checkRunner := clickhouse.NewColumnCheckOperator(conn)
 		clickHouseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		clickHouseTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -2020,6 +2111,12 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeTableau) {
 		tableauOperator := tableau.NewBasicOperator(conn)
 		mainExecutors[pipeline.AssetTypeTableau][scheduler.TaskInstanceTypeMain] = tableauOperator
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDataset) || s.WillRunTaskOfType(pipeline.AssetTypeQuicksightDashboard) {
+		qsOperator := qs.NewBasicOperator(conn)
+		mainExecutors[pipeline.AssetTypeQuicksightDataset][scheduler.TaskInstanceTypeMain] = qsOperator
+		mainExecutors[pipeline.AssetTypeQuicksightDashboard][scheduler.TaskInstanceTypeMain] = qsOperator
 	}
 
 	emrServerlessAssetTypes := []pipeline.AssetType{
@@ -2224,14 +2321,17 @@ func sendTelemetry(s *scheduler.Scheduler, c *cli.Command) {
 }
 
 type Filter struct {
-	IncludeTag        string   // Tag to include assets (from `--tag`)
-	OnlyTaskTypes     []string // Task types to include (from `--only`)
-	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
-	PushMetaData      bool
-	SingleTask        *pipeline.Asset   // Single asset (from running asset file directly)
-	SelectedAssets    []*pipeline.Asset // Multiple assets specified as positional arguments
-	ExcludeTag        string
-	singleCheckID     scheduler.CheckUniqueID // ID of the single check to run, if any
+	IncludeTag         string   // Tag to include assets (from `--tag`)
+	OnlyTaskTypes      []string // Task types to include (from `--only`)
+	IncludeDownstream  bool     // Whether to include downstream tasks (from `--downstream`)
+	PushMetaData       bool
+	SingleTask         *pipeline.Asset   // Single asset (from running asset file directly)
+	SelectedAssets     []*pipeline.Asset // Multiple assets specified as positional arguments
+	ModifiedAssets     []*pipeline.Asset // Assets whose files have been modified vs default branch (from `--modified`)
+	Selector           string
+	ExcludeTag         string
+	selectedBySelector bool
+	singleCheckID      scheduler.CheckUniqueID // ID of the single check to run, if any
 }
 
 func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -2243,6 +2343,46 @@ func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Sche
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func HandleModifiedAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if len(f.ModifiedAssets) == 0 {
+		return nil
+	}
+
+	// Cannot use with single asset mode
+	if f.SingleTask != nil {
+		return errors.New("cannot use --modified when running a single asset file directly")
+	}
+
+	// Cannot use with tags
+	if f.IncludeTag != "" {
+		return errors.New("cannot use --modified with --tag flag")
+	}
+
+	// Cannot use with selected assets
+	if len(f.SelectedAssets) > 0 {
+		return errors.New("cannot use --modified when specifying assets")
+	}
+
+	// Mark all as skipped first
+	s.MarkAll(scheduler.Skipped)
+
+	// Mark modified assets as pending
+	for _, asset := range f.ModifiedAssets {
+		s.MarkAsset(asset, scheduler.Pending, f.IncludeDownstream)
+	}
+
+	// Handle exclude-tag if specified
+	if f.ExcludeTag != "" {
+		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
+		if len(excludedAssets) == 0 {
+			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		}
+		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	}
+
 	return nil
 }
 
@@ -2271,7 +2411,7 @@ func HandleMultipleAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler
 
 	// Handle exclude-tag if specified
 	if f.ExcludeTag != "" {
-		if !f.IncludeDownstream {
+		if !f.IncludeDownstream && !f.selectedBySelector {
 			return errors.New("when specifying assets with --exclude-tag, you must also use --downstream flag")
 		}
 		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
@@ -2286,8 +2426,8 @@ func HandleMultipleAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler
 
 func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if f.SingleTask == nil {
-		// Allow downstream with selected assets, but not for whole pipeline
-		if f.IncludeDownstream && len(f.SelectedAssets) == 0 {
+		// Allow downstream with selected assets or modified assets, but not for whole pipeline
+		if f.IncludeDownstream && len(f.SelectedAssets) == 0 && len(f.ModifiedAssets) == 0 {
 			return errors.New("cannot use the --downstream flag when running the whole pipeline")
 		}
 		return nil
@@ -2299,7 +2439,10 @@ func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p 
 	}
 
 	s.MarkAll(scheduler.Skipped)
-	s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
+	found := s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
+	if !found {
+		return fmt.Errorf("asset '%s' was not found among the pipeline's scheduled task instances; the asset name in the file may have been transformed differently during pipeline construction", f.SingleTask.Name)
+	}
 	if f.IncludeTag != "" {
 		return errors.New("you cannot use the '--tag' flag when running a single asset")
 	}
@@ -2387,7 +2530,8 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 	s.MarkAll(scheduler.Pending)
 
 	funcs := []FilterMutator{
-		HandleMultipleAssets, // Check for multiple assets first
+		HandleModifiedAssets, // Check for modified assets first
+		HandleMultipleAssets, // Check for multiple assets
 		HandleSingleTask,     // Then single asset
 		HandleIncludeTags,    // Then tags
 		HandleExcludeTags,
@@ -2536,6 +2680,30 @@ func loadAssetsFromPaths(assetPaths []string, p *pipeline.Pipeline, repoRoot, cw
 	}
 
 	return assets, nil
+}
+
+// findAssetsFromChangedFiles maps changed file paths (relative to repo root) to pipeline assets.
+func findAssetsFromChangedFiles(changedFiles []string, p *pipeline.Pipeline, repoRoot string) []*pipeline.Asset {
+	seen := make(map[string]bool)
+	var assets []*pipeline.Asset
+
+	for _, relPath := range changedFiles {
+		absPath := filepath.Join(repoRoot, relPath)
+
+		// Try matching by definition file path
+		asset := p.GetAssetByPath(absPath)
+		if asset == nil {
+			// Try matching by executable file path
+			asset = findAssetByExecutablePath(p, absPath)
+		}
+
+		if asset != nil && !seen[asset.Name] {
+			seen[asset.Name] = true
+			assets = append(assets, asset)
+		}
+	}
+
+	return assets
 }
 
 // findAssetByExecutablePath finds an asset by its executable file path.

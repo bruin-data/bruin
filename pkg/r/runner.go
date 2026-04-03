@@ -89,7 +89,7 @@ func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *Comman
 		strings.Join(command.Args, " "),
 	)
 
-	cmd := exec.Command(command.Name, command.Args...) //nolint:gosec
+	cmd := exec.CommandContext(context.Background(), command.Name, command.Args...) //nolint:gosec,contextcheck
 	cmd.Dir = repo.Path
 
 	// pass the path-related env vars by default

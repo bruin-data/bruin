@@ -22,8 +22,16 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       generic:
         - name: KEY1
           value: value1
@@ -35,8 +43,16 @@ environments:
       chess:
         - name: "chess-run-with-filters"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       generic:
         - name: KEY1
           value: value1
@@ -48,8 +64,16 @@ environments:
       chess:
         - name: "chess-run-with-tags"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       generic:
         - name: KEY1
           value: value1
@@ -61,8 +85,16 @@ environments:
       chess:
         - name: "chess-run-main-with-filters"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       generic:
         - name: KEY1
           value: value1
@@ -85,8 +117,16 @@ environments:
       chess:
         - name: "chess-run-with-downstream"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       generic:
         - name: KEY1
           value: value1
@@ -98,11 +138,34 @@ environments:
       chess:
         - name: "chess-run-main-with-downstream"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       generic:
         - name: KEY1
           value: value1
+  env-selector-intersection:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-filters"
+          path: "duckdb-files/run-selector-intersection.db"
+  env-selector-path:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-filters"
+          path: "duckdb-files/run-selector-path.db"
+  env-selector-downstream:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-downstream"
+          path: "duckdb-files/run-selector-downstream.db"
   env-push-metadata:
     connections:
       duckdb:
@@ -116,8 +179,16 @@ environments:
       chess:
         - name: "chess-run-default-option"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       generic:
         - name: KEY1
           value: value1
@@ -131,8 +202,16 @@ environments:
       chess:
         - name: "chess-run-malformed-sql"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
       generic:
         - name: KEY1
           value: value1
@@ -154,8 +233,16 @@ environments:
       chess:
         - name: "chess-ingestr"
           players:
-            - "MagnusCarlsen"
+            - "FabianoCaruana"
             - "Hikaru"
+            - "MagnusCarlsen"
+            - "GothamChess"
+            - "DanielNaroditsky"
+            - "AnishGiri"
+            - "Firouzja2003"
+            - "LevonAronian"
+            - "WesleySo"
+            - "GarryKasparov"
   env-run-python-materialization:
     connections:
       duckdb:
@@ -269,3 +356,16 @@ environments:
       duckdb:
         - name: "duckdb-validate-asset-time-interval"
           path: "duckdb-files/validate-asset-time-interval.db"
+
+  env-query-var:
+    connections:
+      duckdb:
+        - name: "duckdb-query-var"
+          path: "duckdb-files/query-var.db"
+
+  env-schema-prefix:
+    schema_prefix: "test"
+    connections:
+      duckdb:
+        - name: "duckdb-schema-prefix"
+          path: "duckdb-files/schema-prefix.db"

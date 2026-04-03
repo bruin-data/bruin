@@ -143,7 +143,7 @@ func Format(isDebug *bool) *cli.Command {
 					if err != nil {
 						printErrorJSON(err)
 					}
-					fmt.Println(jsMessage)
+					fmt.Println(string(jsMessage))
 					return cli.Exit("", 1)
 				}
 
@@ -407,7 +407,7 @@ func runSqlfluffWithErrorHandling(repoOrAsset, output string, logger interface{}
 				if err != nil {
 					printErrorJSON(err)
 				}
-				fmt.Println(jsMessage)
+				fmt.Println(string(jsMessage))
 				return cli.Exit("", 1)
 			}
 			errorPrinter.Printf("Error finding repository for sqlfluff: %v\n", repoErr)
@@ -424,7 +424,7 @@ func runSqlfluffWithErrorHandling(repoOrAsset, output string, logger interface{}
 			if jsonErr != nil {
 				printErrorJSON(jsonErr)
 			}
-			fmt.Println(jsMessage)
+			fmt.Println(string(jsMessage))
 			return cli.Exit("", 1)
 		}
 		errorPrinter.Printf("Error running sqlfluff: %v\n", err)

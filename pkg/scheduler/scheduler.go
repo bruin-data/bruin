@@ -135,7 +135,7 @@ type RunConfig struct {
 	PushMetadata           bool     `json:"pushMetadata"`
 	NoLogFile              bool     `json:"noLogFile"`
 	FullRefresh            bool     `json:"fullRefresh"`
-	UsePip                 bool     `json:"useUV"`
+	Selector               string   `json:"selector"`
 	Tag                    string   `json:"tag"`
 	ExcludeTag             string   `json:"excludeTag"`
 	Only                   []string `json:"only"`
@@ -370,14 +370,18 @@ func (s *Scheduler) MarkAll(status TaskInstanceStatus) {
 	}
 }
 
-func (s *Scheduler) MarkAsset(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) {
+func (s *Scheduler) MarkAsset(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) bool {
 	instancesByType := s.taskNameMap[task.Name]
+	if len(instancesByType) == 0 {
+		return false
+	}
 	visited := make(map[TaskInstance]struct{})
 	for _, instance := range instancesByType {
 		for _, i := range instance {
 			s.markTaskInstance(i, status, downstream, visited)
 		}
 	}
+	return true
 }
 
 func (s *Scheduler) MarkPendingInstancesByType(instanceType TaskInstanceType, status TaskInstanceStatus) {
@@ -816,12 +820,12 @@ func (s *Scheduler) hasPipelineFinished() bool {
 }
 
 func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfig, runID, statePath string) error {
-	state := make([]*PipelineAssetState, 0)
 	dict := make(map[string][]TaskInstanceStatus)
 	for _, task := range s.taskInstances {
 		dict[task.GetAsset().Name] = append(dict[task.GetAsset().Name], task.GetStatus())
 	}
 
+	state := make([]*PipelineAssetState, 0, len(dict))
 	for key, status := range dict {
 		result := GetStatusForTask(status)
 		state = append(state, &PipelineAssetState{

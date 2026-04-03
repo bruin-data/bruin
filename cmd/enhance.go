@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
@@ -17,11 +19,13 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
+	"golang.org/x/term"
 )
 
 // enhanceCommand returns the enhance subcommand for the ai parent command.
@@ -94,18 +98,97 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 		return printEnhanceError(output, errors.New("please provide a path to an asset file or folder"))
 	}
 
+	isDebugMode := isDebug != nil && *isDebug
+	useTUI := output != "json" && !isDebugMode && term.IsTerminal(int(os.Stderr.Fd())) //nolint:gosec // G115: fd is always safe to convert
+
 	if isPathReferencingAsset(inputPath) {
-		return enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug)
+		if useTUI {
+			return enhanceSingleAssetWithTUI(ctx, c, inputPath, fs, output, isDebug)
+		}
+		if err := enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug, nil); err != nil {
+			return printEnhanceError(output, err)
+		}
+		return nil
 	}
 
 	if isDir(inputPath) {
-		return enhanceFolder(ctx, c, inputPath, fs, output, isDebug)
+		return enhanceFolder(ctx, c, inputPath, fs, output, isDebug, useTUI)
 	}
 
 	return printEnhanceError(output, errors.New("please provide a path to an asset file or a folder containing assets"))
 }
 
-func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs afero.Fs, output string, isDebug *bool) error {
+func enhanceSingleAssetWithTUI(ctx context.Context, c *cli.Command, inputPath string, fs afero.Fs, output string, isDebug *bool) error {
+	name := filepath.Base(inputPath)
+
+	// Read original content before modifications (for diff display after TUI)
+	absPath, err := filepath.Abs(inputPath)
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "failed to get absolute path"))
+	}
+	originalContent, err := afero.ReadFile(fs, absPath)
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "failed to read original file content"))
+	}
+
+	// Save the real terminal and redirect all output so only the TUI writes to the terminal.
+	// color.Output/color.Error are reassigned intentionally to suppress color printer output.
+	realTerminal := os.Stderr
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		return printEnhanceError(output, errors.Wrap(err, "failed to open /dev/null"))
+	}
+	savedStdout := os.Stdout
+	savedColorOutput := color.Output
+	savedColorError := color.Error //nolint:reassign
+	os.Stdout = devNull
+	os.Stderr = devNull
+	color.Output = devNull //nolint:reassign
+	color.Error = devNull  //nolint:reassign
+
+	tui := NewEnhanceTUI(realTerminal, []string{inputPath}, []string{name})
+	tui.Start()
+	tui.MarkRunning(inputPath)
+
+	enhErr := enhanceSingleAsset(ctx, c, inputPath, fs, output, isDebug, tui)
+
+	if enhErr != nil {
+		tui.MarkFailed(inputPath)
+	} else {
+		tui.MarkDone(inputPath)
+	}
+
+	// Brief pause so the user can see the final state
+	time.Sleep(300 * time.Millisecond)
+	tui.Stop()
+
+	// Restore output after TUI is done
+	os.Stdout = savedStdout
+	os.Stderr = realTerminal
+	color.Output = savedColorOutput //nolint:reassign
+	color.Error = savedColorError   //nolint:reassign
+	devNull.Close()
+
+	if enhErr != nil {
+		// Show collected agent events for the failed asset
+		logs := tui.GetLogs(inputPath)
+		if len(logs) > 0 {
+			warningPrinter.Printf("\nAgent events for '%s':\n", name)
+			for _, log := range logs {
+				fmt.Printf("  %s\n", log)
+			}
+			fmt.Println()
+		}
+		return printEnhanceError(output, enhErr)
+	}
+
+	// Show diff after TUI clears
+	successPrinter.Printf("\n✓ Enhanced '%s'\n", name)
+	showDiff(originalContent, absPath)
+	return nil
+}
+
+func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs afero.Fs, output string, isDebug *bool, useTUI bool) error {
 	concurrency := max(c.Int("concurrency"), 1)
 
 	assetPaths := path.GetAllPossibleAssetPaths(folderPath, assetsDirectoryNames, pipeline.SupportedFileSuffixes)
@@ -113,37 +196,104 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 		return printEnhanceError(output, errors.New("no assets found in the given folder"))
 	}
 
-	if output != "json" {
+	// Build display names for the TUI (base filenames), keys are full paths for uniqueness
+	assetDisplayNames := make([]string, len(assetPaths))
+	for i, ap := range assetPaths {
+		assetDisplayNames[i] = filepath.Base(ap)
+	}
+
+	var tui *EnhanceTUI
+	var restoreOutput func()
+	if useTUI {
+		// Save the real terminal BEFORE redirecting output, same pattern as the run TUI.
+		// This ensures only the TUI writes to the terminal — all other output (errorPrinter,
+		// subprocess stderr, validation messages) goes to /dev/null.
+		// We must also redirect color.Output and color.Error since the fatih/color package
+		// caches its own writers at init time and doesn't follow os.Stdout/os.Stderr changes.
+		realTerminal := os.Stderr
+		devNull, devNullErr := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		if devNullErr != nil {
+			return printEnhanceError(output, errors.Wrap(devNullErr, "failed to open /dev/null"))
+		}
+		savedStdout := os.Stdout
+		savedColorOutput := color.Output
+		savedColorError := color.Error //nolint:reassign
+		os.Stdout = devNull
+		os.Stderr = devNull
+		color.Output = devNull //nolint:reassign
+		color.Error = devNull  //nolint:reassign
+		restoreOutput = func() {
+			os.Stdout = savedStdout
+			os.Stderr = realTerminal
+			color.Output = savedColorOutput //nolint:reassign
+			color.Error = savedColorError   //nolint:reassign
+			devNull.Close()
+		}
+
+		tui = NewEnhanceTUI(realTerminal, assetPaths, assetDisplayNames)
+		tui.Start()
+	} else if output != "json" {
 		infoPrinter.Printf("Found %d assets in '%s', enhancing with concurrency %d...\n\n", len(assetPaths), folderPath, concurrency)
 	}
 
+	type assetResult struct {
+		key  string // asset path, used as TUI key
+		name string
+		err  error
+	}
+
 	var mu sync.Mutex
-	var succeeded, failed int
-	var enhanceErrors []string
+	results := make([]assetResult, 0, len(assetPaths))
 
 	p := pool.New().WithMaxGoroutines(concurrency)
 	for _, ap := range assetPaths {
 		p.Go(func() {
-			if output != "json" {
+			displayName := filepath.Base(ap)
+
+			if tui != nil {
+				tui.MarkRunning(ap)
+			} else if output != "json" {
 				mu.Lock()
-				infoPrinter.Printf("Starting enhancement for '%s'...\n", filepath.Base(ap))
+				infoPrinter.Printf("Starting enhancement for '%s'...\n", displayName)
 				mu.Unlock()
 			}
 
-			err := enhanceSingleAsset(ctx, c, ap, fs, output, isDebug)
+			err := enhanceSingleAsset(ctx, c, ap, fs, output, isDebug, tui)
+
+			if tui != nil {
+				if err != nil {
+					tui.MarkFailed(ap)
+				} else {
+					tui.MarkDone(ap)
+				}
+			}
 
 			mu.Lock()
 			defer mu.Unlock()
-			if err != nil {
-				failed++
-				enhanceErrors = append(enhanceErrors, fmt.Sprintf("%s: %v", filepath.Base(ap), err))
-			} else {
-				succeeded++
-			}
+			results = append(results, assetResult{key: ap, name: displayName, err: err})
 		})
 	}
 
 	p.Wait()
+
+	if tui != nil {
+		// Brief pause so the user can see the final state
+		time.Sleep(500 * time.Millisecond)
+		tui.Stop()
+		restoreOutput()
+	}
+
+	// Count results
+	var succeeded, failed int
+	var enhanceErrors []string
+	for _, r := range results {
+		if r.err != nil {
+			failed++
+			enhanceErrors = append(enhanceErrors, fmt.Sprintf("%s: %v", r.name, r.err))
+		} else {
+			succeeded++
+		}
+	}
 
 	if output == "json" {
 		result := struct {
@@ -174,13 +324,35 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 		return nil
 	}
 
+	// Print per-asset results
+	fmt.Println()
+	for _, r := range results {
+		if r.err != nil {
+			errorPrinter.Printf("  ✗ %s\n", r.name)
+		} else {
+			successPrinter.Printf("  ✓ %s\n", r.name)
+		}
+	}
 	fmt.Println()
 	successPrinter.Printf("Enhancement complete: %d/%d assets succeeded", succeeded, len(assetPaths))
 	if failed > 0 {
 		fmt.Println()
-		warningPrinter.Printf("%d assets failed:\n", failed)
-		for _, e := range enhanceErrors {
-			warningPrinter.Printf("  - %s\n", e)
+		warningPrinter.Printf("\n%d assets failed:\n", failed)
+		for _, r := range results {
+			if r.err == nil {
+				continue
+			}
+			warningPrinter.Printf("  - %s: %v\n", r.name, r.err)
+			if tui != nil {
+				logs := tui.GetLogs(r.key)
+				if len(logs) > 0 {
+					dimPrinter := color.New(color.Faint)
+					dimPrinter.Println("    Agent events:")
+					for _, log := range logs {
+						dimPrinter.Printf("      %s\n", log)
+					}
+				}
+			}
 		}
 		return cli.Exit("", 1)
 	}
@@ -189,72 +361,73 @@ func enhanceFolder(ctx context.Context, c *cli.Command, folderPath string, fs af
 	return nil
 }
 
-func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, isDebug *bool) error {
+func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, fs afero.Fs, output string, isDebug *bool, tui *EnhanceTUI) error {
+	quiet := tui != nil
+
 	absAssetPath, err := filepath.Abs(assetPath)
 	if err != nil {
-		return printEnhanceError(output, errors.Wrap(err, "failed to get absolute path"))
+		return errors.Wrap(err, "failed to get absolute path")
 	}
 
-	// Use the filename as a log prefix to identify the asset being processed
 	logPrefix := filepath.Base(assetPath)
+	tuiKey := assetPath // full path as TUI key to avoid collisions with same-named assets
 
 	// Read original file content before any modifications (for diff display)
 	originalContent, err := afero.ReadFile(fs, absAssetPath)
 	if err != nil {
-		return printEnhanceError(output, errors.Wrap(err, "failed to read original file content"))
+		return errors.Wrap(err, "failed to read original file content")
 	}
 
 	// Step 1: Fill columns from DB
-	if output != "json" {
+	if tui != nil {
+		tui.SetStep(tuiKey, "filling columns")
+	} else if output != "json" {
 		infoPrinter.Printf("[%s] Step 1/4: Filling columns from database...\n", logPrefix)
 	}
-	pp, err := GetPipelineAndAsset(ctx, assetPath, fs, "")
+
+	var pp *ppInfo
+	pp, err = GetPipelineAndAsset(ctx, assetPath, fs, "")
 	if err == nil {
-		// Update log prefix with actual asset name if available
 		if pp.Asset.Name != "" {
 			logPrefix = pp.Asset.Name
 		}
 		status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil) //nolint:contextcheck
-		if fillErr != nil && output != "json" {
+		if fillErr != nil && !quiet && output != "json" {
 			warningPrinter.Printf("[%s] Warning: fill columns failed: %v\n", logPrefix, fillErr)
-		} else if status == fillStatusUpdated && output != "json" {
+		} else if status == fillStatusUpdated && !quiet && output != "json" {
 			infoPrinter.Printf("[%s]   Columns updated from database schema.\n", logPrefix)
 		}
-	} else if output != "json" {
+	} else if !quiet && output != "json" {
 		warningPrinter.Printf("[%s] Warning: could not load asset for column filling: %v\n", logPrefix, err)
 	}
 
 	// Step 2: AI Enhancement
-	if output != "json" {
+	if tui != nil {
+		tui.SetStep(tuiKey, "enhancing...")
+	} else if output != "json" {
 		infoPrinter.Printf("[%s] Step 2/4: Enhancing asset with AI...\n", logPrefix)
 	}
 
-	// Reload asset after previous step may have modified it
 	pp, err = GetPipelineAndAsset(ctx, assetPath, fs, "")
 	if err != nil {
-		return printEnhanceError(output, errors.Wrap(err, "failed to load asset"))
+		return errors.Wrap(err, "failed to load asset")
 	}
 
-	// Infer name from path if file doesn't have explicit name field
 	inferredName, nameErr := pp.Asset.GetNameIfItWasSetFromItsPath(pp.Pipeline)
 	if nameErr != nil {
-		return printEnhanceError(output, errors.Wrap(nameErr, "failed to infer asset name from path"))
+		return errors.Wrap(nameErr, "failed to infer asset name from path")
 	}
 	if inferredName != "" && pp.Asset.Name == inferredName {
-		// Name was inferred from path (not set in file) — persist it explicitly
 		pp.Asset.Name = inferredName
-		if output != "json" {
+		if !quiet && output != "json" {
 			infoPrinter.Printf("[%s]   Inferred asset name from path: %s\n", logPrefix, inferredName)
 		}
 		if persistErr := pp.Asset.Persist(fs); persistErr != nil {
-			return printEnhanceError(output, errors.Wrap(persistErr, "failed to persist asset with inferred name"))
+			return errors.Wrap(persistErr, "failed to persist asset with inferred name")
 		}
 	}
 
-	// Determine provider from flags
-	providerType := enhance.ProviderClaude // default
-
-	// Check for mutually exclusive flags
+	providerType := enhance.ProviderClaude
 	flagCount := 0
 	if c.Bool("claude") {
 		flagCount++
@@ -268,46 +441,85 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		flagCount++
 		providerType = enhance.ProviderCodex
 	}
-
 	if flagCount > 1 {
-		return printEnhanceError(output, errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex)"))
+		return errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex)")
 	}
 
 	enhancer := enhance.NewEnhancer(providerType, c.String("model"))
 
-	// Enable debug mode if --debug flag is set
 	isDebugMode := isDebug != nil && *isDebug
 	enhancer.SetDebug(isDebugMode)
 
-	// Try to get API key from config
+	// Set streaming output capture: TUI mode uses the TUI log writer, non-TUI mode
+	// uses a buffer so we can show agent events on failure.
+	var logWriter *enhanceLogWriter
+	var streamBuf bytes.Buffer
+	if tui != nil && !isDebugMode {
+		logWriter = tui.LogWriter(tuiKey)
+		enhancer.SetOutput(logWriter)
+	} else if !isDebugMode {
+		enhancer.SetOutput(&streamBuf)
+	}
+
 	if apiKey := getAnthropicAPIKey(fs, assetPath); apiKey != "" {
 		enhancer.SetAPIKey(apiKey)
 	}
 
 	env := c.String("environment")
-	if env != "" && output != "json" {
+	if env != "" && !quiet && output != "json" {
 		infoPrinter.Printf("[%s]   Using environment: %s\n", logPrefix, env)
 	}
 
-	// Check if the selected provider's CLI is available
 	if err := enhancer.EnsureCLI(); err != nil {
-		return printEnhanceError(output, err)
+		return err
 	}
 
-	// Pre-fetch table statistics to minimize tool calls during enhancement
+	// Pre-fetch table statistics
+	if tui != nil {
+		tui.SetStep(tuiKey, "fetching stats")
+	}
 	var tableSummaryJSON string
+	fetchOutput := output
+	if quiet {
+		fetchOutput = "json" // suppress pre-fetch prints
+	}
 	if pp.Asset.Materialization.Type != "" && pp.Asset.Name != "" {
-		tableSummaryJSON = preFetchTableSummary(ctx, fs, assetPath, pp.Asset, env, output)
+		tableSummaryJSON = preFetchTableSummary(ctx, fs, assetPath, pp.Asset, env, fetchOutput)
+	}
+	if tui != nil {
+		tui.SetStep(tuiKey, "enhancing...")
 	}
 
 	customSystemPrompt := c.String("system-prompt")
 	err = enhancer.EnhanceAsset(ctx, pp.Asset, pp.Pipeline.Name, tableSummaryJSON, customSystemPrompt)
-	if err != nil {
-		return printEnhanceError(output, errors.Wrap(err, "failed to enhance asset"))
+
+	// Flush any remaining log output
+	if logWriter != nil {
+		logWriter.Flush()
 	}
 
-	// Step 3: Validate using the existing bruin validate command
-	if output != "json" {
+	if err != nil {
+		// Show collected agent events on failure (non-TUI mode only; TUI logs are shown after TUI stops)
+		if !quiet && output != "json" {
+			events := strings.TrimSpace(streamBuf.String())
+			if events != "" {
+				fmt.Println()
+				warningPrinter.Printf("[%s] Agent events:\n", logPrefix)
+				for _, line := range strings.Split(events, "\n") {
+					if strings.TrimSpace(line) != "" {
+						fmt.Printf("  %s\n", line)
+					}
+				}
+				fmt.Println()
+			}
+		}
+		return err
+	}
+
+	// Step 3: Validate
+	if tui != nil {
+		tui.SetStep(tuiKey, "validating")
+	} else if output != "json" {
 		infoPrinter.Printf("[%s] Step 3/3: Validating asset...\n", logPrefix)
 	}
 	validateCmd := Lint(isDebug)
@@ -315,32 +527,34 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 	if env := c.String("environment"); env != "" {
 		args = append(args, "--environment", env)
 	}
+
+	// stdout/stderr are already redirected to /dev/null when TUI is active (set up in enhanceFolder/enhanceSingleAssetWithTUI)
 	if err := validateCmd.Run(ctx, args); err != nil {
-		// Rollback: restore original content
 		if writeErr := afero.WriteFile(fs, absAssetPath, originalContent, 0o644); writeErr != nil {
-			return printEnhanceError(output, errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err)))
+			return errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err))
 		}
-		return printEnhanceError(output, errors.Wrap(err, "validation failed, original file restored"))
+		return errors.Wrap(err, "validation failed, original file restored")
 	}
 
-	// Provider directly edited the file
-	if output == "json" {
-		result := struct {
-			Status string `json:"status"`
-			Asset  string `json:"asset"`
-		}{
-			Status: "success",
-			Asset:  pp.Asset.Name,
+	// Display results (only when not using TUI — TUI caller handles output)
+	if !quiet {
+		if output == "json" {
+			result := struct {
+				Status string `json:"status"`
+				Asset  string `json:"asset"`
+			}{
+				Status: "success",
+				Asset:  pp.Asset.Name,
+			}
+			jsonBytes, err := json.Marshal(result)
+			if err != nil {
+				return errors.Wrap(err, "failed to marshal result")
+			}
+			fmt.Println(string(jsonBytes))
+		} else {
+			successPrinter.Printf("\n[%s] ✓ Enhanced '%s'\n", logPrefix, pp.Asset.Name)
+			showDiff(originalContent, absAssetPath)
 		}
-		jsonBytes, err := json.Marshal(result)
-		if err != nil {
-			return printEnhanceError(output, errors.Wrap(err, "failed to marshal result"))
-		}
-		fmt.Println(string(jsonBytes))
-	} else {
-		successPrinter.Printf("\n[%s] ✓ Enhanced '%s'\n", logPrefix, pp.Asset.Name)
-		// Show diff to display what changed
-		showDiff(originalContent, absAssetPath)
 	}
 	return nil
 }

@@ -201,6 +201,65 @@ func CurrentCommit(path string) (string, error) {
 	return hash, nil
 }
 
+// DefaultBranch returns the default branch name for the repository at the given path.
+// It tries to detect it from the remote HEAD, falling back to checking if "main" or "master" exist.
+func DefaultBranch(repoPath string) (string, error) {
+	// Try to detect from remote HEAD
+	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	cmd.Dir = repoPath
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err == nil {
+		ref := strings.TrimSpace(stdout.String())
+		// ref looks like "refs/remotes/origin/main"
+		parts := strings.Split(ref, "/")
+		if len(parts) > 0 && parts[len(parts)-1] != "" {
+			return parts[len(parts)-1], nil
+		}
+	}
+
+	// Fallback: check if "main" or "master" branches exist
+	for _, branch := range []string{"main", "master"} {
+		checkCmd := exec.Command("git", "rev-parse", "--verify", branch)
+		checkCmd.Dir = repoPath
+		if err := checkCmd.Run(); err == nil {
+			return branch, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not detect default branch for repository at '%s'", repoPath)
+}
+
+// ChangedFilesFromBase returns the list of file paths (relative to the repo root) that have changed
+// between the merge base of the given base branch and HEAD.
+func ChangedFilesFromBase(repoPath, baseBranch string) ([]string, error) {
+	cmd := exec.Command("git", "diff", "--name-only", baseBranch+"...HEAD")
+	cmd.Dir = repoPath
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to get changed files: %w: %s", err, stderr.String())
+	}
+
+	output := strings.TrimSpace(stdout.String())
+	if output == "" {
+		return nil, nil
+	}
+
+	lines := strings.Split(output, "\n")
+	files := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+
+	return files, nil
+}
+
 // FindRepoInSubtree finds the git repository in the subtree specified
 // by path. In contrast to FindRepoFromPath, this functions decends down
 // into a directory, and returns the first repository it finds.

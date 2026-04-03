@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
@@ -83,7 +84,7 @@ func NewRendererWithMacros(context Context, macroContent string) *Renderer {
 	}
 }
 
-func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]string {
+func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineName, runID string, fullRefresh bool, commitHash string) map[string]string {
 	vars := map[string]string{
 		"BRUIN_START_DATE":          startDate.Format("2006-01-02"),
 		"BRUIN_START_DATETIME":      startDate.Format("2006-01-02T15:04:05"),
@@ -97,6 +98,7 @@ func PythonEnvVariables(startDate, endDate, executionDate *time.Time, pipelineNa
 		"BRUIN_RUN_ID":              runID,
 		"BRUIN_PIPELINE":            pipelineName,
 		"BRUIN_FULL_REFRESH":        "",
+		"BRUIN_COMMIT_HASH":         commitHash,
 		"PYTHONUNBUFFERED":          "1",
 	}
 
@@ -115,6 +117,13 @@ func NewRendererWithStartEndDates(startDate, endDate, executionDate *time.Time, 
 		queryRenderLock: &sync.Mutex{},
 		macroContent:    "",
 	}
+}
+
+// SetContextValue sets a top-level variable in the Jinja rendering context.
+// Note: values set this way are NOT preserved across CloneForAsset calls;
+// callers must re-apply them on the cloned renderer.
+func (r *Renderer) SetContextValue(key string, value any) {
+	r.context.Set(key, value)
 }
 
 // NewRendererWithStartEndDatesAndMacros creates a new Renderer with the given dates, context, and macro content.
@@ -145,6 +154,8 @@ func defaultContext(startDate, endDate, executionDate *time.Time, pipelineName, 
 		"pipeline":              pipelineName,
 		"run_id":                runID,
 		"full_refresh":          fullRefresh,
+		"commit_hash":           "",
+		"schema_prefix":         "",
 	}
 }
 
@@ -241,14 +252,6 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 
 	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 
-	// If full-refresh and asset has a start_date, use that instead
-	if fullRefresh && asset.StartDate != "" {
-		parsedStartDate, err := time.Parse("2006-01-02", asset.StartDate)
-		if err == nil {
-			startDate = time.Date(parsedStartDate.Year(), parsedStartDate.Month(), parsedStartDate.Day(), 0, 0, 0, 0, time.UTC)
-		}
-	}
-
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
 		tempContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
@@ -275,6 +278,10 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	jinjaContext := defaultContext(&startDate, &endDate, &executionDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string), fullRefresh)
 	jinjaContext["this"] = asset.Name
 	jinjaContext["var"] = pipe.Variables.Value()
+	jinjaContext["commit_hash"] = pipe.Commit
+	if env, ok := ctx.Value(config.EnvironmentContextKey).(*config.Environment); ok && env != nil {
+		jinjaContext["schema_prefix"] = env.SchemaPrefix
+	}
 
 	return &Renderer{
 		context:         exec.NewContext(jinjaContext),

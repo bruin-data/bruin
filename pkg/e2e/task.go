@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -67,14 +69,19 @@ func (s *Task) Run() error {
 }
 
 func (s *Task) runAttempt() error {
-	cmd := exec.Command(s.Command, s.Args...) //nolint:gosec
+	cmd := exec.CommandContext(context.Background(), s.Command, s.Args...) //nolint:gosec,contextcheck
 	cmd.Env = append(os.Environ(), s.Env...)
 	if s.WorkingDir != "" {
 		cmd.Dir = s.WorkingDir
 	}
-	output, err := cmd.CombinedOutput()
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
 	s.Actual.ExitCode = helpers.GetExitCode(err)
-	s.Actual.Output = string(output)
+	s.Actual.Output = stdout.String()
 
 	if err != nil {
 		s.Actual.Error = err.Error()

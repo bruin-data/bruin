@@ -98,7 +98,7 @@ By default, seed assets enforce the column types defined in the `columns` sectio
 
 ```yaml
 name: dashboard.contacts
-type: bigquery.seed
+type: bq.seed
 
 parameters:
     path: contacts.csv

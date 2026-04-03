@@ -59,6 +59,52 @@ Must consist of letters and dot `.` character.
 
 - **Type:** `String`
 
+### Automatic Name Inference from File Path
+
+The `name` field is **optional**. If not provided, Bruin automatically infers the asset name from the file path relative to the `assets/` folder:
+
+- Each directory level becomes a segment of the name, separated by dots (`.`)
+- The file name (without extension) becomes the final segment
+
+**Examples:**
+
+| File Path | Inferred Name |
+|-----------|---------------|
+| `assets/analytics/orders.sql` | `analytics.orders` |
+| `assets/staging/trips.py` | `staging.trips` |
+| `assets/my_project/finance/revenue.asset.yml` | `my_project.finance.revenue` |
+
+::: warning
+If you rely on name inference (i.e. the asset definition does not explicitly set `name`), files placed directly under `assets/` (e.g. `assets/orders.sql`) will infer a single-segment name like `orders`, which most databases will reject since they require at least `schema.table`. Always use at least one folder level under `assets/` when using name inference.
+:::
+
+This allows you to organize assets in folders that naturally mirror your database structure without redundantly specifying the name.
+
+### How name segments map to your database
+
+The inferred name is passed directly to your database, so the segments must match your database's naming convention. Different platforms interpret two-segment and three-segment names differently:
+
+| Platform | Two segments (`a.b`) | Three segments (`a.b.c`) |
+|----------|---------------------|-------------------------|
+| **BigQuery** | `dataset.table` | `project.dataset.table` |
+| **Snowflake** | `schema.table` | `database.schema.table` |
+| **PostgreSQL** | `schema.table` | Not supported |
+| **MSSQL** | `schema.table` | Not supported |
+| **Redshift** | `schema.table` | Not supported |
+| **Databricks** | `schema.table` | Not supported |
+| **DuckDB** | `schema.table` | Not supported |
+
+For example, if you are using **BigQuery** and your folder structure is `assets/my_project/finance/revenue.sql`, the inferred name `my_project.finance.revenue` will be interpreted as project `my_project`, dataset `finance`, table `revenue`.
+
+If you are using **Snowflake** with the same structure, it would be interpreted as database `my_project`, schema `finance`, table `revenue`.
+
+For databases that only support two segments (like PostgreSQL or MSSQL), use a single folder level under `assets/` (e.g. `assets/public/users.sql` → `public.users`).
+
+**When to explicitly set `name`:**
+- When your desired asset name differs from the file path structure
+- When following a naming convention that doesn't match your folder layout
+- When migrating existing assets with established names
+
 ## `uri`
 
 We use `uri` (Universal Resource Identifier) as another way to identify assets. URIs must be unique across all your pipelines and can be used to define [cross pipeline dependencies](../cloud/cross-pipeline).
@@ -214,4 +260,13 @@ custom_checks:
       where client="client_x"
         and date_trunc(StartDateDt, month) = "2024-06-01"
         and credits_spent = 1
+    blocking: true
 ```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | str | - | A descriptive name for the check. |
+| `description` | str | `""` | A human-readable description of what the check validates. |
+| `query` | str | - | The SQL query to execute. |
+| `value` | int | `0` | The expected integer value the query should return to pass. |
+| `blocking` | bool | `false` | Whether a failure of this check should block downstream assets. |

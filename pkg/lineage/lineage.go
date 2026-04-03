@@ -185,7 +185,7 @@ func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *pipeline.Pipeline
 }
 
 func (p *LineageExtractor) mergeNonSelectedColumns(asset *pipeline.Asset, lineage *sqlparser.Lineage) []pipeline.Upstream {
-	upstreams := make([]pipeline.Upstream, 0)
+	upstreams := make([]pipeline.Upstream, 0, len(asset.Upstreams))
 	for _, up := range asset.Upstreams {
 		processedColumns := make(map[string]bool)
 

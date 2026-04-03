@@ -1,0 +1,20 @@
+{
+  "columns": [
+    {
+      "name": "first",
+      "type": "VARCHAR"
+    },
+    {
+      "name": "second",
+      "type": "VARCHAR"
+    }
+  ],
+  "rows": [
+    [
+      "aaa",
+      "bbb"
+    ]
+  ],
+  "connectionName": "duckdb-query-var",
+  "query": "SELECT 'aaa' AS first, 'bbb' AS second;"
+}

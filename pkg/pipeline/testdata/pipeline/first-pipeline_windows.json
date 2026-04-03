@@ -4,6 +4,7 @@
   "tags": [],
   "domains": [],
   "meta": {},
+  "owner": "",
   "schedule": "",
   "start_date": "",
   "snapshot": "",
@@ -44,6 +45,7 @@
             "image": "",
             "instance": "",
             "owner": "",
+            "start_date": "",
             "executable_file": {
                 "name": "hello.sh",
                 "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task1\\hello.sh",
@@ -88,6 +90,7 @@
             "image": "",
             "instance": "",
             "owner": "",
+            "start_date": "",
             "executable_file": {
                 "name": "task.yaml",
                 "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task2\\task.yaml",
@@ -165,6 +168,7 @@
             "image": "",
             "instance": "",
             "owner": "",
+            "start_date": "",
             "executable_file": {
                 "name": "test.py",
                 "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.py",
@@ -247,6 +251,7 @@
             "image": "",
             "instance": "",
             "owner": "",
+            "start_date": "",
             "executable_file": {
                 "name": "test.sql",
                 "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.sql",

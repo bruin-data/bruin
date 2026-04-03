@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -34,6 +35,14 @@ func loadPipelineState(currentFolder, filename string) *scheduler.PipelineState 
 	return &state
 }
 
+func bruinBinary(currentFolder string) string {
+	executable := "bruin"
+	if runtime.GOOS == "windows" {
+		executable = "bruin.exe"
+	}
+	return filepath.Join(currentFolder, "../bin", executable)
+}
+
 func cleanupDuckDBFiles(t *testing.T) {
 	duckdbFilesDir := "duckdb-files"
 
@@ -41,7 +50,7 @@ func cleanupDuckDBFiles(t *testing.T) {
 		t.Fatalf("Failed to remove duckdb-files directory: %v", err)
 	}
 
-	if err := os.MkdirAll(duckdbFilesDir, 0755); err != nil {
+	if err := os.MkdirAll(duckdbFilesDir, 0o755); err != nil {
 		t.Fatalf("Failed to create duckdb-files directory: %v", err)
 	}
 }
@@ -60,11 +69,7 @@ func TestIndividualTasks(t *testing.T) {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	executable := "bruin"
-	if runtime.GOOS == "windows" {
-		executable = "bruin.exe"
-	}
-	binary := filepath.Join(currentFolder, "../bin", executable)
+	binary := bruinBinary(currentFolder)
 
 	tests := []struct {
 		name string
@@ -283,7 +288,8 @@ func TestIndividualTasks(t *testing.T) {
 				Args: []string{
 					"render",
 					"--var", `{"users": ["mark", "nicholas"]}`,
-					filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql")},
+					filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql"),
+				},
 				Env:           []string{},
 				SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 				Expected: e2e.Output{
@@ -304,7 +310,8 @@ func TestIndividualTasks(t *testing.T) {
 				Args: []string{
 					"render",
 					"--var", `users=["mark", "nicholas"]`,
-					filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql")},
+					filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql"),
+				},
 				Env:           []string{},
 				SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 				Expected: e2e.Output{
@@ -327,7 +334,8 @@ func TestIndividualTasks(t *testing.T) {
 					"--start-date", "2024-01-15",
 					"--end-date", "2024-01-31",
 					"--output", "json",
-					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -340,21 +348,19 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "render-full-refresh-uses-pipeline-start-date",
+			name: "render-without-start-date-flag",
 			task: e2e.Task{
-				Name:    "render-full-refresh-uses-pipeline-start-date",
+				Name:    "render-without-start-date-flag",
 				Command: binary,
 				Args: []string{
 					"render",
-					"--full-refresh",
-					"--start-date", "2024-01-15",
-					"--end-date", "2024-01-31",
 					"--output", "json",
-					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{`'2023-06-15'`, `'2024-01-31'`},
+					Contains: []string{time.Now().AddDate(0, 0, -1).Format("2006-01-02")},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
@@ -363,20 +369,45 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "render-full-refresh-no-start-flag-uses-pipeline-start-date",
+			name: "render-asset-with-start-date-uses-cli-date",
 			task: e2e.Task{
-				Name:    "render-full-refresh-no-start-flag-uses-pipeline-start-date",
+				Name:    "render-asset-with-start-date-uses-cli-date",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/asset-start-date-ignored/assets/asset_with_start_date.sql"),
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`'2024-01-15'`, `'2024-01-31'`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "render-full-refresh-ignores-pipeline-start-date",
+			task: e2e.Task{
+				Name:    "render-full-refresh-ignores-pipeline-start-date",
 				Command: binary,
 				Args: []string{
 					"render",
 					"--full-refresh",
-					"--end-date", "2024-12-31",
+					"--start-date", "2024-01-15",
+					"--end-date", "2024-01-31",
 					"--output", "json",
-					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Contains: []string{`'2023-06-15'`, `'2024-12-31'`},
+					Contains: []string{`'2024-01-15'`, `'2024-01-31'`},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
@@ -393,7 +424,8 @@ func TestIndividualTasks(t *testing.T) {
 					"render",
 					"--start-date", "2024-01-15",
 					"--end-date", "2024-01-31",
-					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql")},
+					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -419,7 +451,8 @@ func TestIndividualTasks(t *testing.T) {
 					"--full-refresh",
 					"--start-date", "2024-01-15",
 					"--end-date", "2024-01-31",
-					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql")},
+					filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline/assets/test_full_refresh.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -436,55 +469,14 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "render-asset-level-start-date-no-start-date",
-			task: e2e.Task{
-				Name:    "render-asset-level-start-date-no-start-date",
-				Command: binary,
-				Args: []string{
-					"render",
-					"--full-refresh",
-					"--end-date", "2024-12-31",
-					filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_no_start_date.sql")},
-				Env: []string{},
-				Expected: e2e.Output{
-					ExitCode: 0,
-					Contains: []string{"'2023-01-01' as captured_start_date", "'2024-12-31' as captured_end_date"},
-				},
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-					e2e.AssertByContains,
-				},
-			},
-		},
-		{
-			name: "render-asset-level-start-date-with-start-date",
-			task: e2e.Task{
-				Name:    "render-asset-level-start-date-with-start-date",
-				Command: binary,
-				Args: []string{
-					"render",
-					"--full-refresh",
-					"--end-date", "2024-12-31",
-					filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_with_start_date.sql")},
-				Env: []string{},
-				Expected: e2e.Output{
-					ExitCode: 0,
-					Contains: []string{"'2024-06-01' as captured_start_date", "'2024-12-31' as captured_end_date"},
-				},
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-					e2e.AssertByContains,
-				},
-			},
-		},
-		{
 			name: "render-ddl-basic-duckdb",
 			task: e2e.Task{
 				Name:    "render-ddl-basic-duckdb",
 				Command: binary,
 				Args: []string{
 					"render-ddl",
-					filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-ddl/assets/schema.sql")},
+					filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-ddl/assets/schema.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -512,7 +504,8 @@ func TestIndividualTasks(t *testing.T) {
 					"render-ddl",
 					"--start-date", "2024-01-15",
 					"--end-date", "2024-01-31",
-					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql")},
+					filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_capture.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -534,7 +527,8 @@ func TestIndividualTasks(t *testing.T) {
 				Args: []string{
 					"render-ddl",
 					"--output", "json",
-					filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-ddl/assets/schema.sql")},
+					filepath.Join(currentFolder, "test-pipelines/duckdb-materialization-ddl/assets/schema.sql"),
+				},
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
@@ -640,6 +634,70 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "render-schema-prefix-default-empty",
+			task: e2e.Task{
+				Name:    "render-schema-prefix-default-empty",
+				Command: binary,
+				Args: []string{
+					"render",
+					"--start-date", "2024-01-01",
+					"--end-date", "2024-01-02",
+					"--output", "json",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-test/assets/check_prefix_sql.sql"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{`'' as prefix`},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
+			name: "schema-prefix-sql",
+			task: e2e.Task{
+				Name:    "schema-prefix-sql",
+				Command: binary,
+				Args: []string{
+					"run",
+					"--env", "env-schema-prefix",
+					"--start-date", "2024-01-01",
+					"--end-date", "2024-01-02",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-test/assets/check_prefix_sql.sql"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+		},
+		{
+			name: "schema-prefix-python",
+			task: e2e.Task{
+				Name:    "schema-prefix-python",
+				Command: binary,
+				Args: []string{
+					"run",
+					"--env", "env-schema-prefix",
+					"--start-date", "2024-01-01",
+					"--end-date", "2024-01-02",
+					filepath.Join(currentFolder, "test-pipelines/schema-prefix-test/assets/check_prefix_py.py"),
+				},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{"schema_prefix: test_"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "run-with-tags",
 			task: e2e.Task{
 				Name:    "run-with-tags",
@@ -685,6 +743,74 @@ func TestIndividualTasks(t *testing.T) {
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
 					e2e.AssertByQueryResultCSV,
+				},
+			},
+		},
+		{
+			name: "query-var-direct",
+			task: e2e.Task{
+				Name:    "query-var-direct",
+				Command: binary,
+				Args:    []string{"query", "--env", "env-query-var", "--connection", "duckdb-query-var", "--query", "SELECT '{{ my_var }}' AS val;", "--var", "my_var=test-value", "--output", "json"},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/query-var-pipeline/expected-direct.json")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputJSON,
+				},
+			},
+		},
+		{
+			name: "query-var-asset",
+			task: e2e.Task{
+				Name:    "query-var-asset",
+				Command: binary,
+				Args:    []string{"query", "--env", "env-query-var", "--output", "json", "--asset", filepath.Join(currentFolder, "test-pipelines/query-var-pipeline/assets/greet.sql"), "--var", "greeting=hello-world"},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/query-var-pipeline/expected-asset.json")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputJSON,
+				},
+			},
+		},
+		{
+			name: "query-var-multi",
+			task: e2e.Task{
+				Name:    "query-var-multi",
+				Command: binary,
+				Args:    []string{"query", "--env", "env-query-var", "--connection", "duckdb-query-var", "--query", "SELECT '{{ var1 }}' AS first, '{{ var2 }}' AS second;", "--var", "var1=aaa", "--var", "var2=bbb", "--output", "json"},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/query-var-pipeline/expected-multi.json")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputJSON,
+				},
+			},
+		},
+		{
+			name: "query-var-date",
+			task: e2e.Task{
+				Name:    "query-var-date",
+				Command: binary,
+				Args:    []string{"query", "--env", "env-query-var", "--connection", "duckdb-query-var", "--query", "SELECT DATE('{{ dt }}') AS d;", "--var", "dt=2026-01-23", "--output", "json"},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/query-var-pipeline/expected-date.json")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputJSON,
 				},
 			},
 		},
@@ -1505,11 +1631,7 @@ func TestWorkflowTasks(t *testing.T) {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	executable := "bruin"
-	if runtime.GOOS == "windows" {
-		executable = "bruin.exe"
-	}
-	binary := filepath.Join(currentFolder, "../bin", executable)
+	binary := bruinBinary(currentFolder)
 
 	tempdir := t.TempDir()
 
@@ -1750,6 +1872,146 @@ func TestWorkflowTasks(t *testing.T) {
 						Expected: e2e.Output{
 							ExitCode: 0,
 							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-nameless-asset-pipeline/expected.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "selector_intersection",
+			workflow: e2e.Workflow{
+				Name: "selector_intersection",
+				Steps: []e2e.Task{
+					{
+						Name:    "selector_intersection: run intersection selector",
+						Command: binary,
+						Args: []string{
+							"run",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-intersection",
+							"--selector", "tag:include,file:products",
+							"--start-date", "2024-01-01",
+							"--end-date", "2024-12-31",
+							filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline"),
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "selector_intersection: query created tables",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-intersection",
+							"--connection", "duckdb-run-with-filters",
+							"--query", "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name;",
+							"--output", "json",
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline/expectations/selector_intersection_tables.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "selector_path_with_exclude_tag",
+			workflow: e2e.Workflow{
+				Name: "selector_path_with_exclude_tag",
+				Steps: []e2e.Task{
+					{
+						Name:    "selector_path_with_exclude_tag: run path selector",
+						Command: binary,
+						Args: []string{
+							"run",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-path",
+							"--selector", "path:assets",
+							"--exclude-tag", "exclude",
+							"--start-date", "2024-01-01",
+							"--end-date", "2024-12-31",
+							filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline"),
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "selector_path_with_exclude_tag: query created tables",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-path",
+							"--connection", "duckdb-run-with-filters",
+							"--query", "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name;",
+							"--output", "json",
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline/expectations/selector_path_tables.json")),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputJSON,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "selector_downstream",
+			workflow: e2e.Workflow{
+				Name: "selector_downstream",
+				Steps: []e2e.Task{
+					{
+						Name:    "selector_downstream: run graph selector",
+						Command: binary,
+						Args: []string{
+							"run",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-downstream",
+							"--selector", "products+",
+							filepath.Join(currentFolder, "test-pipelines/run-with-downstream-pipeline"),
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "selector_downstream: query created tables",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+							"--env", "env-selector-downstream",
+							"--connection", "duckdb-run-with-downstream",
+							"--query", "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name;",
+							"--output", "json",
+						},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-with-downstream-pipeline/expectations/selector_downstream_tables.json")),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -2344,101 +2606,6 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
-			name: "start_date_flags_workflow",
-			workflow: e2e.Workflow{
-				Name: "start_date_flags_workflow",
-				Steps: []e2e.Task{
-					{
-						Name:    "start-date-flags: run with start-date and end-date",
-						Command: binary,
-						Args:    []string{"run", "--env", "env-start-date-flags", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Contains: []string{"bruin run completed", "Finished: date_capture", "Finished: date_range_analysis"},
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByContains,
-						},
-					},
-					{
-						Name:          "start-date-flags: validate flag was used",
-						Command:       binary,
-						Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
-						Env:           []string{},
-						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/flag_start_date_used.json")),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByOutputJSON,
-						},
-					},
-					{
-						Name:    "start-date-flags: run with full-refresh override",
-						Command: binary,
-						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Contains: []string{"bruin run completed", "Finished: date_capture", "Finished: date_range_analysis"},
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByContains,
-						},
-					},
-					{
-						Name:          "start-date-flags: validate pipeline was used",
-						Command:       binary,
-						Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
-						Env:           []string{},
-						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/pipeline_start_date_used.json")),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByOutputJSON,
-						},
-					},
-					{
-						Name:    "start-date-flags: run with full-refresh no start-date flag",
-						Command: binary,
-						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Contains: []string{"bruin run completed", "Finished: date_capture", "Finished: date_range_analysis"},
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByContains,
-						},
-					},
-					{
-						Name:          "start-date-flags: validate pipeline start-date used when no flag",
-						Command:       binary,
-						Args:          []string{"query", "--env", "env-start-date-flags", "--asset", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/assets/date_range_analysis.sql"), "--output", "json"},
-						Env:           []string{},
-						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/start-date-flags-test/expectations/pipeline_start_date_no_flag.json")),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByOutputJSON,
-						},
-					},
-				},
-			},
-		},
-		{
 			name: "patch_pipeline_workflow",
 			workflow: e2e.Workflow{
 				Name: "patch_pipeline_workflow",
@@ -2522,72 +2689,6 @@ func TestWorkflowTasks(t *testing.T) {
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
 							e2e.AssertByContains,
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "asset_level_start_date_workflow",
-			workflow: e2e.Workflow{
-				Name: "asset_level_start_date_workflow",
-				Steps: []e2e.Task{
-					{
-						Name:    "asset-level-start-date: run asset_no_start_date",
-						Command: binary,
-						Args:    []string{"run", "--full-refresh", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_no_start_date.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Contains: []string{"bruin run completed", "Finished: asset_no_start_date"},
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByContains,
-						},
-					},
-					{
-						Name:    "asset-level-start-date: run asset_with_start_date",
-						Command: binary,
-						Args:    []string{"run", "--full-refresh", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/assets/asset_with_start_date.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Contains: []string{"bruin run completed", "Finished: asset_with_start_date"},
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByContains,
-						},
-					},
-					{
-						Name:          "asset-level-start-date: validate asset without start_date uses pipeline start_date",
-						Command:       binary,
-						Args:          []string{"query", "--connection", "duckdb-variables", "--query", "SELECT * FROM asset_no_start_date", "--output", "json"},
-						Env:           []string{},
-						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/expectations/asset_no_start_date_full_refresh.json")),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByOutputJSON,
-						},
-					},
-					{
-						Name:          "asset-level-start-date: validate asset with start_date uses its own start_date",
-						Command:       binary,
-						Args:          []string{"query", "--connection", "duckdb-variables", "--query", "SELECT * FROM asset_with_start_date", "--output", "json"},
-						Env:           []string{},
-						SkipJSONNodes: []string{`"connectionName"`, `"query"`},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/asset-level-start-date-test/expectations/asset_with_start_date_full_refresh.json")),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByOutputJSON,
 						},
 					},
 				},
@@ -3169,6 +3270,142 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "pipeline_start_date_ignored",
+			workflow: e2e.Workflow{
+				Name: "pipeline_start_date_ignored",
+				Steps: []e2e.Task{
+					{
+						Name:    "start-date-ignored: run with explicit start-date and end-date",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "start-date-ignored: validate CLI start-date was used, not pipeline start_date",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date, captured_end_date FROM date_capture", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"2024-01-15", "2024-01-31"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "start-date-ignored: run with full-refresh uses pipeline start_date",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--full-refresh", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "start-date-ignored: validate full-refresh uses pipeline start_date",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date, captured_end_date FROM date_capture", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"2023-06-15", "2024-01-31"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "run_without_start_date_flag",
+			workflow: e2e.Workflow{
+				Name: "run_without_start_date_flag",
+				Steps: []e2e.Task{
+					{
+						Name:    "no-start-date-flag: run without --start-date flag",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", filepath.Join(currentFolder, "test-pipelines/start-date-flags-test")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: date_capture"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "no-start-date-flag: validate default date (yesterday) was used, not pipeline start_date",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date FROM date_capture", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{time.Now().AddDate(0, 0, -1).Format("2006-01-02")},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "asset_start_date_ignored",
+			workflow: e2e.Workflow{
+				Name: "asset_start_date_ignored",
+				Steps: []e2e.Task{
+					{
+						Name:    "asset-start-date-ignored: run asset with start_date defined",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-start-date-flags", "--start-date", "2024-01-15", "--end-date", "2024-01-31", filepath.Join(currentFolder, "test-pipelines/asset-start-date-ignored/assets/asset_with_start_date.sql")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"bruin run completed", "Finished: asset_with_start_date"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "asset-start-date-ignored: validate CLI start-date was used, not asset start_date",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-start-date-flags", "--query", "SELECT captured_start_date, captured_end_date FROM asset_with_start_date", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"2024-01-15", "2024-01-31"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3181,6 +3418,109 @@ func TestWorkflowTasks(t *testing.T) {
 			require.NoError(t, err, "Workflow %s failed: %v", tt.workflow.Name, err)
 		})
 	}
+}
+
+//nolint:paralleltest
+func TestModifiedFlag(t *testing.T) {
+	cleanupDuckDBFiles(t)
+
+	currentFolder, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
+
+	binary := bruinBinary(currentFolder)
+
+	tempdir := t.TempDir()
+	modifiedTestDir := filepath.Join(tempdir, "modified-test")
+
+	workflow := e2e.Workflow{
+		Name: "run_modified_with_downstream",
+		Steps: []e2e.Task{
+			{
+				Name:    "modified: copy pipeline to temp dir",
+				Command: "cp",
+				Args:    []string{"-r", filepath.Join(currentFolder, "test-pipelines/run-with-downstream-pipeline"), modifiedTestDir},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "modified: copy .bruin.yml to temp dir",
+				Command: "cp",
+				Args:    []string{filepath.Join(currentFolder, ".bruin.yml"), modifiedTestDir + "/"},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "modified: copy duckdb-files to temp dir",
+				Command: "cp",
+				Args:    []string{"-r", filepath.Join(currentFolder, "duckdb-files"), modifiedTestDir + "/"},
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:       "modified: git init and create main branch with initial commit",
+				Command:    "bash",
+				Args:       []string{"-c", "git init -b main && git config user.name 'test' && git config user.email 'test@test.com' && git add -A && git commit -m 'initial commit'"},
+				WorkingDir: modifiedTestDir,
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:       "modified: create feature branch and modify products.sql",
+				Command:    "bash",
+				Args:       []string{"-c", "git checkout -b feature-branch && echo '-- modified' >> assets/products.sql && git add -A && git commit -m 'modify products'"},
+				WorkingDir: modifiedTestDir,
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:       "modified: run with --modified --downstream",
+				Command:    binary,
+				Args:       []string{"run", "--modified", "--downstream", "--env", "env-run-with-downstream", "--start-date", "2024-01-01", "--end-date", "2024-12-31", modifiedTestDir},
+				WorkingDir: modifiedTestDir,
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Contains: []string{
+						"Running 1 modified asset(s): products (with downstream)",
+						"Finished: products",
+						"Finished: products:price:positive",
+						"Finished: product_price_summary",
+						"Finished: product_price_summary:product_count:non_negative",
+						"Finished: product_price_summary:total_stock:non_negative",
+						"bruin run completed",
+					},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+	}
+
+	err = workflow.Run()
+	require.NoError(t, err, "Workflow %s failed: %v", workflow.Name, err)
 }
 
 //nolint:paralleltest
@@ -3197,11 +3537,7 @@ func TestIngestrTasks(t *testing.T) {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	executable := "bruin"
-	if runtime.GOOS == "windows" {
-		executable = "bruin.exe"
-	}
-	binary := filepath.Join(currentFolder, "../bin", executable)
+	binary := bruinBinary(currentFolder)
 
 	tests := []struct {
 		name string
@@ -3384,11 +3720,7 @@ func TestMacros(t *testing.T) {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
 
-	executable := "bruin"
-	if runtime.GOOS == "windows" {
-		executable = "bruin.exe"
-	}
-	binary := filepath.Join(currentFolder, "../bin", executable)
+	binary := bruinBinary(currentFolder)
 
 	tests := []struct {
 		name string

@@ -52,7 +52,8 @@ type mockWriter struct {
 }
 
 func (m *mockWriter) Write(p []byte) (int, error) {
-	res := m.Called(p)
+	copied := append([]byte(nil), p...)
+	res := m.Called(copied)
 	return res.Int(0), res.Error(1)
 }
 
@@ -86,7 +87,7 @@ func TestRenderCommand_Run(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
-		setup    func(*fields)
+		setup    func(*testing.T, *fields)
 		args     args
 		output   string
 		rawQuery bool
@@ -110,7 +111,7 @@ func TestRenderCommand_Run(t *testing.T) {
 					Name: "asset1",
 				},
 			},
-			setup: func(f *fields) {
+			setup: func(_ *testing.T, f *fields) {
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return(nil, assert.AnError)
 			},
@@ -127,7 +128,7 @@ func TestRenderCommand_Run(t *testing.T) {
 					Name: "asset1",
 				},
 			},
-			setup: func(f *fields) {
+			setup: func(_ *testing.T, f *fields) {
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "some query"}}, nil)
 
@@ -147,7 +148,7 @@ func TestRenderCommand_Run(t *testing.T) {
 					Name: "asset1",
 				},
 			},
-			setup: func(f *fields) {
+			setup: func(_ *testing.T, f *fields) {
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "extracted query"}}, nil)
 				f.bqMaterializer.On("Render", mock.Anything, "extracted query").
@@ -173,7 +174,7 @@ func TestRenderCommand_Run(t *testing.T) {
 					Name: "asset1",
 				},
 			},
-			setup: func(f *fields) {
+			setup: func(_ *testing.T, f *fields) {
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "extracted query"}}, nil)
 				f.bqMaterializer.On("Render", mock.Anything, "extracted query").
@@ -200,7 +201,9 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			output: "json",
-			setup: func(f *fields) {
+			setup: func(t *testing.T, f *fields) {
+				t.Helper()
+
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "extracted query"}}, nil)
 				f.bqMaterializer.On("Render", mock.Anything, "extracted query").
@@ -235,7 +238,9 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			output: "json",
-			setup: func(f *fields) {
+			setup: func(t *testing.T, f *fields) {
+				t.Helper()
+
 				f.extractor.On("ExtractQueriesFromString", "select * from src").
 					Return([]*query.Query{{Query: "base query"}}, nil)
 				f.bqMaterializer.On("Render", mock.Anything, "base query").
@@ -263,7 +268,7 @@ func TestRenderCommand_Run(t *testing.T) {
 					Name: "asset1",
 				},
 			},
-			setup: func(f *fields) {
+			setup: func(_ *testing.T, f *fields) {
 				f.extractor.On("ExtractQueriesFromString", nonBqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "SELECT * FROM nonbq.table1"}}, nil)
 
@@ -284,7 +289,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			rawQuery: true,
-			setup: func(f *fields) {
+			setup: func(_ *testing.T, f *fields) {
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "SELECT * FROM my_table"}}, nil)
 				f.writer.On("Write", []byte("SELECT * FROM my_table\n")).
@@ -305,7 +310,7 @@ func TestRenderCommand_Run(t *testing.T) {
 			}
 
 			if tt.setup != nil {
-				tt.setup(f)
+				tt.setup(t, f)
 			}
 
 			render := &RenderCommand{
@@ -335,13 +340,11 @@ func TestRenderCommand_Run(t *testing.T) {
 	}
 }
 
-func TestRenderCommand_Run_QuerySensors(t *testing.T) {
-	t.Parallel()
-
+func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
 		name     string
 		task     *pipeline.Asset
-		setup    func(*mockExtractor, *mockMaterializer, *mockWriter)
+		setup    func(*testing.T, *mockExtractor, *mockMaterializer, *mockWriter)
 		output   string
 		rawQuery bool
 		wantErr  assert.ErrorAssertionFunc
@@ -359,7 +362,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 					Content: "sensor:\ntype: bq.sensor.query\nparameters:\n  query: SELECT...",
 				},
 			},
-			setup: func(extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
+			setup: func(_ *testing.T, extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
 				extractor.On("ExtractQueriesFromString", "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '{{ start_date }}'").
 					Return([]*query.Query{{Query: "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'"}}, nil)
 				materializer.On("Render", mock.Anything, "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'").
@@ -387,7 +390,9 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 				},
 			},
 			output: "json",
-			setup: func(extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
+			setup: func(t *testing.T, extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
+				t.Helper()
+
 				extractor.On("ExtractQueriesFromString", "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '{{ start_date }}'").
 					Return([]*query.Query{{Query: "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'"}}, nil)
 				materializer.On("Render", mock.Anything, "SELECT COUNT(*) FROM `project.dataset.table` WHERE created_at > '2024-01-01'").
@@ -414,7 +419,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 					Content: "sensor:\ntype: sf.sensor.query\nparameters:\n  query: SELECT...",
 				},
 			},
-			setup: func(extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
+			setup: func(_ *testing.T, extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
 				extractor.On("ExtractQueriesFromString", "SELECT * FROM sensor_table WHERE timestamp > '{{ start_date }}'").
 					Return([]*query.Query{{Query: "SELECT * FROM sensor_table WHERE timestamp > '2024-01-01'"}}, nil)
 				materializer.On("Render", mock.Anything, "SELECT * FROM sensor_table WHERE timestamp > '2024-01-01'").
@@ -437,7 +442,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 					Content: "sensor:\ntype: bq.sensor.query\nparameters:\n  project_id: my-project",
 				},
 			},
-			setup: func(extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
+			setup: func(_ *testing.T, extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
 				// No expectations set since it should fail early
 			},
 			wantErr: assert.Error,
@@ -452,7 +457,7 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 					Content: "SELECT * FROM regular_table WHERE date = '{{ start_date }}'",
 				},
 			},
-			setup: func(extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
+			setup: func(_ *testing.T, extractor *mockExtractor, materializer *mockMaterializer, writer *mockWriter) {
 				extractor.On("ExtractQueriesFromString", "SELECT * FROM regular_table WHERE date = '{{ start_date }}'").
 					Return([]*query.Query{{Query: "SELECT * FROM regular_table WHERE date = '2024-01-01'"}}, nil)
 				materializer.On("Render", mock.Anything, "SELECT * FROM regular_table WHERE date = '2024-01-01'").
@@ -464,16 +469,14 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			extractor := new(mockExtractor)
 			materializer := new(mockMaterializer)
 			writer := new(mockWriter)
 
 			if tt.setup != nil {
-				tt.setup(extractor, materializer, writer)
+				tt.setup(t, extractor, materializer, writer)
 			}
 
 			render := &RenderCommand{

@@ -44,6 +44,13 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 	return NewSQLParserWithConfig(randomize, 10000)
 }
 
+// NewSQLParserCached creates a SQLParser that reuses previously extracted embedded files
+// from a stable temp directory path. This is significantly faster when files already exist
+// (skips ~3s of file extraction) and is safe for concurrent reads across test packages.
+func NewSQLParserCached() (*SQLParser, error) {
+	return newSQLParserInternal("bruin-cli-embedded-cached", false, 10000)
+}
+
 func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, error) {
 	randomInt := 0
 	if randomize {
@@ -54,19 +61,25 @@ func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, err
 		}
 		randomInt = int(b[0])
 	}
-	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded_%d", randomInt))
+	tmpDirName := fmt.Sprintf("bruin-cli-embedded_%d", randomInt)
+	return newSQLParserInternal(tmpDirName, randomize, maxQueryLength)
+}
 
-	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
+func newSQLParserInternal(tmpDirName string, randomize bool, maxQueryLength int) (*SQLParser, error) {
+	tmpDir := filepath.Join(os.TempDir(), tmpDirName)
+	recreate := randomize // only recreate when using random dirs (production); reuse for cached dirs
+
+	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", recreate)
 	if err != nil {
 		return nil, err
 	}
-	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, tmpDir+"-sqlglot-lib", true)
+	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, tmpDir+"-sqlglot-lib", recreate)
 	if err != nil {
 		return nil, err
 	}
 	ep.AddPythonPath(sqlglotDir.GetExtractedPath())
 
-	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, tmpDir+"-jinja2-renderer", true)
+	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, tmpDir+"-jinja2-renderer", recreate)
 	if err != nil {
 		return nil, err
 	}
@@ -276,6 +289,11 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 }
 
 func (s *SQLParser) Close() error {
+	s.startMutex.Lock()
+	defer s.startMutex.Unlock()
+
+	s.started = false
+
 	if s.stdin != nil {
 		s.sendCommand(&parserCommand{ //nolint
 			Command: "exit",
@@ -415,8 +433,11 @@ func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error
 }
 
 func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
-	err := s.Start()
-	if err != nil {
+	return getMissingDependenciesForAsset(s, asset, pipeline, renderer)
+}
+
+func getMissingDependenciesForAsset(p Parser, asset *pipeline.Asset, pl *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
+	if err := p.Start(); err != nil {
 		return []string{}, errors.Wrap(err, "failed to start sql parser")
 	}
 
@@ -425,12 +446,12 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 		return []string{}, nil //nolint:nilerr
 	}
 
-	renderedQ, err := renderer.Render(mergeMacrosWithQuery(asset.ExecutableFile.Content, pipeline.Macros))
+	renderedQ, err := renderer.Render(mergeMacrosWithQuery(asset.ExecutableFile.Content, pl.Macros))
 	if err != nil {
 		return []string{}, errors.New("failed to render the query before parsing the SQL")
 	}
 
-	tables, err := s.UsedTables(renderedQ, dialect)
+	tables, err := p.UsedTables(renderedQ, dialect)
 	if err != nil {
 		return []string{}, errors.Wrap(err, "failed to get used tables")
 	}
@@ -439,8 +460,8 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 		return []string{}, nil
 	}
 
-	pipelineAssetNames := make(map[string]bool, len(pipeline.Assets))
-	for _, a := range pipeline.Assets {
+	pipelineAssetNames := make(map[string]bool, len(pl.Assets))
+	for _, a := range pl.Assets {
 		pipelineAssetNames[strings.ToLower(a.Name)] = true
 	}
 
@@ -464,17 +485,14 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 			continue
 		}
 
-		// if the table is in the dependency list already, move on
 		if _, ok := depsNameMap[usedTable]; ok {
 			continue
 		}
 
-		// report this issue only if there's an asset with the same name, otherwise ignore
 		if _, ok := pipelineAssetNames[usedTable]; !ok {
 			continue
 		}
 
-		// otherwise, report the issue
 		missingDependencies = append(missingDependencies, actualReferenceName)
 	}
 

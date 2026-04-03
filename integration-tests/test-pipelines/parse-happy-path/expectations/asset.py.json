@@ -25,7 +25,7 @@
     "executable_file": {
       "name": "asset.py",
       "path": "test-pipelines/parse-happy-path/assets/asset.py",
-      "content": "import os\nimport duckdb\n\nif os.getenv('INJECTED1') != \"value1\":\n    raise Exception(\"KEY1 is not injected correctly\")\n\ncon = duckdb.connect(database = \"duckdb.db\", read_only = False)\n\ncon.execute(\"SELECT * FROM chess_playground.player_summary\")\nresult = con.fetchall()\nif len(result) != 2:\n    raise Exception(\"Incorrect number of rows in player_summary\")"
+      "content": "import os\nimport duckdb\n\nif os.getenv('INJECTED1') != \"value1\":\n    raise Exception(\"KEY1 is not injected correctly\")\n\ncon = duckdb.connect(database = \"duckdb.db\", read_only = False)\n\ncon.execute(\"SELECT * FROM chess_playground.player_summary\")\nresult = con.fetchall()\nif len(result) != 10:\n    raise Exception(\"Incorrect number of rows in player_summary\")"
     },
     "definition_file": {
       "name": "asset.py",

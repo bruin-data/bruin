@@ -52,6 +52,7 @@ type Connections struct {
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
+	RabbitMQ            []RabbitMQConnection            `yaml:"rabbitmq,omitempty" json:"rabbitmq,omitempty" mapstructure:"rabbitmq"`
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
 	MotherDuck          []MotherduckConnection          `yaml:"motherduck,omitempty" json:"motherduck,omitempty" mapstructure:"motherduck"`
 	ClickHouse          []ClickHouseConnection          `yaml:"clickhouse,omitempty" json:"clickhouse,omitempty" mapstructure:"clickhouse"`
@@ -83,6 +84,7 @@ type Connections struct {
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
+	Posthog             []PosthogConnection             `yaml:"posthog,omitempty" json:"posthog,omitempty" mapstructure:"posthog"`
 	Pinterest           []PinterestConnection           `yaml:"pinterest,omitempty" json:"pinterest,omitempty" mapstructure:"pinterest"`
 	Trustpilot          []TrustpilotConnection          `yaml:"trustpilot,omitempty" json:"trustpilot,omitempty" mapstructure:"trustpilot"`
 	QuickBooks          []QuickBooksConnection          `yaml:"quickbooks,omitempty" json:"quickbooks,omitempty" mapstructure:"quickbooks"`
@@ -107,6 +109,7 @@ type Connections struct {
 	ISOCPulse           []ISOCPulseConnection           `yaml:"isoc_pulse,omitempty" json:"isoc_pulse,omitempty" mapstructure:"isoc_pulse"`
 	InfluxDB            []InfluxDBConnection            `yaml:"influxdb,omitempty" json:"influxdb,omitempty" mapstructure:"influxdb"`
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
+	QuickSight          []QuickSightConnection          `yaml:"quicksight,omitempty" json:"quicksight,omitempty" mapstructure:"quicksight"`
 	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
@@ -120,6 +123,7 @@ type Connections struct {
 	Indeed              []IndeedConnection              `yaml:"indeed,omitempty" json:"indeed,omitempty" mapstructure:"indeed"`
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
+	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -669,6 +673,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Kafka = append(env.Connections.Kafka, conn)
+	case "rabbitmq":
+		var conn RabbitMQConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.RabbitMQ = append(env.Connections.RabbitMQ, conn)
 	case "hubspot":
 		var conn HubspotConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -858,6 +869,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Clickup = append(env.Connections.Clickup, conn)
+	case "posthog":
+		var conn PosthogConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Posthog = append(env.Connections.Posthog, conn)
 	case "mailchimp":
 		var conn MailchimpConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1056,6 +1074,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Tableau = append(env.Connections.Tableau, conn)
+	case "quicksight":
+		var conn QuickSightConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.QuickSight = append(env.Connections.QuickSight, conn)
 	case "fluxx":
 		var conn FluxxConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1119,6 +1144,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Vertica = append(env.Connections.Vertica, conn)
+	case "dune":
+		var conn DuneConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Dune = append(env.Connections.Dune, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1206,6 +1238,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Jira = removeConnection(env.Connections.Jira, connectionName)
 	case "kafka":
 		env.Connections.Kafka = removeConnection(env.Connections.Kafka, connectionName)
+	case "rabbitmq":
+		env.Connections.RabbitMQ = removeConnection(env.Connections.RabbitMQ, connectionName)
 	case "hubspot":
 		env.Connections.Hubspot = removeConnection(env.Connections.Hubspot, connectionName)
 	case "google_sheets":
@@ -1258,6 +1292,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
 	case "clickup":
 		env.Connections.Clickup = removeConnection(env.Connections.Clickup, connectionName)
+	case "posthog":
+		env.Connections.Posthog = removeConnection(env.Connections.Posthog, connectionName)
 	case "mailchimp":
 		env.Connections.Mailchimp = removeConnection(env.Connections.Mailchimp, connectionName)
 	case "mixpanel":
@@ -1314,6 +1350,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.InfluxDB = removeConnection(env.Connections.InfluxDB, connectionName)
 	case "tableau":
 		env.Connections.Tableau = removeConnection(env.Connections.Tableau, connectionName)
+	case "quicksight":
+		env.Connections.QuickSight = removeConnection(env.Connections.QuickSight, connectionName)
 	case "fluxx":
 		env.Connections.Fluxx = removeConnection(env.Connections.Fluxx, connectionName)
 	case "fundraiseup":
@@ -1332,6 +1370,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.CustomerIo = removeConnection(env.Connections.CustomerIo, connectionName)
 	case "vertica":
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
+	case "dune":
+		env.Connections.Dune = removeConnection(env.Connections.Dune, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1412,6 +1452,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Stripe, source.Stripe)
 	mergeConnectionList(&c.Appsflyer, source.Appsflyer)
 	mergeConnectionList(&c.Kafka, source.Kafka)
+	mergeConnectionList(&c.RabbitMQ, source.RabbitMQ)
 	mergeConnectionList(&c.DuckDB, source.DuckDB)
 	mergeConnectionList(&c.ClickHouse, source.ClickHouse)
 	mergeConnectionList(&c.Hubspot, source.Hubspot)
@@ -1448,6 +1489,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Attio, source.Attio)
 	mergeConnectionList(&c.ISOCPulse, source.ISOCPulse)
 	mergeConnectionList(&c.Tableau, source.Tableau)
+	mergeConnectionList(&c.QuickSight, source.QuickSight)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
 	mergeConnectionList(&c.Fireflies, source.Fireflies)

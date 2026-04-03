@@ -1,0 +1,15 @@
+{
+  "columns": [
+    {
+      "name": "d",
+      "type": "DATE"
+    }
+  ],
+  "rows": [
+    [
+      "2026-01-23T00:00:00Z"
+    ]
+  ],
+  "connectionName": "duckdb-query-var",
+  "query": "SELECT DATE('2026-01-23') AS d;"
+}

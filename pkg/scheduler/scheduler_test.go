@@ -899,3 +899,70 @@ func TestScheduler_RestoreState(t *testing.T) {
 	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")
 	assert.Equal(t, expectedState.Cmdline, pipelineState.Cmdline, "Cmdline should match")
 }
+
+func TestScheduler_MarkAssetWithCustomChecks(t *testing.T) {
+	t.Parallel()
+
+	// Reproduce the bug: MarkAsset should mark custom check instances as Pending
+	// when the SingleTask is a different pointer but same Name.
+	pipelineAsset := &pipeline.Asset{
+		Name: "my_schema.my_events",
+		Type: pipeline.AssetTypeSnowflakeQuery,
+		Materialization: pipeline.Materialization{
+			Type:            pipeline.MaterializationTypeTable,
+			Strategy:        pipeline.MaterializationStrategyTimeInterval,
+			IncrementalKey:  "event_date",
+			TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "events_populated", Description: "check events exist"},
+		},
+	}
+
+	p := &pipeline.Pipeline{
+		Name:   "TestPipeline",
+		Assets: []*pipeline.Asset{pipelineAsset},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+
+	// Verify instances were created
+	allInstances := s.GetTaskInstancesByStatus(Pending)
+	t.Logf("All instances: %d", len(allInstances))
+	for _, inst := range allInstances {
+		t.Logf("  %s (type=%d, status=%s)", inst.GetHumanID(), inst.GetType(), inst.GetStatus())
+	}
+
+	// There should be 2 instances: 1 main + 1 custom check
+	assert.Len(t, allInstances, 2, "Expected 2 instances (main + custom check)")
+
+	// Now simulate what HandleSingleTask does:
+	// 1. Mark all as Skipped
+	s.MarkAll(Skipped)
+	assert.Equal(t, 0, s.InstanceCountByStatus(Pending))
+
+	// 2. Mark the asset as Pending using a DIFFERENT pointer with same name
+	differentPointer := &pipeline.Asset{Name: "my_schema.my_events"}
+	found := s.MarkAsset(differentPointer, Pending, false)
+	assert.True(t, found, "MarkAsset should return true for a matching asset name")
+
+	// Verify unknown asset returns false
+	unknownAsset := &pipeline.Asset{Name: "nonexistent.asset"}
+	notFound := s.MarkAsset(unknownAsset, Pending, false)
+	assert.False(t, notFound, "MarkAsset should return false for an unknown asset name")
+
+	// 3. Mark main as Skipped (simulating --only checks)
+	s.MarkPendingInstancesByType(TaskInstanceTypeMain, Skipped)
+
+	// The custom check should still be Pending
+	pending := s.GetTaskInstancesByStatus(Pending)
+	t.Logf("Pending after filtering: %d", len(pending))
+	for _, inst := range pending {
+		t.Logf("  %s (type=%d)", inst.GetHumanID(), inst.GetType())
+	}
+
+	assert.Len(t, pending, 1, "Expected 1 pending custom check")
+	if len(pending) > 0 {
+		assert.Equal(t, TaskInstanceTypeCustomCheck, pending[0].GetType())
+	}
+}

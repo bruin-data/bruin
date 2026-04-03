@@ -42,7 +42,7 @@ func CleanCmd() *cli.Command {
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(inputPath, c.Bool("uv-cache"))
+			return r.Run(inputPath, c.Bool("uv-cache")) //nolint:contextcheck
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -107,8 +107,7 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 
 func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 	var binaryName string
-	//nolint:goconst
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		binaryName = "uv.exe"
 	} else {
 		binaryName = "uv"
@@ -122,7 +121,7 @@ func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 	}
 
 	// Check if uv is available and working
-	cmd := exec.Command(uvBinaryPath, "version")
+	cmd := exec.CommandContext(context.Background(), uvBinaryPath, "version")
 	if err := cmd.Run(); err != nil {
 		return errors.Wrap(err, "uv binary exists but is not working properly")
 	}
@@ -135,7 +134,7 @@ func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
 
 	infoPrinter.Println("Cleaning uv caches...")
 
-	cleanCmd := exec.Command(uvBinaryPath, "cache", "clean")
+	cleanCmd := exec.CommandContext(context.Background(), uvBinaryPath, "cache", "clean")
 	output, err := cleanCmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to clean uv cache: %s", string(output))

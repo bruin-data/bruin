@@ -6,11 +6,13 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/devenv"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 )
 
@@ -27,17 +29,28 @@ type Client interface {
 	SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error)
 }
 
+type devEnv interface {
+	Modify(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) (*query.Query, error)
+	RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error
+}
+
 type BasicOperator struct {
 	connection   config.ConnectionGetter
 	extractor    query.QueryExtractor
 	materializer materializer
+	devEnv       devEnv
 }
 
-func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer, parser *sqlparser.SQLParser) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
 		materializer: materializer,
+		devEnv: &devenv.DevEnvQueryModifier{
+			Dialect: "athena",
+			Conn:    conn,
+			Parser:  parser,
+		},
 	}
 }
 
@@ -95,15 +108,36 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
+	var lastQuery *query.Query
 	for _, queryString := range materializedQueries {
-		p := &query.Query{Query: queryString}
+		queryObj := &query.Query{Query: queryString}
+		if o.devEnv != nil {
+			queryObj, err = o.devEnv.Modify(ctx, p, t, queryObj)
+			if err != nil {
+				return err
+			}
+		}
 
-		ansisql.LogQueryIfVerbose(ctx, writer, p.Query)
+		ansisql.LogQueryIfVerbose(ctx, writer, queryObj.Query)
 
-		err = conn.RunQueryWithoutResult(ctx, p)
+		err = conn.RunQueryWithoutResult(ctx, queryObj)
 		if err != nil {
 			return err
 		}
+		lastQuery = queryObj
+	}
+
+	if o.devEnv == nil {
+		return nil
+	}
+
+	if lastQuery == nil {
+		return nil
+	}
+
+	err = o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, lastQuery)
+	if err != nil {
+		return errors.Wrap(err, "cannot register asset for schema cache")
 	}
 
 	return nil

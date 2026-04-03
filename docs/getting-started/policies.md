@@ -126,7 +126,7 @@ Custom rules can have an optional `target` attribute that defines what resource 
 ```yaml
 custom_rules:
 
-  - name: pipline-must-have-prefix-acme
+  - name: pipeline-must-have-prefix-acme
     description: Pipeline names must start with the prefix 'acme'
     criteria: pipeline.Name startsWith 'acme'
     target: pipeline
@@ -136,7 +136,7 @@ custom_rules:
     criteria: len(split(asset.Name, '.')) == 3
     target: asset # optional
 
-ruleset:
+rulesets:
   - name: std
     rules:
       - pipeline-must-have-prefix-acme

@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -128,7 +129,7 @@ func EnsureTaskNameIsUnique(ctx context.Context, p *pipeline.Pipeline) ([]*Issue
 }
 
 func EnsureTaskNameIsUniqueForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
+	issues := make([]*Issue, 0, 1)
 	if asset.Name == "" {
 		return issues, nil
 	}
@@ -523,7 +524,7 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 }
 
 func ValidateScriptAssetHooksUnsupported(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
+	issues := make([]*Issue, 0, 1)
 
 	if asset.Type != pipeline.AssetTypePython && asset.Type != pipeline.AssetTypeR {
 		return issues, nil
@@ -1774,4 +1775,55 @@ func EnsureTimeIntervalIsValidForAsset(ctx context.Context, p *pipeline.Pipeline
 	}
 
 	return issues, nil
+}
+
+type validateUnknownYAMLFields struct {
+	fs afero.Fs
+}
+
+// unknownFieldIssues filters a strict-decode error to only the lines about unknown fields,
+// ignoring type mismatches and other YAML errors that are handled elsewhere.
+func unknownFieldIssues(err error, task *pipeline.Asset) []*Issue {
+	if err == nil {
+		return nil
+	}
+
+	var issues []*Issue
+	for _, line := range strings.Split(err.Error(), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "not found in type") {
+			issues = append(issues, &Issue{
+				Task:        task,
+				Description: line,
+			})
+		}
+	}
+
+	return issues
+}
+
+func (v *validateUnknownYAMLFields) ValidatePipeline(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	if p.DefinitionFile.Path == "" {
+		return nil, nil
+	}
+
+	data, err := afero.ReadFile(v.fs, p.DefinitionFile.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read pipeline file at %s", p.DefinitionFile.Path)
+	}
+
+	var target pipeline.Pipeline
+	strictErr := path.ConvertYamlToObjectStrict(data, &target)
+
+	return unknownFieldIssues(strictErr, nil), nil
+}
+
+func (v *validateUnknownYAMLFields) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if asset.DefinitionFile.Path == "" {
+		return nil, nil
+	}
+
+	strictErr := pipeline.ValidateAssetYAML(v.fs, asset.DefinitionFile.Path, asset.DefinitionFile.Type)
+
+	return unknownFieldIssues(strictErr, asset), nil
 }

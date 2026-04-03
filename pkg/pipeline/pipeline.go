@@ -55,6 +55,7 @@ const (
 	AssetTypeDuckDBQuerySensor         = AssetType("duckdb.sensor.query")
 	AssetTypeDuckDBSeed                = AssetType("duckdb.seed")
 	AssetTypeDuckDBSource              = AssetType("duckdb.source")
+	AssetTypeDynamoDB                  = AssetType("dynamodb")
 	AssetTypeElasticsearch             = AssetType("elasticsearch")
 	AssetTypeEmpty                     = AssetType("empty")
 	AssetTypeEMRServerlessPyspark      = AssetType("emr_serverless.pyspark")
@@ -96,6 +97,8 @@ const (
 	AssetTypeQlikSense                 = AssetType("qliksense")
 	AssetTypeQlikView                  = AssetType("qlikview")
 	AssetTypeQuicksight                = AssetType("quicksight")
+	AssetTypeQuicksightDashboard       = AssetType("quicksight.dashboard")
+	AssetTypeQuicksightDataset         = AssetType("quicksight.dataset")
 	AssetTypeR                         = AssetType("r")
 	AssetTypeRedash                    = AssetType("redash")
 	AssetTypeRedshiftQuery             = AssetType("rs.sql")
@@ -515,7 +518,7 @@ func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
 
 func (ccv *ColumnCheckValue) ToString() string {
 	if ccv.IntArray != nil {
-		var ints []string
+		ints := make([]string, 0, len(*ccv.IntArray))
 		for _, i := range *ccv.IntArray {
 			ints = append(ints, strconv.Itoa(i))
 		}
@@ -669,12 +672,15 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeOracleQuery:               "oracle",
 	AssetTypeOracleSource:              "oracle",
 	AssetTypeS3KeySensor:               "aws",
+	AssetTypeDynamoDB:                  "dynamodb",
 	AssetTypeElasticsearch:             "elasticsearch",
 	AssetTypeVerticaQuery:              "vertica",
 	AssetTypeVerticaSeed:               "vertica",
 	AssetTypeVerticaQuerySensor:        "vertica",
 	AssetTypeVerticaTableSensor:        "vertica",
 	AssetTypeVerticaSource:             "vertica",
+	AssetTypeQuicksightDataset:         "quicksight",
+	AssetTypeQuicksightDashboard:       "quicksight",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -690,6 +696,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"clickhouse":    AssetTypeClickHouse,
 	"oracle":        AssetTypeOracleQuery,
 	"motherduck":    AssetTypeMotherduckQuery,
+	"dynamodb":      AssetTypeDynamoDB,
 	"elasticsearch": AssetTypeElasticsearch,
 	"vertica":       AssetTypeVerticaQuery,
 }
@@ -1417,7 +1424,7 @@ func uniqueAssets(assets []*Asset) []*Asset {
 
 type EmptyStringMap map[string]string
 
-func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
+func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: staticcheck
 	if m == nil {
 		return []byte{'{', '}'}, nil
 	}
@@ -1540,6 +1547,7 @@ type Pipeline struct {
 	Tags               EmptyStringArray       `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	Domains            EmptyStringArray       `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
 	Meta               EmptyStringMap         `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
+	Owner              string                 `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
 	Schedule           Schedule               `json:"schedule" yaml:"schedule,omitempty" mapstructure:"schedule"`
 	StartDate          string                 `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
 	DefinitionFile     DefinitionFile         `json:"definition_file" yaml:"-"`
@@ -1624,12 +1632,13 @@ func (p *Pipeline) GetCompatibilityHash() string {
 	parts := make([]string, 0, len(p.Assets)+1)
 	parts = append(parts, p.Name)
 	for _, asset := range p.Assets {
-		assetPart := fmt.Sprintf(":%s{", asset.Name)
+		var assetBuilder strings.Builder
+		fmt.Fprintf(&assetBuilder, ":%s{", asset.Name)
 		for _, upstream := range asset.Upstreams {
-			assetPart += fmt.Sprintf(":%s:%s:", upstream.Value, upstream.Type)
+			fmt.Fprintf(&assetBuilder, ":%s:%s:", upstream.Value, upstream.Type)
 		}
-		assetPart += "}"
-		parts = append(parts, assetPart)
+		assetBuilder.WriteByte('}')
+		parts = append(parts, assetBuilder.String())
 	}
 	parts = append(parts, ":")
 	hash := sha256.New()
@@ -1640,7 +1649,7 @@ func (p *Pipeline) GetCompatibilityHash() string {
 func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
 	assetType := asset.Type
 	if assetType == AssetTypePython { //nolint
-		secretKeys := make([]string, 0)
+		secretKeys := make([]string, 0, len(asset.Secrets))
 		for _, secret := range asset.Secrets {
 			secretKeys = append(secretKeys, secret.SecretKey)
 		}
@@ -1695,13 +1704,16 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 
 	assetType := asset.Type
 	var ok bool
-	if assetType == AssetTypeIngestr {
+	switch assetType {
+	case AssetTypeIngestr:
 		assetType, ok = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
 		if !ok {
 			return "", errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", asset.Parameters["destination"])
 		}
-	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty {
+	case AssetTypePython, AssetTypeEmpty:
 		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
+	default:
+		// For all other asset types, use the asset type directly for connection mapping lookup.
 	}
 
 	mapping, ok := AssetTypeConnectionMapping[assetType]
@@ -2158,8 +2170,12 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 		task.Type = AssetTypeR
 	}
 
-	task.DefinitionFile.Name = filepath.Base(filePath)
-	task.DefinitionFile.Path = filePath
+	absPath, absErr := filepath.Abs(filePath)
+	if absErr != nil {
+		absPath = filePath
+	}
+	task.DefinitionFile.Name = filepath.Base(absPath)
+	task.DefinitionFile.Path = absPath
 	task.DefinitionFile.Type = CommentTask
 	if isSeparateDefinitionFile {
 		task.DefinitionFile.Type = YamlTask

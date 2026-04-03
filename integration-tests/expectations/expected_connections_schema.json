@@ -326,8 +326,16 @@
           },
           "type": "array",
           "default": [
+            "FabianoCaruana",
+            "Hikaru",
             "MagnusCarlsen",
-            "Hikaru"
+            "GothamChess",
+            "DanielNaroditsky",
+            "AnishGiri",
+            "Firouzja2003",
+            "LevonAronian",
+            "WesleySo",
+            "GarryKasparov"
           ]
         }
       },
@@ -568,6 +576,12 @@
           },
           "type": "array"
         },
+        "rabbitmq": {
+          "items": {
+            "$ref": "#/$defs/RabbitMQConnection"
+          },
+          "type": "array"
+        },
         "duckdb": {
           "items": {
             "$ref": "#/$defs/DuckDBConnection"
@@ -754,6 +768,12 @@
           },
           "type": "array"
         },
+        "posthog": {
+          "items": {
+            "$ref": "#/$defs/PosthogConnection"
+          },
+          "type": "array"
+        },
         "pinterest": {
           "items": {
             "$ref": "#/$defs/PinterestConnection"
@@ -898,6 +918,12 @@
           },
           "type": "array"
         },
+        "quicksight": {
+          "items": {
+            "$ref": "#/$defs/QuickSightConnection"
+          },
+          "type": "array"
+        },
         "trino": {
           "items": {
             "$ref": "#/$defs/TrinoConnection"
@@ -973,6 +999,12 @@
         "vertica": {
           "items": {
             "$ref": "#/$defs/VerticaConnection"
+          },
+          "type": "array"
+        },
+        "dune": {
+          "items": {
+            "$ref": "#/$defs/DuneConnection"
           },
           "type": "array"
         }
@@ -1241,6 +1273,22 @@
       "required": [
         "name",
         "path"
+      ]
+    },
+    "DuneConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "DynamoDBConnection": {
@@ -1602,11 +1650,28 @@
       ]
     },
     "GoogleAnalyticsConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "service_account_file"
+          ],
+          "title": "service_account_file"
+        },
+        {
+          "required": [
+            "service_account_json"
+          ],
+          "title": "service_account_json"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
         },
         "service_account_file": {
+          "type": "string"
+        },
+        "service_account_json": {
           "type": "string"
         },
         "property_id": {
@@ -1617,7 +1682,6 @@
       "type": "object",
       "required": [
         "name",
-        "service_account_file",
         "property_id"
       ]
     },
@@ -1909,6 +1973,39 @@
         "name",
         "bootstrap_servers",
         "group_id"
+      ]
+    },
+    "RabbitMQConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "vhost": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username",
+        "password"
       ]
     },
     "KinesisConnection": {
@@ -2435,6 +2532,29 @@
         "database"
       ]
     },
+    "PosthogConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "personal_api_key": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "personal_api_key",
+        "project_id"
+      ]
+    },
     "PrimerConnection": {
       "properties": {
         "name": {
@@ -2483,6 +2603,38 @@
         "client_id",
         "client_secret",
         "refresh_token"
+      ]
+    },
+    "QuickSightConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "aws_access_key_id": {
+          "type": "string"
+        },
+        "aws_secret_access_key": {
+          "type": "string"
+        },
+        "aws_session_token": {
+          "type": "string"
+        },
+        "aws_region": {
+          "type": "string"
+        },
+        "aws_account_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_session_token",
+        "aws_region",
+        "aws_account_id"
       ]
     },
     "RedshiftConnection": {

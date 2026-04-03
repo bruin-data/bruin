@@ -123,7 +123,7 @@ func AddConnection() *cli.Command {
 
 			// No flags provided: launch interactive TUI if in a terminal
 			if flagCount == 0 {
-				if term.IsTerminal(int(os.Stdin.Fd())) {
+				if term.IsTerminal(int(os.Stdin.Fd())) { //nolint:gosec // Fd() returns uintptr, safe to convert to int for terminal check
 					return runInteractiveAddConnection(c)
 				}
 				errorPrinter.Println("No flags provided and not running in a terminal. Use --environment, --name, --type, and --credentials flags.")

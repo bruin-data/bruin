@@ -45,14 +45,14 @@ claude doctor
 ## Usage
 
 ```bash
-bruin ai enhance [path to asset] [flags]
+bruin ai enhance [path to asset or pipeline] [flags]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `[path to asset]` | Path to a single asset file (e.g., `assets/my_asset.sql` or `assets/my_asset.asset.yml`). Required. |
+| `[path to asset or pipeline]` | Path to a single asset file (e.g., `assets/my_asset.sql` or `assets/my_asset.asset.yml`) or a pipeline directory. |
 
 ## Flags
 

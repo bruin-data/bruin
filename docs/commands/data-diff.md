@@ -38,7 +38,9 @@ table td:first-child {
 |------|------|---------|-------------|
 | `--connection`, `-c` | str | - | Name of the default connection to use when connection is not specified in table arguments |
 | `--tolerance`, `-t` | float | `0.001` | Tolerance percentage for considering values equal. Values with percentage difference below this threshold are considered equal |
-| `--config-file` | str | `.bruin.yml` | Optional path to the `.bruin.yml` configuration file . Other [secret backends](../secrets/overview.md) can be used.|
+| `--output`, `-o` | str | `plain` | Output format: `plain` for human-readable tables, `json` for machine-readable JSON. |
+| `--dry-run` | bool | `false` | Estimate the cost of the comparison without executing it (outputs JSON). Only supported for BigQuery connections. |
+| `--config-file` | str | - | Optional path to the `.bruin.yml` configuration file. Other [secret backends](../secrets/overview.md) can be used.|
 | `--full` | bool | `false` | Include detailed row counts and column statistics analysis in addition to schema comparison |
 | `--fail-if-diff` | bool | `false` | Return a non-zero exit code if differences are found |
 | `--target-dialect` | str | auto-detect | Target SQL dialect for ALTER TABLE statements (postgresql, snowflake, bigquery, duckdb, generic). Auto-detected from connection types if not specified |

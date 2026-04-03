@@ -30,7 +30,7 @@ Please see the installation instructions [here](https://getbruin.com/docs/bruin/
 Join our Slack community [here](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-3cymzktqu-bvFxPGyQHpvi~dok_W0L3w).
 
 <div style="margin-top: 24px;">
-  <a target="_blank" href="https://join.slack.com/t/bruindatacommunity/shared_invite/zt-3cc6e0hbr-zrW8nxxtEewahu2wIqTzYw" style="background:none">
+  <a target="_blank" href="https://join.slack.com/t/bruindatacommunity/shared_invite/zt-3cymzktqu-bvFxPGyQHpvi~dok_W0L3w" style="background:none">
     <img alt="Join Bruin Slack Community" src="https://img.shields.io/badge/slack-join-dlt.svg?color=d95f5f&logo=slack" style="width: 180px;"  />
   </a>
 </div>

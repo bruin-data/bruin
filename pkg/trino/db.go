@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	_ "github.com/trinodb/trino-go-client/trino"
@@ -141,4 +142,87 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	}
 
 	return result, nil
+}
+
+func toTrinoString(value any) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case []byte:
+		return string(v), true
+	case nil:
+		return "", false
+	default:
+		return "", false
+	}
+}
+
+func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	currentCatalogRows, err := c.Select(ctx, &query.Query{Query: "SELECT current_catalog"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve Trino catalog: %w", err)
+	}
+	if len(currentCatalogRows) == 0 {
+		return nil, errors.New("current_catalog returned no rows")
+	}
+	currentCatalog, ok := toTrinoString(currentCatalogRows[0][0])
+	if !ok {
+		return nil, errors.New("failed to parse current_catalog value")
+	}
+
+	tables, err := c.Select(ctx, &query.Query{Query: `
+SELECT table_schema, table_name, table_type
+FROM information_schema.tables
+WHERE table_schema <> 'information_schema'
+AND table_schema <> 'sys'
+`})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query information_schema.tables: %w", err)
+	}
+
+	summary := &ansisql.DBDatabase{
+		Name:    currentCatalog,
+		Schemas: []*ansisql.DBSchema{},
+	}
+	schemaCache := make(map[string]*ansisql.DBSchema)
+
+	for _, row := range tables {
+		if len(row) < 3 {
+			continue
+		}
+
+		schemaName, ok := toTrinoString(row[0])
+		if !ok {
+			continue
+		}
+		tableName, ok := toTrinoString(row[1])
+		if !ok {
+			continue
+		}
+		tableType, ok := toTrinoString(row[2])
+		if !ok {
+			continue
+		}
+
+		dbSchema, ok := schemaCache[schemaName]
+		if !ok {
+			dbSchema = &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+			schemaCache[schemaName] = dbSchema
+			summary.Schemas = append(summary.Schemas, dbSchema)
+		}
+
+		dbTableType := ansisql.DBTableTypeTable
+		if strings.EqualFold(tableType, "VIEW") || strings.EqualFold(tableType, "MATERIALIZED VIEW") {
+			dbTableType = ansisql.DBTableTypeView
+		}
+		dbSchema.Tables = append(dbSchema.Tables, &ansisql.DBTable{
+			Name: tableName,
+			Type: dbTableType,
+		})
+	}
+
+	return summary, nil
 }

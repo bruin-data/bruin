@@ -111,6 +111,11 @@ func Query() *cli.Command {
 				Name:  "description",
 				Usage: "if you are an AI agent, use this flag to describe why you ran the query",
 			},
+			&cli.StringSliceFlag{
+				Name:    "var",
+				Usage:   "set Jinja template variables for query rendering (e.g. --var key=value)",
+				Sources: cli.EnvVars("BRUIN_VARS"),
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
@@ -118,7 +123,12 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
-			connName, conn, queryStr, assetType, pipelineInfo, err := prepareQueryExecution(ctx, c, fs)
+			vars, err := parseQueryVars(c.StringSlice("var"))
+			if err != nil {
+				return handleError(c.String("output"), err)
+			}
+
+			connName, conn, queryStr, assetType, pipelineInfo, err := prepareQueryExecution(ctx, c, fs, vars)
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
@@ -309,7 +319,7 @@ func validateFlags(connection, query, asset string) error {
 
 	switch {
 	case hasConnection:
-		if !(hasConnection && hasQuery) {
+		if !hasConnection || !hasQuery {
 			return errors.New("direct query mode requires both --connection and --query flags")
 		}
 		if hasAsset {
@@ -330,7 +340,7 @@ func validateFlags(connection, query, asset string) error {
 	}
 }
 
-func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (string, interface{}, string, pipeline.AssetType, *ppInfo, error) {
+func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any) (string, interface{}, string, pipeline.AssetType, *ppInfo, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
@@ -343,10 +353,13 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 		return "", nil, "", "", nil, err
 	}
 
+	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, "your-pipeline-name", "your-run-id", nil)
+	for k, v := range vars {
+		renderer.SetContextValue(k, v)
+	}
 	extractor := &query.WholeFileExtractor{
-		Fs: fs,
-		// note: we don't support variables for now
-		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, "your-pipeline-name", "your-run-id", nil),
+		Fs:       fs,
+		Renderer: renderer,
 	}
 
 	// Direct query mode (no asset path)
@@ -373,15 +386,25 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 		fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
 		// Auto-detect mode (both asset path and query)
+		autoRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil)
+		for k, v := range vars {
+			autoRenderer.SetContextValue(k, v)
+		}
 		extractor = &query.WholeFileExtractor{
-			Fs: fs,
-			// note: we don't support variables for now
-			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
+			Fs:       fs,
+			Renderer: autoRenderer,
 		}
 
 		newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
 		if err != nil {
 			return "", nil, "", "", nil, errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+		}
+		if clonedRenderer, ok := newExtractor.(*query.WholeFileExtractor); ok {
+			if r, ok := clonedRenderer.Renderer.(*jinja.Renderer); ok {
+				for k, v := range vars {
+					r.SetContextValue(k, v)
+				}
+			}
 		}
 
 		connName, conn, err := getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
@@ -407,14 +430,24 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (st
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 	fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
+	assetRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil)
+	for k, v := range vars {
+		assetRenderer.SetContextValue(k, v)
+	}
 	extractor = &query.WholeFileExtractor{
-		Fs: fs,
-		// note: we don't support variables for now
-		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
+		Fs:       fs,
+		Renderer: assetRenderer,
 	}
 	newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
 	if err != nil {
 		return "", nil, "", "", nil, errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+	}
+	if clonedRenderer, ok := newExtractor.(*query.WholeFileExtractor); ok {
+		if r, ok := clonedRenderer.Renderer.(*jinja.Renderer); ok {
+			for k, v := range vars {
+				r.SetContextValue(k, v)
+			}
+		}
 	}
 	// Verify that the asset is a SQL asset
 	if !pipelineInfo.Asset.IsSQLAsset() {
@@ -894,6 +927,26 @@ func formatBigRatAsDecimal(rat *big.Rat) string {
 
 	// BigQuery NUMERIC/BIGNUMERIC scale is up to 38 decimal points.
 	return trimDecimalString(rat.FloatString(38))
+}
+
+// parseQueryVars parses --var flags into a map of string values.
+// Values are always treated as literal strings, matching how pipeline variables work in YAML.
+func parseQueryVars(rawVars []string) (map[string]any, error) {
+	vars := make(map[string]any)
+
+	for _, v := range rawVars {
+		parts := strings.SplitN(v, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid variable %q: must be in key=value format", v)
+		}
+		key := strings.TrimSpace(parts[0])
+		if key == "" {
+			return nil, fmt.Errorf("invalid variable %q: key must not be empty", v)
+		}
+		vars[key] = strings.TrimSpace(parts[1])
+	}
+
+	return vars, nil
 }
 
 func trimDecimalString(value string) string {
