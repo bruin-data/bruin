@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/gong"
 	logger2 "github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -61,6 +62,7 @@ func NewLocalOperator(config config.ConnectionAndDetailsGetter, envVariables map
 			Cmd:         cmdRunner,
 			UvInstaller: &UvChecker{},
 			conn:        config,
+			Gong:        &gong.Checker{},
 		},
 		envVariables: envVariables,
 		config:       config,
