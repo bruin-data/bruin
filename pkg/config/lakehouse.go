@@ -82,8 +82,9 @@ func (c CatalogConfig) IsZero() bool {
 type StorageType string
 
 const (
-	StorageTypeS3 StorageType = "s3"
-	// Future: StorageTypeGCS, StorageTypeLocal.
+	StorageTypeS3  StorageType = "s3"
+	StorageTypeGCS StorageType = "gcs"
+	// Future: StorageTypeLocal.
 )
 
 var (
@@ -95,17 +96,22 @@ var (
 	}
 	supportedStorageTypes = []StorageType{
 		StorageTypeS3,
+		StorageTypeGCS,
 	}
 )
 
 type StorageAuth struct {
-	// AWS S3 credentials
+	// S3/GCS HMAC-style credentials
 	AccessKey    string `yaml:"access_key,omitempty" json:"access_key,omitempty" mapstructure:"access_key"`
 	SecretKey    string `yaml:"secret_key,omitempty" json:"secret_key,omitempty" mapstructure:"secret_key"`
 	SessionToken string `yaml:"session_token,omitempty" json:"session_token,omitempty" mapstructure:"session_token"`
 }
 
 func (a StorageAuth) IsS3() bool {
+	return a.AccessKey != "" && a.SecretKey != ""
+}
+
+func (a StorageAuth) IsGCS() bool {
 	return a.AccessKey != "" && a.SecretKey != ""
 }
 
@@ -162,7 +168,7 @@ func (lh *LakehouseConfig) Validate() error {
 
 	// Validate storage type if specified
 	if lh.Storage.Type == "" || !slices.Contains(supportedStorageTypes, lh.Storage.Type) {
-		return errors.New("empty or unsupported storage type: (supported: s3)")
+		return errors.New("empty or unsupported storage type: (supported: s3, gcs)")
 	}
 
 	return nil
