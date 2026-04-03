@@ -752,9 +752,13 @@ def is_pandas_dataframe(obj):
 # Polars DataFrames are Arrow-native and can write IPC files directly,
 # avoiding the intermediate PyArrow Table copy that doubles memory usage.
 if is_polars_dataframe(df):
+    if pl is None:
+        raise TypeError(f"Polars DataFrame detected but polars cannot be imported: {type(df)}")
     df.write_ipc("$ARROW_FILE_PATH")
 else:
     if is_pandas_dataframe(df):
+        if pd is None:
+            raise TypeError(f"Pandas DataFrame detected but pandas cannot be imported: {type(df)}")
         table = pa.Table.from_pandas(df)
     elif isinstance(df, (list, tuple)):
         table = pa.Table.from_pylist(list(df))
