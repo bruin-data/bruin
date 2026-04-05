@@ -1,3 +1,4 @@
+//nolint:ireturn
 package duck
 
 import (
@@ -5,17 +6,111 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type scanFailingRows struct {
+	nextCalled bool
+}
+
+func (r *scanFailingRows) Close() error {
+	return nil
+}
+
+func (r *scanFailingRows) Columns() ([]string, error) {
+	return []string{"result"}, nil
+}
+
+func (r *scanFailingRows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return []*sql.ColumnType{{}}, nil
+}
+
+func (r *scanFailingRows) Err() error {
+	return nil
+}
+
+func (r *scanFailingRows) Next() bool {
+	if r.nextCalled {
+		return false
+	}
+	r.nextCalled = true
+	return true
+}
+
+func (r *scanFailingRows) Scan(dest ...any) error {
+	return errors.New("Not Implemented: not yet implemented populating from columns of type list<l: utf8, nullable>")
+}
+
+type castedStringRows struct {
+	nextCalled bool
+}
+
+func (r *castedStringRows) Close() error {
+	return nil
+}
+
+func (r *castedStringRows) Columns() ([]string, error) {
+	return []string{"result"}, nil
+}
+
+func (r *castedStringRows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return []*sql.ColumnType{{}}, nil
+}
+
+func (r *castedStringRows) Err() error {
+	return nil
+}
+
+func (r *castedStringRows) Next() bool {
+	if r.nextCalled {
+		return false
+	}
+	r.nextCalled = true
+	return true
+}
+
+func (r *castedStringRows) Scan(dest ...any) error {
+	ptr, ok := dest[0].(*interface{})
+	if !ok {
+		return errors.New("unexpected scan destination type")
+	}
+	*ptr = "main"
+	return nil
+}
+
+type listScanErrorThenCastConnection struct {
+	queries []string
+}
+
+//nolint:ireturn
+func (c *listScanErrorThenCastConnection) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
+	c.queries = append(c.queries, query)
+	if len(c.queries) == 1 {
+		return &scanFailingRows{}, nil
+	}
+	return &castedStringRows{}, nil
+}
+
+func (c *listScanErrorThenCastConnection) ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error) {
+	return nil, errors.New("not implemented")
+}
+
+//nolint:ireturn
+func (c *listScanErrorThenCastConnection) QueryRowContext(ctx context.Context, query string, args ...any) Row {
+	return nil
+}
 
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
@@ -208,6 +303,153 @@ func TestDB_SelectWithSchema(t *testing.T) {
 	}
 }
 
+func TestDB_SelectWithSchema_ListColumnScanErrorFallsBackToCastedQuery(t *testing.T) {
+	t.Parallel()
+
+	conn := &listScanErrorThenCastConnection{}
+	db := Client{
+		connection: conn,
+		config:     Config{Path: "some/path.db"},
+	}
+
+	result, err := db.SelectWithSchema(t.Context(), &query.Query{Query: "SHOW;"})
+	require.NoError(t, err)
+	require.Equal(t, []string{"result"}, result.Columns)
+	require.Equal(t, []string{"VARCHAR"}, result.ColumnTypes)
+	require.Equal(t, [][]interface{}{{"main"}}, result.Rows)
+	require.Len(t, conn.queries, 2)
+	require.Equal(t, "SHOW;", conn.queries[0])
+	assert.Contains(t, conn.queries[1], `CAST("result" AS VARCHAR) AS "result"`)
+}
+
+func TestDB_Select_ListColumnScanErrorFallsBackToCastedQuery(t *testing.T) {
+	t.Parallel()
+
+	conn := &listScanErrorThenCastConnection{}
+	db := Client{
+		connection: conn,
+		config:     Config{Path: "some/path.db"},
+	}
+
+	rows, err := db.Select(t.Context(), &query.Query{Query: "SHOW;"})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{"main"}}, rows)
+	require.Len(t, conn.queries, 2)
+	require.Equal(t, "SHOW;", conn.queries[0])
+	assert.Contains(t, conn.queries[1], `CAST("result" AS VARCHAR) AS "result"`)
+}
+
+func TestEphemeralConnection_QueryContext_SHOW_UsesBufferedFallbackForListColumns(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip()
+	}
+
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "ephemeral-show-proof.db")
+
+	client, err := NewClient(Config{Path: path})
+	require.NoError(t, err)
+	err = client.RunQueryWithoutResult(ctx, &query.Query{Query: "CREATE TABLE t1 (id INT);"})
+	require.NoError(t, err)
+
+	ephemeral, err := NewEphemeralConnection(Config{Path: path})
+	require.NoError(t, err)
+
+	rows, err := ephemeral.QueryContext(ctx, "SHOW;")
+	require.NoError(t, err)
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	require.NoError(t, err)
+	require.NotEmpty(t, columns)
+
+	columnTypes, err := rows.ColumnTypes()
+	require.NoError(t, err)
+	require.NotEmpty(t, columnTypes)
+
+	foundTable := false
+	foundListMetadata := false
+	for rows.Next() {
+		scanned := make([]interface{}, len(columns))
+		ptrs := make([]interface{}, len(columns))
+		for i := range scanned {
+			ptrs[i] = &scanned[i]
+		}
+		require.NoError(t, rows.Scan(ptrs...))
+
+		for _, v := range scanned {
+			strVal, ok := v.(string)
+			if !ok {
+				continue
+			}
+			if strVal == "t1" {
+				foundTable = true
+			}
+			if strVal == "[id]" {
+				foundListMetadata = true
+			}
+		}
+	}
+
+	require.NoError(t, rows.Err())
+	assert.True(t, foundTable, "expected SHOW output to include created table")
+	assert.True(t, foundListMetadata, "expected SHOW output to include list metadata serialized as string")
+}
+
+func TestIsUnsupportedComplexTypeScanError_MatchesDriverMessage(t *testing.T) {
+	t.Parallel()
+
+	t.Run("typed adbc error", func(t *testing.T) {
+		t.Parallel()
+		e := &adbc.Error{
+			Code: adbc.StatusNotImplemented,
+			Msg:  "not yet implemented populating from columns of type list<l: utf8, nullable>",
+		}
+		assert.True(t, isUnsupportedComplexTypeScanError(e))
+	})
+
+	t.Run("wrapped typed adbc error", func(t *testing.T) {
+		t.Parallel()
+		e := fmt.Errorf("wrapped: %w", &adbc.Error{
+			Code: adbc.StatusNotImplemented,
+			Msg:  "not yet implemented populating from columns of type struct<a: utf8>",
+		})
+		assert.True(t, isUnsupportedComplexTypeScanError(e))
+	})
+
+	t.Run("fallback string matching", func(t *testing.T) {
+		t.Parallel()
+		e := errors.New("Not Implemented: not yet implemented populating from columns of type map<k: utf8, v: int64>")
+		assert.True(t, isUnsupportedComplexTypeScanError(e))
+	})
+
+	t.Run("typed error with different status", func(t *testing.T) {
+		t.Parallel()
+		e := &adbc.Error{
+			Code: adbc.StatusInvalidArgument,
+			Msg:  "not yet implemented populating from columns of type list<l: utf8, nullable>",
+		}
+		assert.False(t, isUnsupportedComplexTypeScanError(e))
+	})
+}
+
+func TestClient_SelectWithSchema_SHOW_AfterCreateTable(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip()
+	}
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "proof.db")
+	c, err := NewClient(Config{Path: path})
+	require.NoError(t, err)
+	err = c.RunQueryWithoutResult(ctx, &query.Query{Query: "CREATE TABLE t1 (id INT);"})
+	require.NoError(t, err)
+	res, err := c.SelectWithSchema(ctx, &query.Query{Query: "SHOW;"})
+	require.NoError(t, err)
+	require.NotEmpty(t, res.Rows)
+}
+
 func TestClient_GetDatabaseSummary(t *testing.T) {
 	t.Parallel()
 
@@ -322,7 +564,6 @@ func (d *delayedConnection) ExecContext(_ context.Context, _ string, _ ...any) (
 	return driver.RowsAffected(0), nil
 }
 
-//nolint:ireturn
 //nolint:ireturn
 func (d *delayedConnection) QueryRowContext(_ context.Context, _ string, _ ...any) Row {
 	time.Sleep(d.delay)

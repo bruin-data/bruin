@@ -1,0 +1,4 @@
+name: duckdb_query_show
+
+default_connections:
+  duckdb: duckdb-show-query

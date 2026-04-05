@@ -202,6 +202,17 @@
       },
       "schema_prefix": ""
     },
+    "env-duckdb-show-query": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-show-query",
+            "path": "duckdb-files/show-query-test.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-ingestr": {
       "connections": {
         "duckdb": [
