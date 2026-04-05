@@ -516,15 +516,15 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		return err
 	}
 
-	// Step 3: Validate
+	// Step 3: Validate syntax
 	if tui != nil {
 		tui.SetStep(tuiKey, "validating")
 	} else if output != "json" {
-		infoPrinter.Printf("[%s] Step 3/3: Validating asset...\n", logPrefix)
+		infoPrinter.Printf("[%s] Step 3/4: Validating asset syntax...\n", logPrefix)
 	}
 	validateCmd := Lint(isDebug)
 	args := []string{"validate", absAssetPath}
-	if env := c.String("environment"); env != "" {
+	if env != "" {
 		args = append(args, "--environment", env)
 	}
 
@@ -534,6 +534,40 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 			return errors.Wrap(writeErr, fmt.Sprintf("validation failed and failed to restore original file: %v", err))
 		}
 		return errors.Wrap(err, "validation failed, original file restored")
+	}
+
+	// Step 4: Run quality checks against real data
+	// Reload the asset to get the updated checks after AI enhancement
+	pp, err = GetPipelineAndAsset(ctx, assetPath, fs, "")
+	if err != nil {
+		if writeErr := afero.WriteFile(fs, absAssetPath, originalContent, 0o644); writeErr != nil {
+			return errors.Wrap(writeErr, fmt.Sprintf("failed to reload asset and failed to restore original file: %v", err))
+		}
+		return errors.Wrap(err, "failed to reload asset after validation, original file restored")
+	}
+
+	// Only run quality checks if the asset has quality checks defined
+	if pp.Asset.CheckCount() > 0 {
+		if tui != nil {
+			tui.SetStep(tuiKey, "running checks")
+		} else if output != "json" {
+			infoPrinter.Printf("[%s] Step 4/4: Running quality checks against data...\n", logPrefix)
+		}
+
+		runCmd := Run(isDebug)
+		runArgs := []string{"run", "--only", "checks", absAssetPath}
+		if env != "" {
+			runArgs = append(runArgs, "--environment", env)
+		}
+
+		if err := runCmd.Run(ctx, runArgs); err != nil {
+			if writeErr := afero.WriteFile(fs, absAssetPath, originalContent, 0o644); writeErr != nil {
+				return errors.Wrap(writeErr, fmt.Sprintf("quality checks failed and failed to restore original file: %v", err))
+			}
+			return errors.Wrap(err, "quality checks failed against data, original file restored")
+		}
+	} else if !quiet && output != "json" {
+		infoPrinter.Printf("[%s] Step 4/4: Skipping quality checks (no checks defined)\n", logPrefix)
 	}
 
 	// Display results (only when not using TUI — TUI caller handles output)
