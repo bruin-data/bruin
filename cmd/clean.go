@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
@@ -73,6 +75,8 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 		return errors.Wrap(err, "failed to recreate the home directory")
 	}
 
+	r.cleanOrphanTempFiles()
+
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
@@ -103,6 +107,43 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 	infoPrinter.Printf("Successfully removed %d log files.\n", len(contents))
 
 	return nil
+}
+
+// cleanOrphanTempFiles removes leftover temp files from crashed Python materialization runs.
+// Files newer than 1 hour are skipped to avoid interfering with running processes.
+func (r *CleanCommand) cleanOrphanTempFiles() {
+	tmpDir := os.TempDir()
+	patterns := []string{
+		filepath.Join(tmpDir, python.TempArrowFilePrefix+"*.arrow"),
+		filepath.Join(tmpDir, python.TempArrowScriptPrefix+"*.py"),
+	}
+
+	cutoff := time.Now().Add(-1 * time.Hour)
+	var removed int
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, f := range matches {
+			info, err := os.Stat(f)
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(cutoff) {
+				continue
+			}
+			if err := os.Remove(f); err == nil {
+				removed++
+			} else {
+				r.errorPrinter.Printf("Warning: could not remove %s: %v\n", f, err)
+			}
+		}
+	}
+
+	if removed > 0 {
+		r.infoPrinter.Printf("Removed %d orphan temp file(s) from %s.\n", removed, tmpDir)
+	}
 }
 
 func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
