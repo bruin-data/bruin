@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
+	"github.com/snowflakedb/gosnowflake"
 )
 
 type materializer interface {
@@ -132,6 +133,25 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		if err != nil {
 			return err
 		}
+	}
+
+	tagFields := map[string]interface{}{
+		"asset_name": t.Name,
+		"type":       "main",
+		"pipeline":   p.Name,
+	}
+	for k, v := range t.Meta {
+		tagFields[k] = v
+	}
+	if len(t.Tags) > 0 {
+		tagFields["tags"] = t.Tags
+	}
+	queryTag, err := ansisql.BuildAnnotationJSON(ctx, tagFields)
+	if err != nil {
+		return errors.Wrap(err, "failed to build annotation query tag")
+	}
+	if queryTag != "" {
+		ctx = gosnowflake.WithQueryTag(ctx, queryTag)
 	}
 
 	if o.devEnv == nil {

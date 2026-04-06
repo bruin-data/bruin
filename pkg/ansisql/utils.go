@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -18,115 +19,73 @@ const (
 	QueryLogCharacterLimit  = 10000
 )
 
-func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) (*query.Query, error) {
+// BuildAnnotationJSON builds the annotation JSON string by merging standard fields
+// with any user-provided annotations from the context. Returns empty string if
+// annotations are not enabled.
+func BuildAnnotationJSON(ctx context.Context, fields map[string]interface{}) (string, error) {
 	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
 	if !ok || annotations == "" {
-		return q, nil
+		return "", nil
 	}
+
 	userAnnotations := make(map[string]interface{})
-	// If not "default", try to parse as JSON
 	if annotations != DefaultQueryAnnotations {
 		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
-			return nil, errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
+			return "", errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
 		}
 	}
 
-	finalAnnotations := map[string]interface{}{
-		"asset":    assetName,
-		"type":     taskType,
-		"pipeline": pipelineName,
-	}
-
-	for k, v := range userAnnotations {
-		finalAnnotations[k] = v
-	}
+	finalAnnotations := make(map[string]interface{}, len(fields)+len(userAnnotations))
+	maps.Copy(finalAnnotations, fields)
+	maps.Copy(finalAnnotations, userAnnotations)
 
 	finalJSON, err := json.Marshal(finalAnnotations)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal final annotations")
+		return "", errors.Wrap(err, "failed to marshal final annotations")
 	}
 
-	comment := fmt.Sprintf("-- @bruin.config: %s\n", string(finalJSON))
+	return string(finalJSON), nil
+}
 
-	// Return a new query with the annotation prepended
+func prependAnnotationComment(ctx context.Context, q *query.Query, fields map[string]interface{}) (*query.Query, error) {
+	jsonStr, err := BuildAnnotationJSON(ctx, fields)
+	if err != nil {
+		return nil, err
+	}
+	if jsonStr == "" {
+		return q, nil
+	}
+
 	return &query.Query{
-		Query: comment + q.Query,
+		Query: fmt.Sprintf("-- @bruin.config: %s\n", jsonStr) + q.Query,
 	}, nil
 }
 
-func AddColumnCheckAnnotationComment(ctx context.Context, q *query.Query, assetName, columnName, checkType, pipelineName string) (*query.Query, error) {
-	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
-	if !ok || annotations == "" {
-		return q, nil
-	}
-	userAnnotations := make(map[string]interface{})
-	// If not "default", try to parse as JSON
-	if annotations != DefaultQueryAnnotations {
-		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
-			return nil, errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
-		}
-	}
+func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskType, pipelineName string) (*query.Query, error) {
+	return prependAnnotationComment(ctx, q, map[string]interface{}{
+		"asset":    assetName,
+		"type":     taskType,
+		"pipeline": pipelineName,
+	})
+}
 
-	finalAnnotations := map[string]interface{}{
+func AddColumnCheckAnnotationComment(ctx context.Context, q *query.Query, assetName, columnName, checkType, pipelineName string) (*query.Query, error) {
+	return prependAnnotationComment(ctx, q, map[string]interface{}{
 		"asset_name":        assetName,
 		"column_name":       columnName,
 		"type":              "column_check",
 		"column_check_type": checkType,
 		"pipeline":          pipelineName,
-	}
-
-	for k, v := range userAnnotations {
-		finalAnnotations[k] = v
-	}
-
-	finalJSON, err := json.Marshal(finalAnnotations)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal final annotations")
-	}
-
-	comment := fmt.Sprintf("-- @bruin.config: %s\n", string(finalJSON))
-
-	// Return a new query with the annotation prepended
-	return &query.Query{
-		Query: comment + q.Query,
-	}, nil
+	})
 }
 
 func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetName, checkName, pipelineName string) (*query.Query, error) {
-	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
-	if !ok || annotations == "" {
-		return q, nil
-	}
-	userAnnotations := make(map[string]interface{})
-	// If not "default", try to parse as JSON
-	if annotations != DefaultQueryAnnotations {
-		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
-			return nil, errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
-		}
-	}
-
-	finalAnnotations := map[string]interface{}{
+	return prependAnnotationComment(ctx, q, map[string]interface{}{
 		"asset_name":        assetName,
 		"type":              "custom_check",
 		"custom_check_name": checkName,
 		"pipeline":          pipelineName,
-	}
-
-	for k, v := range userAnnotations {
-		finalAnnotations[k] = v
-	}
-
-	finalJSON, err := json.Marshal(finalAnnotations)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal final annotations")
-	}
-
-	comment := fmt.Sprintf("-- @bruin.config: %s\n", string(finalJSON))
-
-	// Return a new query with the annotation prepended
-	return &query.Query{
-		Query: comment + q.Query,
-	}, nil
+	})
 }
 
 // AddAgentIDAnnotationComment adds an agent ID annotation comment to the query.
