@@ -43,6 +43,8 @@ tags:
 
 ### Amazon QuickSight
 
+QuickSight assets allow you to both define and refresh QuickSight SPICE datasets, and represent dashboards for lineage tracking. Please see the [QuickSight assets](./quicksight-refresh) for more information.
+
 ```yaml
 name: myschema.asset_name
 type: quicksight
