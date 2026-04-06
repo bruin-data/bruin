@@ -1,12 +1,13 @@
 # `import` Command
 
-The `import` commands allow you to automatically import existing resources from your data warehouse as Bruin assets. This includes database tables, BigQuery scheduled queries, and Tableau dashboards.
+The `import` commands allow you to automatically import existing resources from your data warehouse as Bruin assets. This includes database tables, BigQuery scheduled queries, Tableau dashboards, and QuickSight assets.
 
 ## Available Subcommands
 
 - `bruin import database` - Import database tables as Bruin assets
 - `bruin import bq-scheduled-queries` - Import BigQuery scheduled queries as Bruin assets
 - `bruin import tableau` - Import Tableau dashboards, workbooks, and data sources as Bruin assets
+- `bruin import quicksight` - Import QuickSight datasets and dashboards as Bruin assets
 
 ---
 
@@ -594,3 +595,218 @@ Common issues and solutions:
 - [`bruin run`](./run.md) - Execute the imported Tableau assets
 - [`bruin validate`](./validate.md) - Validate the imported pipeline structure
 - [Tableau Asset Documentation](../assets/tableau-refresh.md) - Learn about Tableau asset types and refresh capabilities
+
+---
+
+## `import quicksight`
+
+Import Amazon QuickSight datasets and dashboards as Bruin assets with automatic dependency detection, column metadata, and chart-level details.
+
+```bash
+bruin import quicksight [FLAGS] [pipeline path]
+```
+
+### Overview
+
+The QuickSight import command enables you to:
+
+- Connect to AWS QuickSight using your configured credentials
+- Automatically discover all datasets and dashboards
+- Present an interactive terminal UI for selecting which assets to import
+- Create dependency relationships between dashboards and datasets
+- Preserve column definitions and upstream warehouse table references for datasets
+- Extract chart-level metadata (dimensions, metrics, chart types) for dashboards
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `pipeline path` | **Required.** Path to the directory where the pipeline and imported QuickSight assets will be created. |
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--connection`, `-c` | string | - | **Required.** Name of the QuickSight connection to use as defined in `.bruin.yml` |
+| `--environment`, `--env` | string | - | Target environment name as defined in `.bruin.yml` |
+| `--config-file` | string | - | Path to the `.bruin.yml` file. Can also be set via `BRUIN_CONFIG_FILE` environment variable |
+| `--all`, `-a` | bool | `false` | Import all assets without interactive selection |
+
+### Interactive UI Features
+
+When run without the `--all` flag, the command presents an interactive terminal UI where you can:
+
+- **Navigate** with arrow keys or `j`/`k`
+- **Select/deselect** items with space bar
+- **Select all** with `a`, **deselect all** with `n`
+- **Filter** assets by typing
+- **Import selected** assets with Enter
+- **Quit** without importing with `q` or Esc
+
+### How It Works
+
+1. **Authentication**: Uses your QuickSight AWS credentials from `.bruin.yml`
+2. **Discovery Phase**: Fetches all datasets and dashboards in parallel
+3. **Detail Fetching**: Retrieves detailed metadata for selected assets using up to 10 concurrent workers
+4. **Asset Generation**:
+   - Creates dataset assets with column definitions and upstream table dependencies
+   - Creates dashboard assets with chart-level metadata and dataset dependencies
+5. **Name Sanitization**: Asset names are automatically sanitized (spaces, dashes, and special characters replaced with underscores)
+
+### Examples
+
+#### Basic Import (Interactive)
+
+Import QuickSight assets with interactive selection:
+
+```bash
+bruin import quicksight ./my-pipeline --connection quicksight-prod
+```
+
+#### Import All Assets
+
+Import all datasets and dashboards without interactive selection:
+
+```bash
+bruin import quicksight ./my-pipeline --connection quicksight-prod --all
+```
+
+#### Environment-Specific Import
+
+Import using a specific environment configuration:
+
+```bash
+bruin import quicksight ./my-pipeline --connection quicksight-prod --env production
+```
+
+### Generated Asset Structure
+
+The import command creates a structured folder hierarchy under your pipeline:
+
+```text
+assets/
+└── quicksight/
+    ├── datasets/
+    │   ├── dataset_issues_custom_sql.asset.yml
+    │   └── dataset_sales.asset.yml
+    └── dashboards/
+        ├── dashboard_test.asset.yml
+        └── dashboard_analytics.asset.yml
+```
+
+#### Dataset Asset Example
+
+```yaml
+name: quicksight.datasets.dataset_issues_custom_sql
+type: quicksight.dataset
+description: 'QuickSight dataset: issues_custom_sql'
+
+parameters:
+  dataset_id: 23e4f645-9837-4e73-ad15-04ccd4baa400
+  dataset_name: issues_custom_sql
+  import_mode: SPICE
+  refresh: "false"
+  custom_sql: "select * from issues where true limit 50"
+
+columns:
+  - name: id
+    type: STRING
+  - name: title
+    type: STRING
+  - name: description
+    type: STRING
+```
+
+#### Dashboard Asset Example
+
+```yaml
+name: quicksight.dashboards.dashboard_test
+type: quicksight.dashboard
+description: 'QuickSight dashboard: test'
+
+depends:
+  - quicksight.datasets.dataset_issues
+
+parameters:
+  chart_count: "2"
+  charts[0].dimensions: id
+  charts[0].metrics: labels
+  charts[0].name: BarChart_0
+  charts[0].type: BarChart
+  charts[1].dimensions: assignee_id
+  charts[1].metrics: branch_name
+  charts[1].name: BarChart_1
+  charts[1].type: BarChart
+  dashboard_id: 77f8aa6a-de1c-4cb8-8323-856275b35096
+  dashboard_name: test
+
+columns:
+  - name: id
+    type: STRING
+  - name: labels
+    type: FLOAT
+  - name: assignee_id
+    type: STRING
+  - name: branch_name
+    type: FLOAT
+```
+
+### Key Features
+
+#### Automatic Dependency Detection
+
+The importer automatically identifies which datasets each dashboard depends on using dataset ARNs, and creates proper dependency chains in the generated assets.
+
+#### Column Metadata
+
+Dataset assets include column definitions with type mapping:
+- `STRING` → `STRING`
+- `INTEGER` → `INTEGER`
+- `DECIMAL` → `FLOAT`
+- `DATETIME` → `TIMESTAMP`
+
+Dashboard assets include columns derived from chart dimensions (as `STRING`) and metrics (as `FLOAT`).
+
+#### Chart-Level Metadata
+
+Dashboard assets capture detailed chart information including chart type, dimensions, and metrics, enabling full lineage tracking from warehouse tables through datasets to dashboard visualizations.
+
+#### Upstream Table References
+
+For datasets backed by relational tables, the importer automatically creates upstream dependencies to the source warehouse tables in `schema.table` format.
+
+### Prerequisites
+
+1. **QuickSight Connection**: A QuickSight connection must be configured in `.bruin.yml` with AWS credentials
+2. **Permissions**: Your AWS credentials must have permissions to:
+   - `quicksight:ListDataSets` and `quicksight:DescribeDataSet`
+   - `quicksight:ListDashboards`, `quicksight:DescribeDashboard`, and `quicksight:DescribeDashboardDefinition`
+   - `quicksight:ListDataSources`
+3. **Pipeline Directory**: The target pipeline path must exist
+
+### Error Handling
+
+The import process is resilient to partial failures:
+
+- **Missing Details**: If details can't be fetched for a dataset or dashboard, it is skipped with a warning
+- **Existing Assets**: Assets that already exist in the pipeline are skipped automatically
+- **Name Conflicts**: Sanitization ensures valid filesystem names
+
+Common issues and solutions:
+
+- **Authentication Failed**: Verify your AWS credentials are valid
+- **No Assets Found**: Check that your AWS account has QuickSight datasets or dashboards
+- **Connection Type Mismatch**: Ensure the connection is configured as a QuickSight type
+
+### Best Practices
+
+1. **Review Generated Assets**: After import, review the generated structure and customize as needed
+2. **Enable Refresh Selectively**: Imported datasets have `refresh: "false"` by default — set to `"true"` only for datasets you want to refresh from your pipeline
+3. **Incremental Updates**: Re-running import will skip existing assets; delete the asset file first to re-import
+4. **Validate After Import**: Run `bruin validate` after import to ensure all asset names and dependencies are valid
+
+### Related Commands
+
+- [`bruin run`](./run.md) - Execute the imported QuickSight assets
+- [`bruin validate`](./validate.md) - Validate the imported pipeline structure
+- [QuickSight Asset Documentation](../assets/quicksight-refresh.md) - Learn about QuickSight asset types and refresh capabilities
