@@ -18,6 +18,14 @@ var (
 	telemetryKey string
 )
 
+func init() { //nolint:gochecknoinits
+	// Disable the Snowflake driver's platform detection which runs in a background goroutine on import.
+	// It tries to contact EC2 IMDS, Azure, and GCP metadata services, producing noisy warnings on non-cloud machines.
+	if os.Getenv("SNOWFLAKE_DISABLE_PLATFORM_DETECTION") == "" {
+		os.Setenv("SNOWFLAKE_DISABLE_PLATFORM_DETECTION", "true")
+	}
+}
+
 func main() {
 	isDebug := false
 	color.NoColor = false
