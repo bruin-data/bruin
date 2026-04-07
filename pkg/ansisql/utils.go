@@ -71,6 +71,7 @@ func AddAnnotationComment(ctx context.Context, q *query.Query, assetName, taskTy
 
 func AddColumnCheckAnnotationComment(ctx context.Context, q *query.Query, assetName, columnName, checkType, pipelineName string) (*query.Query, error) {
 	return prependAnnotationComment(ctx, q, map[string]interface{}{
+		"asset":             assetName,
 		"asset_name":        assetName,
 		"column_name":       columnName,
 		"type":              "column_check",
@@ -81,6 +82,7 @@ func AddColumnCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 
 func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetName, checkName, pipelineName string) (*query.Query, error) {
 	return prependAnnotationComment(ctx, q, map[string]interface{}{
+		"asset":             assetName,
 		"asset_name":        assetName,
 		"type":              "custom_check",
 		"custom_check_name": checkName,
