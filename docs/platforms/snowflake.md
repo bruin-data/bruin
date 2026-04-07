@@ -116,6 +116,62 @@ In your `.bruin.yml` file, update the Snowflake connection configuration to incl
 
 For more details on how to set up key-based authentication, see [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair).
 
+## Query Tags
+
+Bruin automatically sets Snowflake's [`QUERY_TAG`](https://docs.snowflake.com/en/sql-reference/parameters#query-tag) on every query it executes when the `--query-annotations` flag is enabled. This makes it easy to trace queries back to their source asset and pipeline in Snowflake's `QUERY_HISTORY`.
+
+The tag is a JSON string containing:
+
+| Field      | Description                          |
+|------------|--------------------------------------|
+| `asset`    | The name of the asset being executed |
+| `type`     | The query type, e.g. `main`         |
+| `pipeline` | The pipeline the asset belongs to    |
+
+### Adding custom metadata to query tags
+
+You can include your own key-value pairs in the query tag by using the `tags` and `meta` fields on the asset definition. The `meta` fields are merged directly into the tag JSON, and `tags` is included as an array.
+
+```bruin-sql
+/* @bruin
+name: events.install
+type: sf.sql
+materialization:
+    type: table
+
+tags:
+  - production
+  - critical
+
+meta:
+  owner: data-team
+  cost-center: engineering
+@bruin */
+
+select user_id, ts, platform, country
+from analytics.events
+where event_name = "install"
+```
+
+This produces a query tag like:
+
+```json
+{"asset":"events.install","type":"main","pipeline":"my_pipeline","owner":"data-team","cost-center":"engineering","tags":["production","critical"]}
+```
+
+You can query these tags in Snowflake:
+
+```sql
+select
+    query_id,
+    parse_json(query_tag):asset::string as asset,
+    parse_json(query_tag):pipeline::string as pipeline,
+    parse_json(query_tag):owner::string as owner
+from table(information_schema.query_history())
+where try_parse_json(query_tag):asset is not null
+order by start_time desc;
+```
+
 ## Snowflake Assets
 
 ### `sf.sql`

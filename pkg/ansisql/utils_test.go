@@ -125,6 +125,73 @@ func TestAddAgentIDAnnotationComment(t *testing.T) {
 	}
 }
 
+func TestBuildAnnotationJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		annotations string
+		fields      map[string]interface{}
+		expectError bool
+		expectEmpty bool
+		contains    []string
+	}{
+		{
+			name:        "default annotations with standard fields",
+			annotations: "default",
+			fields:      map[string]interface{}{"asset": "test-asset", "type": "main", "pipeline": "test-pipeline"},
+			contains:    []string{`"asset":"test-asset"`, `"type":"main"`, `"pipeline":"test-pipeline"`},
+		},
+		{
+			name:        "custom JSON merged with fields",
+			annotations: `{"project": "test"}`,
+			fields:      map[string]interface{}{"asset": "test-asset", "type": "main"},
+			contains:    []string{`"asset":"test-asset"`, `"type":"main"`, `"project":"test"`},
+		},
+		{
+			name:        "no annotations returns empty",
+			annotations: "",
+			fields:      map[string]interface{}{"asset": "test-asset"},
+			expectEmpty: true,
+		},
+		{
+			name:        "invalid JSON returns error",
+			annotations: `{"project": "test"`,
+			fields:      map[string]interface{}{"asset": "test-asset"},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+			if tt.annotations != "" {
+				ctx = context.WithValue(ctx, pipeline.RunConfigQueryAnnotations, tt.annotations)
+			}
+
+			result, err := BuildAnnotationJSON(ctx, tt.fields)
+
+			if tt.expectError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			if tt.expectEmpty {
+				assert.Empty(t, result)
+				return
+			}
+
+			for _, s := range tt.contains {
+				assert.Contains(t, result, s)
+			}
+			assert.NotContains(t, result, "-- @bruin.config")
+		})
+	}
+}
+
 func TestBuildAgentIDQueryTag(t *testing.T) {
 	t.Parallel()
 
