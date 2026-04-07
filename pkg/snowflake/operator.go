@@ -136,9 +136,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	tagFields := map[string]interface{}{
-		"asset_name": t.Name,
-		"type":       "main",
-		"pipeline":   p.Name,
+		"asset":    t.Name,
+		"type":     "main",
+		"pipeline": p.Name,
 	}
 	for k, v := range t.Meta {
 		tagFields[k] = v
