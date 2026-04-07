@@ -15,6 +15,11 @@ type mockSQLParser struct {
 	mock.Mock
 }
 
+func (m *mockSQLParser) Start() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
 func (m *mockSQLParser) UsedTables(sql, dialect string) ([]string, error) {
 	args := m.Called(sql, dialect)
 	return args.Get(0).([]string), args.Error(1)
@@ -28,6 +33,26 @@ func (m *mockSQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pi
 func (m *mockSQLParser) ColumnLineage(sql, dialect string, schema sqlparser.Schema) (*sqlparser.Lineage, error) {
 	args := m.Called(sql, dialect, schema)
 	return args.Get(0).(*sqlparser.Lineage), args.Error(1)
+}
+
+func (m *mockSQLParser) RenameTables(sql, dialect string, tableMapping map[string]string) (string, error) {
+	args := m.Called(sql, dialect, tableMapping)
+	return args.String(0), args.Error(1)
+}
+
+func (m *mockSQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
+	args := m.Called(sql, limit, dialect)
+	return args.String(0), args.Error(1)
+}
+
+func (m *mockSQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error) {
+	args := m.Called(sql, dialect)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *mockSQLParser) Close() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 func TestPolicyRuleDefinition(t *testing.T) {

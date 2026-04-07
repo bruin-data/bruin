@@ -15,7 +15,7 @@ type repoFinder interface {
 	Repo(path string) (*git.Repo, error)
 }
 
-func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlparser.SQLParser, cacheFoundGlossary bool) ([]Rule, error) {
+func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlparser.Parser, cacheFoundGlossary bool) ([]Rule, error) {
 	gr := GlossaryChecker{
 		gr: &glossary.GlossaryReader{
 			RepoFinder: finder,

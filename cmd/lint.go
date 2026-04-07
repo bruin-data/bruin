@@ -180,11 +180,13 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("built the connection manager instance")
 
-			parser, err := sqlparser.NewSQLParser(false)
-			if err != nil {
+			var parser sqlparser.Parser
+			if p, err := sqlparser.NewSQLParser(false); err != nil {
 				printError(err, c.String("output"), "Could not initialize sql parser")
+			} else {
+				parser = p
+				defer p.Close()
 			}
-			defer parser.Close()
 
 			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser, true)
 			if err != nil {
