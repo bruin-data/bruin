@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"golang.org/x/oauth2/google"
 )
 
@@ -110,6 +111,7 @@ func (c AthenaConnection) GetName() string {
 func (c *AthenaConnection) LoadCredentialsFromProfile(ctx context.Context) error {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithSharedConfigProfile(c.Profile),
+		config.WithEC2IMDSClientEnableState(imds.ClientDisabled),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to load AWS credentials from profile %s: %w", c.Profile, err)

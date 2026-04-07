@@ -11,6 +11,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
@@ -179,6 +180,7 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			accessKey, secretKey, "",
 		)),
+		awsconfig.WithEC2IMDSClientEnableState(imds.ClientDisabled),
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to load AWS config")

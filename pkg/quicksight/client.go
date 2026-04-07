@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/quicksight"
 	qstypes "github.com/aws/aws-sdk-go-v2/service/quicksight/types"
 )
@@ -20,6 +21,7 @@ type Client struct {
 func NewClient(cfg Config) (*Client, error) {
 	opts := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(cfg.AwsRegion),
+		awsconfig.WithEC2IMDSClientEnableState(imds.ClientDisabled),
 	}
 	if cfg.AwsAccessKeyID != "" && cfg.AwsSecretAccessKey != "" {
 		opts = append(opts, awsconfig.WithCredentialsProvider(
