@@ -431,7 +431,7 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Warehouse},
 		)
 	}
-	if c.PrivateKeyPath != "" {
+	if c.PrivateKeyPath != "" && c.PrivateKey == "" {
 		node.Content = append(node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "private_key_path"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.PrivateKeyPath},
