@@ -160,6 +160,12 @@ func TestBuildAnnotationJSON(t *testing.T) {
 			fields:      map[string]interface{}{"asset": "test-asset"},
 			expectError: true,
 		},
+		{
+			name:        "single-quoted JSON annotations are trimmed",
+			annotations: `'{"project": "test"}'`,
+			fields:      map[string]interface{}{"asset": "test-asset", "type": "main"},
+			contains:    []string{`"asset":"test-asset"`, `"type":"main"`, `"project":"test"`},
+		},
 	}
 
 	for _, tt := range tests {

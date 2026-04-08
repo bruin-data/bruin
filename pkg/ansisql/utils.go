@@ -30,6 +30,9 @@ func BuildAnnotationJSON(ctx context.Context, fields map[string]interface{}) (st
 
 	userAnnotations := make(map[string]interface{})
 	if annotations != DefaultQueryAnnotations {
+		// Strip surrounding single quotes that may be passed through from shell invocations.
+		annotations = strings.TrimPrefix(annotations, "'")
+		annotations = strings.TrimSuffix(annotations, "'")
 		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
 			return "", errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
 		}
