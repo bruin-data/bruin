@@ -35,6 +35,8 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 
 // openADBC creates an ADBC database and connection, including lakehouse setup.
 // The caller must close both the connection and database when done.
+//
+//nolint:ireturn
 func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
 	path := e.config.ToDBConnectionURI()
 	opts := map[string]string{
@@ -229,9 +231,9 @@ func bufferArrowReader(reader array.RecordReader) (*bufferedRows, error) {
 		record := reader.RecordBatch()
 		numRows := int(record.NumRows())
 		numCols := int(record.NumCols())
-		for i := 0; i < numRows; i++ {
+		for i := range numRows {
 			row := make([]any, numCols)
-			for j := 0; j < numCols; j++ {
+			for j := range numCols {
 				col := record.Column(j)
 				if col.IsNull(i) {
 					row[j] = nil
