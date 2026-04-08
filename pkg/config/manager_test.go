@@ -178,6 +178,12 @@ func TestLoadFromFile(t *testing.T) {
 					Email:  "gorgiasemail",
 				},
 			},
+			G2: []G2Connection{
+				{
+					Name:     "conn-g2",
+					APIToken: "g2token",
+				},
+			},
 			Klaviyo: []KlaviyoConnection{
 				{
 					Name:   "conn15",
@@ -508,6 +514,13 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:     "clickup-1",
 					APIToken: "token_123",
+				},
+			},
+			Jobtread: []JobtreadConnection{
+				{
+					Name:           "jobtread-1",
+					GrantKey:       "grant_key_123",
+					OrganizationID: "org_123",
 				},
 			},
 			Posthog: []PosthogConnection{
@@ -1955,6 +1968,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				HANA:                []HANAConnection{{Name: "hana1"}},
 				Shopify:             []ShopifyConnection{{Name: "shopify1"}},
 				Gorgias:             []GorgiasConnection{{Name: "gorgias1"}},
+				G2:                  []G2Connection{{Name: "g21"}},
 				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
 				DuckDB:              []DuckDBConnection{{Name: "duckdb1"}},
 				ClickHouse:          []ClickHouseConnection{{Name: "clickhouse1"}},
@@ -1976,6 +1990,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				HANA:                []HANAConnection{{Name: "hana1"}},
 				Shopify:             []ShopifyConnection{{Name: "shopify1"}},
 				Gorgias:             []GorgiasConnection{{Name: "gorgias1"}},
+				G2:                  []G2Connection{{Name: "g21"}},
 				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
 				DuckDB:              []DuckDBConnection{{Name: "duckdb1"}},
 				ClickHouse:          []ClickHouseConnection{{Name: "clickhouse1"}},

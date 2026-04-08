@@ -44,6 +44,7 @@ type Connections struct {
 	Hostaway            []HostawayConnection            `yaml:"hostaway,omitempty" json:"hostaway,omitempty" mapstructure:"hostaway"`
 	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify,omitempty" mapstructure:"shopify"`
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
+	G2                  []G2Connection                  `yaml:"g2,omitempty" json:"g2,omitempty" mapstructure:"g2"`
 	Klaviyo             []KlaviyoConnection             `yaml:"klaviyo,omitempty" json:"klaviyo,omitempty" mapstructure:"klaviyo"`
 	Adjust              []AdjustConnection              `yaml:"adjust,omitempty" json:"adjust,omitempty" mapstructure:"adjust"`
 	Anthropic           []AnthropicConnection           `yaml:"anthropic,omitempty" json:"anthropic,omitempty" mapstructure:"anthropic"`
@@ -84,6 +85,7 @@ type Connections struct {
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
+	Jobtread            []JobtreadConnection            `yaml:"jobtread,omitempty" json:"jobtread,omitempty" mapstructure:"jobtread"`
 	Posthog             []PosthogConnection             `yaml:"posthog,omitempty" json:"posthog,omitempty" mapstructure:"posthog"`
 	Pinterest           []PinterestConnection           `yaml:"pinterest,omitempty" json:"pinterest,omitempty" mapstructure:"pinterest"`
 	Trustpilot          []TrustpilotConnection          `yaml:"trustpilot,omitempty" json:"trustpilot,omitempty" mapstructure:"trustpilot"`
@@ -603,6 +605,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Gorgias = append(env.Connections.Gorgias, conn)
+	case "g2":
+		var conn G2Connection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.G2 = append(env.Connections.G2, conn)
 	case "klaviyo":
 		var conn KlaviyoConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -869,6 +878,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Clickup = append(env.Connections.Clickup, conn)
+	case "jobtread":
+		var conn JobtreadConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Jobtread = append(env.Connections.Jobtread, conn)
 	case "posthog":
 		var conn PosthogConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1218,6 +1234,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Synapse = removeConnection(env.Connections.Synapse, connectionName)
 	case "gorgias":
 		env.Connections.Gorgias = removeConnection(env.Connections.Gorgias, connectionName)
+	case "g2":
+		env.Connections.G2 = removeConnection(env.Connections.G2, connectionName)
 	case "klaviyo":
 		env.Connections.Klaviyo = removeConnection(env.Connections.Klaviyo, connectionName)
 	case "adjust":
@@ -1292,6 +1310,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
 	case "clickup":
 		env.Connections.Clickup = removeConnection(env.Connections.Clickup, connectionName)
+	case "jobtread":
+		env.Connections.Jobtread = removeConnection(env.Connections.Jobtread, connectionName)
 	case "posthog":
 		env.Connections.Posthog = removeConnection(env.Connections.Posthog, connectionName)
 	case "mailchimp":

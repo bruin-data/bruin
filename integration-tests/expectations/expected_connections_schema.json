@@ -400,6 +400,26 @@
         "api_token"
       ]
     },
+    "JobtreadConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "grant_key": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "grant_key",
+        "organization_id"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -525,6 +545,12 @@
         "gorgias": {
           "items": {
             "$ref": "#/$defs/GorgiasConnection"
+          },
+          "type": "array"
+        },
+        "g2": {
+          "items": {
+            "$ref": "#/$defs/G2Connection"
           },
           "type": "array"
         },
@@ -765,6 +791,12 @@
         "clickup": {
           "items": {
             "$ref": "#/$defs/ClickupConnection"
+          },
+          "type": "array"
+        },
+        "jobtread": {
+          "items": {
+            "$ref": "#/$defs/JobtreadConnection"
           },
           "type": "array"
         },
@@ -1753,6 +1785,22 @@
         "domain",
         "api_key",
         "email"
+      ]
+    },
+    "G2Connection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
       ]
     },
     "HANAConnection": {
