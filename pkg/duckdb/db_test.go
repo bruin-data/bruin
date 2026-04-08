@@ -332,12 +332,12 @@ func (d *delayedConnection) QueryRowContext(_ context.Context, _ string, _ ...an
 // emptyRows implements Rows with no data.
 type emptyRows struct{}
 
-func (r *emptyRows) Close() error                            { return nil }
-func (r *emptyRows) Columns() ([]string, error)              { return nil, nil }
-func (r *emptyRows) ColumnTypes() ([]*sql.ColumnType, error) { return nil, nil }
-func (r *emptyRows) Err() error                              { return nil }
-func (r *emptyRows) Next() bool                              { return false }
-func (r *emptyRows) Scan(_ ...any) error                     { return sql.ErrNoRows }
+func (r *emptyRows) Close() error                        { return nil }
+func (r *emptyRows) Columns() ([]string, error)          { return nil, nil }
+func (r *emptyRows) ColumnTypes() ([]*ColumnType, error) { return nil, nil }
+func (r *emptyRows) Err() error                          { return nil }
+func (r *emptyRows) Next() bool                          { return false }
+func (r *emptyRows) Scan(_ ...any) error                 { return sql.ErrNoRows }
 
 func TestClient_ReadOnly_AllowsParallelQueries(t *testing.T) {
 	t.Parallel()
@@ -591,6 +591,61 @@ func TestRoundToScale_SymmetricRounding(t *testing.T) {
 			result := roundToScale(tt.value, tt.scale)
 
 			assert.InDelta(t, tt.expected, result, 0.0000001, "expected %v but got %v", tt.expected, result)
+		})
+	}
+}
+
+func TestInlineQueryArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		query    string
+		args     []any
+		expected string
+	}{
+		{
+			name:     "no args returns query unchanged",
+			query:    "SELECT * FROM t",
+			args:     nil,
+			expected: "SELECT * FROM t",
+		},
+		{
+			name:     "single string arg",
+			query:    "SELECT * FROM t WHERE name = ?",
+			args:     []any{"hello"},
+			expected: "SELECT * FROM t WHERE name = 'hello'",
+		},
+		{
+			name:     "string with single quote is escaped",
+			query:    "SELECT * FROM t WHERE name = ?",
+			args:     []any{"O'Brien"},
+			expected: "SELECT * FROM t WHERE name = 'O''Brien'",
+		},
+		{
+			name:     "multiple args",
+			query:    "SELECT * FROM t WHERE schema = ? AND name = ?",
+			args:     []any{"main", "users"},
+			expected: "SELECT * FROM t WHERE schema = 'main' AND name = 'users'",
+		},
+		{
+			name:     "integer arg",
+			query:    "SELECT * FROM t WHERE id = ?",
+			args:     []any{42},
+			expected: "SELECT * FROM t WHERE id = 42",
+		},
+		{
+			name:     "string arg containing question mark",
+			query:    "SELECT * FROM t WHERE schema = ? AND name = ?",
+			args:     []any{"what?", "users"},
+			expected: "SELECT * FROM t WHERE schema = 'what?' AND name = 'users'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, inlineQueryArgs(tt.query, tt.args))
 		})
 	}
 }

@@ -115,11 +115,26 @@ type Row interface {
 	Err() error
 }
 
+// ColumnType holds column metadata for result processing.
+type ColumnType struct {
+	name           string
+	databaseType   string
+	precision      int64
+	scale          int64
+	hasDecimalInfo bool
+}
+
+func (ct *ColumnType) Name() string             { return ct.name }
+func (ct *ColumnType) DatabaseTypeName() string { return ct.databaseType }
+func (ct *ColumnType) DecimalSize() (precision, scale int64, ok bool) {
+	return ct.precision, ct.scale, ct.hasDecimalInfo
+}
+
 // Rows interface abstracts sql.Rows to allow custom implementations that manage connection lifecycle.
 type Rows interface {
 	Close() error
 	Columns() ([]string, error)
-	ColumnTypes() ([]*sql.ColumnType, error)
+	ColumnTypes() ([]*ColumnType, error)
 	Err() error
 	Next() bool
 	Scan(dest ...any) error
@@ -141,9 +156,38 @@ func newSqlxWrapper(db *sqlx.DB) *sqlxWrapper {
 	return &sqlxWrapper{db: db}
 }
 
+// sqlRowsAdapter wraps *sql.Rows to implement the Rows interface,
+// adapting []*sql.ColumnType to []*ColumnType.
+type sqlRowsAdapter struct {
+	*sql.Rows
+}
+
+func (a *sqlRowsAdapter) ColumnTypes() ([]*ColumnType, error) {
+	cts, err := a.Rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*ColumnType, len(cts))
+	for i, ct := range cts {
+		p, s, ok := ct.DecimalSize()
+		result[i] = &ColumnType{
+			name:           ct.Name(),
+			databaseType:   ct.DatabaseTypeName(),
+			precision:      p,
+			scale:          s,
+			hasDecimalInfo: ok,
+		}
+	}
+	return result, nil
+}
+
 //nolint:ireturn
 func (w *sqlxWrapper) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
-	return w.db.QueryContext(ctx, query, args...) //nolint:rowserrcheck
+	rows, err := w.db.QueryContext(ctx, query, args...) //nolint:rowserrcheck
+	if err != nil {
+		return nil, err
+	}
+	return &sqlRowsAdapter{rows}, nil
 }
 
 func (w *sqlxWrapper) ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error) {
@@ -337,7 +381,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	return result, nil
 }
 
-func (c *Client) convertValueWithType(val interface{}, colType *sql.ColumnType) interface{} {
+func (c *Client) convertValueWithType(val interface{}, colType *ColumnType) interface{} {
 	// The ADBC sqldriver returns data from Arrow buffers that may be memory-mapped.
 	// We need to copy certain types to ensure we own the memory before the rows are closed.
 
@@ -367,7 +411,7 @@ func (c *Client) convertValueWithType(val interface{}, colType *sql.ColumnType) 
 }
 
 // convertDecimal128 converts a decimal128.Num to float64 with proper scale.
-func convertDecimal128(v decimal128.Num, colType *sql.ColumnType) float64 {
+func convertDecimal128(v decimal128.Num, colType *ColumnType) float64 {
 	var scale int64
 	if colType != nil {
 		_, s, ok := colType.DecimalSize()
@@ -390,7 +434,7 @@ func roundToScale(value float64, scale int64) float64 {
 }
 
 // tryConvertDecimal attempts to convert a value to float64 if it's a decimal struct.
-func tryConvertDecimal(val interface{}, colType *sql.ColumnType) interface{} {
+func tryConvertDecimal(val interface{}, colType *ColumnType) interface{} {
 	// Check if the value is a decimal128.Num type
 	if d, ok := val.(decimal128.Num); ok {
 		return convertDecimal128(d, colType)

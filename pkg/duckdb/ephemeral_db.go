@@ -8,8 +8,17 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"reflect"
+	"strings"
+
+	"github.com/apache/arrow-adbc/go/adbc"
+	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
 )
 
+// EphemeralConnection uses the ADBC low-level API to query DuckDB directly,
+// bypassing the database/sql adapter which doesn't support complex Arrow types
+// (LIST, STRUCT, MAP).
 type EphemeralConnection struct {
 	config DuckDBConfig
 }
@@ -24,26 +33,41 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 	}, nil
 }
 
-func (e *EphemeralConnection) openDB(ctx context.Context) (*sql.DB, error) {
+// openADBC creates an ADBC database and connection, including lakehouse setup.
+// The caller must close both the connection and database when done.
+func (e *EphemeralConnection) openADBC(ctx context.Context) (adbc.Database, adbc.Connection, error) {
 	path := e.config.ToDBConnectionURI()
-	connStr := "driver=duckdb;path=" + path
+	opts := map[string]string{
+		"driver": "duckdb",
+		"path":   path,
+	}
 
 	if cfg, ok := e.config.(Config); ok && cfg.ReadOnly {
-		connStr += ";access_mode=read_only"
+		opts["access_mode"] = "read_only"
 	}
 
-	db, err := sql.Open("adbc_duckdb", connStr)
+	var drv drivermgr.Driver
+	adb, err := drv.NewDatabase(opts)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to create ADBC database: %w", err)
 	}
-	if err := e.setupLakehouse(ctx, db); err != nil {
-		db.Close()
-		return nil, err
+
+	conn, err := adb.Open(ctx)
+	if err != nil {
+		adb.Close()
+		return nil, nil, fmt.Errorf("failed to open ADBC connection: %w", err)
 	}
-	return db, nil
+
+	if err := e.setupLakehouseADBC(ctx, conn); err != nil {
+		conn.Close()
+		adb.Close()
+		return nil, nil, err
+	}
+
+	return adb, conn, nil
 }
 
-func (e *EphemeralConnection) setupLakehouse(ctx context.Context, db *sql.DB) error {
+func (e *EphemeralConnection) setupLakehouseADBC(ctx context.Context, conn adbc.Connection) error {
 	cfg, ok := e.config.(Config)
 	if !ok || !cfg.HasLakehouse() {
 		return nil
@@ -59,75 +83,128 @@ func (e *EphemeralConnection) setupLakehouse(ctx context.Context, db *sql.DB) er
 		return fmt.Errorf("failed to generate lakehouse statements: %w", err)
 	}
 
-	for _, stmt := range statements {
-		if err := e.execLakehouseStatement(ctx, db, stmt); err != nil {
-			return err
+	for _, sqlStr := range statements {
+		if err := execADBCStatement(ctx, conn, sqlStr); err != nil {
+			return fmt.Errorf("failed to execute lakehouse statement: %w", err)
 		}
 	}
 	return nil
 }
 
-func (e *EphemeralConnection) execLakehouseStatement(ctx context.Context, db *sql.DB, stmt string) error {
-	rows, err := db.QueryContext(ctx, stmt)
+func execADBCStatement(ctx context.Context, conn adbc.Connection, sqlStr string) error {
+	stmt, err := conn.NewStatement()
 	if err != nil {
-		return fmt.Errorf("failed to execute lakehouse statement: %w", err)
+		return err
 	}
-	defer rows.Close()
+	defer stmt.Close()
 
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("failed to execute lakehouse statement: %w", err)
+	if err := stmt.SetSqlQuery(sqlStr); err != nil {
+		return err
+	}
+
+	reader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		return err
+	}
+	if reader != nil {
+		reader.Release()
 	}
 	return nil
 }
 
 //nolint:ireturn
-func (e *EphemeralConnection) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
-	db, err := e.openDB(ctx)
+func (e *EphemeralConnection) QueryContext(ctx context.Context, queryStr string, args ...any) (Rows, error) {
+	adb, conn, err := e.openADBC(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer adb.Close()
+	defer conn.Close()
 
-	rows, err := db.QueryContext(ctx, query, args...)
+	stmt, err := conn.NewStatement()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer stmt.Close()
 
-	return bufferRows(rows)
+	if err := stmt.SetSqlQuery(inlineQueryArgs(queryStr, args)); err != nil {
+		return nil, err
+	}
+
+	reader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if reader == nil {
+		return &bufferedRows{
+			columns:     []string{},
+			columnTypes: []*ColumnType{},
+			index:       -1,
+		}, nil
+	}
+	defer reader.Release()
+
+	return bufferArrowReader(reader)
 }
 
 func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, arguments ...any) (sql.Result, error) {
-	db, err := e.openDB(ctx)
+	adb, conn, err := e.openADBC(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer adb.Close()
+	defer conn.Close()
 
-	rows, err := db.QueryContext(ctx, sqlStr, arguments...)
+	stmt, err := conn.NewStatement()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer stmt.Close()
 
-	return driver.RowsAffected(0), rows.Err()
+	if err := stmt.SetSqlQuery(inlineQueryArgs(sqlStr, arguments)); err != nil {
+		return nil, err
+	}
+
+	reader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if reader != nil {
+		reader.Release()
+	}
+
+	return driver.RowsAffected(0), nil
 }
 
 //nolint:ireturn
-func (e *EphemeralConnection) QueryRowContext(ctx context.Context, query string, args ...any) Row {
-	db, err := e.openDB(ctx)
+func (e *EphemeralConnection) QueryRowContext(ctx context.Context, queryStr string, args ...any) Row {
+	adb, conn, err := e.openADBC(ctx)
 	if err != nil {
 		return &errorRow{err: err}
 	}
-	defer db.Close()
+	defer adb.Close()
+	defer conn.Close()
 
-	rows, err := db.QueryContext(ctx, query, args...)
+	stmt, err := conn.NewStatement()
 	if err != nil {
 		return &errorRow{err: err}
 	}
-	defer rows.Close()
+	defer stmt.Close()
 
-	buffered, err := bufferRows(rows)
+	if err := stmt.SetSqlQuery(inlineQueryArgs(queryStr, args)); err != nil {
+		return &errorRow{err: err}
+	}
+
+	reader, _, err := stmt.ExecuteQuery(ctx)
+	if err != nil {
+		return &errorRow{err: err}
+	}
+	if reader == nil {
+		return &errorRow{err: sql.ErrNoRows}
+	}
+	defer reader.Release()
+
+	buffered, err := bufferArrowReader(reader)
 	if err != nil {
 		return &errorRow{err: err}
 	}
@@ -135,37 +212,38 @@ func (e *EphemeralConnection) QueryRowContext(ctx context.Context, query string,
 	return &bufferedRow{rows: buffered}
 }
 
-// bufferRows reads all rows into memory and returns a bufferedRows that can iterate over them.
-func bufferRows(rows *sql.Rows) (*bufferedRows, error) {
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
+// bufferArrowReader reads all records from an Arrow RecordReader into memory.
+func bufferArrowReader(reader array.RecordReader) (*bufferedRows, error) {
+	schema := reader.Schema()
+	numFields := schema.NumFields()
+	cols := make([]string, numFields)
+	colTypes := make([]*ColumnType, numFields)
 
-	colTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, err
+	for i, field := range schema.Fields() {
+		cols[i] = field.Name
+		colTypes[i] = arrowFieldToColumnType(field)
 	}
 
 	var data [][]any
-	for rows.Next() {
-		values := make([]any, len(cols))
-		ptrs := make([]any, len(cols))
-		for i := range values {
-			ptrs[i] = &values[i]
+	for reader.Next() {
+		record := reader.RecordBatch()
+		numRows := int(record.NumRows())
+		numCols := int(record.NumCols())
+		for i := 0; i < numRows; i++ {
+			row := make([]any, numCols)
+			for j := 0; j < numCols; j++ {
+				col := record.Column(j)
+				if col.IsNull(i) {
+					row[j] = nil
+				} else {
+					row[j] = extractArrowValue(col, i)
+				}
+			}
+			data = append(data, row)
 		}
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, err
-		}
-		// Deep copy values - strings must be copied because they may reference Arrow buffers
-		row := make([]any, len(values))
-		for i, v := range values {
-			row[i] = copyValue(v)
-		}
-		data = append(data, row)
 	}
 
-	if err := rows.Err(); err != nil {
+	if err := reader.Err(); err != nil {
 		return nil, err
 	}
 
@@ -177,10 +255,107 @@ func bufferRows(rows *sql.Rows) (*bufferedRows, error) {
 	}, nil
 }
 
+// extractArrowValue extracts a native Go value from an Arrow array at position i.
+// Scalar types are returned as their natural Go equivalents.
+// Complex types (LIST, STRUCT, MAP) are returned as their string representation,
+// which is the key advantage over the database/sql adapter that cannot handle these types.
+func extractArrowValue(col arrow.Array, i int) any {
+	switch arr := col.(type) {
+	case *array.Boolean:
+		return arr.Value(i)
+	case *array.Int8:
+		return int64(arr.Value(i))
+	case *array.Int16:
+		return int64(arr.Value(i))
+	case *array.Int32:
+		return int64(arr.Value(i))
+	case *array.Int64:
+		return arr.Value(i)
+	case *array.Uint8:
+		return int64(arr.Value(i))
+	case *array.Uint16:
+		return int64(arr.Value(i))
+	case *array.Uint32:
+		return int64(arr.Value(i))
+	case *array.Uint64:
+		return arr.Value(i)
+	case *array.Float32:
+		return float64(arr.Value(i))
+	case *array.Float64:
+		return arr.Value(i)
+	case *array.String:
+		return copyString(arr.Value(i))
+	case *array.LargeString:
+		return copyString(arr.Value(i))
+	case *array.Binary:
+		v := arr.Value(i)
+		cp := make([]byte, len(v))
+		copy(cp, v)
+		return cp
+	case *array.LargeBinary:
+		v := arr.Value(i)
+		cp := make([]byte, len(v))
+		copy(cp, v)
+		return cp
+	case *array.Date32:
+		return arr.Value(i).ToTime()
+	case *array.Date64:
+		return arr.Value(i).ToTime()
+	case *array.Time32:
+		return arr.Value(i).ToTime(arr.DataType().(*arrow.Time32Type).Unit)
+	case *array.Time64:
+		return arr.Value(i).ToTime(arr.DataType().(*arrow.Time64Type).Unit)
+	case *array.Timestamp:
+		return arr.Value(i).ToTime(arr.DataType().(*arrow.TimestampType).Unit)
+	case *array.Decimal128:
+		return arr.Value(i)
+	default:
+		// Complex types (LIST, STRUCT, MAP, UNION, etc.) and any unhandled types
+		// are returned as their string representation.
+		return copyString(col.ValueStr(i))
+	}
+}
+
+// arrowFieldToColumnType converts an Arrow schema field to a ColumnType.
+func arrowFieldToColumnType(field arrow.Field) *ColumnType {
+	ct := &ColumnType{
+		name:         field.Name,
+		databaseType: normalizeTypeName(field.Type.String()),
+	}
+	if dt, ok := field.Type.(*arrow.Decimal128Type); ok {
+		ct.precision = int64(dt.Precision)
+		ct.scale = int64(dt.Scale)
+		ct.hasDecimalInfo = true
+	}
+	return ct
+}
+
+// inlineQueryArgs substitutes positional ? parameters with their escaped values.
+// This is used for internal queries (e.g. information_schema lookups) where
+// parameters are controlled by Bruin, not user input.
+func inlineQueryArgs(queryStr string, args []any) string {
+	if len(args) == 0 {
+		return queryStr
+	}
+	parts := strings.SplitN(queryStr, "?", len(args)+1)
+	var b strings.Builder
+	for i, arg := range args {
+		b.WriteString(parts[i])
+		switch v := arg.(type) {
+		case string:
+			b.WriteString("'" + strings.ReplaceAll(v, "'", "''") + "'")
+		default:
+			fmt.Fprintf(&b, "%v", v)
+		}
+	}
+	b.WriteString(parts[len(args)])
+	return b.String()
+}
+
 // bufferedRows holds rows data in memory and implements the Rows interface.
 type bufferedRows struct {
 	columns     []string
-	columnTypes []*sql.ColumnType
+	columnTypes []*ColumnType
 	data        [][]any
 	index       int
 	err         error
@@ -194,7 +369,7 @@ func (r *bufferedRows) Columns() ([]string, error) {
 	return r.columns, nil
 }
 
-func (r *bufferedRows) ColumnTypes() ([]*sql.ColumnType, error) {
+func (r *bufferedRows) ColumnTypes() ([]*ColumnType, error) {
 	return r.columnTypes, nil
 }
 
@@ -258,27 +433,6 @@ func (r *errorRow) Scan(_ ...any) error {
 
 func (r *errorRow) Err() error {
 	return r.err
-}
-
-// copyValue creates a deep copy of a value, ensuring strings and byte slices
-// don't reference Arrow buffer memory that may be freed.
-func copyValue(v any) any {
-	switch val := v.(type) {
-	case string:
-		// Copy string to new backing array
-		b := make([]byte, len(val))
-		copy(b, val)
-		return string(b)
-	case []byte:
-		if val == nil {
-			return nil
-		}
-		cp := make([]byte, len(val))
-		copy(cp, val)
-		return cp
-	default:
-		return v
-	}
 }
 
 // convertAssign copies src to dest, handling pointer destinations.
