@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"golang.org/x/oauth2/google"
+	"gopkg.in/yaml.v3"
 )
 
 type AwsConnection struct {
@@ -367,6 +369,175 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 
 func (c SnowflakeConnection) GetName() string {
 	return c.Name
+}
+
+// MarshalYAML implements custom YAML marshaling for SnowflakeConnection.
+// This ensures that the private_key field is written using YAML literal block scalar style (|)
+// to preserve newlines in the PEM-formatted private key.
+func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
+	node := &yaml.Node{Kind: yaml.MappingNode}
+
+	if c.Name != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "name"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Name},
+		)
+	}
+	if c.Account != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "account"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Account},
+		)
+	}
+	if c.Username != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "username"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Username},
+		)
+	}
+	if c.Password != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "password"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Password},
+		)
+	}
+	if c.Region != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "region"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Region},
+		)
+	}
+	if c.Role != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "role"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Role},
+		)
+	}
+	if c.Database != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "database"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Database},
+		)
+	}
+	if c.Schema != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "schema"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Schema},
+		)
+	}
+	if c.Warehouse != "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "warehouse"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Warehouse},
+		)
+	}
+	if c.PrivateKeyPath != "" && c.PrivateKey == "" {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "private_key_path"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: c.PrivateKeyPath},
+		)
+	}
+	if c.PrivateKey != "" {
+		// Normalize the private key to ensure proper PEM format with newlines
+		normalizedKey := normalizePrivateKey(c.PrivateKey)
+
+		// Use literal block scalar style (|) for private_key to preserve newlines
+		privateKeyNode := &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Value: normalizedKey,
+			Style: yaml.LiteralStyle,
+		}
+		// Ensure the private key ends with a newline for proper YAML formatting
+		if !strings.HasSuffix(normalizedKey, "\n") {
+			privateKeyNode.Value = normalizedKey + "\n"
+		}
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "private_key"},
+			privateKeyNode,
+		)
+	}
+
+	return node, nil
+}
+
+// normalizePrivateKey converts a private key that may be on a single line with spaces
+// into proper PEM format with newlines between header, content, and footer.
+func normalizePrivateKey(key string) string {
+	if key == "" {
+		return key
+	}
+
+	// Replace literal \n with actual newlines
+	key = strings.ReplaceAll(key, "\\n", "\n")
+
+	// Normalize line endings
+	key = strings.ReplaceAll(key, "\r\n", "\n")
+	key = strings.ReplaceAll(key, "\r", "\n")
+
+	// Check if key already has proper newlines (more than one non-empty line)
+	lines := strings.Split(key, "\n")
+	nonEmptyLines := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			nonEmptyLines++
+		}
+	}
+
+	if nonEmptyLines > 1 {
+		// Key already has newlines, just clean it up
+		var cleanedLines []string
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed != "" {
+				cleanedLines = append(cleanedLines, trimmed)
+			}
+		}
+		return strings.Join(cleanedLines, "\n")
+	}
+
+	// Key is on a single line - need to parse and reconstruct
+	// Find BEGIN and END markers
+	beginIdx := strings.Index(key, "-----BEGIN")
+	endMarkerStart := strings.Index(key, "-----END")
+
+	if beginIdx == -1 || endMarkerStart == -1 {
+		return key // Can't parse, return as-is
+	}
+
+	// Find the end of the BEGIN marker (after "PRIVATE KEY-----")
+	beginMarkerEnd := strings.Index(key[beginIdx:], "-----")
+	if beginMarkerEnd == -1 {
+		return key
+	}
+	// Find the second occurrence of "-----" after BEGIN
+	afterFirstDashes := beginIdx + beginMarkerEnd + 5
+	secondDashesInBegin := strings.Index(key[afterFirstDashes:], "-----")
+	if secondDashesInBegin == -1 {
+		return key
+	}
+	headerEnd := afterFirstDashes + secondDashesInBegin + 5
+
+	// Find the end of the END marker
+	endMarkerEnd := strings.Index(key[endMarkerStart:], "-----")
+	if endMarkerEnd == -1 {
+		return key
+	}
+	afterEndFirstDashes := endMarkerStart + endMarkerEnd + 5
+	secondDashesInEnd := strings.Index(key[afterEndFirstDashes:], "-----")
+	if secondDashesInEnd == -1 {
+		return key
+	}
+	footerEnd := afterEndFirstDashes + secondDashesInEnd + 5
+
+	header := strings.TrimSpace(key[beginIdx:headerEnd])
+	footer := strings.TrimSpace(key[endMarkerStart:footerEnd])
+	content := strings.TrimSpace(key[headerEnd:endMarkerStart])
+
+	// Remove all whitespace from content (base64 shouldn't have spaces)
+	content = strings.ReplaceAll(content, " ", "")
+	content = strings.ReplaceAll(content, "\t", "")
+
+	return header + "\n" + content + "\n" + footer
 }
 
 type HANAConnection struct {

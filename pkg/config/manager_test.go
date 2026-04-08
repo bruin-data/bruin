@@ -2,6 +2,7 @@ package config
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestLoadFromFile(t *testing.T) {
@@ -2241,5 +2243,112 @@ environments:
 				assert.Nil(t, got)
 			}
 		})
+	}
+}
+
+func TestSnowflakeConnection_MarshalYAML_PrivateKey(t *testing.T) {
+	t.Parallel()
+
+	privateKey := `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7ZtFJp7nR3sL9
+Xy8kPq2jLmV9bN3oR6tUwVcXzA1bH2cY4eF5gH6jK7lM8nBvCxDsEwQrTyUiOp
+-----END PRIVATE KEY-----`
+
+	conn := SnowflakeConnection{
+		Name:       "test-snowflake",
+		Account:    "test-account",
+		Username:   "test-user",
+		Database:   "test-db",
+		PrivateKey: privateKey,
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(&conn)
+	require.NoError(t, err)
+
+	yamlStr := string(yamlData)
+
+	// Verify that the YAML contains literal block style indicator (|)
+	assert.Contains(t, yamlStr, "private_key: |", "private_key should use literal block scalar style")
+
+	// Verify that the YAML contains the BEGIN marker on its own line (not inline)
+	assert.Contains(t, yamlStr, "-----BEGIN PRIVATE KEY-----", "private_key should contain BEGIN marker")
+	assert.Contains(t, yamlStr, "-----END PRIVATE KEY-----", "private_key should contain END marker")
+
+	// Verify we can unmarshal it back correctly
+	var unmarshaled SnowflakeConnection
+	err = yaml.Unmarshal(yamlData, &unmarshaled)
+	require.NoError(t, err)
+
+	// The unmarshaled private key should have proper newlines
+	assert.Contains(t, unmarshaled.PrivateKey, "\n", "unmarshaled private_key should contain newlines")
+	assert.Contains(t, unmarshaled.PrivateKey, "-----BEGIN PRIVATE KEY-----", "unmarshaled private_key should contain BEGIN marker")
+	assert.Contains(t, unmarshaled.PrivateKey, "-----END PRIVATE KEY-----", "unmarshaled private_key should contain END marker")
+}
+
+func TestSnowflakeConnection_MarshalYAML_WithoutPrivateKey(t *testing.T) {
+	t.Parallel()
+
+	conn := SnowflakeConnection{
+		Name:     "test-snowflake",
+		Account:  "test-account",
+		Username: "test-user",
+		Password: "test-pass",
+		Database: "test-db",
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(&conn)
+	require.NoError(t, err)
+
+	yamlStr := string(yamlData)
+
+	// Verify that the YAML does not contain private_key field
+	assert.NotContains(t, yamlStr, "private_key:", "YAML should not contain private_key when not set")
+
+	// Verify it contains the other fields
+	assert.Contains(t, yamlStr, "name: test-snowflake")
+	assert.Contains(t, yamlStr, "account: test-account")
+	assert.Contains(t, yamlStr, "username: test-user")
+	assert.Contains(t, yamlStr, "password: test-pass")
+}
+
+func TestSnowflakeConnection_MarshalYAML_SingleLinePrivateKey(t *testing.T) {
+	t.Parallel()
+
+	// This is how a private key might come from the VS Code extension - all on one line with spaces
+	singleLineKey := "-----BEGIN PRIVATE KEY----- MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7ZtFJp -----END PRIVATE KEY-----"
+
+	conn := SnowflakeConnection{
+		Name:       "test-snowflake",
+		Account:    "test-account",
+		Username:   "test-user",
+		Database:   "test-db",
+		PrivateKey: singleLineKey,
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(&conn)
+	require.NoError(t, err)
+
+	yamlStr := string(yamlData)
+
+	// Verify that the YAML contains literal block style indicator (|)
+	assert.Contains(t, yamlStr, "private_key: |", "private_key should use literal block scalar style")
+
+	// Verify we can unmarshal it back correctly
+	var unmarshaled SnowflakeConnection
+	err = yaml.Unmarshal(yamlData, &unmarshaled)
+	require.NoError(t, err)
+
+	// The unmarshaled private key should have proper newlines (header, content, footer on separate lines)
+	assert.Contains(t, unmarshaled.PrivateKey, "-----BEGIN PRIVATE KEY-----\n", "header should be followed by newline")
+	assert.Contains(t, unmarshaled.PrivateKey, "\n-----END PRIVATE KEY-----", "footer should be preceded by newline")
+
+	// Content should not have spaces (they should be removed during normalization)
+	lines := strings.Split(unmarshaled.PrivateKey, "\n")
+	if len(lines) >= 2 {
+		contentLine := lines[1]
+		assert.NotContains(t, contentLine, " ", "content line should not contain spaces")
 	}
 }
