@@ -44,6 +44,7 @@ type Connections struct {
 	Hostaway            []HostawayConnection            `yaml:"hostaway,omitempty" json:"hostaway,omitempty" mapstructure:"hostaway"`
 	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify,omitempty" mapstructure:"shopify"`
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
+	G2                  []G2Connection                  `yaml:"g2,omitempty" json:"g2,omitempty" mapstructure:"g2"`
 	Klaviyo             []KlaviyoConnection             `yaml:"klaviyo,omitempty" json:"klaviyo,omitempty" mapstructure:"klaviyo"`
 	Adjust              []AdjustConnection              `yaml:"adjust,omitempty" json:"adjust,omitempty" mapstructure:"adjust"`
 	Anthropic           []AnthropicConnection           `yaml:"anthropic,omitempty" json:"anthropic,omitempty" mapstructure:"anthropic"`
@@ -84,6 +85,7 @@ type Connections struct {
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
+	Jobtread            []JobtreadConnection            `yaml:"jobtread,omitempty" json:"jobtread,omitempty" mapstructure:"jobtread"`
 	Posthog             []PosthogConnection             `yaml:"posthog,omitempty" json:"posthog,omitempty" mapstructure:"posthog"`
 	Pinterest           []PinterestConnection           `yaml:"pinterest,omitempty" json:"pinterest,omitempty" mapstructure:"pinterest"`
 	Trustpilot          []TrustpilotConnection          `yaml:"trustpilot,omitempty" json:"trustpilot,omitempty" mapstructure:"trustpilot"`
@@ -603,6 +605,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Gorgias = append(env.Connections.Gorgias, conn)
+	case "g2":
+		var conn G2Connection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.G2 = append(env.Connections.G2, conn)
 	case "klaviyo":
 		var conn KlaviyoConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -869,6 +878,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Clickup = append(env.Connections.Clickup, conn)
+	case "jobtread":
+		var conn JobtreadConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Jobtread = append(env.Connections.Jobtread, conn)
 	case "posthog":
 		var conn PosthogConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1218,6 +1234,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Synapse = removeConnection(env.Connections.Synapse, connectionName)
 	case "gorgias":
 		env.Connections.Gorgias = removeConnection(env.Connections.Gorgias, connectionName)
+	case "g2":
+		env.Connections.G2 = removeConnection(env.Connections.G2, connectionName)
 	case "klaviyo":
 		env.Connections.Klaviyo = removeConnection(env.Connections.Klaviyo, connectionName)
 	case "adjust":
@@ -1292,6 +1310,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
 	case "clickup":
 		env.Connections.Clickup = removeConnection(env.Connections.Clickup, connectionName)
+	case "jobtread":
+		env.Connections.Jobtread = removeConnection(env.Connections.Jobtread, connectionName)
 	case "posthog":
 		env.Connections.Posthog = removeConnection(env.Connections.Posthog, connectionName)
 	case "mailchimp":
@@ -1436,17 +1456,22 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.MsSQL, source.MsSQL)
 	mergeConnectionList(&c.Databricks, source.Databricks)
 	mergeConnectionList(&c.Synapse, source.Synapse)
+	mergeConnectionList(&c.Fabric, source.Fabric)
 	mergeConnectionList(&c.Mongo, source.Mongo)
 	mergeConnectionList(&c.Couchbase, source.Couchbase)
+	mergeConnectionList(&c.Cursor, source.Cursor)
 	mergeConnectionList(&c.MongoAtlas, source.MongoAtlas)
 	mergeConnectionList(&c.MySQL, source.MySQL)
 	mergeConnectionList(&c.Notion, source.Notion)
+	mergeConnectionList(&c.Allium, source.Allium)
 	mergeConnectionList(&c.HANA, source.HANA)
 	mergeConnectionList(&c.Hostaway, source.Hostaway)
 	mergeConnectionList(&c.Shopify, source.Shopify)
 	mergeConnectionList(&c.Gorgias, source.Gorgias)
+	mergeConnectionList(&c.G2, source.G2)
 	mergeConnectionList(&c.Klaviyo, source.Klaviyo)
 	mergeConnectionList(&c.Adjust, source.Adjust)
+	mergeConnectionList(&c.Anthropic, source.Anthropic)
 	mergeConnectionList(&c.Generic, source.Generic)
 	mergeConnectionList(&c.FacebookAds, source.FacebookAds)
 	mergeConnectionList(&c.Stripe, source.Stripe)
@@ -1454,50 +1479,77 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Kafka, source.Kafka)
 	mergeConnectionList(&c.RabbitMQ, source.RabbitMQ)
 	mergeConnectionList(&c.DuckDB, source.DuckDB)
+	mergeConnectionList(&c.MotherDuck, source.MotherDuck)
 	mergeConnectionList(&c.ClickHouse, source.ClickHouse)
 	mergeConnectionList(&c.Hubspot, source.Hubspot)
+	mergeConnectionList(&c.Intercom, source.Intercom)
 	mergeConnectionList(&c.GitHub, source.GitHub)
 	mergeConnectionList(&c.GoogleSheets, source.GoogleSheets)
 	mergeConnectionList(&c.Chess, source.Chess)
 	mergeConnectionList(&c.Airtable, source.Airtable)
 	mergeConnectionList(&c.Zendesk, source.Zendesk)
 	mergeConnectionList(&c.TikTokAds, source.TikTokAds)
+	mergeConnectionList(&c.SnapchatAds, source.SnapchatAds)
 	mergeConnectionList(&c.S3, source.S3)
 	mergeConnectionList(&c.Slack, source.Slack)
+	mergeConnectionList(&c.Socrata, source.Socrata)
 	mergeConnectionList(&c.Asana, source.Asana)
 	mergeConnectionList(&c.DynamoDB, source.DynamoDB)
+	mergeConnectionList(&c.Docebo, source.Docebo)
+	mergeConnectionList(&c.GoogleAds, source.GoogleAds)
 	mergeConnectionList(&c.AppStore, source.AppStore)
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
+	mergeConnectionList(&c.Mailchimp, source.Mailchimp)
+	mergeConnectionList(&c.RevenueCat, source.RevenueCat)
 	mergeConnectionList(&c.Linear, source.Linear)
 	mergeConnectionList(&c.GCS, source.GCS)
+	mergeConnectionList(&c.ApplovinMax, source.ApplovinMax)
 	mergeConnectionList(&c.Personio, source.Personio)
+	mergeConnectionList(&c.Kinesis, source.Kinesis)
+	mergeConnectionList(&c.Pipedrive, source.Pipedrive)
+	mergeConnectionList(&c.Mixpanel, source.Mixpanel)
+	mergeConnectionList(&c.Clickup, source.Clickup)
+	mergeConnectionList(&c.Jobtread, source.Jobtread)
+	mergeConnectionList(&c.Posthog, source.Posthog)
+	mergeConnectionList(&c.Pinterest, source.Pinterest)
+	mergeConnectionList(&c.Trustpilot, source.Trustpilot)
+	mergeConnectionList(&c.QuickBooks, source.QuickBooks)
+	mergeConnectionList(&c.Wise, source.Wise)
+	mergeConnectionList(&c.Zoom, source.Zoom)
 	mergeConnectionList(&c.EMRServerless, source.EMRServerless)
 	mergeConnectionList(&c.DataprocServerless, source.DataprocServerless)
 	mergeConnectionList(&c.GoogleAnalytics, source.GoogleAnalytics)
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
+	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
 	mergeConnectionList(&c.SQLite, source.SQLite)
 	mergeConnectionList(&c.DB2, source.DB2)
 	mergeConnectionList(&c.Oracle, source.Oracle)
 	mergeConnectionList(&c.Phantombuster, source.Phantombuster)
-	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Elasticsearch, source.Elasticsearch)
-	mergeConnectionList(&c.Spanner, source.Spanner)
 	mergeConnectionList(&c.Solidgate, source.Solidgate)
+	mergeConnectionList(&c.Spanner, source.Spanner)
 	mergeConnectionList(&c.Smartsheet, source.Smartsheet)
-	mergeConnectionList(&c.Sftp, source.Sftp)
 	mergeConnectionList(&c.Attio, source.Attio)
+	mergeConnectionList(&c.Sftp, source.Sftp)
 	mergeConnectionList(&c.ISOCPulse, source.ISOCPulse)
+	mergeConnectionList(&c.InfluxDB, source.InfluxDB)
 	mergeConnectionList(&c.Tableau, source.Tableau)
 	mergeConnectionList(&c.QuickSight, source.QuickSight)
+	mergeConnectionList(&c.Trino, source.Trino)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
+	mergeConnectionList(&c.Freshdesk, source.Freshdesk)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)
 	mergeConnectionList(&c.Fireflies, source.Fireflies)
+	mergeConnectionList(&c.Jira, source.Jira)
+	mergeConnectionList(&c.Monday, source.Monday)
+	mergeConnectionList(&c.PlusVibeAI, source.PlusVibeAI)
 	mergeConnectionList(&c.BruinCloud, source.BruinCloud)
 	mergeConnectionList(&c.Primer, source.Primer)
 	mergeConnectionList(&c.Indeed, source.Indeed)
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
 	mergeConnectionList(&c.Vertica, source.Vertica)
+	mergeConnectionList(&c.Dune, source.Dune)
 	c.buildConnectionKeyMap()
 	return nil
 }

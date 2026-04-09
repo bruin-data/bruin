@@ -46,6 +46,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/freshdesk"
 	"github.com/bruin-data/bruin/pkg/fundraiseup"
+	"github.com/bruin-data/bruin/pkg/g2"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
@@ -60,6 +61,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/intercom"
 	"github.com/bruin-data/bruin/pkg/isocpulse"
 	"github.com/bruin-data/bruin/pkg/jira"
+	"github.com/bruin-data/bruin/pkg/jobtread"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/kinesis"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
@@ -131,6 +133,7 @@ type Manager struct {
 	Hostaway             map[string]*hostaway.Client
 	Shopify              map[string]*shopify.Client
 	Gorgias              map[string]*gorgias.Client
+	G2                   map[string]*g2.Client
 	Klaviyo              map[string]*klaviyo.Client
 	Adjust               map[string]*adjust.Client
 	Anthropic            map[string]*anthropic.Client
@@ -171,6 +174,7 @@ type Manager struct {
 	Pipedrive            map[string]*pipedrive.Client
 	Mixpanel             map[string]*mixpanel.Client
 	Clickup              map[string]*clickup.Client
+	Jobtread             map[string]*jobtread.Client
 	Posthog              map[string]*posthog.Client
 	Pinterest            map[string]*pinterest.Client
 	Trustpilot           map[string]*trustpilot.Client
@@ -844,6 +848,29 @@ func (m *Manager) AddGorgiasConnectionFromConfig(connection *config.GorgiasConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Gorgias[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddG2ConnectionFromConfig(connection *config.G2Connection) error {
+	m.mutex.Lock()
+	if m.G2 == nil {
+		m.G2 = make(map[string]*g2.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := g2.NewClient(g2.Config{
+		APIToken: connection.APIToken,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.G2[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -1900,6 +1927,28 @@ func (m *Manager) AddClickupConnectionFromConfig(connection *config.ClickupConne
 	return nil
 }
 
+func (m *Manager) AddJobtreadConnectionFromConfig(connection *config.JobtreadConnection) error {
+	m.mutex.Lock()
+	if m.Jobtread == nil {
+		m.Jobtread = make(map[string]*jobtread.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := jobtread.NewClient(jobtread.Config{
+		GrantKey:       connection.GrantKey,
+		OrganizationID: connection.OrganizationID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Jobtread[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddPosthogConnectionFromConfig(connection *config.PosthogConnection) error {
 	m.mutex.Lock()
 	if m.Posthog == nil {
@@ -2860,6 +2909,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Hostaway, connectionManager.AddHostawayConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Shopify, connectionManager.AddShopifyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Gorgias, connectionManager.AddGorgiasConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.G2, connectionManager.AddG2ConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Klaviyo, connectionManager.AddKlaviyoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Adjust, connectionManager.AddAdjustConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Anthropic, connectionManager.AddAnthropicConnectionFromConfig, &wg, &errList, &mu)
@@ -2898,6 +2948,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Clickup, connectionManager.AddClickupConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Jobtread, connectionManager.AddJobtreadConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Posthog, connectionManager.AddPosthogConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)

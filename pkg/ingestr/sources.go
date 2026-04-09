@@ -152,6 +152,27 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Couchbase - NoSQL database (user-defined tables)
 	"couchbase": {},
 
+	// JobTread - Construction management platform
+	"jobtread": {
+		{Name: "accounts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "jobs", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "contacts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "documents", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "tasks", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "cost_codes", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "cost_types", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "cost_items", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "locations", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "custom_fields", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "daily_logs", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "time_entries", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "files", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "comments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "document_payments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "cost_groups", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "events", PrimaryKey: "id", IncKey: "createdAt", IncStrategy: "merge"},
+	},
+
 	// Cursor - AI-powered code editor
 	"cursor": {
 		{Name: "team_members", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
@@ -329,6 +350,25 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	"gorgias": {
 		{Name: "customers", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "tickets", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+	},
+
+	// G2 - Software review platform
+	"g2": {
+		{Name: "products", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "my_products", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "vendors", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "categories", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "category_features", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "product_features", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "buyer_intent", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "competitors", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "discussions", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "downloads", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "integration_reviews", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "questions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "reviews", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "screenshots", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "videos", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 	},
 
 	// Hostaway - Property management system
@@ -751,6 +791,8 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 // gongSources is the set of source names that require gong to be enabled.
 var gongSources = map[string]bool{
 	"dune":     true,
+	"g2":       true,
+	"jobtread": true,
 	"posthog":  true,
 	"rabbitmq": true,
 }
