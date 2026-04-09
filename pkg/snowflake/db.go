@@ -12,7 +12,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
@@ -70,20 +69,13 @@ func (db *DB) initializeDB(ctx context.Context) error {
 // logSnowflakeQueryID tries to read a query ID from the channel and prints it.
 // It is non-blocking, so it is safe to call even if no ID was sent.
 func logSnowflakeQueryID(ctx context.Context, ch <-chan string) {
-	writer, ok := ctx.Value(executor.KeyPrinter).(io.Writer)
-	if !ok {
-		return
-	}
-
 	if ch == nil {
 		return
 	}
 
 	select {
 	case qid := <-ch:
-		if qid != "" {
-			_, _ = fmt.Fprintf(writer, "Snowflake query ID: %s\n", qid)
-		}
+		query.LogQueryID(ctx, "Snowflake", qid)
 	default:
 	}
 }
