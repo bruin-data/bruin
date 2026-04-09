@@ -280,7 +280,7 @@ func extractArrowValue(col arrow.Array, i int) any {
 	case *array.Uint32:
 		return int64(arr.Value(i))
 	case *array.Uint64:
-		return arr.Value(i)
+		return int64(arr.Value(i)) //nolint:gosec // overflow is acceptable; returning raw uint64 causes silent zeroing in convertAssign
 	case *array.Float32:
 		return float64(arr.Value(i))
 	case *array.Float64:
@@ -340,6 +340,9 @@ func inlineQueryArgs(queryStr string, args []any) string {
 		return queryStr
 	}
 	parts := strings.SplitN(queryStr, "?", len(args)+1)
+	if len(parts) < len(args)+1 {
+		return queryStr
+	}
 	var b strings.Builder
 	for i, arg := range args {
 		b.WriteString(parts[i])

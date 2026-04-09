@@ -640,6 +640,12 @@ func TestInlineQueryArgs(t *testing.T) {
 			args:     []any{"what?", "users"},
 			expected: "SELECT * FROM t WHERE schema = 'what?' AND name = 'users'",
 		},
+		{
+			name:     "more args than placeholders returns query unchanged",
+			query:    "SELECT * FROM t WHERE id = ?",
+			args:     []any{1, 2},
+			expected: "SELECT * FROM t WHERE id = ?",
+		},
 	}
 
 	for _, tt := range tests {
