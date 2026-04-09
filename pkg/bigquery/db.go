@@ -248,12 +248,17 @@ func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 	return true, nil
 }
 
-func (d *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) error {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return err
 	}
-	q := d.client.Query(query.String())
-	_, err := q.Read(ctx)
+	bqQuery := d.client.Query(q.String())
+	job, err := bqQuery.Run(ctx)
+	if err != nil {
+		return formatError(err)
+	}
+	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	_, err = job.Read(ctx)
 	if err != nil {
 		return formatError(err)
 	}
@@ -261,12 +266,17 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 	return nil
 }
 
-func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
-	q := d.client.Query(query.String())
-	rows, err := q.Read(ctx)
+	bqQuery := d.client.Query(q.String())
+	job, err := bqQuery.Run(ctx)
+	if err != nil {
+		return nil, formatError(err)
+	}
+	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	rows, err := job.Read(ctx)
 	if err != nil {
 		return nil, formatError(err)
 	}
@@ -297,10 +307,15 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
-	q := d.client.Query(queryObj.String())
-	rows, err := q.Read(ctx)
+	bqQuery := d.client.Query(queryObj.String())
+	job, err := bqQuery.Run(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initiate query read: %w", err)
+		return nil, fmt.Errorf("failed to run query: %w", err)
+	}
+	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
+	rows, err := job.Read(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read query results: %w", err)
 	}
 
 	result := &query.QueryResult{
