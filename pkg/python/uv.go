@@ -46,7 +46,7 @@ var SortedPythonVersions = []string{"3.8", "3.9", "3.10", "3.11", "3.12", "3.13"
 const (
 	pythonVersionForIngestr = "3.11"
 	defaultPythonVersion    = "3.11"
-	ingestrVersion          = "0.14.150"
+	ingestrVersion          = "0.14.151"
 	sqlfluffVersion         = "3.4.1"
 )
 
