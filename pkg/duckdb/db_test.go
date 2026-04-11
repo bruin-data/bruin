@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
@@ -322,7 +325,6 @@ func (d *delayedConnection) ExecContext(_ context.Context, _ string, _ ...any) (
 	return driver.RowsAffected(0), nil
 }
 
-//nolint:ireturn
 //nolint:ireturn
 func (d *delayedConnection) QueryRowContext(_ context.Context, _ string, _ ...any) Row {
 	time.Sleep(d.delay)
@@ -654,4 +656,274 @@ func TestInlineQueryArgs(t *testing.T) {
 			assert.Equal(t, tt.expected, inlineQueryArgs(tt.query, tt.args))
 		})
 	}
+}
+
+func TestExtractArrowValue_ScalarTypes(t *testing.T) {
+	t.Parallel()
+	alloc := memory.NewGoAllocator()
+
+	t.Run("boolean", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewBooleanBuilder(alloc)
+		defer bldr.Release()
+		bldr.Append(true)
+		bldr.Append(false)
+		arr := bldr.NewArray()
+		defer arr.Release()
+		assert.Equal(t, true, extractArrowValue(arr, 0))
+		assert.Equal(t, false, extractArrowValue(arr, 1))
+	})
+
+	t.Run("int64", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewInt64Builder(alloc)
+		defer bldr.Release()
+		bldr.Append(42)
+		bldr.Append(-7)
+		arr := bldr.NewArray()
+		defer arr.Release()
+		assert.Equal(t, int64(42), extractArrowValue(arr, 0))
+		assert.Equal(t, int64(-7), extractArrowValue(arr, 1))
+	})
+
+	t.Run("int32 widens to int64", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewInt32Builder(alloc)
+		defer bldr.Release()
+		bldr.Append(100)
+		arr := bldr.NewArray()
+		defer arr.Release()
+		assert.Equal(t, int64(100), extractArrowValue(arr, 0))
+	})
+
+	t.Run("uint64 cast to int64", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewUint64Builder(alloc)
+		defer bldr.Release()
+		bldr.Append(999)
+		arr := bldr.NewArray()
+		defer arr.Release()
+		assert.Equal(t, int64(999), extractArrowValue(arr, 0))
+	})
+
+	t.Run("float64", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewFloat64Builder(alloc)
+		defer bldr.Release()
+		bldr.Append(3.14)
+		arr := bldr.NewArray()
+		defer arr.Release()
+		assert.InDelta(t, 3.14, extractArrowValue(arr, 0), 0.001)
+	})
+
+	t.Run("float32 widens to float64", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewFloat32Builder(alloc)
+		defer bldr.Release()
+		bldr.Append(2.5)
+		arr := bldr.NewArray()
+		defer arr.Release()
+		val, ok := extractArrowValue(arr, 0).(float64)
+		require.True(t, ok)
+		assert.InDelta(t, 2.5, val, 0.001)
+	})
+
+	t.Run("string", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewStringBuilder(alloc)
+		defer bldr.Release()
+		bldr.Append("hello")
+		arr := bldr.NewArray()
+		defer arr.Release()
+		assert.Equal(t, "hello", extractArrowValue(arr, 0))
+	})
+
+	t.Run("binary", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewBinaryBuilder(alloc, arrow.BinaryTypes.Binary)
+		defer bldr.Release()
+		bldr.Append([]byte{0xDE, 0xAD})
+		arr := bldr.NewArray()
+		defer arr.Release()
+		assert.Equal(t, []byte{0xDE, 0xAD}, extractArrowValue(arr, 0))
+	})
+}
+
+func TestExtractArrowValue_List(t *testing.T) {
+	t.Parallel()
+	alloc := memory.NewGoAllocator()
+
+	t.Run("list of int64", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewListBuilder(alloc, arrow.PrimitiveTypes.Int64)
+		defer bldr.Release()
+
+		vb := bldr.ValueBuilder().(*array.Int64Builder)
+		bldr.Append(true)
+		vb.Append(1)
+		vb.Append(2)
+		vb.Append(3)
+
+		arr := bldr.NewListArray()
+		defer arr.Release()
+
+		result := extractArrowValue(arr, 0)
+		expected := []any{int64(1), int64(2), int64(3)}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("list with null element", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewListBuilder(alloc, arrow.PrimitiveTypes.Int64)
+		defer bldr.Release()
+
+		vb := bldr.ValueBuilder().(*array.Int64Builder)
+		bldr.Append(true)
+		vb.Append(10)
+		vb.AppendNull()
+		vb.Append(30)
+
+		arr := bldr.NewListArray()
+		defer arr.Release()
+
+		result := extractArrowValue(arr, 0)
+		expected := []any{int64(10), nil, int64(30)}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("empty list", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewListBuilder(alloc, arrow.PrimitiveTypes.Int64)
+		defer bldr.Release()
+
+		bldr.Append(true)
+		// no values appended
+
+		arr := bldr.NewListArray()
+		defer arr.Release()
+
+		result := extractArrowValue(arr, 0)
+		expected := []any{}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("list of strings", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewListBuilder(alloc, arrow.BinaryTypes.String)
+		defer bldr.Release()
+
+		vb := bldr.ValueBuilder().(*array.StringBuilder)
+		bldr.Append(true)
+		vb.Append("a")
+		vb.Append("b")
+
+		arr := bldr.NewListArray()
+		defer arr.Release()
+
+		result := extractArrowValue(arr, 0)
+		expected := []any{"a", "b"}
+		assert.Equal(t, expected, result)
+	})
+}
+
+func TestExtractArrowValue_Struct(t *testing.T) {
+	t.Parallel()
+	alloc := memory.NewGoAllocator()
+
+	t.Run("struct with mixed fields", func(t *testing.T) {
+		t.Parallel()
+		dt := arrow.StructOf(
+			arrow.Field{Name: "name", Type: arrow.BinaryTypes.String},
+			arrow.Field{Name: "age", Type: arrow.PrimitiveTypes.Int64},
+		)
+		bldr := array.NewStructBuilder(alloc, dt)
+		defer bldr.Release()
+
+		nameBldr := bldr.FieldBuilder(0).(*array.StringBuilder)
+		ageBldr := bldr.FieldBuilder(1).(*array.Int64Builder)
+
+		bldr.Append(true)
+		nameBldr.Append("Alice")
+		ageBldr.Append(30)
+
+		arr := bldr.NewStructArray()
+		defer arr.Release()
+
+		result := extractArrowValue(arr, 0)
+		expected := map[string]any{"name": "Alice", "age": int64(30)}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("struct with null field", func(t *testing.T) {
+		t.Parallel()
+		dt := arrow.StructOf(
+			arrow.Field{Name: "x", Type: arrow.PrimitiveTypes.Int64},
+			arrow.Field{Name: "y", Type: arrow.PrimitiveTypes.Int64},
+		)
+		bldr := array.NewStructBuilder(alloc, dt)
+		defer bldr.Release()
+
+		xBldr := bldr.FieldBuilder(0).(*array.Int64Builder)
+		yBldr := bldr.FieldBuilder(1).(*array.Int64Builder)
+
+		bldr.Append(true)
+		xBldr.Append(5)
+		yBldr.AppendNull()
+
+		arr := bldr.NewStructArray()
+		defer arr.Release()
+
+		result := extractArrowValue(arr, 0)
+		expected := map[string]any{"x": int64(5), "y": nil}
+		assert.Equal(t, expected, result)
+	})
+}
+
+func TestExtractArrowValue_Map(t *testing.T) {
+	t.Parallel()
+	alloc := memory.NewGoAllocator()
+
+	t.Run("map string to int", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewMapBuilder(alloc, arrow.BinaryTypes.String, arrow.PrimitiveTypes.Int64, false)
+		defer bldr.Release()
+
+		kb := bldr.KeyBuilder().(*array.StringBuilder)
+		vb := bldr.ItemBuilder().(*array.Int64Builder)
+
+		bldr.Append(true)
+		kb.Append("a")
+		vb.Append(1)
+		kb.Append("b")
+		vb.Append(2)
+
+		arr := bldr.NewMapArray()
+		defer arr.Release()
+
+		result := extractArrowValue(arr, 0)
+		expected := map[string]any{"a": int64(1), "b": int64(2)}
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("map with null value", func(t *testing.T) {
+		t.Parallel()
+		bldr := array.NewMapBuilder(alloc, arrow.BinaryTypes.String, arrow.PrimitiveTypes.Int64, false)
+		defer bldr.Release()
+
+		kb := bldr.KeyBuilder().(*array.StringBuilder)
+		vb := bldr.ItemBuilder().(*array.Int64Builder)
+
+		bldr.Append(true)
+		kb.Append("x")
+		vb.Append(10)
+		kb.Append("y")
+		vb.AppendNull()
+
+		arr := bldr.NewMapArray()
+		defer arr.Release()
+
+		result := extractArrowValue(arr, 0)
+		expected := map[string]any{"x": int64(10), "y": nil}
+		assert.Equal(t, expected, result)
+	})
 }

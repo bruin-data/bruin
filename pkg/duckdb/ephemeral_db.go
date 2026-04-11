@@ -311,9 +311,46 @@ func extractArrowValue(col arrow.Array, i int) any {
 		return arr.Value(i).ToTime(arr.DataType().(*arrow.TimestampType).Unit)
 	case *array.Decimal128:
 		return arr.Value(i)
+	case *array.List:
+		start, end := arr.ValueOffsets(i)
+		vals := make([]any, end-start)
+		inner := arr.ListValues()
+		for k := start; k < end; k++ {
+			if inner.IsNull(int(k)) {
+				vals[k-start] = nil
+			} else {
+				vals[k-start] = extractArrowValue(inner, int(k))
+			}
+		}
+		return vals
+	case *array.Struct:
+		m := make(map[string]any, arr.NumField())
+		dt := arr.DataType().(*arrow.StructType)
+		for k := range arr.NumField() {
+			field := arr.Field(k)
+			if field.IsNull(i) {
+				m[dt.Field(k).Name] = nil
+			} else {
+				m[dt.Field(k).Name] = extractArrowValue(field, i)
+			}
+		}
+		return m
+	case *array.Map:
+		keys := arr.Keys()
+		items := arr.Items()
+		start, end := arr.ValueOffsets(i)
+		m := make(map[string]any, end-start)
+		for k := start; k < end; k++ {
+			key := fmt.Sprintf("%v", extractArrowValue(keys, int(k)))
+			if items.IsNull(int(k)) {
+				m[key] = nil
+			} else {
+				m[key] = extractArrowValue(items, int(k))
+			}
+		}
+		return m
 	default:
-		// Complex types (LIST, STRUCT, MAP, UNION, etc.) and any unhandled types
-		// are returned as their string representation.
+		// Any remaining unhandled types are returned as their string representation.
 		return copyString(col.ValueStr(i))
 	}
 }
