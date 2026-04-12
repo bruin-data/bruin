@@ -310,12 +310,12 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	bqQuery := d.client.Query(queryObj.String())
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run query: %w", err)
+		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
 	}
 	query.LogOrSinkQueryID(ctx, "BigQuery", job.ID())
 	rows, err := job.Read(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read query results: %w", err)
+		return nil, fmt.Errorf("failed to read query results: %w", formatError(err))
 	}
 
 	result := &query.QueryResult{
