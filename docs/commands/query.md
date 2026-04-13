@@ -23,6 +23,7 @@ You can run it in three modes:
 | `--timeout`          | `-t`  | Timeout for query execution in seconds (default: 1000).                    |
 | `--output [format]`  | `-o`  | Output type: `plain`, `json`, `csv`.                                       |
 | `--export`           |       | Export results to a CSV file.                                              |
+| `--split-rows`       |       | Split export into multiple CSV files with at most this many rows per file (requires `--export`). |
 | `--config-file`      |       | The path to the `.bruin.yml` file.                                         |
 
 ## Example
@@ -42,3 +43,25 @@ bruin query --connection my_connection --query "SELECT * FROM table"
 | Value7      | Value8      | Value9         |
 +-------------+-------------+----------------+
 ```
+
+## Splitting Large Exports
+
+When exporting large query results, you can use `--split-rows` to split the output into multiple CSV files. This is useful when:
+
+- Your query returns millions of rows that are too large for a single file
+- You need to process the data in chunks
+- You're working with tools that have file size limitations
+
+**Example:**
+
+```bash
+# Export a large table, splitting into files of 400,000 rows each
+bruin query --connection my_connection --query "SELECT * FROM large_table" --export --split-rows 400000
+```
+
+If your query returns 1,000,000 rows with `--split-rows 400000`, you'll get 3 files:
+- `query_result_<timestamp>_part1.csv` (400,000 rows)
+- `query_result_<timestamp>_part2.csv` (400,000 rows)
+- `query_result_<timestamp>_part3.csv` (200,000 rows)
+
+Each file includes the header row with column names.

@@ -93,6 +93,10 @@ func Query() *cli.Command {
 				Name:  "export",
 				Usage: "export results to a CSV file ",
 			},
+			&cli.IntFlag{
+				Name:  "split-rows",
+				Usage: "split export into multiple CSV files with at most this many rows per file (requires --export)",
+			},
 			&cli.StringFlag{
 				Name:    "config-file",
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
@@ -164,6 +168,11 @@ func Query() *cli.Command {
 
 			if c.IsSet("limit") && parser != nil {
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
+			}
+
+			// Validate split-rows is only used with export
+			if c.IsSet("split-rows") && !c.Bool("export") {
+				return handleError(c.String("output"), errors.New("--split-rows requires --export flag"))
 			}
 
 			if c.Bool("dry-run") {
@@ -239,11 +248,18 @@ func Query() *cli.Command {
 				}
 
 				// Output result based on format specified
-				var resultsPath string
 				if c.Bool("export") {
-					resultsPath, err = exportResultsToCSV(result, inputPath)
-					if err != nil {
-						return handleError(c.String("output"), errors.Wrap(err, "failed to export results to CSV"))
+					splitRows := c.Int("split-rows")
+					if splitRows > 0 {
+						resultsPaths, exportErr := exportResultsToMultipleCSV(result, inputPath, splitRows)
+						if exportErr != nil {
+							return handleError(c.String("output"), errors.Wrap(exportErr, "failed to export results to CSV"))
+						}
+						return handleMultipleFilesSuccess(c.String("output"), resultsPaths)
+					}
+					resultsPath, exportErr := exportResultsToCSV(result, inputPath)
+					if exportErr != nil {
+						return handleError(c.String("output"), errors.Wrap(exportErr, "failed to export results to CSV"))
 					}
 					successMessage := "Results Successfully exported to " + resultsPath
 					return handleSuccess(c.String("output"), successMessage)
@@ -725,6 +741,90 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	return resultsPath, nil
 }
 
+func exportResultsToMultipleCSV(results *query.QueryResult, inputPath string, splitRows int) ([]string, error) {
+	if inputPath == "" {
+		inputPath = "."
+	}
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
+	if err != nil {
+		return nil, err
+	}
+
+	exportsDir := filepath.Join(repoRoot.Path, "logs/exports")
+	err = os.MkdirAll(exportsDir, 0o755)
+	if err != nil {
+		return nil, err
+	}
+
+	totalRows := len(results.Rows)
+	if totalRows == 0 {
+		resultName := fmt.Sprintf("query_result_%d_part1.csv", time.Now().UnixMilli())
+		resultsPath := filepath.Join(exportsDir, resultName)
+		if err = writeCSVFile(resultsPath, results.Columns, nil); err != nil {
+			return nil, err
+		}
+		return []string{resultsPath}, nil
+	}
+
+	numFiles := (totalRows + splitRows - 1) / splitRows
+	timestamp := time.Now().UnixMilli()
+	resultsPaths := make([]string, 0, numFiles)
+
+	for i := range numFiles {
+		startIdx := i * splitRows
+		endIdx := startIdx + splitRows
+		if endIdx > totalRows {
+			endIdx = totalRows
+		}
+
+		resultName := fmt.Sprintf("query_result_%d_part%d.csv", timestamp, i+1)
+		resultsPath := filepath.Join(exportsDir, resultName)
+
+		if err = writeCSVFile(resultsPath, results.Columns, results.Rows[startIdx:endIdx]); err != nil {
+			return nil, err
+		}
+		resultsPaths = append(resultsPaths, resultsPath)
+	}
+
+	return resultsPaths, nil
+}
+
+func writeCSVFile(path string, columns []string, rows [][]interface{}) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	if err = writer.Write(columns); err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		rowStrings := make([]string, len(row))
+		for i, val := range row {
+			if val == nil {
+				rowStrings[i] = ""
+			} else {
+				rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
+			}
+		}
+		if err = writer.Write(rowStrings); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func applySchemaPrefix(_ context.Context, queryStr, dialect string, parser *sqlparser.SQLParser, pipelineInfo *ppInfo, conn interface{}) (string, error) {
 	if dialect == "" {
 		// If no dialect, we can't rewrite the query
@@ -793,6 +893,27 @@ func handleSuccess(output string, message string) error {
 		fmt.Println(string(jsonSuccessMessage))
 	} else {
 		successPrinter.Printf("%s\n", message)
+	}
+	return nil
+}
+
+func handleMultipleFilesSuccess(output string, paths []string) error {
+	if output == "json" {
+		jsonSuccessMessage, err := json.Marshal(map[string]interface{}{
+			"message": "Results successfully exported",
+			"files":   paths,
+			"count":   len(paths),
+		})
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+			return cli.Exit("", 1)
+		}
+		fmt.Println(string(jsonSuccessMessage))
+	} else {
+		successPrinter.Printf("Results successfully exported to %d files:\n", len(paths))
+		for _, p := range paths {
+			successPrinter.Printf("  - %s\n", p)
+		}
 	}
 	return nil
 }
