@@ -12,6 +12,7 @@ const (
 	ProviderClaude   ProviderType = "claude"
 	ProviderOpenCode ProviderType = "opencode"
 	ProviderCodex    ProviderType = "codex"
+	ProviderCursor   ProviderType = "cursor"
 )
 
 // Provider defines the interface for AI CLI providers.

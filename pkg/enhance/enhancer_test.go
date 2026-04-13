@@ -36,6 +36,15 @@ func TestNewEnhancer(t *testing.T) {
 		assert.Equal(t, "codex", enhancer.provider.Name())
 	})
 
+	t.Run("creates Cursor provider when specified", func(t *testing.T) {
+		t.Parallel()
+		enhancer := NewEnhancer(ProviderCursor, "")
+
+		assert.NotNil(t, enhancer)
+		assert.NotNil(t, enhancer.provider)
+		assert.Equal(t, "cursor", enhancer.provider.Name())
+	})
+
 	t.Run("defaults to Claude when invalid provider type", func(t *testing.T) {
 		t.Parallel()
 		enhancer := NewEnhancer(ProviderType("invalid"), "")

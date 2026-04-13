@@ -66,6 +66,11 @@ func enhanceCommand(isDebug *bool) *cli.Command {
 				Value: false,
 			},
 			&cli.BoolFlag{
+				Name:  "cursor",
+				Usage: "Use Cursor (cursor-agent) CLI for AI enhancement",
+				Value: false,
+			},
+			&cli.BoolFlag{
 				Name:  "debug",
 				Usage: "Show debug information during enhancement",
 				Value: false,
@@ -441,8 +446,12 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		flagCount++
 		providerType = enhance.ProviderCodex
 	}
+	if c.Bool("cursor") {
+		flagCount++
+		providerType = enhance.ProviderCursor
+	}
 	if flagCount > 1 {
-		return errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex)")
+		return errors.New("cannot specify multiple provider flags (--claude, --opencode, --codex, --cursor)")
 	}
 
 	enhancer := enhance.NewEnhancer(providerType, c.String("model"))

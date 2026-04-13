@@ -34,6 +34,8 @@ func NewEnhancer(providerType ProviderType, model string) *Enhancer {
 		provider = NewCodexProvider(model, fs)
 	case ProviderOpenCode:
 		provider = NewOpenCodeProvider(model, fs)
+	case ProviderCursor:
+		provider = NewCursorProvider(model, fs)
 	case ProviderClaude:
 		provider = NewClaudeProvider(model, fs)
 	default:
