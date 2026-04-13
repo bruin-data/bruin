@@ -76,6 +76,46 @@ func NewOpenCodeProvider(model string, fs afero.Fs) Provider {
 	return NewCLIProvider(config, model, fs)
 }
 
+// NewCursorProvider creates a new Cursor (cursor-agent) CLI provider.
+func NewCursorProvider(model string, fs afero.Fs) Provider {
+	buildCursorArgs := func(modelName, prompt, systemPrompt, outputFormat string) []string {
+		args := []string{
+			"-p",
+			"--output-format", outputFormat,
+			"--force",
+		}
+		if modelName != "" {
+			args = append(args, "--model", modelName)
+		} else {
+			args = append(args, "--model", "claude-4.6-sonnet-medium")
+		}
+
+		// Combine system prompt and user prompt
+		fullPrompt := prompt
+		if systemPrompt != "" {
+			fullPrompt = systemPrompt + "\n\n" + prompt
+		}
+		args = append(args, fullPrompt)
+		return args
+	}
+
+	config := CLIProviderConfig{ //nolint:gosec // G101: APIKeyEnvVar is an env var name, not a hardcoded credential
+		Name:         "cursor",
+		BinaryName:   "cursor-agent",
+		DefaultModel: "",
+		UseAPIKeyEnv: true,
+		APIKeyEnvVar: "CURSOR_API_KEY",
+		BuildArgs: func(modelName, prompt, systemPrompt string) []string {
+			return buildCursorArgs(modelName, prompt, systemPrompt, "text")
+		},
+		BuildStreamArgs: func(modelName, prompt, systemPrompt string) []string {
+			return buildCursorArgs(modelName, prompt, systemPrompt, "stream-json")
+		},
+		ParseStream: parseCursorStreamJSON,
+	}
+	return NewCLIProvider(config, model, fs)
+}
+
 // NewCodexProvider creates a new Codex CLI provider.
 func NewCodexProvider(model string, fs afero.Fs) Provider {
 	buildCodexArgs := func(modelName, prompt, systemPrompt string, json bool) []string {

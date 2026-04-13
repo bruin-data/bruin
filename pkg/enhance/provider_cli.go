@@ -263,7 +263,7 @@ func parseClaudeStreamJSON(r io.Reader, w io.Writer) {
 			// Claude may return subtype:"success" with is_error:true (e.g. auth failures)
 			isError, _ := event["is_error"].(bool)
 			sub, _ := event["subtype"].(string)
-			if isError || sub == "error" {
+			if isError || sub == "error" { //nolint:goconst // "error" is a protocol constant, not worth extracting
 				if errMsg, _ := event["result"].(string); errMsg != "" {
 					fmt.Fprintf(w, "error: %s\n", errMsg)
 				} else if errMsg := extractErrorMessage(event); errMsg != "" {
@@ -331,6 +331,119 @@ func firstString(m map[string]interface{}, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+// parseCursorStreamJSON reads cursor-agent --output-format stream-json output and writes
+// human-readable activity lines to the writer.
+//
+// Cursor emits events with these types:
+//
+//	{"type":"system","subtype":"init",...}
+//	{"type":"tool_call","subtype":"started","tool_call":{"readToolCall":{"args":{...}}},...}
+//	{"type":"tool_call","subtype":"completed",...}
+//	{"type":"assistant","message":{"content":[{"type":"text","text":"..."}]},...}
+//	{"type":"result","subtype":"success"|"error",...}
+func parseCursorStreamJSON(r io.Reader, w io.Writer) {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		var event map[string]interface{}
+		if err := json.Unmarshal(line, &event); err != nil {
+			if text := strings.TrimSpace(string(line)); text != "" {
+				fmt.Fprintf(w, "%s\n", text)
+			}
+			continue
+		}
+
+		msgType, _ := event["type"].(string)
+		switch msgType {
+		case "tool_call":
+			subtype, _ := event["subtype"].(string)
+			if subtype != "started" {
+				continue
+			}
+			if tc, ok := event["tool_call"].(map[string]interface{}); ok {
+				toolName, detail := cursorToolDetail(tc)
+				if toolName != "" {
+					if detail != "" {
+						fmt.Fprintf(w, "%s: %s\n", toolName, detail)
+					} else {
+						fmt.Fprintf(w, "%s\n", toolName)
+					}
+				}
+			}
+		case "result":
+			isError, _ := event["is_error"].(bool)
+			sub, _ := event["subtype"].(string)
+			if isError || sub == "error" {
+				if errMsg, _ := event["result"].(string); errMsg != "" {
+					fmt.Fprintf(w, "error: %s\n", errMsg)
+				} else if errMsg := extractErrorMessage(event); errMsg != "" {
+					fmt.Fprintf(w, "error: %s\n", errMsg)
+				} else {
+					fmt.Fprintln(w, "enhancement failed")
+				}
+			} else if sub == "success" {
+				fmt.Fprintln(w, "enhancement complete")
+			}
+		case "error":
+			if errMsg := extractErrorMessage(event); errMsg != "" {
+				fmt.Fprintf(w, "error: %s\n", errMsg)
+			}
+		}
+	}
+}
+
+// cursorToolNames maps Cursor's tool_call keys to human-readable display names.
+var cursorToolNames = map[string]string{
+	"readToolCall":     "Read",
+	"editToolCall":     "Edit",
+	"writeToolCall":    "Write",
+	"shellToolCall":    "Bash",
+	"searchToolCall":   "Search",
+	"grepToolCall":     "Grep",
+	"globToolCall":     "Glob",
+	"listDirToolCall":  "ListDir",
+	"fetchToolCall":    "Fetch",
+	"listToolCall":     "List",
+	"fileEditToolCall": "Edit",
+}
+
+// cursorToolDetail extracts a human-readable tool name and detail from a Cursor tool_call object.
+// Cursor nests tool calls as {"readToolCall":{"args":{...}}}, {"editToolCall":{"args":{...}}}, etc.
+func cursorToolDetail(tc map[string]interface{}) (string, string) {
+	for key, displayName := range cursorToolNames {
+		call, ok := tc[key].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		args, _ := call["args"].(map[string]interface{})
+		if args == nil {
+			return displayName, ""
+		}
+		// Extract path or command as detail
+		if p := firstString(args, "path", "file_path"); p != "" {
+			return displayName, p
+		}
+		if cmd := firstString(args, "command", "cmd"); cmd != "" {
+			if len(cmd) > 80 {
+				cmd = cmd[:77] + "..."
+			}
+			return displayName, cmd
+		}
+		if pattern := firstString(args, "pattern", "globPattern", "query", "regex"); pattern != "" {
+			return displayName, fmt.Sprintf(`"%s"`, pattern)
+		}
+		return displayName, ""
+	}
+
+	return "", ""
 }
 
 // parseCodexStreamJSON reads Codex CLI --json JSONL output and writes human-readable
