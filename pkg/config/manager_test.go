@@ -2,6 +2,7 @@ package config
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestLoadFromFile(t *testing.T) {
@@ -174,6 +176,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "gorgiaskey",
 					Domain: "gorgiasurl",
 					Email:  "gorgiasemail",
+				},
+			},
+			G2: []G2Connection{
+				{
+					Name:     "conn-g2",
+					APIToken: "g2token",
 				},
 			},
 			Klaviyo: []KlaviyoConnection{
@@ -506,6 +514,13 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:     "clickup-1",
 					APIToken: "token_123",
+				},
+			},
+			Jobtread: []JobtreadConnection{
+				{
+					Name:           "jobtread-1",
+					GrantKey:       "grant_key_123",
+					OrganizationID: "org_123",
 				},
 			},
 			Posthog: []PosthogConnection{
@@ -1946,16 +1961,100 @@ func TestConnections_MergeFrom(t *testing.T) {
 				MsSQL:               []MsSQLConnection{{Name: "mssql1"}},
 				Databricks:          []DatabricksConnection{{Name: "db1"}},
 				Synapse:             []SynapseConnection{{Name: "syn1"}},
+				Fabric:              []FabricConnection{{Name: "fabric1"}},
 				Mongo:               []MongoConnection{{Name: "mongo1"}},
 				Couchbase:           []CouchbaseConnection{{Name: "couchbase1"}},
+				Cursor:              []CursorConnection{{Name: "cursor1"}},
+				MongoAtlas:          []MongoAtlasConnection{{Name: "mongoatlas1"}},
 				MySQL:               []MySQLConnection{{Name: "mysql1"}},
 				Notion:              []NotionConnection{{Name: "notion1"}},
+				Allium:              []AlliumConnection{{Name: "allium1"}},
 				HANA:                []HANAConnection{{Name: "hana1"}},
+				Hostaway:            []HostawayConnection{{Name: "hostaway1"}},
 				Shopify:             []ShopifyConnection{{Name: "shopify1"}},
 				Gorgias:             []GorgiasConnection{{Name: "gorgias1"}},
+				G2:                  []G2Connection{{Name: "g21"}},
 				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
+				Adjust:              []AdjustConnection{{Name: "adjust1"}},
+				Anthropic:           []AnthropicConnection{{Name: "anthropic1"}},
+				Generic:             []GenericConnection{{Name: "generic1"}},
+				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
+				Stripe:              []StripeConnection{{Name: "stripe1"}},
+				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
+				Kafka:               []KafkaConnection{{Name: "kafka1"}},
+				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
 				DuckDB:              []DuckDBConnection{{Name: "duckdb1"}},
+				MotherDuck:          []MotherduckConnection{{Name: "motherduck1"}},
 				ClickHouse:          []ClickHouseConnection{{Name: "clickhouse1"}},
+				Hubspot:             []HubspotConnection{{Name: "hubspot1"}},
+				Intercom:            []IntercomConnection{{Name: "intercom1"}},
+				GitHub:              []GitHubConnection{{Name: "github1"}},
+				GoogleSheets:        []GoogleSheetsConnection{{Name: "googlesheets1"}},
+				Chess:               []ChessConnection{{Name: "chess1"}},
+				Airtable:            []AirtableConnection{{Name: "airtable1"}},
+				Zendesk:             []ZendeskConnection{{Name: "zendesk1"}},
+				TikTokAds:           []TikTokAdsConnection{{Name: "tiktokads1"}},
+				SnapchatAds:         []SnapchatAdsConnection{{Name: "snapchatads1"}},
+				S3:                  []S3Connection{{Name: "s31"}},
+				Slack:               []SlackConnection{{Name: "slack1"}},
+				Socrata:             []SocrataConnection{{Name: "socrata1"}},
+				Asana:               []AsanaConnection{{Name: "asana1"}},
+				DynamoDB:            []DynamoDBConnection{{Name: "dynamodb1"}},
+				Docebo:              []DoceboConnection{{Name: "docebo1"}},
+				GoogleAds:           []GoogleAdsConnection{{Name: "googleads1"}},
+				AppStore:            []AppStoreConnection{{Name: "appstore1"}},
+				LinkedInAds:         []LinkedInAdsConnection{{Name: "linkedinads1"}},
+				Mailchimp:           []MailchimpConnection{{Name: "mailchimp1"}},
+				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
+				Linear:              []LinearConnection{{Name: "linear1"}},
+				GCS:                 []GCSConnection{{Name: "gcs1"}},
+				ApplovinMax:         []ApplovinMaxConnection{{Name: "applovinmax1"}},
+				Personio:            []PersonioConnection{{Name: "personio1"}},
+				Kinesis:             []KinesisConnection{{Name: "kinesis1"}},
+				Pipedrive:           []PipedriveConnection{{Name: "pipedrive1"}},
+				Mixpanel:            []MixpanelConnection{{Name: "mixpanel1"}},
+				Clickup:             []ClickupConnection{{Name: "clickup1"}},
+				Jobtread:            []JobtreadConnection{{Name: "jobtread1"}},
+				Posthog:             []PosthogConnection{{Name: "posthog1"}},
+				Pinterest:           []PinterestConnection{{Name: "pinterest1"}},
+				Trustpilot:          []TrustpilotConnection{{Name: "trustpilot1"}},
+				QuickBooks:          []QuickBooksConnection{{Name: "quickbooks1"}},
+				Wise:                []WiseConnection{{Name: "wise1"}},
+				Zoom:                []ZoomConnection{{Name: "zoom1"}},
+				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
+				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
+				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
+				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
+				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
+				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
+				SQLite:              []SQLiteConnection{{Name: "sqlite1"}},
+				DB2:                 []DB2Connection{{Name: "db21"}},
+				Oracle:              []OracleConnection{{Name: "oracle1"}},
+				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
+				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
+				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Spanner:             []SpannerConnection{{Name: "spanner1"}},
+				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
+				Attio:               []AttioConnection{{Name: "attio1"}},
+				Sftp:                []SFTPConnection{{Name: "sftp1"}},
+				ISOCPulse:           []ISOCPulseConnection{{Name: "isocpulse1"}},
+				InfluxDB:            []InfluxDBConnection{{Name: "influxdb1"}},
+				Tableau:             []TableauConnection{{Name: "tableau1"}},
+				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
+				Trino:               []TrinoConnection{{Name: "trino1"}},
+				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
+				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
+				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
+				Fireflies:           []FirefliesConnection{{Name: "fireflies1"}},
+				Jira:                []JiraConnection{{Name: "jira1"}},
+				Monday:              []MondayConnection{{Name: "monday1"}},
+				PlusVibeAI:          []PlusVibeAIConnection{{Name: "plusvibeai1"}},
+				BruinCloud:          []BruinCloudConnection{{Name: "bruin1"}},
+				Primer:              []PrimerConnection{{Name: "primer1"}},
+				Indeed:              []IndeedConnection{{Name: "indeed1"}},
+				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
+				Vertica:             []VerticaConnection{{Name: "vertica1"}},
+				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
 			want: &Connections{
 				AwsConnection:       []AwsConnection{{Name: "aws1"}},
@@ -1967,16 +2066,100 @@ func TestConnections_MergeFrom(t *testing.T) {
 				MsSQL:               []MsSQLConnection{{Name: "mssql1"}},
 				Databricks:          []DatabricksConnection{{Name: "db1"}},
 				Synapse:             []SynapseConnection{{Name: "syn1"}},
+				Fabric:              []FabricConnection{{Name: "fabric1"}},
 				Mongo:               []MongoConnection{{Name: "mongo1"}},
 				Couchbase:           []CouchbaseConnection{{Name: "couchbase1"}},
+				Cursor:              []CursorConnection{{Name: "cursor1"}},
+				MongoAtlas:          []MongoAtlasConnection{{Name: "mongoatlas1"}},
 				MySQL:               []MySQLConnection{{Name: "mysql1"}},
 				Notion:              []NotionConnection{{Name: "notion1"}},
+				Allium:              []AlliumConnection{{Name: "allium1"}},
 				HANA:                []HANAConnection{{Name: "hana1"}},
+				Hostaway:            []HostawayConnection{{Name: "hostaway1"}},
 				Shopify:             []ShopifyConnection{{Name: "shopify1"}},
 				Gorgias:             []GorgiasConnection{{Name: "gorgias1"}},
+				G2:                  []G2Connection{{Name: "g21"}},
 				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
+				Adjust:              []AdjustConnection{{Name: "adjust1"}},
+				Anthropic:           []AnthropicConnection{{Name: "anthropic1"}},
+				Generic:             []GenericConnection{{Name: "generic1"}},
+				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
+				Stripe:              []StripeConnection{{Name: "stripe1"}},
+				Appsflyer:           []AppsflyerConnection{{Name: "appsflyer1"}},
+				Kafka:               []KafkaConnection{{Name: "kafka1"}},
+				RabbitMQ:            []RabbitMQConnection{{Name: "rabbitmq1"}},
 				DuckDB:              []DuckDBConnection{{Name: "duckdb1"}},
+				MotherDuck:          []MotherduckConnection{{Name: "motherduck1"}},
 				ClickHouse:          []ClickHouseConnection{{Name: "clickhouse1"}},
+				Hubspot:             []HubspotConnection{{Name: "hubspot1"}},
+				Intercom:            []IntercomConnection{{Name: "intercom1"}},
+				GitHub:              []GitHubConnection{{Name: "github1"}},
+				GoogleSheets:        []GoogleSheetsConnection{{Name: "googlesheets1"}},
+				Chess:               []ChessConnection{{Name: "chess1"}},
+				Airtable:            []AirtableConnection{{Name: "airtable1"}},
+				Zendesk:             []ZendeskConnection{{Name: "zendesk1"}},
+				TikTokAds:           []TikTokAdsConnection{{Name: "tiktokads1"}},
+				SnapchatAds:         []SnapchatAdsConnection{{Name: "snapchatads1"}},
+				S3:                  []S3Connection{{Name: "s31"}},
+				Slack:               []SlackConnection{{Name: "slack1"}},
+				Socrata:             []SocrataConnection{{Name: "socrata1"}},
+				Asana:               []AsanaConnection{{Name: "asana1"}},
+				DynamoDB:            []DynamoDBConnection{{Name: "dynamodb1"}},
+				Docebo:              []DoceboConnection{{Name: "docebo1"}},
+				GoogleAds:           []GoogleAdsConnection{{Name: "googleads1"}},
+				AppStore:            []AppStoreConnection{{Name: "appstore1"}},
+				LinkedInAds:         []LinkedInAdsConnection{{Name: "linkedinads1"}},
+				Mailchimp:           []MailchimpConnection{{Name: "mailchimp1"}},
+				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
+				Linear:              []LinearConnection{{Name: "linear1"}},
+				GCS:                 []GCSConnection{{Name: "gcs1"}},
+				ApplovinMax:         []ApplovinMaxConnection{{Name: "applovinmax1"}},
+				Personio:            []PersonioConnection{{Name: "personio1"}},
+				Kinesis:             []KinesisConnection{{Name: "kinesis1"}},
+				Pipedrive:           []PipedriveConnection{{Name: "pipedrive1"}},
+				Mixpanel:            []MixpanelConnection{{Name: "mixpanel1"}},
+				Clickup:             []ClickupConnection{{Name: "clickup1"}},
+				Jobtread:            []JobtreadConnection{{Name: "jobtread1"}},
+				Posthog:             []PosthogConnection{{Name: "posthog1"}},
+				Pinterest:           []PinterestConnection{{Name: "pinterest1"}},
+				Trustpilot:          []TrustpilotConnection{{Name: "trustpilot1"}},
+				QuickBooks:          []QuickBooksConnection{{Name: "quickbooks1"}},
+				Wise:                []WiseConnection{{Name: "wise1"}},
+				Zoom:                []ZoomConnection{{Name: "zoom1"}},
+				EMRServerless:       []EMRServerlessConnection{{Name: "emr1"}},
+				DataprocServerless:  []DataprocServerlessConnection{{Name: "dataproc1"}},
+				GoogleAnalytics:     []GoogleAnalyticsConnection{{Name: "googleanalytics1"}},
+				AppLovin:            []AppLovinConnection{{Name: "applovin1"}},
+				Frankfurter:         []FrankfurterConnection{{Name: "frankfurter1"}},
+				Salesforce:          []SalesforceConnection{{Name: "salesforce1"}},
+				SQLite:              []SQLiteConnection{{Name: "sqlite1"}},
+				DB2:                 []DB2Connection{{Name: "db21"}},
+				Oracle:              []OracleConnection{{Name: "oracle1"}},
+				Phantombuster:       []PhantombusterConnection{{Name: "phantombuster1"}},
+				Elasticsearch:       []ElasticsearchConnection{{Name: "elasticsearch1"}},
+				Solidgate:           []SolidgateConnection{{Name: "solidgate1"}},
+				Spanner:             []SpannerConnection{{Name: "spanner1"}},
+				Smartsheet:          []SmartsheetConnection{{Name: "smartsheet1"}},
+				Attio:               []AttioConnection{{Name: "attio1"}},
+				Sftp:                []SFTPConnection{{Name: "sftp1"}},
+				ISOCPulse:           []ISOCPulseConnection{{Name: "isocpulse1"}},
+				InfluxDB:            []InfluxDBConnection{{Name: "influxdb1"}},
+				Tableau:             []TableauConnection{{Name: "tableau1"}},
+				QuickSight:          []QuickSightConnection{{Name: "quicksight1"}},
+				Trino:               []TrinoConnection{{Name: "trino1"}},
+				Fluxx:               []FluxxConnection{{Name: "fluxx1"}},
+				Freshdesk:           []FreshdeskConnection{{Name: "freshdesk1"}},
+				FundraiseUp:         []FundraiseUpConnection{{Name: "fundraiseup1"}},
+				Fireflies:           []FirefliesConnection{{Name: "fireflies1"}},
+				Jira:                []JiraConnection{{Name: "jira1"}},
+				Monday:              []MondayConnection{{Name: "monday1"}},
+				PlusVibeAI:          []PlusVibeAIConnection{{Name: "plusvibeai1"}},
+				BruinCloud:          []BruinCloudConnection{{Name: "bruin1"}},
+				Primer:              []PrimerConnection{{Name: "primer1"}},
+				Indeed:              []IndeedConnection{{Name: "indeed1"}},
+				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
+				Vertica:             []VerticaConnection{{Name: "vertica1"}},
+				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
 			expectedErr: false,
 		},
@@ -2241,5 +2424,112 @@ environments:
 				assert.Nil(t, got)
 			}
 		})
+	}
+}
+
+func TestSnowflakeConnection_MarshalYAML_PrivateKey(t *testing.T) {
+	t.Parallel()
+
+	privateKey := `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7ZtFJp7nR3sL9
+Xy8kPq2jLmV9bN3oR6tUwVcXzA1bH2cY4eF5gH6jK7lM8nBvCxDsEwQrTyUiOp
+-----END PRIVATE KEY-----`
+
+	conn := SnowflakeConnection{
+		Name:       "test-snowflake",
+		Account:    "test-account",
+		Username:   "test-user",
+		Database:   "test-db",
+		PrivateKey: privateKey,
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(&conn)
+	require.NoError(t, err)
+
+	yamlStr := string(yamlData)
+
+	// Verify that the YAML contains literal block style indicator (|)
+	assert.Contains(t, yamlStr, "private_key: |", "private_key should use literal block scalar style")
+
+	// Verify that the YAML contains the BEGIN marker on its own line (not inline)
+	assert.Contains(t, yamlStr, "-----BEGIN PRIVATE KEY-----", "private_key should contain BEGIN marker")
+	assert.Contains(t, yamlStr, "-----END PRIVATE KEY-----", "private_key should contain END marker")
+
+	// Verify we can unmarshal it back correctly
+	var unmarshaled SnowflakeConnection
+	err = yaml.Unmarshal(yamlData, &unmarshaled)
+	require.NoError(t, err)
+
+	// The unmarshaled private key should have proper newlines
+	assert.Contains(t, unmarshaled.PrivateKey, "\n", "unmarshaled private_key should contain newlines")
+	assert.Contains(t, unmarshaled.PrivateKey, "-----BEGIN PRIVATE KEY-----", "unmarshaled private_key should contain BEGIN marker")
+	assert.Contains(t, unmarshaled.PrivateKey, "-----END PRIVATE KEY-----", "unmarshaled private_key should contain END marker")
+}
+
+func TestSnowflakeConnection_MarshalYAML_WithoutPrivateKey(t *testing.T) {
+	t.Parallel()
+
+	conn := SnowflakeConnection{
+		Name:     "test-snowflake",
+		Account:  "test-account",
+		Username: "test-user",
+		Password: "test-pass",
+		Database: "test-db",
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(&conn)
+	require.NoError(t, err)
+
+	yamlStr := string(yamlData)
+
+	// Verify that the YAML does not contain private_key field
+	assert.NotContains(t, yamlStr, "private_key:", "YAML should not contain private_key when not set")
+
+	// Verify it contains the other fields
+	assert.Contains(t, yamlStr, "name: test-snowflake")
+	assert.Contains(t, yamlStr, "account: test-account")
+	assert.Contains(t, yamlStr, "username: test-user")
+	assert.Contains(t, yamlStr, "password: test-pass")
+}
+
+func TestSnowflakeConnection_MarshalYAML_SingleLinePrivateKey(t *testing.T) {
+	t.Parallel()
+
+	// This is how a private key might come from the VS Code extension - all on one line with spaces
+	singleLineKey := "-----BEGIN PRIVATE KEY----- MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7ZtFJp -----END PRIVATE KEY-----"
+
+	conn := SnowflakeConnection{
+		Name:       "test-snowflake",
+		Account:    "test-account",
+		Username:   "test-user",
+		Database:   "test-db",
+		PrivateKey: singleLineKey,
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(&conn)
+	require.NoError(t, err)
+
+	yamlStr := string(yamlData)
+
+	// Verify that the YAML contains literal block style indicator (|)
+	assert.Contains(t, yamlStr, "private_key: |", "private_key should use literal block scalar style")
+
+	// Verify we can unmarshal it back correctly
+	var unmarshaled SnowflakeConnection
+	err = yaml.Unmarshal(yamlData, &unmarshaled)
+	require.NoError(t, err)
+
+	// The unmarshaled private key should have proper newlines (header, content, footer on separate lines)
+	assert.Contains(t, unmarshaled.PrivateKey, "-----BEGIN PRIVATE KEY-----\n", "header should be followed by newline")
+	assert.Contains(t, unmarshaled.PrivateKey, "\n-----END PRIVATE KEY-----", "footer should be preceded by newline")
+
+	// Content should not have spaces (they should be removed during normalization)
+	lines := strings.Split(unmarshaled.PrivateKey, "\n")
+	if len(lines) >= 2 {
+		contentLine := lines[1]
+		assert.NotContains(t, contentLine, " ", "content line should not contain spaces")
 	}
 }

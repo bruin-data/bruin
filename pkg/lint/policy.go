@@ -170,7 +170,7 @@ func (spec *PolicySpecification) init() error {
 }
 
 // we need to pass in the sqlparser to the policy because of the query-matches-columns rule.
-func (spec *PolicySpecification) Rules(sqlParser sqlParser) ([]Rule, error) {
+func (spec *PolicySpecification) Rules(sqlParser sqlparser.Parser) ([]Rule, error) {
 	if err := spec.init(); err != nil {
 		return nil, err
 	}
@@ -202,15 +202,12 @@ func (spec *PolicySpecification) Rules(sqlParser sqlParser) ([]Rule, error) {
 }
 
 // we need to pass in the sqlparser to the policy because of the query-matches-columns rule.
-func (spec *PolicySpecification) getValidators(name string, sqlParser sqlParser) (validators, bool) {
+func (spec *PolicySpecification) getValidators(name string, sqlParser sqlparser.Parser) (validators, bool) {
 	def, found := spec.compiledRules[name]
 	if !found {
 		validators, found := builtinRules[name]
 		if found && name == "query-matches-columns" && sqlParser != nil {
-			// Special case: replace the noop validator with the actual implementation
-			if realParser, ok := sqlParser.(*sqlparser.SQLParser); ok {
-				validators.Asset = QueryColumnsMatchColumnsPolicy(realParser)
-			}
+			validators.Asset = QueryColumnsMatchColumnsPolicy(sqlParser)
 		}
 		return validators, found
 	}
@@ -353,7 +350,7 @@ func addBoundaryAnchors(pattern string) string {
 	return pattern
 }
 
-func loadPolicy(path string, sqlParser sqlParser) (rules []Rule, err error) {
+func loadPolicy(path string, sqlParser sqlparser.Parser) (rules []Rule, err error) {
 	// TODO(turtledev): utilize cached FS to improve performance
 	repo, err := git.FindRepoFromPath(path)
 	if errors.Is(err, git.ErrNoGitRepoFound) {

@@ -1,3 +1,18 @@
+# Treat binary files as binary to prevent corruption
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp4 binary
+*.webm binary
+*.mov binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
 # Specify language for Python files
 *.py linguist-language=Python
 

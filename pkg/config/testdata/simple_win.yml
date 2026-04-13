@@ -118,6 +118,10 @@ environments:
           domain: "gorgiasurl"
           email: "gorgiasemail"
 
+      g2:
+        - name: conn-g2
+          api_token: "g2token"
+
       aws:
         - name: conn13
           access_key: "awskey"
@@ -322,6 +326,10 @@ environments:
       clickup:
         - name: "clickup-1"
           api_token: "token_123"
+      jobtread:
+        - name: "jobtread-1"
+          grant_key: "grant_key_123"
+          organization_id: "org_123"
       posthog:
         - name: "posthog-1"
           personal_api_key: "phx_test123"

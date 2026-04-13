@@ -1540,15 +1540,9 @@ func (g *GlossaryChecker) EnsureParentDomainsExistInGlossary(ctx context.Context
 	return issues, nil
 }
 
-type sqlParser interface {
-	UsedTables(sql, dialect string) ([]string, error)
-	GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error)
-	ColumnLineage(sql, dialect string, schema sqlparser.Schema) (*sqlparser.Lineage, error)
-}
-
 type UsedTableValidatorRule struct {
 	renderer jinja.RendererInterface
-	parser   sqlParser
+	parser   sqlparser.Parser
 }
 
 func (u UsedTableValidatorRule) Name() string {
