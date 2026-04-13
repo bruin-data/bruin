@@ -461,40 +461,67 @@ func generateStgMarketingSpend(c *EcommerceChoices) string {
 		switch ad {
 		case adsFacebook:
 			depends = append(depends, "raw.facebook_ad_insights")
-			parts = append(parts, `-- Facebook Ads spend
+			var fbDate string
+			switch c.Warehouse {
+			case warehouseClickHouse:
+				fbDate = "toDate(date_start)"
+			case warehouseSnowflake:
+				fbDate = "date_start::DATE"
+			default:
+				fbDate = "DATE(date_start)"
+			}
+			parts = append(parts, fmt.Sprintf(`-- Facebook Ads spend
 SELECT
-    DATE(date_start) AS spend_date,
+    %s AS spend_date,
     'paid_ads' AS channel,
     campaign_name,
     CAST(spend AS DECIMAL(12,2)) AS spend,
     CAST(impressions AS INTEGER) AS impressions,
     CAST(clicks AS INTEGER) AS clicks,
     CAST(conversions AS INTEGER) AS conversions
-FROM raw.facebook_ad_insights`)
+FROM raw.facebook_ad_insights`, fbDate))
 		case adsGoogle:
 			depends = append(depends, "raw.google_ad_insights")
-			parts = append(parts, `-- Google Ads spend
+			var gaDate string
+			switch c.Warehouse {
+			case warehouseClickHouse:
+				gaDate = "toDate(date)"
+			case warehouseSnowflake:
+				gaDate = "date::DATE"
+			default:
+				gaDate = "DATE(date)"
+			}
+			parts = append(parts, fmt.Sprintf(`-- Google Ads spend
 SELECT
-    DATE(date) AS spend_date,
+    %s AS spend_date,
     'paid_ads' AS channel,
     campaign_name,
     CAST(spend AS DECIMAL(12,2)) AS spend,
     CAST(impressions AS INTEGER) AS impressions,
     CAST(clicks AS INTEGER) AS clicks,
     CAST(conversions AS INTEGER) AS conversions
-FROM raw.google_ad_insights`)
+FROM raw.google_ad_insights`, gaDate))
 		case adsTikTok:
 			depends = append(depends, "raw.tiktok_ad_insights")
-			parts = append(parts, `-- TikTok Ads spend
+			var ttDate string
+			switch c.Warehouse {
+			case warehouseClickHouse:
+				ttDate = "toDate(stat_datetime)"
+			case warehouseSnowflake:
+				ttDate = "stat_datetime::DATE"
+			default:
+				ttDate = "DATE(stat_datetime)"
+			}
+			parts = append(parts, fmt.Sprintf(`-- TikTok Ads spend
 SELECT
-    DATE(stat_datetime) AS spend_date,
+    %s AS spend_date,
     'paid_ads' AS channel,
     campaign_name,
     CAST(spend AS DECIMAL(12,2)) AS spend,
     CAST(impressions AS INTEGER) AS impressions,
     CAST(clicks AS INTEGER) AS clicks,
     CAST(conversions AS INTEGER) AS conversions
-FROM raw.tiktok_ad_insights`)
+FROM raw.tiktok_ad_insights`, ttDate))
 		}
 	}
 
@@ -910,10 +937,10 @@ columns:
 	var dateFn, nullIfFn string
 	switch c.Warehouse {
 	case warehouseClickHouse:
-		dateFn = "toDate(order_date)"
+		dateFn = "toDate(o.order_date)"
 		nullIfFn = "nullIf"
 	case warehouseBigQuery:
-		dateFn = "DATE(order_date)"
+		dateFn = "DATE(o.order_date)"
 		nullIfFn = "NULLIF"
 	case warehouseSnowflake:
 		dateFn = "order_date::DATE"
