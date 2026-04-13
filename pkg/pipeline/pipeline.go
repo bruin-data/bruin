@@ -823,6 +823,7 @@ type Asset struct { //nolint:recvcheck
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
+	Notifications     Notifications      `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 
 	upstream   []*Asset
 	downstream []*Asset
