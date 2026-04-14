@@ -108,6 +108,27 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
+			Identifier:       "valid-asset-slack-notification",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureSlackFieldInAssetIsValid,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
+			Identifier:       "valid-asset-ms-teams-notification",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureMSTeamsFieldInAssetIsValid,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
+			Identifier:       "valid-asset-discord-notification",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureDiscordFieldInAssetIsValid,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "materialization-config",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
