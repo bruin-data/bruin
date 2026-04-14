@@ -4440,6 +4440,61 @@ columns:
 	}
 }
 
+func TestEnsureDiscordFieldInPipelineIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pipeline *pipeline.Pipeline
+		want     []*Issue
+	}{
+		{
+			name:     "no discord notifications, no issues",
+			pipeline: &pipeline.Pipeline{},
+			want:     noIssues,
+		},
+		{
+			name: "valid connection",
+			pipeline: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Discord: []pipeline.DiscordNotification{{Connection: "discord-conn"}},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "empty connection",
+			pipeline: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Discord: []pipeline.DiscordNotification{{Connection: ""}},
+				},
+			},
+			want: []*Issue{{Description: pipelineDiscordConnectionFieldEmpty}},
+		},
+		{
+			name: "duplicate connection",
+			pipeline: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Discord: []pipeline.DiscordNotification{
+						{Connection: "discord-conn"},
+						{Connection: "discord-conn"},
+					},
+				},
+			},
+			want: []*Issue{{Description: pipelineDiscordConnectionFieldNotUnique}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := EnsureDiscordFieldInPipelineIsValid(context.Background(), tt.pipeline)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, issues)
+		})
+	}
+}
+
 func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
 	t.Parallel()
 
