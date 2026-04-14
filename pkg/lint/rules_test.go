@@ -4463,6 +4463,18 @@ func TestEnsureDiscordFieldInPipelineIsValid(t *testing.T) {
 			want: noIssues,
 		},
 		{
+			name: "multiple valid connections",
+			pipeline: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Discord: []pipeline.DiscordNotification{
+						{Connection: "discord-conn-1"},
+						{Connection: "discord-conn-2"},
+					},
+				},
+			},
+			want: noIssues,
+		},
+		{
 			name: "empty connection",
 			pipeline: &pipeline.Pipeline{
 				Notifications: pipeline.Notifications{
