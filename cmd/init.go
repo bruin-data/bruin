@@ -339,9 +339,26 @@ func Init() *cli.Command {
 					return nil // user cancelled
 				}
 
-				// Generate .bruin.yml with selected connections
+				// Load or create .bruin.yml, then merge ecommerce connections into it
+				centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
+				if err != nil {
+					errorPrinter.Printf("Could not load .bruin.yml file: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
 				bruinContent := generateBruinYML(ecommerceChoices)
-				if err := os.WriteFile(bruinYmlPath, []byte(bruinContent), 0o644); err != nil { //nolint:gosec
+				if err := mergeTemplateConfig(centralConfig, []byte(bruinContent)); err != nil {
+					errorPrinter.Printf("Could not merge ecommerce config: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				configBytes, err := yaml.Marshal(centralConfig)
+				if err != nil {
+					errorPrinter.Printf("Could not marshal .bruin.yml: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
 					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 					return cli.Exit("", 1)
 				}
