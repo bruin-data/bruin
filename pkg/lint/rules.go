@@ -55,6 +55,8 @@ const (
 	assetSlackChannelFieldNotUnique      = "The `channel` attribute under the asset-level Slack notifications must be unique"
 	assetMSTeamsConnectionFieldEmpty     = "Asset-level MS Teams notifications `connection` attribute must not be empty"
 	assetMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the asset-level MS Teams notifications must be unique"
+	assetDiscordConnectionFieldEmpty     = "Asset-level Discord notifications `connection` attribute must not be empty"
+	assetDiscordConnectionFieldNotUnique = "The `connection` attribute under the asset-level Discord notifications must be unique"
 
 	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
 	pipelineMaxActiveStepsMustBePositive = "Pipeline max_active_steps must be a positive number"
@@ -1026,6 +1028,34 @@ func EnsureMSTeamsFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline,
 		}
 
 		MSTeamsConnections = append(MSTeamsConnections, notification.Connection)
+	}
+
+	return issues, nil
+}
+
+func EnsureDiscordFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if asset.Notifications == nil {
+		return issues, nil
+	}
+
+	discordConnections := make([]string, 0, len(asset.Notifications.Discord))
+	for _, notification := range asset.Notifications.Discord {
+		if notification.Connection == "" {
+			issues = append(issues, &Issue{
+				Description: assetDiscordConnectionFieldEmpty,
+			})
+			continue
+		}
+
+		if isStringInArray(discordConnections, notification.Connection) {
+			issues = append(issues, &Issue{
+				Description: assetDiscordConnectionFieldNotUnique,
+			})
+		}
+
+		discordConnections = append(discordConnections, notification.Connection)
 	}
 
 	return issues, nil
