@@ -61,6 +61,20 @@ const (
 	assetDiscordConnectionFieldEmpty     = "Asset-level Discord notifications `connection` attribute must not be empty"
 	assetDiscordConnectionFieldNotUnique = "The `connection` attribute under the asset-level Discord notifications must be unique"
 
+	customCheckSlackFieldEmptyChannel          = "Custom check Slack notifications must have a `channel` attribute"
+	customCheckSlackChannelFieldNotUnique      = "The `channel` attribute under the custom check Slack notifications must be unique"
+	customCheckMSTeamsConnectionFieldEmpty     = "Custom check MS Teams notifications `connection` attribute must not be empty"
+	customCheckMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the custom check MS Teams notifications must be unique"
+	customCheckDiscordConnectionFieldEmpty     = "Custom check Discord notifications `connection` attribute must not be empty"
+	customCheckDiscordConnectionFieldNotUnique = "The `connection` attribute under the custom check Discord notifications must be unique"
+
+	columnCheckSlackFieldEmptyChannel          = "Column check Slack notifications must have a `channel` attribute"
+	columnCheckSlackChannelFieldNotUnique      = "The `channel` attribute under the column check Slack notifications must be unique"
+	columnCheckMSTeamsConnectionFieldEmpty     = "Column check MS Teams notifications `connection` attribute must not be empty"
+	columnCheckMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the column check MS Teams notifications must be unique"
+	columnCheckDiscordConnectionFieldEmpty     = "Column check Discord notifications `connection` attribute must not be empty"
+	columnCheckDiscordConnectionFieldNotUnique = "The `connection` attribute under the column check Discord notifications must be unique"
+
 	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
 	pipelineMaxActiveStepsMustBePositive = "Pipeline max_active_steps must be a positive number"
 	assetTierMustBeBetweenOneAndFive     = "Asset tier must be between 1 and 5"
@@ -1083,6 +1097,152 @@ func EnsureDiscordFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline,
 		}
 
 		discordConnections = append(discordConnections, notification.Connection)
+	}
+
+	return issues, nil
+}
+
+func EnsureSlackFieldInCustomCheckIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for _, check := range asset.CustomChecks {
+		if check.Notifications == nil {
+			continue
+		}
+		slackChannels := make([]string, 0, len(check.Notifications.Slack))
+		for _, slack := range check.Notifications.Slack {
+			channelWithoutHash := strings.TrimPrefix(slack.Channel, "#")
+			if channelWithoutHash == "" {
+				issues = append(issues, &Issue{Description: customCheckSlackFieldEmptyChannel})
+				continue
+			}
+			if isStringInArray(slackChannels, channelWithoutHash) {
+				issues = append(issues, &Issue{Description: customCheckSlackChannelFieldNotUnique})
+			}
+			slackChannels = append(slackChannels, channelWithoutHash)
+		}
+	}
+
+	return issues, nil
+}
+
+func EnsureMSTeamsFieldInCustomCheckIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for _, check := range asset.CustomChecks {
+		if check.Notifications == nil {
+			continue
+		}
+		connections := make([]string, 0, len(check.Notifications.MSTeams))
+		for _, notification := range check.Notifications.MSTeams {
+			if notification.Connection == "" {
+				issues = append(issues, &Issue{Description: customCheckMSTeamsConnectionFieldEmpty})
+				continue
+			}
+			if isStringInArray(connections, notification.Connection) {
+				issues = append(issues, &Issue{Description: customCheckMSTeamsConnectionFieldNotUnique})
+			}
+			connections = append(connections, notification.Connection)
+		}
+	}
+
+	return issues, nil
+}
+
+func EnsureDiscordFieldInCustomCheckIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for _, check := range asset.CustomChecks {
+		if check.Notifications == nil {
+			continue
+		}
+		connections := make([]string, 0, len(check.Notifications.Discord))
+		for _, notification := range check.Notifications.Discord {
+			if notification.Connection == "" {
+				issues = append(issues, &Issue{Description: customCheckDiscordConnectionFieldEmpty})
+				continue
+			}
+			if isStringInArray(connections, notification.Connection) {
+				issues = append(issues, &Issue{Description: customCheckDiscordConnectionFieldNotUnique})
+			}
+			connections = append(connections, notification.Connection)
+		}
+	}
+
+	return issues, nil
+}
+
+func EnsureSlackFieldInColumnCheckIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for _, col := range asset.Columns {
+		for _, check := range col.Checks {
+			if check.Notifications == nil {
+				continue
+			}
+			slackChannels := make([]string, 0, len(check.Notifications.Slack))
+			for _, slack := range check.Notifications.Slack {
+				channelWithoutHash := strings.TrimPrefix(slack.Channel, "#")
+				if channelWithoutHash == "" {
+					issues = append(issues, &Issue{Description: columnCheckSlackFieldEmptyChannel})
+					continue
+				}
+				if isStringInArray(slackChannels, channelWithoutHash) {
+					issues = append(issues, &Issue{Description: columnCheckSlackChannelFieldNotUnique})
+				}
+				slackChannels = append(slackChannels, channelWithoutHash)
+			}
+		}
+	}
+
+	return issues, nil
+}
+
+func EnsureMSTeamsFieldInColumnCheckIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for _, col := range asset.Columns {
+		for _, check := range col.Checks {
+			if check.Notifications == nil {
+				continue
+			}
+			connections := make([]string, 0, len(check.Notifications.MSTeams))
+			for _, notification := range check.Notifications.MSTeams {
+				if notification.Connection == "" {
+					issues = append(issues, &Issue{Description: columnCheckMSTeamsConnectionFieldEmpty})
+					continue
+				}
+				if isStringInArray(connections, notification.Connection) {
+					issues = append(issues, &Issue{Description: columnCheckMSTeamsConnectionFieldNotUnique})
+				}
+				connections = append(connections, notification.Connection)
+			}
+		}
+	}
+
+	return issues, nil
+}
+
+func EnsureDiscordFieldInColumnCheckIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for _, col := range asset.Columns {
+		for _, check := range col.Checks {
+			if check.Notifications == nil {
+				continue
+			}
+			connections := make([]string, 0, len(check.Notifications.Discord))
+			for _, notification := range check.Notifications.Discord {
+				if notification.Connection == "" {
+					issues = append(issues, &Issue{Description: columnCheckDiscordConnectionFieldEmpty})
+					continue
+				}
+				if isStringInArray(connections, notification.Connection) {
+					issues = append(issues, &Issue{Description: columnCheckDiscordConnectionFieldNotUnique})
+				}
+				connections = append(connections, notification.Connection)
+			}
+		}
 	}
 
 	return issues, nil
