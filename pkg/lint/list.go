@@ -108,6 +108,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
+			Identifier:       "valid-discord-notification",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        EnsureDiscordFieldInPipelineIsValid,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
 			Identifier:       "valid-asset-slack-notification",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,

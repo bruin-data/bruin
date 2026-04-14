@@ -51,6 +51,9 @@ const (
 	pipelineMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
 
+	pipelineDiscordConnectionFieldEmpty     = "Discord notifications `connection` attribute must not be empty"
+	pipelineDiscordConnectionFieldNotUnique = "The `connection` attribute under the Discord notifications must be unique"
+
 	assetSlackFieldEmptyChannel          = "Asset-level Slack notifications must have a `channel` attribute"
 	assetSlackChannelFieldNotUnique      = "The `channel` attribute under the asset-level Slack notifications must be unique"
 	assetMSTeamsConnectionFieldEmpty     = "Asset-level MS Teams notifications `connection` attribute must not be empty"
@@ -971,6 +974,30 @@ func EnsureMSTeamsFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeli
 		}
 
 		MSTeamsConnections = append(MSTeamsConnections, notification.Connection)
+	}
+
+	return issues, nil
+}
+
+func EnsureDiscordFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	discordConnections := make([]string, 0, len(p.Notifications.Discord))
+	for _, notification := range p.Notifications.Discord {
+		if notification.Connection == "" {
+			issues = append(issues, &Issue{
+				Description: pipelineDiscordConnectionFieldEmpty,
+			})
+			continue
+		}
+
+		if isStringInArray(discordConnections, notification.Connection) {
+			issues = append(issues, &Issue{
+				Description: pipelineDiscordConnectionFieldNotUnique,
+			})
+		}
+
+		discordConnections = append(discordConnections, notification.Connection)
 	}
 
 	return issues, nil
