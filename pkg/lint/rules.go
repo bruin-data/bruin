@@ -51,9 +51,9 @@ const (
 	pipelineMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
 
-	assetSlackFieldEmptyChannel        = "Asset-level Slack notifications must have a `channel` attribute"
-	assetSlackChannelFieldNotUnique    = "The `channel` attribute under the asset-level Slack notifications must be unique"
-	assetMSTeamsConnectionFieldEmpty   = "Asset-level MS Teams notifications `connection` attribute must not be empty"
+	assetSlackFieldEmptyChannel          = "Asset-level Slack notifications must have a `channel` attribute"
+	assetSlackChannelFieldNotUnique      = "The `channel` attribute under the asset-level Slack notifications must be unique"
+	assetMSTeamsConnectionFieldEmpty     = "Asset-level MS Teams notifications `connection` attribute must not be empty"
 	assetMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the asset-level MS Teams notifications must be unique"
 
 	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
@@ -977,6 +977,10 @@ func EnsureMSTeamsFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeli
 func EnsureSlackFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
+	if asset.Notifications == nil {
+		return issues, nil
+	}
+
 	slackChannels := make([]string, 0, len(asset.Notifications.Slack))
 	for _, slack := range asset.Notifications.Slack {
 		channelWithoutHash := strings.TrimPrefix(slack.Channel, "#")
@@ -1001,6 +1005,10 @@ func EnsureSlackFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline, a
 
 func EnsureMSTeamsFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
+
+	if asset.Notifications == nil {
+		return issues, nil
+	}
 
 	MSTeamsConnections := make([]string, 0, len(asset.Notifications.MSTeams))
 	for _, notification := range asset.Notifications.MSTeams {

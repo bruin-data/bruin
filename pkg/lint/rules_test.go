@@ -4456,7 +4456,7 @@ func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
 		{
 			name: "valid channel",
 			asset: &pipeline.Asset{
-				Notifications: pipeline.Notifications{
+				Notifications: &pipeline.Notifications{
 					Slack: []pipeline.SlackNotification{{Channel: "#alerts"}},
 				},
 			},
@@ -4465,7 +4465,7 @@ func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
 		{
 			name: "valid channel without hash prefix",
 			asset: &pipeline.Asset{
-				Notifications: pipeline.Notifications{
+				Notifications: &pipeline.Notifications{
 					Slack: []pipeline.SlackNotification{{Channel: "alerts"}},
 				},
 			},
@@ -4474,7 +4474,7 @@ func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
 		{
 			name: "empty channel",
 			asset: &pipeline.Asset{
-				Notifications: pipeline.Notifications{
+				Notifications: &pipeline.Notifications{
 					Slack: []pipeline.SlackNotification{{Channel: ""}},
 				},
 			},
@@ -4483,7 +4483,7 @@ func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
 		{
 			name: "duplicate channel",
 			asset: &pipeline.Asset{
-				Notifications: pipeline.Notifications{
+				Notifications: &pipeline.Notifications{
 					Slack: []pipeline.SlackNotification{
 						{Channel: "#alerts"},
 						{Channel: "#alerts"},
@@ -4495,7 +4495,7 @@ func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
 		{
 			name: "duplicate channel with and without hash",
 			asset: &pipeline.Asset{
-				Notifications: pipeline.Notifications{
+				Notifications: &pipeline.Notifications{
 					Slack: []pipeline.SlackNotification{
 						{Channel: "#alerts"},
 						{Channel: "alerts"},
@@ -4532,7 +4532,7 @@ func TestEnsureMSTeamsFieldInAssetIsValid(t *testing.T) {
 		{
 			name: "valid connection",
 			asset: &pipeline.Asset{
-				Notifications: pipeline.Notifications{
+				Notifications: &pipeline.Notifications{
 					MSTeams: []pipeline.MSTeamsNotification{{Connection: "teams-webhook"}},
 				},
 			},
@@ -4541,7 +4541,7 @@ func TestEnsureMSTeamsFieldInAssetIsValid(t *testing.T) {
 		{
 			name: "empty connection",
 			asset: &pipeline.Asset{
-				Notifications: pipeline.Notifications{
+				Notifications: &pipeline.Notifications{
 					MSTeams: []pipeline.MSTeamsNotification{{Connection: ""}},
 				},
 			},
@@ -4550,7 +4550,7 @@ func TestEnsureMSTeamsFieldInAssetIsValid(t *testing.T) {
 		{
 			name: "duplicate connection",
 			asset: &pipeline.Asset{
-				Notifications: pipeline.Notifications{
+				Notifications: &pipeline.Notifications{
 					MSTeams: []pipeline.MSTeamsNotification{
 						{Connection: "teams-webhook"},
 						{Connection: "teams-webhook"},

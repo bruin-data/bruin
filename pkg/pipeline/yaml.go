@@ -316,6 +316,13 @@ type athena struct {
 	QueryResultsPath string `yaml:"query_results_path"`
 }
 
+func notificationsOrNil(n Notifications) *Notifications {
+	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 {
+		return nil
+	}
+	return &n
+}
+
 type taskDefinition struct {
 	Name              string            `yaml:"name"`
 	URI               string            `yaml:"uri"`
@@ -524,7 +531,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Meta:              definition.Meta,
 		RerunCooldown:     definition.RerunCooldown,
 		RefreshRestricted: definition.RefreshRestricted,
-		Notifications:     definition.Notifications,
+		Notifications:     notificationsOrNil(definition.Notifications),
 	}
 
 	for index, check := range definition.CustomChecks {
