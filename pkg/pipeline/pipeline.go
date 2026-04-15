@@ -544,11 +544,12 @@ func (ccv *ColumnCheckValue) ToString() string {
 }
 
 type ColumnCheck struct {
-	ID          string           `json:"id" yaml:"-" mapstructure:"-"`
-	Name        string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Value       ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
-	Blocking    DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
-	Description string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	ID            string           `json:"id" yaml:"-" mapstructure:"-"`
+	Name          string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Value         ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Blocking      DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
+	Description   string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Notifications *Notifications   `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
 func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking *bool, description string) ColumnCheck {
@@ -723,13 +724,14 @@ func (s SecretMapping) MarshalYAML() (interface{}, error) {
 }
 
 type CustomCheck struct {
-	ID          string          `json:"id" yaml:"-" mapstructure:"-"`
-	Name        string          `json:"name" yaml:"name" mapstructure:"name"`
-	Description string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Value       int64           `json:"value" yaml:"value" mapstructure:"value"`
-	Count       *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
-	Blocking    DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
-	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
+	ID            string          `json:"id" yaml:"-" mapstructure:"-"`
+	Name          string          `json:"name" yaml:"name" mapstructure:"name"`
+	Description   string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Value         int64           `json:"value" yaml:"value" mapstructure:"value"`
+	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
+	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
+	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
+	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
 type DependsColumn struct {

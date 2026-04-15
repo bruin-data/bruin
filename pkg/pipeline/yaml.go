@@ -266,10 +266,11 @@ func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type columnCheck struct {
-	Name        string           `yaml:"name"`
-	Value       columnCheckValue `yaml:"value"`
-	Blocking    *bool            `yaml:"blocking"`
-	Description string           `yaml:"description,omitempty"`
+	Name          string           `yaml:"name"`
+	Value         columnCheckValue `yaml:"value"`
+	Blocking      *bool            `yaml:"blocking"`
+	Description   string           `yaml:"description,omitempty"`
+	Notifications Notifications    `yaml:"notifications"`
 }
 
 type columnUpstream struct {
@@ -300,12 +301,13 @@ type secretMapping struct {
 }
 
 type customCheck struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	Query       string `yaml:"query"`
-	Value       int64  `yaml:"value"`
-	Count       *int64 `yaml:"count"`
-	Blocking    *bool  `yaml:"blocking"`
+	Name          string        `yaml:"name"`
+	Description   string        `yaml:"description"`
+	Query         string        `yaml:"query"`
+	Value         int64         `yaml:"value"`
+	Count         *int64        `yaml:"count"`
+	Blocking      *bool         `yaml:"blocking"`
+	Notifications Notifications `yaml:"notifications"`
 }
 
 type snowflake struct {
@@ -441,7 +443,9 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 			seenTests[test.Name] = true
 
-			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking, test.Description))
+			check := NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking, test.Description)
+			check.Notifications = notificationsOrNil(test.Notifications)
+			tests = append(tests, check)
 		}
 
 		var entityDefinition *EntityAttribute
@@ -537,13 +541,14 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	for index, check := range definition.CustomChecks {
 		// set the ID as the hash of the name
 		task.CustomChecks[index] = CustomCheck{
-			ID:          hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
-			Name:        check.Name,
-			Description: check.Description,
-			Query:       check.Query,
-			Value:       check.Value,
-			Count:       check.Count,
-			Blocking:    DefaultTrueBool{Value: check.Blocking},
+			ID:            hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
+			Name:          check.Name,
+			Description:   check.Description,
+			Query:         check.Query,
+			Value:         check.Value,
+			Count:         check.Count,
+			Blocking:      DefaultTrueBool{Value: check.Blocking},
+			Notifications: notificationsOrNil(check.Notifications),
 		}
 	}
 
