@@ -78,7 +78,7 @@ Asset success notifications fire after the asset task **and all its quality chec
 
 Check notifications fire for each individual quality check that runs against an asset — both **column-level checks** (defined under `columns[].checks`) and **custom checks** (defined under `custom_checks`).
 
-By default, checks inherit the asset-level `notifications` block. Individual checks can also have their own `notifications` block that **overrides** the asset-level config for that check only. This lets you route specific checks to dedicated channels while keeping a catch-all at the asset level.
+Check notifications are **opt-in per check** — asset-level notifications do not apply to individual checks. To receive a notification for a specific check, add a `notifications` block directly on that check.
 
 ```bruin-sql
 /* @bruin
@@ -88,7 +88,7 @@ type: bq.sql
 
 notifications:
   slack:
-    # Notified on every outcome: each check passing, each check failing, and the asset succeeding or failing.
+    # Notified when the asset succeeds or fails (does not cover individual checks).
     - channel: "#data-quality"
 
     # Notified only when something goes wrong: a check fails or the asset fails.
