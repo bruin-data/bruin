@@ -24,7 +24,6 @@ notifications:
 
   ms_teams:
     - connection: "the-name-of-the-ms-teams-connection"
-      failure: false   # success only
 
   discord:
     - connection: "the-name-of-the-discord-connection"
