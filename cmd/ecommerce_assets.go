@@ -607,6 +607,19 @@ columns:
 func generateStgWebSessions(c *EcommerceChoices) string {
 	var depends, sourceQuery, dateCast string
 
+	var timeDateCast string
+	switch c.Warehouse {
+	case warehouseClickHouse:
+		dateCast = "toDate(session_raw_date)"
+		timeDateCast = "toDate(e.time)"
+	case warehouseBigQuery:
+		dateCast = "DATE(session_raw_date)"
+		timeDateCast = "DATE(e.time)"
+	case warehouseSnowflake:
+		dateCast = "session_raw_date::DATE"
+		timeDateCast = "e.time::DATE"
+	}
+
 	switch c.Analytics {
 	case analyticsGA4:
 		depends = `  - raw.ga4_sessions
@@ -634,7 +647,7 @@ LEFT JOIN raw.ga4_events e
 	case analyticsMixpanel:
 		depends = `  - raw.mixpanel_events`
 
-		sourceQuery = `SELECT
+		sourceQuery = fmt.Sprintf(`SELECT
     s.session_raw_date,
     s.total_sessions,
     s.new_users,
@@ -643,7 +656,7 @@ LEFT JOIN raw.ga4_events e
     s.channel
 FROM (
     SELECT
-        e.time AS session_raw_date,
+        %s AS session_raw_date,
         COUNT(*) AS total_sessions,
         COUNT(CASE WHEN e.is_new_user = true THEN 1 END) AS new_users,
         COUNT(CASE WHEN e.session_duration > 10 THEN 1 END) AS engaged_sessions,
@@ -660,22 +673,13 @@ FROM (
 ) s
 LEFT JOIN (
     SELECT
-        e.time AS purchase_date,
+        %s AS purchase_date,
         COUNT(*) AS purchase_events
     FROM raw.mixpanel_events e
     WHERE e.event_name = 'purchase'
     GROUP BY purchase_date
 ) p
-    ON s.session_raw_date = p.purchase_date`
-	}
-
-	switch c.Warehouse {
-	case warehouseClickHouse:
-		dateCast = "toDate(session_raw_date)"
-	case warehouseBigQuery:
-		dateCast = "DATE(session_raw_date)"
-	case warehouseSnowflake:
-		dateCast = "session_raw_date::DATE"
+    ON s.session_raw_date = p.purchase_date`, timeDateCast, timeDateCast)
 	}
 
 	return fmt.Sprintf(`/* @bruin
