@@ -4692,3 +4692,395 @@ func TestEnsureDiscordFieldInAssetIsValid(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureSlackFieldInCustomCheckIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []*Issue
+	}{
+		{
+			name:  "no custom checks, no issues",
+			asset: &pipeline.Asset{},
+			want:  noIssues,
+		},
+		{
+			name: "custom check with no notifications, no issues",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{Name: "check1"}},
+			},
+			want: noIssues,
+		},
+		{
+			name: "valid channel",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name:          "check1",
+					Notifications: &pipeline.Notifications{Slack: []pipeline.SlackNotification{{Channel: "#alerts"}}},
+				}},
+			},
+			want: noIssues,
+		},
+		{
+			name: "empty channel",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name:          "check1",
+					Notifications: &pipeline.Notifications{Slack: []pipeline.SlackNotification{{Channel: ""}}},
+				}},
+			},
+			want: []*Issue{{Description: customCheckSlackFieldEmptyChannel}},
+		},
+		{
+			name: "duplicate channel",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name: "check1",
+					Notifications: &pipeline.Notifications{Slack: []pipeline.SlackNotification{
+						{Channel: "#alerts"},
+						{Channel: "#alerts"},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: customCheckSlackChannelFieldNotUnique}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := EnsureSlackFieldInCustomCheckIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, issues)
+		})
+	}
+}
+
+func TestEnsureMSTeamsFieldInCustomCheckIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []*Issue
+	}{
+		{
+			name:  "no custom checks, no issues",
+			asset: &pipeline.Asset{},
+			want:  noIssues,
+		},
+		{
+			name: "valid connection",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name:          "check1",
+					Notifications: &pipeline.Notifications{MSTeams: []pipeline.MSTeamsNotification{{Connection: "teams-conn"}}},
+				}},
+			},
+			want: noIssues,
+		},
+		{
+			name: "empty connection",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name:          "check1",
+					Notifications: &pipeline.Notifications{MSTeams: []pipeline.MSTeamsNotification{{Connection: ""}}},
+				}},
+			},
+			want: []*Issue{{Description: customCheckMSTeamsConnectionFieldEmpty}},
+		},
+		{
+			name: "duplicate connection",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name: "check1",
+					Notifications: &pipeline.Notifications{MSTeams: []pipeline.MSTeamsNotification{
+						{Connection: "teams-conn"},
+						{Connection: "teams-conn"},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: customCheckMSTeamsConnectionFieldNotUnique}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := EnsureMSTeamsFieldInCustomCheckIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, issues)
+		})
+	}
+}
+
+func TestEnsureDiscordFieldInCustomCheckIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []*Issue
+	}{
+		{
+			name:  "no custom checks, no issues",
+			asset: &pipeline.Asset{},
+			want:  noIssues,
+		},
+		{
+			name: "valid connection",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name:          "check1",
+					Notifications: &pipeline.Notifications{Discord: []pipeline.DiscordNotification{{Connection: "discord-conn"}}},
+				}},
+			},
+			want: noIssues,
+		},
+		{
+			name: "empty connection",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name:          "check1",
+					Notifications: &pipeline.Notifications{Discord: []pipeline.DiscordNotification{{Connection: ""}}},
+				}},
+			},
+			want: []*Issue{{Description: customCheckDiscordConnectionFieldEmpty}},
+		},
+		{
+			name: "duplicate connection",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name: "check1",
+					Notifications: &pipeline.Notifications{Discord: []pipeline.DiscordNotification{
+						{Connection: "discord-conn"},
+						{Connection: "discord-conn"},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: customCheckDiscordConnectionFieldNotUnique}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := EnsureDiscordFieldInCustomCheckIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, issues)
+		})
+	}
+}
+
+func TestEnsureSlackFieldInColumnCheckIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []*Issue
+	}{
+		{
+			name:  "no columns, no issues",
+			asset: &pipeline.Asset{},
+			want:  noIssues,
+		},
+		{
+			name: "column check with no notifications, no issues",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name:   "id",
+					Checks: []pipeline.ColumnCheck{{Name: "not_null"}},
+				}},
+			},
+			want: noIssues,
+		},
+		{
+			name: "valid channel",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name:          "not_null",
+						Notifications: &pipeline.Notifications{Slack: []pipeline.SlackNotification{{Channel: "#alerts"}}},
+					}},
+				}},
+			},
+			want: noIssues,
+		},
+		{
+			name: "empty channel",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name:          "not_null",
+						Notifications: &pipeline.Notifications{Slack: []pipeline.SlackNotification{{Channel: ""}}},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: columnCheckSlackFieldEmptyChannel}},
+		},
+		{
+			name: "duplicate channel",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name: "not_null",
+						Notifications: &pipeline.Notifications{Slack: []pipeline.SlackNotification{
+							{Channel: "#alerts"},
+							{Channel: "#alerts"},
+						}},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: columnCheckSlackChannelFieldNotUnique}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := EnsureSlackFieldInColumnCheckIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, issues)
+		})
+	}
+}
+
+func TestEnsureMSTeamsFieldInColumnCheckIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []*Issue
+	}{
+		{
+			name:  "no columns, no issues",
+			asset: &pipeline.Asset{},
+			want:  noIssues,
+		},
+		{
+			name: "valid connection",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name:          "not_null",
+						Notifications: &pipeline.Notifications{MSTeams: []pipeline.MSTeamsNotification{{Connection: "teams-conn"}}},
+					}},
+				}},
+			},
+			want: noIssues,
+		},
+		{
+			name: "empty connection",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name:          "not_null",
+						Notifications: &pipeline.Notifications{MSTeams: []pipeline.MSTeamsNotification{{Connection: ""}}},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: columnCheckMSTeamsConnectionFieldEmpty}},
+		},
+		{
+			name: "duplicate connection",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name: "not_null",
+						Notifications: &pipeline.Notifications{MSTeams: []pipeline.MSTeamsNotification{
+							{Connection: "teams-conn"},
+							{Connection: "teams-conn"},
+						}},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: columnCheckMSTeamsConnectionFieldNotUnique}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := EnsureMSTeamsFieldInColumnCheckIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, issues)
+		})
+	}
+}
+
+func TestEnsureDiscordFieldInColumnCheckIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		asset *pipeline.Asset
+		want  []*Issue
+	}{
+		{
+			name:  "no columns, no issues",
+			asset: &pipeline.Asset{},
+			want:  noIssues,
+		},
+		{
+			name: "valid connection",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name:          "not_null",
+						Notifications: &pipeline.Notifications{Discord: []pipeline.DiscordNotification{{Connection: "discord-conn"}}},
+					}},
+				}},
+			},
+			want: noIssues,
+		},
+		{
+			name: "empty connection",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name:          "not_null",
+						Notifications: &pipeline.Notifications{Discord: []pipeline.DiscordNotification{{Connection: ""}}},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: columnCheckDiscordConnectionFieldEmpty}},
+		},
+		{
+			name: "duplicate connection",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "id",
+					Checks: []pipeline.ColumnCheck{{
+						Name: "not_null",
+						Notifications: &pipeline.Notifications{Discord: []pipeline.DiscordNotification{
+							{Connection: "discord-conn"},
+							{Connection: "discord-conn"},
+						}},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: columnCheckDiscordConnectionFieldNotUnique}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			issues, err := EnsureDiscordFieldInColumnCheckIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, issues)
+		})
+	}
+}
