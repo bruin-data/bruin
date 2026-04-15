@@ -635,21 +635,38 @@ LEFT JOIN raw.ga4_events e
 		depends = `  - raw.mixpanel_events`
 
 		sourceQuery = `SELECT
-    e.time AS session_raw_date,
-    COUNT(*) AS total_sessions,
-    COUNT(CASE WHEN e.is_new_user = true THEN 1 END) AS new_users,
-    COUNT(CASE WHEN e.session_duration > 10 THEN 1 END) AS engaged_sessions,
-    COUNT(CASE WHEN e.event_name = 'purchase' THEN 1 END) AS purchase_events,
-    CASE
-        WHEN e.utm_source = 'facebook' THEN 'paid_ads'
-        WHEN e.utm_medium = 'email' THEN 'email'
-        WHEN e.utm_medium = 'organic' THEN 'organic_search'
-        WHEN e.utm_medium = 'cpc' THEN 'paid_search'
-        ELSE 'other'
-    END AS channel
-FROM raw.mixpanel_events e
-WHERE e.event_name = 'session_start'
-GROUP BY session_raw_date, channel`
+    s.session_raw_date,
+    s.total_sessions,
+    s.new_users,
+    s.engaged_sessions,
+    COALESCE(p.purchase_events, 0) AS purchase_events,
+    s.channel
+FROM (
+    SELECT
+        e.time AS session_raw_date,
+        COUNT(*) AS total_sessions,
+        COUNT(CASE WHEN e.is_new_user = true THEN 1 END) AS new_users,
+        COUNT(CASE WHEN e.session_duration > 10 THEN 1 END) AS engaged_sessions,
+        CASE
+            WHEN e.utm_source = 'facebook' THEN 'paid_ads'
+            WHEN e.utm_medium = 'email' THEN 'email'
+            WHEN e.utm_medium = 'organic' THEN 'organic_search'
+            WHEN e.utm_medium = 'cpc' THEN 'paid_search'
+            ELSE 'other'
+        END AS channel
+    FROM raw.mixpanel_events e
+    WHERE e.event_name = 'session_start'
+    GROUP BY session_raw_date, channel
+) s
+LEFT JOIN (
+    SELECT
+        e.time AS purchase_date,
+        COUNT(*) AS purchase_events
+    FROM raw.mixpanel_events e
+    WHERE e.event_name = 'purchase'
+    GROUP BY purchase_date
+) p
+    ON s.session_raw_date = p.purchase_date`
 	}
 
 	switch c.Warehouse {
