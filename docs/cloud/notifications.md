@@ -221,63 +221,15 @@ Details:
 - Body: JSON
 - Headers: `Content-Type: application/json`
 
-Example payloads
+#### Payload shape
 
-The payload shape is the same for all events. Fields that are not applicable to the event type are `null`.
+The payload is the same for all events. Fields that don't apply to the event type are `null`.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `pipeline` | string | Pipeline name |
-| `asset` | string \| null | Asset name (null for pipeline-level events) |
-| `column` | string \| null | Column name (non-null for column check events only) |
-| `check` | string \| null | Check name (non-null for check events only) |
+| `asset` | string \| null | Asset name — `null` for pipeline-level events |
+| `column` | string \| null | Column name — non-null for column check events only |
+| `check` | string \| null | Check name — non-null for check events only |
 | `run_id` | string | Unique run identifier |
 | `status` | string | `"success"` or `"failure"` |
-
-Pipeline run success
-```json
-{
-  "pipeline": "daily_orders",
-  "asset": null,
-  "column": null,
-  "check": null,
-  "run_id": "2025-09-03T12:34:56Z-8f3a2c",
-  "status": "success"
-}
-```
-
-Asset failure
-```json
-{
-  "pipeline": "daily_orders",
-  "asset": "orders_curated",
-  "column": null,
-  "check": null,
-  "run_id": "2025-09-03T00:00:00Z-42b1de",
-  "status": "failure"
-}
-```
-
-Column check failure
-```json
-{
-  "pipeline": "daily_orders",
-  "asset": "orders_curated",
-  "column": "order_id",
-  "check": "not_null",
-  "run_id": "2025-09-03T00:00:00Z-42b1de",
-  "status": "failure"
-}
-```
-
-Custom check success
-```json
-{
-  "pipeline": "daily_orders",
-  "asset": "orders_curated",
-  "column": null,
-  "check": "order count is positive",
-  "run_id": "2025-09-03T00:00:00Z-42b1de",
-  "status": "success"
-}
-```
