@@ -78,7 +78,7 @@ Asset success notifications fire after the asset task **and all its quality chec
 
 Check notifications fire for each individual quality check that runs against an asset — both **column-level checks** (defined under `columns[].checks`) and **custom checks** (defined under `custom_checks`).
 
-The same `notifications` block on the asset controls check notifications. The `success`/`failure` flags apply to check outcomes as well.
+By default, checks inherit the asset-level `notifications` block. Individual checks can also have their own `notifications` block that **overrides** the asset-level config for that check only. This lets you route specific checks to dedicated channels while keeping a catch-all at the asset level.
 
 ```bruin-sql
 /* @bruin
@@ -88,11 +88,11 @@ type: bq.sql
 
 notifications:
   slack:
-    # This channel gets notified when the asset succeeds AND when any check succeeds or fails
-    - channel: "#channel1"
+    # Notified on every outcome: each check passing, each check failing, and the asset succeeding or failing.
+    - channel: "#data-quality"
 
-    # This channel gets only check/asset failure alerts
-    - channel: "#channel2"
+    # Notified only when something goes wrong: a check fails or the asset fails.
+    - channel: "#data-alerts"
       success: false
 
 columns:
@@ -100,16 +100,29 @@ columns:
     checks:
       - name: not_null
       - name: unique
+      - name: accepted_values
+        value: ["pending", "shipped", "delivered"]
+        # This check overrides the asset-level notifications — only sent to #data-alerts on failure
+        notifications:
+          slack:
+            - channel: "#data-alerts"
+              success: false
 
 custom_checks:
   - name: order count is positive
     query: SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM orders.curated
     value: 1
+    # This check overrides the asset-level notifications with its own config
+    notifications:
+      slack:
+        - channel: "#data-quality"
 
 @bruin */
 
 SELECT ...
 ```
+
+Checks without their own `notifications` block send no notification — asset-level notifications only cover the asset success/failure event, not individual checks.
 
 ### Check notification timing
 
