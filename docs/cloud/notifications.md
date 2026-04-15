@@ -6,7 +6,7 @@ Bruin Cloud supports notifications across Slack, Microsoft Teams, Discord, and g
 |-------|---------------|-----------------------|
 | **Pipeline** | When an entire pipeline run succeeds or fails | `pipeline.yml` |
 | **Asset** | When a single asset succeeds or fails | Asset definition file |
-| **Check** | When a quality check (column or custom) succeeds or fails | Asset definition file |
+| **Check** | When a quality check with its own `notifications` block succeeds or fails | Asset definition file |
 
 All three scopes share the same `notifications` block structure and the same `success`/`failure` flags. The `success` and `failure` flags default to `true`, so omitting them means notifications are sent for both outcomes.
 
@@ -91,7 +91,7 @@ notifications:
     # Notified when the asset succeeds or fails (does not cover individual checks).
     - channel: "#data-quality"
 
-    # Notified only when something goes wrong: a check fails or the asset fails.
+    # Notified only when the asset fails.
     - channel: "#data-alerts"
       success: false
 
@@ -102,7 +102,7 @@ columns:
       - name: unique
       - name: accepted_values
         value: ["pending", "shipped", "delivered"]
-        # This check overrides the asset-level notifications — only sent to #data-alerts on failure
+        # This check has its own notifications — sent to #data-alerts on failure only
         notifications:
           slack:
             - channel: "#data-alerts"
@@ -112,7 +112,7 @@ custom_checks:
   - name: order count is positive
     query: SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM orders.curated
     value: 1
-    # This check overrides the asset-level notifications with its own config
+    # This check has its own notifications configured
     notifications:
       slack:
         - channel: "#data-quality"
@@ -130,7 +130,7 @@ Checks without their own `notifications` block send no notification — asset-le
 - **Custom check** — fires immediately when that custom check task completes (pass or fail).
 - **Asset success** — fires after all checks have passed (i.e., the asset is fully complete including all checks).
 
-These are distinct events. An asset with 5 column checks may produce up to 5 check notifications plus 1 asset success notification per run.
+These are distinct events. Only checks with their own `notifications` block produce check notifications. An asset success notification fires once regardless of how many checks pass.
 
 ---
 
