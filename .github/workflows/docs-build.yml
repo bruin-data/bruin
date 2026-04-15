@@ -28,14 +28,8 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Upgrade npm to v11 for min-release-age support
-        run: |
-          npm cache clean --force
-          npm install -g npm@11 --force
-          npm --version
-
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies with npm@11 (for min-release-age support)
+        run: npx npm@11 install
 
 
       - name: Build documentation
