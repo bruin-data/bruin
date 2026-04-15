@@ -304,3 +304,4 @@ custom_checks:
 | `query` | str | - | The SQL query to execute. |
 | `value` | int | `0` | The expected integer value the query should return to pass. |
 | `blocking` | bool | `false` | Whether a failure of this check should block downstream assets. |
+| `notifications` | object | - | Per-check notification config. If omitted, no notification is sent for this check (asset-level notifications do not apply to individual checks). Uses the same structure as asset-level notifications. |

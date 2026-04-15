@@ -6,7 +6,7 @@ Bruin Cloud supports notifications across Slack, Microsoft Teams, Discord, and g
 |-------|---------------|-----------------------|
 | **Pipeline** | When an entire pipeline run succeeds or fails | `pipeline.yml` |
 | **Asset** | When a single asset succeeds or fails | Asset definition file |
-| **Check** | When a quality check (column or custom) succeeds or fails | Asset definition file |
+| **Check** | When a quality check with its own `notifications` block succeeds or fails | Asset definition file |
 
 All three scopes share the same `notifications` block structure and the same `success`/`failure` flags. The `success` and `failure` flags default to `true`, so omitting them means notifications are sent for both outcomes.
 
@@ -78,7 +78,7 @@ Asset success notifications fire after the asset task **and all its quality chec
 
 Check notifications fire for each individual quality check that runs against an asset — both **column-level checks** (defined under `columns[].checks`) and **custom checks** (defined under `custom_checks`).
 
-The same `notifications` block on the asset controls check notifications. The `success`/`failure` flags apply to check outcomes as well.
+Check notifications are **opt-in per check** — asset-level notifications do not apply to individual checks. To receive a notification for a specific check, add a `notifications` block directly on that check.
 
 ```bruin-sql
 /* @bruin
@@ -88,11 +88,11 @@ type: bq.sql
 
 notifications:
   slack:
-    # This channel gets notified when the asset succeeds AND when any check succeeds or fails
-    - channel: "#channel1"
+    # Notified when the asset succeeds or fails (does not cover individual checks).
+    - channel: "#data-quality"
 
-    # This channel gets only check/asset failure alerts
-    - channel: "#channel2"
+    # Notified only when the asset fails.
+    - channel: "#data-alerts"
       success: false
 
 columns:
@@ -100,16 +100,29 @@ columns:
     checks:
       - name: not_null
       - name: unique
+      - name: accepted_values
+        value: ["pending", "shipped", "delivered"]
+        # This check has its own notifications — sent to #data-alerts on failure only
+        notifications:
+          slack:
+            - channel: "#data-alerts"
+              success: false
 
 custom_checks:
   - name: order count is positive
     query: SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM orders.curated
     value: 1
+    # This check has its own notifications configured
+    notifications:
+      slack:
+        - channel: "#data-quality"
 
 @bruin */
 
 SELECT ...
 ```
+
+Checks without their own `notifications` block send no notification — asset-level notifications only cover the asset success/failure event, not individual checks.
 
 ### Check notification timing
 
@@ -117,7 +130,7 @@ SELECT ...
 - **Custom check** — fires immediately when that custom check task completes (pass or fail).
 - **Asset success** — fires after all checks have passed (i.e., the asset is fully complete including all checks).
 
-These are distinct events. An asset with 5 column checks may produce up to 5 check notifications plus 1 asset success notification per run.
+These are distinct events. Only checks with their own `notifications` block produce check notifications. An asset success notification fires once regardless of how many checks pass.
 
 ---
 
