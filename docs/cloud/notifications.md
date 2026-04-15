@@ -71,7 +71,7 @@ notifications:
 SELECT ...
 ```
 
-Asset notifications fire as soon as the asset task itself completes — before any downstream assets or quality checks run. Check notifications (below) are separate and fire for each individual quality check.
+Asset success notifications fire after the asset task **and all its quality checks** have passed. Asset failure notifications fire as soon as the asset task itself fails (before checks run). Check notifications (below) are separate and fire for each individual quality check.
 
 ---
 
@@ -104,7 +104,7 @@ columns:
 
 custom_checks:
   - name: order count is positive
-    query: SELECT COUNT(*) FROM orders.curated
+    query: SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM orders.curated
     value: 1
 
 @bruin */
