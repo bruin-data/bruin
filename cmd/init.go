@@ -328,6 +328,68 @@ func Init() *cli.Command {
 				bruinYmlPath = filepath.Join(repoRoot.Path, ".bruin.yml")
 			}
 
+			// Handle ecommerce template with interactive stack picker
+			if templateName == "ecommerce" {
+				ecommerceChoices, err := runEcommerceStackPicker()
+				if err != nil {
+					errorPrinter.Printf("Error during stack selection: %v\n", err)
+					return cli.Exit("", 1)
+				}
+				if ecommerceChoices == nil {
+					return nil // user cancelled
+				}
+
+				// Load or create .bruin.yml, then merge ecommerce connections into it
+				centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
+				if err != nil {
+					errorPrinter.Printf("Could not load .bruin.yml file: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				bruinContent := generateBruinYML(ecommerceChoices)
+				if err := mergeTemplateConfig(centralConfig, []byte(bruinContent)); err != nil {
+					errorPrinter.Printf("Could not merge ecommerce config: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				configBytes, err := yaml.Marshal(centralConfig)
+				if err != nil {
+					errorPrinter.Printf("Could not marshal .bruin.yml: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
+					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				// Generate all pipeline files
+				if err := generateEcommerceTemplate(inputPath, ecommerceChoices); err != nil {
+					errorPrinter.Printf("Could not generate ecommerce template: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				telemetry.SetTemplateName(templateName)
+				telemetry.SendEvent("template_selected", map[string]interface{}{
+					"template_name": templateName,
+					"interactive":   true,
+					"warehouse":     ecommerceChoices.Warehouse,
+					"payments":      ecommerceChoices.Payments,
+					"marketing":     ecommerceChoices.Marketing,
+					"ads":           ecommerceChoices.Ads,
+					"analytics":     ecommerceChoices.Analytics,
+				})
+
+				successPrinter.Printf("\n\nEcommerce pipeline created successfully in folder '%s'.\n", inputPath)
+				printEcommerceSummary(ecommerceChoices)
+				infoPrinter.Println("\nNext steps:")
+				infoPrinter.Printf("  1. Edit .bruin.yml to add your real connection credentials\n")
+				infoPrinter.Printf("  2. Run: bruin validate %s\n", inputPath)
+				infoPrinter.Printf("  3. Run: bruin run %s\n\n", inputPath)
+
+				return nil
+			}
+
 			centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
 			if err != nil {
 				errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
