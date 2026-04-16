@@ -244,40 +244,6 @@ Hooks can also be set as pipeline defaults (see [pipeline defaults](/pipelines/d
 
 This is a list that contains all the columns defined with the asset, along with their quality checks and other metadata. Refer to the [columns](./columns.md) documentation for more details.
 
-## `notifications`
-
-Per-asset notification configuration. When set, Bruin Cloud fires notifications when this specific asset (or its quality checks) succeeds or fails — independently of the pipeline-level run notification.
-
-The `notifications` block on an asset controls three distinct event types:
-
-- **Asset success / failure** — fires when the asset task itself finishes.
-- **Column check success / failure** — fires for each column-level quality check.
-- **Custom check success / failure** — fires for each custom check.
-
-```yaml
-notifications:
-  slack:
-    - channel: "#channel1"           # success and failure (default)
-    - channel: "#channel2"
-      success: false                 # failure only
-
-  ms_teams:
-    - connection: "the-name-of-the-ms-teams-connection"
-      failure: false                 # success only
-
-  discord:
-    - connection: "the-name-of-the-discord-connection"
-
-  webhook:
-    - connection: "the-name-of-the-webhook-connection"
-```
-
-Both `success` and `failure` default to `true` when omitted.
-
-> This is a Bruin Cloud feature. See the [Notifications](/cloud/notifications) page for full details including check-level notification timing, platform setup, and webhook payload shapes.
-
----
-
 ## `custom_checks`
 
 This is a list of custom data quality checks that are applied to an asset. These checks allow you to define custom data quality checks in SQL, enabling you to encode any business logic into quality checks that might require more power.
@@ -304,4 +270,3 @@ custom_checks:
 | `query` | str | - | The SQL query to execute. |
 | `value` | int | `0` | The expected integer value the query should return to pass. |
 | `blocking` | bool | `false` | Whether a failure of this check should block downstream assets. |
-| `notifications` | object | - | Per-check notification config. If omitted, no notification is sent for this check (asset-level notifications do not apply to individual checks). Uses the same structure as asset-level notifications. |

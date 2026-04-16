@@ -55,11 +55,10 @@ Each column will have the following keys:
 
 The structure of the quality checks is rather simple:
 
-| key             | type   | req? | description                                                       |
-|-----------------|--------|------|-------------------------------------------------------------------|
-| `name`          | String | yes  | The name of the quality check, see [Quality](../quality/overview) |
-| `blocking`      | Bool   | no   | Whether the check should block the downstreams, default `true`    |
-| `value`         | Any    | no   | Check-specific expected value                                     |
-| `notifications` | Object | no   | Per-check notification config. If omitted, no notification is sent for this check (asset-level notifications do not apply to individual checks). Uses the same structure as [asset-level notifications](/cloud/notifications). |
+| key        | type   | req? | description                                                       |
+|------------|--------|------|-------------------------------------------------------------------|
+| `name`     | String | yes  | The name of the quality check, see [Quality](../quality/overview) |
+| `blocking` | Bool   | no   | Whether the check should block the downstreams, default `true`    |
+| `value`    | Any    | no   | Check-specific expected value                                     |
 
 For more details on the quality checks, please refer to the  [Quality](../quality/overview) documentation.
