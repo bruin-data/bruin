@@ -59,14 +59,15 @@ func TestCreateAsset(t *testing.T) {
 	testAssetsPath := filepath.Join("test", "assets")
 
 	tests := []struct {
-		name              string
-		schemaName        string
-		tableName         string
-		assetType         pipeline.AssetType
-		fillColumns       bool
-		table             *ansisql.DBTable
-		want              *pipeline.Asset
-		descriptionPrefix string // Expected prefix of the description (since it now includes dynamic timestamp)
+		name            string
+		schemaName      string
+		tableName       string
+		assetType       pipeline.AssetType
+		fillColumns     bool
+		table           *ansisql.DBTable
+		want            *pipeline.Asset
+		wantDescription string
+		wantOwner       string
 	}{
 		{
 			name:        "successful asset creation without columns (fillColumns false)",
@@ -88,7 +89,6 @@ func TestCreateAsset(t *testing.T) {
 				},
 				Columns: nil,
 			},
-			descriptionPrefix: "Imported table: public.users",
 		},
 		{
 			name:        "successful asset creation with pre-fetched columns",
@@ -118,7 +118,6 @@ func TestCreateAsset(t *testing.T) {
 					{Name: "price", Type: "DECIMAL", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 				},
 			},
-			descriptionPrefix: "Imported table: public.products",
 		},
 		{
 			name:        "fillColumns true but no pre-fetched columns and no conn returns empty",
@@ -140,7 +139,6 @@ func TestCreateAsset(t *testing.T) {
 				},
 				Columns: nil,
 			},
-			descriptionPrefix: "Imported table: public.orders",
 		},
 		{
 			name:        "view asset creation with view definition",
@@ -167,7 +165,6 @@ func TestCreateAsset(t *testing.T) {
 				},
 				Columns: nil,
 			},
-			descriptionPrefix: "Imported view: public.active_users",
 		},
 		{
 			name:        "view without view definition is not treated as view",
@@ -190,7 +187,6 @@ func TestCreateAsset(t *testing.T) {
 				},
 				Columns: nil,
 			},
-			descriptionPrefix: "Imported view: public.some_view",
 		},
 		{
 			name:        "bigquery view asset creation",
@@ -217,7 +213,31 @@ func TestCreateAsset(t *testing.T) {
 				},
 				Columns: nil,
 			},
-			descriptionPrefix: "Imported view: analytics.daily_metrics",
+		},
+		{
+			name:        "asset with database description and owner",
+			schemaName:  "public",
+			tableName:   "customers",
+			assetType:   pipeline.AssetTypePostgresSource,
+			fillColumns: false,
+			table: &ansisql.DBTable{
+				Name:        "customers",
+				Type:        ansisql.DBTableTypeTable,
+				Description: "Customer master data table",
+				Owner:       "data_team",
+				Columns:     nil,
+			},
+			want: &pipeline.Asset{
+				Name: "public.customers",
+				Type: pipeline.AssetTypePostgresSource,
+				ExecutableFile: pipeline.ExecutableFile{
+					Name: "customers.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public", "customers.asset.yml"),
+				},
+				Columns: nil,
+			},
+			wantDescription: "Customer master data table",
+			wantOwner:       "data_team",
 		},
 	}
 
@@ -227,9 +247,6 @@ func TestCreateAsset(t *testing.T) {
 
 			ctx := t.Context()
 
-			// Pass nil for conn since we're testing the pre-fetched columns path
-			// When dbColumns is empty and conn is nil, it will try fillAssetColumnsFromDB
-			// which will fail, but for these tests we're just checking the pre-fetched path
 			got, warning := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, nil, tt.fillColumns, tt.table)
 
 			// When dbColumns is empty and conn is nil, we get a warning about failing to fill columns
@@ -239,17 +256,128 @@ func TestCreateAsset(t *testing.T) {
 				assert.Equal(t, "", warning)
 			}
 
-			// Check the description contains the expected prefix and "Extracted at:" timestamp
-			assert.True(t, strings.Contains(got.Description, tt.descriptionPrefix),
-				"Expected description to contain %q, got %q", tt.descriptionPrefix, got.Description)
-			assert.True(t, strings.Contains(got.Description, "Extracted at:"),
-				"Expected description to contain 'Extracted at:', got %q", got.Description)
+			// Metadata should always contain extracted_at
+			assert.NotEmpty(t, got.Metadata["extracted_at"], "expected extracted_at in metadata")
 
-			// Compare all other fields except Description
-			tt.want.Description = got.Description // Copy description to make comparison work
+			// Description should only contain the actual DB comment, not synthetic import text
+			assert.Equal(t, tt.wantDescription, got.Description)
+
+			// Owner should come from the database table owner
+			assert.Equal(t, tt.wantOwner, got.Owner)
+
+			// Copy dynamic fields for full struct comparison
+			tt.want.Description = got.Description
+			tt.want.Metadata = got.Metadata
+			tt.want.Owner = got.Owner
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestBuildImportMetadata(t *testing.T) {
+	t.Parallel()
+
+	rowCount := int64(1234567)
+	sizeBytes := int64(268435456) // 256 MB
+
+	table := &ansisql.DBTable{
+		Description: "A test table",
+		Owner:       "analytics_team",
+		RowCount:    &rowCount,
+		SizeBytes:   &sizeBytes,
+	}
+
+	description, metadata, owner := buildImportMetadata(table)
+
+	assert.Equal(t, "A test table", description)
+	assert.Equal(t, "analytics_team", owner)
+	assert.NotEmpty(t, metadata["extracted_at"])
+	assert.Equal(t, "1234567", metadata["row_count"])
+	assert.Equal(t, "256.00 MB", metadata["size"])
+}
+
+func TestBuildImportMetadataOptionalFields(t *testing.T) {
+	t.Parallel()
+
+	// Table with no optional fields set
+	table := &ansisql.DBTable{}
+
+	description, metadata, owner := buildImportMetadata(table)
+
+	assert.Empty(t, description)
+	assert.Empty(t, owner)
+	assert.NotEmpty(t, metadata["extracted_at"])
+	assert.Empty(t, metadata["row_count"])
+	assert.Empty(t, metadata["size"])
+	assert.Empty(t, metadata["created_at"])
+	assert.Empty(t, metadata["last_modified"])
+}
+
+func TestMergeImportMetadata(t *testing.T) {
+	t.Parallel()
+
+	t.Run("refreshes metadata and owner, preserves custom keys", func(t *testing.T) {
+		t.Parallel()
+
+		existing := &pipeline.Asset{
+			Name:  "public.users",
+			Owner: "old_owner",
+			Metadata: pipeline.EmptyStringMap{
+				"extracted_at":    "2024-01-01T00:00:00Z",
+				"row_count":       "100",
+				"custom_user_key": "should_be_preserved",
+			},
+		}
+
+		created := &pipeline.Asset{
+			Name:  "public.users",
+			Owner: "new_owner",
+			Metadata: pipeline.EmptyStringMap{
+				"extracted_at": "2025-06-01T00:00:00Z",
+				"row_count":    "200",
+				"size":         "512.00 MB",
+			},
+		}
+
+		mergeImportMetadata(existing, created)
+
+		assert.Equal(t, "new_owner", existing.Owner)
+		assert.Equal(t, "200", existing.Metadata["row_count"])
+		assert.Equal(t, "512.00 MB", existing.Metadata["size"])
+		assert.Equal(t, "2025-06-01T00:00:00Z", existing.Metadata["extracted_at"])
+		assert.Equal(t, "should_be_preserved", existing.Metadata["custom_user_key"])
+	})
+
+	t.Run("clears stale import keys when DB stops reporting them", func(t *testing.T) {
+		t.Parallel()
+
+		existing := &pipeline.Asset{
+			Name: "public.users",
+			Metadata: pipeline.EmptyStringMap{
+				"extracted_at":    "2024-01-01T00:00:00Z",
+				"row_count":       "100",
+				"size":            "256.00 MB",
+				"created_at":      "2023-01-01T00:00:00Z",
+				"custom_user_key": "keep_me",
+			},
+		}
+
+		// Second import: DB no longer reports row_count, size, or created_at
+		created := &pipeline.Asset{
+			Name: "public.users",
+			Metadata: pipeline.EmptyStringMap{
+				"extracted_at": "2025-06-01T00:00:00Z",
+			},
+		}
+
+		mergeImportMetadata(existing, created)
+
+		assert.Equal(t, "2025-06-01T00:00:00Z", existing.Metadata["extracted_at"])
+		assert.Empty(t, existing.Metadata["row_count"], "stale row_count should be cleared")
+		assert.Empty(t, existing.Metadata["size"], "stale size should be cleared")
+		assert.Empty(t, existing.Metadata["created_at"], "stale created_at should be cleared")
+		assert.Equal(t, "keep_me", existing.Metadata["custom_user_key"])
+	})
 }
 
 func TestDetermineAssetTypeFromConnection(t *testing.T) {
