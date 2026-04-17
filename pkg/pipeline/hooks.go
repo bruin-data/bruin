@@ -12,10 +12,20 @@ func WrapHooks(query string, hooks Hooks) string {
 		return query
 	}
 
-	parts := make([]string, 0, len(preParts)+1+len(postParts))
+	// Extract DECLARE statements from the beginning of the query
+	// BigQuery requires DECLARE to come before any other statements
+	declares, remainingQuery := extractDeclareStatements(query)
+
+	parts := make([]string, 0, len(declares)+len(preParts)+1+len(postParts))
+
+	// Add DECLARE statements first
+	parts = append(parts, declares...)
+
+	// Add pre-hooks after DECLARE
 	parts = append(parts, preParts...)
 
-	if main := formatStatement(query); main != "" {
+	// Add the main query (without DECLARE statements)
+	if main := formatStatement(remainingQuery); main != "" {
 		parts = append(parts, main)
 	}
 
@@ -56,6 +66,54 @@ func formatStatement(query string) string {
 		return trimmed
 	}
 	return trimmed + ";"
+}
+
+// extractDeclareStatements separates DECLARE statements from the beginning of a query.
+// BigQuery requires DECLARE statements to appear before any other statements in a script.
+// Returns a slice of formatted DECLARE statements and the remaining query.
+func extractDeclareStatements(query string) ([]string, string) {
+	trimmed := strings.TrimSpace(query)
+	if trimmed == "" {
+		return nil, ""
+	}
+
+	// Split by semicolons to get individual statements
+	statements := splitStatements(trimmed)
+	var declares []string
+	firstNonDeclare := 0
+
+	// Collect all DECLARE statements from the beginning
+	for i, stmt := range statements {
+		stmtTrimmed := strings.TrimSpace(stmt)
+		if stmtTrimmed == "" {
+			continue
+		}
+
+		// Check if this statement starts with DECLARE (case-insensitive)
+		upperStmt := strings.ToUpper(stmtTrimmed)
+		if strings.HasPrefix(upperStmt, "DECLARE ") || upperStmt == "DECLARE" {
+			declares = append(declares, formatStatement(stmt))
+			firstNonDeclare = i + 1
+		} else {
+			// Stop at the first non-DECLARE statement
+			break
+		}
+	}
+
+	// If no DECLARE statements found, return the original query as-is
+	if len(declares) == 0 {
+		return nil, trimmed
+	}
+
+	// Rejoin the remaining statements
+	remaining := strings.Join(statements[firstNonDeclare:], ";")
+	return declares, strings.TrimSpace(remaining)
+}
+
+// splitStatements splits a query into individual statements by semicolons.
+// This is a simple split that doesn't handle strings or comments containing semicolons.
+func splitStatements(query string) []string {
+	return strings.Split(query, ";")
 }
 
 // ResolveHookTemplatesToNew renders hook query templates with the provided renderer and returns a new hooks value.

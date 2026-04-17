@@ -66,6 +66,50 @@ func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
 			},
 			want: "select 1;\nselect 2;\nselect 3;",
 		},
+		{
+			name:  "DECLARE statement with hooks",
+			query: "DECLARE var1 INT64;\nSELECT var1;",
+			hooks: Hooks{
+				Pre:  []Hook{{Query: "CREATE TEMP TABLE tmp AS SELECT 1"}},
+				Post: []Hook{{Query: "DROP TABLE tmp"}},
+			},
+			want: "DECLARE var1 INT64;\nCREATE TEMP TABLE tmp AS SELECT 1;\nSELECT var1;\nDROP TABLE tmp;",
+		},
+		{
+			name:  "multiple DECLARE statements with hooks",
+			query: "DECLARE var1 INT64; DECLARE var2 STRING; SELECT var1, var2;",
+			hooks: Hooks{
+				Pre:  []Hook{{Query: "SELECT 1"}},
+				Post: []Hook{{Query: "SELECT 2"}},
+			},
+			want: "DECLARE var1 INT64;\nDECLARE var2 STRING;\nSELECT 1;\nSELECT var1, var2;\nSELECT 2;",
+		},
+		{
+			name:  "DECLARE with array type",
+			query: "DECLARE distinct_keys array<date>;\nBEGIN TRANSACTION;\nSELECT 1;",
+			hooks: Hooks{
+				Pre:  []Hook{{Query: "CREATE SCHEMA IF NOT EXISTS test"}},
+				Post: []Hook{{Query: "COMMIT"}},
+			},
+			want: "DECLARE distinct_keys array<date>;\nCREATE SCHEMA IF NOT EXISTS test;\nBEGIN TRANSACTION;\nSELECT 1;\nCOMMIT;",
+		},
+		{
+			name:  "DECLARE case insensitive",
+			query: "declare var1 INT64;\nselect var1;",
+			hooks: Hooks{
+				Pre: []Hook{{Query: "SELECT 1"}},
+			},
+			want: "declare var1 INT64;\nSELECT 1;\nselect var1;",
+		},
+		{
+			name:  "no DECLARE statements preserves original behavior",
+			query: "SELECT 1; INSERT INTO table VALUES (2);",
+			hooks: Hooks{
+				Pre:  []Hook{{Query: "CREATE TABLE table (id INT)"}},
+				Post: []Hook{{Query: "DROP TABLE table"}},
+			},
+			want: "CREATE TABLE table (id INT);\nSELECT 1; INSERT INTO table VALUES (2);\nDROP TABLE table;",
+		},
 	}
 
 	for _, tt := range tests {
@@ -201,4 +245,73 @@ func TestAssetFormatContent_HookQueries_NoSemicolonInjection(t *testing.T) {
 	assert.Equal(t, "SELECT 1; -- comment", asset.Hooks.Pre[0].Query)
 	assert.Equal(t, "SELECT 2", asset.Hooks.Pre[1].Query)
 	assert.Equal(t, "SELECT 3;", asset.Hooks.Post[0].Query)
+}
+
+func TestExtractDeclareStatements(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name               string
+		query              string
+		wantDeclares       []string
+		wantRemainingQuery string
+	}{
+		{
+			name:               "no DECLARE statements",
+			query:              "SELECT 1; INSERT INTO table VALUES (2);",
+			wantDeclares:       nil,
+			wantRemainingQuery: "SELECT 1; INSERT INTO table VALUES (2);",
+		},
+		{
+			name:               "single DECLARE statement",
+			query:              "DECLARE var1 INT64; SELECT var1;",
+			wantDeclares:       []string{"DECLARE var1 INT64;"},
+			wantRemainingQuery: "SELECT var1;",
+		},
+		{
+			name:               "multiple DECLARE statements",
+			query:              "DECLARE var1 INT64; DECLARE var2 STRING; SELECT var1, var2;",
+			wantDeclares:       []string{"DECLARE var1 INT64;", "DECLARE var2 STRING;"},
+			wantRemainingQuery: "SELECT var1, var2;",
+		},
+		{
+			name:               "DECLARE with array type",
+			query:              "DECLARE distinct_keys array<date>;\nBEGIN TRANSACTION;\nSELECT 1;",
+			wantDeclares:       []string{"DECLARE distinct_keys array<date>;"},
+			wantRemainingQuery: "BEGIN TRANSACTION;\nSELECT 1;",
+		},
+		{
+			name:               "case insensitive DECLARE",
+			query:              "declare var1 INT64; DeClaRe var2 STRING; SELECT 1;",
+			wantDeclares:       []string{"declare var1 INT64;", "DeClaRe var2 STRING;"},
+			wantRemainingQuery: "SELECT 1;",
+		},
+		{
+			name:               "DECLARE in middle of query should stop at first non-DECLARE",
+			query:              "DECLARE var1 INT64; SELECT 1; DECLARE var2 STRING;",
+			wantDeclares:       []string{"DECLARE var1 INT64;"},
+			wantRemainingQuery: "SELECT 1; DECLARE var2 STRING;",
+		},
+		{
+			name:               "empty query",
+			query:              "",
+			wantDeclares:       nil,
+			wantRemainingQuery: "",
+		},
+		{
+			name:               "whitespace only",
+			query:              "   \n  \t  ",
+			wantDeclares:       nil,
+			wantRemainingQuery: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			declares, remaining := extractDeclareStatements(tt.query)
+			assert.Equal(t, tt.wantDeclares, declares)
+			assert.Equal(t, tt.wantRemainingQuery, remaining)
+		})
+	}
 }
