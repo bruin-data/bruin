@@ -350,7 +350,13 @@ environments:
       duckdb:
         - name: "duckdb-decimal"
           path: "duckdb-files/duckdb-decimal.db"
-        
+
+  env-duckdb-show-query:
+    connections:
+      duckdb:
+        - name: "duckdb-show-query"
+          path: "duckdb-files/show-query-test.db"
+
   env-validate-asset-time-interval:
     connections:
       duckdb:

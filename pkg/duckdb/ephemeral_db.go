@@ -92,9 +92,8 @@ func (e *EphemeralConnection) QueryContext(ctx context.Context, query string, ar
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	return bufferRows(rows)
+	return bufferRows(ctx, db, query, rows)
 }
 
 func (e *EphemeralConnection) ExecContext(ctx context.Context, sqlStr string, arguments ...any) (sql.Result, error) {
@@ -125,9 +124,8 @@ func (e *EphemeralConnection) QueryRowContext(ctx context.Context, query string,
 	if err != nil {
 		return &errorRow{err: err}
 	}
-	defer rows.Close()
 
-	buffered, err := bufferRows(rows)
+	buffered, err := bufferRows(ctx, db, query, rows)
 	if err != nil {
 		return &errorRow{err: err}
 	}
@@ -136,7 +134,11 @@ func (e *EphemeralConnection) QueryRowContext(ctx context.Context, query string,
 }
 
 // bufferRows reads all rows into memory and returns a bufferedRows that can iterate over them.
-func bufferRows(rows *sql.Rows) (*bufferedRows, error) {
+// If db and originalQuery are set and the ADBC driver cannot scan Arrow complex types (LIST/STRUCT/MAP),
+// it retries once with CAST(... AS VARCHAR) per column (see buildCastedColumnsQuery in db.go).
+func bufferRows(ctx context.Context, db *sql.DB, originalQuery string, rows *sql.Rows) (*bufferedRows, error) {
+	defer rows.Close()
+
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, err
@@ -144,6 +146,16 @@ func bufferRows(rows *sql.Rows) (*bufferedRows, error) {
 
 	colTypes, err := rows.ColumnTypes()
 	if err != nil {
+		if isUnsupportedComplexTypeScanError(err) && db != nil && originalQuery != "" {
+			_ = rows.Close()
+			casted := buildCastedColumnsQuery(originalQuery, cols)
+			rows2, err2 := db.QueryContext(ctx, casted)
+			if err2 != nil {
+				return nil, err2
+			}
+			// Pass nil for db so we only retry once; avoids unbounded recursion if the casted query still fails.
+			return bufferRows(ctx, nil, casted, rows2)
+		}
 		return nil, err
 	}
 
@@ -155,6 +167,15 @@ func bufferRows(rows *sql.Rows) (*bufferedRows, error) {
 			ptrs[i] = &values[i]
 		}
 		if err := rows.Scan(ptrs...); err != nil {
+			if isUnsupportedComplexTypeScanError(err) && db != nil && originalQuery != "" {
+				_ = rows.Close()
+				casted := buildCastedColumnsQuery(originalQuery, cols)
+				rows2, err2 := db.QueryContext(ctx, casted)
+				if err2 != nil {
+					return nil, err2
+				}
+				return bufferRows(ctx, nil, casted, rows2)
+			}
 			return nil, err
 		}
 		// Deep copy values - strings must be copied because they may reference Arrow buffers
@@ -166,6 +187,15 @@ func bufferRows(rows *sql.Rows) (*bufferedRows, error) {
 	}
 
 	if err := rows.Err(); err != nil {
+		if isUnsupportedComplexTypeScanError(err) && db != nil && originalQuery != "" {
+			_ = rows.Close()
+			casted := buildCastedColumnsQuery(originalQuery, cols)
+			rows2, err2 := db.QueryContext(ctx, casted)
+			if err2 != nil {
+				return nil, err2
+			}
+			return bufferRows(ctx, nil, casted, rows2)
+		}
 		return nil, err
 	}
 

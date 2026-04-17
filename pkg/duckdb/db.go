@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -248,6 +249,11 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 		// Scan the result into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
+			if isUnsupportedComplexTypeScanError(err) {
+				// Release the first result set before issuing the fallback query on the same connection.
+				_ = rows.Close()
+				return c.selectWithCastedColumns(ctx, query.String(), cols)
+			}
 			return nil, err
 		}
 
@@ -323,6 +329,19 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 
 		// Scan the result into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
+			if isUnsupportedComplexTypeScanError(err) {
+				// Release the first result set before issuing the fallback query on the same connection.
+				_ = rows.Close()
+				rowsFallback, fallbackErr := c.selectWithCastedColumns(ctx, queryObject.String(), cols)
+				if fallbackErr != nil {
+					return nil, fallbackErr
+				}
+				result.Rows = rowsFallback
+				for i := range result.ColumnTypes {
+					result.ColumnTypes[i] = "VARCHAR"
+				}
+				return result, nil
+			}
 			return nil, err
 		}
 
@@ -332,6 +351,94 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 		}
 
 		result.Rows = append(result.Rows, columns)
+	}
+
+	return result, nil
+}
+
+func isUnsupportedComplexTypeScanError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var adbcErr *adbc.Error
+	if errors.As(err, &adbcErr) {
+		if adbcErr.Code != adbc.StatusNotImplemented {
+			return false
+		}
+		return isComplexTypePopulationMessage(adbcErr.Msg)
+	}
+
+	// Keep a fallback for non-ADBC errors so tests/mocks and future wrappers
+	// that lose typed metadata can still trigger the casted-query path.
+	return isComplexTypePopulationMessage(err.Error())
+}
+
+func isComplexTypePopulationMessage(msg string) bool {
+	normalized := strings.ToLower(msg)
+	if !strings.Contains(normalized, "populating from columns of type") {
+		return false
+	}
+
+	return strings.Contains(normalized, "list<") ||
+		strings.Contains(normalized, "struct<") ||
+		strings.Contains(normalized, "map<")
+}
+
+func buildCastedColumnsQuery(queryText string, columns []string) string {
+	trimmedQuery := strings.TrimSpace(queryText)
+	trimmedQuery = strings.TrimSuffix(trimmedQuery, ";")
+
+	if len(columns) == 0 {
+		return trimmedQuery
+	}
+
+	projections := make([]string, len(columns))
+	for i, col := range columns {
+		quoted := quoteIdentifier(col)
+		projections[i] = fmt.Sprintf("CAST(%s AS VARCHAR) AS %s", quoted, quoted)
+	}
+
+	return fmt.Sprintf("SELECT %s FROM (%s) AS __bruin_complex_type_query", strings.Join(projections, ", "), trimmedQuery)
+}
+
+func quoteIdentifier(identifier string) string {
+	return `"` + strings.ReplaceAll(identifier, `"`, `""`) + `"`
+}
+
+func (c *Client) selectWithCastedColumns(ctx context.Context, queryText string, columns []string) ([][]interface{}, error) {
+	castedQuery := buildCastedColumnsQuery(queryText, columns)
+	rows, err := c.connection.QueryContext(ctx, castedQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([][]interface{}, 0)
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		pointers := make([]interface{}, len(columns))
+		for i := range values {
+			pointers[i] = &values[i]
+		}
+
+		if err := rows.Scan(pointers...); err != nil {
+			return nil, err
+		}
+
+		for i, val := range values {
+			values[i] = c.convertValueWithType(val, columnTypes[i])
+		}
+		result = append(result, values)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return result, nil
