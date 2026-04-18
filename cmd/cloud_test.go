@@ -3,8 +3,10 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -71,6 +73,68 @@ func TestResolveAPIKey_NoKeyError(t *testing.T) {
 
 	err := app.Run(t.Context(), []string{"test"})
 	require.NoError(t, err)
+}
+
+func TestResolveProjectID_UsesExplicitProject(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	projectID, err := resolveProjectID("project-123", func() ([]bruincloud.Project, error) {
+		called = true
+		return nil, nil
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "project-123", projectID)
+	assert.False(t, called)
+}
+
+func TestResolveProjectID_UsesSingleAccessibleProject(t *testing.T) {
+	t.Parallel()
+
+	projectID, err := resolveProjectID("", func() ([]bruincloud.Project, error) {
+		return []bruincloud.Project{{ID: "project-123", Name: "only-project"}}, nil
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "project-123", projectID)
+}
+
+func TestResolveProjectID_NoProjects(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolveProjectID("", func() ([]bruincloud.Project, error) {
+		return []bruincloud.Project{}, nil
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no Bruin Cloud projects found")
+}
+
+func TestResolveProjectID_MultipleProjects(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolveProjectID("", func() ([]bruincloud.Project, error) {
+		return []bruincloud.Project{
+			{ID: "project-1", Name: "first"},
+			{ID: "project-2", Name: "second"},
+		}, nil
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--project-id is required")
+}
+
+func TestResolveProjectID_ListProjectsError(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolveProjectID("", func() ([]bruincloud.Project, error) {
+		return nil, errors.New("boom")
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to list projects")
+	assert.Contains(t, err.Error(), "boom")
 }
 
 func TestCloudCommand_Help(t *testing.T) {
