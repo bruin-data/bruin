@@ -115,6 +115,47 @@ ingestr ingest \
 
 When you include associations, the response will contain information about the related objects, allowing you to track relationships between your custom objects and standard HubSpot objects.
 
+## Property History
+
+HubSpot tracks every change made to a CRM record's properties. You can ingest this change log using `property_history:*` tables, which emit one row per property value change rather than one row per record.
+
+### Table names
+
+- Built-in objects: `property_history:<object>` (e.g. `property_history:contacts`, `property_history:deals`)
+- Custom objects: `property_history:custom:<object>` (e.g. `property_history:custom:licenses`)
+
+### Row shape
+
+Each row represents a single property value change and carries:
+
+- `hs_object_id` — the record the change belongs to
+- `property_name` — the property that changed
+- `timestamp` — when the change occurred
+- `value` — the property value set by the change
+- `sourceType`, `sourceId` — what caused the change (user, integration, workflow, etc.)
+
+Primary key is `(hs_object_id, property_name, timestamp)` and ingestion is incremental by `timestamp`.
+
+### Filtering properties in `property_history:*` tables
+
+By default, `property_history:*` fetches history for every property on the object type, which can produce large, slow responses for tenants with many properties. You can narrow the fetch by appending a comma-separated allow-list of property names to the table name. When present, only those properties' history is requested from HubSpot's `POST /crm/v3/objects/{type}/batch/read` endpoint (via `propertiesWithHistory`); when omitted, behavior is unchanged.
+
+#### Syntax
+
+```plaintext
+property_history:<object>[:<prop1>,<prop2>,...]
+property_history:custom:<object>[:<prop1>,<prop2>,...]
+```
+
+#### Examples
+
+- `property_history:contacts` — all properties (unchanged default)
+- `property_history:contacts:email,firstname,lastname` — only these three properties
+- `property_history:deals:amount,dealstage` — only deal amount and stage history
+- `property_history:custom:my_object:field_a,field_b` — only these two properties on a custom object
+
+Use this when only a handful of properties matter — response payloads are dramatically smaller, ingests are faster, and HubSpot API quota usage is lower.
+
 ### Step 3: [Run](/commands/run) asset to ingest data
 
 ```bash
