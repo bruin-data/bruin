@@ -48,6 +48,7 @@ var SupportedIngestrStrategies = []string{
 	"append",
 	"merge",
 	"delete+insert",
+	"truncate+insert",
 }
 
 // IsIngestrStrategySupported checks if a given strategy string is supported by ingestr.
