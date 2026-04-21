@@ -100,9 +100,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         items: [
                             {text: "Bruin Academy", link: "https://getbruin.com/learn/"},
                             {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
-                            {text: "Load Notion to PostgreSQL", link: "/getting-started/tutorials/load-notion-postgres"},
-                            {text: "Oracle to DuckDB", link: "/getting-started/tutorials/oracle-duckdb"},
-                            {text: "Using Templates", link: "/getting-started/tutorials/template-tutorial"},
                         ],
                     },
                 ],
