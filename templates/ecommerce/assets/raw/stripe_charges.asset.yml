@@ -1,0 +1,8 @@
+name: raw.stripe_charges
+type: ingestr
+parameters:
+  source_connection: stripe
+  source_table: charges
+  incremental_strategy: merge
+  incremental_key: created
+  primary_key: id

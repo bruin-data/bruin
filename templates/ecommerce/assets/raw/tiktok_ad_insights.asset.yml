@@ -1,0 +1,8 @@
+name: raw.tiktok_ad_insights
+type: ingestr
+parameters:
+  source_connection: tiktok_ads
+  source_table: ads
+  incremental_strategy: merge
+  incremental_key: stat_datetime
+  primary_key: "stat_datetime,campaign_id"

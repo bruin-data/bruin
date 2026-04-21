@@ -1,0 +1,8 @@
+name: raw.stripe_refunds
+type: ingestr
+parameters:
+  source_connection: stripe
+  source_table: refunds
+  incremental_strategy: merge
+  incremental_key: created
+  primary_key: id

@@ -1,0 +1,8 @@
+name: raw.ga4_events
+type: ingestr
+parameters:
+  source_connection: google_analytics
+  source_table: events
+  incremental_strategy: merge
+  incremental_key: date
+  primary_key: "date,event_name"

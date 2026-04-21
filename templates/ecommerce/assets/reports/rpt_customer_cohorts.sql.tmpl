@@ -1,0 +1,115 @@
+/* @bruin
+name: reports.rpt_customer_cohorts
+type: sql
+materialization:
+  type: table
+depends:
+  - staging.stg_orders
+  - staging.stg_customers
+columns:
+  - name: cohort_month
+    type: date
+    checks:
+      - name: not_null
+@bruin */
+
+{{- if .IsClickHouse }}
+
+WITH customer_orders AS (
+    SELECT
+        o.customer_email,
+        toStartOfMonth(c.first_seen_at) AS cohort_month,
+        toStartOfMonth(o.order_date) AS order_month,
+        o.order_total
+    FROM staging.stg_orders o
+    INNER JOIN staging.stg_customers c
+        ON o.customer_email = c.customer_email
+    WHERE o.payment_status = 'paid'
+),
+cohort_sizes AS (
+    SELECT
+        cohort_month,
+        count(DISTINCT customer_email) AS cohort_size
+    FROM customer_orders
+    GROUP BY cohort_month
+)
+SELECT
+    co.cohort_month,
+    cs.cohort_size,
+    dateDiff('month', co.cohort_month, co.order_month) AS months_since_first,
+    count(DISTINCT co.customer_email) AS active_customers,
+    round(active_customers / nullIf(cs.cohort_size, 0) * 100, 2) AS retention_rate,
+    sum(co.order_total) AS cohort_revenue,
+    round(cohort_revenue / nullIf(cs.cohort_size, 0), 2) AS revenue_per_customer
+FROM customer_orders co
+INNER JOIN cohort_sizes cs
+    ON co.cohort_month = cs.cohort_month
+GROUP BY co.cohort_month, cs.cohort_size, months_since_first
+ORDER BY co.cohort_month, months_since_first
+{{- else if .IsBigQuery }}
+
+WITH customer_orders AS (
+    SELECT
+        o.customer_email,
+        DATE_TRUNC(c.first_seen_at, MONTH) AS cohort_month,
+        DATE_TRUNC(o.order_date, MONTH) AS order_month,
+        o.order_total
+    FROM staging.stg_orders o
+    INNER JOIN staging.stg_customers c
+        ON o.customer_email = c.customer_email
+    WHERE o.payment_status = 'paid'
+),
+cohort_sizes AS (
+    SELECT
+        cohort_month,
+        count(DISTINCT customer_email) AS cohort_size
+    FROM customer_orders
+    GROUP BY cohort_month
+)
+SELECT
+    co.cohort_month,
+    cs.cohort_size,
+    DATE_DIFF(co.order_month, co.cohort_month, MONTH) AS months_since_first,
+    count(DISTINCT co.customer_email) AS active_customers,
+    round(count(DISTINCT co.customer_email) / NULLIF(cs.cohort_size, 0) * 100, 2) AS retention_rate,
+    sum(co.order_total) AS cohort_revenue,
+    round(sum(co.order_total) / NULLIF(cs.cohort_size, 0), 2) AS revenue_per_customer
+FROM customer_orders co
+INNER JOIN cohort_sizes cs
+    ON co.cohort_month = cs.cohort_month
+GROUP BY co.cohort_month, cs.cohort_size, months_since_first
+ORDER BY co.cohort_month, months_since_first
+{{- else }}
+
+WITH customer_orders AS (
+    SELECT
+        o.customer_email,
+        DATE_TRUNC('month', c.first_seen_at) AS cohort_month,
+        DATE_TRUNC('month', o.order_date) AS order_month,
+        o.order_total
+    FROM staging.stg_orders o
+    INNER JOIN staging.stg_customers c
+        ON o.customer_email = c.customer_email
+    WHERE o.payment_status = 'paid'
+),
+cohort_sizes AS (
+    SELECT
+        cohort_month,
+        count(DISTINCT customer_email) AS cohort_size
+    FROM customer_orders
+    GROUP BY cohort_month
+)
+SELECT
+    co.cohort_month,
+    cs.cohort_size,
+    DATEDIFF('month', co.cohort_month, co.order_month) AS months_since_first,
+    count(DISTINCT co.customer_email) AS active_customers,
+    round(count(DISTINCT co.customer_email) / NULLIF(cs.cohort_size, 0) * 100, 2) AS retention_rate,
+    sum(co.order_total) AS cohort_revenue,
+    round(sum(co.order_total) / NULLIF(cs.cohort_size, 0), 2) AS revenue_per_customer
+FROM customer_orders co
+INNER JOIN cohort_sizes cs
+    ON co.cohort_month = cs.cohort_month
+GROUP BY co.cohort_month, cs.cohort_size, months_since_first
+ORDER BY co.cohort_month, months_since_first
+{{- end }}

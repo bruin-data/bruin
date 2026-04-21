@@ -1,0 +1,6 @@
+name: raw.hubspot_campaigns
+type: ingestr
+parameters:
+  source_connection: hubspot
+  source_table: campaigns
+  incremental_strategy: replace

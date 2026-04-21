@@ -1,0 +1,6 @@
+name: raw.klaviyo_campaigns
+type: ingestr
+parameters:
+  source_connection: klaviyo
+  source_table: campaigns
+  incremental_strategy: replace

@@ -1,0 +1,8 @@
+name: raw.mixpanel_events
+type: ingestr
+parameters:
+  source_connection: mixpanel
+  source_table: events
+  incremental_strategy: merge
+  incremental_key: time
+  primary_key: "distinct_id,time"

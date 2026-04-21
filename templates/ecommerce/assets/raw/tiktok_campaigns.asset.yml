@@ -1,0 +1,6 @@
+name: raw.tiktok_campaigns
+type: ingestr
+parameters:
+  source_connection: tiktok_ads
+  source_table: campaigns
+  incremental_strategy: replace

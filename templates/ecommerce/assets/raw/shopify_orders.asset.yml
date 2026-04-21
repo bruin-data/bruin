@@ -1,0 +1,9 @@
+name: raw.shopify_orders
+type: ingestr
+parameters:
+  source_connection: shopify
+  source_table: orders
+  loader_file_format: jsonl
+  incremental_strategy: merge
+  incremental_key: updated_at
+  primary_key: id

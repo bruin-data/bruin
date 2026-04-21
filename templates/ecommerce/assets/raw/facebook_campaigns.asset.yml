@@ -1,0 +1,6 @@
+name: raw.facebook_campaigns
+type: ingestr
+parameters:
+  source_connection: facebook_ads
+  source_table: campaigns
+  incremental_strategy: replace

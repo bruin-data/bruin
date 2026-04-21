@@ -1,0 +1,77 @@
+/* @bruin
+name: staging.stg_orders
+type: sql
+materialization:
+  type: table
+depends:
+  - raw.shopify_orders
+{{- if .IsStripe }}
+  - raw.stripe_charges
+{{- end }}
+columns:
+  - name: order_id
+    type: varchar
+    checks:
+      - name: not_null
+      - name: unique
+  - name: order_date
+    type: timestamp
+    checks:
+      - name: not_null
+custom_checks:
+  - name: has_rows
+    query: "SELECT count(*) > 0 FROM staging.stg_orders"
+    value: 1
+@bruin */
+
+SELECT
+    o.id AS order_id,
+    o.order_number,
+    o.email AS customer_email,
+    o.created_at AS order_date,
+    o.financial_status AS payment_status,
+    o.fulfillment_status,
+{{- if .IsClickHouse }}
+    CAST(o.total_price AS DECIMAL(12,2)) AS order_total,
+    CAST(o.subtotal_price AS DECIMAL(12,2)) AS subtotal,
+    CAST(o.total_tax AS DECIMAL(12,2)) AS tax_amount,
+    CAST(o.total_discounts AS DECIMAL(12,2)) AS discount_amount,
+{{- else if .IsBigQuery }}
+    SAFE_CAST(o.total_price AS DECIMAL(12,2)) AS order_total,
+    SAFE_CAST(o.subtotal_price AS DECIMAL(12,2)) AS subtotal,
+    SAFE_CAST(o.total_tax AS DECIMAL(12,2)) AS tax_amount,
+    SAFE_CAST(o.total_discounts AS DECIMAL(12,2)) AS discount_amount,
+{{- else }}
+    CAST(o.total_price AS DECIMAL(12,2)) AS order_total,
+    CAST(o.subtotal_price AS DECIMAL(12,2)) AS subtotal,
+    CAST(o.total_tax AS DECIMAL(12,2)) AS tax_amount,
+    CAST(o.total_discounts AS DECIMAL(12,2)) AS discount_amount,
+{{- end }}
+    o.currency,
+    o.cancel_reason,
+    o.cancelled_at
+{{- if .IsStripe }},
+    c.amount / 100.0 AS stripe_charge_amount,
+    c.status AS stripe_status,
+    c.paid AS stripe_paid
+{{- end }}
+FROM raw.shopify_orders o
+{{- if .IsStripe }}
+{{- if .IsSnowflake }}
+LEFT JOIN raw.stripe_charges c
+    ON o.email = c.receipt_email
+    AND o.created_at::DATE = c.created::DATE
+{{- else if .IsClickHouse }}
+LEFT JOIN raw.stripe_charges c
+    ON o.email = c.receipt_email
+    AND toDate(o.created_at) = toDate(c.created)
+{{- else }}
+LEFT JOIN raw.stripe_charges c
+    ON o.email = c.receipt_email
+    AND DATE(o.created_at) = DATE(c.created)
+{{- end }}
+{{- end }}
+{{- if .IsBigQuery }}
+WHERE o.test IS NOT TRUE AND o.financial_status IS NOT NULL
+QUALIFY ROW_NUMBER() OVER (PARTITION BY o.id ORDER BY o.updated_at DESC) = 1
+{{- end }}
