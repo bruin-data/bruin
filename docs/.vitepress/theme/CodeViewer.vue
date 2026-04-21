@@ -49,24 +49,6 @@ const props = defineProps({
 const selectedPath = ref('')
 const copied = ref(false)
 
-const languageMap = {
-  yml: 'yaml',
-  yaml: 'yaml',
-  sql: 'sql',
-  py: 'python',
-  js: 'javascript',
-  ts: 'typescript',
-  json: 'json',
-  md: 'markdown',
-  sh: 'bash',
-  toml: 'toml'
-}
-
-function getLanguage(filename) {
-  const ext = filename.split('.').pop()
-  return languageMap[ext] || 'text'
-}
-
 function buildTree(files) {
   const root = []
   const folderMap = {}
@@ -101,8 +83,7 @@ function buildTree(files) {
       name: parts[parts.length - 1],
       path: file.path,
       type: 'file',
-      content: file.content,
-      language: file.language || getLanguage(parts[parts.length - 1])
+      content: file.content
     })
   }
 
@@ -138,14 +119,7 @@ async function copyContent() {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
   } catch {
-    const ta = document.createElement('textarea')
-    ta.value = selectedFile.value.content
-    document.body.appendChild(ta)
-    ta.select()
-    document.execCommand('copy')
-    document.body.removeChild(ta)
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 2000)
+    // Clipboard API unavailable (non-HTTPS or denied permission)
   }
 }
 
@@ -155,17 +129,23 @@ onMounted(() => {
   }
 })
 
-// Recursive TreeItem using render functions (no runtime template compilation needed)
-const chevronDown = h('svg', { width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none' }, [
-  h('path', { d: 'M3 4.5L6 7.5L9 4.5', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
-])
-const chevronRight = h('svg', { width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none' }, [
-  h('path', { d: 'M4.5 3L7.5 6L4.5 9', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
-])
-const fileIcon = h('svg', { width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none' }, [
-  h('path', { d: 'M7 1H3C2.44772 1 2 1.44772 2 2V10C2 10.5523 2.44772 11 3 11H9C9.55228 11 10 10.5523 10 10V4L7 1Z', stroke: 'currentColor', 'stroke-width': '1', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
-  h('path', { d: 'M7 1V4H10', stroke: 'currentColor', 'stroke-width': '1', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
-])
+// Icon factory functions — must create fresh VNodes per render call
+function makeChevronDown() {
+  return h('svg', { width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none' }, [
+    h('path', { d: 'M3 4.5L6 7.5L9 4.5', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
+  ])
+}
+function makeChevronRight() {
+  return h('svg', { width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none' }, [
+    h('path', { d: 'M4.5 3L7.5 6L4.5 9', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
+  ])
+}
+function makeFileIcon() {
+  return h('svg', { width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none' }, [
+    h('path', { d: 'M7 1H3C2.44772 1 2 1.44772 2 2V10C2 10.5523 2.44772 11 3 11H9C9.55228 11 10 10.5523 10 10V4L7 1Z', stroke: 'currentColor', 'stroke-width': '1', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
+    h('path', { d: 'M7 1V4H10', stroke: 'currentColor', 'stroke-width': '1', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })
+  ])
+}
 
 const TreeItem = defineComponent({
   name: 'TreeItem',
@@ -187,8 +167,8 @@ const TreeItem = defineComponent({
       if (isFolder) itemClasses.push('is-folder')
 
       const icon = isFolder
-        ? h('span', { class: 'cv-tree-icon' }, [expanded.value ? chevronDown : chevronRight])
-        : h('span', { class: 'cv-tree-icon cv-file-icon' }, [fileIcon])
+        ? h('span', { class: 'cv-tree-icon' }, [expanded.value ? makeChevronDown() : makeChevronRight()])
+        : h('span', { class: 'cv-tree-icon cv-file-icon' }, [makeFileIcon()])
 
       const label = h('span', { class: 'cv-tree-label' }, props.node.name)
 
