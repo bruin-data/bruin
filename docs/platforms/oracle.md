@@ -182,14 +182,6 @@ columns:
     description: "Employee's last name"
 ```
 
-#### Visualizing Lineage in VSCode
-
-When you define dependencies between your Oracle assets, you can visualize the lineage relationships directly in VSCode. Here's how the `hr.employees` asset dependencies would appear:
-
-![Oracle Asset Lineage](/oracle-lineage.png)
-
-In this diagram, you can see that `hr.employees` depends on both `hr.departments` and `hr.jobs` assets, which is defined in the `depends` section of the asset configuration. The VSCode extension provides this visual representation to help you understand data flow and relationships between your Oracle tables and views.
-
 ## Ingesting Data from Oracle
 
 While the `oracle.sql` and `oracle.source` asset types are useful for documentation and lineage, you can use [Ingestr assets](../assets/ingestr.md) to actually move data from Oracle to your data warehouse platforms like BigQuery, Snowflake, Redshift, or Synapse.
