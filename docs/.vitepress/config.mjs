@@ -103,6 +103,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Load Notion to PostgreSQL", link: "/getting-started/tutorials/load-notion-postgres"},
                             {text: "Oracle to DuckDB", link: "/getting-started/tutorials/oracle-duckdb"},
                             {text: "Using Templates", link: "/getting-started/tutorials/template-tutorial"},
+                            {text: "Explore Example Project", link: "/getting-started/tutorials/example-project"},
                         ],
                     },
                 ],
