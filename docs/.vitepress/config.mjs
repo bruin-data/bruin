@@ -100,6 +100,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         items: [
                             {text: "Bruin Academy", link: "https://getbruin.com/learn/"},
                             {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
+                            {text: "Explore Example Project", link: "/getting-started/tutorials/example-project"},
                         ],
                     },
                 ],
