@@ -151,6 +151,26 @@ func resolveRunID(ctx context.Context, c *cli.Command, client *bruincloud.APICli
 	return "", errors.New("either --run-id or --latest is required")
 }
 
+func resolveProjectID(projectID string, listProjects func() ([]bruincloud.Project, error)) (string, error) {
+	if projectID != "" {
+		return projectID, nil
+	}
+
+	projects, err := listProjects()
+	if err != nil {
+		return "", fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	switch len(projects) {
+	case 0:
+		return "", errors.New("no Bruin Cloud projects found for this account")
+	case 1:
+		return projects[0].ID, nil
+	default:
+		return "", errors.New("--project-id is required when your account has access to multiple projects")
+	}
+}
+
 func printFormattedLogs(result json.RawMessage) {
 	var logResp struct {
 		Logs struct {
@@ -920,16 +940,23 @@ func cloudRunsDiagnose() *cli.Command {
 			defer RecoverFromPanic()
 			output := c.String("output")
 
-			project := c.String("project-id")
 			pipeline := c.String("pipeline")
-			if project == "" || pipeline == "" {
-				printError(errors.New("--project-id and --pipeline are required"), output, "Missing required flags")
+			if pipeline == "" {
+				printError(errors.New("--pipeline is required"), output, "Missing required flags")
 				return cli.Exit("", 1)
 			}
 
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			project, err := resolveProjectID(c.String("project-id"), func() ([]bruincloud.Project, error) {
+				return client.ListProjects(ctx)
+			})
+			if err != nil {
+				printError(err, output, "Failed to resolve project ID")
 				return cli.Exit("", 1)
 			}
 
