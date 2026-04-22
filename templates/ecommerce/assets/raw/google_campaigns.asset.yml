@@ -1,0 +1,6 @@
+name: raw.google_campaigns
+type: ingestr
+parameters:
+  source_connection: google_ads
+  source_table: campaigns
+  incremental_strategy: replace

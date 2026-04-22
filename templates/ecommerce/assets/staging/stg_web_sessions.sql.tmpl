@@ -1,0 +1,101 @@
+/* @bruin
+name: staging.stg_web_sessions
+type: sql
+materialization:
+  type: table
+depends:
+{{- if .IsGA4 }}
+  - raw.ga4_sessions
+  - raw.ga4_events
+{{- else }}
+  - raw.mixpanel_events
+{{- end }}
+columns:
+  - name: session_date
+    type: date
+    checks:
+      - name: not_null
+@bruin */
+
+WITH source AS (
+{{- if .IsGA4 }}
+    SELECT
+        s.date AS session_raw_date,
+        s.sessions AS total_sessions,
+        s.new_users,
+        s.engaged_sessions,
+        e.event_count AS purchase_events,
+        CASE
+            WHEN s.source = 'facebook' THEN 'paid_ads'
+            WHEN s.medium = 'email' THEN 'email'
+            WHEN s.medium = 'organic' THEN 'organic_search'
+            WHEN s.medium = 'cpc' THEN 'paid_search'
+            WHEN s.source = '(direct)' THEN 'direct'
+            ELSE 'other'
+        END AS channel
+    FROM raw.ga4_sessions s
+    LEFT JOIN raw.ga4_events e
+        ON s.date = e.date
+        AND e.event_name = 'purchase'
+{{- else }}
+    SELECT
+        s.session_raw_date,
+        s.total_sessions,
+        s.new_users,
+        s.engaged_sessions,
+        COALESCE(p.purchase_events, 0) AS purchase_events,
+        s.channel
+    FROM (
+        SELECT
+{{- if .IsClickHouse }}
+            toDate(e.time) AS session_raw_date,
+{{- else if .IsBigQuery }}
+            DATE(e.time) AS session_raw_date,
+{{- else }}
+            e.time::DATE AS session_raw_date,
+{{- end }}
+            COUNT(*) AS total_sessions,
+            COUNT(CASE WHEN e.is_new_user = true THEN 1 END) AS new_users,
+            COUNT(CASE WHEN e.session_duration > 10 THEN 1 END) AS engaged_sessions,
+            CASE
+                WHEN e.utm_source = 'facebook' THEN 'paid_ads'
+                WHEN e.utm_medium = 'email' THEN 'email'
+                WHEN e.utm_medium = 'organic' THEN 'organic_search'
+                WHEN e.utm_medium = 'cpc' THEN 'paid_search'
+                ELSE 'other'
+            END AS channel
+        FROM raw.mixpanel_events e
+        WHERE e.event_name = 'session_start'
+        GROUP BY session_raw_date, channel
+    ) s
+    LEFT JOIN (
+        SELECT
+{{- if .IsClickHouse }}
+            toDate(e.time) AS purchase_date,
+{{- else if .IsBigQuery }}
+            DATE(e.time) AS purchase_date,
+{{- else }}
+            e.time::DATE AS purchase_date,
+{{- end }}
+            COUNT(*) AS purchase_events
+        FROM raw.mixpanel_events e
+        WHERE e.event_name = 'purchase'
+        GROUP BY purchase_date
+    ) p
+        ON s.session_raw_date = p.purchase_date
+{{- end }}
+)
+SELECT
+{{- if .IsClickHouse }}
+    toDate(session_raw_date) AS session_date,
+{{- else if .IsBigQuery }}
+    DATE(session_raw_date) AS session_date,
+{{- else }}
+    session_raw_date::DATE AS session_date,
+{{- end }}
+    total_sessions,
+    new_users,
+    engaged_sessions,
+    purchase_events,
+    channel
+FROM source

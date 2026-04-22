@@ -1,0 +1,53 @@
+/* @bruin
+name: staging.stg_customers
+type: sql
+materialization:
+  type: table
+depends:
+  - raw.shopify_customers
+{{- if .IsStripe }}
+  - raw.stripe_customers
+{{- end }}
+columns:
+  - name: customer_email
+    type: varchar
+    checks:
+      - name: not_null
+      - name: unique
+@bruin */
+
+{{- if .IsStripe }}
+
+SELECT
+    COALESCE(sc.email, st.email) AS customer_email,
+    sc.id AS shopify_customer_id,
+    st.id AS stripe_customer_id,
+    sc.first_name,
+    sc.last_name,
+    sc.created_at AS shopify_created_at,
+    st.created AS stripe_created_at,
+    LEAST(sc.created_at, st.created) AS first_seen_at,
+    sc.orders_count,
+    CAST(sc.total_spent AS DECIMAL(12,2)) AS shopify_total_spent,
+    sc.tags AS customer_tags,
+    sc.state AS customer_state
+FROM raw.shopify_customers sc
+FULL OUTER JOIN raw.stripe_customers st
+    ON lower(sc.email) = lower(st.email)
+WHERE COALESCE(sc.email, st.email) IS NOT NULL
+{{- else }}
+
+SELECT
+    email AS customer_email,
+    id AS shopify_customer_id,
+    first_name,
+    last_name,
+    created_at AS shopify_created_at,
+    created_at AS first_seen_at,
+    orders_count,
+    CAST(total_spent AS DECIMAL(12,2)) AS shopify_total_spent,
+    tags AS customer_tags,
+    state AS customer_state
+FROM raw.shopify_customers
+WHERE email IS NOT NULL
+{{- end }}

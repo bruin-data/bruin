@@ -1,0 +1,7 @@
+name: raw.shopify_inventory
+type: ingestr
+parameters:
+  source_connection: shopify
+  source_table: inventory_levels
+  loader_file_format: jsonl
+  incremental_strategy: replace

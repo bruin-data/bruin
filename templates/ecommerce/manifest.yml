@@ -1,0 +1,109 @@
+# Ecommerce template manifest.
+# Each asset lists the user selections it requires.
+#
+# Convention:
+#   - Files ending in .tmpl get Go text/template processing; the suffix is stripped for output.
+#   - Files without .tmpl are copied as-is.
+#   - 'requires' maps a selection category to a value. The asset is included only when
+#     every requirement is satisfied. For the 'ads' category the value must appear in
+#     the user's multi-select list. Empty or absent 'requires' means always included.
+
+pipeline:
+  path: pipeline.yml.tmpl
+
+assets:
+  # ── Shopify core (always included) ────────────────────────────────
+  - path: assets/raw/shopify_orders.asset.yml
+  - path: assets/raw/shopify_customers.asset.yml
+  - path: assets/raw/shopify_products.asset.yml
+  - path: assets/raw/shopify_inventory.asset.yml
+
+  # ── Stripe payment assets ─────────────────────────────────────────
+  - path: assets/raw/stripe_charges.asset.yml
+    requires:
+      payments: stripe
+  - path: assets/raw/stripe_refunds.asset.yml
+    requires:
+      payments: stripe
+  - path: assets/raw/stripe_customers.asset.yml
+    requires:
+      payments: stripe
+  - path: assets/raw/stripe_payouts.asset.yml
+    requires:
+      payments: stripe
+
+  # ── Klaviyo marketing assets ──────────────────────────────────────
+  - path: assets/raw/klaviyo_campaigns.asset.yml
+    requires:
+      marketing: klaviyo
+  - path: assets/raw/klaviyo_flows.asset.yml
+    requires:
+      marketing: klaviyo
+  - path: assets/raw/klaviyo_metrics.asset.yml
+    requires:
+      marketing: klaviyo
+
+  # ── HubSpot marketing assets ──────────────────────────────────────
+  - path: assets/raw/hubspot_contacts.asset.yml
+    requires:
+      marketing: hubspot
+  - path: assets/raw/hubspot_deals.asset.yml
+    requires:
+      marketing: hubspot
+  - path: assets/raw/hubspot_campaigns.asset.yml
+    requires:
+      marketing: hubspot
+
+  # ── Facebook Ads ──────────────────────────────────────────────────
+  - path: assets/raw/facebook_campaigns.asset.yml
+    requires:
+      ads: facebook-ads
+  - path: assets/raw/facebook_ad_insights.asset.yml
+    requires:
+      ads: facebook-ads
+
+  # ── Google Ads ────────────────────────────────────────────────────
+  - path: assets/raw/google_campaigns.asset.yml
+    requires:
+      ads: google-ads
+  - path: assets/raw/google_ad_insights.asset.yml
+    requires:
+      ads: google-ads
+
+  # ── TikTok Ads ────────────────────────────────────────────────────
+  - path: assets/raw/tiktok_campaigns.asset.yml
+    requires:
+      ads: tiktok-ads
+  - path: assets/raw/tiktok_ad_insights.asset.yml
+    requires:
+      ads: tiktok-ads
+
+  # ── GA4 analytics ─────────────────────────────────────────────────
+  - path: assets/raw/ga4_events.asset.yml
+    requires:
+      analytics: ga4
+  - path: assets/raw/ga4_sessions.asset.yml
+    requires:
+      analytics: ga4
+
+  # ── Mixpanel analytics ────────────────────────────────────────────
+  - path: assets/raw/mixpanel_events.asset.yml
+    requires:
+      analytics: mixpanel
+  - path: assets/raw/mixpanel_funnels.asset.yml
+    requires:
+      analytics: mixpanel
+
+  # ── Staging (templated on warehouse + platform choices) ───────────
+  - path: assets/staging/stg_orders.sql.tmpl
+  - path: assets/staging/stg_customers.sql.tmpl
+  - path: assets/staging/stg_products.sql
+  - path: assets/staging/stg_marketing_spend.sql.tmpl
+  - path: assets/staging/stg_web_sessions.sql.tmpl
+
+  # ── Reports (templated on warehouse) ──────────────────────────────
+  - path: assets/reports/rpt_daily_revenue.sql.tmpl
+  - path: assets/reports/rpt_customer_cohorts.sql.tmpl
+  - path: assets/reports/rpt_product_performance.sql
+  - path: assets/reports/rpt_marketing_roi.sql.tmpl
+  - path: assets/reports/rpt_daily_kpis.sql.tmpl

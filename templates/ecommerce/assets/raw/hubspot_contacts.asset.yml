@@ -1,0 +1,8 @@
+name: raw.hubspot_contacts
+type: ingestr
+parameters:
+  source_connection: hubspot
+  source_table: contacts
+  incremental_strategy: merge
+  incremental_key: updatedAt
+  primary_key: id

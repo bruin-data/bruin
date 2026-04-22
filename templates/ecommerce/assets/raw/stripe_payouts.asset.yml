@@ -1,0 +1,8 @@
+name: raw.stripe_payouts
+type: ingestr
+parameters:
+  source_connection: stripe
+  source_table: payouts
+  incremental_strategy: merge
+  incremental_key: created
+  primary_key: id

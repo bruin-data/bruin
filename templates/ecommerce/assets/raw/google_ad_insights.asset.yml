@@ -1,0 +1,8 @@
+name: raw.google_ad_insights
+type: ingestr
+parameters:
+  source_connection: google_ads
+  source_table: campaign_performance
+  incremental_strategy: merge
+  incremental_key: date
+  primary_key: "date,campaign_id"
