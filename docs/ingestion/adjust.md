@@ -63,8 +63,6 @@ parameters:
   source_table: 'campaigns:app_token=abc123,def456'
 ```
 
-This works for `events`, `campaigns`, and `creatives` tables. For custom tables, use the `app_token__in` filter in the filters section instead (e.g., `custom:day,campaign:installs:app_token__in=abc123`).
-
 ## Available Source Tables
 
 | Table | PK | Inc Key | Inc Strategy | Details |
