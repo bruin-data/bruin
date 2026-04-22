@@ -109,6 +109,8 @@ func (a *ManifestAsset) matchesChoices(c *EcommerceChoices) bool {
 			if c.Warehouse != value {
 				return false
 			}
+		default:
+			return false
 		}
 	}
 	return true
@@ -179,7 +181,10 @@ func buildEcommerceFiles(c *EcommerceChoices) (map[string]string, error) {
 			continue
 		}
 
-		var content string
+		var (
+			content string
+			err     error
+		)
 		if isTemplate(asset.Path) {
 			content, err = renderEcommerceTemplate(asset.Path, data)
 			if err != nil {
