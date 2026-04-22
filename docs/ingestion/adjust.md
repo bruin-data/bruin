@@ -44,16 +44,35 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Adjust connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Adjust that you want to ingest. For example, `creatives` is the table of Adjust that you want to ingest.
+- `source_table`: The name of the data table in Adjust that you want to ingest. For example, `creatives` is the table of Adjust that you want to ingest. You can also filter by app token by appending `:app_token=<token>` to the table name (e.g., `creatives:app_token=abc123`).
+
+### App Token Filtering
+
+You can filter data for a specific app by appending `:app_token=<token>` to the source table name. Multiple app tokens can be separated by commas.
+
+```yaml
+parameters:
+  source_connection: my_adjust
+  source_table: 'campaigns:app_token=abc123'
+```
+
+```yaml
+# Multiple app tokens
+parameters:
+  source_connection: my_adjust
+  source_table: 'campaigns:app_token=abc123,def456'
+```
+
+This works for `events`, `campaigns`, and `creatives` tables. For custom tables, use the `app_token__in` filter in the filters section instead (e.g., `custom:day,campaign:installs:app_token__in=abc123`).
 
 ## Available Source Tables
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 | ----- | -- | ------- | ------------ | ------- |
-| `campaigns` | id | created | merge | Retrieves data for a campaign, showing the app's revenue and network costs over multiple days. |
-| `creatives` | id | created | merge | Retrieves data for a creative assets, detailing the app's revenue and network costs across multiple days. |
-| `events` | id | created | merge | Retrieves data for events and event slugs. |
-| `custom` | id | created | merge | Retrieves custom data based on the dimensions and metrics specified. |
+| `campaigns` | day | – | merge | Retrieves data for a campaign, showing the app's revenue and network costs over multiple days. Columns include `app_token`. |
+| `creatives` | day | – | merge | Retrieves data for creative assets, detailing the app's revenue and network costs across multiple days. Columns include `app_token`. |
+| `events` | id | – | replace | Retrieves data for events and event slugs. |
+| `custom` | configurable | – | merge | Retrieves custom data based on the dimensions and metrics specified. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
