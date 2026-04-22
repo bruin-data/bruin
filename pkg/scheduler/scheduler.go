@@ -601,12 +601,14 @@ func NewScheduler(logger logger.Logger, p *pipeline.Pipeline, runID string) *Sch
 		}
 	}
 
+	// Size WorkQueue to fit every task instance so Tick can never block under
+	// taskScheduleLock — a bounded send there deadlocks the scheduler loop.
 	s := &Scheduler{
 		logger:           logger,
 		pipeline:         p,
 		taskInstances:    instances,
 		taskScheduleLock: sync.Mutex{},
-		WorkQueue:        make(chan TaskInstance, 100),
+		WorkQueue:        make(chan TaskInstance, len(instances)+1),
 		Results:          make(chan *TaskExecutionResult),
 		runID:            runID,
 	}
