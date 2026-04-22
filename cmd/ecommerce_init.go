@@ -232,7 +232,10 @@ func runEcommerceStackPicker() (*EcommerceChoices, error) {
 
 // generateEcommerceTemplate generates all files for the ecommerce template based on user choices.
 func generateEcommerceTemplate(basePath string, choices *EcommerceChoices) error {
-	files := buildEcommerceFiles(choices)
+	files, err := buildEcommerceFiles(choices)
+	if err != nil {
+		return err
+	}
 
 	for relPath, content := range files {
 		fullPath := filepath.Join(basePath, relPath)
@@ -248,79 +251,4 @@ func generateEcommerceTemplate(basePath string, choices *EcommerceChoices) error
 	}
 
 	return nil
-}
-
-// buildEcommerceFiles returns all files to be generated, keyed by relative path.
-func buildEcommerceFiles(c *EcommerceChoices) map[string]string {
-	files := make(map[string]string)
-
-	// Pipeline config
-	files["pipeline.yml"] = generatePipelineYML(c)
-
-	// Shopify raw assets (always included)
-	files["assets/raw/shopify_orders.asset.yml"] = shopifyOrdersAsset
-	files["assets/raw/shopify_customers.asset.yml"] = shopifyCustomersAsset
-	files["assets/raw/shopify_products.asset.yml"] = shopifyProductsAsset
-	files["assets/raw/shopify_inventory.asset.yml"] = shopifyInventoryAsset
-
-	// Payments
-	if c.Payments == paymentsStripe {
-		files["assets/raw/stripe_charges.asset.yml"] = stripeChargesAsset
-		files["assets/raw/stripe_refunds.asset.yml"] = stripeRefundsAsset
-		files["assets/raw/stripe_customers.asset.yml"] = stripeCustomersAsset
-		files["assets/raw/stripe_payouts.asset.yml"] = stripePayoutsAsset
-	}
-
-	// Marketing
-	switch c.Marketing {
-	case marketingKlaviyo:
-		files["assets/raw/klaviyo_campaigns.asset.yml"] = klaviyoCampaignsAsset
-		files["assets/raw/klaviyo_flows.asset.yml"] = klaviyoFlowsAsset
-		files["assets/raw/klaviyo_metrics.asset.yml"] = klaviyoMetricsAsset
-	case marketingHubSpot:
-		files["assets/raw/hubspot_contacts.asset.yml"] = hubspotContactsAsset
-		files["assets/raw/hubspot_deals.asset.yml"] = hubspotDealsAsset
-		files["assets/raw/hubspot_campaigns.asset.yml"] = hubspotCampaignsAsset
-	}
-
-	// Ads (multi-select)
-	for _, ad := range c.Ads {
-		switch ad {
-		case adsFacebook:
-			files["assets/raw/facebook_campaigns.asset.yml"] = facebookCampaignsAsset
-			files["assets/raw/facebook_ad_insights.asset.yml"] = facebookAdInsightsAsset
-		case adsGoogle:
-			files["assets/raw/google_campaigns.asset.yml"] = googleCampaignsAsset
-			files["assets/raw/google_ad_insights.asset.yml"] = googleAdInsightsAsset
-		case adsTikTok:
-			files["assets/raw/tiktok_campaigns.asset.yml"] = tiktokCampaignsAsset
-			files["assets/raw/tiktok_ad_insights.asset.yml"] = tiktokAdInsightsAsset
-		}
-	}
-
-	// Analytics
-	switch c.Analytics {
-	case analyticsGA4:
-		files["assets/raw/ga4_events.asset.yml"] = ga4EventsAsset
-		files["assets/raw/ga4_sessions.asset.yml"] = ga4SessionsAsset
-	case analyticsMixpanel:
-		files["assets/raw/mixpanel_events.asset.yml"] = mixpanelEventsAsset
-		files["assets/raw/mixpanel_funnels.asset.yml"] = mixpanelFunnelsAsset
-	}
-
-	// Staging SQL
-	files["assets/staging/stg_orders.sql"] = generateStgOrders(c)
-	files["assets/staging/stg_customers.sql"] = generateStgCustomers(c)
-	files["assets/staging/stg_products.sql"] = stgProductsSQL
-	files["assets/staging/stg_marketing_spend.sql"] = generateStgMarketingSpend(c)
-	files["assets/staging/stg_web_sessions.sql"] = generateStgWebSessions(c)
-
-	// Reports SQL
-	files["assets/reports/rpt_daily_revenue.sql"] = generateRptDailyRevenue(c)
-	files["assets/reports/rpt_customer_cohorts.sql"] = generateRptCustomerCohorts(c)
-	files["assets/reports/rpt_product_performance.sql"] = rptProductPerformanceSQL
-	files["assets/reports/rpt_marketing_roi.sql"] = generateRptMarketingROI(c)
-	files["assets/reports/rpt_daily_kpis.sql"] = generateRptDailyKPIs(c)
-
-	return files
 }

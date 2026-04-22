@@ -1,0 +1,152 @@
+/* @bruin
+name: staging.stg_marketing_spend
+type: sql
+materialization:
+  type: table
+depends:
+{{- if .HasFacebook }}
+  - raw.facebook_ad_insights
+{{- end }}
+{{- if .HasGoogle }}
+  - raw.google_ad_insights
+{{- end }}
+{{- if .HasTikTok }}
+  - raw.tiktok_ad_insights
+{{- end }}
+{{- if .IsKlaviyo }}
+  - raw.klaviyo_campaigns
+  - raw.klaviyo_metrics
+{{- end }}
+{{- if .IsHubSpot }}
+  - raw.hubspot_campaigns
+{{- end }}
+columns:
+  - name: spend_date
+    type: date
+    checks:
+      - name: not_null
+@bruin */
+
+{{- if .HasFacebook }}
+
+-- Facebook Ads spend
+SELECT
+{{- if .IsClickHouse }}
+    toDate(date_start) AS spend_date,
+{{- else if .IsSnowflake }}
+    date_start::DATE AS spend_date,
+{{- else }}
+    DATE(date_start) AS spend_date,
+{{- end }}
+    'paid_ads' AS channel,
+    campaign_name,
+    CAST(spend AS DECIMAL(12,2)) AS spend,
+    CAST(impressions AS INTEGER) AS impressions,
+    CAST(clicks AS INTEGER) AS clicks,
+    CAST(conversions AS INTEGER) AS conversions
+FROM raw.facebook_ad_insights
+{{- end }}
+
+{{- if .HasGoogle }}
+{{- if .HasFacebook }}
+
+UNION ALL
+
+{{- end }}
+
+-- Google Ads spend
+SELECT
+{{- if .IsClickHouse }}
+    toDate(date) AS spend_date,
+{{- else if .IsSnowflake }}
+    date::DATE AS spend_date,
+{{- else }}
+    DATE(date) AS spend_date,
+{{- end }}
+    'paid_ads' AS channel,
+    campaign_name,
+    CAST(spend AS DECIMAL(12,2)) AS spend,
+    CAST(impressions AS INTEGER) AS impressions,
+    CAST(clicks AS INTEGER) AS clicks,
+    CAST(conversions AS INTEGER) AS conversions
+FROM raw.google_ad_insights
+{{- end }}
+
+{{- if .HasTikTok }}
+{{- if or .HasFacebook .HasGoogle }}
+
+UNION ALL
+
+{{- end }}
+
+-- TikTok Ads spend
+SELECT
+{{- if .IsClickHouse }}
+    toDate(stat_datetime) AS spend_date,
+{{- else if .IsSnowflake }}
+    stat_datetime::DATE AS spend_date,
+{{- else }}
+    DATE(stat_datetime) AS spend_date,
+{{- end }}
+    'paid_ads' AS channel,
+    campaign_name,
+    CAST(spend AS DECIMAL(12,2)) AS spend,
+    CAST(impressions AS INTEGER) AS impressions,
+    CAST(clicks AS INTEGER) AS clicks,
+    CAST(conversions AS INTEGER) AS conversions
+FROM raw.tiktok_ad_insights
+{{- end }}
+
+{{- if .IsKlaviyo }}
+{{- if or .HasFacebook .HasGoogle .HasTikTok }}
+
+UNION ALL
+
+{{- end }}
+
+-- Klaviyo email campaigns
+SELECT
+{{- if .IsClickHouse }}
+    toDate(send_time) AS spend_date,
+{{- else if .IsBigQuery }}
+    DATE(send_time) AS spend_date,
+{{- else }}
+    send_time::date AS spend_date,
+{{- end }}
+    'email' AS channel,
+    name AS campaign_name,
+    0.00 AS spend,
+    num_recipients AS impressions,
+    CAST(click_count AS INTEGER) AS clicks,
+    CAST(conversion_count AS INTEGER) AS conversions
+FROM raw.klaviyo_campaigns kc
+LEFT JOIN raw.klaviyo_metrics km
+    ON kc.id = km.campaign_id
+WHERE send_time IS NOT NULL
+{{- end }}
+
+{{- if .IsHubSpot }}
+{{- if or .HasFacebook .HasGoogle .HasTikTok }}
+
+UNION ALL
+
+{{- end }}
+
+-- HubSpot email campaigns
+SELECT
+{{- if .IsClickHouse }}
+    toDate(updated_at) AS spend_date,
+{{- else if .IsBigQuery }}
+    DATE(updated_at) AS spend_date,
+{{- else }}
+    updated_at::date AS spend_date,
+{{- end }}
+    'email' AS channel,
+    name AS campaign_name,
+    0.00 AS spend,
+    CAST(num_included AS INTEGER) AS impressions,
+    CAST(num_clicks AS INTEGER) AS clicks,
+    0 AS conversions
+FROM raw.hubspot_campaigns
+WHERE name IS NOT NULL
+{{- end }}

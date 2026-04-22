@@ -1,0 +1,164 @@
+/* @bruin
+name: reports.rpt_daily_kpis
+type: sql
+materialization:
+  type: table
+depends:
+  - reports.rpt_daily_revenue
+  - staging.stg_customers
+  - staging.stg_orders
+  - staging.stg_web_sessions
+  - staging.stg_marketing_spend
+columns:
+  - name: kpi_date
+    type: date
+    checks:
+      - name: not_null
+      - name: unique
+@bruin */
+
+{{- if .IsClickHouse }}
+
+WITH daily_customers AS (
+    SELECT
+        toDate(o.order_date) AS order_date,
+        countIf(toDate(c.first_seen_at) = toDate(o.order_date)) AS new_customers,
+        countIf(toDate(c.first_seen_at) < toDate(o.order_date)) AS returning_customers
+    FROM staging.stg_orders o
+    LEFT JOIN staging.stg_customers c
+        ON o.customer_email = c.customer_email
+    WHERE o.payment_status = 'paid'
+    GROUP BY toDate(o.order_date)
+),
+daily_sessions AS (
+    SELECT
+        session_date,
+        sum(total_sessions) AS sessions,
+        sum(new_users) AS new_visitors,
+        sum(purchase_events) AS purchases
+    FROM staging.stg_web_sessions
+    GROUP BY session_date
+),
+daily_spend AS (
+    SELECT
+        spend_date,
+        sum(spend) AS total_ad_spend
+    FROM staging.stg_marketing_spend
+    GROUP BY spend_date
+)
+SELECT
+    r.order_date AS kpi_date,
+    r.net_revenue,
+    r.total_orders,
+    r.paid_orders,
+    r.avg_order_value,
+    r.cancellation_rate,
+    dc.new_customers,
+    dc.returning_customers,
+    ds.sessions,
+    ds.new_visitors,
+    round(ds.purchases / nullIf(ds.sessions, 0) * 100, 2) AS conversion_rate,
+    sp.total_ad_spend,
+    round(r.net_revenue / nullIf(sp.total_ad_spend, 0), 2) AS overall_roas
+FROM reports.rpt_daily_revenue r
+LEFT JOIN daily_customers dc ON r.order_date = dc.order_date
+LEFT JOIN daily_sessions ds ON r.order_date = ds.session_date
+LEFT JOIN daily_spend sp ON r.order_date = sp.spend_date
+ORDER BY kpi_date DESC
+{{- else if .IsBigQuery }}
+
+WITH daily_customers AS (
+    SELECT
+        DATE(o.order_date) AS order_date,
+        COUNTIF(DATE(c.first_seen_at) = DATE(o.order_date)) AS new_customers,
+        COUNTIF(DATE(c.first_seen_at) < DATE(o.order_date)) AS returning_customers
+    FROM staging.stg_orders o
+    LEFT JOIN staging.stg_customers c
+        ON o.customer_email = c.customer_email
+    WHERE o.payment_status = 'paid'
+    GROUP BY DATE(o.order_date)
+),
+daily_sessions AS (
+    SELECT
+        session_date,
+        sum(total_sessions) AS sessions,
+        sum(new_users) AS new_visitors,
+        sum(purchase_events) AS purchases
+    FROM staging.stg_web_sessions
+    GROUP BY session_date
+),
+daily_spend AS (
+    SELECT
+        spend_date,
+        sum(spend) AS total_ad_spend
+    FROM staging.stg_marketing_spend
+    GROUP BY spend_date
+)
+SELECT
+    r.order_date AS kpi_date,
+    r.net_revenue,
+    r.total_orders,
+    r.paid_orders,
+    r.avg_order_value,
+    r.cancellation_rate,
+    dc.new_customers,
+    dc.returning_customers,
+    ds.sessions,
+    ds.new_visitors,
+    round(ds.purchases / NULLIF(ds.sessions, 0) * 100, 2) AS conversion_rate,
+    sp.total_ad_spend,
+    round(r.net_revenue / NULLIF(sp.total_ad_spend, 0), 2) AS overall_roas
+FROM reports.rpt_daily_revenue r
+LEFT JOIN daily_customers dc ON r.order_date = dc.order_date
+LEFT JOIN daily_sessions ds ON r.order_date = ds.session_date
+LEFT JOIN daily_spend sp ON r.order_date = sp.spend_date
+ORDER BY kpi_date DESC
+{{- else }}
+
+WITH daily_customers AS (
+    SELECT
+        o.order_date::DATE AS order_date,
+        COUNT(CASE WHEN c.first_seen_at::DATE = o.order_date::DATE THEN 1 END) AS new_customers,
+        COUNT(CASE WHEN c.first_seen_at::DATE < o.order_date::DATE THEN 1 END) AS returning_customers
+    FROM staging.stg_orders o
+    LEFT JOIN staging.stg_customers c
+        ON o.customer_email = c.customer_email
+    WHERE o.payment_status = 'paid'
+    GROUP BY o.order_date::DATE
+),
+daily_sessions AS (
+    SELECT
+        session_date,
+        sum(total_sessions) AS sessions,
+        sum(new_users) AS new_visitors,
+        sum(purchase_events) AS purchases
+    FROM staging.stg_web_sessions
+    GROUP BY session_date
+),
+daily_spend AS (
+    SELECT
+        spend_date,
+        sum(spend) AS total_ad_spend
+    FROM staging.stg_marketing_spend
+    GROUP BY spend_date
+)
+SELECT
+    r.order_date AS kpi_date,
+    r.net_revenue,
+    r.total_orders,
+    r.paid_orders,
+    r.avg_order_value,
+    r.cancellation_rate,
+    dc.new_customers,
+    dc.returning_customers,
+    ds.sessions,
+    ds.new_visitors,
+    round(ds.purchases / NULLIF(ds.sessions, 0) * 100, 2) AS conversion_rate,
+    sp.total_ad_spend,
+    round(r.net_revenue / NULLIF(sp.total_ad_spend, 0), 2) AS overall_roas
+FROM reports.rpt_daily_revenue r
+LEFT JOIN daily_customers dc ON r.order_date = dc.order_date
+LEFT JOIN daily_sessions ds ON r.order_date = ds.session_date
+LEFT JOIN daily_spend sp ON r.order_date = sp.spend_date
+ORDER BY kpi_date DESC
+{{- end }}

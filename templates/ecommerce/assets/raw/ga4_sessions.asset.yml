@@ -1,0 +1,8 @@
+name: raw.ga4_sessions
+type: ingestr
+parameters:
+  source_connection: google_analytics
+  source_table: sessions
+  incremental_strategy: merge
+  incremental_key: date
+  primary_key: date

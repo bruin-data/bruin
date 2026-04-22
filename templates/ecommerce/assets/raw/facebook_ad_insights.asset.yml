@@ -1,0 +1,8 @@
+name: raw.facebook_ad_insights
+type: ingestr
+parameters:
+  source_connection: facebook_ads
+  source_table: insights
+  incremental_strategy: merge
+  incremental_key: date_start
+  primary_key: "date_start,campaign_id"

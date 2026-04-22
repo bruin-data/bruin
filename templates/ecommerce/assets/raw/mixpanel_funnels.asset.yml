@@ -1,0 +1,6 @@
+name: raw.mixpanel_funnels
+type: ingestr
+parameters:
+  source_connection: mixpanel
+  source_table: funnels
+  incremental_strategy: replace

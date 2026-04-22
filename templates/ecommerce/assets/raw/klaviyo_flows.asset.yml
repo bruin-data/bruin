@@ -1,0 +1,6 @@
+name: raw.klaviyo_flows
+type: ingestr
+parameters:
+  source_connection: klaviyo
+  source_table: flows
+  incremental_strategy: replace

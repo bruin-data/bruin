@@ -1,0 +1,6 @@
+name: raw.klaviyo_metrics
+type: ingestr
+parameters:
+  source_connection: klaviyo
+  source_table: metrics
+  incremental_strategy: replace

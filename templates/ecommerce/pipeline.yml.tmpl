@@ -1,0 +1,12 @@
+name: ecommerce
+schedule: daily
+start_date: "2024-01-01"
+
+default_connections:
+{{- if .IsClickHouse }}
+  clickhouse: clickhouse-default
+{{- else if .IsBigQuery }}
+  google_cloud_platform: bigquery-default
+{{- else }}
+  snowflake: snowflake-default
+{{- end }}
