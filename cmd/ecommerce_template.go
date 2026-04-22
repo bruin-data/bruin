@@ -7,9 +7,8 @@ import (
 	"strings"
 	"text/template"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/bruin-data/bruin/templates"
+	"gopkg.in/yaml.v3"
 )
 
 // EcommerceTemplateData is the data passed to Go text/template files.
