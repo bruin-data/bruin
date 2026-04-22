@@ -69,8 +69,8 @@ This works for `events`, `campaigns`, and `creatives` tables. For custom tables,
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 | ----- | -- | ------- | ------------ | ------- |
-| `campaigns` | day | – | merge | Retrieves data for a campaign, showing the app's revenue and network costs over multiple days. Columns include `app_token`. |
-| `creatives` | day | – | merge | Retrieves data for creative assets, detailing the app's revenue and network costs across multiple days. Columns include `app_token`. |
+| `campaigns` | day | – | merge | Retrieves data for a campaign, showing the app's revenue and network costs over multiple days. |
+| `creatives` | day | – | merge | Retrieves data for creative assets, detailing the app's revenue and network costs across multiple days. |
 | `events` | id | – | replace | Retrieves data for events and event slugs. |
 | `custom` | configurable | – | merge | Retrieves custom data based on the dimensions and metrics specified. |
 
