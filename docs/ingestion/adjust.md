@@ -44,23 +44,23 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Adjust connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Adjust that you want to ingest. For example, `creatives` is the table of Adjust that you want to ingest. You can also filter by app token by appending `:app_token=<token>` to the table name (e.g., `creatives:app_token=abc123`).
+- `source_table`: The name of the data table in Adjust that you want to ingest. For example, `creatives` is the table of Adjust that you want to ingest. You can also filter by app token by appending `:<app_token>` to the table name (e.g., `creatives:abc123`).
 
 ### App Token Filtering
 
-You can filter data for a specific app by appending `:app_token=<token>` to the source table name. Multiple app tokens can be separated by commas.
+You can filter data for a specific app by appending `:<app_token>` to the source table name. Multiple app tokens can be separated by commas.
 
 ```yaml
 parameters:
   source_connection: my_adjust
-  source_table: 'campaigns:app_token=abc123'
+  source_table: 'campaigns:abc123'
 ```
 
 ```yaml
 # Multiple app tokens
 parameters:
   source_connection: my_adjust
-  source_table: 'campaigns:app_token=abc123,def456'
+  source_table: 'campaigns:abc123,def456'
 ```
 
 ## Available Source Tables
