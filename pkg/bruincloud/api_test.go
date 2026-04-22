@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -108,6 +109,61 @@ func TestDoRequest_ErrorParsing(t *testing.T) {
 		_, err := client.ListProjects(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse response")
+	})
+}
+
+func TestDoRequest_RetriesOn429(t *testing.T) {
+	t.Parallel()
+
+	t.Run("recovers after 429", func(t *testing.T) {
+		t.Parallel()
+		var attempts atomic.Int32
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			n := attempts.Add(1)
+			if n < 3 {
+				w.Header().Set("Retry-After", "0")
+				w.WriteHeader(http.StatusTooManyRequests)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("[]"))
+		})
+
+		_, err := client.ListProjects(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, int32(3), attempts.Load())
+	})
+
+	t.Run("returns 429 error after exhausting retries", func(t *testing.T) {
+		t.Parallel()
+		var attempts atomic.Int32
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			attempts.Add(1)
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"message":"rate limited"}`))
+		})
+
+		_, err := client.ListProjects(t.Context())
+		require.Error(t, err)
+		var apiErr *APIError
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, http.StatusTooManyRequests, apiErr.StatusCode)
+		// NewAPIClient configures RetryMax=3, so 1 initial + 3 retries = 4 attempts.
+		assert.Equal(t, int32(defaultRetryMax+1), attempts.Load())
+	})
+
+	t.Run("does not retry on 500", func(t *testing.T) {
+		t.Parallel()
+		var attempts atomic.Int32
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			attempts.Add(1)
+			w.WriteHeader(http.StatusInternalServerError)
+		})
+
+		_, err := client.ListProjects(t.Context())
+		require.Error(t, err)
+		assert.Equal(t, int32(1), attempts.Load())
 	})
 }
 
