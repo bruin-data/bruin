@@ -9,9 +9,17 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
 
-const defaultBaseURL = "https://cloud.getbruin.com/api/v1"
+const (
+	defaultBaseURL      = "https://cloud.getbruin.com/api/v1"
+	defaultRetryMax     = 3
+	defaultRetryWaitMin = 1 * time.Second
+	defaultRetryWaitMax = 10 * time.Second
+)
 
 // APIClient is the HTTP client for the Bruin Cloud API.
 type APIClient struct {
@@ -22,11 +30,35 @@ type APIClient struct {
 
 // NewAPIClient creates a new API client with the given API key.
 func NewAPIClient(apiKey string) *APIClient {
+	rc := retryablehttp.NewClient()
+	rc.Logger = nil
+	rc.RetryMax = defaultRetryMax
+	rc.RetryWaitMin = defaultRetryWaitMin
+	rc.RetryWaitMax = defaultRetryWaitMax
+	rc.CheckRetry = retryOn429
+	// Preserve the final response (body + status) when retries are exhausted so
+	// doRequest can surface the upstream APIError instead of an opaque "giving
+	// up after N attempts" message.
+	rc.ErrorHandler = retryablehttp.PassthroughErrorHandler
 	return &APIClient{
 		baseURL:    defaultBaseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{},
+		httpClient: rc.StandardClient(),
 	}
+}
+
+// retryOn429 retries only on HTTP 429 Too Many Requests. Other error statuses
+// (including 5xx) are returned to the caller unchanged — 429 is the only
+// status the server signals as explicitly retryable, and the default backoff
+// respects the Retry-After header automatically.
+func retryOn429(ctx context.Context, resp *http.Response, err error) (bool, error) {
+	if ctx.Err() != nil {
+		return false, ctx.Err()
+	}
+	if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+		return true, nil
+	}
+	return false, err
 }
 
 // doRequest performs an HTTP request and unmarshals the response.
