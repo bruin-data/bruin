@@ -83,6 +83,14 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "creatives", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Apple Ads - Apple Search Ads campaign management
+	"appleads": {
+		{Name: "campaigns", PrimaryKey: "orgId,id", IncKey: "modificationTime", IncStrategy: "merge"},
+		{Name: "ad_groups", PrimaryKey: "orgId,id", IncKey: "modificationTime", IncStrategy: "merge"},
+		{Name: "ads", PrimaryKey: "orgId,id", IncKey: "modificationTime", IncStrategy: "merge"},
+		{Name: "creatives", PrimaryKey: "orgId,id", IncKey: "modificationTime", IncStrategy: "merge"},
+	},
+
 	// Apple AppStore - App marketplace
 	"appstore": {
 		{Name: "app-downloads-detailed", PrimaryKey: "", IncKey: "processing_date", IncStrategy: "merge"},
@@ -790,6 +798,7 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 // gongSources is the set of source names that require gong to be enabled.
 var gongSources = map[string]bool{
+	"appleads": true,
 	"dune":     true,
 	"g2":       true,
 	"jobtread": true,
