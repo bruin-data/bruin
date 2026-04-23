@@ -279,6 +279,13 @@ environments:
           key_id: "key-id-123"
           key_path: "/path/to/key.pem"
           issuer_id: "issuer-id-123"
+      appleads:
+        - name: "appleads-1"
+          client_id: "SEARCHADS.client-id-123"
+          team_id: "SEARCHADS.team-id-123"
+          key_id: "key-id-123"
+          org_id: "19371590"
+          key_path: "/path/to/key.pem"
       linkedinads:
         - name: "linkedinads-1"
           access_token: "access-token-123"

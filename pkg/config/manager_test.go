@@ -454,6 +454,16 @@ func TestLoadFromFile(t *testing.T) {
 					KeyPath:  "/path/to/key.pem",
 				},
 			},
+			AppleAds: []AppleAdsConnection{
+				{
+					Name:     "appleads-1",
+					ClientID: "SEARCHADS.client-id-123",
+					TeamID:   "SEARCHADS.team-id-123",
+					KeyID:    "key-id-123",
+					OrgID:    "19371590",
+					KeyPath:  "/path/to/key.pem",
+				},
+			},
 			LinkedInAds: []LinkedInAdsConnection{
 				{
 					Name:        "linkedinads-1",
@@ -2003,6 +2013,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Docebo:              []DoceboConnection{{Name: "docebo1"}},
 				GoogleAds:           []GoogleAdsConnection{{Name: "googleads1"}},
 				AppStore:            []AppStoreConnection{{Name: "appstore1"}},
+				AppleAds:            []AppleAdsConnection{{Name: "appleads1"}},
 				LinkedInAds:         []LinkedInAdsConnection{{Name: "linkedinads1"}},
 				Mailchimp:           []MailchimpConnection{{Name: "mailchimp1"}},
 				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
@@ -2108,6 +2119,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Docebo:              []DoceboConnection{{Name: "docebo1"}},
 				GoogleAds:           []GoogleAdsConnection{{Name: "googleads1"}},
 				AppStore:            []AppStoreConnection{{Name: "appstore1"}},
+				AppleAds:            []AppleAdsConnection{{Name: "appleads1"}},
 				LinkedInAds:         []LinkedInAdsConnection{{Name: "linkedinads1"}},
 				Mailchimp:           []MailchimpConnection{{Name: "mailchimp1"}},
 				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},

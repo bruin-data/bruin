@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/allium"
 	"github.com/bruin-data/bruin/pkg/anthropic"
+	"github.com/bruin-data/bruin/pkg/appleads"
 	"github.com/bruin-data/bruin/pkg/applovin"
 	"github.com/bruin-data/bruin/pkg/applovinmax"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
@@ -162,6 +163,7 @@ type Manager struct {
 	SnapchatAds          map[string]*snapchatads.Client
 	GitHub               map[string]*github.Client
 	AppStore             map[string]*appstore.Client
+	AppleAds             map[string]*appleads.Client
 	LinkedInAds          map[string]*linkedinads.Client
 	Mailchimp            map[string]*mailchimp.Client
 	Linear               map[string]*linear.Client
@@ -1713,6 +1715,34 @@ func (m *Manager) AddAppStoreConnectionFromConfig(connection *config.AppStoreCon
 	return nil
 }
 
+func (m *Manager) AddAppleAdsConnectionFromConfig(connection *config.AppleAdsConnection) error {
+	m.mutex.Lock()
+	if m.AppleAds == nil {
+		m.AppleAds = make(map[string]*appleads.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := appleads.NewClient(appleads.Config{
+		ClientID:  connection.ClientID,
+		TeamID:    connection.TeamID,
+		KeyID:     connection.KeyID,
+		OrgID:     connection.OrgID,
+		KeyPath:   connection.KeyPath,
+		KeyBase64: connection.KeyBase64,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AppleAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedInAdsConnection) error {
 	m.mutex.Lock()
 	if m.LinkedInAds == nil {
@@ -2938,6 +2968,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.SnapchatAds, connectionManager.AddSnapchatAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AppleAds, connectionManager.AddAppleAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mailchimp, connectionManager.AddMailchimpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RevenueCat, connectionManager.AddRevenueCatConnectionFromConfig, &wg, &errList, &mu)
