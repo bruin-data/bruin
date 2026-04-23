@@ -91,18 +91,49 @@ var validSnowflakeTypes = map[string]struct{}{
 	"vector":           {},
 }
 
-var placeholderDescriptions = []string{
-	"todo",
-	"fixme",
-	"tbd",
-	"wip",
-	"temp",
-	"temporary",
-	"placeholder",
+// singleWordPlaceholders contains placeholders that should match only as whole words.
+var singleWordPlaceholders = regexp.MustCompile(`\b(todo|fixme|tbd|wip|temp|temporary|placeholder)\b`)
+
+// multiWordPlaceholders contains phrase-style placeholders matched as exact substrings.
+var multiWordPlaceholders = []string{
 	"add description",
 	"description goes here",
 	"to be added",
 	"work in progress",
+}
+
+// placeholderFinder helps identify which placeholder matched in a description.
+type placeholderFinder struct {
+	singleWords []string
+	multiWords  []string
+	wordRe      *regexp.Regexp
+}
+
+func newPlaceholderFinder() *placeholderFinder {
+	return &placeholderFinder{
+		singleWords: []string{"todo", "fixme", "tbd", "wip", "temp", "temporary", "placeholder"},
+		multiWords:  multiWordPlaceholders,
+		wordRe:      singleWordPlaceholders,
+	}
+}
+
+func (pf *placeholderFinder) FindSingleWordMatch(desc string) string {
+	for _, w := range pf.singleWords {
+		r := regexp.MustCompile(`\b` + w + `\b`)
+		if r.MatchString(desc) {
+			return w
+		}
+	}
+	return ""
+}
+
+func (pf *placeholderFinder) FindMultiWordMatch(desc string) string {
+	for _, m := range pf.multiWords {
+		if strings.Contains(desc, m) {
+			return m
+		}
+	}
+	return ""
 }
 
 var builtinRules = map[string]validators{
@@ -347,33 +378,42 @@ var builtinRules = map[string]validators{
 		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			var issues []*Issue
 
-			lowerAssetDesc := strings.ToLower(strings.TrimSpace(asset.Description))
-			if lowerAssetDesc != "" {
-				for _, placeholder := range placeholderDescriptions {
-					if strings.Contains(lowerAssetDesc, placeholder) {
-						issues = append(issues, &Issue{
-							Task:        asset,
-							Description: "Asset description appears to contain placeholder text: '" + placeholder + "'",
-						})
-						break
-					}
+			placeholderFinder := newPlaceholderFinder()
+
+			descToCheck := strings.TrimSpace(asset.Description)
+			if descToCheck != "" {
+				if pw := placeholderFinder.FindSingleWordMatch(strings.ToLower(descToCheck)); pw != "" {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Asset description appears to contain placeholder text: '" + pw + "'",
+					})
+				} else if pw := placeholderFinder.FindMultiWordMatch(strings.ToLower(descToCheck)); pw != "" {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Asset description appears to contain placeholder text: '" + pw + "'",
+					})
 				}
 			}
 
 			for _, col := range asset.Columns {
-				lowerColDesc := strings.ToLower(strings.TrimSpace(col.Description))
-				if lowerColDesc == "" {
+				colDesc := strings.TrimSpace(col.Description)
+				if colDesc == "" {
 					continue
 				}
 
-				for _, placeholder := range placeholderDescriptions {
-					if strings.Contains(lowerColDesc, placeholder) {
-						issues = append(issues, &Issue{
-							Task:        asset,
-							Description: "Column '" + col.Name + "' description appears to contain placeholder text: '" + placeholder + "'",
-						})
-						break
-					}
+				if pw := placeholderFinder.FindSingleWordMatch(strings.ToLower(colDesc)); pw != "" {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Column '" + col.Name + "' description appears to contain placeholder text: '" + pw + "'",
+					})
+					continue
+				}
+
+				if match := placeholderFinder.FindMultiWordMatch(strings.ToLower(colDesc)); match != "" {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Column '" + col.Name + "' description appears to contain placeholder text: '" + match + "'",
+					})
 				}
 			}
 
