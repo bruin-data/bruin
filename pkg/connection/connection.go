@@ -280,11 +280,27 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 	m.mutex.Unlock()
 
+	// Validate project_id is provided
+	if strings.TrimSpace(connection.ProjectID) == "" {
+		return &BigQueryConfigError{
+			ConnectionName: connection.Name,
+			Issue:          "missing required field 'project_id'",
+			Hint:           "Add 'project_id' to your google_cloud_platform connection in .bruin.yml.\nYou can find your project ID in Google Cloud Console at the top of the page.",
+		}
+	}
+
 	// Check if we have valid credentials configuration
 	hasExplicitCredentials := len(connection.ServiceAccountFile) > 0 || len(connection.ServiceAccountJSON) > 0 || connection.GetCredentials() != nil
 
 	if !hasExplicitCredentials && !connection.UseApplicationDefaultCredentials {
-		return errors.New("credentials are required: provide either service_account_file, service_account_json, or enable use_application_default_credentials")
+		return &BigQueryConfigError{
+			ConnectionName: connection.Name,
+			Issue:          "no credentials configured",
+			Hint: `Provide credentials using one of these methods:
+  1. service_account_file: Path to a JSON key file (relative to .bruin.yml or absolute)
+  2. service_account_json: JSON content of a service account key
+  3. use_application_default_credentials: true (uses 'gcloud auth application-default login')`,
+		}
 	}
 
 	// Validate ServiceAccountFile if provided.
@@ -312,7 +328,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		UseApplicationDefaultCredentials: connection.UseApplicationDefaultCredentials,
 	})
 	if err != nil {
-		return err
+		return wrapBigQueryClientError(err, connection.Name)
 	}
 
 	// Lock and store the new BigQuery client.
@@ -323,6 +339,68 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	m.AllConnectionDetails[connection.Name] = connection
 
 	return nil
+}
+
+// BigQueryConfigError provides detailed error information for BigQuery configuration issues.
+type BigQueryConfigError struct {
+	ConnectionName string
+	Issue          string
+	Hint           string
+	OriginalErr    error
+}
+
+func (e *BigQueryConfigError) Error() string {
+	var sb strings.Builder
+	if e.ConnectionName != "" {
+		sb.WriteString("BigQuery connection '")
+		sb.WriteString(e.ConnectionName)
+		sb.WriteString("': ")
+	}
+	sb.WriteString(e.Issue)
+
+	if e.Hint != "" {
+		sb.WriteString("\n\n")
+		sb.WriteString("Hint: ")
+		sb.WriteString(e.Hint)
+	}
+
+	return sb.String()
+}
+
+func (e *BigQueryConfigError) Unwrap() error {
+	return e.OriginalErr
+}
+
+// wrapBigQueryClientError wraps BigQuery client creation errors with helpful hints.
+func wrapBigQueryClientError(err error, connectionName string) error {
+	errStr := err.Error()
+
+	// Check for common error patterns and provide helpful hints
+	if strings.Contains(errStr, "no credentials provided") {
+		return &BigQueryConfigError{
+			ConnectionName: connectionName,
+			Issue:          "no credentials provided",
+			Hint: `Provide credentials using one of these methods:
+  1. service_account_file: Path to a JSON key file
+  2. service_account_json: JSON content of a service account key  
+  3. use_application_default_credentials: true`,
+			OriginalErr: err,
+		}
+	}
+
+	if strings.Contains(errStr, "could not find default credentials") {
+		return &BigQueryConfigError{
+			ConnectionName: connectionName,
+			Issue:          "Application Default Credentials not found",
+			Hint: `To set up Application Default Credentials, run:
+  gcloud auth application-default login
+
+Or provide explicit credentials using service_account_file or service_account_json in .bruin.yml`,
+			OriginalErr: err,
+		}
+	}
+
+	return errors.Wrapf(err, "failed to create BigQuery connection '%s'", connectionName)
 }
 
 func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnection) error {
