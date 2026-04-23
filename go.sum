@@ -484,6 +484,8 @@ github.com/muesli/termenv v0.16.0/go.mod h1:ZRfOIKPFDYQoDFF4Olj7/QJbW60Ol/kL1pU3
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nikolalohinski/gonja/v2 v2.3.4 h1:s6KnOc5UTEXoaVd8/Yfvnv7KAm1W9UxKs139DsqaMGs=
 github.com/nikolalohinski/gonja/v2 v2.3.4/go.mod h1:8KC3RlefxnOaY5P4rH5erdwV0/owS83U615cSnDLYFs=
+github.com/nikolalohinski/gonja/v2 v2.8.0 h1:kOQv887+yMXcaSZjbfa5MMlfHVTpCIcTd8yh+liGmhQ=
+github.com/nikolalohinski/gonja/v2 v2.8.0/go.mod h1:UIzXPVuOsr5h7dZ5DUbqk3/Z7oFA/NLGQGMjqT4L2aU=
 github.com/onsi/ginkgo/v2 v2.28.1 h1:S4hj+HbZp40fNKuLUQOYLDgZLwNUVn19N3Atb98NCyI=
 github.com/onsi/ginkgo/v2 v2.28.1/go.mod h1:CLtbVInNckU3/+gC8LzkGUb9oF+e8W8TdUsxPwvdOgE=
 github.com/onsi/gomega v1.39.1 h1:1IJLAad4zjPn2PsnhH70V4DKRFlrCzGBNrNaru+Vf28=
