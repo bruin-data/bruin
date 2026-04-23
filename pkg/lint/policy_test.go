@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockSQLParser struct {
@@ -228,5 +229,77 @@ func TestPolicyRuleSet(t *testing.T) {
 		mockParser := new(mockSQLParser)
 		_, err := spec.Rules(mockParser)
 		assert.Error(t, err)
+	})
+}
+
+func TestDescriptionMustNotBePlaceholderPolicy(t *testing.T) {
+	t.Parallel()
+
+	newRule := func(t *testing.T) lint.Rule {
+		t.Helper()
+
+		spec := &lint.PolicySpecification{
+			RuleSets: []lint.RuleSet{
+				{
+					Name:  "placeholder-description",
+					Rules: []string{"description-must-not-be-placeholder"},
+				},
+			},
+		}
+
+		rules, err := spec.Rules(nil)
+		require.NoError(t, err)
+		require.Len(t, rules, 1)
+		return rules[0]
+	}
+
+	t.Run("does not match placeholders inside larger words", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Description: "Tracks orders with wiped status records.",
+			Columns: []pipeline.Column{
+				{
+					Name:        "attempt_count",
+					Description: "Number of attempts to process the order.",
+				},
+			},
+		}
+
+		issues, err := newRule(t).ValidateAsset(t.Context(), &pipeline.Pipeline{}, asset)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("matches single-word placeholder tokens", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Description: "TODO: add the real asset description.",
+		}
+
+		issues, err := newRule(t).ValidateAsset(t.Context(), &pipeline.Pipeline{}, asset)
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Contains(t, issues[0].Description, "'todo'")
+	})
+
+	t.Run("matches multi-word placeholder tokens", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Description: "Order data synchronized from Shopify.",
+			Columns: []pipeline.Column{
+				{
+					Name:        "status",
+					Description: "Description goes here.",
+				},
+			},
+		}
+
+		issues, err := newRule(t).ValidateAsset(t.Context(), &pipeline.Pipeline{}, asset)
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Contains(t, issues[0].Description, "'description goes here'")
 	})
 }

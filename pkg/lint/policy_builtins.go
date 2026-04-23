@@ -105,6 +105,69 @@ var placeholderDescriptions = []string{
 	"work in progress",
 }
 
+var descriptionTokenPattern = regexp.MustCompile(`[a-z0-9]+`)
+
+type placeholderDescriptionMatcher struct {
+	phrase string
+	tokens []string
+}
+
+var placeholderDescriptionMatchers = buildPlaceholderDescriptionMatchers(placeholderDescriptions)
+
+func buildPlaceholderDescriptionMatchers(placeholders []string) []placeholderDescriptionMatcher {
+	matchers := make([]placeholderDescriptionMatcher, 0, len(placeholders))
+	for _, placeholder := range placeholders {
+		tokens := descriptionTokenPattern.FindAllString(strings.ToLower(placeholder), -1)
+		if len(tokens) == 0 {
+			continue
+		}
+
+		matchers = append(matchers, placeholderDescriptionMatcher{
+			phrase: placeholder,
+			tokens: tokens,
+		})
+	}
+
+	return matchers
+}
+
+func findPlaceholderDescription(description string) (string, bool) {
+	descriptionTokens := descriptionTokenPattern.FindAllString(strings.ToLower(strings.TrimSpace(description)), -1)
+	if len(descriptionTokens) == 0 {
+		return "", false
+	}
+
+	for _, matcher := range placeholderDescriptionMatchers {
+		if containsTokenSequence(descriptionTokens, matcher.tokens) {
+			return matcher.phrase, true
+		}
+	}
+
+	return "", false
+}
+
+func containsTokenSequence(tokens []string, sequence []string) bool {
+	if len(sequence) == 0 || len(sequence) > len(tokens) {
+		return false
+	}
+
+	for start := 0; start <= len(tokens)-len(sequence); start++ {
+		matched := true
+		for offset := range sequence {
+			if tokens[start+offset] != sequence[offset] {
+				matched = false
+				break
+			}
+		}
+
+		if matched {
+			return true
+		}
+	}
+
+	return false
+}
+
 var builtinRules = map[string]validators{
 	"asset-name-is-lowercase": {
 		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -347,33 +410,19 @@ var builtinRules = map[string]validators{
 		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			var issues []*Issue
 
-			lowerAssetDesc := strings.ToLower(strings.TrimSpace(asset.Description))
-			if lowerAssetDesc != "" {
-				for _, placeholder := range placeholderDescriptions {
-					if strings.Contains(lowerAssetDesc, placeholder) {
-						issues = append(issues, &Issue{
-							Task:        asset,
-							Description: "Asset description appears to contain placeholder text: '" + placeholder + "'",
-						})
-						break
-					}
-				}
+			if placeholder, found := findPlaceholderDescription(asset.Description); found {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Asset description appears to contain placeholder text: '" + placeholder + "'",
+				})
 			}
 
 			for _, col := range asset.Columns {
-				lowerColDesc := strings.ToLower(strings.TrimSpace(col.Description))
-				if lowerColDesc == "" {
-					continue
-				}
-
-				for _, placeholder := range placeholderDescriptions {
-					if strings.Contains(lowerColDesc, placeholder) {
-						issues = append(issues, &Issue{
-							Task:        asset,
-							Description: "Column '" + col.Name + "' description appears to contain placeholder text: '" + placeholder + "'",
-						})
-						break
-					}
+				if placeholder, found := findPlaceholderDescription(col.Description); found {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Column '" + col.Name + "' description appears to contain placeholder text: '" + placeholder + "'",
+					})
 				}
 			}
 
