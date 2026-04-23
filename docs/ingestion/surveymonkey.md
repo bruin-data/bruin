@@ -18,7 +18,7 @@ connections:
 ```
 
 - `access_token` (required): The access token used to authenticate with the SurveyMonkey API.
-- `region` (optional): The region region. Must be `us` (default), `eu`, or `ca`.
+- `region` (optional): The region. Must be `us` (default), `eu`, or `ca`.
 
 For EU or CA accounts:
 
