@@ -790,44 +790,42 @@ try:
 except ImportError:
     pl = None
 
-# Use isinstance() for robust type checking across pandas/polars versions
-# This works across all pandas versions (including 3.0+) regardless of string representation
-if pd is not None and isinstance(df, pd.DataFrame):
-    table = pa.Table.from_pandas(df)
-elif pl is not None and isinstance(df, pl.DataFrame):
-    table = df.to_arrow()
-elif isinstance(df, (list, tuple)):
-    table = pa.Table.from_pylist(list(df))
-elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
-    # Handle generators and other iterables (but not strings/bytes)
-    table = pa.Table.from_pylist(list(df))
+def is_polars_dataframe(obj):
+    if pl is not None and isinstance(obj, pl.DataFrame):
+        return True
+    type_module = type(obj).__module__
+    type_name = type(obj).__name__
+    return 'polars' in type_module and type_name == 'DataFrame'
+
+def is_pandas_dataframe(obj):
+    if pd is not None and isinstance(obj, pd.DataFrame):
+        return True
+    type_module = type(obj).__module__
+    type_name = type(obj).__name__
+    return 'pandas' in type_module and type_name == 'DataFrame'
+
+# Polars DataFrames are Arrow-native and can write IPC files directly,
+# avoiding the intermediate PyArrow Table copy that doubles memory usage.
+if is_polars_dataframe(df):
+    if pl is None:
+        raise TypeError(f"Polars DataFrame detected but polars cannot be imported: {type(df)}")
+    df.write_ipc("$ARROW_FILE_PATH")
 else:
-    # Fallback: check type module/name for pandas/polars if isinstance failed
-    # This handles edge cases where pandas/polars might not be importable
-    type_name = type(df).__name__
-    type_module = type(df).__module__
-    if 'pandas' in type_module and type_name == 'DataFrame':
-        # Try to import pandas if not already imported
-        try:
-            import pandas as pd
-            table = pa.Table.from_pandas(df)
-        except ImportError:
-            raise TypeError(f"Unsupported return type: {type(df)}. pandas DataFrame detected but pandas cannot be imported.")
-    elif 'polars' in type_module and type_name == 'DataFrame':
-        # Try to import polars if not already imported
-        try:
-            import polars as pl
-            table = df.to_arrow()
-        except ImportError:
-            raise TypeError(f"Unsupported return type: {type(df)}. polars DataFrame detected but polars cannot be imported.")
+    if is_pandas_dataframe(df):
+        if pd is None:
+            raise TypeError(f"Pandas DataFrame detected but pandas cannot be imported: {type(df)}")
+        table = pa.Table.from_pandas(df)
+    elif isinstance(df, (list, tuple)):
+        table = pa.Table.from_pylist(list(df))
+    elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
+        table = pa.Table.from_pylist(list(df))
     else:
         raise TypeError(f"Unsupported return type: {type(df)}")
 
-# Write to memory mapped file
-with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
-	writer = ipc.new_file(f, table.schema)
-	writer.write_table(table)
-	writer.close()
+    with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
+        writer = ipc.new_file(f, table.schema)
+        writer.write_table(table)
+        writer.close()
 `
 
 type SqlfluffRunner struct {
