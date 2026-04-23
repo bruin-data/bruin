@@ -1,14 +1,18 @@
 package cmd
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -460,6 +464,165 @@ func TestFormatQueryRowsForJSON_Marshal(t *testing.T) {
 			payload, err := json.Marshal(rows)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, string(payload))
+		})
+	}
+}
+
+func TestWriteCSVFile(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		columns  []string
+		rows     [][]interface{}
+		expected [][]string
+	}{
+		{
+			name:    "basic data",
+			columns: []string{"id", "name"},
+			rows: [][]interface{}{
+				{1, "alice"},
+				{2, "bob"},
+			},
+			expected: [][]string{
+				{"id", "name"},
+				{"1", "alice"},
+				{"2", "bob"},
+			},
+		},
+		{
+			name:    "with nil values",
+			columns: []string{"id", "value"},
+			rows: [][]interface{}{
+				{1, nil},
+				{2, "test"},
+			},
+			expected: [][]string{
+				{"id", "value"},
+				{"1", ""},
+				{"2", "test"},
+			},
+		},
+		{
+			name:     "empty rows",
+			columns:  []string{"col1", "col2"},
+			rows:     nil,
+			expected: [][]string{{"col1", "col2"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpDir := t.TempDir()
+			tmpFile := filepath.Join(tmpDir, "test.csv")
+
+			err := writeCSVFile(tmpFile, tt.columns, tt.rows)
+			require.NoError(t, err)
+
+			file, err := os.Open(tmpFile)
+			require.NoError(t, err)
+			defer file.Close()
+
+			reader := csv.NewReader(file)
+			records, err := reader.ReadAll()
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expected, records)
+		})
+	}
+}
+
+func TestExportResultsToMultipleCSV(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		numRows       int
+		splitRows     int
+		expectedFiles int
+		rowsPerFile   []int
+	}{
+		{
+			name:          "exact split",
+			numRows:       10,
+			splitRows:     5,
+			expectedFiles: 2,
+			rowsPerFile:   []int{5, 5},
+		},
+		{
+			name:          "with remainder",
+			numRows:       10,
+			splitRows:     4,
+			expectedFiles: 3,
+			rowsPerFile:   []int{4, 4, 2},
+		},
+		{
+			name:          "single file when rows less than split",
+			numRows:       3,
+			splitRows:     10,
+			expectedFiles: 1,
+			rowsPerFile:   []int{3},
+		},
+		{
+			name:          "empty result creates single file",
+			numRows:       0,
+			splitRows:     10,
+			expectedFiles: 1,
+			rowsPerFile:   []int{0},
+		},
+		{
+			name:          "one million rows example from issue",
+			numRows:       1000000,
+			splitRows:     400000,
+			expectedFiles: 3,
+			rowsPerFile:   []int{400000, 400000, 200000},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpDir := t.TempDir()
+
+			err := os.MkdirAll(filepath.Join(tmpDir, ".git"), 0o755)
+			require.NoError(t, err)
+
+			columns := []string{"id", "name", "value"}
+			rows := make([][]interface{}, tt.numRows)
+			for i := range tt.numRows {
+				rows[i] = []interface{}{i, fmt.Sprintf("name_%d", i), i * 100}
+			}
+
+			result := &query.QueryResult{
+				Columns: columns,
+				Rows:    rows,
+			}
+
+			paths, err := exportResultsToMultipleCSV(result, tmpDir, tt.splitRows)
+			require.NoError(t, err)
+			assert.Len(t, paths, tt.expectedFiles)
+
+			for i, path := range paths {
+				assert.FileExists(t, path)
+
+				file, err := os.Open(path)
+				require.NoError(t, err)
+				defer file.Close()
+
+				reader := csv.NewReader(file)
+				records, err := reader.ReadAll()
+				require.NoError(t, err)
+
+				expectedRowsWithHeader := tt.rowsPerFile[i] + 1
+				assert.Len(t, records, expectedRowsWithHeader, "file %d should have %d rows (including header)", i+1, expectedRowsWithHeader)
+
+				assert.Equal(t, columns, records[0], "header should match columns")
+
+				assert.Contains(t, filepath.Base(path), fmt.Sprintf("_part%d.csv", i+1))
+			}
 		})
 	}
 }
