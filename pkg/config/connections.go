@@ -966,6 +966,20 @@ func (c AppStoreConnection) GetName() string {
 	return c.Name
 }
 
+type AppleAdsConnection struct {
+	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ClientID  string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	TeamID    string `yaml:"team_id,omitempty" json:"team_id" mapstructure:"team_id"`
+	KeyID     string `yaml:"key_id,omitempty" json:"key_id" mapstructure:"key_id"`
+	OrgID     string `yaml:"org_id,omitempty" json:"org_id" mapstructure:"org_id"`
+	KeyPath   string `yaml:"key_path,omitempty" json:"key_path" mapstructure:"key_path"`
+	KeyBase64 string `yaml:"key_base64,omitempty" json:"key_base64" mapstructure:"key_base64"`
+}
+
+func (c AppleAdsConnection) GetName() string {
+	return c.Name
+}
+
 type LinkedInAdsConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
@@ -1510,5 +1524,15 @@ type VerticaConnection struct {
 }
 
 func (c VerticaConnection) GetName() string {
+	return c.Name
+}
+
+type SurveyMonkeyConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	Region      string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
+}
+
+func (c SurveyMonkeyConnection) GetName() string {
 	return c.Name
 }

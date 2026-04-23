@@ -196,6 +196,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "adjustokey",
 				},
 			},
+			SurveyMonkey: []SurveyMonkeyConnection{
+				{
+					Name:        "surveymonkey-default",
+					AccessToken: "test-token-123",
+				},
+			},
 			Anthropic: []AnthropicConnection{
 				{
 					Name:   "anthropic-1",
@@ -451,6 +457,16 @@ func TestLoadFromFile(t *testing.T) {
 					Name:     "appstore-1",
 					IssuerID: "issuer-id-123",
 					KeyID:    "key-id-123",
+					KeyPath:  "/path/to/key.pem",
+				},
+			},
+			AppleAds: []AppleAdsConnection{
+				{
+					Name:     "appleads-1",
+					ClientID: "SEARCHADS.client-id-123",
+					TeamID:   "SEARCHADS.team-id-123",
+					KeyID:    "key-id-123",
+					OrgID:    "19371590",
 					KeyPath:  "/path/to/key.pem",
 				},
 			},
@@ -1976,6 +1992,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				G2:                  []G2Connection{{Name: "g21"}},
 				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
 				Adjust:              []AdjustConnection{{Name: "adjust1"}},
+				SurveyMonkey:        []SurveyMonkeyConnection{{Name: "surveymonkey1"}},
 				Anthropic:           []AnthropicConnection{{Name: "anthropic1"}},
 				Generic:             []GenericConnection{{Name: "generic1"}},
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
@@ -2003,6 +2020,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Docebo:              []DoceboConnection{{Name: "docebo1"}},
 				GoogleAds:           []GoogleAdsConnection{{Name: "googleads1"}},
 				AppStore:            []AppStoreConnection{{Name: "appstore1"}},
+				AppleAds:            []AppleAdsConnection{{Name: "appleads1"}},
 				LinkedInAds:         []LinkedInAdsConnection{{Name: "linkedinads1"}},
 				Mailchimp:           []MailchimpConnection{{Name: "mailchimp1"}},
 				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
@@ -2081,6 +2099,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				G2:                  []G2Connection{{Name: "g21"}},
 				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
 				Adjust:              []AdjustConnection{{Name: "adjust1"}},
+				SurveyMonkey:        []SurveyMonkeyConnection{{Name: "surveymonkey1"}},
 				Anthropic:           []AnthropicConnection{{Name: "anthropic1"}},
 				Generic:             []GenericConnection{{Name: "generic1"}},
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
@@ -2108,6 +2127,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Docebo:              []DoceboConnection{{Name: "docebo1"}},
 				GoogleAds:           []GoogleAdsConnection{{Name: "googleads1"}},
 				AppStore:            []AppStoreConnection{{Name: "appstore1"}},
+				AppleAds:            []AppleAdsConnection{{Name: "appleads1"}},
 				LinkedInAds:         []LinkedInAdsConnection{{Name: "linkedinads1"}},
 				Mailchimp:           []MailchimpConnection{{Name: "mailchimp1"}},
 				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},

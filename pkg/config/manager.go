@@ -74,6 +74,7 @@ type Connections struct {
 	Docebo              []DoceboConnection              `yaml:"docebo,omitempty" json:"docebo,omitempty" mapstructure:"docebo"`
 	GoogleAds           []GoogleAdsConnection           `yaml:"googleads,omitempty" json:"googleads,omitempty" mapstructure:"googleads"`
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
+	AppleAds            []AppleAdsConnection            `yaml:"appleads,omitempty" json:"appleads,omitempty" mapstructure:"appleads"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
 	Mailchimp           []MailchimpConnection           `yaml:"mailchimp,omitempty" json:"mailchimp,omitempty" mapstructure:"mailchimp"`
 	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
@@ -125,6 +126,7 @@ type Connections struct {
 	Indeed              []IndeedConnection              `yaml:"indeed,omitempty" json:"indeed,omitempty" mapstructure:"indeed"`
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
+	SurveyMonkey        []SurveyMonkeyConnection        `yaml:"surveymonkey,omitempty" json:"surveymonkey,omitempty" mapstructure:"surveymonkey"`
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
@@ -808,6 +810,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.AppStore = append(env.Connections.AppStore, conn)
+	case "appleads":
+		var conn AppleAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AppleAds = append(env.Connections.AppleAds, conn)
 	case "linkedinads":
 		var conn LinkedInAdsConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1160,6 +1169,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Vertica = append(env.Connections.Vertica, conn)
+	case "surveymonkey":
+		var conn SurveyMonkeyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SurveyMonkey = append(env.Connections.SurveyMonkey, conn)
 	case "dune":
 		var conn DuneConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1292,6 +1308,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GitHub = removeConnection(env.Connections.GitHub, connectionName)
 	case "appstore":
 		env.Connections.AppStore = removeConnection(env.Connections.AppStore, connectionName)
+	case "appleads":
+		env.Connections.AppleAds = removeConnection(env.Connections.AppleAds, connectionName)
 	case "linkedinads":
 		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
 	case "linear":
@@ -1390,6 +1408,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.CustomerIo = removeConnection(env.Connections.CustomerIo, connectionName)
 	case "vertica":
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
+	case "surveymonkey":
+		env.Connections.SurveyMonkey = removeConnection(env.Connections.SurveyMonkey, connectionName)
 	case "dune":
 		env.Connections.Dune = removeConnection(env.Connections.Dune, connectionName)
 	default:
@@ -1498,6 +1518,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Docebo, source.Docebo)
 	mergeConnectionList(&c.GoogleAds, source.GoogleAds)
 	mergeConnectionList(&c.AppStore, source.AppStore)
+	mergeConnectionList(&c.AppleAds, source.AppleAds)
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
 	mergeConnectionList(&c.Mailchimp, source.Mailchimp)
 	mergeConnectionList(&c.RevenueCat, source.RevenueCat)
@@ -1549,6 +1570,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Indeed, source.Indeed)
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
 	mergeConnectionList(&c.Vertica, source.Vertica)
+	mergeConnectionList(&c.SurveyMonkey, source.SurveyMonkey)
 	mergeConnectionList(&c.Dune, source.Dune)
 	c.buildConnectionKeyMap()
 	return nil

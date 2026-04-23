@@ -19,6 +19,25 @@
         "api_key"
       ]
     },
+    "SurveyMonkeyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
+      ]
+    },
     "AirtableConnection": {
       "properties": {
         "name": {
@@ -113,6 +132,42 @@
         "issuer_id",
         "key_path",
         "key"
+      ]
+    },
+    "AppleAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "team_id": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "key_path": {
+          "type": "string"
+        },
+        "key_base64": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "client_id",
+        "team_id",
+        "key_id",
+        "org_id",
+        "key_path",
+        "key_base64"
       ]
     },
     "ApplovinMaxConnection": {
@@ -566,6 +621,12 @@
           },
           "type": "array"
         },
+        "surveymonkey": {
+          "items": {
+            "$ref": "#/$defs/SurveyMonkeyConnection"
+          },
+          "type": "array"
+        },
         "anthropic": {
           "items": {
             "$ref": "#/$defs/AnthropicConnection"
@@ -725,6 +786,12 @@
         "appstore": {
           "items": {
             "$ref": "#/$defs/AppStoreConnection"
+          },
+          "type": "array"
+        },
+        "appleads": {
+          "items": {
+            "$ref": "#/$defs/AppleAdsConnection"
           },
           "type": "array"
         },
