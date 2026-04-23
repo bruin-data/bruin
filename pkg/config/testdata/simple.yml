@@ -139,6 +139,9 @@ environments:
       adjust:
         - name: conn16
           api_key: "adjustokey"
+      surveymonkey:
+        - name: "surveymonkey-default"
+          access_token: "test-token-123"
       anthropic:
         - name: "anthropic-1"
           api_key: "test-api-key"

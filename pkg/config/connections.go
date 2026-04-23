@@ -1526,3 +1526,13 @@ type VerticaConnection struct {
 func (c VerticaConnection) GetName() string {
 	return c.Name
 }
+
+type SurveyMonkeyConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	Datacenter  string `yaml:"datacenter,omitempty" json:"datacenter,omitempty" mapstructure:"datacenter"`
+}
+
+func (c SurveyMonkeyConnection) GetName() string {
+	return c.Name
+}

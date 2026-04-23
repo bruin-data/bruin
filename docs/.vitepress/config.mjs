@@ -273,6 +273,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Snapchat Ads", link: "/ingestion/snapchat-ads"},
                                     {text: "Solidgate", link: "/ingestion/solidgate"},
                                     {text: "Stripe", link: "/ingestion/stripe"},
+                                    {text: "SurveyMonkey", link: "/ingestion/surveymonkey"},
                                     {text: "Slack", link: "/ingestion/slack"},
                                     {text: "Socrata", link: "/ingestion/socrata"},
                                     {text: "SQLite", link: "/ingestion/sqlite"},

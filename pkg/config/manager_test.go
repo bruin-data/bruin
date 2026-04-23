@@ -196,6 +196,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "adjustokey",
 				},
 			},
+			SurveyMonkey: []SurveyMonkeyConnection{
+				{
+					Name:        "surveymonkey-default",
+					AccessToken: "test-token-123",
+				},
+			},
 			Anthropic: []AnthropicConnection{
 				{
 					Name:   "anthropic-1",
@@ -1986,6 +1992,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				G2:                  []G2Connection{{Name: "g21"}},
 				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
 				Adjust:              []AdjustConnection{{Name: "adjust1"}},
+				SurveyMonkey:        []SurveyMonkeyConnection{{Name: "surveymonkey1"}},
 				Anthropic:           []AnthropicConnection{{Name: "anthropic1"}},
 				Generic:             []GenericConnection{{Name: "generic1"}},
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},
@@ -2092,6 +2099,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				G2:                  []G2Connection{{Name: "g21"}},
 				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
 				Adjust:              []AdjustConnection{{Name: "adjust1"}},
+				SurveyMonkey:        []SurveyMonkeyConnection{{Name: "surveymonkey1"}},
 				Anthropic:           []AnthropicConnection{{Name: "anthropic1"}},
 				Generic:             []GenericConnection{{Name: "generic1"}},
 				FacebookAds:         []FacebookAdsConnection{{Name: "facebookads1"}},

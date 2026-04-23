@@ -126,6 +126,7 @@ type Connections struct {
 	Indeed              []IndeedConnection              `yaml:"indeed,omitempty" json:"indeed,omitempty" mapstructure:"indeed"`
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
+	SurveyMonkey        []SurveyMonkeyConnection        `yaml:"surveymonkey,omitempty" json:"surveymonkey,omitempty" mapstructure:"surveymonkey"`
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
@@ -1168,6 +1169,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Vertica = append(env.Connections.Vertica, conn)
+	case "surveymonkey":
+		var conn SurveyMonkeyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SurveyMonkey = append(env.Connections.SurveyMonkey, conn)
 	case "dune":
 		var conn DuneConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1400,6 +1408,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.CustomerIo = removeConnection(env.Connections.CustomerIo, connectionName)
 	case "vertica":
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
+	case "surveymonkey":
+		env.Connections.SurveyMonkey = removeConnection(env.Connections.SurveyMonkey, connectionName)
 	case "dune":
 		env.Connections.Dune = removeConnection(env.Connections.Dune, connectionName)
 	default:
@@ -1560,6 +1570,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Indeed, source.Indeed)
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
 	mergeConnectionList(&c.Vertica, source.Vertica)
+	mergeConnectionList(&c.SurveyMonkey, source.SurveyMonkey)
 	mergeConnectionList(&c.Dune, source.Dune)
 	c.buildConnectionKeyMap()
 	return nil
