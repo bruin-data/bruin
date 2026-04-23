@@ -102,6 +102,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
+	"github.com/bruin-data/bruin/pkg/surveymonkey"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/trino"
@@ -143,6 +144,7 @@ type Manager struct {
 	Aws                  map[string]*config.AwsConnection
 	FacebookAds          map[string]*facebookads.Client
 	Stripe               map[string]*stripe.Client
+	SurveyMonkey         map[string]*surveymonkey.Client
 	Appsflyer            map[string]*appsflyer.Client
 	Kafka                map[string]*kafka.Client
 	RabbitMQ             map[string]*rabbitmq.Client
@@ -919,6 +921,30 @@ func (m *Manager) AddAdjustConnectionFromConfig(connection *config.AdjustConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Adjust[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddSurveyMonkeyConnectionFromConfig(connection *config.SurveyMonkeyConnection) error {
+	m.mutex.Lock()
+	if m.SurveyMonkey == nil {
+		m.SurveyMonkey = make(map[string]*surveymonkey.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := surveymonkey.NewClient(surveymonkey.Config{
+		AccessToken: connection.AccessToken,
+		Datacenter:  connection.Datacenter,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SurveyMonkey[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2942,6 +2968,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.G2, connectionManager.AddG2ConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Klaviyo, connectionManager.AddKlaviyoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Adjust, connectionManager.AddAdjustConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.SurveyMonkey, connectionManager.AddSurveyMonkeyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Anthropic, connectionManager.AddAnthropicConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Intercom, connectionManager.AddIntercomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)

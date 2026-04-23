@@ -276,6 +276,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Slack", link: "/ingestion/slack"},
                                     {text: "Socrata", link: "/ingestion/socrata"},
                                     {text: "SQLite", link: "/ingestion/sqlite"},
+                                    {text: "SurveyMonkey", link: "/ingestion/surveymonkey"},
                                     {text: "TikTok Ads", link: "/ingestion/tiktokads"},
                                     {text: "Wise", link: "/ingestion/wise"},
                                     {text: "Zendesk", link: "/ingestion/zendesk"},
