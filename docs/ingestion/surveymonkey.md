@@ -18,7 +18,7 @@ connections:
 ```
 
 - `access_token` (required): The access token used to authenticate with the SurveyMonkey API.
-- `datacenter` (optional): The datacenter region. Must be `us` (default), `eu`, or `ca`.
+- `region` (optional): The region. Must be `us` (default), `eu`, or `ca`.
 
 For EU or CA accounts:
 
@@ -27,7 +27,7 @@ connections:
   surveymonkey:
     - name: "my_surveymonkey_eu"
       access_token: "your-access-token"
-      datacenter: "eu"
+      region: "eu"
 ```
 
 ### Step 2: Create an asset file for data ingestion
@@ -83,4 +83,4 @@ Use these as the `source_table` parameter in the asset configuration.
 5. Copy the **Access Token** from the Credentials section.
 
 > [!NOTE]
-> For EU accounts, use the [EU Developer Portal](https://developer.eu.surveymonkey.com/apps/) and set `datacenter: eu`. For CA accounts, use the [CA Developer Portal](https://developer.ca.surveymonkey.com/apps/) and set `datacenter: ca`.
+> For EU accounts, use the [EU Developer Portal](https://developer.eu.surveymonkey.com/apps/) and set `region: eu`. For CA accounts, use the [CA Developer Portal](https://developer.ca.surveymonkey.com/apps/) and set `region: ca`.

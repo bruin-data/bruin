@@ -27,7 +27,7 @@
         "access_token": {
           "type": "string"
         },
-        "datacenter": {
+        "region": {
           "type": "string"
         }
       },

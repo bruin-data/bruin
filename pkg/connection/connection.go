@@ -936,7 +936,7 @@ func (m *Manager) AddSurveyMonkeyConnectionFromConfig(connection *config.SurveyM
 
 	client, err := surveymonkey.NewClient(surveymonkey.Config{
 		AccessToken: connection.AccessToken,
-		Datacenter:  connection.Datacenter,
+		Region:      connection.Region,
 	})
 	if err != nil {
 		return err

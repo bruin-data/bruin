@@ -4,13 +4,13 @@ import "net/url"
 
 type Config struct {
 	AccessToken string
-	Datacenter  string
+	Region      string
 }
 
 func (c *Config) GetIngestrURI() string {
 	uri := "surveymonkey://?access_token=" + url.QueryEscape(c.AccessToken)
-	if c.Datacenter != "" {
-		uri += "&datacenter=" + url.QueryEscape(c.Datacenter)
+	if c.Region != "" {
+		uri += "&region=" + url.QueryEscape(c.Region)
 	}
 	return uri
 }
