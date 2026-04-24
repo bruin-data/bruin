@@ -11,6 +11,7 @@
               :node="node"
               :depth="0"
               :selected-path="selectedPath"
+              :collapsed-folders="collapsedFolders"
               @select="selectFile"
             />
           </template>
@@ -25,7 +26,7 @@
           </button>
         </div>
         <div class="cv-code-wrapper">
-          <pre class="cv-pre"><code>{{ selectedFile?.content || '' }}</code></pre>
+          <pre class="cv-pre"><code class="hljs" v-html="highlightedContent"></code></pre>
         </div>
       </div>
     </div>
@@ -34,6 +35,25 @@
 
 <script setup>
 import { ref, computed, onMounted, h, defineComponent } from 'vue'
+import hljs from 'highlight.js/lib/core'
+import yaml from 'highlight.js/lib/languages/yaml'
+import sql from 'highlight.js/lib/languages/sql'
+import python from 'highlight.js/lib/languages/python'
+import json from 'highlight.js/lib/languages/json'
+import bash from 'highlight.js/lib/languages/bash'
+import plaintext from 'highlight.js/lib/languages/plaintext'
+
+hljs.registerLanguage('yaml', yaml)
+hljs.registerLanguage('yml', yaml)
+hljs.registerLanguage('sql', sql)
+hljs.registerLanguage('python', python)
+hljs.registerLanguage('py', python)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('shell', bash)
+hljs.registerLanguage('sh', bash)
+hljs.registerLanguage('plaintext', plaintext)
+hljs.registerLanguage('text', plaintext)
 
 const props = defineProps({
   files: {
@@ -43,6 +63,10 @@ const props = defineProps({
   title: {
     type: String,
     default: ''
+  },
+  collapsedFolders: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -83,7 +107,8 @@ function buildTree(files) {
       name: parts[parts.length - 1],
       path: file.path,
       type: 'file',
-      content: file.content
+      content: file.content,
+      language: file.language
     })
   }
 
@@ -107,6 +132,31 @@ const flatFiles = computed(() => {
 const selectedFile = computed(() =>
   flatFiles.value.find(f => f.path === selectedPath.value)
 )
+
+function inferLanguage(path) {
+  const ext = path.split('.').pop().toLowerCase()
+  const map = {
+    yml: 'yaml', yaml: 'yaml',
+    sql: 'sql',
+    py: 'python',
+    json: 'json',
+    sh: 'bash', bash: 'bash',
+  }
+  return map[ext] || 'plaintext'
+}
+
+const highlightedContent = computed(() => {
+  const file = selectedFile.value
+  if (!file) return ''
+  const lang = file.language && hljs.getLanguage(file.language)
+    ? file.language
+    : inferLanguage(file.path)
+  try {
+    return hljs.highlight(file.content, { language: lang, ignoreIllegals: true }).value
+  } catch {
+    return hljs.highlight(file.content, { language: 'plaintext', ignoreIllegals: true }).value
+  }
+})
 
 function selectFile(path) {
   selectedPath.value = path
@@ -152,11 +202,14 @@ const TreeItem = defineComponent({
   props: {
     node: { type: Object, required: true },
     depth: { type: Number, default: 0 },
-    selectedPath: { type: String, default: '' }
+    selectedPath: { type: String, default: '' },
+    collapsedFolders: { type: Array, default: () => [] }
   },
   emits: ['select'],
   setup(props, { emit }) {
-    const expanded = ref(true)
+    const expanded = ref(
+      !(props.node.type === 'folder' && props.collapsedFolders.includes(props.node.path))
+    )
 
     return () => {
       const isFolder = props.node.type === 'folder'
@@ -191,6 +244,7 @@ const TreeItem = defineComponent({
               node: child,
               depth: props.depth + 1,
               selectedPath: props.selectedPath,
+              collapsedFolders: props.collapsedFolders,
               onSelect: (path) => emit('select', path)
             })
           )
@@ -338,5 +392,98 @@ const TreeItem = defineComponent({
 
 .cv-pre code {
   font-family: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+.code-viewer .hljs {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.code-viewer .hljs-comment,
+.code-viewer .hljs-quote {
+  color: #8e908c;
+  font-style: italic;
+}
+.code-viewer .hljs-keyword,
+.code-viewer .hljs-selector-tag,
+.code-viewer .hljs-section,
+.code-viewer .hljs-doctag {
+  color: #8959a8;
+}
+.code-viewer .hljs-string,
+.code-viewer .hljs-regexp,
+.code-viewer .hljs-addition {
+  color: #4f8a10;
+}
+.code-viewer .hljs-number,
+.code-viewer .hljs-literal,
+.code-viewer .hljs-meta {
+  color: #c18401;
+}
+.code-viewer .hljs-built_in,
+.code-viewer .hljs-type,
+.code-viewer .hljs-class .hljs-title {
+  color: #0086b3;
+}
+.code-viewer .hljs-title,
+.code-viewer .hljs-name,
+.code-viewer .hljs-selector-id,
+.code-viewer .hljs-selector-class {
+  color: #4271ae;
+}
+.code-viewer .hljs-attr,
+.code-viewer .hljs-attribute,
+.code-viewer .hljs-variable,
+.code-viewer .hljs-template-variable,
+.code-viewer .hljs-tag {
+  color: #c82829;
+}
+.code-viewer .hljs-deletion {
+  color: #c82829;
+}
+
+.dark .code-viewer .hljs-comment,
+.dark .code-viewer .hljs-quote {
+  color: #8b949e;
+}
+.dark .code-viewer .hljs-keyword,
+.dark .code-viewer .hljs-selector-tag,
+.dark .code-viewer .hljs-section,
+.dark .code-viewer .hljs-doctag {
+  color: #c678dd;
+}
+.dark .code-viewer .hljs-string,
+.dark .code-viewer .hljs-regexp,
+.dark .code-viewer .hljs-addition {
+  color: #98c379;
+}
+.dark .code-viewer .hljs-number,
+.dark .code-viewer .hljs-literal,
+.dark .code-viewer .hljs-meta {
+  color: #d19a66;
+}
+.dark .code-viewer .hljs-built_in,
+.dark .code-viewer .hljs-type,
+.dark .code-viewer .hljs-class .hljs-title {
+  color: #56b6c2;
+}
+.dark .code-viewer .hljs-title,
+.dark .code-viewer .hljs-name,
+.dark .code-viewer .hljs-selector-id,
+.dark .code-viewer .hljs-selector-class {
+  color: #61afef;
+}
+.dark .code-viewer .hljs-attr,
+.dark .code-viewer .hljs-attribute,
+.dark .code-viewer .hljs-variable,
+.dark .code-viewer .hljs-template-variable,
+.dark .code-viewer .hljs-tag {
+  color: #e06c75;
+}
+.dark .code-viewer .hljs-deletion {
+  color: #e06c75;
 }
 </style>
