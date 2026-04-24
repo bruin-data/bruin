@@ -37,7 +37,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, h, defineComponent } from 'vue'
+import { ref, computed, watch, h, defineComponent } from 'vue'
 import hljs from 'highlight.js/lib/core'
 import yaml from 'highlight.js/lib/languages/yaml'
 import sql from 'highlight.js/lib/languages/sql'
@@ -73,7 +73,17 @@ const props = defineProps({
   }
 })
 
-const selectedPath = ref('')
+function firstFilePath(files) {
+  const sorted = [...files].sort((a, b) => {
+    const aParts = a.path.split('/')
+    const bParts = b.path.split('/')
+    if (aParts.length !== bParts.length) return aParts.length - bParts.length
+    return a.path.localeCompare(b.path)
+  })
+  return sorted[0]?.path || ''
+}
+
+const selectedPath = ref(firstFilePath(props.files))
 const copied = ref(false)
 
 function buildTree(files) {
@@ -176,12 +186,6 @@ async function copyContent() {
     // Clipboard API unavailable (non-HTTPS or denied permission)
   }
 }
-
-onMounted(() => {
-  if (flatFiles.value.length > 0) {
-    selectedPath.value = flatFiles.value[0].path
-  }
-})
 
 // Icon factory functions — must create fresh VNodes per render call
 function makeChevronDown() {
@@ -501,4 +505,74 @@ const TreeItem = defineComponent({
 .dark .code-viewer .hljs-deletion {
   color: #e06c75;
 }
+
+/* highlight.js theme — light (github) */
+.cv-pre .hljs { color: #24292e; background: transparent; }
+.cv-pre .hljs-comment,
+.cv-pre .hljs-quote { color: #6a737d; font-style: italic; }
+.cv-pre .hljs-keyword,
+.cv-pre .hljs-selector-tag,
+.cv-pre .hljs-subst { color: #d73a49; }
+.cv-pre .hljs-literal,
+.cv-pre .hljs-number,
+.cv-pre .hljs-tag .hljs-attr,
+.cv-pre .hljs-template-variable,
+.cv-pre .hljs-variable { color: #005cc5; }
+.cv-pre .hljs-string,
+.cv-pre .hljs-doctag,
+.cv-pre .hljs-regexp { color: #032f62; }
+.cv-pre .hljs-title,
+.cv-pre .hljs-section,
+.cv-pre .hljs-selector-id { color: #6f42c1; font-weight: 600; }
+.cv-pre .hljs-type,
+.cv-pre .hljs-class .hljs-title { color: #22863a; }
+.cv-pre .hljs-tag,
+.cv-pre .hljs-name,
+.cv-pre .hljs-attribute { color: #22863a; }
+.cv-pre .hljs-symbol,
+.cv-pre .hljs-bullet,
+.cv-pre .hljs-link,
+.cv-pre .hljs-meta,
+.cv-pre .hljs-selector-attr,
+.cv-pre .hljs-selector-pseudo { color: #e36209; }
+.cv-pre .hljs-built_in,
+.cv-pre .hljs-builtin-name { color: #005cc5; }
+.cv-pre .hljs-deletion { background: #ffeef0; }
+.cv-pre .hljs-addition { background: #f0fff4; }
+.cv-pre .hljs-emphasis { font-style: italic; }
+.cv-pre .hljs-strong { font-weight: 700; }
+
+/* highlight.js theme — dark (github-dark) */
+.dark .cv-pre .hljs { color: #e1e4e8; background: transparent; }
+.dark .cv-pre .hljs-comment,
+.dark .cv-pre .hljs-quote { color: #8b949e; }
+.dark .cv-pre .hljs-keyword,
+.dark .cv-pre .hljs-selector-tag,
+.dark .cv-pre .hljs-subst { color: #ff7b72; }
+.dark .cv-pre .hljs-literal,
+.dark .cv-pre .hljs-number,
+.dark .cv-pre .hljs-tag .hljs-attr,
+.dark .cv-pre .hljs-template-variable,
+.dark .cv-pre .hljs-variable { color: #79c0ff; }
+.dark .cv-pre .hljs-string,
+.dark .cv-pre .hljs-doctag,
+.dark .cv-pre .hljs-regexp { color: #a5d6ff; }
+.dark .cv-pre .hljs-title,
+.dark .cv-pre .hljs-section,
+.dark .cv-pre .hljs-selector-id { color: #d2a8ff; }
+.dark .cv-pre .hljs-type,
+.dark .cv-pre .hljs-class .hljs-title { color: #ffa657; }
+.dark .cv-pre .hljs-tag,
+.dark .cv-pre .hljs-name,
+.dark .cv-pre .hljs-attribute { color: #7ee787; }
+.dark .cv-pre .hljs-symbol,
+.dark .cv-pre .hljs-bullet,
+.dark .cv-pre .hljs-link,
+.dark .cv-pre .hljs-meta,
+.dark .cv-pre .hljs-selector-attr,
+.dark .cv-pre .hljs-selector-pseudo { color: #ffa657; }
+.dark .cv-pre .hljs-built_in,
+.dark .cv-pre .hljs-builtin-name { color: #ffa657; }
+.dark .cv-pre .hljs-deletion { background: #490202; }
+.dark .cv-pre .hljs-addition { background: #04260f; }
 </style>
