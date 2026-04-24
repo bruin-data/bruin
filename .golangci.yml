@@ -179,6 +179,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - repro_adbc_list
 formatters:
   enable:
     - gci
@@ -197,3 +198,4 @@ formatters:
       - third_party$
       - builtin$
       - examples$
+      - repro_adbc_list
