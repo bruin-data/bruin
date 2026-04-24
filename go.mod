@@ -52,7 +52,7 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/microsoft/go-mssqldb v1.8.2
 	github.com/muesli/termenv v0.16.0
-	github.com/nikolalohinski/gonja/v2 v2.3.4
+	github.com/nikolalohinski/gonja/v2 v2.8.0
 	github.com/pashagolub/pgxmock/v3 v3.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/robfig/cron/v3 v3.0.1
