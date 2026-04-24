@@ -2,6 +2,527 @@
 outline: deep
 ---
 
+<script setup>
+const pythonSdkFiles = [
+  {
+    path: '.gitignore',
+    language: 'text',
+    content: `.bruin.yml
+.env
+duckdb.db
+duckdb.db.wal
+__pycache__/
+.venv/`
+  },
+  {
+    path: '.bruin.yml',
+    language: 'yaml',
+    content: `default_environment: default
+environments:
+  default:
+    connections:
+      google_cloud_platform:
+        - name: gcp-default
+          location: US
+          project_id: <project-id>
+          use_application_default_credentials: true
+      duckdb:
+        - name: duckdb-default
+          path: duckdb.db
+      postgres:
+        - name: pg-default
+          username: <user>
+          password: <password>
+          host: <host-url>
+          port: <port>
+          database: <db>
+      motherduck:
+        - name: motherduck-default
+          token: <motherduck-token>
+          database: my_db`
+  },
+  {
+    path: 'python-sdk-example/pipeline.yml',
+    language: 'yaml',
+    content: `name: python-sdk-example
+schedule: daily
+start_date: "2026-01-01"
+catchup: false
+default_connections:
+  google_cloud_platform: "gcp-default"
+
+variables:
+  target_currency:
+    type: string
+    default: "USD"
+  min_orders:
+    type: integer
+    default: 1`
+  },
+  {
+    path: 'python-sdk-example/requirements.txt',
+    language: 'text',
+    content: `bruin-sdk[bigquery,postgres,duckdb,motherduck]
+google-cloud-bigquery==3.25.0
+google-auth==2.35.0
+psycopg2-binary==2.9.10
+duckdb==1.4.3
+pandas==2.2.3
+pyarrow==17.0.0
+db-dtypes==1.3.0`
+  },
+  {
+    path: 'python-sdk-example/assets/sdk_query.py',
+    language: 'python',
+    content: `""" @bruin
+name: contoso_analytics.sdk_query
+image: python:3.11
+connection: gcp-default
+@bruin """
+
+from bruin import query
+
+
+df = query(
+    """
+    SELECT *
+    FROM \`contoso_raw.orders\`
+    """,
+    connection="gcp-default"
+)`
+  },
+  {
+    path: 'python-sdk-example/assets/sdk_context_dates.py',
+    language: 'python',
+    content: `""" @bruin
+
+name: contoso_analytics.sdk_context_dates
+image: python:3.11
+connection: gcp-default
+
+materialization:
+  type: table
+
+@bruin """
+
+from bruin import context, query
+
+
+def materialize():
+    # context.start_date / context.end_date come from the pipeline's run interval.
+    # The same asset works for both daily schedules and manual backfills without code changes.
+    return query(
+        f"""
+        SELECT
+            DATE(order_date)           AS order_date,
+            COUNT(*)                   AS order_count,
+            DATE('{context.start_date}') AS window_start,
+            DATE('{context.end_date}')   AS window_end
+        FROM \`contoso_raw.orders\`
+        WHERE DATE(order_date) <= DATE('{context.end_date}')
+        GROUP BY order_date
+        ORDER BY order_date DESC
+        LIMIT 30
+        """
+    )`
+  },
+  {
+    path: 'python-sdk-example/assets/sdk_context_vars.py',
+    language: 'python',
+    content: `""" @bruin
+
+name: contoso_analytics.sdk_context_vars
+image: python:3.11
+connection: gcp-default
+
+materialization:
+  type: table
+
+@bruin """
+
+from bruin import context, query
+
+
+def materialize():
+    # context.vars is populated from pipeline.yml \`variables:\` with JSON Schema types preserved.
+    # Defaults apply when the variable isn't overridden at run time.
+    currency = context.vars.get("target_currency", "USD")
+    min_orders = context.vars.get("min_orders", 1)
+
+    return query(
+        f"""
+        SELECT
+            store_key,
+            COUNT(*)        AS order_count,
+            '{currency}'    AS filtered_currency
+        FROM \`contoso_raw.orders\`
+        WHERE currency_code = '{currency}'
+        GROUP BY store_key
+        HAVING order_count >= {min_orders}
+        ORDER BY order_count DESC
+        LIMIT 25
+        """
+    )`
+  },
+  {
+    path: 'python-sdk-example/assets/sdk_is_full_refresh.py',
+    language: 'python',
+    content: `""" @bruin
+
+name: contoso_analytics.sdk_is_full_refresh
+image: python:3.11
+connection: gcp-default
+
+materialization:
+  type: table
+
+@bruin """
+
+from bruin import context, query
+
+
+def materialize():
+    # context.is_full_refresh is True when the run was invoked with --full-refresh.
+    # Use it to branch between a full reload and an incremental slice.
+    if context.is_full_refresh:
+        sql = """
+            SELECT
+                DATE(order_date)    AS order_date,
+                COUNT(*)            AS order_count,
+                'full_refresh'      AS run_mode
+            FROM \`contoso_raw.orders\`
+            GROUP BY order_date
+        """
+    else:
+        # Incremental: last 7 days of source data relative to the newest order_date.
+        # (Using a trailing window off the source rather than the pipeline interval keeps
+        # the demo meaningful even when the historical source predates the pipeline start_date.)
+        sql = """
+            SELECT
+                DATE(order_date)    AS order_date,
+                COUNT(*)            AS order_count,
+                'incremental'       AS run_mode
+            FROM \`contoso_raw.orders\`
+            WHERE DATE(order_date) > DATE_SUB(
+                (SELECT DATE(MAX(order_date)) FROM \`contoso_raw.orders\`),
+                INTERVAL 7 DAY
+            )
+            GROUP BY order_date
+        """
+
+    return query(sql + " ORDER BY order_date DESC LIMIT 50")`
+  },
+  {
+    path: 'python-sdk-example/assets/sdk_context_metadata.py',
+    language: 'python',
+    content: `""" @bruin
+
+name: contoso_analytics.sdk_context_metadata
+image: python:3.11
+connection: gcp-default
+
+materialization:
+  type: table
+
+@bruin """
+
+import pandas as pd
+
+from bruin import context
+
+
+def materialize():
+    # context exposes run-level identifiers that are useful for audit trails.
+    # Each field reads its env var fresh on access, so tests can monkeypatch safely.
+    return pd.DataFrame(
+        [
+            {
+                "pipeline": context.pipeline,
+                "asset_name": context.asset_name,
+                "run_id": context.run_id,
+                "commit_hash": context.commit_hash,
+                "execution_timestamp": context.execution_timestamp,
+                "connection": context.connection,
+            }
+        ]
+    )`
+  },
+  {
+    path: 'python-sdk-example/assets/sdk_get_connection.py',
+    language: 'python',
+    content: `""" @bruin
+
+name: contoso_analytics.sdk_get_connection
+image: python:3.11
+connection: gcp-default
+
+materialization:
+  type: table
+
+@bruin """
+
+import pandas as pd
+
+from bruin import get_connection
+
+
+def materialize():
+    # get_connection() gives you a typed connection wrapper.
+    # For a GCP connection, .bigquery() returns a fully-configured google.cloud.bigquery.Client
+    # with credentials already resolved - no env-var parsing required.
+    with get_connection("gcp-default") as conn:
+        bq = conn.bigquery()
+        table = bq.get_table("contoso_raw.orders")
+
+    rows = [
+        {
+            "column_name": field.name,
+            "data_type": field.field_type,
+            "is_nullable": field.mode != "REQUIRED",
+        }
+        for field in table.schema
+    ]
+    return pd.DataFrame(rows)`
+  },
+  {
+    path: 'python-sdk-example/assets/sdk_multi_source_union.py',
+    language: 'python',
+    content: `""" @bruin
+name: contoso_analytics.sdk_multi_source_union
+image: python:3.11
+connection: gcp-default
+
+secrets:
+  - key: pg-default
+  - key: duckdb-default
+  - key: motherduck-default
+
+materialization:
+  type: table
+@bruin """
+
+import pandas as pd
+
+from bruin import query
+
+
+def materialize():
+    # Each call targets a different connection by name.
+    # The SDK resolves credentials from the connections declared in \`secrets:\` above.
+    pg_df = query(
+        """
+        SELECT content_key::text AS source_id,
+               content_title     AS label
+        FROM hulu.core
+        ORDER BY content_key
+        LIMIT 5
+        """,
+        connection="pg-default",
+    )
+    pg_df["source_db"] = "postgres"
+    pg_df["category"] = "hulu_show"
+
+    duck_df = query(
+        """
+        SELECT CAST(order_id AS VARCHAR)       AS source_id,
+               product || '-' || region        AS label
+        FROM demo.dummy_orders
+        ORDER BY order_id
+        LIMIT 5
+        """,
+        connection="duckdb-default",
+    )
+    duck_df["source_db"] = "duckdb"
+    duck_df["category"] = "order"
+
+    md_df = query(
+        """
+        SELECT CAST(id AS VARCHAR) AS source_id,
+               title               AS label
+        FROM sample_data.hn.hacker_news
+        WHERE title IS NOT NULL AND score > 500
+        ORDER BY score DESC
+        LIMIT 5
+        """,
+        connection="motherduck-default",
+    )
+    md_df["source_db"] = "motherduck"
+    md_df["category"] = "hackernews_top"
+
+    return pd.concat([pg_df, duck_df, md_df], ignore_index=True)[
+        ["source_db", "category", "source_id", "label"]
+    ]`
+  },
+  {
+    path: 'python-sdk-example/assets/legacy_bigquery_client.py',
+    language: 'python',
+    content: `""" @bruin
+name: contoso_analytics.legacy_bigquery_client
+image: python:3.11
+connection: gcp-default
+
+secrets:
+  - key: gcp-default
+@bruin """
+
+import json
+import os
+
+from google.cloud import bigquery
+from google.oauth2 import service_account
+
+def _build_client() -> bigquery.Client:
+    cfg = json.loads(os.environ["gcp-default"])
+    sa_info = json.loads(cfg["service_account_json"])
+    creds = service_account.Credentials.from_service_account_info(sa_info)
+    return bigquery.Client(project=cfg["project_id"], credentials=creds)
+
+client = _build_client()
+df = client.query(
+  """
+  SELECT *
+  FROM \`contoso_raw.orders\`
+  """
+).to_dataframe()`
+  },
+  {
+    path: 'python-sdk-example/assets/legacy_multi_source_union.py',
+    language: 'python',
+    content: `""" @bruin
+name: contoso_analytics.legacy_multi_source_union
+image: python:3.11
+connection: gcp-default
+
+secrets:
+  - key: gcp-default
+  - key: pg-default
+  - key: duckdb-default
+  - key: motherduck-default
+
+materialization:
+  type: table
+@bruin """
+
+import json
+import os
+
+import duckdb
+import pandas as pd
+import psycopg2
+from google.cloud import bigquery
+from google.oauth2 import service_account
+
+
+def _bigquery_client() -> bigquery.Client:
+    cfg = json.loads(os.environ["gcp-default"])
+    sa_info = json.loads(cfg["service_account_json"])
+    creds = service_account.Credentials.from_service_account_info(sa_info)
+    return bigquery.Client(project=cfg["project_id"], credentials=creds)
+
+def _postgres_conn():
+    cfg = json.loads(os.environ["pg-default"])
+    return psycopg2.connect(
+        host=cfg["host"],
+        port=cfg["port"],
+        user=cfg["username"],
+        password=cfg["password"],
+        dbname=cfg["database"],
+        sslmode=cfg.get("ssl_mode", "prefer"),
+    )
+
+def _duckdb_conn() -> duckdb.DuckDBPyConnection:
+    cfg = json.loads(os.environ["duckdb-default"])
+    return duckdb.connect(cfg["path"], read_only=True)
+
+
+def _motherduck_conn() -> duckdb.DuckDBPyConnection:
+    cfg = json.loads(os.environ["motherduck-default"])
+    return duckdb.connect(f"md:?motherduck_token={cfg['token']}")
+
+def _read_postgres() -> pd.DataFrame:
+    with _postgres_conn() as conn:
+        df = pd.read_sql(
+            """
+            SELECT content_key::text AS source_id,
+                   content_title     AS label
+            FROM hulu.core
+            ORDER BY content_key
+            LIMIT 5
+            """,
+            conn,
+        )
+    df["source_db"] = "postgres"
+    df["category"] = "hulu_show"
+    return df
+
+def _read_duckdb() -> pd.DataFrame:
+    conn = _duckdb_conn()
+    try:
+        df = conn.execute(
+            """
+            SELECT CAST(order_id AS VARCHAR)       AS source_id,
+                   product || '-' || region        AS label
+            FROM demo.dummy_orders
+            ORDER BY order_id
+            LIMIT 5
+            """
+        ).fetch_df()
+    finally:
+        conn.close()
+    df["source_db"] = "duckdb"
+    df["category"] = "order"
+    return df
+
+def _read_motherduck() -> pd.DataFrame:
+    conn = _motherduck_conn()
+    try:
+        df = conn.execute(
+            """
+            SELECT CAST(id AS VARCHAR) AS source_id,
+                   title               AS label
+            FROM sample_data.hn.hacker_news
+            WHERE title IS NOT NULL AND score > 500
+            ORDER BY score DESC
+            LIMIT 5
+            """
+        ).fetch_df()
+    finally:
+        conn.close()
+    df["source_db"] = "motherduck"
+    df["category"] = "hackernews_top"
+    return df
+
+def _read_bigquery_sample() -> str:
+    client = _bigquery_client()
+    row = next(
+        iter(
+            client.query(
+                """
+                SELECT currency_code
+                FROM \`contoso_raw.orders\`
+                GROUP BY currency_code
+                ORDER BY COUNT(*) DESC
+                LIMIT 1
+                """
+            ).result()
+        )
+    )
+    return row["currency_code"]
+
+def materialize():
+    top_currency = _read_bigquery_sample()
+
+    union = pd.concat(
+        [_read_postgres(), _read_duckdb(), _read_motherduck()],
+        ignore_index=True,
+    )
+    union["bq_sample_currency"] = top_currency
+
+    return union[["source_db", "category", "source_id", "label", "bq_sample_currency"]]`
+  }
+]
+</script>
+
 # Python SDK
 
 The official Python SDK for Bruin CLI. Query databases, access connections, and read pipeline context — all with zero boilerplate.
@@ -121,6 +642,31 @@ from bruin import query, context
 
 df = query(f"SELECT * FROM users WHERE dt >= '{context.start_date}'")
 ```
+
+## Example Project
+
+A complete Bruin project that uses the Python SDK against BigQuery, alongside side-by-side legacy implementations against raw database drivers. Every SDK asset uses Python materialization — each `materialize()` returns a `pandas.DataFrame` and Bruin writes it to the destination table. Browse the files below to see how the assets and connections fit together.
+
+<CodeViewer :files="pythonSdkFiles" title="python-sdk-example/" />
+
+### SDK feature matrix
+
+| File | Function / attribute demonstrated |
+|---|---|
+| `sdk_query.py` | `bruin.query(sql)` — one call → `pandas.DataFrame` |
+| `sdk_context_dates.py` | `context.start_date`, `context.end_date` |
+| `sdk_context_vars.py` | `context.vars[...]` — pipeline-level variables |
+| `sdk_is_full_refresh.py` | `context.is_full_refresh` — branching logic |
+| `sdk_context_metadata.py` | `context.pipeline`, `asset_name`, `run_id`, `execution_timestamp`, `connection` |
+| `sdk_get_connection.py` | `bruin.get_connection(name).bigquery()` — typed client |
+| `sdk_multi_source_union.py` | `query(sql, connection=...)` across postgres / duckdb / motherduck, union → BQ |
+
+### Legacy comparison pair
+
+| File | What it does |
+|---|---|
+| `legacy_bigquery_client.py` | Parses `os.environ["gcp-default"]`, builds `google.cloud.bigquery.Client` manually — pairs with `sdk_query.py` |
+| `legacy_multi_source_union.py` | Builds a BigQuery client, a psycopg2 connection, a duckdb connection, and a motherduck connection by hand — pairs with `sdk_multi_source_union.py` |
 
 ## API Reference
 
