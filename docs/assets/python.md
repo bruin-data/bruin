@@ -321,7 +321,7 @@ The requirements to get this working are:
 
 - define a `materialization` config in the asset definition
 - define a `connection` in the asset definition (required for Python assets with `materialization.type: table`)
-- have a function called `materialize` in your Python script that returns a pandas/polars dataframe or a list of dicts.
+- have a function called `materialize` in your Python script that returns a pandas/polars dataframe, a list of dicts, or a generator that yields dicts.
 
 Supported materialization strategies for Python assets are: `create+replace`, `append`, `merge`, and `delete+insert`. The `time_interval` strategy is not supported for Python assets.
 
@@ -355,6 +355,65 @@ def materialize(**kwargs):
 
     return df
 ```
+
+### Using generators
+
+You can use `yield` in your `materialize()` function to produce data incrementally. This is useful when fetching data from paginated APIs or processing data in chunks. You can yield individual dicts or batches (lists of dicts):
+
+::: code-group
+
+```bruin-python [Yielding individual dicts]
+"""@bruin
+name: tier1.paginated_api
+image: python:3.13
+connection: bigquery
+
+materialization:
+  type: table
+  strategy: append
+@bruin"""
+
+import requests
+
+def materialize():
+    page = 1
+    while True:
+        resp = requests.get(f"https://api.example.com/data?page={page}")
+        items = resp.json()["items"]
+        if not items:
+            break
+        for item in items:
+            yield item
+        page += 1
+```
+
+```bruin-python [Yielding batches]
+"""@bruin
+name: tier1.paginated_api_batch
+image: python:3.13
+connection: bigquery
+
+materialization:
+  type: table
+  strategy: append
+@bruin"""
+
+import requests
+
+def materialize():
+    page = 1
+    while True:
+        resp = requests.get(f"https://api.example.com/data?page={page}")
+        items = resp.json()["items"]
+        if not items:
+            break
+        yield items  # yield the entire page as a batch
+        page += 1
+```
+
+:::
+
+If `materialize()` returns `None`, Bruin will skip materialization with a warning instead of failing the pipeline. This is useful when there is no data to materialize for a given run.
 
 ### Under the hood
 

@@ -3406,6 +3406,191 @@ func TestWorkflowTasks(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "python_mat",
+			workflow: e2e.Workflow{
+				Name: "python_mat",
+				Steps: []e2e.Task{
+					{
+						Name:    "python_mat: run all success/skip assets",
+						Command: binary,
+						Args:    []string{"run", "--workers", "1", "--env", "env-python-mat", filepath.Join(currentFolder, "test-pipelines/python-mat")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{
+								"Finished: mat.yield_dicts",
+								"Finished: mat.yield_batches",
+								"Finished: mat.pandas_df",
+								"Finished: mat.polars_df",
+								"Finished: materialize.country",
+								"materialize() returned None, skipping materialization",
+								"Finished: mat.none_return",
+								"Finished: mat.empty_generator",
+								"Finished: mat.empty_list",
+							},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "python_mat: verify yield_dicts row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.yield_dicts",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 5   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify yield_batches row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.yield_batches",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 6   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify pandas_df row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.pandas_df",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 3   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify polars_df row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.polars_df",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 3   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "python_mat_errors",
+			workflow: e2e.Workflow{
+				Name: "python_mat_errors",
+				Steps: []e2e.Task{
+					{
+						Name:    "python_mat_errors: run error assets",
+						Command: binary,
+						Args:    []string{"run", "--env", "env-python-mat-errors", filepath.Join(currentFolder, "test-pipelines/python-mat-errors")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+							Contains: []string{"Failed: mat.exception", "Failed: mat.exit"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "python_mat_merge",
+			workflow: e2e.Workflow{
+				Name: "python_mat_merge",
+				Steps: []e2e.Task{
+					{
+						Name:    "merge: first run (Jan 1-15, inserts ids 1,2,3)",
+						Command: binary,
+						Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-01-15", "--env", "env-python-mat-merge", filepath.Join(currentFolder, "test-pipelines/python-mat-merge")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: mat.merge_test"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "merge: second run (Jan 10-31, merges ids 2,3 and inserts 4,5)",
+						Command: binary,
+						Args:    []string{"run", "--start-date", "2024-01-10", "--end-date", "2024-01-31", "--env", "env-python-mat-merge", filepath.Join(currentFolder, "test-pipelines/python-mat-merge")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Contains: []string{"Finished: mat.merge_test"},
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByContains,
+						},
+					},
+					{
+						Name:    "merge: verify 5 unique rows (no duplicates from overlapping ids 2,3)",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat-merge",
+							"--connection", "duckdb-python-mat-merge",
+							"--query", "SELECT count(*) AS cnt FROM mat.merge_test",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 5   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3587,23 +3772,6 @@ func TestIngestrTasks(t *testing.T) {
 				Expected: e2e.Output{
 					ExitCode: 0,
 					Contains: []string{"Successfully validated 4 assets", "bruin run completed", "Finished: chess_playground.player_summary", "Finished: chess_playground.games", "Finished: python_asset"},
-				},
-				Asserts: []func(*e2e.Task) error{
-					e2e.AssertByExitCode,
-					e2e.AssertByContains,
-				},
-			},
-		},
-		{
-			name: "run-python-materialization",
-			task: e2e.Task{
-				Name:    "run-python-materialization",
-				Command: binary,
-				Args:    []string{"run", "--env", "env-run-python-materialization", filepath.Join(currentFolder, "test-pipelines/run-python-materialization")},
-				Env:     []string{},
-				Expected: e2e.Output{
-					ExitCode: 0,
-					Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: materialize.country"},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,

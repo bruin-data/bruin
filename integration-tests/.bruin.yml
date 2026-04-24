@@ -243,11 +243,17 @@ environments:
             - "LevonAronian"
             - "WesleySo"
             - "GarryKasparov"
-  env-run-python-materialization:
+  env-python-mat:
     connections:
       duckdb:
-        - name: "duckdb-run-python-materialization"
-          path: "duckdb-files/run-python-materialization.db"
+        - name: "duckdb-python-mat"
+          path: "duckdb-files/python-mat.db"
+
+  env-python-mat-errors:
+    connections:
+      duckdb:
+        - name: "duckdb-python-mat-errors"
+          path: "duckdb-files/python-mat-errors.db"
 
   env-python-pyproject-materialization:
     connections:
@@ -362,6 +368,12 @@ environments:
       duckdb:
         - name: "duckdb-query-var"
           path: "duckdb-files/query-var.db"
+
+  env-python-mat-merge:
+    connections:
+      duckdb:
+        - name: "duckdb-python-mat-merge"
+          path: "duckdb-files/python-mat-merge.db"
 
   env-schema-prefix:
     schema_prefix: "test"
