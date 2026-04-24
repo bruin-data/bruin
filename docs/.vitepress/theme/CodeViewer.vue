@@ -26,6 +26,9 @@
           </button>
         </div>
         <div class="cv-code-wrapper">
+          <!-- v-html is safe here: hljs.highlight() HTML-escapes its input before
+               emitting token markup. Do not pass externally-sourced content without
+               first ensuring the same guarantee. -->
           <pre class="cv-pre"><code class="hljs" v-html="highlightedContent"></code></pre>
         </div>
       </div>
@@ -34,7 +37,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, h, defineComponent } from 'vue'
+import { ref, computed, onMounted, watch, h, defineComponent } from 'vue'
 import hljs from 'highlight.js/lib/core'
 import yaml from 'highlight.js/lib/languages/yaml'
 import sql from 'highlight.js/lib/languages/sql'
@@ -148,13 +151,14 @@ function inferLanguage(path) {
 const highlightedContent = computed(() => {
   const file = selectedFile.value
   if (!file) return ''
+  const source = file.content ?? ''
   const lang = file.language && hljs.getLanguage(file.language)
     ? file.language
     : inferLanguage(file.path)
   try {
-    return hljs.highlight(file.content, { language: lang, ignoreIllegals: true }).value
+    return hljs.highlight(source, { language: lang, ignoreIllegals: true }).value
   } catch {
-    return hljs.highlight(file.content, { language: 'plaintext', ignoreIllegals: true }).value
+    return hljs.highlight(source, { language: 'plaintext', ignoreIllegals: true }).value
   }
 })
 
@@ -207,9 +211,20 @@ const TreeItem = defineComponent({
   },
   emits: ['select'],
   setup(props, { emit }) {
-    const expanded = ref(
-      !(props.node.type === 'folder' && props.collapsedFolders.includes(props.node.path))
-    )
+    const isInitiallyCollapsed =
+      props.node.type === 'folder' && props.collapsedFolders.includes(props.node.path)
+    const expanded = ref(!isInitiallyCollapsed)
+
+    // Keep expanded in sync with collapsedFolders so a parent-driven change
+    // (e.g. dynamic prop / page transition) is reflected after mount. Using
+    // watch on a getter instead of watchEffect means a parent re-render with
+    // an equivalent value won't clobber a user's manual expand/collapse.
+    if (props.node.type === 'folder') {
+      watch(
+        () => props.collapsedFolders.includes(props.node.path),
+        (collapsed) => { expanded.value = !collapsed }
+      )
+    }
 
     return () => {
       const isFolder = props.node.type === 'folder'
