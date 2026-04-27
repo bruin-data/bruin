@@ -801,19 +801,19 @@ func handleSuccess(output string, message string) error {
 
 // QueryLog represents the structure of a query log entry.
 type QueryLog struct {
-	Query                string          `json:"query"`
-	QueryStartTimestamp  time.Time       `json:"query_start_timestamp"`
-	Timestamp            time.Time       `json:"timestamp"`
-	Connection           string          `json:"connection"`
-	Success              bool            `json:"success"`
-	Columns              []string        `json:"columns,omitempty"`
-	Rows                 [][]interface{} `json:"rows,omitempty"`
-	Error                string          `json:"error,omitempty"`
-	Asset                string          `json:"asset,omitempty"`
-	Environment          string          `json:"environment,omitempty"`
-	Limit                int64           `json:"limit,omitempty"`
-	Timeout              int             `json:"timeout,omitempty"`
-	Description          string          `json:"description,omitempty"`
+	Query               string          `json:"query"`
+	QueryStartTimestamp time.Time       `json:"query_start_timestamp"`
+	Timestamp           time.Time       `json:"timestamp"`
+	Connection          string          `json:"connection"`
+	Success             bool            `json:"success"`
+	Columns             []string        `json:"columns,omitempty"`
+	Rows                [][]interface{} `json:"rows,omitempty"`
+	Error               string          `json:"error,omitempty"`
+	Asset               string          `json:"asset,omitempty"`
+	Environment         string          `json:"environment,omitempty"`
+	Limit               int64           `json:"limit,omitempty"`
+	Timeout             int             `json:"timeout,omitempty"`
+	Description         string          `json:"description,omitempty"`
 }
 
 // QueryLogOptions contains optional parameters for query logging.
