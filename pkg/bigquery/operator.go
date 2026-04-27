@@ -305,14 +305,19 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		fmt.Fprintln(printer, "Poking:", qry[0].Query)
 	}
 
+	var lastJobID string
+	sinkCtx := query.WithQueryIDSink(ctx, &lastJobID)
+
 	timeout := time.After(24 * time.Hour)
 	for {
 		select {
 		case <-timeout:
+			query.LogQueryID(ctx, "BigQuery", lastJobID)
 			return errors.New("Sensor timed out after 24 hours")
 		default:
-			res, err := conn.Select(ctx, qry[0])
+			res, err := conn.Select(sinkCtx, qry[0])
 			if err != nil {
+				query.LogQueryID(ctx, "BigQuery", lastJobID)
 				return err
 			}
 			intRes, err := helpers.CastResultToInteger(res, true)
@@ -321,9 +326,11 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			}
 
 			if intRes > 0 {
+				query.LogQueryID(ctx, "BigQuery", lastJobID)
 				return nil
 			}
 			if o.sensorMode == "once" || o.sensorMode == "" {
+				query.LogQueryID(ctx, "BigQuery", lastJobID)
 				return errors.New("Sensor didn't return the expected result")
 			}
 
@@ -392,14 +399,19 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		fmt.Fprintln(printer, "Poking:", tableName)
 	}
 
+	var lastJobID string
+	sinkCtx := query.WithQueryIDSink(ctx, &lastJobID)
+
 	timeout := time.After(24 * time.Hour)
 	for {
 		select {
 		case <-timeout:
+			query.LogQueryID(ctx, "BigQuery", lastJobID)
 			return errors.New("Sensor timed out after 24 hours")
 		default:
-			res, err := conn.Select(ctx, extractedQuery)
+			res, err := conn.Select(sinkCtx, extractedQuery)
 			if err != nil {
+				query.LogQueryID(ctx, "BigQuery", lastJobID)
 				return err
 			}
 			intRes, err := helpers.CastResultToInteger(res, true)
@@ -408,9 +420,11 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			}
 
 			if intRes > 0 {
+				query.LogQueryID(ctx, "BigQuery", lastJobID)
 				return nil
 			}
 			if ts.sensorMode == "once" || ts.sensorMode == "" {
+				query.LogQueryID(ctx, "BigQuery", lastJobID)
 				return errors.New("Sensor didn't return the expected result")
 			}
 

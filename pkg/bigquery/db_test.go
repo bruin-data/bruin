@@ -305,18 +305,19 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 				t.Fatal(err)
 			}
 			return
-		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
+		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)) {
+			// Handle jobs.insert (used by q.Run)
 			w.WriteHeader(jsr.statusCode)
 
 			response, err := json.Marshal(jsr.response)
 			if err != nil {
 				t.Fatal(err)
-			} // Updated error handling
+			}
 
 			_, err = w.Write(response)
 			if err != nil {
 				t.Fatal(err)
-			} // Updated error handling
+			}
 			return
 		}
 
@@ -324,7 +325,7 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
 		if err != nil {
 			t.Fatal(err)
-		} // Updated error handling
+		}
 	})
 }
 
@@ -835,7 +836,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 				},
 				statusCode: http.StatusBadRequest,
 			},
-			err: errors.New(`failed to initiate query read: googleapi: Error 400: Syntax error: Expected "(" or keyword SELECT or keyword WITH but got identifier "sselect" at [3:1], invalidQuery`),
+			err: errors.New(`failed to run query: Syntax error: Expected "(" or keyword SELECT or keyword WITH but got identifier "sselect" at [3:1], invalidQuery`),
 		},
 		{
 			name:  "Google API returns 404",
@@ -849,7 +850,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 				},
 				statusCode: http.StatusNotFound,
 			},
-			err: errors.New("failed to initiate query read: googleapi: Error 404: not found: Table project:schema.table was not found in location ABC"),
+			err: errors.New("failed to run query: not found: Table project:schema.table was not found in location ABC"),
 		},
 		{
 			name:  "successful query with schema",
