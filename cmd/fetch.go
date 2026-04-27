@@ -218,16 +218,18 @@ func Query() *cli.Command {
 					q = *ansisql.AddAgentIDAnnotationComment(&q, agentID)
 				}
 
+				queryStart := time.Now()
 				result, queryErr := querier.SelectWithSchema(timeoutCtx, &q)
 
 				// Save query log (for both success and error cases)
 				inputPath := c.String("asset")
 				logOpts := QueryLogOptions{
-					Asset:       inputPath,
-					Environment: c.String("environment"),
-					Limit:       c.Int64("limit"),
-					Timeout:     c.Int("timeout"),
-					Description: c.String("description"),
+					QueryStartTimestamp: queryStart,
+					Asset:               inputPath,
+					Environment:         c.String("environment"),
+					Limit:               c.Int64("limit"),
+					Timeout:             c.Int("timeout"),
+					Description:         c.String("description"),
 				}
 				if err := saveQueryLog(queryStr, connName, result, queryErr, logOpts); err != nil {
 					// Log the error but don't fail the command
@@ -799,27 +801,29 @@ func handleSuccess(output string, message string) error {
 
 // QueryLog represents the structure of a query log entry.
 type QueryLog struct {
-	Query       string          `json:"query"`
-	Timestamp   time.Time       `json:"timestamp"`
-	Connection  string          `json:"connection"`
-	Success     bool            `json:"success"`
-	Columns     []string        `json:"columns,omitempty"`
-	Rows        [][]interface{} `json:"rows,omitempty"`
-	Error       string          `json:"error,omitempty"`
-	Asset       string          `json:"asset,omitempty"`
-	Environment string          `json:"environment,omitempty"`
-	Limit       int64           `json:"limit,omitempty"`
-	Timeout     int             `json:"timeout,omitempty"`
-	Description string          `json:"description,omitempty"`
+	Query                string          `json:"query"`
+	QueryStartTimestamp  time.Time       `json:"query_start_timestamp"`
+	Timestamp            time.Time       `json:"timestamp"`
+	Connection           string          `json:"connection"`
+	Success              bool            `json:"success"`
+	Columns              []string        `json:"columns,omitempty"`
+	Rows                 [][]interface{} `json:"rows,omitempty"`
+	Error                string          `json:"error,omitempty"`
+	Asset                string          `json:"asset,omitempty"`
+	Environment          string          `json:"environment,omitempty"`
+	Limit                int64           `json:"limit,omitempty"`
+	Timeout              int             `json:"timeout,omitempty"`
+	Description          string          `json:"description,omitempty"`
 }
 
 // QueryLogOptions contains optional parameters for query logging.
 type QueryLogOptions struct {
-	Asset       string
-	Environment string
-	Limit       int64
-	Timeout     int
-	Description string
+	QueryStartTimestamp time.Time
+	Asset               string
+	Environment         string
+	Limit               int64
+	Timeout             int
+	Description         string
 }
 
 func saveQueryLog(queryStr string, connName string, result *query.QueryResult, queryErr error, opts QueryLogOptions) error {
@@ -849,15 +853,16 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 	logPath := filepath.Join(logDir, logFileName)
 
 	logEntry := QueryLog{
-		Query:       queryStr,
-		Timestamp:   timestamp,
-		Connection:  connName,
-		Success:     queryErr == nil,
-		Asset:       opts.Asset,
-		Environment: opts.Environment,
-		Limit:       opts.Limit,
-		Timeout:     opts.Timeout,
-		Description: opts.Description,
+		Query:               queryStr,
+		QueryStartTimestamp: opts.QueryStartTimestamp,
+		Timestamp:           timestamp,
+		Connection:          connName,
+		Success:             queryErr == nil,
+		Asset:               opts.Asset,
+		Environment:         opts.Environment,
+		Limit:               opts.Limit,
+		Timeout:             opts.Timeout,
+		Description:         opts.Description,
 	}
 
 	if queryErr != nil {
