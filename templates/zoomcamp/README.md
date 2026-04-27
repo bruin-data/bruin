@@ -157,7 +157,7 @@ Let's start by initializing a simple project to learn the basics before diving i
 **Initialize the default template:**
 ```bash
 bruin init default my-first-pipeline
-cd my-first-pipeline
+cd bruin
 ```
 
 **Explore the generated structure:**
