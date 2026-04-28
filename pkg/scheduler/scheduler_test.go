@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -964,5 +965,42 @@ func TestScheduler_MarkAssetWithCustomChecks(t *testing.T) {
 	assert.Len(t, pending, 1, "Expected 1 pending custom check")
 	if len(pending) > 0 {
 		assert.Equal(t, TaskInstanceTypeCustomCheck, pending[0].GetType())
+	}
+}
+
+func TestScheduler_RunDoesNotDeadlockWithManyInitiallyEligibleTasks(t *testing.T) {
+	t.Parallel()
+
+	const numAssets = 500
+	assets := make([]*pipeline.Asset, numAssets)
+	for i := range numAssets {
+		assets[i] = &pipeline.Asset{Name: fmt.Sprintf("task%d", i)}
+	}
+	p := &pipeline.Pipeline{Assets: assets}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
+
+	// Pre-fix: Kickstart held taskScheduleLock, blocked pushing to a 100-cap WorkQueue, and the first Tick from Run deadlocked on the same lock.
+	done := make(chan []*TaskExecutionResult, 1)
+	go func() {
+		done <- s.Run(t.Context())
+	}()
+
+	completed := 0
+	for completed < numAssets {
+		select {
+		case task := <-s.WorkQueue:
+			s.Results <- &TaskExecutionResult{Instance: task}
+			completed++
+		case <-time.After(5 * time.Second):
+			t.Fatalf("scheduler deadlocked after completing %d/%d tasks", completed, numAssets)
+		}
+	}
+
+	select {
+	case results := <-done:
+		assert.Len(t, results, numAssets)
+	case <-time.After(5 * time.Second):
+		t.Fatal("scheduler Run did not return after all tasks completed")
 	}
 }
