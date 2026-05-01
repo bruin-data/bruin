@@ -1318,6 +1318,23 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "duckdb-sensor-timeout",
+			task: e2e.Task{
+				Name:    "duckdb-sensor-timeout",
+				Command: binary,
+				Args:    []string{"run", "--sensor-mode", "wait", filepath.Join(currentFolder, "test-pipelines/duckdb-sensor-timeout")},
+				Env:     []string{},
+				Expected: e2e.Output{
+					ExitCode: 1,
+					Contains: []string{"Sensor timed out after 3s"},
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByContains,
+				},
+			},
+		},
+		{
 			name: "test-truncate-insert-validate",
 			task: e2e.Task{
 				Name:       "test-truncate-insert-validate",

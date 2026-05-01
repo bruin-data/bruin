@@ -1,0 +1,6 @@
+name: duckdb_sensor_timeout.always_false
+type: duckdb.sensor.query
+parameters:
+    query: SELECT FALSE
+    poke_interval: "1"
+    timeout: 3s
