@@ -3,6 +3,7 @@ package ansisql
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -227,6 +228,40 @@ func TestNewTableSensorExtractQueriesFromStringError(t *testing.T) {
 	})
 
 	assert.ErrorContains(t, err, "failed to extract table exists query")
+}
+
+func TestTableSensorTimesOutWhenConfigured(t *testing.T) {
+	t.Parallel()
+
+	mockConn := &MockConnectionGetter{}
+	mockTableExistsChecker := &MockTableExistsChecker{}
+	mockExtractor := &MockQueryExtractor{}
+
+	mockConn.On("GetConnection", "gcp-default").Return(mockTableExistsChecker)
+	mockTableExistsChecker.On("BuildTableExistsQuery", "database.test.table").Return("SELECT 1", nil)
+	mockExtractor.On("ExtractQueriesFromString", "SELECT 1").Return([]*query.Query{{Query: "SELECT 1"}}, nil)
+	// Always return 0 so the sensor never succeeds.
+	mockTableExistsChecker.On("Select", mock.Anything, mock.Anything).Return([][]interface{}{{int64(0)}}, nil)
+
+	ts := NewTableSensor(mockConn, "wait", mockExtractor)
+
+	start := time.Now()
+	err := ts.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
+		Type: pipeline.AssetTypeBigqueryQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "test-file.sql",
+			Content: "some content",
+		},
+		Parameters: pipeline.EmptyStringMap{
+			"table":         "database.test.table",
+			"timeout":       "100ms",
+			"poke_interval": "0",
+		},
+	})
+	elapsed := time.Since(start)
+
+	assert.ErrorContains(t, err, "Sensor timed out after")
+	assert.Less(t, elapsed, 5*time.Second, "timeout should fire promptly")
 }
 
 func TestNewTableSensorgNoQueries(t *testing.T) {

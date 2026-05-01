@@ -305,11 +305,12 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		fmt.Fprintln(printer, "Poking:", qry[0].Query)
 	}
 
-	timeout := time.After(24 * time.Hour)
+	sensorTimeout := helpers.GetSensorTimeout(t)
+	timeout := time.After(sensorTimeout)
 	for {
 		select {
 		case <-timeout:
-			return errors.New("Sensor timed out after 24 hours")
+			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
 		default:
 			res, err := conn.Select(ctx, qry[0])
 			if err != nil {
@@ -392,11 +393,12 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		fmt.Fprintln(printer, "Poking:", tableName)
 	}
 
-	timeout := time.After(24 * time.Hour)
+	sensorTimeout := helpers.GetSensorTimeout(t)
+	timeout := time.After(sensorTimeout)
 	for {
 		select {
 		case <-timeout:
-			return errors.New("Sensor timed out after 24 hours")
+			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
 		default:
 			res, err := conn.Select(ctx, extractedQuery)
 			if err != nil {

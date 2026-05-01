@@ -163,6 +163,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "valid-sensor-timeout",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateSensorTimeout,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "valid-ingestr",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,

@@ -15,6 +15,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -1409,6 +1410,40 @@ func validateTableNameFormat(assetType pipeline.AssetType, tableName string) str
 	}
 
 	return ""
+}
+
+// ValidateSensorTimeout validates the optional `timeout` parameter on sensor
+// assets. It uses the same single-unit duration syntax as pipeline
+// interval_modifiers (s, m, h, d, ms, ns); combinators like "1h30m" and
+// month suffix "M" are not supported.
+func ValidateSensorTimeout(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if !strings.Contains(string(asset.Type), ".sensor.") {
+		return issues, nil
+	}
+
+	raw, ok := asset.Parameters["timeout"]
+	if !ok || strings.TrimSpace(raw) == "" {
+		return issues, nil
+	}
+
+	d, err := helpers.ParseSensorDuration(raw)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "parameters.timeout is invalid: " + err.Error(),
+		})
+		return issues, nil
+	}
+
+	if d <= 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "parameters.timeout must be a positive duration",
+		})
+	}
+
+	return issues, nil
 }
 
 func EnsureBigQueryQuerySensorHasQueryParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

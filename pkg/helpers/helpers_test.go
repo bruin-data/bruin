@@ -255,6 +255,80 @@ func TestParseJSONOutputs(t *testing.T) {
 	}
 }
 
+func TestParseSensorDuration(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		want    time.Duration
+		wantErr string
+	}{
+		{name: "1h", input: "1h", want: time.Hour},
+		{name: "30m", input: "30m", want: 30 * time.Minute},
+		{name: "90m", input: "90m", want: 90 * time.Minute},
+		{name: "45s", input: "45s", want: 45 * time.Second},
+		{name: "2d", input: "2d", want: 48 * time.Hour},
+		{name: "100ms", input: "100ms", want: 100 * time.Millisecond},
+		{name: "500ns", input: "500ns", want: 500 * time.Nanosecond},
+		{name: "trim spaces", input: "  1h  ", want: time.Hour},
+
+		{name: "empty", input: "", wantErr: "empty"},
+		{name: "blank", input: "   ", wantErr: "empty"},
+		{name: "month rejected", input: "1M", wantErr: "M (months) is not supported"},
+		{name: "unknown unit y", input: "1y", wantErr: "unknown unit"},
+		{name: "no unit", input: "10", wantErr: "unknown unit"},
+		{name: "non-numeric", input: "abh", wantErr: "invalid numeric portion"},
+		{name: "single char", input: "h", wantErr: "invalid duration"},
+		{name: "combinator unsupported", input: "1h30m", wantErr: "invalid numeric portion"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := ParseSensorDuration(tt.input)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestGetSensorTimeout(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		params map[string]string
+		want   time.Duration
+	}{
+		{name: "unset returns default", params: nil, want: DefaultSensorTimeout},
+		{name: "empty returns default", params: map[string]string{"timeout": ""}, want: DefaultSensorTimeout},
+		{name: "blank returns default", params: map[string]string{"timeout": "   "}, want: DefaultSensorTimeout},
+		{name: "valid 1h", params: map[string]string{"timeout": "1h"}, want: time.Hour},
+		{name: "valid 90m", params: map[string]string{"timeout": "90m"}, want: 90 * time.Minute},
+		{name: "valid 1d", params: map[string]string{"timeout": "1d"}, want: 24 * time.Hour},
+		{name: "invalid falls back to default", params: map[string]string{"timeout": "foo"}, want: DefaultSensorTimeout},
+		{name: "month suffix falls back to default", params: map[string]string{"timeout": "1M"}, want: DefaultSensorTimeout},
+		{name: "zero falls back to default", params: map[string]string{"timeout": "0s"}, want: DefaultSensorTimeout},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{Parameters: pipeline.EmptyStringMap{}}
+			for k, v := range tt.params {
+				asset.Parameters[k] = v
+			}
+			assert.Equal(t, tt.want, GetSensorTimeout(asset))
+		})
+	}
+}
+
 func TestCastResultToInteger(t *testing.T) {
 	t.Parallel()
 

@@ -220,11 +220,12 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 
 	isWildcard := containsWildcard(bucketKey)
 
-	timeout := time.After(24 * time.Hour)
+	sensorTimeout := helpers.GetSensorTimeout(t)
+	timeout := time.After(sensorTimeout)
 	for {
 		select {
 		case <-timeout:
-			return errors.New("Sensor timed out after 24 hours")
+			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
 		default:
 			if isWildcard {
 				found, err := matchWildcard(ctx, s3Client, bucketName, bucketKey)

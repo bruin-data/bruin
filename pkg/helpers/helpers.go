@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -251,4 +252,70 @@ func GetPokeInterval(ctx context.Context, t *pipeline.Asset) int64 {
 		pokeInterval = 30
 	}
 	return pokeInterval
+}
+
+const DefaultSensorTimeout = 24 * time.Hour
+
+// ParseSensorDuration parses a single-unit duration string using the same
+// suffix syntax as pipeline interval_modifiers (s, m, h, d, ms, ns).
+// Combinators like "1h30m" are not supported; use "90m" instead.
+// "M" (months) is rejected because a month is not a fixed time.Duration.
+func ParseSensorDuration(raw string) (time.Duration, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return 0, errors.New("empty duration")
+	}
+
+	if len(s) >= 3 {
+		twoCharSuffix := s[len(s)-2:]
+		if twoCharSuffix == "ms" || twoCharSuffix == "ns" {
+			n, err := strconv.Atoi(s[:len(s)-2])
+			if err != nil {
+				return 0, fmt.Errorf("invalid numeric portion in %q", raw)
+			}
+			if twoCharSuffix == "ms" {
+				return time.Duration(n) * time.Millisecond, nil
+			}
+			return time.Duration(n) * time.Nanosecond, nil
+		}
+	}
+
+	if len(s) < 2 {
+		return 0, fmt.Errorf("invalid duration %q; expected a number followed by s, m, h, d, ms, or ns", raw)
+	}
+
+	suffix := s[len(s)-1]
+	n, err := strconv.Atoi(s[:len(s)-1])
+	if err != nil {
+		return 0, fmt.Errorf("invalid numeric portion in %q", raw)
+	}
+
+	switch suffix {
+	case 's':
+		return time.Duration(n) * time.Second, nil
+	case 'm':
+		return time.Duration(n) * time.Minute, nil
+	case 'h':
+		return time.Duration(n) * time.Hour, nil
+	case 'd':
+		return time.Duration(n) * 24 * time.Hour, nil
+	case 'M':
+		return 0, fmt.Errorf("M (months) is not supported for timeout; use d, h, m, or s")
+	default:
+		return 0, fmt.Errorf("unknown unit %q in %q; use s, m, h, d, ms, or ns", string(suffix), raw)
+	}
+}
+
+// GetSensorTimeout returns the configured sensor timeout for an asset, falling
+// back to DefaultSensorTimeout when unset, invalid, or non-positive.
+func GetSensorTimeout(t *pipeline.Asset) time.Duration {
+	raw, ok := t.Parameters["timeout"]
+	if !ok || strings.TrimSpace(raw) == "" {
+		return DefaultSensorTimeout
+	}
+	d, err := ParseSensorDuration(raw)
+	if err != nil || d <= 0 {
+		return DefaultSensorTimeout
+	}
+	return d
 }

@@ -38,6 +38,21 @@ parameters:
     poke_interval: 10 # seconds // [!code focus]
 ```
 
+### Timeout
+
+By default a sensor gives up after 24 hours and the asset fails. You can shorten that bound with the `timeout` parameter. The value uses the same single-unit duration syntax as pipeline `interval_modifiers`: a number followed by `s`, `m`, `h`, `d`, `ms`, or `ns`. Combinators like `1h30m` are not supported — use `90m` instead. The `M` (months) suffix is not supported for `timeout` because a month is not a fixed duration.
+
+```yaml
+name: my_sensor
+type: bq.sensor.query
+parameters:
+    query: select count(*) > 0 from `your-project-id.raw.external_asset`
+    poke_interval: 60
+    timeout: 1h # [!code focus]
+```
+
+If `timeout` is unset, invalid, or zero, the default `24h` applies.
+
 ## Definition Schema
 
 Sensors are defined as YAML files, with the naming schema `<name>.asset.yml`.
