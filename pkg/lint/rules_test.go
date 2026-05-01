@@ -1678,6 +1678,175 @@ func TestEnsureBigqueryQuerySensorHasQueryParameter(t *testing.T) {
 	}
 }
 
+func TestValidateSensorTimeout(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		want    []string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "non-sensor asset is skipped even with bogus timeout",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryQuery,
+						Parameters: map[string]string{
+							"timeout": "bogus",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "sensor without timeout param is fine",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryQuerySensor,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "empty timeout string is fine (uses default)",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryQuerySensor,
+						Parameters: map[string]string{
+							"timeout": "",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "valid 1h",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryQuerySensor,
+						Parameters: map[string]string{
+							"timeout": "1h",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "valid 2d",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeDuckDBQuerySensor,
+						Parameters: map[string]string{
+							"timeout": "2d",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "month suffix rejected",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryQuerySensor,
+						Parameters: map[string]string{
+							"timeout": "1M",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"parameters.timeout is invalid: M (months) is not supported for timeout; use d, h, m, or s"},
+		},
+		{
+			name: "negative duration rejected",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryQuerySensor,
+						Parameters: map[string]string{
+							"timeout": "-1h",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"parameters.timeout is invalid: duration must be positive, got -1"},
+		},
+		{
+			name: "zero duration rejected",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeS3KeySensor,
+						Parameters: map[string]string{
+							"timeout": "0s",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"parameters.timeout is invalid: duration must be positive, got 0"},
+		},
+		{
+			name: "garbage value rejected",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryQuerySensor,
+						Parameters: map[string]string{
+							"timeout": "foo",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"parameters.timeout is invalid: invalid numeric portion in \"foo\""},
+		},
+	}
+	ctx := t.Context()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := CallFuncForEveryAsset(ValidateSensorTimeout)(ctx, tt.p)
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			if tt.want != nil {
+				gotMessages := make([]string, len(got))
+				for i, issue := range got {
+					gotMessages[i] = issue.Description
+				}
+				assert.Equal(t, tt.want, gotMessages)
+			} else {
+				assert.Equal(t, []*Issue{}, got)
+			}
+		})
+	}
+}
+
 func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	t.Parallel()
 

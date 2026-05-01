@@ -281,6 +281,10 @@ func TestParseSensorDuration(t *testing.T) {
 		{name: "non-numeric", input: "abh", wantErr: "invalid numeric portion"},
 		{name: "single char", input: "h", wantErr: "invalid duration"},
 		{name: "combinator unsupported", input: "1h30m", wantErr: "invalid numeric portion"},
+		{name: "negative h", input: "-1h", wantErr: "duration must be positive"},
+		{name: "negative ms", input: "-100ms", wantErr: "duration must be positive"},
+		{name: "zero s", input: "0s", wantErr: "duration must be positive"},
+		{name: "zero ns", input: "0ns", wantErr: "duration must be positive"},
 	}
 
 	for _, tt := range tests {
@@ -315,6 +319,7 @@ func TestGetSensorTimeout(t *testing.T) {
 		{name: "invalid falls back to default", params: map[string]string{"timeout": "foo"}, want: DefaultSensorTimeout},
 		{name: "month suffix falls back to default", params: map[string]string{"timeout": "1M"}, want: DefaultSensorTimeout},
 		{name: "zero falls back to default", params: map[string]string{"timeout": "0s"}, want: DefaultSensorTimeout},
+		{name: "negative falls back to default", params: map[string]string{"timeout": "-1h"}, want: DefaultSensorTimeout},
 	}
 
 	for _, tt := range tests {

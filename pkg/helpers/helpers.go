@@ -273,6 +273,9 @@ func ParseSensorDuration(raw string) (time.Duration, error) {
 			if err != nil {
 				return 0, fmt.Errorf("invalid numeric portion in %q", raw)
 			}
+			if n <= 0 {
+				return 0, fmt.Errorf("duration must be positive, got %d", n)
+			}
 			if twoCharSuffix == "ms" {
 				return time.Duration(n) * time.Millisecond, nil
 			}
@@ -288,6 +291,9 @@ func ParseSensorDuration(raw string) (time.Duration, error) {
 	n, err := strconv.Atoi(s[:len(s)-1])
 	if err != nil {
 		return 0, fmt.Errorf("invalid numeric portion in %q", raw)
+	}
+	if n <= 0 {
+		return 0, fmt.Errorf("duration must be positive, got %d", n)
 	}
 
 	switch suffix {

@@ -1427,17 +1427,10 @@ func ValidateSensorTimeout(ctx context.Context, p *pipeline.Pipeline, asset *pip
 		return issues, nil
 	}
 
-	d, err := helpers.ParseSensorDuration(raw)
-	switch {
-	case err != nil:
+	if _, err := helpers.ParseSensorDuration(raw); err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "parameters.timeout is invalid: " + err.Error(),
-		})
-	case d <= 0:
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "parameters.timeout must be a positive duration",
 		})
 	}
 
