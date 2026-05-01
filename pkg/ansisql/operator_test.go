@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type MockConnectionGetter struct {
@@ -260,7 +261,7 @@ func TestTableSensorTimesOutWhenConfigured(t *testing.T) {
 	})
 	elapsed := time.Since(start)
 
-	assert.ErrorContains(t, err, "Sensor timed out after")
+	require.ErrorContains(t, err, "Sensor timed out after")
 	assert.Less(t, elapsed, 5*time.Second, "timeout should fire promptly")
 }
 

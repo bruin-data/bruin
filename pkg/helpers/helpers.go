@@ -300,7 +300,7 @@ func ParseSensorDuration(raw string) (time.Duration, error) {
 	case 'd':
 		return time.Duration(n) * 24 * time.Hour, nil
 	case 'M':
-		return 0, fmt.Errorf("M (months) is not supported for timeout; use d, h, m, or s")
+		return 0, errors.New("M (months) is not supported for timeout; use d, h, m, or s")
 	default:
 		return 0, fmt.Errorf("unknown unit %q in %q; use s, m, h, d, ms, or ns", string(suffix), raw)
 	}
