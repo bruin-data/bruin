@@ -123,13 +123,24 @@ type StorageConfig struct {
 	Type   StorageType `yaml:"type" json:"type" mapstructure:"type"`
 	Path   string      `yaml:"path,omitempty" json:"path,omitempty" mapstructure:"path"`
 	Region string      `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
-	Auth   StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
+
+	// S3-compatible storage (MinIO, R2, B2, Tigris, on-prem, etc.).
+	// All three are optional pass-throughs to DuckDB's CREATE SECRET; when
+	// unset, behaviour is unchanged (AWS S3 / GCS defaults).
+	Endpoint string `yaml:"endpoint,omitempty" json:"endpoint,omitempty" mapstructure:"endpoint"`
+	URLStyle string `yaml:"url_style,omitempty" json:"url_style,omitempty" mapstructure:"url_style"`
+	UseSSL   *bool  `yaml:"use_ssl,omitempty" json:"use_ssl,omitempty" mapstructure:"use_ssl"`
+
+	Auth StorageAuth `yaml:"auth,omitempty" json:"auth,omitempty" mapstructure:"auth"`
 }
 
 func (s StorageConfig) IsZero() bool {
 	return s.Type == "" &&
 		s.Path == "" &&
 		s.Region == "" &&
+		s.Endpoint == "" &&
+		s.URLStyle == "" &&
+		s.UseSSL == nil &&
 		s.Auth.IsZero()
 }
 

@@ -288,6 +288,41 @@ storage:
     session_token: "${AWS_SESSION_TOKEN}" # optional
 ```
 
+##### S3-compatible storage (MinIO, R2, B2, Tigris, on-prem)
+
+For S3-compatible backends, three optional fields can be set on the `storage` block. They are passed through to DuckDB's `CREATE SECRET` and behaviour is unchanged when they are omitted (AWS S3 defaults).
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `endpoint` | string | No | (AWS S3) | Custom S3 endpoint, e.g. `minio.local:9000`, `<account>.r2.cloudflarestorage.com`, `fly.storage.tigris.dev` |
+| `url_style` | string | No | `vhost` | `path` is required for MinIO and several other S3-compatible backends |
+| `use_ssl` | bool | No | `true` | Set to `false` for plain-HTTP local dev (e.g. MinIO without TLS) |
+
+```yaml
+# MinIO local dev
+storage:
+  type: s3
+  path: "s3://ducklake/warehouse"
+  endpoint: "minio.local:9000"
+  url_style: "path"
+  use_ssl: false
+  auth:
+    access_key: "${MINIO_ACCESS_KEY}"
+    secret_key: "${MINIO_SECRET_KEY}"
+```
+
+```yaml
+# Cloudflare R2
+storage:
+  type: s3
+  path: "s3://my-bucket/ducklake"
+  region: "auto"
+  endpoint: "<account>.r2.cloudflarestorage.com"
+  auth:
+    access_key: "${R2_ACCESS_KEY_ID}"
+    secret_key: "${R2_SECRET_ACCESS_KEY}"
+```
+
 #### GCS
 
 Bruin currently supports explicit GCS HMAC credentials in the `auth` block (`access_key` and `secret_key`).

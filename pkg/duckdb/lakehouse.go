@@ -208,7 +208,7 @@ func (l *LakehouseAttacher) generateS3Secret(name string, storage config.Storage
 		return ""
 	}
 
-	parts := make([]string, 0, 9)
+	parts := make([]string, 0, 12)
 	parts = append(parts, "CREATE OR REPLACE SECRET "+name+" (")
 	parts = append(parts, "    TYPE s3")
 	parts = append(parts, ",   PROVIDER config")
@@ -220,6 +220,15 @@ func (l *LakehouseAttacher) generateS3Secret(name string, storage config.Storage
 	}
 	if storage.Region != "" {
 		parts = append(parts, ",   REGION "+quoteSQLStringLiteral(storage.Region))
+	}
+	if storage.Endpoint != "" {
+		parts = append(parts, ",   ENDPOINT "+quoteSQLStringLiteral(storage.Endpoint))
+	}
+	if storage.URLStyle != "" {
+		parts = append(parts, ",   URL_STYLE "+quoteSQLStringLiteral(storage.URLStyle))
+	}
+	if storage.UseSSL != nil {
+		parts = append(parts, ",   USE_SSL "+strconv.FormatBool(*storage.UseSSL))
 	}
 	scope := "s3://"
 	if storage.Path != "" {
