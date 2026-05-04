@@ -73,7 +73,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, asset 
 	}
 
 	if len(queries) > 1 && asset.Materialization.Type != pipeline.MaterializationTypeNone {
-		return errors.New("Oracle operator can only handle a single query when materialization is enabled")
+		return errors.New("oracle operator can only handle a single query when materialization is enabled")
 	}
 
 	q := queries[0]

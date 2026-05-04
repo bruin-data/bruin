@@ -80,17 +80,17 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	// and identifiers are escaped for the string literal context.
 	escapedQuery := escapeOracleString(query)
 	escapedName := escapeOracleString(task.Name)
-	return fmt.Sprintf(`BEGIN
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE %s PURGE';
-   EXCEPTION
-      WHEN OTHERS THEN
-         IF SQLCODE != -942 THEN
-            RAISE;
-         END IF;
-   END;
-   EXECUTE IMMEDIATE 'CREATE TABLE %s AS %s';
-END;`, escapedName, escapedName, escapedQuery), nil
+	return fmt.Sprintf("BEGIN\n"+
+		"   BEGIN\n"+
+		"      EXECUTE IMMEDIATE 'DROP TABLE %s PURGE';\n"+
+		"   EXCEPTION\n"+
+		"      WHEN OTHERS THEN\n"+
+		"         IF SQLCODE != -942 THEN\n"+
+		"            RAISE;\n"+
+		"         END IF;\n"+
+		"   END;\n"+
+		"   EXECUTE IMMEDIATE 'CREATE TABLE %s AS %s';\n"+
+		"END;", escapedName, escapedName, escapedQuery), nil
 }
 
 func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query string) (string, error) {
@@ -120,17 +120,17 @@ FROM (
 	escapedQuery := escapeOracleString(createAsQuery)
 	escapedName := escapeOracleString(asset.Name)
 
-	return fmt.Sprintf(`BEGIN
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE %s PURGE';
-   EXCEPTION
-      WHEN OTHERS THEN
-         IF SQLCODE != -942 THEN
-            RAISE;
-         END IF;
-   END;
-   EXECUTE IMMEDIATE 'CREATE TABLE %s AS %s';
-END;`, escapedName, escapedName, escapedQuery), nil
+	return fmt.Sprintf("BEGIN\n"+
+		"   BEGIN\n"+
+		"      EXECUTE IMMEDIATE 'DROP TABLE %s PURGE';\n"+
+		"   EXCEPTION\n"+
+		"      WHEN OTHERS THEN\n"+
+		"         IF SQLCODE != -942 THEN\n"+
+		"            RAISE;\n"+
+		"         END IF;\n"+
+		"   END;\n"+
+		"   EXECUTE IMMEDIATE 'CREATE TABLE %s AS %s';\n"+
+		"END;", escapedName, escapedName, escapedQuery), nil
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -170,8 +170,8 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	if asset.Materialization.TimeGranularity == "" {
 		return "", errors.New("time_granularity is required for time_interval strategy")
 	}
-	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp ||
-		asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
+	if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp &&
+		asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate {
 		return "", errors.New("time_granularity must be either 'date' or 'timestamp'")
 	}
 

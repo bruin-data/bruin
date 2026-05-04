@@ -45,17 +45,17 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: `BEGIN
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE my.asset PURGE';
-   EXCEPTION
-      WHEN OTHERS THEN
-         IF SQLCODE != -942 THEN
-            RAISE;
-         END IF;
-   END;
-   EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT 1';
-END;`,
+			want: "BEGIN\n" +
+				"   BEGIN\n" +
+				"      EXECUTE IMMEDIATE 'DROP TABLE my.asset PURGE';\n" +
+				"   EXCEPTION\n" +
+				"      WHEN OTHERS THEN\n" +
+				"         IF SQLCODE != -942 THEN\n" +
+				"            RAISE;\n" +
+				"         END IF;\n" +
+				"   END;\n" +
+				"   EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT 1';\n" +
+				"END;",
 		},
 		{
 			name: "create+replace with single-quoted query content",
@@ -66,17 +66,17 @@ END;`,
 				},
 			},
 			query: "SELECT 'hello' FROM dual",
-			want: `BEGIN
-   BEGIN
-      EXECUTE IMMEDIATE 'DROP TABLE my.asset PURGE';
-   EXCEPTION
-      WHEN OTHERS THEN
-         IF SQLCODE != -942 THEN
-            RAISE;
-         END IF;
-   END;
-   EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT ''hello'' FROM dual';
-END;`,
+			want: "BEGIN\n" +
+				"   BEGIN\n" +
+				"      EXECUTE IMMEDIATE 'DROP TABLE my.asset PURGE';\n" +
+				"   EXCEPTION\n" +
+				"      WHEN OTHERS THEN\n" +
+				"         IF SQLCODE != -942 THEN\n" +
+				"            RAISE;\n" +
+				"         END IF;\n" +
+				"   END;\n" +
+				"   EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT ''hello'' FROM dual';\n" +
+				"END;",
 		},
 		{
 			name: "materialize to a table with append",

@@ -2,6 +2,7 @@ package oracle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -22,11 +23,11 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	}
 
 	if ti.Check.Value.StringArray != nil && len(*ti.Check.Value.StringArray) == 0 {
-		return fmt.Errorf("no values provided for accepted_values check")
+		return errors.New("no values provided for accepted_values check")
 	}
 
 	if ti.Check.Value.IntArray != nil && len(*ti.Check.Value.IntArray) == 0 {
-		return fmt.Errorf("no values provided for accepted_values check")
+		return errors.New("no values provided for accepted_values check")
 	}
 
 	var val []string

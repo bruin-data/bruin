@@ -1831,7 +1831,7 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeColumnCheck] = oracleCheckRunner
 		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeMetadataPush] = oracleMetadataPushOperator
-		
+
 		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeMain] = executor.NoOpOperator{}
 		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeColumnCheck] = oracleCheckRunner
 		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
