@@ -197,7 +197,7 @@ type pipelineConnection interface {
 }
 
 type GongInstaller interface {
-	EnsureGongInstalled(ctx context.Context) (string, error)
+	EnsureGongInstalled(ctx context.Context, version string) (string, error)
 }
 
 type UvPythonRunner struct {
@@ -560,7 +560,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		if u.Gong == nil {
 			return errors.New("use_gong is set but gong installer is not available")
 		}
-		gongPath, gongErr := u.Gong.EnsureGongInstalled(ingestrCtx)
+		gongPath, gongErr := u.Gong.EnsureGongInstalled(ingestrCtx, "")
 		if gongErr != nil {
 			return fmt.Errorf("use_gong is set but failed to install gong: %w", gongErr)
 		}
@@ -635,6 +635,11 @@ func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
 		if ok && ingestrPath != "" {
 			// maybe verify that the destination exists?
 			return ingestrPath, true
+		}
+	}
+	if v := ctx.Value(CtxIngestrVersion); v != nil {
+		if version, ok := v.(string); ok && version != "" {
+			return "ingestr@" + version, false
 		}
 	}
 	return "ingestr@" + ingestrVersion, false

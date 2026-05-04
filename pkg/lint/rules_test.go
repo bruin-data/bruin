@@ -2026,6 +2026,90 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErrMessage: "",
 			wantErr:        assert.NoError,
 		},
+		{
+			name: "valid version v0",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v0",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid version v0.14.2",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v0.14.2",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid version v1",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v1",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "rejected partial version v0.14",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v0.14",
+				},
+			},
+			wantErrMessage: `Invalid 'version' value "v0.14": must be 'v0', 'v1', or fully-qualified 'vMAJOR.MINOR.PATCH' where MAJOR is 0 or 1`,
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "rejected version v2.0.0",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v2.0.0",
+				},
+			},
+			wantErrMessage: `Invalid 'version' value "v2.0.0": must be 'v0', 'v1', or fully-qualified 'vMAJOR.MINOR.PATCH' where MAJOR is 0 or 1`,
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "rejected version latest",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "latest",
+				},
+			},
+			wantErrMessage: `Invalid 'version' value "latest": must be 'v0', 'v1', or fully-qualified 'vMAJOR.MINOR.PATCH' where MAJOR is 0 or 1`,
+			wantErr:        assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
