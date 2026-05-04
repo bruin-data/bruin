@@ -182,5 +182,11 @@ func (lh *LakehouseConfig) Validate() error {
 		return errors.New("empty or unsupported storage type: (supported: s3, gcs)")
 	}
 
+	// DuckDB's CREATE SECRET only accepts "path" or "vhost" for URL_STYLE;
+	// fail fast here rather than at query time.
+	if lh.Storage.URLStyle != "" && !slices.Contains([]string{"path", "vhost"}, lh.Storage.URLStyle) {
+		return fmt.Errorf("unsupported url_style: %q (supported: path, vhost)", lh.Storage.URLStyle)
+	}
+
 	return nil
 }

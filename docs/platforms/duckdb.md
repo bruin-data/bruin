@@ -318,6 +318,7 @@ storage:
   path: "s3://my-bucket/ducklake"
   region: "auto"
   endpoint: "<account>.r2.cloudflarestorage.com"
+  url_style: "path"
   auth:
     access_key: "${R2_ACCESS_KEY_ID}"
     secret_key: "${R2_SECRET_ACCESS_KEY}"

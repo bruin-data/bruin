@@ -146,6 +146,49 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "url_style path is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeSQLite,
+				},
+				Storage: StorageConfig{
+					Type:     StorageTypeS3,
+					URLStyle: "path",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "url_style vhost is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeSQLite,
+				},
+				Storage: StorageConfig{
+					Type:     StorageTypeS3,
+					URLStyle: "vhost",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unsupported url_style fails",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeSQLite,
+				},
+				Storage: StorageConfig{
+					Type:     StorageTypeS3,
+					URLStyle: "subdomain",
+				},
+			},
+			wantErr: true,
+			errMsg:  "unsupported url_style",
+		},
 	}
 
 	for _, tt := range tests {
