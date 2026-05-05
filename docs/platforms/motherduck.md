@@ -77,11 +77,13 @@ type: duckdb.sensor.query
 connection: my_motherduck_connection
 parameters:
     query: string
+    timeout: duration (optional)
 ```
 
 **Parameters**:
 
 - `query`: Query you expect to return any results
+- `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
 #### Example: Partitioned upstream table
 

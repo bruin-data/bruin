@@ -235,12 +235,14 @@ type: string
 parameters:
     table: string
     poke_interval: int (optional)
+    timeout: duration (optional)
 ```
 
 **Parameters**:
 
 - `table`: In `database_id.schema_id.table_id` or `schema_id.table_id` format. If `schema_id.table_id` is provided, the database will be taken from the database configuration in the `.bruin.yml`.
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
+- `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
 ### `sf.sensor.query`
 
@@ -252,12 +254,14 @@ type: string
 parameters:
     query: string
     poke_interval: int (optional)
+    timeout: duration (optional)
 ```
 
 **Parameters:**
 
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
+- `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
 #### Example: Partitioned upstream table
 
