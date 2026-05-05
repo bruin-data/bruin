@@ -103,6 +103,18 @@ func TestMaterializer_Render(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "invalid multi-dot identifier is rejected",
+			task: &pipeline.Asset{
+				Name: "my_schema..my_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyAppend,
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
 			name: "delete+insert builds a proper PL/SQL block",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -407,7 +419,7 @@ WHERE target.bruin_is_current = 1
   )
   AND EXISTS (SELECT 1 FROM (SELECT id, event_name, ts from source_table) source_exists);
 
-MERGE INTO (SELECT * FROM my.asset WHERE bruin_is_current = 1) target
+MERGE INTO my.asset target
 USING (
   WITH s1 AS (
     SELECT id, event_name, ts from source_table
@@ -420,7 +432,7 @@ USING (
   JOIN my.asset t1 ON ((t1.id = s1.id OR (t1.id IS NULL AND s1.id IS NULL)))
   WHERE t1.bruin_valid_from < CAST(s1.ts AS TIMESTAMP) AND t1.bruin_is_current = 1
 ) source
-ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)) AND source.bruin_is_current_src = 1)
+ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)) AND source.bruin_is_current_src = 1 AND target.bruin_is_current = 1)
 WHEN MATCHED THEN
   UPDATE SET
     target.bruin_valid_until = CAST(source.ts AS TIMESTAMP),

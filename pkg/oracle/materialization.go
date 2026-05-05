@@ -12,7 +12,7 @@ import (
 
 // validIdentifierRe matches Oracle unquoted identifiers.
 // Allows schema-qualified names like "MY_SCHEMA.MY_TABLE".
-var validIdentifierRe = regexp.MustCompile(`^[A-Za-z_#$][A-Za-z0-9_#$.]*$`)
+var validIdentifierRe = regexp.MustCompile(`^[A-Za-z_#$][A-Za-z0-9_#$]*(\.[A-Za-z_#$][A-Za-z0-9_#$]*)?$`)
 
 // validateIdentifier rejects names that could cause SQL injection when
 // interpolated outside of EXECUTE IMMEDIATE string literals.
@@ -364,6 +364,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 		))
 	}
 	joinConds = append(joinConds, "source.bruin_is_current_src = 1")
+	joinConds = append(joinConds, "target.bruin_is_current = 1")
 	onCondition := strings.Join(joinConds, " AND ")
 	tbl := asset.Name
 	pkJoinUpdateStr := strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND ")
@@ -382,7 +383,7 @@ WHERE target.bruin_is_current = 1
   )
   AND EXISTS (SELECT 1 FROM (%s) source_exists);
 
-MERGE INTO (SELECT * FROM %s WHERE bruin_is_current = 1) target
+MERGE INTO %s target
 USING (
   WITH s1 AS (
     %s

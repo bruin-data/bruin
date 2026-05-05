@@ -1820,7 +1820,7 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
-	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
 		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat: oracle.NewMaterializer(fullRefresh),

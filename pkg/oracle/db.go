@@ -49,7 +49,7 @@ func (db *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query)
 // It checks for a word boundary after BEGIN/DECLARE to avoid false positives
 // on identifiers like BEGINDATE.
 func isPLSQLBlock(q string) bool {
-	upper := strings.ToUpper(strings.TrimSpace(q))
+	upper := strings.ToUpper(trimTrailingSQLComments(q))
 	if !strings.HasSuffix(upper, "END;") {
 		return false
 	}
@@ -63,6 +63,27 @@ func isPLSQLBlock(q string) bool {
 		}
 	}
 	return false
+}
+
+func trimTrailingSQLComments(q string) string {
+	q = strings.TrimSpace(q)
+	for {
+		trimmed := q
+		if strings.HasSuffix(trimmed, "*/") {
+			if start := strings.LastIndex(trimmed, "/*"); start >= 0 {
+				trimmed = strings.TrimSpace(trimmed[:start])
+			}
+		}
+
+		if lineComment := strings.LastIndex(trimmed, "--"); lineComment >= 0 && !strings.ContainsAny(trimmed[lineComment:], "\n\r") {
+			trimmed = strings.TrimSpace(trimmed[:lineComment])
+		}
+
+		if trimmed == q {
+			return trimmed
+		}
+		q = trimmed
+	}
 }
 
 func (db *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {

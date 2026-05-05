@@ -22,7 +22,8 @@ func (m *mockQuerierWithResult) RunQueryWithoutResult(ctx context.Context, query
 
 func (m *mockQuerierWithResult) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	res := m.Called(ctx, query)
-	return res.Get(0).([][]interface{}), res.Error(1)
+	val, _ := res.Get(0).([][]interface{})
+	return val, res.Error(1)
 }
 
 func (m *mockQuerierWithResult) Ping(ctx context.Context) error {

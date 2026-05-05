@@ -364,6 +364,28 @@ func TestClient_RunQueryWithoutResult(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "PL/SQL block with trailing line comment preserves semicolon",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("BEGIN DELETE FROM users WHERE id = 1; END; -- done").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			query: &query.Query{
+				Query: "BEGIN\n   DELETE FROM users WHERE id = 1;\nEND; -- done",
+			},
+			wantErr: false,
+		},
+		{
+			name: "PL/SQL block with trailing block comment preserves semicolon",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("BEGIN DELETE FROM users WHERE id = 1; END; /* done */").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			query: &query.Query{
+				Query: "BEGIN\n   DELETE FROM users WHERE id = 1;\nEND;\n/* done */",
+			},
+			wantErr: false,
+		},
+		{
 			name: "invalid query returns error",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(`some broken query`).
