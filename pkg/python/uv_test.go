@@ -185,6 +185,39 @@ func Test_buildIngestrPackageKey(t *testing.T) {
 	}
 }
 
+func Test_ingestrPackage_HonorsCtxIngestrVersion(t *testing.T) {
+	t.Parallel()
+
+	u := &UvPythonRunner{}
+
+	defaultPkg, _ := u.ingestrPackage(t.Context())
+	assert.Equal(t, "ingestr@"+ingestrVersion, defaultPkg)
+
+	pinnedCtx := context.WithValue(t.Context(), CtxIngestrVersion, "0.14.2")
+	pinnedPkg, isLocal := u.ingestrPackage(pinnedCtx)
+	assert.Equal(t, "ingestr@0.14.2", pinnedPkg)
+	assert.False(t, isLocal)
+
+	// LocalIngestr (debug-ingestr-src) takes precedence over CtxIngestrVersion.
+	localCtx := context.WithValue(pinnedCtx, LocalIngestr, "/local/path/to/ingestr")
+	localPkg, isLocal := u.ingestrPackage(localCtx)
+	assert.Equal(t, "/local/path/to/ingestr", localPkg)
+	assert.True(t, isLocal)
+}
+
+func Test_buildIngestrPackageKey_DiffersByVersion(t *testing.T) {
+	t.Parallel()
+
+	u := &UvPythonRunner{}
+	defaultKey := u.buildIngestrPackageKey(t.Context(), nil)
+
+	pinnedCtx := context.WithValue(t.Context(), CtxIngestrVersion, "0.14.2")
+	pinnedKey := u.buildIngestrPackageKey(pinnedCtx, nil)
+
+	assert.NotEqual(t, defaultKey, pinnedKey)
+	assert.Equal(t, "ingestr@0.14.2:", pinnedKey)
+}
+
 func Test_ensureIngestrInstalled_OnlyInstallsOnce(t *testing.T) { //nolint:paralleltest
 	ResetIngestrInstallCache()
 	defer ResetIngestrInstallCache()

@@ -32,17 +32,61 @@ const (
 )
 
 // Checker handles checking and installing the gong binary.
+// It supports installing multiple versions side-by-side; concurrent installs of
+// the same version are deduplicated, while different versions install in parallel.
 type Checker struct {
-	mut sync.Mutex
+	mu    sync.Mutex
+	slots map[string]*installSlot
+}
+
+type installSlot struct {
+	once sync.Once
+	path string
+	err  error
 }
 
 // EnsureGongInstalled checks if gong is installed and installs it if not present, then returns the full path of the binary.
-func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
-	g.mut.Lock()
-	defer g.mut.Unlock()
+// An empty version uses the bundled default from version.txt.
+func (g *Checker) EnsureGongInstalled(ctx context.Context, version string) (string, error) {
+	resolvedVersion := strings.TrimSpace(version)
+	if resolvedVersion == "" {
+		resolvedVersion = strings.TrimSpace(Version)
+	}
 
-	Version = strings.TrimSpace(Version)
+	slot := g.slotFor(resolvedVersion)
+	slot.once.Do(func() {
+		slot.path, slot.err = g.ensureInstalled(ctx, resolvedVersion)
+		if slot.err != nil {
+			// Drop the slot so a subsequent caller retries the install.
+			g.dropSlot(resolvedVersion, slot)
+		}
+	})
+	return slot.path, slot.err
+}
 
+func (g *Checker) slotFor(version string) *installSlot {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.slots == nil {
+		g.slots = make(map[string]*installSlot)
+	}
+	slot, ok := g.slots[version]
+	if !ok {
+		slot = &installSlot{}
+		g.slots[version] = slot
+	}
+	return slot
+}
+
+func (g *Checker) dropSlot(version string, slot *installSlot) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if current, ok := g.slots[version]; ok && current == slot {
+		delete(g.slots, version)
+	}
+}
+
+func (g *Checker) binaryPath(version string) (string, error) {
 	m := user.NewConfigManager(afero.NewOsFs())
 	bruinHomeDirAbsPath, err := m.EnsureAndGetBruinHomeDir()
 	if err != nil {
@@ -54,15 +98,21 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "failed to create bin directory")
 	}
 
-	binaryName := "gong"
+	binaryName := "gong-" + version
 	if runtime.GOOS == "windows" {
-		binaryName = "gong.exe"
+		binaryName += ".exe"
+	}
+	return filepath.Join(binDirPath, binaryName), nil
+}
+
+func (g *Checker) ensureInstalled(ctx context.Context, version string) (string, error) {
+	gongBinaryPath, err := g.binaryPath(version)
+	if err != nil {
+		return "", err
 	}
 
-	gongBinaryPath := filepath.Join(binDirPath, binaryName)
 	if _, err := os.Stat(gongBinaryPath); errors.Is(err, os.ErrNotExist) {
-		err = g.downloadGong(ctx, gongBinaryPath)
-		if err != nil {
+		if err := g.downloadGong(ctx, version, gongBinaryPath); err != nil {
 			return "", err
 		}
 		return gongBinaryPath, nil
@@ -75,9 +125,8 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 		installedVersion = parseVersionOutput(strings.TrimSpace(string(output)))
 	}
 
-	if installedVersion != Version {
-		err = g.downloadGong(ctx, gongBinaryPath)
-		if err != nil {
+	if installedVersion != version {
+		if err := g.downloadGong(ctx, version, gongBinaryPath); err != nil {
 			return "", err
 		}
 	}
@@ -86,10 +135,10 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context) (string, error) {
 }
 
 // buildDownloadURL constructs the download URL for the gong binary based on OS and architecture.
-func buildDownloadURL() string {
+func buildDownloadURL(version string) string {
 	osName := getOSName()
 	archName := getArchName()
-	return fmt.Sprintf("%s/releases/%s/%s/gong_%s", BaseURL, strings.TrimSpace(Version), osName, archName)
+	return fmt.Sprintf("%s/releases/%s/%s/gong_%s", BaseURL, version, osName, archName)
 }
 
 func getOSName() string {
@@ -132,18 +181,18 @@ func parseVersionOutput(output string) string {
 	return ver
 }
 
-func (g *Checker) downloadGong(ctx context.Context, destPath string) error {
+func (g *Checker) downloadGong(ctx context.Context, version, destPath string) error {
 	var output io.Writer = os.Stdout
 	if printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
 		output = printer
 	}
 
 	_, _ = fmt.Fprintf(output, "===============================\n")
-	_, _ = fmt.Fprintf(output, "Installing gong %s...\n", Version)
+	_, _ = fmt.Fprintf(output, "Installing gong %s...\n", version)
 	_, _ = fmt.Fprintf(output, "This is a one-time operation.\n")
 	_, _ = fmt.Fprintf(output, "\n")
 
-	downloadURL := buildDownloadURL()
+	downloadURL := buildDownloadURL(version)
 	_, _ = fmt.Fprintf(output, "Downloading from %s\n", downloadURL)
 
 	client := &http.Client{
@@ -162,7 +211,7 @@ func (g *Checker) downloadGong(ctx context.Context, destPath string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download gong: server returned status %d", resp.StatusCode)
+		return fmt.Errorf("failed to download gong %s: server returned status %d", version, resp.StatusCode)
 	}
 
 	// Create a temporary file in the same directory to ensure atomic write
@@ -202,7 +251,7 @@ func (g *Checker) downloadGong(ctx context.Context, destPath string) error {
 	tmpPath = "" // Prevent cleanup of the renamed file
 
 	_, _ = fmt.Fprintf(output, "\n")
-	_, _ = fmt.Fprintf(output, "Installed gong %s, continuing...\n", Version)
+	_, _ = fmt.Fprintf(output, "Installed gong %s, continuing...\n", version)
 	_, _ = fmt.Fprintf(output, "===============================\n")
 	_, _ = fmt.Fprintf(output, "\n")
 

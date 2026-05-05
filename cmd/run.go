@@ -594,12 +594,12 @@ func Run(isDebug *bool) *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:   "use-gong",
-				Usage:  "use gong binary for execution",
+				Usage:  "force gong for all ingestr assets in this run (overridden per-asset by parameters.version=v0)",
 				Hidden: true,
 			},
 			&cli.StringFlag{
 				Name:   "gong-path",
-				Usage:  "path to the gong binary (when using --use-gong)",
+				Usage:  "path to a pre-installed gong binary; overrides per-asset gong installation for the run",
 				Hidden: true,
 			},
 			&cli.StringFlag{
@@ -676,7 +676,7 @@ func Run(isDebug *bool) *cli.Command {
 				if gongPath == "" {
 					// Auto-install gong if no custom path provided
 					gongChecker := &gong.Checker{}
-					installedPath, err := gongChecker.EnsureGongInstalled(ctx)
+					installedPath, err := gongChecker.EnsureGongInstalled(ctx, "")
 					if err != nil {
 						return cli.Exit(fmt.Sprintf("failed to install gong: %v", err), 1)
 					}
@@ -907,7 +907,7 @@ func Run(isDebug *bool) *cli.Command {
 						if gongPath == "" {
 							// Auto-install gong if no custom path provided
 							gongChecker := &gong.Checker{}
-							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx)
+							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx, "")
 							if gongErr != nil {
 								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to install gong: %v", gongErr), 1)
 							}
