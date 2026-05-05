@@ -4,7 +4,7 @@ type: ingestr
 description: |
   Snapshot of every pipeline registered in your Bruin Cloud workspace, ingested from the Bruin Cloud API (`GET /api/v1/pipelines`).
   Each row represents a single pipeline definition along with its scheduling, ownership, and source-control metadata. The table is fully replaced on every run, so it always reflects the current state of pipelines in Bruin Cloud at the time of ingestion.
-  Use this as the canonical lookup table for joining other Bruin Cloud metadata (such as `bruin_cloud_logs.assets`) on (`name`, `project`).
+  Use this as the canonical lookup table for joining other Bruin Cloud metadata (such as `bruin_cloud_logs.assets`) on the composite key (`name`, `project`) — pipeline names are not unique across projects, so joining on `name` alone can produce a cross-product.
 
   Note on schema inference: ingestr/dlt creates the destination schema from the API response. Optional fields (`description`, `owner`, `default_connections`, `schedule`, `commit`, `start_date`) are only materialized as columns when at least one pipeline in your workspace has a non-NULL value for them. If every pipeline you have leaves a field unset, the column will be missing from the destination — this is expected behaviour, not a load failure.
 

@@ -4,7 +4,7 @@ type: ingestr
 description: |
   Flat catalogue of every asset across every pipeline in your Bruin Cloud workspace, ingested from the Bruin Cloud API (`GET /api/v1/pipelines`, asset list).
   Each row represents a single asset (SQL transform, Python script, ingestr load, sensor, etc.) including its lineage relationships, ownership, materialization strategy, parameters, and the raw asset content/code.
-  The table is fully replaced on every run and always reflects the current state of assets in Bruin Cloud. Join to `bruin_cloud_logs.pipelines` on `assets.pipeline = pipelines.name` to enrich with pipeline-level metadata.
+  The table is fully replaced on every run and always reflects the current state of assets in Bruin Cloud. Join to `bruin_cloud_logs.pipelines` on `(assets.pipeline = pipelines.name AND assets.project = pipelines.project)` to enrich with pipeline-level metadata — pipeline names are not unique across projects, so joining on `name` alone can produce a cross-product.
 
 columns:
   - name: name
@@ -19,7 +19,7 @@ columns:
       - name: not_null
   - name: pipeline
     type: varchar
-    description: "Name of the parent pipeline this asset belongs to. Foreign key to `bruin_cloud_logs.pipelines.name`."
+    description: "Name of the parent pipeline this asset belongs to. Combined with `project`, forms the foreign key to (`bruin_cloud_logs.pipelines.name`, `bruin_cloud_logs.pipelines.project`); not unique on its own."
     checks:
       - name: not_null
   - name: project
