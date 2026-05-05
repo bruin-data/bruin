@@ -53,6 +53,7 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context, version string) (stri
 	if resolvedVersion == "" {
 		resolvedVersion = strings.TrimSpace(Version)
 	}
+
 	slot := g.slotFor(resolvedVersion)
 	slot.once.Do(func() {
 		slot.path, slot.err = g.ensureInstalled(ctx, resolvedVersion)
@@ -113,6 +114,7 @@ func (g *Checker) binaryPath(version string) (string, error) {
 	if err := os.MkdirAll(binDirPath, filePermissions); err != nil {
 		return "", errors.Wrap(err, "failed to create bin directory")
 	}
+
 	binaryName := "gong-" + version
 	if runtime.GOOS == "windows" {
 		binaryName += ".exe"
@@ -125,23 +127,27 @@ func (g *Checker) ensureInstalled(ctx context.Context, version string) (string, 
 	if err != nil {
 		return "", err
 	}
+
 	if _, err := os.Stat(gongBinaryPath); errors.Is(err, os.ErrNotExist) {
 		if err := g.downloadGong(ctx, version, gongBinaryPath); err != nil {
 			return "", err
 		}
 		return gongBinaryPath, nil
 	}
+
 	installedVersion := ""
 	cmd := exec.CommandContext(ctx, gongBinaryPath, "--version")
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		installedVersion = parseVersionOutput(strings.TrimSpace(string(output)))
 	}
+
 	if installedVersion != version {
 		if err := g.downloadGong(ctx, version, gongBinaryPath); err != nil {
 			return "", err
 		}
 	}
+
 	return gongBinaryPath, nil
 }
 
@@ -217,6 +223,7 @@ func parseVersionOutput(output string) string {
 	if len(parts) < 3 {
 		return output
 	}
+
 	ver := parts[len(parts)-1]
 	if !strings.HasPrefix(ver, "v") {
 		ver = "v" + ver
@@ -226,17 +233,13 @@ func parseVersionOutput(output string) string {
 
 func (g *Checker) downloadGong(ctx context.Context, version, destPath string) error {
 	var output io.Writer = os.Stdout
-
 	if printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer); ok {
 		output = printer
 	}
 
 	_, _ = fmt.Fprintf(output, "===============================\n")
-
 	_, _ = fmt.Fprintf(output, "Installing gong %s...\n", version)
-
 	_, _ = fmt.Fprintf(output, "This is a one-time operation.\n")
-
 	_, _ = fmt.Fprintf(output, "\n")
 
 	base := g.effectiveBaseURL()
@@ -248,18 +251,22 @@ func (g *Checker) downloadGong(ctx context.Context, version, destPath string) er
 	client := &http.Client{
 		Timeout: httpTimeout,
 	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create download request: %w", err)
 	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to download gong: %w", err)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to download gong %s: server returned status %d", version, resp.StatusCode)
 	}
+
 	// Create a temporary file in the same directory to ensure atomic write
 	destDir := filepath.Dir(destPath)
 	tmpFile, err := os.CreateTemp(destDir, "gong-download-*")
@@ -267,20 +274,24 @@ func (g *Checker) downloadGong(ctx context.Context, version, destPath string) er
 		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
+
 	// Clean up temp file on error
 	defer func() {
 		if tmpPath != "" {
 			os.Remove(tmpPath)
 		}
 	}()
+
 	_, err = io.Copy(tmpFile, resp.Body)
 	if err != nil {
 		tmpFile.Close()
 		return fmt.Errorf("failed to write gong binary: %w", err)
 	}
+
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("failed to close temporary file: %w", err)
 	}
+
 	// Verify the downloaded binary against the published checksum manifest before
 	// granting executable permissions or moving it to the final destination.
 	// On any failure the deferred os.Remove cleans up tmpPath automatically.
@@ -299,14 +310,17 @@ func (g *Checker) downloadGong(ctx context.Context, version, destPath string) er
 	if err := os.Chmod(tmpPath, filePermissions); err != nil {
 		return fmt.Errorf("failed to set executable permissions: %w", err)
 	}
+
 	// Atomic rename
 	if err := os.Rename(tmpPath, destPath); err != nil {
 		return fmt.Errorf("failed to move gong binary to destination: %w", err)
 	}
 	tmpPath = "" // Prevent cleanup of the renamed file
+
 	_, _ = fmt.Fprintf(output, "\n")
 	_, _ = fmt.Fprintf(output, "Installed gong %s, continuing...\n", version)
 	_, _ = fmt.Fprintf(output, "===============================\n")
 	_, _ = fmt.Fprintf(output, "\n")
+
 	return nil
 }
