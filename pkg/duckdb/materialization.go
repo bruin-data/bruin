@@ -38,6 +38,39 @@ var matMap = pipeline.AssetMaterializationMap{
 	},
 }
 
+const (
+	duckDBCurrentTimestamp = "CURRENT_TIMESTAMP"
+	duckDBMaxTimestamp     = "TIMESTAMPTZ '9999-12-31 23:59:59+00'"
+)
+
+func duckDBTimestampWithTimeZone(expr, columnType string) string {
+	lcType := strings.ToLower(columnType)
+	if strings.Contains(lcType, "time zone") || strings.Contains(lcType, "timestamptz") {
+		return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", expr)
+	}
+
+	return fmt.Sprintf("CAST(%s AS TIMESTAMP) AT TIME ZONE 'UTC'", expr)
+}
+
+func duckDBIncrementalKeyType(asset *pipeline.Asset, strategy string) (string, error) {
+	incrementalKey := asset.Materialization.IncrementalKey
+	if incrementalKey == "" {
+		return "", nil
+	}
+
+	col := asset.GetColumnWithName(incrementalKey)
+	if col == nil {
+		return "", fmt.Errorf("incremental_key column %s not found", incrementalKey)
+	}
+
+	lcType := strings.ToLower(col.Type)
+	if !strings.Contains(lcType, "timestamp") && lcType != "date" {
+		return "", fmt.Errorf("incremental_key must be TIMESTAMP or DATE in %s strategy", strategy)
+	}
+
+	return col.Type, nil
+}
+
 func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s and asset type %s", asset.Materialization.Strategy, asset.Materialization.Type, asset.Type)
 }
@@ -227,6 +260,10 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	)
 
 	incrementalKey := asset.Materialization.IncrementalKey
+	incrementalKeyType, err := duckDBIncrementalKeyType(asset, "SCD2_by_column")
+	if err != nil {
+		return "", err
+	}
 
 	for _, col := range asset.Columns {
 		switch col.Name {
@@ -285,15 +322,15 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	validFromExpr := "(SELECT now FROM time_now)"
 	validUntilUpdateExpr := "(SELECT now FROM time_now)"
 	if incrementalKey != "" {
-		validFromExpr = fmt.Sprintf("CAST(s.%s AS TIMESTAMP)", incrementalKey)
-		validUntilUpdateExpr = fmt.Sprintf("CAST(s.%s AS TIMESTAMP)", incrementalKey)
+		validFromExpr = duckDBTimestampWithTimeZone("s."+incrementalKey, incrementalKeyType)
+		validUntilUpdateExpr = duckDBTimestampWithTimeZone("s."+incrementalKey, incrementalKeyType)
 	}
 
 	sqlLines := []string{
 		"CREATE OR REPLACE TABLE " + asset.Name + " AS",
 		"WITH",
 		"time_now AS (",
-		"\tSELECT CURRENT_TIMESTAMP AS now",
+		fmt.Sprintf("\tSELECT %s AS now", duckDBCurrentTimestamp),
 		"),",
 		"source AS (",
 		fmt.Sprintf("\tSELECT %s,", userColList),
@@ -331,7 +368,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		"to_insert AS (",
 		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
 		fmt.Sprintf("\t%s AS _valid_from,", validFromExpr),
-		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
+		fmt.Sprintf("\t%s AS _valid_until,", duckDBMaxTimestamp),
 		"\tTRUE AS _is_current",
 		"\tFROM source s",
 		fmt.Sprintf("\tLEFT JOIN current_data t ON (%s)", joinCondition),
@@ -353,6 +390,10 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 
 	incrementalKey := asset.Materialization.IncrementalKey
+	incrementalKeyType, err := duckDBIncrementalKeyType(asset, "SCD2_by_time")
+	if err != nil {
+		return "", err
+	}
 
 	var (
 		primaryKeys = make([]string, 0, 4)
@@ -363,12 +404,6 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 		switch col.Name {
 		case "_is_current", "_valid_from", "_valid_until":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
-		}
-		if col.Name == asset.Materialization.IncrementalKey {
-			lcType := strings.ToLower(col.Type)
-			if lcType != "timestamp" && lcType != "date" {
-				return "", errors.New("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
-			}
 		}
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
@@ -387,7 +422,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 	joinCondition := strings.Join(onConds, " AND ")
 
-	changeCondition := fmt.Sprintf("CAST(s.%s AS TIMESTAMP) > t._valid_from", incrementalKey)
+	incrementalKeyTimestamp := duckDBTimestampWithTimeZone("s."+incrementalKey, incrementalKeyType)
+	changeCondition := incrementalKeyTimestamp + " > t._valid_from"
 
 	// Build user column list for SELECTs
 	userColList := strings.Join(userCols, ", ")
@@ -412,7 +448,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 		"CREATE OR REPLACE TABLE " + asset.Name + " AS",
 		"WITH",
 		"time_now AS (",
-		"\tSELECT CURRENT_TIMESTAMP AS now",
+		fmt.Sprintf("\tSELECT %s AS now", duckDBCurrentTimestamp),
 		"),",
 		"source AS (",
 		fmt.Sprintf("\tSELECT %s,", userColList),
@@ -434,7 +470,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 		fmt.Sprintf("\tSELECT %s,", strings.Join(toKeepSelectCols, ", ")),
 		"\tt._valid_from,",
 		"\t\tCASE",
-		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN CAST(s.%s AS TIMESTAMP)", changeCondition, incrementalKey),
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN %s", changeCondition, incrementalKeyTimestamp),
 		"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)",
 		"\t\t\tELSE t._valid_until",
 		"\t\tEND AS _valid_until,",
@@ -449,8 +485,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 		"--new/updated rows from source",
 		"to_insert AS (",
 		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
-		fmt.Sprintf("\tCAST(s.%s AS TIMESTAMP) AS _valid_from,", incrementalKey),
-		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
+		fmt.Sprintf("\t%s AS _valid_from,", incrementalKeyTimestamp),
+		fmt.Sprintf("\t%s AS _valid_until,", duckDBMaxTimestamp),
 		"\tTRUE AS _is_current",
 		"\tFROM source s",
 		fmt.Sprintf("\tLEFT JOIN current_data t ON (%s)", joinCondition),
@@ -473,6 +509,10 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	if len(primaryKeys) == 0 {
 		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
 	}
+	incrementalKeyType, err := duckDBIncrementalKeyType(asset, "SCD2_by_time")
+	if err != nil {
+		return "", err
+	}
 
 	srcCols := make([]string, len(asset.Columns))
 	for i, col := range asset.Columns {
@@ -482,14 +522,15 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	createQuery := fmt.Sprintf(
 		"CREATE OR REPLACE TABLE %s AS\n"+
 			"SELECT %s,\n"+
-			"CAST(src.%s AS TIMESTAMP) AS _valid_from,\n"+
-			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"%s AS _valid_from,\n"+
+			"%s AS _valid_until,\n"+
 			"TRUE AS _is_current\n"+
 			"FROM (%s\n"+
 			") AS src;",
 		asset.Name,
 		strings.Join(srcCols, ", "),
-		asset.Materialization.IncrementalKey,
+		duckDBTimestampWithTimeZone("src."+asset.Materialization.IncrementalKey, incrementalKeyType),
+		duckDBMaxTimestamp,
 		strings.TrimSpace(query),
 	)
 
@@ -507,22 +548,27 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		srcCols[i] = "src." + col.Name
 	}
 
-	validFromExpr := "CURRENT_TIMESTAMP"
+	validFromExpr := duckDBCurrentTimestamp
 	if asset.Materialization.IncrementalKey != "" {
-		validFromExpr = fmt.Sprintf("CAST(src.%s AS TIMESTAMP)", asset.Materialization.IncrementalKey)
+		incrementalKeyType, err := duckDBIncrementalKeyType(asset, "SCD2_by_column")
+		if err != nil {
+			return "", err
+		}
+		validFromExpr = duckDBTimestampWithTimeZone("src."+asset.Materialization.IncrementalKey, incrementalKeyType)
 	}
 
 	createQuery := fmt.Sprintf(
 		"CREATE OR REPLACE TABLE %s AS\n"+
 			"SELECT %s,\n"+
 			"%s AS _valid_from,\n"+
-			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"%s AS _valid_until,\n"+
 			"TRUE AS _is_current\n"+
 			"FROM (%s\n"+
 			") AS src;",
 		asset.Name,
 		strings.Join(srcCols, ", "),
 		validFromExpr,
+		duckDBMaxTimestamp,
 		strings.TrimSpace(query),
 	)
 
