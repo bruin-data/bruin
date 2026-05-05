@@ -3171,6 +3171,15 @@
         "region": {
           "type": "string"
         },
+        "endpoint": {
+          "type": "string"
+        },
+        "url_style": {
+          "type": "string"
+        },
+        "use_ssl": {
+          "type": "boolean"
+        },
         "auth": {
           "$ref": "#/$defs/StorageAuth"
         }
