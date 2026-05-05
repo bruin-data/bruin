@@ -40,17 +40,19 @@ type resolvedEngine struct {
 }
 
 // resolveIngestrEngine reads parameters.version, validates it, and returns the
-// resolved engine. An empty version defaults to v1 (gong). When parameters.version
-// is set, use_gong is ignored with a deprecation warning.
+// resolved engine. An empty version defaults to v0 (ingestr) unless use_gong is
+// set — preserving the legacy auto-enable for gong-required sources/destinations.
+// When parameters.version is set explicitly, use_gong is ignored with a
+// deprecation warning.
 func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 	versionParam := strings.TrimSpace(asset.Parameters["version"])
 	useGongLegacy := asset.Parameters["use_gong"] == "true"
 
 	if versionParam == "" {
-		// Legacy: no version, fall back to use_gong (or the v1 default if neither is set).
-		// Either way the family is v1 — explicit use_gong is a no-op equivalent.
-		_ = useGongLegacy
-		return resolvedEngine{family: versionFamilyGong}, nil
+		if useGongLegacy {
+			return resolvedEngine{family: versionFamilyGong}, nil
+		}
+		return resolvedEngine{family: versionFamilyIngestr}, nil
 	}
 
 	if !versionPattern.MatchString(versionParam) {

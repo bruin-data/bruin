@@ -1325,12 +1325,12 @@ func TestResolveIngestrEngine(t *testing.T) {
 		expectErr string
 	}{
 		{
-			name:   "unset defaults to v1",
+			name:   "unset defaults to v0",
 			params: map[string]string{},
-			want:   resolvedEngine{family: versionFamilyGong},
+			want:   resolvedEngine{family: versionFamilyIngestr},
 		},
 		{
-			name:   "use_gong true with no version still v1",
+			name:   "use_gong true with no version routes to v1",
 			params: map[string]string{"use_gong": "true"},
 			want:   resolvedEngine{family: versionFamilyGong},
 		},
@@ -1435,7 +1435,25 @@ func TestBasicOperator_Version(t *testing.T) {
 		}
 	}
 
-	t.Run("version unset defaults to v1 (gong installed)", func(t *testing.T) {
+	t.Run("version unset defaults to v0 (no gong)", func(t *testing.T) {
+		t.Parallel()
+
+		runner := new(contextCapturingRunner)
+		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
+
+		gongInst := new(mockGongInstaller)
+
+		o := makeOperator(runner, gongInst)
+		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(nil)}
+		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+
+		require.NoError(t, o.Run(ctx, &ti))
+		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
+		assert.Nil(t, runner.capturedCtx.Value(python.CtxGongPath))
+		assert.Nil(t, runner.capturedCtx.Value(python.CtxIngestrVersion))
+	})
+
+	t.Run("use_gong=true with no version routes to v1", func(t *testing.T) {
 		t.Parallel()
 
 		runner := new(contextCapturingRunner)
@@ -1445,13 +1463,12 @@ func TestBasicOperator_Version(t *testing.T) {
 		gongInst.On("EnsureGongInstalled", mock.Anything, "").Return("/path/to/gong", nil)
 
 		o := makeOperator(runner, gongInst)
-		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(nil)}
+		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(map[string]string{"use_gong": "true"})}
 		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 
 		require.NoError(t, o.Run(ctx, &ti))
 		gongInst.AssertCalled(t, "EnsureGongInstalled", mock.Anything, "")
 		assert.Equal(t, "/path/to/gong", runner.capturedCtx.Value(python.CtxGongPath))
-		assert.Nil(t, runner.capturedCtx.Value(python.CtxIngestrVersion))
 	})
 
 	t.Run("version v0.14.2 sets CtxIngestrVersion and skips gong", func(t *testing.T) {
