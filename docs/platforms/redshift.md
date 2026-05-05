@@ -90,12 +90,14 @@ type: string
 parameters:
     query: string
     poke_interval: int (optional)
+    timeout: duration (optional)
 ```
 
 **Parameters**:
 
 - `query`: Query you expect to return any results
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
+- `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
 ### `rs.sensor.table`
 
@@ -109,12 +111,14 @@ type: string
 parameters:
     table: string
     poke_interval: int (optional)
+    timeout: duration (optional)
 ```
 
 **Parameters**:
 
 - `table`: `schema_id.table_id` or (for default schema `public`) `table_id` format.
 - `poke_interval`: The interval between retries in seconds (default 30 seconds).
+- `timeout`: How long to wait before the sensor fails. Uses single-unit duration syntax (`s`, `m`, `h`, `d`, `ms`, `ns`), e.g. `1h` or `90m`. Defaults to `24h`. See [Sensor Timeout](/assets/sensor#timeout).
 
 #### Example: Partitioned upstream table
 
