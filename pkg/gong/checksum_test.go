@@ -31,6 +31,7 @@ func hashOf(b []byte) string {
 // and returns the file path. Cleanup is handled automatically by the test runner.
 func tempFileWithContent(t *testing.T, content []byte) string {
 	t.Helper()
+
 	f, err := os.CreateTemp(t.TempDir(), "verify-sha256-*")
 	require.NoError(t, err)
 	_, err = f.Write(content)
@@ -43,15 +44,19 @@ func tempFileWithContent(t *testing.T, content []byte) string {
 
 func TestParseChecksumManifestReturnsMatchingChecksum(t *testing.T) {
 	t.Parallel()
+
 	artifactName := "gong_linux_amd64"
 	manifest := []byte(knownHash + "  " + artifactName + "\n")
+
 	got, err := parseChecksumManifest(manifest, artifactName)
+
 	require.NoError(t, err)
 	assert.Equal(t, knownHash, got)
 }
 
 func TestParseChecksumManifestIgnoresEmptyAndCommentLines(t *testing.T) {
 	t.Parallel()
+
 	artifactName := "gong_linux_amd64"
 	// Manifest deliberately padded with every kind of noise the spec calls out:
 	// blank lines, lines of only whitespace, and comment lines.
@@ -65,7 +70,9 @@ func TestParseChecksumManifestIgnoresEmptyAndCommentLines(t *testing.T) {
 			"# end\n",
 		knownHash, artifactName,
 	))
+
 	got, err := parseChecksumManifest(manifest, artifactName)
+
 	require.NoError(t, err)
 	assert.Equal(t, knownHash, got)
 }
@@ -75,6 +82,7 @@ func TestParseChecksumManifestIgnoresEmptyAndCommentLines(t *testing.T) {
 // the requested artifact only — not for any other artifact.
 func TestParseChecksumManifestPicksCorrectEntryAmongMultiple(t *testing.T) {
 	t.Parallel()
+
 	arm64Hash := strings.Repeat("a", 64)
 	amd64Hash := knownHash
 	manifest := []byte(fmt.Sprintf(
@@ -82,16 +90,21 @@ func TestParseChecksumManifestPicksCorrectEntryAmongMultiple(t *testing.T) {
 			"%s  gong_linux_amd64\n",
 		arm64Hash, amd64Hash,
 	))
+
 	got, err := parseChecksumManifest(manifest, "gong_linux_amd64")
+
 	require.NoError(t, err)
 	assert.Equal(t, amd64Hash, got)
 }
 
 func TestParseChecksumManifestReturnsErrorWhenArtifactMissing(t *testing.T) {
 	t.Parallel()
+
 	// Manifest contains only arm64; requesting amd64 must fail.
 	manifest := []byte(knownHash + "  gong_linux_arm64\n")
+
 	_, err := parseChecksumManifest(manifest, "gong_linux_amd64")
+
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "checksum entry not found for gong_linux_amd64")
 }
@@ -104,9 +117,12 @@ func TestParseChecksumManifestReturnsErrorWhenArtifactMissing(t *testing.T) {
 // always receives an error rather than a silent empty string.
 func TestParseChecksumManifestReturnsErrorForMalformedLine(t *testing.T) {
 	t.Parallel()
+
 	// Single-token line: the artifact name appears but with no checksum column.
 	manifest := []byte("gong_linux_amd64\n")
+
 	_, err := parseChecksumManifest(manifest, "gong_linux_amd64")
+
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "checksum entry not found for gong_linux_amd64")
 }
@@ -117,11 +133,14 @@ func TestParseChecksumManifestReturnsErrorForMalformedLine(t *testing.T) {
 // but isValidSHA256 rejects the value before we return it.
 func TestParseChecksumManifestReturnsErrorForInvalidChecksum(t *testing.T) {
 	t.Parallel()
+
 	// 64 characters but all 'Z' — valid length, invalid hex.
 	invalidChecksum := strings.Repeat("Z", 64)
 	artifactName := "gong_linux_amd64"
 	manifest := []byte(invalidChecksum + "  " + artifactName + "\n")
+
 	_, err := parseChecksumManifest(manifest, artifactName)
+
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid checksum for gong_linux_amd64")
 }
@@ -130,20 +149,26 @@ func TestParseChecksumManifestReturnsErrorForInvalidChecksum(t *testing.T) {
 
 func TestVerifySHA256ReturnsNilForMatchingChecksum(t *testing.T) {
 	t.Parallel()
+
 	content := []byte("fake gong binary content")
 	path := tempFileWithContent(t, content)
 	expected := hashOf(content)
+
 	err := verifySHA256(path, expected)
+
 	assert.NoError(t, err)
 }
 
 func TestVerifySHA256ReturnsErrorForMismatch(t *testing.T) {
 	t.Parallel()
+
 	content := []byte("fake gong binary content")
 	path := tempFileWithContent(t, content)
 	// Checksum of different content — guaranteed not to match.
 	wrongHash := hashOf([]byte("completely different content"))
+
 	err := verifySHA256(path, wrongHash)
+
 	require.Error(t, err)
 	// Error must name both hashes so the operator can diagnose without
 	// running external tools.
@@ -157,10 +182,13 @@ func TestVerifySHA256ReturnsErrorForMismatch(t *testing.T) {
 // hashes but users may paste uppercase values from other tools.
 func TestVerifySHA256AcceptsUppercaseChecksum(t *testing.T) {
 	t.Parallel()
+
 	content := []byte("fake gong binary content")
 	path := tempFileWithContent(t, content)
 	upper := strings.ToUpper(hashOf(content))
+
 	err := verifySHA256(path, upper)
+
 	assert.NoError(t, err)
 }
 
@@ -169,7 +197,9 @@ func TestVerifySHA256AcceptsUppercaseChecksum(t *testing.T) {
 // instead of a hash-mismatch error.
 func TestVerifySHA256ReturnsErrorForNonExistentFile(t *testing.T) {
 	t.Parallel()
+
 	err := verifySHA256(t.TempDir()+"/does-not-exist", knownHash)
+
 	require.Error(t, err)
 	assert.True(t, os.IsNotExist(err), "expected a not-exist error, got: %v", err)
 }
@@ -179,8 +209,11 @@ func TestVerifySHA256ReturnsErrorForNonExistentFile(t *testing.T) {
 // a structurally invalid expected value.
 func TestVerifySHA256ReturnsErrorForInvalidExpectedChecksum(t *testing.T) {
 	t.Parallel()
+
 	path := tempFileWithContent(t, []byte("anything"))
+
 	err := verifySHA256(path, "tooshort")
+
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid expected checksum")
 }
@@ -189,6 +222,7 @@ func TestVerifySHA256ReturnsErrorForInvalidExpectedChecksum(t *testing.T) {
 
 func TestIsValidSHA256(t *testing.T) {
 	t.Parallel()
+
 	cases := []struct {
 		name  string
 		input string
@@ -206,6 +240,7 @@ func TestIsValidSHA256(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+
 			assert.Equal(t, tc.want, isValidSHA256(tc.input))
 		})
 	}

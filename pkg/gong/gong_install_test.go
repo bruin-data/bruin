@@ -61,6 +61,7 @@ func newInstallTestServer(
 	checksumStatus int,
 ) *httptest.Server {
 	t.Helper()
+
 	if checksumStatus == 0 {
 		checksumStatus = http.StatusOK
 	}
@@ -94,14 +95,18 @@ const installTestVersion = "v0.0.0-test"
 // exact same bytes that the server sent.
 func TestEnsureGongInstalled_ValidChecksumInstallsBinary(t *testing.T) {
 	t.Parallel()
+
 	installDir := t.TempDir()
 	manifest := checksumManifestFor(fakeBinaryContent)
 	srv := newInstallTestServer(t, installTestVersion, fakeBinaryContent, manifest, 0)
 	checker := &Checker{baseURL: srv.URL, installDir: installDir}
+
 	gotPath, err := checker.EnsureGongInstalled(context.Background(), installTestVersion)
+
 	require.NoError(t, err, "valid checksum must not produce an error")
 	expectedPath := installBinaryPath(installDir, installTestVersion)
 	assert.Equal(t, expectedPath, gotPath, "returned path must equal the final install destination")
+
 	// Content integrity: bytes on disk must exactly match what the server served.
 	gotBytes, readErr := os.ReadFile(expectedPath)
 	require.NoError(t, readErr, "installed binary must be readable at the returned path")
@@ -115,12 +120,15 @@ func TestEnsureGongInstalled_ValidChecksumInstallsBinary(t *testing.T) {
 // os.Remove inside downloadGong).
 func TestEnsureGongInstalled_InvalidChecksumBlocksInstall(t *testing.T) {
 	t.Parallel()
+
 	installDir := t.TempDir()
 	// Build a manifest whose hash is for content that differs from fakeBinaryContent.
 	wrongManifest := checksumManifestFor([]byte("this is not the binary that was downloaded"))
 	srv := newInstallTestServer(t, installTestVersion, fakeBinaryContent, wrongManifest, 0)
 	checker := &Checker{baseURL: srv.URL, installDir: installDir}
+
 	_, err := checker.EnsureGongInstalled(context.Background(), installTestVersion)
+
 	require.Error(t, err, "a checksum mismatch must produce an error")
 	assert.Contains(t, err.Error(), "checksum mismatch",
 		"error message must identify the cause as a checksum mismatch")
@@ -134,6 +142,7 @@ func TestEnsureGongInstalled_InvalidChecksumBlocksInstall(t *testing.T) {
 // artifact name, EnsureGongInstalled fails before installing anything.
 func TestEnsureGongInstalled_MissingChecksumEntryBlocksInstall(t *testing.T) {
 	t.Parallel()
+
 	installDir := t.TempDir()
 	// Manifest has a valid entry but for a completely different artifact name,
 	// so the lookup for the current platform's artifact returns "not found".
@@ -141,7 +150,9 @@ func TestEnsureGongInstalled_MissingChecksumEntryBlocksInstall(t *testing.T) {
 	manifestWithWrongArtifact := unrelatedHash + "  gong_completely_different_arch\n"
 	srv := newInstallTestServer(t, installTestVersion, fakeBinaryContent, manifestWithWrongArtifact, 0)
 	checker := &Checker{baseURL: srv.URL, installDir: installDir}
+
 	_, err := checker.EnsureGongInstalled(context.Background(), installTestVersion)
+
 	require.Error(t, err, "a missing checksum entry must produce an error")
 	assert.Contains(t, err.Error(), "checksum entry not found",
 		"error message must report that no matching checksum was found in the manifest")
@@ -156,10 +167,13 @@ func TestEnsureGongInstalled_MissingChecksumEntryBlocksInstall(t *testing.T) {
 // fetch fails — this is the strongest proof that verification is mandatory.
 func TestEnsureGongInstalled_ChecksumServerFailureBlocksInstall(t *testing.T) {
 	t.Parallel()
+
 	installDir := t.TempDir()
 	srv := newInstallTestServer(t, installTestVersion, fakeBinaryContent, "", http.StatusInternalServerError)
 	checker := &Checker{baseURL: srv.URL, installDir: installDir}
+
 	_, err := checker.EnsureGongInstalled(context.Background(), installTestVersion)
+
 	require.Error(t, err,
 		"an HTTP error on the checksum endpoint must propagate as an error")
 	_, statErr := os.Stat(installBinaryPath(installDir, installTestVersion))
