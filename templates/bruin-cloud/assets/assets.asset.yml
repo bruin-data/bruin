@@ -1,0 +1,57 @@
+name: bruin_cloud_logs.assets
+type: ingestr
+
+description: |
+  Flat catalogue of every asset across every pipeline in your Bruin Cloud workspace, ingested from the Bruin Cloud API (`GET /api/v1/pipelines`, asset list).
+  Each row represents a single asset (SQL transform, Python script, ingestr load, sensor, etc.) including its lineage relationships, ownership, materialization strategy, parameters, and the raw asset content/code.
+  The table is fully replaced on every run and always reflects the current state of assets in Bruin Cloud. Join to `bruin_cloud_logs.pipelines` on `assets.pipeline = pipelines.name` to enrich with pipeline-level metadata.
+
+columns:
+  - name: name
+    type: varchar
+    description: "Fully qualified asset name (e.g. `schema.table_name`) as declared in the asset file. Unique within a pipeline; combine with `pipeline` to form a globally unique identifier."
+    checks:
+      - name: not_null
+  - name: type
+    type: varchar
+    description: "Asset type identifier such as `ingestr`, `bq.sql`, `duckdb.sql`, `python`, `sf.sql`, `ms.sensor.query`, etc. Drives which executor Bruin uses to run the asset."
+    checks:
+      - name: not_null
+  - name: pipeline
+    type: varchar
+    description: "Name of the parent pipeline this asset belongs to. Foreign key to `bruin_cloud_logs.pipelines.name`."
+    checks:
+      - name: not_null
+  - name: project
+    type: varchar
+    description: "Bruin Cloud project (workspace folder) that owns the asset's pipeline."
+  - name: uri
+    type: varchar
+    description: "External URI for the asset's underlying physical object (e.g. `bigquery://project.dataset.table` or an `s3://...` path). Used by lineage and external integrations to identify the resource outside Bruin."
+  - name: description
+    type: varchar
+    description: "Human-readable description of the asset, sourced from its `description` field. May be null if the asset has no description."
+  - name: upstreams
+    type: json
+    description: "Array of upstream dependencies declared for this asset (each entry typically `{type, value}` such as `{\"type\": \"asset\", \"value\": \"raw.orders\"}`). Drives the dependency graph used by the scheduler and lineage view."
+  - name: downstream
+    type: json
+    description: "Array of downstream assets that depend on this asset. Computed by Bruin Cloud as the inverse of `upstreams` across all assets in the workspace."
+  - name: owner
+    type: json
+    description: "Asset owner — loaded as JSON because the API may return either a single string or an array of identifiers (typically email addresses or team handles). Falls back to the pipeline-level owner when unset."
+  - name: content
+    type: varchar
+    description: "Raw asset content as stored in the source file: SQL query body for SQL assets, Python source for Python assets, or YAML body for ingestr assets. Useful for code search, diffing, and documentation."
+  - name: columns
+    type: json
+    description: "Array of column definitions declared on the asset (each entry includes `name`, `type`, `description`, `primary_key`, `checks`, etc.). Drives Bruin's data quality checks and column-level lineage."
+  - name: materialization
+    type: json
+    description: "Materialization configuration for the asset (e.g. `{\"type\": \"table\"}`, `{\"type\": \"incremental\", \"strategy\": \"merge\", \"incremental_key\": \"updated_at\"}`). Determines how the executor writes the asset's output."
+  - name: parameters
+    type: json
+    description: "Asset parameters block as declared in the asset file. For ingestr assets this typically contains `source_connection`, `source_table`, `destination`, etc.; for sensor assets it contains the sensor query."
+
+parameters:
+  source_table: assets

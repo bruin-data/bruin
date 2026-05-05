@@ -1,0 +1,10 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      bruin:
+        - name: "bruin-cloud-default"
+          api_token: "your_api_token_here"
+      duckdb:
+        - name: "duckdb-default"
+          path: "duckdb.db"
