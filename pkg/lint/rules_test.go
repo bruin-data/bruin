@@ -2069,6 +2069,20 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "valid future major v2.0.0",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v2.0.0",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "rejected partial version v0.14",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
@@ -2079,21 +2093,21 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 					"version":           "v0.14",
 				},
 			},
-			wantErrMessage: `Invalid 'version' value "v0.14": must be 'v0', 'v1', or fully-qualified 'vMAJOR.MINOR.PATCH' where MAJOR is 0 or 1`,
+			wantErrMessage: `Invalid 'version' value "v0.14": must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'`,
 			wantErr:        assert.NoError,
 		},
 		{
-			name: "rejected version v2.0.0",
+			name: "rejected leading-zero major",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
 				Parameters: map[string]string{
 					"source_connection": "sf",
 					"source_table":      "t",
 					"destination":       "bigquery",
-					"version":           "v2.0.0",
+					"version":           "v01",
 				},
 			},
-			wantErrMessage: `Invalid 'version' value "v2.0.0": must be 'v0', 'v1', or fully-qualified 'vMAJOR.MINOR.PATCH' where MAJOR is 0 or 1`,
+			wantErrMessage: `Invalid 'version' value "v01": must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'`,
 			wantErr:        assert.NoError,
 		},
 		{
@@ -2107,7 +2121,7 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 					"version":           "latest",
 				},
 			},
-			wantErrMessage: `Invalid 'version' value "latest": must be 'v0', 'v1', or fully-qualified 'vMAJOR.MINOR.PATCH' where MAJOR is 0 or 1`,
+			wantErrMessage: `Invalid 'version' value "latest": must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'`,
 			wantErr:        assert.NoError,
 		},
 	}

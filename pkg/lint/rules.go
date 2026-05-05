@@ -318,7 +318,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 	if v, exists := asset.Parameters["version"]; exists && v != "" && !ingestrVersionPattern.MatchString(v) {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: fmt.Sprintf("Invalid 'version' value %q: must be 'v0', 'v1', or fully-qualified 'vMAJOR.MINOR.PATCH' where MAJOR is 0 or 1", v),
+			Description: fmt.Sprintf("Invalid 'version' value %q: must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'", v),
 		})
 	}
 	if value, exists := asset.Parameters["incremental_strategy"]; exists && value == "merge" {
@@ -649,8 +649,8 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 
 var arnPattern = regexp.MustCompile(`^arn:[^:\n]*:[^:\n]*:[^:\n]*:[^:\n]*:(?:[^:\/\n]*[:\/])?.*$`)
 
-// ingestrVersionPattern matches the bare family marker (v0/v1) or a fully-qualified vMAJOR.MINOR.PATCH where MAJOR is 0 or 1.
-var ingestrVersionPattern = regexp.MustCompile(`^v(0|1)(\.\d+\.\d+)?$`)
+// ingestrVersionPattern matches the bare family marker (vMAJOR) or a fully-qualified vMAJOR.MINOR.PATCH. MAJOR has no leading zero (other than the literal "0").
+var ingestrVersionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)(\.\d+\.\d+)?$`)
 
 func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)

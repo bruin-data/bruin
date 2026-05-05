@@ -20,9 +20,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-// versionPattern matches the bare family marker (v0/v1) or a fully-qualified
-// vMAJOR.MINOR.PATCH where MAJOR is 0 or 1.
-var versionPattern = regexp.MustCompile(`^v(0|1)(\.\d+\.\d+)?$`)
+// versionPattern matches the bare family marker (vMAJOR) or a fully-qualified
+// vMAJOR.MINOR.PATCH. MAJOR is any non-negative integer with no leading zero
+// (other than the literal "0"). Family selection is decided separately:
+// MAJOR == 0 routes to ingestr, anything else routes to gong.
+var versionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)(\.\d+\.\d+)?$`)
 
 const (
 	versionFamilyIngestr = "v0"
@@ -55,15 +57,17 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 		return resolvedEngine{family: versionFamilyIngestr}, nil
 	}
 
-	if !versionPattern.MatchString(versionParam) {
-		return resolvedEngine{}, fmt.Errorf("invalid parameters.version %q: expected v0, v1, or vMAJOR.MINOR.PATCH where MAJOR is 0 or 1", versionParam)
+	match := versionPattern.FindStringSubmatch(versionParam)
+	if match == nil {
+		return resolvedEngine{}, fmt.Errorf("invalid parameters.version %q: expected vMAJOR or vMAJOR.MINOR.PATCH", versionParam)
 	}
 
 	if useGongLegacy {
 		fmt.Fprintf(os.Stderr, "Warning: parameters.use_gong is ignored when parameters.version is set; version=%q wins.\n", versionParam)
 	}
 
-	if strings.HasPrefix(versionParam, versionFamilyIngestr) {
+	major := match[1]
+	if major == "0" {
 		out := resolvedEngine{family: versionFamilyIngestr}
 		if versionParam != versionFamilyIngestr {
 			// Strip the leading "v" to get the PyPI version (e.g. v0.14.2 -> 0.14.2).
@@ -73,7 +77,9 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 	}
 
 	out := resolvedEngine{family: versionFamilyGong}
-	if versionParam != versionFamilyGong {
+	// Only fully-qualified versions get pinned; bare family markers (v1, v2, ...)
+	// fall back to bruin's bundled gong default.
+	if match[2] != "" {
 		out.gongVersion = versionParam
 	}
 	return out, nil

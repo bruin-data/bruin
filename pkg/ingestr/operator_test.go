@@ -1355,13 +1355,23 @@ func TestResolveIngestrEngine(t *testing.T) {
 			want:   resolvedEngine{family: versionFamilyGong, gongVersion: "v1.0.5"},
 		},
 		{
+			name:   "future major v2 routes to gong",
+			params: map[string]string{"version": "v2"},
+			want:   resolvedEngine{family: versionFamilyGong},
+		},
+		{
+			name:   "future major v2.0.0 pins gong release",
+			params: map[string]string{"version": "v2.0.0"},
+			want:   resolvedEngine{family: versionFamilyGong, gongVersion: "v2.0.0"},
+		},
+		{
 			name:      "v0.14 partial is rejected",
 			params:    map[string]string{"version": "v0.14"},
 			expectErr: "invalid parameters.version",
 		},
 		{
-			name:      "v2.0.0 is rejected",
-			params:    map[string]string{"version": "v2.0.0"},
+			name:      "leading-zero major is rejected",
+			params:    map[string]string{"version": "v01"},
 			expectErr: "invalid parameters.version",
 		},
 		{
