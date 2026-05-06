@@ -13,13 +13,17 @@ import (
 
 func mustRead(t *testing.T, file string) string {
 	content, err := afero.ReadFile(afero.NewOsFs(), file)
+
 	require.NoError(t, err)
+
 	return strings.ReplaceAll(strings.TrimSpace(string(content)), "\r\n", "\n")
 }
 
 func mustReadWithoutReplacement(t *testing.T, file string) string {
 	content, err := afero.ReadFile(afero.NewOsFs(), file)
+
 	require.NoError(t, err)
+
 	return strings.TrimSpace(string(content))
 }
 
@@ -27,6 +31,7 @@ func Test_createTaskFromFile(t *testing.T) {
 	t.Parallel()
 
 	falseValue := false
+
 	trueValue := true
 
 	type args struct {
@@ -34,345 +39,582 @@ func Test_createTaskFromFile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		args    args
-		want    *pipeline.Asset
+		name string
+
+		args args
+
+		want *pipeline.Asset
+
 		wantErr bool
 	}{
 		{
 			name: "file does not exist",
+
 			args: args{
 				filePath: "testdata/comments/some-file-that-doesnt-exist.sql",
 			},
+
 			wantErr: true,
 		},
+
 		{
 			name: "existing file with no comments is skipped",
+
 			args: args{
 				filePath: "testdata/comments/nocomments.py",
 			},
+
 			wantErr: false,
 		},
+
 		{
 			name: "SQL file parsed",
+
 			args: args{
 				filePath: "testdata/comments/test.sql",
 			},
+
 			want: &pipeline.Asset{
-				ID:          "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
-				Name:        "some-sql-task",
+				ID: "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
+
+				Name: "some-sql-task",
+
 				Description: "some description goes here",
-				Type:        "bq.sql",
+
+				Type: "bq.sql",
+
 				ExecutableFile: pipeline.ExecutableFile{
-					Name:    "test.sql",
-					Path:    path.AbsPathForTests(t, "testdata/comments/test.sql"),
+					Name: "test.sql",
+
+					Path: path.AbsPathForTests(t, "testdata/comments/test.sql"),
+
 					Content: "select *\nfrom foo;",
 				},
+
 				Parameters: map[string]string{
-					"param1":       "first-parameter",
-					"param2":       "second-parameter",
+					"param1": "first-parameter",
+
+					"param2": "second-parameter",
+
 					"s3_file_path": "s3://bucket/path",
 				},
+
 				Connection: "conn2",
-				Secrets:    []pipeline.SecretMapping{},
+
+				Secrets: []pipeline.SecretMapping{},
+
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
 
 				Materialization: pipeline.Materialization{
-					Type:           pipeline.MaterializationTypeTable,
-					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
-					PartitionBy:    "dt",
+					Type: pipeline.MaterializationTypeTable,
+
+					Strategy: pipeline.MaterializationStrategyDeleteInsert,
+
+					PartitionBy: "dt",
+
 					IncrementalKey: "dt",
-					ClusterBy:      []string{"event_name"},
+
+					ClusterBy: []string{"event_name"},
 				},
+
 				Columns: []pipeline.Column{
 					{Name: "some_column", PrimaryKey: true, Checks: make([]pipeline.ColumnCheck, 0)},
+
 					{Name: "some_other_column", PrimaryKey: false, Checks: make([]pipeline.ColumnCheck, 0)},
 				},
+
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
 		},
+
 		{
 			name: "SQL file failed to parse",
+
 			args: args{
 				filePath: "testdata/comments/failparseprimarykey.sql",
 			},
+
 			wantErr: true,
 		},
+
 		{
 			name: "SQL file with embedded yaml content is parsed",
+
 			args: args{
 				filePath: "testdata/comments/embeddedyaml.sql",
 			},
+
 			want: &pipeline.Asset{
-				ID:          "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
-				Name:        "some-sql-task",
+				ID: "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
+
+				Name: "some-sql-task",
+
 				Description: "some description goes here",
-				Type:        "bq.sql",
+
+				Type: "bq.sql",
+
 				ExecutableFile: pipeline.ExecutableFile{
-					Name:    "embeddedyaml.sql",
-					Path:    path.AbsPathForTests(t, "testdata/comments/embeddedyaml.sql"),
+					Name: "embeddedyaml.sql",
+
+					Path: path.AbsPathForTests(t, "testdata/comments/embeddedyaml.sql"),
+
 					Content: "select *\nfrom foo;",
 				},
+
 				Parameters: map[string]string{
-					"param1":       "first-parameter",
-					"param2":       "second-parameter",
+					"param1": "first-parameter",
+
+					"param2": "second-parameter",
+
 					"s3_file_path": "s3://bucket/path",
 				},
+
 				Connection: "conn1",
-				Secrets:    []pipeline.SecretMapping{},
+
+				Secrets: []pipeline.SecretMapping{},
+
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
+
 				Materialization: pipeline.Materialization{
-					Type:           pipeline.MaterializationTypeTable,
-					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
-					PartitionBy:    "dt",
+					Type: pipeline.MaterializationTypeTable,
+
+					Strategy: pipeline.MaterializationStrategyDeleteInsert,
+
+					PartitionBy: "dt",
+
 					IncrementalKey: "dt",
-					ClusterBy:      []string{"event_name"},
+
+					ClusterBy: []string{"event_name"},
 				},
+
 				Columns: make([]pipeline.Column, 0),
+
 				CustomChecks: []pipeline.CustomCheck{
 					{
-						ID:    "480f365424205654f7108f2d0ddf6418faed97652bba106ba4080a967a50e5cf",
-						Name:  "check1",
+						ID: "480f365424205654f7108f2d0ddf6418faed97652bba106ba4080a967a50e5cf",
+
+						Name: "check1",
+
 						Query: "select * from table1",
+
 						Value: 16,
+
+						SourceLocation: &pipeline.SourceLocation{
+							File: path.AbsPathForTests(t, "testdata/comments/embeddedyaml.sql"),
+
+							Line: 27,
+
+							Column: 5,
+						},
+
+						QueryLocation: &pipeline.SourceLocation{
+							File: path.AbsPathForTests(t, "testdata/comments/embeddedyaml.sql"),
+
+							Line: 29,
+
+							Column: 5,
+						},
 					},
 				},
+
 				Hooks: pipeline.Hooks{
-					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Pre: []pipeline.Hook{{Query: "select 1"}},
+
 					Post: []pipeline.Hook{{Query: "select 2"}},
 				},
 			},
 		},
+
 		{
 			name: "Python file parsed",
+
 			args: args{
 				filePath: path.AbsPathForTests(t, "testdata/comments/test.py"), // giving an absolute path here tests the case of double-absolute paths
+
 			},
+
 			want: &pipeline.Asset{
-				ID:          "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
-				Name:        "some-python-task",
+				ID: "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
+
+				Name: "some-python-task",
+
 				Description: "some description goes here",
-				Type:        "bq.sql",
+
+				Type: "bq.sql",
+
 				ExecutableFile: pipeline.ExecutableFile{
-					Name:    "test.py",
-					Path:    path.AbsPathForTests(t, "testdata/comments/test.py"),
+					Name: "test.py",
+
+					Path: path.AbsPathForTests(t, "testdata/comments/test.py"),
+
 					Content: "print('hello world')",
 				},
+
 				Parameters: map[string]string{
 					"param1": "first-parameter",
+
 					"param2": "second-parameter",
+
 					"param3": "third-parameter",
 				},
+
 				Connection: "conn1",
-				Image:      "python:3.11",
-				Instance:   "b1.nano",
-				Secrets:    []pipeline.SecretMapping{},
+
+				Image: "python:3.11",
+
+				Instance: "b1.nano",
+
+				Secrets: []pipeline.SecretMapping{},
+
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
+
 				Columns: []pipeline.Column{
 					{
 						Name: "col1",
+
 						Type: "string",
+
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:       "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
-								Name:     "not_null",
+								ID: "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
+
+								Name: "not_null",
+
 								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
+
 							{
-								ID:       "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
-								Name:     "positive",
+								ID: "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
+
+								Name: "positive",
+
 								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
+
 							{
-								ID:       "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
-								Name:     "unique",
+								ID: "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
+
+								Name: "unique",
+
 								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
 						},
 					},
+
 					{
 						Name: "col2",
+
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:       "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
-								Name:     "not_null",
+								ID: "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
+
+								Name: "not_null",
+
 								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
+
 							{
-								ID:       "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
-								Name:     "unique",
+								ID: "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
+
+								Name: "unique",
+
 								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
 						},
 					},
 				},
+
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
 		},
+
 		{
 			name: "Python file with comment block parsed",
+
 			args: args{
 				filePath: path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
 			},
+
 			want: &pipeline.Asset{
-				ID:          "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
-				Name:        "some-python-task",
+				ID: "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
+
+				Name: "some-python-task",
+
 				Description: "some description goes here",
-				Type:        "python",
+
+				Type: "python",
+
 				ExecutableFile: pipeline.ExecutableFile{
-					Name:    "testblockcomments.py",
-					Path:    path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
+					Name: "testblockcomments.py",
+
+					Path: path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
+
 					Content: "print('hello world')",
 				},
+
 				Parameters: map[string]string{
 					"param1": "first-parameter",
+
 					"param2": "second-parameter",
+
 					"param3": "third-parameter",
 				},
-				Image:    "python:3.11",
+
+				Image: "python:3.11",
+
 				Instance: "b1.nano",
+
 				Secrets: []pipeline.SecretMapping{
 					{
-						SecretKey:   "secret1",
+						SecretKey: "secret1",
+
 						InjectedKey: "INJECTED_SECRET1",
 					},
+
 					{
-						SecretKey:   "secret2",
+						SecretKey: "secret2",
+
 						InjectedKey: "secret2",
 					},
 				},
+
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
+
 				Columns: []pipeline.Column{
 					{
-						Name:      "col1",
-						Type:      "string",
+						Name: "col1",
+
+						Type: "string",
+
 						Upstreams: make([]*pipeline.UpstreamColumn, 0),
+
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:   "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
+								ID: "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
+
 								Name: "not_null",
 							},
+
 							{
-								ID:   "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
+								ID: "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
+
 								Name: "positive",
 							},
+
 							{
-								ID:   "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
+								ID: "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
+
 								Name: "unique",
 							},
 						},
 					},
+
 					{
-						Name:      "col2",
-						Type:      "string",
+						Name: "col2",
+
+						Type: "string",
+
 						Upstreams: make([]*pipeline.UpstreamColumn, 0),
+
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:   "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
+								ID: "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
+
 								Name: "not_null",
 							},
+
 							{
-								ID:       "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
-								Name:     "unique",
+								ID: "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
+
+								Name: "unique",
+
 								Blocking: pipeline.DefaultTrueBool{Value: &falseValue},
 							},
 						},
 					},
 				},
+
 				CustomChecks: []pipeline.CustomCheck{
 					{
-						ID:       "a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc",
-						Name:     "check1",
-						Query:    "select 5",
-						Value:    16,
-						Blocking: pipeline.DefaultTrueBool{Value: &falseValue},
-					},
-					{
-						ID:    "cc1040bd694dcb5fae26300d2c0f721e4c4304cb16b9dce3b4ddcaa44498b940",
-						Name:  "check2",
+						ID: "a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc",
+
+						Name: "check1",
+
 						Query: "select 5",
+
 						Value: 16,
+
+						Blocking: pipeline.DefaultTrueBool{Value: &falseValue},
+
+						SourceLocation: &pipeline.SourceLocation{
+							File: path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
+
+							Line: 35,
+
+							Column: 7,
+						},
+
+						QueryLocation: &pipeline.SourceLocation{
+							File: path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
+
+							Line: 36,
+
+							Column: 7,
+						},
+					},
+
+					{
+						ID: "cc1040bd694dcb5fae26300d2c0f721e4c4304cb16b9dce3b4ddcaa44498b940",
+
+						Name: "check2",
+
+						Query: "select 5",
+
+						Value: 16,
+
+						SourceLocation: &pipeline.SourceLocation{
+							File: path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
+
+							Line: 40,
+
+							Column: 7,
+						},
+
+						QueryLocation: &pipeline.SourceLocation{
+							File: path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
+
+							Line: 41,
+
+							Column: 7,
+						},
 					},
 				},
+
 				Hooks: pipeline.Hooks{
-					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Pre: []pipeline.Hook{{Query: "select 1"}},
+
 					Post: []pipeline.Hook{{Query: "select 2"}},
 				},
 			},
 		},
+
 		{
 			name: "R file with comment block parsed",
+
 			args: args{
 				filePath: path.AbsPathForTests(t, "testdata/comments/test.r"),
 			},
+
 			want: &pipeline.Asset{
-				ID:          "aba30496cdc78a46e6e2e6da72985ac3e05aa83b87a01b3dc347166ffa634e5f",
-				Name:        "some-r-task",
+				ID: "aba30496cdc78a46e6e2e6da72985ac3e05aa83b87a01b3dc347166ffa634e5f",
+
+				Name: "some-r-task",
+
 				Description: "R task with multiline configuration",
-				Type:        "r",
+
+				Type: "r",
+
 				ExecutableFile: pipeline.ExecutableFile{
-					Name:    "test.r",
-					Path:    path.AbsPathForTests(t, "testdata/comments/test.r"),
+					Name: "test.r",
+
+					Path: path.AbsPathForTests(t, "testdata/comments/test.r"),
+
 					Content: "cat(\"Hello from R!\\n\")\nprint(\"This is an R script\")",
 				},
+
 				Parameters: map[string]string{
 					"param1": "first-parameter",
+
 					"param2": "second-parameter",
+
 					"param3": "third-parameter",
 				},
-				Image:    "r:4.3",
+
+				Image: "r:4.3",
+
 				Instance: "b1.nano",
+
 				Secrets: []pipeline.SecretMapping{
 					{
-						SecretKey:   "secret1",
+						SecretKey: "secret1",
+
 						InjectedKey: "INJECTED_SECRET1",
 					},
+
 					{
-						SecretKey:   "secret2",
+						SecretKey: "secret2",
+
 						InjectedKey: "secret2",
 					},
 				},
+
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+
 					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
-				Columns:      make([]pipeline.Column, 0),
+
+				Columns: make([]pipeline.Column, 0),
+
 				CustomChecks: make([]pipeline.CustomCheck, 0),
+
 				Hooks: pipeline.Hooks{
-					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Pre: []pipeline.Hook{{Query: "select 1"}},
+
 					Post: []pipeline.Hook{{Query: "select 2"}},
 				},
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -387,6 +629,7 @@ func Test_createTaskFromFile(t *testing.T) {
 
 			if tt.want == nil {
 				assert.Nil(t, got)
+
 				return
 			}
 
@@ -402,6 +645,7 @@ func BenchmarkCreateTaskFromFileComments(b *testing.B) {
 
 	for range make([]struct{}, b.N) {
 		_, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())(file)
+
 		require.NoError(b, err)
 	}
 }
