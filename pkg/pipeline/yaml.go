@@ -383,6 +383,11 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, err
 		}
 
+		var root yaml.Node
+		if yamlErr := yaml.Unmarshal(buf, &root); yamlErr == nil {
+			annotateCustomCheckLocations(task, &root, filePath, 0)
+		}
+
 		executableFile := ExecutableFile{
 			Name:    filepath.Base(filePath),
 			Path:    filePath,

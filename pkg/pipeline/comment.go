@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -87,7 +88,7 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 }
 
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
-	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
+	rows, commentRowEnd, openingMarkerLine := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
 	if rows == "" {
 		return nil, &ParseError{"no embedded YAML found in the comments"}
 	}
@@ -100,6 +101,11 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	absFilePath, err := filepath.Abs(filePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get absolute path for file %s", filePath)
+	}
+
+	var root yaml.Node
+	if yamlErr := yaml.Unmarshal([]byte(rows), &root); yamlErr == nil {
+		annotateCustomCheckLocations(task, &root, absFilePath, openingMarkerLine)
 	}
 
 	scanner := bufio.NewScanner(file)
@@ -122,11 +128,12 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	return task, nil
 }
 
-func readUntilComments(file afero.File, prefixes, suffixes []string) (string, int) {
+func readUntilComments(file afero.File, prefixes, suffixes []string) (string, int, int) {
 	scanner := bufio.NewScanner(file)
 	defer func() { _, _ = file.Seek(0, io.SeekStart) }()
 	var rowsBuilder strings.Builder
 	rowCount := 0
+	openingMarkerLine := 0
 
 	seenPrefix := false
 
@@ -143,6 +150,7 @@ OUTER:
 				if !seenPrefix {
 					// First occurrence - this is the opening marker
 					seenPrefix = true
+					openingMarkerLine = rowCount
 					continue OUTER
 				}
 			}
@@ -160,7 +168,7 @@ OUTER:
 		rowsBuilder.WriteByte('\n')
 	}
 
-	return strings.TrimSpace(rowsBuilder.String()), rowCount
+	return strings.TrimSpace(rowsBuilder.String()), rowCount, openingMarkerLine
 }
 
 func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath string) (*Asset, error) {
@@ -414,7 +422,7 @@ func ValidateAssetYAML(fs afero.Fs, filePath string, defType TaskDefinitionType)
 			return nil
 		}
 
-		rows, _ := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
+		rows, _, _ := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
 		if rows == "" {
 			return nil
 		}

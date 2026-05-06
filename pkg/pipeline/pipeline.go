@@ -732,6 +732,8 @@ type CustomCheck struct {
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
 	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
+	SourceLocation *SourceLocation `json:"-" yaml:"-" mapstructure:"-"`
+	QueryLocation  *SourceLocation `json:"-" yaml:"-" mapstructure:"-"`
 }
 
 type DependsColumn struct {
@@ -850,7 +852,7 @@ func (h Hooks) IsZero() bool {
 }
 
 //nolint:recvcheck
-type TimeModifier struct {
+type TimeModifier struct { //nolint:recvcheck
 	Months       int    `json:"months" yaml:"months,omitempty" mapstructure:"months"`
 	Days         int    `json:"days" yaml:"days,omitempty" mapstructure:"days"`
 	Hours        int    `json:"hours" yaml:"hours,omitempty" mapstructure:"hours"`
