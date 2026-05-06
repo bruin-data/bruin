@@ -432,6 +432,15 @@ func TestBuildDDLQuery(t *testing.T) {
 	}
 }
 
+func TestDuckDBTimestampWithTimeZone(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "CAST(s.updated_at AS TIMESTAMP) AT TIME ZONE 'UTC'", duckDBTimestampWithTimeZone("s.updated_at", "TIMESTAMP"))
+	assert.Equal(t, "CAST(s.updated_at AS TIMESTAMP) AT TIME ZONE 'UTC'", duckDBTimestampWithTimeZone("s.updated_at", "DATE"))
+	assert.Equal(t, "CAST(s.updated_at AS TIMESTAMPTZ)", duckDBTimestampWithTimeZone("s.updated_at", "TIMESTAMP WITH TIME ZONE"))
+	assert.Equal(t, "CAST(s.updated_at AS TIMESTAMPTZ)", duckDBTimestampWithTimeZone("s.updated_at", "TIMESTAMPTZ"))
+}
+
 func TestBuildSCD2ByColumnQuery(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -508,6 +517,23 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "scd2_invalid_incremental_key_type",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByColumn,
+					IncrementalKey: "updated_at",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "updated_at", Type: "VARCHAR"},
+				},
+			},
+			query:   "SELECT id, updated_at from source_table",
+			wantErr: true,
+		},
+		{
 			name: "scd2_basic_column_change_detection and partitioning",
 			asset: &pipeline.Asset{
 				Name: "my.asset",
@@ -564,7 +590,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"to_insert AS (\n" +
 				"\tSELECT s.id AS id, s.col1 AS col1, s.col2 AS col2,\n" +
 				"\t(SELECT now FROM time_now) AS _valid_from,\n" +
-				"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"\tTIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"\tTRUE AS _is_current\n" +
 				"\tFROM source s\n" +
 				"\tLEFT JOIN current_data t ON (t.id = s.id)\n" +
@@ -630,7 +656,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"to_insert AS (\n" +
 				"\tSELECT s.id AS id, s.category AS category, s.name AS name,\n" +
 				"\t(SELECT now FROM time_now) AS _valid_from,\n" +
-				"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"\tTIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"\tTRUE AS _is_current\n" +
 				"\tFROM source s\n" +
 				"\tLEFT JOIN current_data t ON (t.id = s.id AND t.category = s.category)\n" +
@@ -681,7 +707,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"\tSELECT t.id, t.col1, t.updated_at,\n" +
 				"\tt._valid_from,\n" +
 				"\t\tCASE\n" +
-				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.updated_at != s.updated_at) THEN CAST(s.updated_at AS TIMESTAMP)\n" +
+				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.updated_at != s.updated_at) THEN CAST(s.updated_at AS TIMESTAMP) AT TIME ZONE 'UTC'\n" +
 				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
 				"\t\t\tELSE t._valid_until\n" +
 				"\t\tEND AS _valid_until,\n" +
@@ -696,8 +722,8 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"--new/updated rows from source\n" +
 				"to_insert AS (\n" +
 				"\tSELECT s.id AS id, s.col1 AS col1, s.updated_at AS updated_at,\n" +
-				"\tCAST(s.updated_at AS TIMESTAMP) AS _valid_from,\n" +
-				"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"\tCAST(s.updated_at AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
+				"\tTIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"\tTRUE AS _is_current\n" +
 				"\tFROM source s\n" +
 				"\tLEFT JOIN current_data t ON (t.id = s.id)\n" +
@@ -771,7 +797,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
 				"SELECT src.id, src.name, src.price,\n" +
 				"CURRENT_TIMESTAMP AS _valid_from,\n" +
-				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"TIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"TRUE AS _is_current\n" +
 				"FROM (SELECT id, name, price from source_table\n" +
 				") AS src;",
@@ -796,7 +822,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
 				"SELECT src.id, src.category, src.name, src.price,\n" +
 				"CURRENT_TIMESTAMP AS _valid_from,\n" +
-				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"TIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"TRUE AS _is_current\n" +
 				"FROM (SELECT id, category, name, price from source_table\n" +
 				") AS src;",
@@ -821,7 +847,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
 				"SELECT src.id, src.name, src.price,\n" +
 				"CURRENT_TIMESTAMP AS _valid_from,\n" +
-				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"TIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"TRUE AS _is_current\n" +
 				"FROM (SELECT id, name, price from source_table\n" +
 				") AS src;",
@@ -846,8 +872,8 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			query:       "SELECT id, name, price, updated_at from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
 				"SELECT src.id, src.name, src.price, src.updated_at,\n" +
-				"CAST(src.updated_at AS TIMESTAMP) AS _valid_from,\n" +
-				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"CAST(src.updated_at AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
+				"TIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"TRUE AS _is_current\n" +
 				"FROM (SELECT id, name, price, updated_at from source_table\n" +
 				") AS src;",
@@ -1026,12 +1052,12 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 				"\tSELECT t.id, t.event_name, t.ts,\n" +
 				"\tt._valid_from,\n" +
 				"\t\tCASE\n" +
-				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) > t._valid_from) THEN CAST(s.ts AS TIMESTAMP)\n" +
+				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' > t._valid_from) THEN CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC'\n" +
 				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
 				"\t\t\tELSE t._valid_until\n" +
 				"\t\tEND AS _valid_until,\n" +
 				"\t\tCASE\n" +
-				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) > t._valid_from) THEN FALSE\n" +
+				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' > t._valid_from) THEN FALSE\n" +
 				"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE\n" +
 				"\t\t\tELSE t._is_current\n" +
 				"\t\tEND AS _is_current\n" +
@@ -1041,12 +1067,12 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 				"--new/updated rows from source\n" +
 				"to_insert AS (\n" +
 				"\tSELECT s.id AS id, s.event_name AS event_name, s.ts AS ts,\n" +
-				"\tCAST(s.ts AS TIMESTAMP) AS _valid_from,\n" +
-				"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"\tCAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
+				"\tTIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"\tTRUE AS _is_current\n" +
 				"\tFROM source s\n" +
 				"\tLEFT JOIN current_data t ON (t.id = s.id)\n" +
-				"\tWHERE (_matched_by_target IS NULL) OR (CAST(s.ts AS TIMESTAMP) > t._valid_from)\n" +
+				"\tWHERE (_matched_by_target IS NULL) OR (CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' > t._valid_from)\n" +
 				")\n" +
 				"SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM to_keep\n" +
 				"UNION ALL\n" +
@@ -1093,12 +1119,12 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 				"\tSELECT t.id, t.event_name, t.ts,\n" +
 				"\tt._valid_from,\n" +
 				"\t\tCASE\n" +
-				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) > t._valid_from) THEN CAST(s.ts AS TIMESTAMP)\n" +
+				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' > t._valid_from) THEN CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC'\n" +
 				"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
 				"\t\t\tELSE t._valid_until\n" +
 				"\t\tEND AS _valid_until,\n" +
 				"\t\tCASE\n" +
-				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) > t._valid_from) THEN FALSE\n" +
+				"\t\t\tWHEN _matched_by_source IS NOT NULL AND (CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' > t._valid_from) THEN FALSE\n" +
 				"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE\n" +
 				"\t\t\tELSE t._is_current\n" +
 				"\t\tEND AS _is_current\n" +
@@ -1108,12 +1134,12 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 				"--new/updated rows from source\n" +
 				"to_insert AS (\n" +
 				"\tSELECT s.id AS id, s.event_name AS event_name, s.ts AS ts,\n" +
-				"\tCAST(s.ts AS TIMESTAMP) AS _valid_from,\n" +
-				"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"\tCAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
+				"\tTIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"\tTRUE AS _is_current\n" +
 				"\tFROM source s\n" +
 				"\tLEFT JOIN current_data t ON (t.id = s.id AND t.event_name = s.event_name)\n" +
-				"\tWHERE (_matched_by_target IS NULL) OR (CAST(s.ts AS TIMESTAMP) > t._valid_from)\n" +
+				"\tWHERE (_matched_by_target IS NULL) OR (CAST(s.ts AS TIMESTAMP) AT TIME ZONE 'UTC' > t._valid_from)\n" +
 				")\n" +
 				"SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM to_keep\n" +
 				"UNION ALL\n" +
@@ -1202,8 +1228,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			query:       "SELECT id, event_name, ts from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
 				"SELECT src.id, src.event_name, src.ts,\n" +
-				"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
-				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"CAST(src.ts AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
+				"TIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"TRUE AS _is_current\n" +
 				"FROM (SELECT id, event_name, ts from source_table\n" +
 				") AS src;",
@@ -1228,8 +1254,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			query:       "SELECT id, category, event_name, ts from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
 				"SELECT src.id, src.category, src.event_name, src.ts,\n" +
-				"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
-				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"CAST(src.ts AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
+				"TIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"TRUE AS _is_current\n" +
 				"FROM (SELECT id, category, event_name, ts from source_table\n" +
 				") AS src;",
@@ -1254,8 +1280,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			query:       "SELECT id, event_name, ts from source_table",
 			want: "CREATE OR REPLACE TABLE my.asset AS\n" +
 				"SELECT src.id, src.event_name, src.ts,\n" +
-				"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
-				"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+				"CAST(src.ts AS TIMESTAMP) AT TIME ZONE 'UTC' AS _valid_from,\n" +
+				"TIMESTAMPTZ '9999-12-31 23:59:59+00' AS _valid_until,\n" +
 				"TRUE AS _is_current\n" +
 				"FROM (SELECT id, event_name, ts from source_table\n" +
 				") AS src;",

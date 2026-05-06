@@ -1,0 +1,3 @@
+column_name,data_type
+_valid_from,TIMESTAMP WITH TIME ZONE
+_valid_until,TIMESTAMP WITH TIME ZONE
