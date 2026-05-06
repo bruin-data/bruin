@@ -1600,10 +1600,17 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 					color.New(color.FgRed).Sprintf("%s", result.Error)))
 
 			case *scheduler.CustomCheckInstance:
-				assetBranch.AddNode(fmt.Sprintf("%s %s - %s",
+				msg := fmt.Sprintf("%s %s - %s",
 					color.New(color.FgMagenta).Sprint(instance.Check.Name),
 					faint("custom check"),
-					color.New(color.FgRed).Sprintf("%s", result.Error)))
+					color.New(color.FgRed).Sprintf("%s", result.Error))
+				checkNode := assetBranch.AddBranch(msg)
+				if !instance.Check.SourceLocation.IsZero() {
+					checkNode.AddNode(faint("defined at:      " + instance.Check.SourceLocation.String()))
+				}
+				if !instance.Check.QueryLocation.IsZero() {
+					checkNode.AddNode(faint("query starts at: " + instance.Check.QueryLocation.String()))
+				}
 
 			default:
 				assetBranch.AddNode(color.New(color.FgRed).Sprintf("%s", result.Error))
@@ -1633,6 +1640,15 @@ func printSingleCheckError(result *scheduler.TaskExecutionResult) {
 		fmt.Println(checkErr.Query + "\n")
 	} else {
 		fmt.Printf("Error: %s\n", result.Error)
+	}
+
+	if instance, ok := result.Instance.(*scheduler.CustomCheckInstance); ok {
+		if !instance.Check.SourceLocation.IsZero() {
+			fmt.Printf("Defined at:      %s\n", instance.Check.SourceLocation)
+		}
+		if !instance.Check.QueryLocation.IsZero() {
+			fmt.Printf("Query starts at: %s\n", instance.Check.QueryLocation)
+		}
 	}
 }
 
