@@ -21,9 +21,11 @@ connections:
     smartsheet:
         - name: "smartsheet"
           access_token: "access_token"
+          smartsheet_id: "1234567890123456" # optional
 ```
 
-- `access_token`: Your Smartsheet API access token.
+- `access_token` (required): Your Smartsheet API access token.
+- `smartsheet_id` (optional): The default Smartsheet sheet ID for this connection. When set, you can omit `source_table` from the asset and Bruin will fall back to this value. If `source_table` is provided on the asset, it takes priority.
 
 ### Step 2: Create an asset file for data ingestion
 

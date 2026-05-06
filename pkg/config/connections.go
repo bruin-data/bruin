@@ -1311,8 +1311,9 @@ func (c SolidgateConnection) GetName() string {
 }
 
 type SmartsheetConnection struct {
-	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken  string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	SmartsheetID string `yaml:"smartsheet_id,omitempty" json:"smartsheet_id,omitempty" mapstructure:"smartsheet_id"`
 }
 
 func (c SmartsheetConnection) GetName() string {
