@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
@@ -46,7 +47,7 @@ func NewEnhancer(providerType ProviderType, model string) *Enhancer {
 		provider: provider,
 		pipelineBuilder: pipeline.NewBuilder(pipeline.BuilderConfig{
 			TasksFileSuffixes: []string{"task.yml", "task.yaml", "asset.yml", "asset.yaml"},
-		}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil, nil),
+		}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil, jinja.VariantRendererFactory),
 		fs: fs,
 	}
 }
