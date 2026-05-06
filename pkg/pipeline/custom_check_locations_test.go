@@ -167,30 +167,26 @@ func TestCustomCheckLocations_YAMLAsset(t *testing.T) {
 
 // TestCustomCheckLocations_NoChecks verifies that assets without custom checks
 
-// are handled gracefully.
+// are handled gracefully — the early-return path in annotateCustomCheckLocations
+
+// must not panic and the returned asset must have an empty CustomChecks slice.
 
 func TestCustomCheckLocations_NoChecks(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewOsFs()
 
-	creator := pipeline.CreateTaskFromFileComments(fs)
+	creator := pipeline.CreateTaskFromYamlDefinition(fs)
 
-	// embeddedyaml.sql has custom_checks but the test validates it still parses cleanly
+	// task-with-no-runfile has no custom_checks section at all, which exercises
 
-	asset, err := creator(filepath.Join("testdata", "comments", "embeddedyaml.sql"))
+	// the len(asset.CustomChecks) == 0 early-return in annotateCustomCheckLocations.
+
+	asset, err := creator(filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml"))
 
 	require.NoError(t, err)
 
 	require.NotNil(t, asset)
 
-	// check that custom checks without source location still parse fine
-
-	for _, cc := range asset.CustomChecks {
-		if cc.SourceLocation != nil {
-			assert.NotEmpty(t, cc.SourceLocation.File)
-
-			assert.Positive(t, cc.SourceLocation.Line)
-		}
-	}
+	assert.Empty(t, asset.CustomChecks, "expected no custom checks for this asset")
 }

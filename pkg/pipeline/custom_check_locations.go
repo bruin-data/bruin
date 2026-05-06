@@ -38,16 +38,19 @@ func annotateCustomCheckLocations(asset *Asset, root *yaml.Node, filePath string
 		return
 	}
 
-	for i, checkNode := range checksSeqNode.Content {
-		if i >= len(asset.CustomChecks) {
+	ccIdx := 0
+	for _, checkNode := range checksSeqNode.Content {
+		if ccIdx >= len(asset.CustomChecks) {
 			break
 		}
 		if checkNode.Kind != yaml.MappingNode {
+			// Skip non-mapping nodes without advancing the CustomChecks index
+			// so all subsequent checks are stamped correctly.
 			continue
 		}
 
 		// Set SourceLocation from the check item node position.
-		asset.CustomChecks[i].SourceLocation = &SourceLocation{
+		asset.CustomChecks[ccIdx].SourceLocation = &SourceLocation{
 			File:   filePath,
 			Line:   lineOffset + checkNode.Line,
 			Column: checkNode.Column,
@@ -57,7 +60,7 @@ func annotateCustomCheckLocations(asset *Asset, root *yaml.Node, filePath string
 		for j := 0; j+1 < len(checkNode.Content); j += 2 {
 			if checkNode.Content[j].Value == "query" {
 				qk := checkNode.Content[j] // use the key node for the column reference
-				asset.CustomChecks[i].QueryLocation = &SourceLocation{
+				asset.CustomChecks[ccIdx].QueryLocation = &SourceLocation{
 					File:   filePath,
 					Line:   lineOffset + qk.Line,
 					Column: qk.Column,
@@ -65,5 +68,6 @@ func annotateCustomCheckLocations(asset *Asset, root *yaml.Node, filePath string
 				break
 			}
 		}
+		ccIdx++
 	}
 }
