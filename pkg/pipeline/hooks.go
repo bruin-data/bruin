@@ -68,52 +68,157 @@ func formatStatement(query string) string {
 	return trimmed + ";"
 }
 
-// extractDeclareStatements separates DECLARE statements from the beginning of a query.
-// BigQuery requires DECLARE statements to appear before any other statements in a script.
-// Returns a slice of formatted DECLARE statements and the remaining query.
+// extractDeclareStatements separates DECLARE statements from the beginning of a
+// query. BigQuery requires DECLARE statements to appear before any other
+// statements in a script, so when hooks are present the leading DECLAREs must
+// be lifted above the pre-hooks.
+//
+// The scan is SQL-aware: semicolons inside string literals (single, double,
+// backtick, and BigQuery triple-quoted), line comments (--) and block
+// comments (/* */) are not treated as statement terminators.
 func extractDeclareStatements(query string) ([]string, string) {
-	trimmed := strings.TrimSpace(query)
-	if trimmed == "" {
+	if strings.TrimSpace(query) == "" {
 		return nil, ""
 	}
 
-	// Split by semicolons to get individual statements
-	statements := splitStatements(trimmed)
 	var declares []string
-	firstNonDeclare := 0
-
-	// Collect all DECLARE statements from the beginning
-	for i, stmt := range statements {
-		stmtTrimmed := strings.TrimSpace(stmt)
-		if stmtTrimmed == "" {
-			continue
-		}
-
-		// Check if this statement starts with DECLARE (case-insensitive)
-		upperStmt := strings.ToUpper(stmtTrimmed)
-		if strings.HasPrefix(upperStmt, "DECLARE ") || upperStmt == "DECLARE" {
-			declares = append(declares, formatStatement(stmt))
-			firstNonDeclare = i + 1
-		} else {
-			// Stop at the first non-DECLARE statement
-			break
+	n := len(query)
+	i := 0
+	stmtStart := 0
+	for i < n {
+		switch c := query[i]; {
+		case c == '-' && i+1 < n && query[i+1] == '-':
+			for i < n && query[i] != '\n' {
+				i++
+			}
+		case c == '/' && i+1 < n && query[i+1] == '*':
+			i += 2
+			for i+1 < n && !(query[i] == '*' && query[i+1] == '/') {
+				i++
+			}
+			if i+1 < n {
+				i += 2
+			} else {
+				i = n
+			}
+		case c == '\'' || c == '"':
+			i = skipStringLiteral(query, i)
+		case c == '`':
+			i++
+			for i < n && query[i] != '`' {
+				i++
+			}
+			if i < n {
+				i++
+			}
+		case c == ';':
+			stmt := query[stmtStart:i]
+			if startsWithDeclare(stmt) {
+				declares = append(declares, formatStatement(stmt))
+				i++
+				stmtStart = i
+				continue
+			}
+			if strings.TrimSpace(stmt) == "" {
+				i++
+				stmtStart = i
+				continue
+			}
+			return declares, strings.TrimSpace(query[stmtStart:])
+		default:
+			i++
 		}
 	}
 
-	// If no DECLARE statements found, return the original query as-is
+	trailing := query[stmtStart:]
+	if strings.TrimSpace(trailing) == "" {
+		if len(declares) == 0 {
+			return nil, strings.TrimSpace(query)
+		}
+		return declares, ""
+	}
+	if startsWithDeclare(trailing) {
+		declares = append(declares, formatStatement(trailing))
+		return declares, ""
+	}
 	if len(declares) == 0 {
-		return nil, trimmed
+		return nil, strings.TrimSpace(query)
 	}
-
-	// Rejoin the remaining statements
-	remaining := strings.Join(statements[firstNonDeclare:], ";")
-	return declares, strings.TrimSpace(remaining)
+	return declares, strings.TrimSpace(trailing)
 }
 
-// splitStatements splits a query into individual statements by semicolons.
-// This is a simple split that doesn't handle strings or comments containing semicolons.
-func splitStatements(query string) []string {
-	return strings.Split(query, ";")
+// skipStringLiteral advances past a string literal beginning at query[i].
+// Handles BigQuery triple-quoted strings (”'...”' / """...""") in addition
+// to standard single/double-quoted strings with backslash escapes.
+func skipStringLiteral(query string, i int) int {
+	n := len(query)
+	quote := query[i]
+	if i+2 < n && query[i+1] == quote && query[i+2] == quote {
+		i += 3
+		for i+2 < n && !(query[i] == quote && query[i+1] == quote && query[i+2] == quote) {
+			i++
+		}
+		if i+2 < n {
+			return i + 3
+		}
+		return n
+	}
+	i++
+	for i < n {
+		if query[i] == '\\' && i+1 < n {
+			i += 2
+			continue
+		}
+		if query[i] == quote {
+			return i + 1
+		}
+		i++
+	}
+	return n
+}
+
+// startsWithDeclare reports whether stmt's first significant token is the
+// DECLARE keyword (case-insensitive). Leading whitespace and SQL comments are
+// skipped before the keyword check.
+func startsWithDeclare(stmt string) bool {
+	n := len(stmt)
+	i := 0
+	for i < n {
+		c := stmt[i]
+		switch {
+		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
+			i++
+		case c == '-' && i+1 < n && stmt[i+1] == '-':
+			for i < n && stmt[i] != '\n' {
+				i++
+			}
+		case c == '/' && i+1 < n && stmt[i+1] == '*':
+			i += 2
+			for i+1 < n && !(stmt[i] == '*' && stmt[i+1] == '/') {
+				i++
+			}
+			if i+1 < n {
+				i += 2
+			} else {
+				return false
+			}
+		default:
+			rest := stmt[i:]
+			const kw = "DECLARE"
+			if len(rest) < len(kw) {
+				return false
+			}
+			if !strings.EqualFold(rest[:len(kw)], kw) {
+				return false
+			}
+			if len(rest) == len(kw) {
+				return true
+			}
+			next := rest[len(kw)]
+			return next == ' ' || next == '\t' || next == '\n' || next == '\r'
+		}
+	}
+	return false
 }
 
 // ResolveHookTemplatesToNew renders hook query templates with the provided renderer and returns a new hooks value.

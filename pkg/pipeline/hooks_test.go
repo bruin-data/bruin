@@ -110,6 +110,15 @@ func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
 			},
 			want: "CREATE TABLE table (id INT);\nSELECT 1; INSERT INTO table VALUES (2);\nDROP TABLE table;",
 		},
+		{
+			name:  "DECLARE with semicolon inside string literal",
+			query: "DECLARE msg STRING DEFAULT 'a;b;c';\nSELECT msg;",
+			hooks: Hooks{
+				Pre:  []Hook{{Query: "CREATE SCHEMA IF NOT EXISTS test"}},
+				Post: []Hook{{Query: "DROP SCHEMA test"}},
+			},
+			want: "DECLARE msg STRING DEFAULT 'a;b;c';\nCREATE SCHEMA IF NOT EXISTS test;\nSELECT msg;\nDROP SCHEMA test;",
+		},
 	}
 
 	for _, tt := range tests {
@@ -302,6 +311,54 @@ func TestExtractDeclareStatements(t *testing.T) {
 			name:               "whitespace only",
 			query:              "   \n  \t  ",
 			wantDeclares:       nil,
+			wantRemainingQuery: "",
+		},
+		{
+			name:               "semicolon inside string literal is not a separator",
+			query:              "DECLARE msg STRING DEFAULT 'a;b;c'; SELECT msg;",
+			wantDeclares:       []string{"DECLARE msg STRING DEFAULT 'a;b;c';"},
+			wantRemainingQuery: "SELECT msg;",
+		},
+		{
+			name:               "semicolon inside double-quoted literal is not a separator",
+			query:              `DECLARE msg STRING DEFAULT "a;b"; SELECT msg;`,
+			wantDeclares:       []string{`DECLARE msg STRING DEFAULT "a;b";`},
+			wantRemainingQuery: "SELECT msg;",
+		},
+		{
+			name:               "semicolon inside triple-quoted literal is not a separator",
+			query:              "DECLARE msg STRING DEFAULT '''a;b;c'''; SELECT msg;",
+			wantDeclares:       []string{"DECLARE msg STRING DEFAULT '''a;b;c''';"},
+			wantRemainingQuery: "SELECT msg;",
+		},
+		{
+			name:               "semicolon inside line comment is not a separator",
+			query:              "DECLARE x INT64; -- end; of; line\nSELECT x;",
+			wantDeclares:       []string{"DECLARE x INT64;"},
+			wantRemainingQuery: "-- end; of; line\nSELECT x;",
+		},
+		{
+			name:               "semicolon inside block comment is not a separator",
+			query:              "DECLARE x INT64 DEFAULT 1 /* uses; semicolons; */; SELECT x;",
+			wantDeclares:       []string{"DECLARE x INT64 DEFAULT 1 /* uses; semicolons; */;"},
+			wantRemainingQuery: "SELECT x;",
+		},
+		{
+			name:               "DECLARE preceded by line comment is still recognized",
+			query:              "-- partition pruning\nDECLARE start_dt DATE;\nSELECT * FROM t WHERE dt >= start_dt;",
+			wantDeclares:       []string{"-- partition pruning\nDECLARE start_dt DATE;"},
+			wantRemainingQuery: "SELECT * FROM t WHERE dt >= start_dt;",
+		},
+		{
+			name:               "escaped quote inside string literal",
+			query:              `DECLARE msg STRING DEFAULT 'a\';b'; SELECT 1;`,
+			wantDeclares:       []string{`DECLARE msg STRING DEFAULT 'a\';b';`},
+			wantRemainingQuery: "SELECT 1;",
+		},
+		{
+			name:               "DECLARE without trailing semicolon",
+			query:              "DECLARE x INT64",
+			wantDeclares:       []string{"DECLARE x INT64;"},
 			wantRemainingQuery: "",
 		},
 	}
