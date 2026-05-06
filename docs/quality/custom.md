@@ -137,3 +137,64 @@ GROUP BY 1
 
 > [!INFO]
 > Non-blocking checks are useful for long-running or expensive quality checks. It means the downstream assets will not be waiting for this quality check to finish.
+
+## Troubleshooting custom check failures
+
+When a custom check fails, Bruin prints the name of the failing check, its location in the original asset file, and the underlying database error.
+
+### Example output
+
+```
+  dataset.orders
+  └── duplicate check  custom check  result 2 doesn't match expected value 0
+      ├── defined at:      assets/orders.sql:8:5
+      └── query starts at: assets/orders.sql:9:5
+```
+
+When running a single check with `--single-check`, the output is:
+
+```
+Check Failed
+------------
+Error: result 2 doesn't match expected value 0
+
+Result: 2 (expected: 0)
+
+Query:
+SELECT COUNT(*) - COUNT(DISTINCT id) FROM dataset.orders
+
+Defined at:      assets/orders.sql:8:5
+Query starts at: assets/orders.sql:9:5
+```
+
+### Reading the locations
+
+| Field | Meaning |
+| ----- | ------- |
+| `defined at` | File, line, and column of the `- name:` entry for the failing check in the asset file. |
+| `query starts at` | File, line, and column of the `query:` key for that check. |
+
+Both locations refer to the **original asset file** — the `.sql` or `.yml` file you edit — not to the SQL that Bruin sends to the database.
+
+### Database error line numbers
+
+Database engines often report a location inside the SQL they received, for example:
+
+```
+Aggregations of aggregations are not allowed at [17:16]
+```
+
+That `[17:16]` refers to the **rendered SQL** Bruin sent to the database, which may differ from your source file because:
+
+- Bruin strips the `/* @bruin … @bruin */` metadata block before execution.
+- `count`-based checks are wrapped with `SELECT count(*) FROM (<your query>)`, adding extra lines.
+- Jinja templating expands macros and variables.
+
+Use `defined at` and `query starts at` to find the check in your file. Use the database location only to understand which part of the rendered SQL the engine rejected.
+
+### Supported asset types
+
+Source locations are captured for both asset types:
+
+- **SQL assets** (`.sql` files with a `/* @bruin … @bruin */` block) — line numbers are relative to the original `.sql` file, not the extracted YAML block.
+- **YAML assets** (`.yml` / `.yaml` asset files) — line numbers are the YAML file lines directly.
