@@ -3,9 +3,9 @@ package jinja
 import "github.com/bruin-data/bruin/pkg/pipeline"
 
 // VariantRendererFactory satisfies pipeline.VariantRendererFactory using a
-// fresh Jinja renderer per call. Wire it onto a *pipeline.Builder via
-// Builder.SetVariantRenderer so WithVariant / CreatePipelinesFromPath can
-// materialize variants without callers having to construct a renderer.
+// fresh Jinja renderer per call. Pass it into pipeline.NewBuilder so
+// WithVariant / CreatePipelinesFromPath can materialize variants without
+// callers having to construct a renderer.
 //
 // The renderer's context exposes only `var` (the merged variable values) and
 // `variant` (the variant name). Run-time variables like start_date / end_date

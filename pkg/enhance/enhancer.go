@@ -46,7 +46,7 @@ func NewEnhancer(providerType ProviderType, model string) *Enhancer {
 		provider: provider,
 		pipelineBuilder: pipeline.NewBuilder(pipeline.BuilderConfig{
 			TasksFileSuffixes: []string{"task.yml", "task.yaml", "asset.yml", "asset.yaml"},
-		}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil),
+		}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil, nil),
 		fs: fs,
 	}
 }

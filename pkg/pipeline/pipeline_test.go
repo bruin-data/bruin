@@ -262,7 +262,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 				TasksFileSuffixes:   []string{"task.yml", "task.yaml"},
 			}
 
-			p := pipeline.NewBuilder(builderConfig, tt.fields.yamlTaskCreator, tt.fields.commentTaskCreator, fs, nil)
+			p := pipeline.NewBuilder(builderConfig, tt.fields.yamlTaskCreator, tt.fields.commentTaskCreator, fs, nil, nil)
 
 			got, err := p.CreatePipelineFromPath(t.Context(), tt.args.pathToPipeline, pipeline.WithMutate())
 			if tt.wantErr {
@@ -311,7 +311,7 @@ func Test_Builder_ParseGitMetadata(t *testing.T) {
 	}
 	builder := pipeline.NewBuilder(pipeline.BuilderConfig{
 		PipelineFileName: []string{"pipeline.yaml"},
-	}, nil, nil, afero.NewOsFs(), nil)
+	}, nil, nil, afero.NewOsFs(), nil, nil)
 
 	pipeline, err := builder.CreatePipelineFromPath(
 		t.Context(),
@@ -532,7 +532,7 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 		TasksDirectoryNames: []string{"tasks", "assets"},
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml"},
 	}
-	builder := pipeline.NewBuilder(config, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil)
+	builder := pipeline.NewBuilder(config, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil, nil)
 	p, err := builder.CreatePipelineFromPath(t.Context(), "./testdata/pipeline/first-pipeline", pipeline.WithMutate())
 	require.NoError(t, err)
 
