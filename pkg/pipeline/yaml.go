@@ -14,30 +14,41 @@ import (
 )
 
 var ValidQualityChecks = map[string]bool{
-	"not_null":        true,
-	"unique":          true,
-	"positive":        true,
-	"min":             true,
-	"max":             true,
+	"not_null": true,
+
+	"unique": true,
+
+	"positive": true,
+
+	"min": true,
+
+	"max": true,
+
 	"accepted_values": true,
-	"negative":        true,
-	"non_negative":    true,
-	"pattern":         true,
+
+	"negative": true,
+
+	"non_negative": true,
+
+	"pattern": true,
 }
 
 func mustBeStringArray(fieldName string, value *yaml.Node) ([]string, error) {
 	var multi []string
+
 	err := value.Decode(&multi)
 	if err != nil {
 		return nil, &ParseError{Msg: "`" + fieldName + "` field must be an array of strings"}
 	}
+
 	return multi, nil
 }
 
 type columns []upstreamColumn
 
 type upstreamColumn struct {
-	Name  string
+	Name string
+
 	Usage string
 }
 
@@ -47,14 +58,18 @@ type UpstreamMode int
 
 const (
 	UpstreamModeFull UpstreamMode = iota
+
 	UpstreamModeSymbolic
 )
 
 func (m *UpstreamMode) IsValid() bool {
 	switch *m {
 	case UpstreamModeFull, UpstreamModeSymbolic:
+
 		return true
+
 	default:
+
 		return false
 	}
 }
@@ -62,10 +77,15 @@ func (m *UpstreamMode) IsValid() bool {
 func (m *UpstreamMode) String() string {
 	switch *m {
 	case UpstreamModeFull:
+
 		return "full"
+
 	case UpstreamModeSymbolic:
+
 		return "symbolic"
+
 	default:
+
 		return "full" // default to full mode for safety
 	}
 }
@@ -76,50 +96,74 @@ func (m *UpstreamMode) MarshalJSON() ([]byte, error) {
 
 func (m *UpstreamMode) UnmarshalJSON(data []byte) error {
 	var s string
+
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
+
 	*m = MarshalUpstreamMode(s)
+
 	return nil
 }
 
 func MarshalUpstreamMode(s string) UpstreamMode {
 	switch strings.ToLower(s) {
 	case "full":
+
 		return UpstreamModeFull
+
 	case "symbolic":
+
 		return UpstreamModeSymbolic
+
 	default:
+
 		return UpstreamModeFull // default to full mode for safety
 	}
 }
 
 type upstream struct {
-	Value   string       `yaml:"value"`
-	Type    string       `yaml:"type"`
-	Mode    UpstreamMode `yaml:"mode"`
-	Columns columns      `yaml:"columns"`
+	Value string `yaml:"value"`
+
+	Type string `yaml:"type"`
+
+	Mode UpstreamMode `yaml:"mode"`
+
+	Columns columns `yaml:"columns"`
 }
 
 func (a *depends) UnmarshalYAML(value *yaml.Node) error {
 	switch value.Kind {
 	case yaml.SequenceNode:
+
 		var multi []upstream
+
 		if err := value.Decode(&multi); err != nil {
 			return &ParseError{Msg: "Malformed `depends` items"}
 		}
+
 		*a = multi
+
 		return nil
+
 	case yaml.ScalarNode, yaml.MappingNode:
+
 		var single upstream
+
 		if err := value.Decode(&single); err != nil {
 			return &ParseError{Msg: "Malformed `depends` items"}
 		}
+
 		*a = []upstream{single}
+
 		return nil
+
 	case yaml.DocumentNode, yaml.AliasNode:
+
 		return &ParseError{Msg: "Malformed `depends` items"}
+
 	default:
+
 		return &ParseError{Msg: "Malformed `depends` items"}
 	}
 }
@@ -127,51 +171,69 @@ func (a *depends) UnmarshalYAML(value *yaml.Node) error {
 func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.ScalarNode {
 		*u = upstream{Value: value.Value, Type: "asset", Columns: columns(nil), Mode: UpstreamModeFull}
+
 		return nil
 	}
 
 	var us map[string]any
+
 	err := value.Decode(&us)
 	if err != nil {
 		return &ParseError{Msg: "Malformed `depends` field"}
 	}
 
 	uri, foundURI := us["uri"]
+
 	asset, foundAsset := us["asset"]
+
 	cols, foundColumns := us["columns"]
+
 	colsStruct := columns(nil)
 
 	mode, foundMode := us["mode"]
+
 	upstreamMode := UpstreamModeFull
+
 	if foundMode {
 		upstreamMode = MarshalUpstreamMode(mode.(string))
 	}
 
 	if foundColumns {
 		colsSlice, ok := cols.([]any)
+
 		if !ok {
 			return &ParseError{Msg: "`columns` is malformed"}
 		}
 
 		for _, col := range colsSlice {
 			colString, ok := col.(string)
+
 			if ok {
 				colsStruct = append(colsStruct, upstreamColumn{Name: colString, Usage: ""})
+
 				continue
 			}
+
 			colMap, ok := col.(map[string]any)
+
 			if !ok {
 				return &ParseError{Msg: "'columns' is malformed"}
 			}
+
 			name, ok := colMap["name"]
+
 			if !ok {
 				return &ParseError{Msg: "Missing 'name' in column"}
 			}
+
 			nameString, ok := name.(string)
+
 			if !ok {
 				return &ParseError{Msg: "Malformed 'name' in column"}
 			}
+
 			usage, ok := colMap["usage"]
+
 			if !ok {
 				usage = ""
 			}
@@ -182,19 +244,25 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 
 	if foundURI && !foundAsset {
 		uriString, ok := uri.(string)
+
 		if !ok {
 			return &ParseError{Msg: "`uri` field must be a string"}
 		}
+
 		*u = upstream{Value: uriString, Type: "uri", Columns: colsStruct, Mode: upstreamMode}
+
 		return nil
 	}
 
 	if foundAsset && !foundURI {
 		assetString, ok := asset.(string)
+
 		if !ok {
 			return &ParseError{Msg: "`uri` field must be a string"}
 		}
+
 		*u = upstream{Value: assetString, Type: "asset", Columns: colsStruct, Mode: upstreamMode}
+
 		return nil
 	}
 
@@ -205,30 +273,43 @@ type clusterBy []string
 
 func (a *clusterBy) UnmarshalYAML(value *yaml.Node) error {
 	multi, err := mustBeStringArray("cluster_by", value)
+
 	*a = multi
+
 	return err
 }
 
 type materialization struct {
-	Type            string    `yaml:"type"`
-	Strategy        string    `yaml:"strategy"`
-	PartitionBy     string    `yaml:"partition_by"`
-	ClusterBy       clusterBy `yaml:"cluster_by"`
-	IncrementalKey  string    `yaml:"incremental_key"`
-	TimeGranularity string    `yaml:"time_granularity,omitempty"`
+	Type string `yaml:"type"`
+
+	Strategy string `yaml:"strategy"`
+
+	PartitionBy string `yaml:"partition_by"`
+
+	ClusterBy clusterBy `yaml:"cluster_by"`
+
+	IncrementalKey string `yaml:"incremental_key"`
+
+	TimeGranularity string `yaml:"time_granularity,omitempty"`
 }
 
 type columnCheckValue struct {
-	IntArray    *[]int
-	Int         *int
-	Float       *float64
+	IntArray *[]int
+
+	Int *int
+
+	Float *float64
+
 	StringArray *[]string
-	String      *string
-	Bool        *bool
+
+	String *string
+
+	Bool *bool
 }
 
 func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 	var val interface{}
+
 	err := value.Decode(&val)
 	if err != nil {
 		return err
@@ -236,29 +317,44 @@ func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 
 	switch v := val.(type) {
 	case []interface{}:
+
 		var multiInt []int
+
 		err := value.Decode(&multiInt)
+
 		if err == nil {
 			*a = columnCheckValue{IntArray: &multiInt}
+
 			return nil
 		}
 
 		var multi []string
+
 		err = value.Decode(&multi)
 		if err != nil {
 			return &ParseError{Msg: err.Error()}
 		}
 
 		*a = columnCheckValue{StringArray: &multi}
+
 	case string:
+
 		*a = columnCheckValue{String: &v}
+
 	case int:
+
 		*a = columnCheckValue{Int: &v}
+
 	case float64:
+
 		*a = columnCheckValue{Float: &v}
+
 	case bool:
+
 		*a = columnCheckValue{Bool: &v}
+
 	default:
+
 		return &ParseError{Msg: fmt.Sprintf("unexpected type %T", v)}
 	}
 
@@ -266,47 +362,72 @@ func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type columnCheck struct {
-	Name          string           `yaml:"name"`
-	Value         columnCheckValue `yaml:"value"`
-	Blocking      *bool            `yaml:"blocking"`
-	Description   string           `yaml:"description,omitempty"`
-	Notifications Notifications    `yaml:"notifications"`
+	Name string `yaml:"name"`
+
+	Value columnCheckValue `yaml:"value"`
+
+	Blocking *bool `yaml:"blocking"`
+
+	Description string `yaml:"description,omitempty"`
+
+	Notifications Notifications `yaml:"notifications"`
 }
 
 type columnUpstream struct {
 	Column string `yaml:"column"`
-	Table  string `yaml:"table"`
+
+	Table string `yaml:"table"`
 }
 
 type column struct {
-	Extends       string            `yaml:"extends"`
-	Name          string            `yaml:"name"`
-	Type          string            `yaml:"type"`
-	Description   string            `yaml:"description"`
-	Tests         []columnCheck     `yaml:"checks"`
-	PrimaryKey    bool              `yaml:"primary_key"`
-	UpdateOnMerge bool              `yaml:"update_on_merge"`
-	MergeSQL      string            `yaml:"merge_sql"`
-	Nullable      *bool             `yaml:"nullable"`
-	Upstreams     []columnUpstream  `yaml:"upstreams"`
-	Tags          []string          `yaml:"tags"`
-	Domains       []string          `yaml:"domains"`
-	Meta          map[string]string `yaml:"meta"`
-	Owner         string            `yaml:"owner"`
+	Extends string `yaml:"extends"`
+
+	Name string `yaml:"name"`
+
+	Type string `yaml:"type"`
+
+	Description string `yaml:"description"`
+
+	Tests []columnCheck `yaml:"checks"`
+
+	PrimaryKey bool `yaml:"primary_key"`
+
+	UpdateOnMerge bool `yaml:"update_on_merge"`
+
+	MergeSQL string `yaml:"merge_sql"`
+
+	Nullable *bool `yaml:"nullable"`
+
+	Upstreams []columnUpstream `yaml:"upstreams"`
+
+	Tags []string `yaml:"tags"`
+
+	Domains []string `yaml:"domains"`
+
+	Meta map[string]string `yaml:"meta"`
+
+	Owner string `yaml:"owner"`
 }
 
 type secretMapping struct {
-	SecretKey   string `yaml:"key"`
+	SecretKey string `yaml:"key"`
+
 	InjectedKey string `yaml:"inject_as"`
 }
 
 type customCheck struct {
-	Name          string        `yaml:"name"`
-	Description   string        `yaml:"description"`
-	Query         string        `yaml:"query"`
-	Value         int64         `yaml:"value"`
-	Count         *int64        `yaml:"count"`
-	Blocking      *bool         `yaml:"blocking"`
+	Name string `yaml:"name"`
+
+	Description string `yaml:"description"`
+
+	Query string `yaml:"query"`
+
+	Value int64 `yaml:"value"`
+
+	Count *int64 `yaml:"count"`
+
+	Blocking *bool `yaml:"blocking"`
+
 	Notifications Notifications `yaml:"notifications"`
 }
 
@@ -322,38 +443,66 @@ func notificationsOrNil(n Notifications) *Notifications {
 	if len(n.Slack) == 0 && len(n.MSTeams) == 0 && len(n.Discord) == 0 && len(n.Webhook) == 0 {
 		return nil
 	}
+
 	return &n
 }
 
 type taskDefinition struct {
-	Name              string            `yaml:"name"`
-	URI               string            `yaml:"uri"`
-	Description       string            `yaml:"description"`
-	Type              string            `yaml:"type"`
-	RunFile           string            `yaml:"run"`
-	Depends           depends           `yaml:"depends"`
-	Parameters        map[string]string `yaml:"parameters"`
-	Connections       map[string]string `yaml:"connections"`
-	Secrets           []secretMapping   `yaml:"secrets"`
-	Connection        string            `yaml:"connection"`
-	Image             string            `yaml:"image"`
-	Instance          string            `yaml:"instance"`
-	Materialization   materialization   `yaml:"materialization"`
-	Owner             string            `yaml:"owner"`
-	StartDate         string            `yaml:"start_date"`
-	Extends           []string          `yaml:"extends"`
-	Columns           []column          `yaml:"columns"`
-	CustomChecks      []customCheck     `yaml:"custom_checks"`
-	Hooks             Hooks             `yaml:"hooks"`
-	Tags              []string          `yaml:"tags"`
-	Snowflake         snowflake         `yaml:"snowflake"`
-	Athena            athena            `yaml:"athena"`
+	Name string `yaml:"name"`
+
+	URI string `yaml:"uri"`
+
+	Description string `yaml:"description"`
+
+	Type string `yaml:"type"`
+
+	RunFile string `yaml:"run"`
+
+	Depends depends `yaml:"depends"`
+
+	Parameters map[string]string `yaml:"parameters"`
+
+	Connections map[string]string `yaml:"connections"`
+
+	Secrets []secretMapping `yaml:"secrets"`
+
+	Connection string `yaml:"connection"`
+
+	Image string `yaml:"image"`
+
+	Instance string `yaml:"instance"`
+
+	Materialization materialization `yaml:"materialization"`
+
+	Owner string `yaml:"owner"`
+
+	StartDate string `yaml:"start_date"`
+
+	Extends []string `yaml:"extends"`
+
+	Columns []column `yaml:"columns"`
+
+	CustomChecks []customCheck `yaml:"custom_checks"`
+
+	Hooks Hooks `yaml:"hooks"`
+
+	Tags []string `yaml:"tags"`
+
+	Snowflake snowflake `yaml:"snowflake"`
+
+	Athena athena `yaml:"athena"`
+
 	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
-	Domains           []string          `yaml:"domains"`
-	Meta              map[string]string `yaml:"meta"`
-	RerunCooldown     *int              `yaml:"rerun_cooldown"`
-	RefreshRestricted *bool             `yaml:"refresh_restricted,omitempty"`
-	Notifications     Notifications     `yaml:"notifications"`
+
+	Domains []string `yaml:"domains"`
+
+	Meta map[string]string `yaml:"meta"`
+
+	RerunCooldown *int `yaml:"rerun_cooldown"`
+
+	RefreshRestricted *bool `yaml:"refresh_restricted,omitempty"`
+
+	Notifications Notifications `yaml:"notifications"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -364,11 +513,15 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 		}
 
 		yamlError := new(path.YamlParseError)
+
 		var definition taskDefinition
+
 		err = path.ReadYaml(fs, filePath, &definition)
+
 		if err != nil && errors.As(err, &yamlError) {
 			return nil, &ParseError{Msg: err.Error()}
 		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -383,27 +536,40 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, err
 		}
 
+		var root yaml.Node
+
+		if yamlErr := yaml.Unmarshal(buf, &root); yamlErr == nil {
+			annotateCustomCheckLocations(task, &root, filePath, 0)
+		}
+
 		executableFile := ExecutableFile{
-			Name:    filepath.Base(filePath),
-			Path:    filePath,
+			Name: filepath.Base(filePath),
+
+			Path: filePath,
+
 			Content: string(buf),
 		}
+
 		if definition.RunFile != "" {
 			relativeRunFilePath := filepath.Join(filepath.Dir(filePath), definition.RunFile)
+
 			absRunFile, err := filepath.Abs(relativeRunFilePath)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to resolve the absolute run file path: %s", definition.RunFile)
 			}
 
 			executableFile.Name = filepath.Base(definition.RunFile)
+
 			executableFile.Path = absRunFile
 
 			content, err := afero.ReadFile(fs, absRunFile)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to read the run file: %s", absRunFile)
 			}
+
 			executableFile.Content = string(content)
 		}
+
 		task.ExecutableFile = executableFile
 
 		return task, nil
@@ -412,21 +578,28 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 
 func ConvertYamlToTask(content []byte) (*Asset, error) {
 	var definition taskDefinition
+
 	err := path.ConvertYamlToObject(content, &definition)
 	if err != nil {
 		return nil, err
 	}
 
 	mat := Materialization{
-		Type:            MaterializationType(strings.ToLower(definition.Materialization.Type)),
-		Strategy:        MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
-		ClusterBy:       definition.Materialization.ClusterBy,
-		PartitionBy:     definition.Materialization.PartitionBy,
-		IncrementalKey:  definition.Materialization.IncrementalKey,
+		Type: MaterializationType(strings.ToLower(definition.Materialization.Type)),
+
+		Strategy: MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
+
+		ClusterBy: definition.Materialization.ClusterBy,
+
+		PartitionBy: definition.Materialization.PartitionBy,
+
+		IncrementalKey: definition.Materialization.IncrementalKey,
+
 		TimeGranularity: MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
 	}
 
 	columns := make([]Column, len(definition.Columns))
+
 	for index, column := range definition.Columns {
 		tests := make([]ColumnCheck, 0, len(column.Tests))
 
@@ -444,53 +617,76 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			seenTests[test.Name] = true
 
 			check := NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking, test.Description)
+
 			check.Notifications = notificationsOrNil(test.Notifications)
+
 			tests = append(tests, check)
 		}
 
 		var entityDefinition *EntityAttribute
+
 		if column.Extends != "" {
 			fromBits := strings.Split(column.Extends, ".")
+
 			if len(fromBits) != 2 {
 				return nil, &ParseError{Msg: "'from' field must be in the format `entity.attribute`"}
 			}
 
 			entityDefinition = &EntityAttribute{
-				Entity:    strings.TrimSpace(fromBits[0]),
+				Entity: strings.TrimSpace(fromBits[0]),
+
 				Attribute: strings.TrimSpace(fromBits[1]),
 			}
 		}
 
 		upstreamColumns := make([]*UpstreamColumn, len(column.Upstreams))
+
 		for index, upstream := range column.Upstreams {
 			upstreamColumns[index] = &UpstreamColumn{
 				Column: upstream.Column,
-				Table:  upstream.Table,
+
+				Table: upstream.Table,
 			}
 		}
 
 		columns[index] = Column{
-			Name:            column.Name,
-			Type:            strings.TrimSpace(column.Type),
-			Description:     column.Description,
-			Checks:          tests,
-			PrimaryKey:      column.PrimaryKey,
-			UpdateOnMerge:   column.UpdateOnMerge,
-			MergeSQL:        column.MergeSQL,
-			Nullable:        DefaultTrueBool{Value: column.Nullable},
+			Name: column.Name,
+
+			Type: strings.TrimSpace(column.Type),
+
+			Description: column.Description,
+
+			Checks: tests,
+
+			PrimaryKey: column.PrimaryKey,
+
+			UpdateOnMerge: column.UpdateOnMerge,
+
+			MergeSQL: column.MergeSQL,
+
+			Nullable: DefaultTrueBool{Value: column.Nullable},
+
 			EntityAttribute: entityDefinition,
-			Extends:         column.Extends,
-			Upstreams:       upstreamColumns,
-			Tags:            column.Tags,
-			Domains:         column.Domains,
-			Meta:            column.Meta,
-			Owner:           column.Owner,
+
+			Extends: column.Extends,
+
+			Upstreams: upstreamColumns,
+
+			Tags: column.Tags,
+
+			Domains: column.Domains,
+
+			Meta: column.Meta,
+
+			Owner: column.Owner,
 		}
 	}
 
 	upstreams := make([]Upstream, len(definition.Depends))
+
 	for index, dep := range definition.Depends {
 		cols := make([]DependsColumn, 0)
+
 		for _, col := range dep.Columns {
 			cols = append(cols, DependsColumn(col))
 		}
@@ -500,60 +696,99 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		}
 
 		upstreams[index] = Upstream{
-			Value:   dep.Value,
-			Type:    dep.Type,
-			Mode:    dep.Mode,
+			Value: dep.Value,
+
+			Type: dep.Type,
+
+			Mode: dep.Mode,
+
 			Columns: cols,
 		}
 	}
 
 	task := Asset{
-		ID:                hash(definition.Name),
-		URI:               definition.URI,
-		Name:              definition.Name,
-		Description:       definition.Description,
-		Type:              AssetType(definition.Type),
-		Parameters:        definition.Parameters,
-		Connection:        definition.Connection,
-		Secrets:           make([]SecretMapping, len(definition.Secrets)),
-		Upstreams:         upstreams,
-		ExecutableFile:    ExecutableFile{},
-		Materialization:   mat,
-		Image:             definition.Image,
-		Instance:          definition.Instance,
-		Owner:             definition.Owner,
-		StartDate:         definition.StartDate,
-		Tags:              definition.Tags,
-		Extends:           definition.Extends,
-		Columns:           columns,
-		CustomChecks:      make([]CustomCheck, len(definition.CustomChecks)),
-		Hooks:             definition.Hooks,
-		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
-		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		ID: hash(definition.Name),
+
+		URI: definition.URI,
+
+		Name: definition.Name,
+
+		Description: definition.Description,
+
+		Type: AssetType(definition.Type),
+
+		Parameters: definition.Parameters,
+
+		Connection: definition.Connection,
+
+		Secrets: make([]SecretMapping, len(definition.Secrets)),
+
+		Upstreams: upstreams,
+
+		ExecutableFile: ExecutableFile{},
+
+		Materialization: mat,
+
+		Image: definition.Image,
+
+		Instance: definition.Instance,
+
+		Owner: definition.Owner,
+
+		StartDate: definition.StartDate,
+
+		Tags: definition.Tags,
+
+		Extends: definition.Extends,
+
+		Columns: columns,
+
+		CustomChecks: make([]CustomCheck, len(definition.CustomChecks)),
+
+		Hooks: definition.Hooks,
+
+		Snowflake: SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
+
+		Athena: AthenaConfig{Location: definition.Athena.QueryResultsPath},
+
 		IntervalModifiers: definition.IntervalModifiers,
-		Domains:           definition.Domains,
-		Meta:              definition.Meta,
-		RerunCooldown:     definition.RerunCooldown,
+
+		Domains: definition.Domains,
+
+		Meta: definition.Meta,
+
+		RerunCooldown: definition.RerunCooldown,
+
 		RefreshRestricted: definition.RefreshRestricted,
-		Notifications:     notificationsOrNil(definition.Notifications),
+
+		Notifications: notificationsOrNil(definition.Notifications),
 	}
 
 	for index, check := range definition.CustomChecks {
 		// set the ID as the hash of the name
+
 		task.CustomChecks[index] = CustomCheck{
-			ID:            hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
-			Name:          check.Name,
-			Description:   check.Description,
-			Query:         check.Query,
-			Value:         check.Value,
-			Count:         check.Count,
-			Blocking:      DefaultTrueBool{Value: check.Blocking},
+			ID: hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
+
+			Name: check.Name,
+
+			Description: check.Description,
+
+			Query: check.Query,
+
+			Value: check.Value,
+
+			Count: check.Count,
+
+			Blocking: DefaultTrueBool{Value: check.Blocking},
+
 			Notifications: notificationsOrNil(check.Notifications),
 		}
 	}
 
 	for index, m := range definition.Secrets {
 		mapping := SecretMapping(m)
+
 		if mapping.InjectedKey == "" {
 			mapping.InjectedKey = mapping.SecretKey
 		}
