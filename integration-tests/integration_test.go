@@ -955,7 +955,12 @@ func TestIndividualTasks(t *testing.T) {
 				Env:     []string{},
 				Expected: e2e.Output{
 					ExitCode: 1,
-					Contains: []string{"custom check 'row_count' has returned 4 instead of the expected 7"},
+					Contains: []string{
+						"custom check 'row_count' has returned 4 instead of the expected 7",
+						"defined at:",
+						"query starts at:",
+						"products.sql",
+					},
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
