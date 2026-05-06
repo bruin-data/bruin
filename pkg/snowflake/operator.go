@@ -3,13 +3,11 @@ package snowflake
 import (
 	"context"
 	"io"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/devenv"
 	"github.com/bruin-data/bruin/pkg/executor"
-	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -191,74 +189,6 @@ func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnChec
 		"accepted_values": &AcceptedValuesCheck{conn: manager},
 		"pattern":         &PatternCheck{conn: manager},
 	})
-}
-
-type QuerySensor struct {
-	connection     config.ConnectionGetter
-	extractor      query.QueryExtractor
-	secondsToSleep int64
-}
-
-func NewQuerySensor(conn config.ConnectionGetter, extractor query.QueryExtractor, secondsToSleep int64) *QuerySensor {
-	return &QuerySensor{
-		connection:     conn,
-		extractor:      extractor,
-		secondsToSleep: secondsToSleep,
-	}
-}
-
-func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
-}
-
-func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	qq, ok := t.Parameters["query"]
-	if !ok {
-		return errors.New("query sensor requires a parameter named 'query'")
-	}
-	extractor, err := o.extractor.CloneForAsset(ctx, p, t)
-	if err != nil {
-		return errors.Wrapf(err, "failed to clone extractor for asset %s", t.Name)
-	}
-	qry, err := extractor.ExtractQueriesFromString(qq)
-	if err != nil {
-		return errors.Wrap(err, "failed to render query sensor query")
-	}
-
-	connName, err := p.GetConnectionNameForAsset(t)
-	if err != nil {
-		return err
-	}
-
-	rawConn := o.connection.GetConnection(connName)
-	if rawConn == nil {
-		return config.NewConnectionNotFoundError(ctx, "", connName)
-	}
-
-	conn, ok := rawConn.(SfClient)
-	if !ok {
-		return errors.Errorf("connection '%s' is not a snowflake connection", connName)
-	}
-
-	for {
-		res, err := conn.SelectOnlyLastResult(ctx, qry[0])
-		if err != nil {
-			return err
-		}
-
-		intRes, err := helpers.CastResultToInteger(res, true)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse query sensor result")
-		}
-
-		if intRes > 0 {
-			break
-		}
-
-		time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
-	}
-
-	return nil
 }
 
 type MetadataOperator struct {

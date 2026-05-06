@@ -1845,7 +1845,7 @@ func SetupExecutors(
 
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
 
-		sfQuerySensor := snowflake.NewQuerySensor(conn, wholeFileExtractor, 30)
+		sfQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		sfTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		sfMetadataPushOperator := snowflake.NewMetadataPushOperator(conn)

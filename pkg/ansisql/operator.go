@@ -20,6 +20,13 @@ type TableExistsChecker interface {
 	BuildTableExistsQuery(tableName string) (string, error)
 }
 
+// LastResultSelector is an optional connection capability for query sensors.
+// Connections that can run multi-statement queries (e.g. Snowflake) implement
+// this so the sensor uses only the final result set instead of the first.
+type LastResultSelector interface {
+	SelectOnlyLastResult(ctx context.Context, q *query.Query) ([][]interface{}, error)
+}
+
 type QuerySensor struct {
 	connection config.ConnectionGetter
 	extractor  query.QueryExtractor
@@ -80,16 +87,14 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			}
 			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
 		default:
-			if querier, ok := conn.(interface {
-				Select(ctx context.Context, q *query.Query) ([][]interface{}, error)
-			}); ok {
-				res, err := querier.Select(ctx, qry[0])
-				if err != nil {
-					if printerExists {
-						fmt.Fprintln(printer, "Error: Sensor query failed:", err)
-					}
-					return err
+			res, ok, err := selectForSensor(ctx, conn, qry[0])
+			if err != nil {
+				if printerExists {
+					fmt.Fprintln(printer, "Error: Sensor query failed:", err)
 				}
+				return err
+			}
+			if ok {
 				intRes, err := helpers.CastResultToInteger(res, true)
 				if err != nil {
 					return errors.Wrap(err, "failed to parse query sensor result")
@@ -110,6 +115,24 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			}
 		}
 	}
+}
+
+// selectForSensor runs the sensor probe against conn, preferring
+// SelectOnlyLastResult when the connection implements LastResultSelector.
+// The boolean indicates whether the connection supports either capability;
+// when false, the caller proceeds without a result.
+func selectForSensor(ctx context.Context, conn any, q *query.Query) ([][]interface{}, bool, error) {
+	if last, ok := conn.(LastResultSelector); ok {
+		res, err := last.SelectOnlyLastResult(ctx, q)
+		return res, true, err
+	}
+	if querier, ok := conn.(interface {
+		Select(ctx context.Context, q *query.Query) ([][]interface{}, error)
+	}); ok {
+		res, err := querier.Select(ctx, q)
+		return res, true, err
+	}
+	return nil, false, nil
 }
 
 type TableSensor struct {
