@@ -2969,6 +2969,9 @@
         },
         "access_token": {
           "type": "string"
+        },
+        "smartsheet_id": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
