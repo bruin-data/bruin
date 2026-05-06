@@ -93,7 +93,7 @@ func extractDeclareStatements(query string) ([]string, string) {
 			}
 		case c == '/' && i+1 < n && query[i+1] == '*':
 			i += 2
-			for i+1 < n && !(query[i] == '*' && query[i+1] == '/') {
+			for i+1 < n && (query[i] != '*' || query[i+1] != '/') {
 				i++
 			}
 			if i+1 < n {
@@ -155,7 +155,7 @@ func skipStringLiteral(query string, i int) int {
 	quote := query[i]
 	if i+2 < n && query[i+1] == quote && query[i+2] == quote {
 		i += 3
-		for i+2 < n && !(query[i] == quote && query[i+1] == quote && query[i+2] == quote) {
+		for i+2 < n && (query[i] != quote || query[i+1] != quote || query[i+2] != quote) {
 			i++
 		}
 		if i+2 < n {
@@ -194,7 +194,7 @@ func startsWithDeclare(stmt string) bool {
 			}
 		case c == '/' && i+1 < n && stmt[i+1] == '*':
 			i += 2
-			for i+1 < n && !(stmt[i] == '*' && stmt[i+1] == '/') {
+			for i+1 < n && (stmt[i] != '*' || stmt[i+1] != '/') {
 				i++
 			}
 			if i+1 < n {
