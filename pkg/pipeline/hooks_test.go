@@ -361,6 +361,12 @@ func TestExtractDeclareStatements(t *testing.T) {
 			wantDeclares:       []string{"DECLARE x INT64;"},
 			wantRemainingQuery: "",
 		},
+		{
+			name:               "double semicolons between DECLARE and main query",
+			query:              "DECLARE var1 INT64; ; SELECT 1;",
+			wantDeclares:       []string{"DECLARE var1 INT64;"},
+			wantRemainingQuery: "SELECT 1;",
+		},
 	}
 
 	for _, tt := range tests {
