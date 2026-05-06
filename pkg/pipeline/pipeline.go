@@ -1934,15 +1934,6 @@ func (b *Builder) SetGlossaryReader(reader glossaryReader) {
 	b.GlossaryReader = reader
 }
 
-// SetVariantRenderer wires a renderer factory used by WithVariant /
-// CreatePipelinesFromPath. The factory receives the effective variable values
-// (after merging the variant's overrides) plus the variant name and returns a
-// per-render function. Callers wire this once at builder construction; if it's
-// unset, attempting to materialize a variant returns a clear error.
-func (b *Builder) SetVariantRenderer(f VariantRendererFactory) {
-	b.variantRenderer = f
-}
-
 func (b *Builder) AddAssetMutator(m AssetMutator) {
 	b.assetMutators = append(b.assetMutators, m)
 }
@@ -1959,13 +1950,14 @@ func (e ParseError) Error() string {
 	return e.Msg
 }
 
-func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCreator TaskCreator, fs afero.Fs, gr glossaryReader) *Builder {
+func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCreator TaskCreator, fs afero.Fs, gr glossaryReader, variantRenderer VariantRendererFactory) *Builder {
 	b := &Builder{
 		config:             config,
 		yamlTaskCreator:    yamlTaskCreator,
 		commentTaskCreator: commentTaskCreator,
 		fs:                 fs,
 		GlossaryReader:     gr,
+		variantRenderer:    variantRenderer,
 	}
 
 	b.assetMutators = []AssetMutator{
@@ -2031,8 +2023,9 @@ func WithOnlyPipeline() CreatePipelineOption {
 }
 
 // WithVariant materializes the named variant during pipeline construction.
-// The Builder must have a renderer set via SetVariantRenderer; otherwise the
-// call errors. Passing an empty name is equivalent to omitting the option.
+// The Builder must have been constructed with a non-nil VariantRendererFactory;
+// otherwise the call errors. Passing an empty name is equivalent to omitting
+// the option.
 func WithVariant(name string) CreatePipelineOption {
 	return func(o *createPipelineConfig) {
 		o.variantName = name
@@ -2202,7 +2195,7 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	// stays valid because rendering only mutates values, not pointers.
 	if config.variantName != "" && len(pipeline.Variants) > 0 {
 		if b.variantRenderer == nil {
-			return nil, fmt.Errorf("WithVariant(%q) requires a renderer; call Builder.SetVariantRenderer", config.variantName)
+			return nil, fmt.Errorf("WithVariant(%q) requires a renderer; pass a VariantRendererFactory to NewBuilder", config.variantName)
 		}
 		variantName := config.variantName
 		if err := pipeline.RenderTemplatedFields(func(vars map[string]any) RenderFunc {

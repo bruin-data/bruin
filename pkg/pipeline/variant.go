@@ -65,8 +65,8 @@ func (vs *VariantSet) UnmarshalJSON(data []byte) error {
 type RenderFunc func(string) (string, error)
 
 // VariantRendererFactory builds a RenderFunc for a given (vars, variantName)
-// pair. It is registered on a *Builder via SetVariantRenderer so the Builder
-// can materialize variants without taking a hard dependency on pkg/jinja.
+// pair. It is passed into NewBuilder so the Builder can materialize variants
+// without taking a hard dependency on pkg/jinja.
 type VariantRendererFactory func(vars map[string]any, variantName string) RenderFunc
 
 // ApplyVariantVariables merges the named variant's overrides into pl.Variables.
