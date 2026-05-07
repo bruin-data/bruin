@@ -440,6 +440,7 @@ environments:
       smartsheet:
         - name: "smartsheet-1"
           access_token: "access-token-123"
+          smartsheet_id: "1234567890"
       attio:
         - name: "attio-1"
           api_key: "api-key-123"
