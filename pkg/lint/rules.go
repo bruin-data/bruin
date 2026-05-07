@@ -975,6 +975,7 @@ func validateConnectionKeys(keys []string, emptyMsg, dupeMsg string, issueContex
 		}
 		if slices.Contains(seen, k) {
 			issues = append(issues, &Issue{Description: dupeMsg, Context: issueContext})
+			continue
 		}
 		seen = append(seen, k)
 	}

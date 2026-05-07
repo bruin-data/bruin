@@ -1085,6 +1085,11 @@ func TestEnsurePipelineNotificationsAreValid(t *testing.T) {
 		want []*Issue
 	}{
 		{
+			name: "no notifications configured",
+			p:    &pipeline.Pipeline{},
+			want: noIssues,
+		},
+		{
 			name: "valid slack channel",
 			p: &pipeline.Pipeline{
 				Notifications: pipeline.Notifications{
