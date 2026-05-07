@@ -1581,6 +1581,7 @@ type Pipeline struct {
 	Agent              bool                   `json:"agent" yaml:"agent,omitempty" mapstructure:"agent"`
 	Variables          Variables              `json:"variables" yaml:"variables,omitempty" mapstructure:"variables"`
 	Variants           VariantSet             `json:"variants,omitempty" yaml:"variants,omitempty" mapstructure:"variants"`
+	SelectedVariant    string                 `json:"selected_variant" yaml:"-"`
 	TasksByType        map[AssetType][]*Asset `json:"-" yaml:"-"`
 	tasksByName        map[string]*Asset      `yaml:"-"`
 	MacrosPath         string                 `json:"-" yaml:"-"`

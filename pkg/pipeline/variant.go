@@ -89,6 +89,7 @@ func (pl *Pipeline) ApplyVariantVariables(variantName string) error {
 	if err := pl.Variables.Merge(overrides); err != nil {
 		return fmt.Errorf("invalid variant %q: %w", variantName, err)
 	}
+	pl.SelectedVariant = variantName
 	return nil
 }
 
