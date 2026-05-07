@@ -34,5 +34,6 @@
     "snapshot": "",
     "agent": false,
     "variables": null,
+    "selected_variant": "",
     "macros": []
 }
