@@ -133,9 +133,12 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 
 		// Periodically log "still running" for long-running tasks
 		var stopTicker chan struct{}
+		var tickerWg sync.WaitGroup
 		if !w.formatOpts.TUIMode && !w.formatOpts.MinimalLogs {
 			stopTicker = make(chan struct{})
+			tickerWg.Add(1)
 			go func() {
+				defer tickerWg.Done()
 				ticker := time.NewTicker(10 * time.Second)
 				defer ticker.Stop()
 				for {
@@ -181,6 +184,7 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 
 		if stopTicker != nil {
 			close(stopTicker)
+			tickerWg.Wait()
 		}
 
 		duration := time.Since(start)
