@@ -46,21 +46,12 @@ const (
 
 	pipelineContainsCycle = "The pipeline has a cycle with dependencies, make sure there are no cyclic dependencies"
 
-	pipelineSlackFieldEmptyChannel     = "Slack notifications must have a `channel` attribute"
-	pipelineSlackChannelFieldNotUnique = "The `channel` attribute under the Slack notifications must be unique"
-
-	pipelineMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
-	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
-
-	pipelineDiscordConnectionFieldEmpty     = "Discord notifications `connection` attribute must not be empty"
-	pipelineDiscordConnectionFieldNotUnique = "The `connection` attribute under the Discord notifications must be unique"
-
-	assetSlackFieldEmptyChannel          = "Asset-level Slack notifications must have a `channel` attribute"
-	assetSlackChannelFieldNotUnique      = "The `channel` attribute under the asset-level Slack notifications must be unique"
-	assetMSTeamsConnectionFieldEmpty     = "Asset-level MS Teams notifications `connection` attribute must not be empty"
-	assetMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the asset-level MS Teams notifications must be unique"
-	assetDiscordConnectionFieldEmpty     = "Asset-level Discord notifications `connection` attribute must not be empty"
-	assetDiscordConnectionFieldNotUnique = "The `connection` attribute under the asset-level Discord notifications must be unique"
+	slackChannelEmpty         = "Slack notifications must have a `channel` attribute"
+	slackChannelNotUnique     = "The `channel` attribute under the Slack notifications must be unique"
+	msTeamsConnectionEmpty    = "MS Teams notifications `connection` attribute must not be empty"
+	msTeamsConnectionNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
+	discordConnectionEmpty    = "Discord notifications `connection` attribute must not be empty"
+	discordConnectionNotUnique = "The `connection` attribute under the Discord notifications must be unique"
 
 	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
 	pipelineMaxActiveStepsMustBePositive = "Pipeline max_active_steps must be a positive number"
@@ -940,161 +931,94 @@ func isStringInArray(arr []string, str string) bool {
 	return false
 }
 
-func EnsureSlackFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	slackChannels := make([]string, 0, len(p.Notifications.Slack))
-	for _, slack := range p.Notifications.Slack {
-		channelWithoutHash := strings.TrimPrefix(slack.Channel, "#")
-		if channelWithoutHash == "" {
-			issues = append(issues, &Issue{
-				Description: pipelineSlackFieldEmptyChannel,
-			})
-			continue
-		}
-
-		if isStringInArray(slackChannels, channelWithoutHash) {
-			issues = append(issues, &Issue{
-				Description: pipelineSlackChannelFieldNotUnique,
-			})
-		}
-
-		slackChannels = append(slackChannels, channelWithoutHash)
+// validateNotifications checks a single Notifications value for empty/duplicate targets.
+// issueContext is an optional label (e.g. "custom_check:my_check") included in issues for traceability.
+func validateNotifications(n *pipeline.Notifications, issueContext []string) []*Issue {
+	if n == nil {
+		return nil
 	}
 
+	var issues []*Issue
+
+	slackChannels := make([]string, 0, len(n.Slack))
+	for _, s := range n.Slack {
+		ch := strings.TrimPrefix(s.Channel, "#")
+		if ch == "" {
+			issues = append(issues, &Issue{Description: slackChannelEmpty, Context: issueContext})
+			continue
+		}
+		if slices.Contains(slackChannels, ch) {
+			issues = append(issues, &Issue{Description: slackChannelNotUnique, Context: issueContext})
+		}
+		slackChannels = append(slackChannels, ch)
+	}
+
+	issues = append(issues, validateConnectionKeys(
+		mapSlice(n.MSTeams, func(t pipeline.MSTeamsNotification) string { return t.Connection }),
+		msTeamsConnectionEmpty, msTeamsConnectionNotUnique, issueContext,
+	)...)
+	issues = append(issues, validateConnectionKeys(
+		mapSlice(n.Discord, func(d pipeline.DiscordNotification) string { return d.Connection }),
+		discordConnectionEmpty, discordConnectionNotUnique, issueContext,
+	)...)
+
+	return issues
+}
+
+func mapSlice[T any](items []T, key func(T) string) []string {
+	out := make([]string, len(items))
+	for i, item := range items {
+		out[i] = key(item)
+	}
+	return out
+}
+
+// validateConnectionKeys checks a list of connection keys for empty/duplicate values.
+func validateConnectionKeys(keys []string, emptyMsg, dupeMsg string, issueContext []string) []*Issue {
+	var issues []*Issue
+	var seen []string
+	for _, k := range keys {
+		if k == "" {
+			issues = append(issues, &Issue{Description: emptyMsg, Context: issueContext})
+			continue
+		}
+		if slices.Contains(seen, k) {
+			issues = append(issues, &Issue{Description: dupeMsg, Context: issueContext})
+		}
+		seen = append(seen, k)
+	}
+	return issues
+}
+
+// EnsurePipelineNotificationsAreValid validates all notification targets on the pipeline.
+func EnsurePipelineNotificationsAreValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := validateNotifications(&p.Notifications, nil)
+	if issues == nil {
+		return []*Issue{}, nil
+	}
 	return issues, nil
 }
 
-func EnsureMSTeamsFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
+// EnsureAssetNotificationsAreValid validates notification targets on the asset,
+// its custom checks, and its column checks.
+func EnsureAssetNotificationsAreValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
 
-	MSTeamsConnections := make([]string, 0, len(p.Notifications.MSTeams))
-	for _, notification := range p.Notifications.MSTeams {
-		if notification.Connection == "" {
-			issues = append(issues, &Issue{
-				Description: pipelineMSTeamsConnectionFieldEmpty,
-			})
-			continue
-		}
+	issues = append(issues, validateNotifications(asset.Notifications, nil)...)
 
-		if isStringInArray(MSTeamsConnections, notification.Connection) {
-			issues = append(issues, &Issue{
-				Description: pipelineMSTeamsConnectionFieldNotUnique,
-			})
-		}
-
-		MSTeamsConnections = append(MSTeamsConnections, notification.Connection)
+	for _, check := range asset.CustomChecks {
+		issues = append(issues, validateNotifications(check.Notifications, []string{"custom_check:" + check.Name})...)
 	}
 
-	return issues, nil
-}
-
-func EnsureDiscordFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	discordConnections := make([]string, 0, len(p.Notifications.Discord))
-	for _, notification := range p.Notifications.Discord {
-		if notification.Connection == "" {
-			issues = append(issues, &Issue{
-				Description: pipelineDiscordConnectionFieldEmpty,
-			})
-			continue
+	for _, col := range asset.Columns {
+		for _, check := range col.Checks {
+			issues = append(issues, validateNotifications(check.Notifications, []string{col.Name + "." + check.Name})...)
 		}
-
-		if isStringInArray(discordConnections, notification.Connection) {
-			issues = append(issues, &Issue{
-				Description: pipelineDiscordConnectionFieldNotUnique,
-			})
-		}
-
-		discordConnections = append(discordConnections, notification.Connection)
 	}
 
-	return issues, nil
-}
-
-func EnsureSlackFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	if asset.Notifications == nil {
-		return issues, nil
+	if len(issues) == 0 {
+		return []*Issue{}, nil
 	}
-
-	slackChannels := make([]string, 0, len(asset.Notifications.Slack))
-	for _, slack := range asset.Notifications.Slack {
-		channelWithoutHash := strings.TrimPrefix(slack.Channel, "#")
-		if channelWithoutHash == "" {
-			issues = append(issues, &Issue{
-				Description: assetSlackFieldEmptyChannel,
-			})
-			continue
-		}
-
-		if isStringInArray(slackChannels, channelWithoutHash) {
-			issues = append(issues, &Issue{
-				Description: assetSlackChannelFieldNotUnique,
-			})
-		}
-
-		slackChannels = append(slackChannels, channelWithoutHash)
-	}
-
-	return issues, nil
-}
-
-func EnsureMSTeamsFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	if asset.Notifications == nil {
-		return issues, nil
-	}
-
-	MSTeamsConnections := make([]string, 0, len(asset.Notifications.MSTeams))
-	for _, notification := range asset.Notifications.MSTeams {
-		if notification.Connection == "" {
-			issues = append(issues, &Issue{
-				Description: assetMSTeamsConnectionFieldEmpty,
-			})
-			continue
-		}
-
-		if isStringInArray(MSTeamsConnections, notification.Connection) {
-			issues = append(issues, &Issue{
-				Description: assetMSTeamsConnectionFieldNotUnique,
-			})
-		}
-
-		MSTeamsConnections = append(MSTeamsConnections, notification.Connection)
-	}
-
-	return issues, nil
-}
-
-func EnsureDiscordFieldInAssetIsValid(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	if asset.Notifications == nil {
-		return issues, nil
-	}
-
-	discordConnections := make([]string, 0, len(asset.Notifications.Discord))
-	for _, notification := range asset.Notifications.Discord {
-		if notification.Connection == "" {
-			issues = append(issues, &Issue{
-				Description: assetDiscordConnectionFieldEmpty,
-			})
-			continue
-		}
-
-		if isStringInArray(discordConnections, notification.Connection) {
-			issues = append(issues, &Issue{
-				Description: assetDiscordConnectionFieldNotUnique,
-			})
-		}
-
-		discordConnections = append(discordConnections, notification.Connection)
-	}
-
 	return issues, nil
 }
 
