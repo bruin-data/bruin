@@ -46,11 +46,11 @@ const (
 
 	pipelineContainsCycle = "The pipeline has a cycle with dependencies, make sure there are no cyclic dependencies"
 
-	slackChannelEmpty         = "Slack notifications must have a `channel` attribute"
-	slackChannelNotUnique     = "The `channel` attribute under the Slack notifications must be unique"
-	msTeamsConnectionEmpty    = "MS Teams notifications `connection` attribute must not be empty"
+	slackChannelEmpty          = "Slack notifications must have a `channel` attribute"
+	slackChannelNotUnique      = "The `channel` attribute under the Slack notifications must be unique"
+	msTeamsConnectionEmpty     = "MS Teams notifications `connection` attribute must not be empty"
 	msTeamsConnectionNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
-	discordConnectionEmpty    = "Discord notifications `connection` attribute must not be empty"
+	discordConnectionEmpty     = "Discord notifications `connection` attribute must not be empty"
 	discordConnectionNotUnique = "The `connection` attribute under the Discord notifications must be unique"
 
 	pipelineConcurrencyMustBePositive    = "Pipeline concurrency must be 1 or greater"
@@ -920,15 +920,6 @@ func EnsurePipelineHasNoCycles(ctx context.Context, p *pipeline.Pipeline) ([]*Is
 	}
 
 	return issues, nil
-}
-
-func isStringInArray(arr []string, str string) bool {
-	for _, a := range arr {
-		if str == a {
-			return true
-		}
-	}
-	return false
 }
 
 // validateNotifications checks a single Notifications value for empty/duplicate targets.
