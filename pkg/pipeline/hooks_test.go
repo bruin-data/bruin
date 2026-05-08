@@ -164,6 +164,16 @@ func TestHoistDeclares(t *testing.T) {
 			want: "DECLARE x INT64;\nSELECT 1;",
 		},
 		{
+			name: "already-ordered declares preserve original separators",
+			in:   "DECLARE x INT64; SELECT 1;",
+			want: "DECLARE x INT64; SELECT 1;",
+		},
+		{
+			name: "multiple already-ordered declares preserve original formatting",
+			in:   "DECLARE x INT64;DECLARE y STRING;\n\nSELECT 1;",
+			want: "DECLARE x INT64;DECLARE y STRING;\n\nSELECT 1;",
+		},
+		{
 			name: "declare after non-declare gets hoisted",
 			in:   "SET x = 1;\nDECLARE y INT64;\nSELECT 1;",
 			want: "DECLARE y INT64;\nSET x = 1;\nSELECT 1;",
@@ -192,6 +202,31 @@ func TestHoistDeclares(t *testing.T) {
 			name: "empty parts are dropped",
 			in:   "SET x = 1;;\nDECLARE y INT64;",
 			want: "DECLARE y INT64;\nSET x = 1;",
+		},
+		{
+			name: "semicolon inside single-quoted literal is left untouched",
+			in:   "SET separator = ';';\nDECLARE y INT64;",
+			want: "SET separator = ';';\nDECLARE y INT64;",
+		},
+		{
+			name: "declare keyword inside string literal does not trigger reordering",
+			in:   "SELECT 'declare bankruptcy' AS msg;",
+			want: "SELECT 'declare bankruptcy' AS msg;",
+		},
+		{
+			name: "declare as a column alias does not trigger reordering",
+			in:   "SELECT 1 AS declare;",
+			want: "SELECT 1 AS declare;",
+		},
+		{
+			name: "semicolon inside double-quoted literal is left untouched",
+			in:   "SET label = \"a;b\";\nDECLARE y INT64;",
+			want: "SET label = \"a;b\";\nDECLARE y INT64;",
+		},
+		{
+			name: "escaped quote inside literal does not trip the guard",
+			in:   "SET msg = 'it''s fine';\nDECLARE y INT64;",
+			want: "DECLARE y INT64;\nSET msg = 'it''s fine';",
 		},
 	}
 

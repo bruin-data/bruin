@@ -71,36 +71,140 @@ func formatStatement(query string) string {
 // own DECLARE can otherwise end up past the start of the script.
 //
 // Returns the input unchanged when no DECLARE statements are present, when only
-// a single statement exists, or when reordering would have no effect.
+// a single statement exists, when reordering would have no effect, or when the
+// SQL contains a string literal that would be corrupted by a naive ';' split.
 func hoistDeclares(sql string) string {
-	if !containsDeclare(sql) {
+	// Cheap pre-check: only ASCII upper/lower forms of "declare" matter as a
+	// keyword, and a top-level DECLARE must appear at a statement boundary
+	// (start of script or after a ';'). Anything else means we can return the
+	// input untouched without splitting.
+	if !mayContainDeclareStatement(sql) {
 		return sql
 	}
 
 	parts := strings.Split(sql, ";")
 	declares := make([]string, 0, len(parts))
 	rest := make([]string, 0, len(parts))
-	hadDeclare := false
+	sawNonDeclare := false
+	needsReorder := false
 
 	for _, part := range parts {
 		trimmed := strings.TrimSpace(part)
 		if trimmed == "" {
 			continue
 		}
+		// If splitting on ';' produced a fragment with an unbalanced quote, a
+		// string literal contained a semicolon and we cannot safely reorder.
+		// Return the input unchanged rather than risk corrupting the SQL.
+		if hasUnbalancedQuote(trimmed) {
+			return sql
+		}
 		if isDeclareStatement(trimmed) {
 			declares = append(declares, trimmed)
-			hadDeclare = true
+			if sawNonDeclare {
+				needsReorder = true
+			}
 		} else {
 			rest = append(rest, trimmed)
+			sawNonDeclare = true
 		}
 	}
 
-	if !hadDeclare {
+	// If every DECLARE is already ahead of every non-DECLARE, return the input
+	// unchanged so we don't normalize separators or whitespace unnecessarily.
+	if !needsReorder {
 		return sql
 	}
 
 	reordered := append(declares, rest...) //nolint:gocritic // intentional concat into a fresh slice
 	return strings.Join(reordered, ";\n") + ";"
+}
+
+// mayContainDeclareStatement is a fast pre-check: it scans the input once,
+// skipping over single- and double-quoted string literals, and returns true
+// only when the keyword "declare" appears outside of any string literal.
+// This avoids the cost of the full split/classify pass for queries that only
+// mention "declare" inside a quoted string (e.g. SELECT 'declare bankruptcy').
+func mayContainDeclareStatement(sql string) bool {
+	for i := 0; i < len(sql); i++ {
+		c := sql[i]
+		switch c {
+		case '\'', '"':
+			// Skip past the matching closing quote (treating doubled quotes as
+			// escapes). If unterminated, fall through to the end of the input.
+			quote := c
+			i++
+			for i < len(sql) {
+				if sql[i] == quote {
+					if i+1 < len(sql) && sql[i+1] == quote {
+						i += 2
+						continue
+					}
+					break
+				}
+				i++
+			}
+		case 'd', 'D':
+			if hasDeclarePrefix(sql[i:]) && (i == 0 || !isIdentChar(sql[i-1])) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasDeclarePrefix reports whether s begins with the keyword "declare" followed
+// by a non-identifier character (i.e. a word boundary), case-insensitive.
+func hasDeclarePrefix(s string) bool {
+	const kw = "declare"
+	if len(s) < len(kw) {
+		return false
+	}
+	for i := 0; i < len(kw); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if c != kw[i] {
+			return false
+		}
+	}
+	if len(s) == len(kw) {
+		return true
+	}
+	return !isIdentChar(s[len(kw)])
+}
+
+func isIdentChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		c == '_'
+}
+
+// hasUnbalancedQuote reports whether a SQL fragment contains an odd number of
+// single or double quote characters, ignoring `”` / `""` escapes. Used as a
+// guard so hoistDeclares bails out when a naive `;` split has cut through a
+// string literal.
+func hasUnbalancedQuote(s string) bool {
+	single, double := 0, 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '\'':
+			if i+1 < len(s) && s[i+1] == '\'' {
+				i++
+				continue
+			}
+			single++
+		case '"':
+			if i+1 < len(s) && s[i+1] == '"' {
+				i++
+				continue
+			}
+			double++
+		}
+	}
+	return single%2 != 0 || double%2 != 0
 }
 
 // hoistDeclaresList reorders a list of pre-split SQL statements so DECLAREs
@@ -128,13 +232,6 @@ func hoistDeclaresList(queries []string) []string {
 		}
 	}
 	return append(declares, rest...)
-}
-
-// containsDeclare is a fast pre-check that avoids splitting the script when
-// no DECLARE keyword is present at all.
-func containsDeclare(sql string) bool {
-	lower := strings.ToLower(sql)
-	return strings.Contains(lower, "declare")
 }
 
 // isDeclareStatement reports whether the given statement (without trailing ';')
