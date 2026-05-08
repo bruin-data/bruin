@@ -160,7 +160,7 @@ func hasDeclarePrefix(s string) bool {
 	if len(s) < len(kw) {
 		return false
 	}
-	for i := 0; i < len(kw); i++ {
+	for i := range len(kw) {
 		c := s[i]
 		if c >= 'A' && c <= 'Z' {
 			c += 'a' - 'A'
