@@ -60,27 +60,6 @@ Rules:
 - **Variable names** under each variant must reference variables already declared in the pipeline's `variables:` block. Unknown names fail validation with `references unknown variable "X"`.
 - A variant can override **any subset** of variables; unmentioned variables keep their `default` value.
 - Variant overrides must match the type of the underlying variable (e.g., a variable typed as `integer` cannot be overridden with a string).
-
-## Required: Variants Need Templated Identity Fields
-
-Variants are only useful when the pipeline's identity fields (`name`, `schedule`, etc.) reference the variables you override. Otherwise every variant renders to the same `name` and they collide:
-
-```yaml
-# ❌ All variants produce a pipeline named "my_pipe" — collision
-name: "my_pipe"
-variants:
-  client_alpha: { client: alpha }
-  client_beta:  { client: beta }
-```
-
-```yaml
-# ✅ Each variant produces a distinct name
-name: "{{ var.client }}_pipe"
-variants:
-  client_alpha: { client: alpha }   # → alpha_pipe
-  client_beta:  { client: beta }    # → beta_pipe
-```
-
 ## Running a Variant
 
 When a `pipeline.yml` declares variants, you must pick one with `--variant`:
@@ -89,20 +68,13 @@ When a `pipeline.yml` declares variants, you must pick one with `--variant`:
 bruin run --variant client_alpha
 ```
 
-Without the flag, Bruin refuses to run:
 
-```
-pipeline "{{ var.client }}_pipe" declares variants [client_alpha client_beta client_gamma]; --variant is required
-```
 
 ## Listing Variants
 
 ```bash
-bruin internal list-variants
+bruin internal list-variants <path-to-pipeline>
 ```
-
-Prints the variant names declared in the pipeline at the current path.
-
 ## Asset Body Example
 
 A more realistic example where `region` steers the source schema and output table, not just literals:
