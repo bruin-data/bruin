@@ -833,6 +833,14 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
 					return cli.Exit("", 1)
 				}
+
+				if preview.Pipeline.SelectedVariant != "" {
+					render := jinja.VariantRendererFactory(preview.Pipeline.Variables.Value(), preview.Pipeline.SelectedVariant)
+					if err := pipeline.RenderAssetTemplatedFields(task, render); err != nil {
+						errorPrinter.Printf("Failed to render variant fields on asset: %v\n", err)
+						return cli.Exit("", 1)
+					}
+				}
 			}
 
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", preview.Pipeline.Name)
