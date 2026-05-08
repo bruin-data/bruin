@@ -67,10 +67,28 @@ parameters:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 | ----- | -- | ------- | ------------ | ------- |
-| `campaigns` | day | – | merge | Retrieves data for a campaign, showing the app's revenue and network costs over multiple days. |
-| `creatives` | day | – | merge | Retrieves data for creative assets, detailing the app's revenue and network costs across multiple days. |
-| `events` | id | – | replace | Retrieves data for events and event slugs. |
-| `custom` | configurable | – | merge | Retrieves custom data based on the dimensions and metrics specified. |
+| [`campaigns`](https://dev.adjust.com/en/api/rs-api/reports) | day | – | merge | Retrieves data for a campaign, showing the app's revenue and network costs over multiple days. `Columns:` campaign, day, app, app_token, store_type, channel, country, network_cost, all_revenue_total_d0, ad_revenue_total_d0, revenue_total_d0, all_revenue_total_d1, ad_revenue_total_d1, revenue_total_d1, all_revenue_total_d3, ad_revenue_total_d3, revenue_total_d3, all_revenue_total_d7, ad_revenue_total_d7, revenue_total_d7, all_revenue_total_d14, ad_revenue_total_d14, revenue_total_d14, all_revenue_total_d21 |
+| [`creatives`](https://dev.adjust.com/en/api/rs-api/reports) | day | – | merge | Retrieves data for creative assets, detailing the app's revenue and network costs across multiple days. `Columns:` campaign, day, app, app_token, store_type, channel, country, adgroup, creative, network_cost, all_revenue_total_d0, ad_revenue_total_d0, revenue_total_d0, all_revenue_total_d1, ad_revenue_total_d1, revenue_total_d1, all_revenue_total_d3, ad_revenue_total_d3, revenue_total_d3, all_revenue_total_d7, ad_revenue_total_d7, revenue_total_d7, all_revenue_total_d14, ad_revenue_total_d14, revenue_total_d14, all_revenue_total_d21 |
+| [`events`](https://dev.adjust.com/en/api/rs-api/events) | id | – | replace | Retrieves data for [events](https://dev.adjust.com/en/api/rs-api/events/) and event slugs. |
+| `custom` | configurable | – | merge | Retrieves custom data based on the dimensions and metrics specified. Please refer to the `custom reports` section below for more information. |
+
+#### Custom reports: `custom:<dimensions>:<metrics>[:<filters>]`
+
+The custom table allows you to retrieve data based on specific dimensions and metrics, and apply filters to the data.
+
+The format for the custom table is:
+
+```plaintext
+custom:<dimensions>:<metrics>[:<filters>]
+```
+
+Parameters:
+- `dimensions`: A comma-separated list of [dimensions](https://dev.adjust.com/en/api/rs-api/reports#dimensions) to retrieve.
+- `metrics`: A comma-separated list of [metrics](https://dev.adjust.com/en/api/rs-api/reports#metrics) to retrieve.
+- `filters`: A comma-separated list of [filters](https://dev.adjust.com/en/api/rs-api/reports#filters) to apply to the data. For example, `app_token__in=abc123` filters results to a specific app.
+
+> [!WARNING]
+> Custom tables require a time-based dimension for efficient operation, such as `hour`, `day`, `week`, `month`, or `year`.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
