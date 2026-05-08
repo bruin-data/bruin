@@ -72,7 +72,7 @@ parameters:
 | [`events`](https://dev.adjust.com/en/api/rs-api/events) | id | – | replace | Retrieves data for [events](https://dev.adjust.com/en/api/rs-api/events/) and event slugs. |
 | `custom` | configurable | – | merge | Retrieves custom data based on the dimensions and metrics specified. Please refer to the `custom reports` section below for more information. |
 
-#### Custom reports: `custom:<dimensions>:<metrics>[:<filters>]`
+### Custom reports: `custom:<dimensions>:<metrics>[:<filters>]`
 
 The custom table allows you to retrieve data based on specific dimensions and metrics, and apply filters to the data.
 
