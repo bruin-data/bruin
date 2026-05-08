@@ -181,10 +181,6 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			if variantName == "" && len(pl.Variants) > 0 {
-				printError(fmt.Errorf("pipeline %q declares variants %v; --variant is required", pl.Name, pl.Variants.Names()), c.String("output"), "Variant required")
-				return cli.Exit("", 1)
-			}
 			if variantName != "" {
 				if len(pl.Variants) == 0 {
 					printError(fmt.Errorf("pipeline %q does not declare any variants but --variant=%q was provided", pl.Name, variantName), c.String("output"), "Variant not supported")
