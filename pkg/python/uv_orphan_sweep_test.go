@@ -12,6 +12,8 @@ import (
 func TestSweepOrphanArrowTempFiles(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("TMPDIR", tmp)
+	t.Setenv("TMP", tmp)
+	t.Setenv("TEMP", tmp)
 
 	oldArrow := filepath.Join(tmp, tempArrowFilePrefix+"old.arrow")
 	oldScript := filepath.Join(tmp, tempArrowScriptPrefix+"old.py")
