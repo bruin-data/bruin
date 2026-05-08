@@ -30,6 +30,41 @@ var (
 	ingestrInstalledPackages = make(map[string]bool)
 )
 
+const (
+	tempArrowFilePrefix   = "asset_data_"
+	tempArrowScriptPrefix = "bruin-arrow-"
+	orphanTempFileMaxAge  = time.Hour
+)
+
+// sweepOrphanArrowTempFiles removes leftover arrow data and wrapper script
+// files from previous Python materialization runs that crashed before defers
+// could fire (e.g. SIGKILL/OOM). Files newer than orphanTempFileMaxAge are
+// skipped to avoid touching files belonging to a concurrently running bruin.
+func sweepOrphanArrowTempFiles() {
+	tmpDir := os.TempDir()
+	patterns := []string{
+		filepath.Join(tmpDir, tempArrowFilePrefix+"*.arrow"),
+		filepath.Join(tmpDir, tempArrowScriptPrefix+"*.py"),
+	}
+	cutoff := time.Now().Add(-orphanTempFileMaxAge)
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, f := range matches {
+			info, err := os.Stat(f)
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(cutoff) {
+				continue
+			}
+			_ = os.Remove(f)
+		}
+	}
+}
+
 var AvailablePythonVersions = map[string]bool{
 	"3.8":  true,
 	"3.9":  true,
@@ -389,12 +424,14 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return errors.New("only table materialization is supported for Python assets")
 	}
 
-	arrowFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("asset_data_%d.arrow", time.Now().UnixNano()))
+	sweepOrphanArrowTempFiles()
+
+	arrowFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("%s%d.arrow", tempArrowFilePrefix, time.Now().UnixNano()))
 	defer func(name string) {
 		_ = os.Remove(name)
 	}(arrowFilePath)
 
-	tempPyScript, err := os.CreateTemp("", "bruin-arrow-*.py")
+	tempPyScript, err := os.CreateTemp("", tempArrowScriptPrefix+"*.py")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
