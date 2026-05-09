@@ -40,7 +40,6 @@ func TestApplyJobIDPrefix(t *testing.T) {
 			{query.QueryTypeEnhance, "bruin_enhance"},
 		}
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.queryType, func(t *testing.T) {
 				t.Parallel()
 				ctx := query.WithQueryType(context.Background(), tc.queryType)

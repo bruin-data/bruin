@@ -44,7 +44,7 @@ func TestQueryType(t *testing.T) {
 
 	t.Run("returns empty when not set", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, "", QueryTypeFromContext(context.Background()))
+		assert.Empty(t, QueryTypeFromContext(context.Background()))
 	})
 
 	t.Run("round-trips a value", func(t *testing.T) {
@@ -56,7 +56,7 @@ func TestQueryType(t *testing.T) {
 	t.Run("ignores empty values", func(t *testing.T) {
 		t.Parallel()
 		ctx := WithQueryType(context.Background(), "")
-		assert.Equal(t, "", QueryTypeFromContext(ctx))
+		assert.Empty(t, QueryTypeFromContext(ctx))
 	})
 
 	t.Run("inner WithQueryType overrides outer", func(t *testing.T) {

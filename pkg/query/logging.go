@@ -25,7 +25,6 @@ const (
 	QueryTypeDiff    = "diff"
 	QueryTypeImport  = "import"
 	QueryTypePatch   = "patch"
-	QueryTypeFetch   = "fetch"
 	QueryTypeDryRun  = "dryrun"
 	QueryTypePing    = "ping"
 	QueryTypeSchema  = "schema"
