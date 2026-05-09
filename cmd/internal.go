@@ -296,7 +296,7 @@ func DBSummary() *cli.Command {
 			}
 
 			// Get database summary
-			summary, err := summarizer.GetDatabaseSummary(ctx)
+			summary, err := summarizer.GetDatabaseSummary(query.WithQueryType(ctx, query.QueryTypeSchema))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve database summary"))
 			}
@@ -928,7 +928,7 @@ func FetchDatabases() *cli.Command {
 
 			// Get databases
 			// ctx is already available from function signature
-			databases, err := fetcher.GetDatabases(ctx)
+			databases, err := fetcher.GetDatabases(query.WithQueryType(ctx, query.QueryTypeSchema))
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve databases"))
 			}
@@ -1078,7 +1078,7 @@ func FetchTables() *cli.Command {
 			if fetcher, ok := conn.(interface {
 				GetTables(ctx context.Context, databaseName string) ([]string, error)
 			}); ok {
-				tables, err := fetcher.GetTables(ctx, databaseName)
+				tables, err := fetcher.GetTables(query.WithQueryType(ctx, query.QueryTypeSchema), databaseName)
 				if err != nil {
 					return handleError(output, errors2.Wrap(err, "failed to retrieve tables"))
 				}
@@ -1243,7 +1243,7 @@ func FetchColumns() *cli.Command {
 
 			// Get columns
 			// ctx is already available from function signature
-			columns, err := fetcher.GetColumns(ctx, databaseName, tableName)
+			columns, err := fetcher.GetColumns(query.WithQueryType(ctx, query.QueryTypeSchema), databaseName, tableName)
 			if err != nil {
 				return handleError(output, errors2.Wrap(err, "failed to retrieve columns"))
 			}

@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
@@ -216,6 +217,7 @@ func DataDiffCmd() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
+			ctx = query.WithQueryType(ctx, query.QueryTypeDiff)
 			if c.NArg() != 2 {
 				return errors.New("incorrect number of arguments, please provide two table names")
 			}

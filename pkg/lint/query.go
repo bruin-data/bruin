@@ -139,7 +139,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 
 		return issues, nil
 	}
-	valid, err := validatorInstance.IsValid(ctx, foundQuery)
+	valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), foundQuery)
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -255,7 +255,7 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 
 				return
 			}
-			valid, err := valll.IsValid(ctx, foundQuery)
+			valid, err := valll.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), foundQuery)
 			if err != nil {
 				mu.Lock()
 				issues = append(issues, &Issue{

@@ -84,6 +84,7 @@ func ImportDatabase(isDebug *bool) *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
+			ctx = query.WithQueryType(ctx, query.QueryTypeImport)
 			pipelinePath := c.Args().Get(0)
 			if pipelinePath == "" {
 				return cli.Exit("pipeline path is required", 1)
@@ -167,6 +168,7 @@ Example:
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
+			ctx = query.WithQueryType(ctx, query.QueryTypeImport)
 			pipelinePath := c.Args().Get(0)
 			if pipelinePath == "" {
 				return cli.Exit("pipeline path is required", 1)

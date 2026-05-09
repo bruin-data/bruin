@@ -948,7 +948,7 @@ func getSampleColumnValues(ctx context.Context, conn interface{}, tableName, col
 	`, columnName, tableName, columnName, limit)
 
 	q := &query.Query{Query: sampleQuery}
-	result, err := selector.Select(ctx, q)
+	result, err := selector.Select(query.WithQueryType(ctx, query.QueryTypeEnhance), q)
 	if err != nil {
 		return nil
 	}

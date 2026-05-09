@@ -176,6 +176,7 @@ func Query() *cli.Command {
 			}
 
 			if c.Bool("dry-run") {
+				ctx = query.WithQueryType(ctx, query.QueryTypeDryRun)
 				if c.Bool("export") {
 					return handleError(c.String("output"), errors.New("cannot combine --dry-run with --export"))
 				}
@@ -211,6 +212,7 @@ func Query() *cli.Command {
 			}); ok {
 				ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 				defer cancel()
+				ctx = query.WithQueryType(ctx, query.QueryTypeQuery)
 
 				timeoutCtx, timeoutCancel := context.WithTimeout(ctx, time.Duration(c.Int("timeout"))*time.Second)
 				defer timeoutCancel()

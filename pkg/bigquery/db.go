@@ -228,12 +228,26 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 	return client, nil
 }
 
+// applyJobIDPrefix tags the BigQuery job with a "bruin_<type>" prefix so the
+// resulting jobId is recognizable in the BigQuery console / job history.
+// AddJobIDSuffix appends a random suffix so repeated calls (e.g. sensors)
+// don't collide.
+func applyJobIDPrefix(ctx context.Context, bqQuery *bigquery.Query) {
+	queryType := query.QueryTypeFromContext(ctx)
+	if queryType == "" {
+		return
+	}
+	bqQuery.JobID = "bruin_" + queryType
+	bqQuery.AddJobIDSuffix = true
+}
+
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return false, err
 	}
 	q := d.client.Query(query.ToDryRunQuery())
 	q.DryRun = true
+	applyJobIDPrefix(ctx, q)
 
 	job, err := q.Run(ctx)
 	if err != nil {
@@ -253,6 +267,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 		return err
 	}
 	bqQuery := d.client.Query(q.String())
+	applyJobIDPrefix(ctx, bqQuery)
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return formatError(err)
@@ -271,6 +286,7 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 		return nil, err
 	}
 	bqQuery := d.client.Query(q.String())
+	applyJobIDPrefix(ctx, bqQuery)
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return nil, formatError(err)
@@ -308,6 +324,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, err
 	}
 	bqQuery := d.client.Query(queryObj.String())
+	applyJobIDPrefix(ctx, bqQuery)
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
@@ -366,6 +383,7 @@ func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigqu
 	}
 	q := d.client.Query(queryObj.String())
 	q.DryRun = true
+	applyJobIDPrefix(ctx, q)
 
 	if d.client.Location != "" {
 		q.Location = d.client.Location
