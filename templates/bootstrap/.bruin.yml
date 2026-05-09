@@ -5,6 +5,8 @@ environments:
       duckdb:
         - name: "duckdb-default"
           path: "duckdb.db"
+        - name: "duckdb-gong"
+          path: "duckdb_gong.db"
       chess:
         - name: "chess-default"
           players:
