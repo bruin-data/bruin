@@ -107,9 +107,24 @@ func Query() *cli.Command {
 				Usage: "validate the query without executing it; show estimated cost and metadata when available",
 			},
 			&cli.StringFlag{
+				Name:    "thread-id",
+				Sources: cli.EnvVars("BRUIN_THREAD_ID"),
+				Usage:   "thread ID to include in query annotations for tracking purposes",
+			},
+			&cli.StringFlag{
 				Name:    "agent-id",
 				Sources: cli.EnvVars("BRUIN_AGENT_ID"),
 				Usage:   "agent ID to include in query annotations for tracking purposes",
+			},
+			&cli.StringFlag{
+				Name:    "user-id",
+				Sources: cli.EnvVars("BRUIN_USER_ID"),
+				Usage:   "ID of the user who triggered the query, included in query annotations",
+			},
+			&cli.StringFlag{
+				Name:    "message-pair-id",
+				Sources: cli.EnvVars("BRUIN_MESSAGE_PAIR_ID"),
+				Usage:   "message pair ID to include in query annotations for tracking purposes",
 			},
 			&cli.StringFlag{
 				Name:  "description",
@@ -216,16 +231,21 @@ func Query() *cli.Command {
 				defer timeoutCancel()
 
 				q := query.Query{Query: queryStr}
-				agentID := c.String("agent-id")
+				adhocIDs := ansisql.AdhocQueryIDs{
+					ThreadID:      c.String("thread-id"),
+					AgentID:       c.String("agent-id"),
+					UserID:        c.String("user-id"),
+					MessagePairID: c.String("message-pair-id"),
+				}
 
-				// Apply agent-id annotation based on connection type
+				// Apply adhoc-query annotation based on connection type
 				_, isSnowflake := conn.(snowflake.SfClient)
-				if isSnowflake && agentID != "" {
+				if isSnowflake && adhocIDs.HasAny() {
 					// Snowflake: use query tag via context (Snowflake strips leading SQL comments)
-					timeoutCtx = gosnowflake.WithQueryTag(timeoutCtx, ansisql.BuildAgentIDQueryTag(agentID))
-				} else if agentID != "" {
+					timeoutCtx = gosnowflake.WithQueryTag(timeoutCtx, ansisql.BuildAdhocQueryTag(adhocIDs))
+				} else if adhocIDs.HasAny() {
 					// BigQuery and others: prepend comment to query
-					q = *ansisql.AddAgentIDAnnotationComment(&q, agentID)
+					q = *ansisql.AddAdhocQueryAnnotationComment(&q, adhocIDs)
 				}
 
 				queryStart := time.Now()

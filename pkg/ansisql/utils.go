@@ -90,34 +90,60 @@ func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 	})
 }
 
-// AddAgentIDAnnotationComment adds an agent ID annotation comment to the query.
-// This is used for adhoc queries to track which agent executed them.
-// The comment is prepended to the beginning of the query (works for BigQuery and others).
-// For Snowflake, use BuildAgentIDQueryTag with gosnowflake.WithQueryTag instead.
-func AddAgentIDAnnotationComment(q *query.Query, agentID string) *query.Query {
-	if agentID == "" {
+// AdhocQueryIDs carries the optional tracking identifiers attached to an
+// adhoc query (e.g. via `bruin query`). Empty fields are omitted from
+// annotations.
+type AdhocQueryIDs struct {
+	ThreadID      string
+	AgentID       string
+	UserID        string
+	MessagePairID string
+}
+
+// HasAny reports whether at least one tracking ID is set.
+func (a AdhocQueryIDs) HasAny() bool {
+	return a.ThreadID != "" || a.AgentID != "" || a.UserID != "" || a.MessagePairID != ""
+}
+
+// AddAdhocQueryAnnotationComment prepends a tracking annotation comment to the
+// query. The comment is prepended to the beginning of the query (works for
+// BigQuery and others). For Snowflake, use BuildAdhocQueryTag with
+// gosnowflake.WithQueryTag instead, since Snowflake strips leading SQL comments.
+func AddAdhocQueryAnnotationComment(q *query.Query, ids AdhocQueryIDs) *query.Query {
+	if !ids.HasAny() {
 		return q
 	}
 
-	comment := "-- @bruin.config: " + BuildAgentIDQueryTag(agentID)
+	comment := "-- @bruin.config: " + BuildAdhocQueryTag(ids)
 
 	return &query.Query{
 		Query: comment + "\n" + q.Query,
 	}
 }
 
-// BuildAgentIDQueryTag builds the JSON query tag string for agent ID annotation.
-// This is used for Snowflake's QUERY_TAG via gosnowflake.WithQueryTag.
-func BuildAgentIDQueryTag(agentID string) string {
+// BuildAdhocQueryTag builds the JSON query tag string for adhoc query
+// tracking. This is used for Snowflake's QUERY_TAG via
+// gosnowflake.WithQueryTag. Empty IDs are omitted from the JSON payload.
+func BuildAdhocQueryTag(ids AdhocQueryIDs) string {
 	annotations := map[string]interface{}{
-		"agent_id": agentID,
-		"type":     "adhoc_query",
+		"type": "adhoc_query",
+	}
+	if ids.ThreadID != "" {
+		annotations["thread_id"] = ids.ThreadID
+	}
+	if ids.AgentID != "" {
+		annotations["agent_id"] = ids.AgentID
+	}
+	if ids.UserID != "" {
+		annotations["user_id"] = ids.UserID
+	}
+	if ids.MessagePairID != "" {
+		annotations["message_pair_id"] = ids.MessagePairID
 	}
 
 	finalJSON, err := json.Marshal(annotations)
 	if err != nil {
-		// If marshaling fails, return just the agent ID
-		return agentID
+		return ""
 	}
 
 	return string(finalJSON)

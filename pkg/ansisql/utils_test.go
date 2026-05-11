@@ -87,24 +87,35 @@ func TestAddAnnotationComment(t *testing.T) {
 	}
 }
 
-func TestAddAgentIDAnnotationComment(t *testing.T) {
+func TestAddAdhocQueryAnnotationComment(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		agentID  string
+		ids      AdhocQueryIDs
 		query    string
 		expected string
 	}{
 		{
-			name:     "with agent ID",
-			agentID:  "my-agent-123",
+			name:     "with thread ID only",
+			ids:      AdhocQueryIDs{ThreadID: "my-thread-123"},
 			query:    "SELECT * FROM table",
-			expected: `-- @bruin.config: {"agent_id":"my-agent-123","type":"adhoc_query"}` + "\n" + "SELECT * FROM table",
+			expected: `-- @bruin.config: {"thread_id":"my-thread-123","type":"adhoc_query"}` + "\n" + "SELECT * FROM table",
 		},
 		{
-			name:     "empty agent ID",
-			agentID:  "",
+			name: "with all IDs",
+			ids: AdhocQueryIDs{
+				ThreadID:      "t-1",
+				AgentID:       "a-1",
+				UserID:        "u-1",
+				MessagePairID: "mp-1",
+			},
+			query:    "SELECT * FROM table",
+			expected: `-- @bruin.config: {"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query","user_id":"u-1"}` + "\n" + "SELECT * FROM table",
+		},
+		{
+			name:     "no IDs set",
+			ids:      AdhocQueryIDs{},
 			query:    "SELECT * FROM table",
 			expected: "SELECT * FROM table",
 		},
@@ -115,7 +126,7 @@ func TestAddAgentIDAnnotationComment(t *testing.T) {
 			t.Parallel()
 
 			q := &query.Query{Query: tt.query}
-			result := AddAgentIDAnnotationComment(q, tt.agentID)
+			result := AddAdhocQueryAnnotationComment(q, tt.ids)
 
 			assert.NotNil(t, result)
 			assert.Equal(t, tt.expected, result.Query)
@@ -192,23 +203,33 @@ func TestBuildAnnotationJSON(t *testing.T) {
 	}
 }
 
-func TestBuildAgentIDQueryTag(t *testing.T) {
+func TestBuildAdhocQueryTag(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		agentID  string
+		ids      AdhocQueryIDs
 		expected string
 	}{
 		{
-			name:     "with agent ID",
-			agentID:  "my-agent-123",
-			expected: `{"agent_id":"my-agent-123","type":"adhoc_query"}`,
+			name:     "with thread ID only",
+			ids:      AdhocQueryIDs{ThreadID: "my-thread-123"},
+			expected: `{"thread_id":"my-thread-123","type":"adhoc_query"}`,
 		},
 		{
-			name:     "empty agent ID returns empty JSON",
-			agentID:  "",
-			expected: `{"agent_id":"","type":"adhoc_query"}`,
+			name: "with all IDs",
+			ids: AdhocQueryIDs{
+				ThreadID:      "t-1",
+				AgentID:       "a-1",
+				UserID:        "u-1",
+				MessagePairID: "mp-1",
+			},
+			expected: `{"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query","user_id":"u-1"}`,
+		},
+		{
+			name:     "no IDs set still emits type",
+			ids:      AdhocQueryIDs{},
+			expected: `{"type":"adhoc_query"}`,
 		},
 	}
 
@@ -216,7 +237,7 @@ func TestBuildAgentIDQueryTag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := BuildAgentIDQueryTag(tt.agentID)
+			result := BuildAdhocQueryTag(tt.ids)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
