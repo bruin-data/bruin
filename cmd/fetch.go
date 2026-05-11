@@ -234,6 +234,10 @@ func Query() *cli.Command {
 
 				// Save query log (for both success and error cases)
 				inputPath := c.String("asset")
+				var annotations json.RawMessage
+				if tag != "" {
+					annotations = json.RawMessage(tag)
+				}
 				logOpts := QueryLogOptions{
 					QueryStartTimestamp: queryStart,
 					Asset:               inputPath,
@@ -241,6 +245,7 @@ func Query() *cli.Command {
 					Limit:               c.Int64("limit"),
 					Timeout:             c.Int("timeout"),
 					Description:         c.String("description"),
+					Annotations:         annotations,
 				}
 				if err := saveQueryLog(queryStr, connName, result, queryErr, logOpts); err != nil {
 					// Log the error but don't fail the command
@@ -937,6 +942,7 @@ type QueryLog struct {
 	Limit               int64           `json:"limit,omitempty"`
 	Timeout             int             `json:"timeout,omitempty"`
 	Description         string          `json:"description,omitempty"`
+	Annotations         json.RawMessage `json:"annotations,omitempty"`
 }
 
 // QueryLogOptions contains optional parameters for query logging.
@@ -947,6 +953,7 @@ type QueryLogOptions struct {
 	Limit               int64
 	Timeout             int
 	Description         string
+	Annotations         json.RawMessage
 }
 
 func saveQueryLog(queryStr string, connName string, result *query.QueryResult, queryErr error, opts QueryLogOptions) error {
@@ -986,6 +993,7 @@ func saveQueryLog(queryStr string, connName string, result *query.QueryResult, q
 		Limit:               opts.Limit,
 		Timeout:             opts.Timeout,
 		Description:         opts.Description,
+		Annotations:         opts.Annotations,
 	}
 
 	if queryErr != nil {
