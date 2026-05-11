@@ -131,6 +131,39 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 
 		start := time.Now()
 
+		// Periodically log "still running" for long-running tasks
+		var stopTicker chan struct{}
+		var tickerWg sync.WaitGroup
+		if !w.formatOpts.TUIMode && !w.formatOpts.MinimalLogs {
+			stopTicker = make(chan struct{})
+			tickerWg.Add(1)
+			go func() {
+				defer tickerWg.Done()
+				ticker := time.NewTicker(10 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ticker.C:
+						elapsed := time.Since(start).Truncate(time.Second)
+						w.printLock.Lock()
+						stillRunningPrinter := w.printer
+						if !w.formatOpts.NoColor {
+							stillRunningPrinter = color.New(color.Faint)
+						}
+						if w.formatOpts.DoNotLogTimestamp {
+							fmt.Printf("%s\n", stillRunningPrinter.Sprintf("Still running: %s (%s)", task.GetHumanID(), elapsed))
+						} else {
+							ts := whitePrinter("[%s]", time.Now().Format(timeFormat))
+							fmt.Printf("%s %s\n", ts, stillRunningPrinter.Sprintf("Still running: %s (%s)", task.GetHumanID(), elapsed))
+						}
+						w.printLock.Unlock()
+					case <-stopTicker:
+						return
+					}
+				}
+			}()
+		}
+
 		// In TUI mode, redirect worker output to log-only writer
 		outputWriter := io.Writer(os.Stdout)
 		if w.formatOpts.TUIMode && w.formatOpts.LogOnlyWriter != nil {
@@ -148,6 +181,11 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		executionCtx := context.WithValue(ctx, KeyPrinter, printer)
 		executionCtx = context.WithValue(executionCtx, ContextLogger, w.logger)
 		err := w.executor.RunSingleTask(executionCtx, task)
+
+		if stopTicker != nil {
+			close(stopTicker)
+			tickerWg.Wait()
+		}
 
 		duration := time.Since(start)
 
