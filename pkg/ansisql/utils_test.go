@@ -87,54 +87,6 @@ func TestAddAnnotationComment(t *testing.T) {
 	}
 }
 
-func TestAddAdhocQueryAnnotationComment(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		ids      AdhocQueryIDs
-		query    string
-		expected string
-	}{
-		{
-			name:     "with thread ID only",
-			ids:      AdhocQueryIDs{ThreadID: "my-thread-123"},
-			query:    "SELECT * FROM table",
-			expected: `-- @bruin.config: {"thread_id":"my-thread-123","type":"adhoc_query"}` + "\n" + "SELECT * FROM table",
-		},
-		{
-			name: "with all IDs",
-			ids: AdhocQueryIDs{
-				ThreadID:      "t-1",
-				AgentID:       "a-1",
-				MessagePairID: "mp-1",
-			},
-			query:    "SELECT * FROM table",
-			expected: `-- @bruin.config: {"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query"}` + "\n" + "SELECT * FROM table",
-		},
-		{
-			name:     "no IDs set",
-			ids:      AdhocQueryIDs{},
-			query:    "SELECT * FROM table",
-			expected: "SELECT * FROM table",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			q := &query.Query{Query: tt.query}
-			result := AddAdhocQueryAnnotationComment(q, tt.ids)
-
-			assert.NotNil(t, result)
-			assert.Equal(t, tt.expected, result.Query)
-			// Original query should remain unchanged
-			assert.Equal(t, tt.query, q.Query)
-		})
-	}
-}
-
 func TestBuildAnnotationJSON(t *testing.T) {
 	t.Parallel()
 
@@ -206,28 +158,40 @@ func TestBuildAdhocQueryTag(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		ids      AdhocQueryIDs
-		expected string
+		name        string
+		annotations string
+		expected    string
+		expectError bool
 	}{
 		{
-			name:     "with thread ID only",
-			ids:      AdhocQueryIDs{ThreadID: "my-thread-123"},
-			expected: `{"thread_id":"my-thread-123","type":"adhoc_query"}`,
+			name:        "single field via JSON",
+			annotations: `{"thread_id":"my-thread-123"}`,
+			expected:    `{"thread_id":"my-thread-123","type":"adhoc_query"}`,
 		},
 		{
-			name: "with all IDs",
-			ids: AdhocQueryIDs{
-				ThreadID:      "t-1",
-				AgentID:       "a-1",
-				MessagePairID: "mp-1",
-			},
-			expected: `{"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query"}`,
+			name:        "multiple fields via JSON",
+			annotations: `{"thread_id":"t-1","agent_id":"a-1","message_pair_id":"mp-1"}`,
+			expected:    `{"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query"}`,
 		},
 		{
-			name:     "no IDs set still emits type",
-			ids:      AdhocQueryIDs{},
-			expected: `{"type":"adhoc_query"}`,
+			name:        "default sentinel emits only baseline",
+			annotations: DefaultQueryAnnotations,
+			expected:    `{"type":"adhoc_query"}`,
+		},
+		{
+			name:        "empty annotations returns empty string",
+			annotations: "",
+			expected:    "",
+		},
+		{
+			name:        "user JSON can override baseline type",
+			annotations: `{"type":"custom"}`,
+			expected:    `{"type":"custom"}`,
+		},
+		{
+			name:        "invalid JSON returns error",
+			annotations: `{"bad"`,
+			expectError: true,
 		},
 	}
 
@@ -235,7 +199,12 @@ func TestBuildAdhocQueryTag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := BuildAdhocQueryTag(tt.ids)
+			result, err := BuildAdhocQueryTag(tt.annotations)
+			if tt.expectError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

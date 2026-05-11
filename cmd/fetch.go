@@ -107,19 +107,9 @@ func Query() *cli.Command {
 				Usage: "validate the query without executing it; show estimated cost and metadata when available",
 			},
 			&cli.StringFlag{
-				Name:    "thread-id",
-				Sources: cli.EnvVars("BRUIN_THREAD_ID"),
-				Usage:   "thread ID to include in query annotations for tracking purposes",
-			},
-			&cli.StringFlag{
-				Name:    "agent-id",
-				Sources: cli.EnvVars("BRUIN_AGENT_ID"),
-				Usage:   "agent ID to include in query annotations for tracking purposes",
-			},
-			&cli.StringFlag{
-				Name:    "message-pair-id",
-				Sources: cli.EnvVars("BRUIN_MESSAGE_PAIR_ID"),
-				Usage:   "message pair ID to include in query annotations for tracking purposes",
+				Name:    "query-annotations",
+				Sources: cli.EnvVars("BRUIN_QUERY_ANNOTATIONS"),
+				Usage:   fmt.Sprintf("JSON string containing annotations to be attached to the query for tracking purposes. Use '%s' to only include the default annotations.", ansisql.DefaultQueryAnnotations),
 			},
 			&cli.StringFlag{
 				Name:  "description",
@@ -226,20 +216,17 @@ func Query() *cli.Command {
 				defer timeoutCancel()
 
 				q := query.Query{Query: queryStr}
-				adhocIDs := ansisql.AdhocQueryIDs{
-					ThreadID:      c.String("thread-id"),
-					AgentID:       c.String("agent-id"),
-					MessagePairID: c.String("message-pair-id"),
+				tag, err := ansisql.BuildAdhocQueryTag(c.String("query-annotations"))
+				if err != nil {
+					return handleError(c.String("output"), err)
 				}
-
-				// Apply adhoc-query annotation based on connection type
-				_, isSnowflake := conn.(snowflake.SfClient)
-				if isSnowflake && adhocIDs.HasAny() {
-					// Snowflake: use query tag via context (Snowflake strips leading SQL comments)
-					timeoutCtx = gosnowflake.WithQueryTag(timeoutCtx, ansisql.BuildAdhocQueryTag(adhocIDs))
-				} else if adhocIDs.HasAny() {
-					// BigQuery and others: prepend comment to query
-					q = *ansisql.AddAdhocQueryAnnotationComment(&q, adhocIDs)
+				if tag != "" {
+					if _, isSnowflake := conn.(snowflake.SfClient); isSnowflake {
+						// Snowflake strips leading SQL comments, so use QUERY_TAG instead.
+						timeoutCtx = gosnowflake.WithQueryTag(timeoutCtx, tag)
+					} else {
+						q.Query = "-- @bruin.config: " + tag + "\n" + q.Query
+					}
 				}
 
 				queryStart := time.Now()
