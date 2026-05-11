@@ -689,8 +689,9 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Smartsheet: []SmartsheetConnection{
 				{
-					Name:        "smartsheet-1",
-					AccessToken: "access-token-123",
+					Name:         "smartsheet-1",
+					AccessToken:  "access-token-123",
+					SmartsheetID: "1234567890",
 				},
 			},
 			Attio: []AttioConnection{

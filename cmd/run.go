@@ -41,6 +41,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
@@ -594,12 +595,12 @@ func Run(isDebug *bool) *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:   "use-gong",
-				Usage:  "use gong binary for execution",
+				Usage:  "force gong for all ingestr assets in this run (overridden per-asset by parameters.version=v0)",
 				Hidden: true,
 			},
 			&cli.StringFlag{
 				Name:   "gong-path",
-				Usage:  "path to the gong binary (when using --use-gong)",
+				Usage:  "path to a pre-installed gong binary; overrides per-asset gong installation for the run",
 				Hidden: true,
 			},
 			&cli.StringFlag{
@@ -676,7 +677,7 @@ func Run(isDebug *bool) *cli.Command {
 				if gongPath == "" {
 					// Auto-install gong if no custom path provided
 					gongChecker := &gong.Checker{}
-					installedPath, err := gongChecker.EnsureGongInstalled(ctx)
+					installedPath, err := gongChecker.EnsureGongInstalled(ctx, "")
 					if err != nil {
 						return cli.Exit(fmt.Sprintf("failed to install gong: %v", err), 1)
 					}
@@ -832,6 +833,14 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
 					return cli.Exit("", 1)
 				}
+
+				if preview.Pipeline.SelectedVariant != "" {
+					render := jinja.VariantRendererFactory(preview.Pipeline.Variables.Value(), preview.Pipeline.SelectedVariant)
+					if err := pipeline.RenderAssetTemplatedFields(task, render); err != nil {
+						errorPrinter.Printf("Failed to render variant fields on asset: %v\n", err)
+						return cli.Exit("", 1)
+					}
+				}
 			}
 
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", preview.Pipeline.Name)
@@ -907,7 +916,7 @@ func Run(isDebug *bool) *cli.Command {
 						if gongPath == "" {
 							// Auto-install gong if no custom path provided
 							gongChecker := &gong.Checker{}
-							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx)
+							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx, "")
 							if gongErr != nil {
 								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to install gong: %v", gongErr), 1)
 							}
@@ -1818,6 +1827,23 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeMain] = trinoQuerySensor
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
+		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
+		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
+			Mat: oracle.NewMaterializer(fullRefresh),
+		}, parser)
+		oracleMetadataPushOperator := postgres.NewMetadataPushOperator(conn) // using Postgres Metadata Push for Oracle if suitable, or skipping it
+
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeMain] = oracleOperator
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeColumnCheck] = oracleCheckRunner
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeOracleQuery][scheduler.TaskInstanceTypeMetadataPush] = oracleMetadataPushOperator
+
+		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeMain] = executor.NoOpOperator{}
+		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeColumnCheck] = oracleCheckRunner
+		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeOracleSource][scheduler.TaskInstanceTypeMetadataPush] = oracleMetadataPushOperator
 	}
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeTableSensor)
 	if shouldInitiateSnowflake {

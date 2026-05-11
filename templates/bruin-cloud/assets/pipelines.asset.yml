@@ -1,0 +1,40 @@
+name: bruin_cloud_logs.pipelines
+type: ingestr
+
+description: |
+  Snapshot of every pipeline registered in your Bruin Cloud workspace, ingested from the Bruin Cloud API (`GET /api/v1/pipelines`).
+  Each row represents a single pipeline definition along with its scheduling, ownership, and source-control metadata. The table is fully replaced on every run, so it always reflects the current state of pipelines in Bruin Cloud at the time of ingestion.
+  Use this as the canonical lookup table for joining other Bruin Cloud metadata (such as `bruin_cloud_logs.assets`) on the composite key (`name`, `project`) — pipeline names are not unique across projects, so joining on `name` alone can produce a cross-product.
+
+  Note on schema inference: ingestr/dlt creates the destination schema from the API response. Optional fields (`description`, `owner`, `default_connections`, `schedule`, `commit`, `start_date`) are only materialized as columns when at least one pipeline in your workspace has a non-NULL value for them. If every pipeline you have leaves a field unset, the column will be missing from the destination — this is expected behaviour, not a load failure.
+
+columns:
+  - name: name
+    type: varchar
+    description: "Pipeline name as defined in `pipeline.yml`. Joins to `bruin_cloud_logs.assets.pipeline`. Note: not globally unique — the same name may appear across different `project`s, so use (`name`, `project`) when a unique key is required."
+    checks:
+      - name: not_null
+  - name: description
+    type: varchar
+    description: "Human-readable description of what the pipeline does, sourced from the `description` field in `pipeline.yml`. May be null if no description was provided."
+  - name: project
+    type: varchar
+    description: "Name of the Bruin Cloud project (workspace folder) the pipeline belongs to. Used to group pipelines that share configuration and connections."
+  - name: owner
+    type: varchar
+    description: "Pipeline owner — typically the email or handle of the user/team accountable for the pipeline. Sourced from the `owner` field in `pipeline.yml`."
+  - name: default_connections
+    type: json
+    description: "Map of asset types to default connection names used when an asset does not specify its own connection (e.g. `{\"google_cloud_platform\": \"gcp-default\"}`). Defined under `default_connections` in `pipeline.yml`."
+  - name: schedule
+    type: varchar
+    description: "Pipeline schedule expression — either a preset (e.g. `daily`, `hourly`) or a cron string. Null when the pipeline is not scheduled."
+  - name: commit
+    type: varchar
+    description: "Git commit SHA representing the version of the pipeline definition that is currently deployed in Bruin Cloud."
+  - name: start_date
+    type: varchar
+    description: "Pipeline start date (ISO-8601 string). Marks the earliest logical date for which the pipeline is allowed to run; used by Bruin's scheduler for backfills and catchups."
+
+parameters:
+  source_table: pipelines

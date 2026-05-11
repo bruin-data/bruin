@@ -76,6 +76,201 @@ func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
 	}
 }
 
+func TestWrapHooks_HoistsDeclares(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+		hooks Hooks
+		want  string
+	}{
+		{
+			name: "materialization DECLARE bubbles past pre-hook SET",
+			query: "DECLARE distinct_keys array<STRING>;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"SELECT 1;\n" +
+				"COMMIT TRANSACTION",
+			hooks: Hooks{
+				Pre: []Hook{
+					{Query: "DECLARE my_var DATE"},
+					{Query: "SET my_var = DATE('2026-01-01')"},
+				},
+			},
+			want: "DECLARE my_var DATE;\n" +
+				"DECLARE distinct_keys array<STRING>;\n" +
+				"SET my_var = DATE('2026-01-01');\n" +
+				"BEGIN TRANSACTION;\n" +
+				"SELECT 1;\n" +
+				"COMMIT TRANSACTION;",
+		},
+		{
+			name:  "lowercase declare also hoisted",
+			query: "select 1",
+			hooks: Hooks{
+				Pre: []Hook{
+					{Query: "set x = 1"},
+					{Query: "declare y int64"},
+				},
+			},
+			want: "declare y int64;\n" +
+				"set x = 1;\n" +
+				"select 1;",
+		},
+		{
+			name:  "declare preceded by line comment is still detected",
+			query: "select 1",
+			hooks: Hooks{
+				Pre: []Hook{
+					{Query: "SET x = 1"},
+					{Query: "-- setup\nDECLARE y INT64"},
+				},
+			},
+			want: "-- setup\nDECLARE y INT64;\n" +
+				"SET x = 1;\n" +
+				"select 1;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, WrapHooks(tt.query, tt.hooks))
+		})
+	}
+}
+
+func TestHoistDeclares(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "no declare is a no-op",
+			in:   "SELECT 1;\nSELECT 2;",
+			want: "SELECT 1;\nSELECT 2;",
+		},
+		{
+			name: "single statement is a no-op",
+			in:   "SELECT 1",
+			want: "SELECT 1",
+		},
+		{
+			name: "leading declare is a no-op",
+			in:   "DECLARE x INT64;\nSELECT 1;",
+			want: "DECLARE x INT64;\nSELECT 1;",
+		},
+		{
+			name: "already-ordered declares preserve original separators",
+			in:   "DECLARE x INT64; SELECT 1;",
+			want: "DECLARE x INT64; SELECT 1;",
+		},
+		{
+			name: "multiple already-ordered declares preserve original formatting",
+			in:   "DECLARE x INT64;DECLARE y STRING;\n\nSELECT 1;",
+			want: "DECLARE x INT64;DECLARE y STRING;\n\nSELECT 1;",
+		},
+		{
+			name: "declare after non-declare gets hoisted",
+			in:   "SET x = 1;\nDECLARE y INT64;\nSELECT 1;",
+			want: "DECLARE y INT64;\nSET x = 1;\nSELECT 1;",
+		},
+		{
+			name: "multiple declares preserve relative order",
+			in:   "SET x = 1;\nDECLARE y INT64;\nSET z = 2;\nDECLARE w STRING;",
+			want: "DECLARE y INT64;\nDECLARE w STRING;\nSET x = 1;\nSET z = 2;",
+		},
+		{
+			name: "case-insensitive detection",
+			in:   "set x = 1;\ndeclare y int64",
+			want: "declare y int64;\nset x = 1;",
+		},
+		{
+			name: "leading comment before declare is tolerated",
+			in:   "SET x = 1;\n-- a comment\nDECLARE y INT64",
+			want: "-- a comment\nDECLARE y INT64;\nSET x = 1;",
+		},
+		{
+			name: "block comment before declare is tolerated",
+			in:   "SET x = 1;\n/* block */ DECLARE y INT64",
+			want: "/* block */ DECLARE y INT64;\nSET x = 1;",
+		},
+		{
+			name: "empty parts are dropped",
+			in:   "SET x = 1;;\nDECLARE y INT64;",
+			want: "DECLARE y INT64;\nSET x = 1;",
+		},
+		{
+			name: "semicolon inside single-quoted literal is left untouched",
+			in:   "SET separator = ';';\nDECLARE y INT64;",
+			want: "SET separator = ';';\nDECLARE y INT64;",
+		},
+		{
+			name: "declare keyword inside string literal does not trigger reordering",
+			in:   "SELECT 'declare bankruptcy' AS msg;",
+			want: "SELECT 'declare bankruptcy' AS msg;",
+		},
+		{
+			name: "declare as a column alias does not trigger reordering",
+			in:   "SELECT 1 AS declare;",
+			want: "SELECT 1 AS declare;",
+		},
+		{
+			name: "semicolon inside double-quoted literal is left untouched",
+			in:   "SET label = \"a;b\";\nDECLARE y INT64;",
+			want: "SET label = \"a;b\";\nDECLARE y INT64;",
+		},
+		{
+			name: "escaped quote inside literal does not trip the guard",
+			in:   "SET msg = 'it''s fine';\nDECLARE y INT64;",
+			want: "DECLARE y INT64;\nSET msg = 'it''s fine';",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, hoistDeclares(tt.in))
+		})
+	}
+}
+
+func TestHoistDeclaresList(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{
+			name: "no declare is a no-op",
+			in:   []string{"SELECT 1", "SELECT 2"},
+			want: []string{"SELECT 1", "SELECT 2"},
+		},
+		{
+			name: "declare after non-declare gets hoisted",
+			in:   []string{"SET x = 1", "DECLARE y INT64", "SELECT 1"},
+			want: []string{"DECLARE y INT64", "SET x = 1", "SELECT 1"},
+		},
+		{
+			name: "case-insensitive",
+			in:   []string{"set x = 1", "declare y int64"},
+			want: []string{"declare y int64", "set x = 1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, hoistDeclaresList(tt.in))
+		})
+	}
+}
+
 func TestWrapHookQueriesList(t *testing.T) {
 	t.Parallel()
 

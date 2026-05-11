@@ -240,25 +240,30 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return errors.Errorf("connection '%s' is not a snowflake connection", connName)
 	}
 
+	sensorTimeout := helpers.GetSensorTimeout(t)
+	timeout := time.After(sensorTimeout)
 	for {
-		res, err := conn.SelectOnlyLastResult(ctx, qry[0])
-		if err != nil {
-			return err
-		}
+		select {
+		case <-timeout:
+			return errors.Errorf("Sensor timed out after %s", sensorTimeout)
+		default:
+			res, err := conn.SelectOnlyLastResult(ctx, qry[0])
+			if err != nil {
+				return err
+			}
 
-		intRes, err := helpers.CastResultToInteger(res, true)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse query sensor result")
-		}
+			intRes, err := helpers.CastResultToInteger(res, true)
+			if err != nil {
+				return errors.Wrap(err, "failed to parse query sensor result")
+			}
 
-		if intRes > 0 {
-			break
-		}
+			if intRes > 0 {
+				return nil
+			}
 
-		time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
+			time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
+		}
 	}
-
-	return nil
 }
 
 type MetadataOperator struct {

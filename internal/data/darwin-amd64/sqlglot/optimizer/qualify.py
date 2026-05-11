@@ -16,14 +16,14 @@ from sqlglot.schema import Schema, ensure_schema
 
 
 def qualify(
-    expression: exp.Expression,
+    expression: exp.Expr,
     dialect: DialectType = None,
-    db: t.Optional[str] = None,
-    catalog: t.Optional[str] = None,
-    schema: t.Optional[dict | Schema] = None,
+    db: str | None = None,
+    catalog: str | None = None,
+    schema: dict[str, object] | Schema | None = None,
     expand_alias_refs: bool = True,
     expand_stars: bool = True,
-    infer_schema: t.Optional[bool] = None,
+    infer_schema: bool | None = None,
     isolate_tables: bool = False,
     qualify_columns: bool = True,
     allow_partial_qualification: bool = False,
@@ -31,9 +31,9 @@ def qualify(
     quote_identifiers: bool = True,
     identify: bool = True,
     canonicalize_table_aliases: bool = False,
-    on_qualify: t.Optional[t.Callable[[exp.Expression], None]] = None,
-    sql: t.Optional[str] = None,
-) -> exp.Expression:
+    on_qualify: t.Callable[[exp.Expr], None] | None = None,
+    sql: str | None = None,
+) -> exp.Expr:
     """
     Rewrite sqlglot AST to have normalized and qualified tables and columns.
 
@@ -47,7 +47,7 @@ def qualify(
         'SELECT "tbl"."col" AS "col" FROM "tbl" AS "tbl"'
 
     Args:
-        expression: Expression to qualify.
+        expression: Expr to qualify.
         db: Default database name for tables.
         catalog: Default catalog name for tables.
         schema: Schema to infer column names and types.

@@ -2969,6 +2969,9 @@
         },
         "access_token": {
           "type": "string"
+        },
+        "smartsheet_id": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -3170,6 +3173,15 @@
         },
         "region": {
           "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "url_style": {
+          "type": "string"
+        },
+        "use_ssl": {
+          "type": "boolean"
         },
         "auth": {
           "$ref": "#/$defs/StorageAuth"

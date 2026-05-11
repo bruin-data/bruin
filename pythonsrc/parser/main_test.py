@@ -1630,7 +1630,7 @@ GROUP BY 1
             },
             {
                 "name": "FIRST_DEVICE_TYPE",
-                "type": "UNKNOWN",
+                "type": "TEXT",
                 "upstream": [
                     {
                         "column": "FIRST_ACTIVITY_TIMESTAMP",
@@ -1732,7 +1732,7 @@ ORDER BY 1, 2, 3
             }
         },
         "expected": [
-            {"name": "CREATED_AT", "type": "TIMESTAMP", "upstream": []},
+            {"name": "CREATED_AT", "type": "TIMESTAMPLTZ", "upstream": []},
             {
                 "name": "EVENT_DATE",
                 "type": "DATE",

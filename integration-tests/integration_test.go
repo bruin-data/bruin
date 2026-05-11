@@ -2242,7 +2242,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-02: run pipeline with full refresh",
 						Command: binary,
-						Args:    []string{"run", "--full-refresh", "--env", "env-scd2-by-column", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline")},
+						Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--env", "env-scd2-by-column", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline")},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2254,11 +2254,35 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-03: query the initial table",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
 							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/expectations/scd2_by_col_expected_initial.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "scd2-col-03b: verify metadata timestamp types",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file",
+							filepath.Join(currentFolder, ".bruin.yml"),
+							"--connection",
+							"duckdb-scd2-by-column",
+							"--query",
+							"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'test' AND table_name = 'menu' AND column_name IN ('_valid_from', '_valid_until') ORDER BY column_name;",
+							"--output",
+							"csv",
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-pipeline/expectations/scd2_by_col_metadata_types.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -2290,7 +2314,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-05: query the updated table 01",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2326,7 +2350,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-07: query the updated table 02",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-column", "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2395,11 +2419,35 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-time-03: query the initial table",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
 							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/expectations/scd2_by_time_expected_initial.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "scd2-time-03b: verify metadata timestamp types",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file",
+							filepath.Join(currentFolder, ".bruin.yml"),
+							"--connection",
+							"duckdb-scd2-by-time",
+							"--query",
+							"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'test' AND table_name = 'products' AND column_name IN ('_valid_from', '_valid_until') ORDER BY column_name;",
+							"--output",
+							"csv",
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/expectations/scd2_by_time_metadata_types.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -2431,7 +2479,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-time-05: query the updated table 01",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2467,7 +2515,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-time-07: query the updated table 02",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-time", "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2536,11 +2584,35 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-ik-03: query the initial table",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
 							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-incremental-key-pipeline/expectations/scd2_by_col_ik_expected_initial.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "scd2-col-ik-03b: verify metadata timestamp types",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--config-file",
+							filepath.Join(currentFolder, ".bruin.yml"),
+							"--connection",
+							"duckdb-scd2-by-column-incremental-key",
+							"--query",
+							"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'test' AND table_name = 'products' AND column_name IN ('_valid_from', '_valid_until') ORDER BY column_name;",
+							"--output",
+							"csv",
+						},
+						Env: []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-column-incremental-key-pipeline/expectations/scd2_by_col_ik_metadata_types.csv"),
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -2572,7 +2644,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-ik-05: query the updated table 01",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -2608,7 +2680,7 @@ func TestWorkflowTasks(t *testing.T) {
 					{
 						Name:    "scd2-col-ik-07: query the updated table 02",
 						Command: binary,
-						Args:    []string{"query", "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-scd2-by-column-incremental-key", "--query", "SELECT product_id, product_name, price, _is_current, _valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,

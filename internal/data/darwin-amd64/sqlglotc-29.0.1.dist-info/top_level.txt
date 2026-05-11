@@ -1,2 +1,0 @@
-e1890b2472c724a62761__mypyc
-sqlglot

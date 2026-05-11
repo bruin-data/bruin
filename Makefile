@@ -116,7 +116,7 @@ tools-update:
 
 lint-python:
 	@[ -d .venv ] || uv venv --quiet
-	@uv pip install --quiet sqlglot
+	@uv pip install --quiet sqlglot==30.7.0
 	@echo "$(OK_COLOR)==> Running Python formatting with ruff...$(NO_COLOR)"
 	@uvx ruff format ./pythonsrc
 

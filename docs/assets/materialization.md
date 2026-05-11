@@ -442,6 +442,8 @@ When changes are detected in non-primary key columns:
 - `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records, or uses `incremental_key` value when a record is expired due to changes)
 - `_is_current`: BOOLEAN indicating if this is the current version of the record
 
+For DuckDB and MotherDuck, `_valid_from` and `_valid_until` are created as `TIMESTAMP WITH TIME ZONE`.
+
 **Optional: Using `incremental_key` for timestamps:**
 
 By default, `_valid_from` and `_valid_until` are set using `CURRENT_TIMESTAMP()`. However, if your source data has a column that indicates when changes actually occurred (e.g., an `updated_at` timestamp), you can specify it using the `incremental_key` option:
@@ -596,6 +598,8 @@ The strategy tracks changes based on the time values in the `incremental_key` co
 - `_valid_from`: TIMESTAMP when the record version became active (derived from the `incremental_key`)
 - `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records)
 - `_is_current`: BOOLEAN indicating if this is the current version of the record
+
+For DuckDB and MotherDuck, `_valid_from` and `_valid_until` are created as `TIMESTAMP WITH TIME ZONE`.
 
 Here's an example of an asset with `scd2_by_time` materialization:
 

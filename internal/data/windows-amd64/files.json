@@ -1,80 +1,74 @@
 {
-  "contentHash": "e6bd8f0c9e7450d2d8b615ce53d7bb1d3b4d4093e35a09b58e450a505879700a",
+  "contentHash": "1a4aa52862441d5f2431b7b266eb7a59a31806a4d89d580b46e0dd8afd62e51c",
   "files": [
-    {
-      "name": "e1890b2472c724a62761__mypyc.cp313-win_amd64.pyd",
-      "size": 707584,
-      "perm": 420,
-      "compressed": true
-    },
     {
       "name": "sqlglot",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglot-29.0.1.dist-info",
+      "name": "sqlglot-30.7.0.dist-info",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglot-29.0.1.dist-info/INSTALLER",
+      "name": "sqlglot-30.7.0.dist-info/INSTALLER",
       "size": 4,
       "perm": 420
     },
     {
-      "name": "sqlglot-29.0.1.dist-info/METADATA",
-      "size": 22644,
+      "name": "sqlglot-30.7.0.dist-info/METADATA",
+      "size": 24943,
       "perm": 420
     },
     {
-      "name": "sqlglot-29.0.1.dist-info/RECORD",
-      "size": 13676,
+      "name": "sqlglot-30.7.0.dist-info/RECORD",
+      "size": 25531,
       "perm": 420
     },
     {
-      "name": "sqlglot-29.0.1.dist-info/REQUESTED",
+      "name": "sqlglot-30.7.0.dist-info/REQUESTED",
       "size": 0,
       "perm": 420
     },
     {
-      "name": "sqlglot-29.0.1.dist-info/WHEEL",
+      "name": "sqlglot-30.7.0.dist-info/WHEEL",
       "size": 91,
       "perm": 420
     },
     {
-      "name": "sqlglot-29.0.1.dist-info/licenses",
+      "name": "sqlglot-30.7.0.dist-info/licenses",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglot-29.0.1.dist-info/licenses/LICENSE",
+      "name": "sqlglot-30.7.0.dist-info/licenses/LICENSE",
       "size": 1065,
       "perm": 420
     },
     {
-      "name": "sqlglot-29.0.1.dist-info/top_level.txt",
+      "name": "sqlglot-30.7.0.dist-info/top_level.txt",
       "size": 8,
       "perm": 420
     },
     {
       "name": "sqlglot/__init__.py",
-      "size": 5375,
+      "size": 5873,
       "perm": 420
     },
     {
       "name": "sqlglot/__main__.py",
-      "size": 2179,
+      "size": 2148,
       "perm": 420
     },
     {
       "name": "sqlglot/_typing.py",
-      "size": 642,
+      "size": 1550,
       "perm": 420
     },
     {
       "name": "sqlglot/_version.py",
-      "size": 706,
+      "size": 522,
       "perm": 420
     },
     {
@@ -84,189 +78,195 @@
     },
     {
       "name": "sqlglot/dialects/__init__.py",
-      "size": 3811,
+      "size": 3733,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/athena.py",
-      "size": 10966,
+      "size": 4363,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/bigquery.py",
-      "size": 61809,
+      "size": 7312,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/clickhouse.py",
-      "size": 62472,
+      "size": 4671,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/databricks.py",
-      "size": 6280,
+      "size": 1143,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/dialect.py",
-      "size": 93903,
+      "size": 92944,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/doris.py",
-      "size": 22045,
+      "size": 364,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/dremio.py",
-      "size": 8613,
+      "size": 1678,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/drill.py",
-      "size": 5825,
+      "size": 1438,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/druid.py",
-      "size": 762,
+      "size": 224,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/duckdb.py",
-      "size": 174694,
+      "size": 4314,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/dune.py",
-      "size": 375,
+      "size": 329,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/exasol.py",
-      "size": 36058,
+      "size": 2052,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/fabric.py",
-      "size": 10222,
+      "size": 1865,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/hive.py",
-      "size": 36036,
+      "size": 3693,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/materialize.py",
-      "size": 3533,
+      "size": 305,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/mysql.py",
-      "size": 55501,
+      "size": 5800,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/oracle.py",
-      "size": 18920,
+      "size": 3343,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/postgres.py",
-      "size": 40908,
+      "size": 4540,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/presto.py",
-      "size": 34374,
+      "size": 2189,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/prql.py",
-      "size": 7908,
+      "size": 782,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/redshift.py",
-      "size": 17753,
+      "size": 1870,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/risingwave.py",
-      "size": 3882,
+      "size": 618,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/singlestore.py",
-      "size": 62512,
+      "size": 2126,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/snowflake.py",
-      "size": 98258,
+      "size": 6617,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/solr.py",
-      "size": 617,
+      "size": 535,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/spark.py",
-      "size": 13342,
+      "size": 897,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/spark2.py",
-      "size": 15271,
+      "size": 977,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/sqlite.py",
-      "size": 14617,
+      "size": 1122,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/starrocks.py",
-      "size": 17220,
+      "size": 529,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/tableau.py",
-      "size": 2190,
+      "size": 432,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/teradata.py",
-      "size": 17853,
+      "size": 2555,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/trino.py",
-      "size": 4757,
+      "size": 545,
       "perm": 420
     },
     {
       "name": "sqlglot/dialects/tsql.py",
-      "size": 58498,
+      "size": 5419,
       "perm": 420
     },
     {
       "name": "sqlglot/diff.py",
-      "size": 17371,
+      "size": 16715,
       "perm": 420
     },
     {
       "name": "sqlglot/errors.cp313-win_amd64.pyd",
-      "size": 10752,
+      "size": 11264,
       "perm": 420,
       "compressed": true
     },
     {
       "name": "sqlglot/errors.py",
-      "size": 4880,
+      "size": 4858,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/errors__mypyc.cp313-win_amd64.pyd",
+      "size": 71680,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/executor",
@@ -275,70 +275,932 @@
     },
     {
       "name": "sqlglot/executor/__init__.py",
-      "size": 2827,
+      "size": 2801,
       "perm": 420
     },
     {
       "name": "sqlglot/executor/context.py",
-      "size": 3386,
+      "size": 3364,
       "perm": 420
     },
     {
       "name": "sqlglot/executor/env.py",
-      "size": 8276,
+      "size": 8220,
       "perm": 420
     },
     {
       "name": "sqlglot/executor/python.py",
-      "size": 15549,
+      "size": 11566,
       "perm": 420
     },
     {
-      "name": "sqlglot/executor/table.py",
-      "size": 4419,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/expression_core.cp313-win_amd64.pyd",
-      "size": 10752,
+      "name": "sqlglot/executor/table.cp313-win_amd64.pyd",
+      "size": 11264,
       "perm": 420,
       "compressed": true
     },
     {
-      "name": "sqlglot/expression_core.py",
-      "size": 14324,
+      "name": "sqlglot/executor/table.py",
+      "size": 4512,
       "perm": 420
     },
     {
-      "name": "sqlglot/expressions.py",
-      "size": 262121,
+      "name": "sqlglot/executor/table__mypyc.cp313-win_amd64.pyd",
+      "size": 90112,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions",
+      "size": 0,
+      "perm": 2147484141
+    },
+    {
+      "name": "sqlglot/expressions/__init__.py",
+      "size": 2083,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/aggregate.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/aggregate.py",
+      "size": 7099,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/aggregate__mypyc.cp313-win_amd64.pyd",
+      "size": 669184,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/array.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/array.py",
+      "size": 7804,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/array__mypyc.cp313-win_amd64.pyd",
+      "size": 555008,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/builders.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/builders.py",
+      "size": 34988,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/builders__mypyc.cp313-win_amd64.pyd",
+      "size": 162816,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/constraints.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/constraints.py",
+      "size": 5511,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/constraints__mypyc.cp313-win_amd64.pyd",
+      "size": 289792,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/core.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/core.py",
+      "size": 89056,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/core__mypyc.cp313-win_amd64.pyd",
+      "size": 1111552,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/datatypes.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/datatypes.py",
+      "size": 11354,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/datatypes__mypyc.cp313-win_amd64.pyd",
+      "size": 138240,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/ddl.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/ddl.py",
+      "size": 9186,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/ddl__mypyc.cp313-win_amd64.pyd",
+      "size": 284672,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/dml.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/dml.py",
+      "size": 15582,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/dml__mypyc.cp313-win_amd64.pyd",
+      "size": 135680,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/functions.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/functions.py",
+      "size": 11318,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/functions__mypyc.cp313-win_amd64.pyd",
+      "size": 737280,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/json.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/json.py",
+      "size": 5622,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/json__mypyc.cp313-win_amd64.pyd",
+      "size": 309760,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/math.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/math.py",
+      "size": 4382,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/math__mypyc.cp313-win_amd64.pyd",
+      "size": 480256,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/properties.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/properties.py",
+      "size": 13585,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/properties__mypyc.cp313-win_amd64.pyd",
+      "size": 630272,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/query.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/query.py",
+      "size": 61723,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/query__mypyc.cp313-win_amd64.pyd",
+      "size": 818176,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/string.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/string.py",
+      "size": 12377,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/string__mypyc.cp313-win_amd64.pyd",
+      "size": 810496,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/temporal.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/expressions/temporal.py",
+      "size": 12265,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/expressions/temporal__mypyc.cp313-win_amd64.pyd",
+      "size": 849920,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generator.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/generator.py",
-      "size": 241743,
+      "size": 251650,
       "perm": 420
     },
     {
+      "name": "sqlglot/generator__mypyc.cp313-win_amd64.pyd",
+      "size": 2485248,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators",
+      "size": 0,
+      "perm": 2147484141
+    },
+    {
+      "name": "sqlglot/generators/__init__.py",
+      "size": 0,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/athena.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/athena.py",
+      "size": 5973,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/athena__mypyc.cp313-win_amd64.pyd",
+      "size": 113664,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/bigquery.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/bigquery.py",
+      "size": 24926,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/bigquery__mypyc.cp313-win_amd64.pyd",
+      "size": 701952,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/clickhouse.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/clickhouse.py",
+      "size": 27401,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/clickhouse__mypyc.cp313-win_amd64.pyd",
+      "size": 589824,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/databricks.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/databricks.py",
+      "size": 3919,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/databricks__mypyc.cp313-win_amd64.pyd",
+      "size": 104448,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/doris.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/doris.py",
+      "size": 14603,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/doris__mypyc.cp313-win_amd64.pyd",
+      "size": 160768,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/dremio.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/dremio.py",
+      "size": 3408,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/dremio__mypyc.cp313-win_amd64.pyd",
+      "size": 83968,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/drill.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/drill.py",
+      "size": 4288,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/drill__mypyc.cp313-win_amd64.pyd",
+      "size": 124416,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/druid.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/druid.py",
+      "size": 892,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/druid__mypyc.cp313-win_amd64.pyd",
+      "size": 64512,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/duckdb.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/duckdb.py",
+      "size": 179699,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/duckdb__mypyc.cp313-win_amd64.pyd",
+      "size": 1824256,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/dune.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/dune.py",
+      "size": 323,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/dune__mypyc.cp313-win_amd64.pyd",
+      "size": 60416,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/exasol.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/exasol.py",
+      "size": 29740,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/exasol__mypyc.cp313-win_amd64.pyd",
+      "size": 416256,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/fabric.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/fabric.py",
+      "size": 6619,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/fabric__mypyc.cp313-win_amd64.pyd",
+      "size": 79872,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/hive.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/hive.py",
+      "size": 21461,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/hive__mypyc.cp313-win_amd64.pyd",
+      "size": 634880,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/materialize.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/materialize.py",
+      "size": 2060,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/materialize__mypyc.cp313-win_amd64.pyd",
+      "size": 77312,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/mysql.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/mysql.py",
+      "size": 25931,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/mysql__mypyc.cp313-win_amd64.pyd",
+      "size": 436224,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/oracle.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/oracle.py",
+      "size": 6569,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/oracle__mypyc.cp313-win_amd64.pyd",
+      "size": 144384,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/postgres.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/postgres.py",
+      "size": 22051,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/postgres__mypyc.cp313-win_amd64.pyd",
+      "size": 577024,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/presto.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/presto.py",
+      "size": 25776,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/presto__mypyc.cp313-win_amd64.pyd",
+      "size": 714240,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/prql.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/prql.py",
+      "size": 192,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/prql__mypyc.cp313-win_amd64.pyd",
+      "size": 52736,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/python.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/python.py",
+      "size": 3999,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/python__mypyc.cp313-win_amd64.pyd",
+      "size": 149504,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/redshift.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/redshift.py",
+      "size": 10717,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/redshift__mypyc.cp313-win_amd64.pyd",
+      "size": 151040,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/risingwave.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/risingwave.py",
+      "size": 1129,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/risingwave__mypyc.cp313-win_amd64.pyd",
+      "size": 65536,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/singlestore.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/singlestore.py",
+      "size": 43144,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/singlestore__mypyc.cp313-win_amd64.pyd",
+      "size": 730624,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/snowflake.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/snowflake.py",
+      "size": 47700,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/snowflake__mypyc.cp313-win_amd64.pyd",
+      "size": 1144832,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/solr.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/solr.py",
+      "size": 192,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/solr__mypyc.cp313-win_amd64.pyd",
+      "size": 52736,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/spark.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/spark.py",
+      "size": 7864,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/spark2.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/spark2.py",
+      "size": 9871,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/spark2__mypyc.cp313-win_amd64.pyd",
+      "size": 164864,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/spark__mypyc.cp313-win_amd64.pyd",
+      "size": 137728,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/sqlite.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/sqlite.py",
+      "size": 12136,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/sqlite__mypyc.cp313-win_amd64.pyd",
+      "size": 166400,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/starrocks.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/starrocks.py",
+      "size": 10123,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/starrocks__mypyc.cp313-win_amd64.pyd",
+      "size": 132096,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/tableau.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/tableau.py",
+      "size": 1634,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/tableau__mypyc.cp313-win_amd64.pyd",
+      "size": 65536,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/teradata.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/teradata.py",
+      "size": 7216,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/teradata__mypyc.cp313-win_amd64.pyd",
+      "size": 121344,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/trino.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/trino.py",
+      "size": 2349,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/trino__mypyc.cp313-win_amd64.pyd",
+      "size": 80896,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/tsql.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/generators/tsql.py",
+      "size": 25790,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/generators/tsql__mypyc.cp313-win_amd64.pyd",
+      "size": 258048,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/helper.cp313-win_amd64.pyd",
-      "size": 10752,
+      "size": 11264,
       "perm": 420,
       "compressed": true
     },
     {
       "name": "sqlglot/helper.py",
-      "size": 11939,
+      "size": 12009,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/helper__mypyc.cp313-win_amd64.pyd",
+      "size": 119808,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/jsonpath.py",
-      "size": 7905,
+      "size": 8022,
       "perm": 420
     },
     {
+      "name": "sqlglot/lineage.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/lineage.py",
-      "size": 15489,
+      "size": 20804,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/lineage__mypyc.cp313-win_amd64.pyd",
+      "size": 154624,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/optimizer",
@@ -347,48 +1209,95 @@
     },
     {
       "name": "sqlglot/optimizer/__init__.py",
-      "size": 343,
+      "size": 2679,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/annotate_types.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/optimizer/annotate_types.py",
-      "size": 33622,
+      "size": 37850,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/annotate_types__mypyc.cp313-win_amd64.pyd",
+      "size": 217088,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/optimizer/canonicalize.py",
-      "size": 8784,
+      "size": 8536,
       "perm": 420
     },
     {
+      "name": "sqlglot/optimizer/canonicalize_internal_names.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/canonicalize_internal_names.py",
+      "size": 13678,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/canonicalize_internal_names__mypyc.cp313-win_amd64.pyd",
+      "size": 95744,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/optimizer/eliminate_ctes.py",
-      "size": 1568,
+      "size": 1626,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/eliminate_joins.py",
-      "size": 6070,
+      "size": 6352,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/eliminate_subqueries.py",
-      "size": 6294,
+      "size": 6572,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/isolate_table_selects.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/optimizer/isolate_table_selects.py",
-      "size": 1464,
+      "size": 1470,
       "perm": 420
     },
     {
+      "name": "sqlglot/optimizer/isolate_table_selects__mypyc.cp313-win_amd64.pyd",
+      "size": 41984,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/optimizer/merge_subqueries.py",
-      "size": 16384,
+      "size": 16772,
       "perm": 420
     },
     {
       "name": "sqlglot/optimizer/normalize.py",
-      "size": 7041,
+      "size": 7252,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/normalize_identifiers.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/optimizer/normalize_identifiers.py",
@@ -396,79 +1305,729 @@
       "perm": 420
     },
     {
-      "name": "sqlglot/optimizer/optimize_joins.py",
-      "size": 4120,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/optimizer.py",
-      "size": 3775,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/pushdown_predicates.py",
-      "size": 8602,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/pushdown_projections.py",
-      "size": 6668,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/qualify.py",
-      "size": 4374,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/qualify_columns.py",
-      "size": 38664,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/qualify_tables.py",
-      "size": 8483,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/resolver.py",
-      "size": 17068,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/scope.py",
-      "size": 32090,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/simplify.py",
-      "size": 59143,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/optimizer/unnest_subqueries.py",
-      "size": 11751,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/parser.py",
-      "size": 355404,
-      "perm": 420
-    },
-    {
-      "name": "sqlglot/parser_core.cp313-win_amd64.pyd",
-      "size": 10752,
+      "name": "sqlglot/optimizer/normalize_identifiers__mypyc.cp313-win_amd64.pyd",
+      "size": 44544,
       "perm": 420,
       "compressed": true
     },
     {
-      "name": "sqlglot/parser_core.py",
-      "size": 6042,
+      "name": "sqlglot/optimizer/optimize_joins.py",
+      "size": 4431,
       "perm": 420
     },
     {
+      "name": "sqlglot/optimizer/optimizer.py",
+      "size": 4298,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/pushdown_predicates.py",
+      "size": 9160,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/pushdown_projections.py",
+      "size": 6697,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/qualify.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/qualify.py",
+      "size": 4333,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/qualify__mypyc.cp313-win_amd64.pyd",
+      "size": 39424,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/qualify_columns.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/qualify_columns.py",
+      "size": 37887,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/qualify_columns__mypyc.cp313-win_amd64.pyd",
+      "size": 203264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/qualify_tables.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/qualify_tables.py",
+      "size": 8761,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/qualify_tables__mypyc.cp313-win_amd64.pyd",
+      "size": 91136,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/resolver.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/resolver.py",
+      "size": 18087,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/resolver__mypyc.cp313-win_amd64.pyd",
+      "size": 108544,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/scope.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/scope.py",
+      "size": 34802,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/scope__mypyc.cp313-win_amd64.pyd",
+      "size": 290816,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/simplify.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/simplify.py",
+      "size": 60407,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/optimizer/simplify__mypyc.cp313-win_amd64.pyd",
+      "size": 382976,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/optimizer/unnest_subqueries.py",
+      "size": 12132,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parser.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parser.py",
+      "size": 376209,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parser__mypyc.cp313-win_amd64.pyd",
+      "size": 2635776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers",
+      "size": 0,
+      "perm": 2147484141
+    },
+    {
+      "name": "sqlglot/parsers/__init__.py",
+      "size": 1,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/athena.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/athena.py",
+      "size": 2353,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/athena__mypyc.cp313-win_amd64.pyd",
+      "size": 72704,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/base.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/base.py",
+      "size": 582,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/base__mypyc.cp313-win_amd64.pyd",
+      "size": 43008,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/bigquery.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/bigquery.py",
+      "size": 29000,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/bigquery__mypyc.cp313-win_amd64.pyd",
+      "size": 288768,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/clickhouse.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/clickhouse.py",
+      "size": 33388,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/clickhouse__mypyc.cp313-win_amd64.pyd",
+      "size": 270336,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/databricks.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/databricks.py",
+      "size": 1819,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/databricks__mypyc.cp313-win_amd64.pyd",
+      "size": 64512,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/doris.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/doris.py",
+      "size": 5129,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/doris__mypyc.cp313-win_amd64.pyd",
+      "size": 96256,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/dremio.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/dremio.py",
+      "size": 3882,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/dremio__mypyc.cp313-win_amd64.pyd",
+      "size": 76288,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/drill.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/drill.py",
+      "size": 671,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/drill__mypyc.cp313-win_amd64.pyd",
+      "size": 43008,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/druid.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/druid.py",
+      "size": 108,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/druid__mypyc.cp313-win_amd64.pyd",
+      "size": 37376,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/duckdb.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/duckdb.py",
+      "size": 15718,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/duckdb__mypyc.cp313-win_amd64.pyd",
+      "size": 207360,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/dune.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/dune.py",
+      "size": 124,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/dune__mypyc.cp313-win_amd64.pyd",
+      "size": 46080,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/exasol.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/exasol.py",
+      "size": 6636,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/exasol__mypyc.cp313-win_amd64.pyd",
+      "size": 112128,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/fabric.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/fabric.py",
+      "size": 1348,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/fabric__mypyc.cp313-win_amd64.pyd",
+      "size": 51200,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/hive.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/hive.py",
+      "size": 11021,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/hive__mypyc.cp313-win_amd64.pyd",
+      "size": 141824,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/materialize.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/materialize.py",
+      "size": 1368,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/materialize__mypyc.cp313-win_amd64.pyd",
+      "size": 56832,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/mysql.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/mysql.py",
+      "size": 24146,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/mysql__mypyc.cp313-win_amd64.pyd",
+      "size": 267776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/oracle.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/oracle.py",
+      "size": 8749,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/oracle__mypyc.cp313-win_amd64.pyd",
+      "size": 142848,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/postgres.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/postgres.py",
+      "size": 13150,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/postgres__mypyc.cp313-win_amd64.pyd",
+      "size": 156160,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/presto.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/presto.py",
+      "size": 5311,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/presto__mypyc.cp313-win_amd64.pyd",
+      "size": 105472,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/prql.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/prql.py",
+      "size": 7049,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/prql__mypyc.cp313-win_amd64.pyd",
+      "size": 104448,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/redshift.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/redshift.py",
+      "size": 4996,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/redshift__mypyc.cp313-win_amd64.pyd",
+      "size": 89600,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/risingwave.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/risingwave.py",
+      "size": 2268,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/risingwave__mypyc.cp313-win_amd64.pyd",
+      "size": 62976,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/singlestore.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/singlestore.py",
+      "size": 10700,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/singlestore__mypyc.cp313-win_amd64.pyd",
+      "size": 182784,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/snowflake.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/snowflake.py",
+      "size": 53574,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/snowflake__mypyc.cp313-win_amd64.pyd",
+      "size": 988160,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/solr.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/solr.py",
+      "size": 353,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/solr__mypyc.cp313-win_amd64.pyd",
+      "size": 41472,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/spark.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/spark.py",
+      "size": 5294,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/spark2.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/spark2.py",
+      "size": 4285,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/spark2__mypyc.cp313-win_amd64.pyd",
+      "size": 125440,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/spark__mypyc.cp313-win_amd64.pyd",
+      "size": 89600,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/sqlite.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/sqlite.py",
+      "size": 3572,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/sqlite__mypyc.cp313-win_amd64.pyd",
+      "size": 88576,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/starrocks.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/starrocks.py",
+      "size": 6598,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/starrocks__mypyc.cp313-win_amd64.pyd",
+      "size": 100352,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/tableau.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/tableau.py",
+      "size": 507,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/tableau__mypyc.cp313-win_amd64.pyd",
+      "size": 52224,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/teradata.cp313-win_amd64.pyd",
+      "size": 11776,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/teradata.py",
+      "size": 7586,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/teradata__mypyc.cp313-win_amd64.pyd",
+      "size": 89088,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/trino.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/trino.py",
+      "size": 2085,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/trino__mypyc.cp313-win_amd64.pyd",
+      "size": 64512,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/tsql.cp313-win_amd64.pyd",
+      "size": 11264,
+      "perm": 420,
+      "compressed": true
+    },
+    {
+      "name": "sqlglot/parsers/tsql.py",
+      "size": 24911,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/parsers/tsql__mypyc.cp313-win_amd64.pyd",
+      "size": 214016,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/planner.py",
-      "size": 14682,
+      "size": 14508,
       "perm": 420
     },
     {
@@ -478,68 +2037,98 @@
     },
     {
       "name": "sqlglot/schema.cp313-win_amd64.pyd",
-      "size": 10752,
+      "size": 11264,
       "perm": 420,
       "compressed": true
     },
     {
       "name": "sqlglot/schema.py",
-      "size": 27748,
+      "size": 28014,
       "perm": 420
     },
     {
+      "name": "sqlglot/schema__mypyc.cp313-win_amd64.pyd",
+      "size": 144384,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/serde.cp313-win_amd64.pyd",
-      "size": 10752,
+      "size": 11264,
       "perm": 420,
       "compressed": true
     },
     {
       "name": "sqlglot/serde.py",
-      "size": 3137,
+      "size": 3072,
       "perm": 420
     },
     {
+      "name": "sqlglot/serde__mypyc.cp313-win_amd64.pyd",
+      "size": 50688,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/time.cp313-win_amd64.pyd",
-      "size": 10752,
+      "size": 11264,
       "perm": 420,
       "compressed": true
     },
     {
       "name": "sqlglot/time.py",
-      "size": 18400,
+      "size": 18396,
       "perm": 420
     },
     {
+      "name": "sqlglot/time__mypyc.cp313-win_amd64.pyd",
+      "size": 84480,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/tokenizer_core.cp313-win_amd64.pyd",
-      "size": 10752,
+      "size": 11264,
       "perm": 420,
       "compressed": true
     },
     {
       "name": "sqlglot/tokenizer_core.py",
-      "size": 33000,
+      "size": 35212,
       "perm": 420
     },
     {
+      "name": "sqlglot/tokenizer_core__mypyc.cp313-win_amd64.pyd",
+      "size": 292864,
+      "perm": 420,
+      "compressed": true
+    },
+    {
       "name": "sqlglot/tokens.py",
-      "size": 22632,
+      "size": 23347,
       "perm": 420
     },
     {
       "name": "sqlglot/transforms.py",
-      "size": 42361,
+      "size": 41946,
       "perm": 420
     },
     {
       "name": "sqlglot/trie.cp313-win_amd64.pyd",
-      "size": 10752,
+      "size": 11264,
       "perm": 420,
       "compressed": true
     },
     {
       "name": "sqlglot/trie.py",
-      "size": 2245,
+      "size": 2278,
       "perm": 420
+    },
+    {
+      "name": "sqlglot/trie__mypyc.cp313-win_amd64.pyd",
+      "size": 36864,
+      "perm": 420,
+      "compressed": true
     },
     {
       "name": "sqlglot/typing",
@@ -548,87 +2137,92 @@
     },
     {
       "name": "sqlglot/typing/__init__.py",
-      "size": 10647,
+      "size": 10501,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/bigquery.py",
-      "size": 12437,
+      "size": 12684,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/clickhouse.py",
-      "size": 296,
+      "size": 288,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/duckdb.py",
-      "size": 1433,
+      "size": 1402,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/hive.py",
-      "size": 1944,
+      "size": 1938,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/mysql.py",
-      "size": 771,
+      "size": 739,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/presto.py",
-      "size": 1041,
+      "size": 1025,
+      "perm": 420
+    },
+    {
+      "name": "sqlglot/typing/redshift.py",
+      "size": 362,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/snowflake.py",
-      "size": 17782,
+      "size": 17583,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/spark.py",
-      "size": 1180,
+      "size": 1124,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/spark2.py",
-      "size": 2723,
+      "size": 2615,
       "perm": 420
     },
     {
       "name": "sqlglot/typing/tsql.py",
-      "size": 852,
+      "size": 887,
       "perm": 420
     },
     {
-      "name": "sqlglotc-29.0.1.dist-info",
+      "name": "sqlglotc-30.7.0.dist-info",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglotc-29.0.1.dist-info/INSTALLER",
+      "name": "sqlglotc-30.7.0.dist-info/INSTALLER",
       "size": 4,
       "perm": 420
     },
     {
-      "name": "sqlglotc-29.0.1.dist-info/METADATA",
-      "size": 304,
+      "name": "sqlglotc-30.7.0.dist-info/METADATA",
+      "size": 481,
       "perm": 420
     },
     {
-      "name": "sqlglotc-29.0.1.dist-info/RECORD",
-      "size": 1361,
+      "name": "sqlglotc-30.7.0.dist-info/RECORD",
+      "size": 22254,
       "perm": 420
     },
     {
-      "name": "sqlglotc-29.0.1.dist-info/WHEEL",
+      "name": "sqlglotc-30.7.0.dist-info/WHEEL",
       "size": 101,
       "perm": 420
     },
     {
-      "name": "sqlglotc-29.0.1.dist-info/top_level.txt",
-      "size": 36,
+      "name": "sqlglotc-30.7.0.dist-info/top_level.txt",
+      "size": 8,
       "perm": 420
     }
   ]

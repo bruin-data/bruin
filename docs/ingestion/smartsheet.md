@@ -21,9 +21,11 @@ connections:
     smartsheet:
         - name: "smartsheet"
           access_token: "access_token"
+          smartsheet_id: "1234567890123456" # optional
 ```
 
-- `access_token`: Your Smartsheet API access token.
+- `access_token` (required): Your Smartsheet API access token.
+- `smartsheet_id` (optional): A default sheet ID baked into the connection URI. It is consulted only when the asset's `source_table` is set to the literal value `sheet`; any other `source_table` value (numeric or `sheet:<id>`) wins.
 
 ### Step 2: Create an asset file for data ingestion
 
@@ -45,7 +47,15 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: "postgres" indicates that the ingested data will be stored in a PostgreSQL database.
 - `source_connection`: The name of the Smartsheet connection defined in .bruin.yml.
-- `source_table`: The source table will be the `sheet_id` of the Smartsheet you want to ingest. You can find the sheet_id by opening the sheet in Smartsheet and going to File > Properties. The Sheet ID will be listed there.
+- `source_table`: Identifies the sheet to ingest. You can find the `sheet_id` by opening the sheet in Smartsheet and going to File > Properties. Three forms are accepted:
+
+  | Value | Behaviour |
+  | --- | --- |
+  | `<sheet_id>` | Use the value as the sheet ID. |
+  | `sheet:<sheet_id>` | Strip the `sheet:` prefix and use the rest as the sheet ID. |
+  | `sheet` | Use the connection's `smartsheet_id`. Errors if it isn't set. |
+
+  Use the `sheet` alias when you want the sheet ID to live on the connection (via `smartsheet_id`) rather than on every asset.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

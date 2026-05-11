@@ -1076,208 +1076,117 @@ func TestEnsurePipelineHasNoCycles(t *testing.T) {
 	}
 }
 
-func TestEnsureSlackFieldInPipelineIsValid(t *testing.T) {
+func TestEnsurePipelineNotificationsAreValid(t *testing.T) {
 	t.Parallel()
-	type args struct {
-		p *pipeline.Pipeline
-	}
+
 	tests := []struct {
-		name    string
-		args    args
-		want    []*Issue
-		wantErr bool
+		name string
+		p    *pipeline.Pipeline
+		want []*Issue
 	}{
 		{
-			name: "no issues",
-			args: args{
-				p: &pipeline.Pipeline{
-					Notifications: pipeline.Notifications{
-						Slack: []pipeline.SlackNotification{
-							{
-								Channel: "#data",
-							},
-						},
-					},
+			name: "no notifications configured",
+			p:    &pipeline.Pipeline{},
+			want: noIssues,
+		},
+		{
+			name: "valid slack channel",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Slack: []pipeline.SlackNotification{{Channel: "#data"}},
 				},
 			},
 			want: noIssues,
 		},
 		{
-			name: "empty channel field",
-			args: args{
-				p: &pipeline.Pipeline{
-					Notifications: pipeline.Notifications{
-						Slack: []pipeline.SlackNotification{
-							{
-								Channel: "",
-							},
-						},
-					},
+			name: "empty slack channel",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Slack: []pipeline.SlackNotification{{Channel: ""}},
 				},
 			},
-			want: []*Issue{
-				{
-					Description: pipelineSlackFieldEmptyChannel,
-				},
-			},
+			want: []*Issue{{Description: slackChannelEmpty}},
 		},
 		{
-			name: "no slack name and connection field",
-			args: args{
-				p: &pipeline.Pipeline{
-					Notifications: pipeline.Notifications{
-						Slack: []pipeline.SlackNotification{
-							{},
-						},
-					},
+			name: "duplicate slack channel with and without hash",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Slack: []pipeline.SlackNotification{{Channel: "#data"}, {Channel: "data"}},
 				},
 			},
-			want: []*Issue{
-				{
-					Description: pipelineSlackFieldEmptyChannel,
-				},
-			},
-		},
-
-		{
-			name: "non unique channel field with and without hash",
-			args: args{
-				p: &pipeline.Pipeline{
-					Notifications: pipeline.Notifications{
-						Slack: []pipeline.SlackNotification{
-							{
-								Channel: "#data",
-							},
-							{
-								Channel: "data",
-							},
-						},
-					},
-				},
-			},
-			want: []*Issue{
-				{
-					Description: pipelineSlackChannelFieldNotUnique,
-				},
-			},
+			want: []*Issue{{Description: slackChannelNotUnique}},
 		},
 		{
-			name: "non unique channel field",
-			args: args{
-				p: &pipeline.Pipeline{
-					Notifications: pipeline.Notifications{
-						Slack: []pipeline.SlackNotification{
-							{
-								Channel: "#data",
-							},
-							{
-								Channel: "#data",
-							},
-						},
-					},
+			name: "duplicate slack channel",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Slack: []pipeline.SlackNotification{{Channel: "#data"}, {Channel: "#data"}},
 				},
 			},
-			want: []*Issue{
-				{
-					Description: pipelineSlackChannelFieldNotUnique,
-				},
-			},
+			want: []*Issue{{Description: slackChannelNotUnique}},
 		},
-	}
-	ctx := t.Context()
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := EnsureSlackFieldInPipelineIsValid(ctx, tt.args.p)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equalf(t, tt.want, got, "EnsureSlackFieldInPipelineIsValid(%v)", tt.args.p)
-		})
-	}
-}
-
-func TestMSTeamsFieldInPipelineIsValid(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		p *pipeline.Pipeline
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []*Issue
-		wantErr bool
-	}{
 		{
-			name: "no issues",
-			args: args{
-				p: &pipeline.Pipeline{
-					Notifications: pipeline.Notifications{
-						MSTeams: []pipeline.MSTeamsNotification{
-							{
-								Connection: "some_conn",
-							},
-						},
-					},
+			name: "valid ms teams connection",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					MSTeams: []pipeline.MSTeamsNotification{{Connection: "some_conn"}},
 				},
 			},
 			want: noIssues,
 		},
 		{
-			name: "empty channel field",
-			args: args{
-				p: &pipeline.Pipeline{
-					Notifications: pipeline.Notifications{
-						MSTeams: []pipeline.MSTeamsNotification{
-							{
-								Connection: "some_conn",
-							},
-							{
-								Connection: "some_conn",
-							},
-						},
-					},
+			name: "empty ms teams connection",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					MSTeams: []pipeline.MSTeamsNotification{{Connection: ""}},
 				},
 			},
-			want: []*Issue{
-				{
-					Description: pipelineMSTeamsConnectionFieldNotUnique,
-				},
-			},
+			want: []*Issue{{Description: msTeamsConnectionEmpty}},
 		},
 		{
-			name: "no slack name and connection field",
-			args: args{
-				p: &pipeline.Pipeline{
-					Notifications: pipeline.Notifications{
-						MSTeams: []pipeline.MSTeamsNotification{
-							{
-								Connection: "",
-							},
-						},
-					},
+			name: "duplicate ms teams connection",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					MSTeams: []pipeline.MSTeamsNotification{{Connection: "some_conn"}, {Connection: "some_conn"}},
 				},
 			},
-			want: []*Issue{
-				{
-					Description: pipelineMSTeamsConnectionFieldEmpty,
+			want: []*Issue{{Description: msTeamsConnectionNotUnique}},
+		},
+		{
+			name: "valid discord connection",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Discord: []pipeline.DiscordNotification{{Connection: "dc-conn"}},
 				},
 			},
+			want: noIssues,
+		},
+		{
+			name: "empty discord connection",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Discord: []pipeline.DiscordNotification{{Connection: ""}},
+				},
+			},
+			want: []*Issue{{Description: discordConnectionEmpty}},
+		},
+		{
+			name: "duplicate discord connection",
+			p: &pipeline.Pipeline{
+				Notifications: pipeline.Notifications{
+					Discord: []pipeline.DiscordNotification{{Connection: "dc-conn"}, {Connection: "dc-conn"}},
+				},
+			},
+			want: []*Issue{{Description: discordConnectionNotUnique}},
 		},
 	}
-	ctx := t.Context()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := EnsureMSTeamsFieldInPipelineIsValid(ctx, tt.args.p)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equalf(t, tt.want, got, "EnsureMSTeamsFieldInPipelineIsValid(%v)", tt.args.p)
+			got, err := EnsurePipelineNotificationsAreValid(context.Background(), tt.p)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -2024,6 +1933,104 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 				},
 			},
 			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid version v0",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v0",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid version v0.14.2",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v0.14.2",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid version v1",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v1",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid future major v2.0.0",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v2.0.0",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "rejected partial version v0.14",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v0.14",
+				},
+			},
+			wantErrMessage: `Invalid 'version' value "v0.14": must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'`,
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "rejected leading-zero major",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "v01",
+				},
+			},
+			wantErrMessage: `Invalid 'version' value "v01": must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'`,
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "rejected version latest",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "t",
+					"destination":       "bigquery",
+					"version":           "latest",
+				},
+			},
+			wantErrMessage: `Invalid 'version' value "latest": must be 'vMAJOR' or fully-qualified 'vMAJOR.MINOR.PATCH'`,
 			wantErr:        assert.NoError,
 		},
 	}
@@ -4609,74 +4616,7 @@ columns:
 	}
 }
 
-func TestEnsureDiscordFieldInPipelineIsValid(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		pipeline *pipeline.Pipeline
-		want     []*Issue
-	}{
-		{
-			name:     "no discord notifications, no issues",
-			pipeline: &pipeline.Pipeline{},
-			want:     noIssues,
-		},
-		{
-			name: "valid connection",
-			pipeline: &pipeline.Pipeline{
-				Notifications: pipeline.Notifications{
-					Discord: []pipeline.DiscordNotification{{Connection: "discord-conn"}},
-				},
-			},
-			want: noIssues,
-		},
-		{
-			name: "multiple valid connections",
-			pipeline: &pipeline.Pipeline{
-				Notifications: pipeline.Notifications{
-					Discord: []pipeline.DiscordNotification{
-						{Connection: "discord-conn-1"},
-						{Connection: "discord-conn-2"},
-					},
-				},
-			},
-			want: noIssues,
-		},
-		{
-			name: "empty connection",
-			pipeline: &pipeline.Pipeline{
-				Notifications: pipeline.Notifications{
-					Discord: []pipeline.DiscordNotification{{Connection: ""}},
-				},
-			},
-			want: []*Issue{{Description: pipelineDiscordConnectionFieldEmpty}},
-		},
-		{
-			name: "duplicate connection",
-			pipeline: &pipeline.Pipeline{
-				Notifications: pipeline.Notifications{
-					Discord: []pipeline.DiscordNotification{
-						{Connection: "discord-conn"},
-						{Connection: "discord-conn"},
-					},
-				},
-			},
-			want: []*Issue{{Description: pipelineDiscordConnectionFieldNotUnique}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			issues, err := EnsureDiscordFieldInPipelineIsValid(context.Background(), tt.pipeline)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, issues)
-		})
-	}
-}
-
-func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
+func TestEnsureAssetNotificationsAreValid(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -4685,12 +4625,12 @@ func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
 		want  []*Issue
 	}{
 		{
-			name:  "no slack notifications, no issues",
+			name:  "no notifications, no issues",
 			asset: &pipeline.Asset{},
 			want:  noIssues,
 		},
 		{
-			name: "valid channel",
+			name: "valid asset-level slack channel",
 			asset: &pipeline.Asset{
 				Notifications: &pipeline.Notifications{
 					Slack: []pipeline.SlackNotification{{Channel: "#alerts"}},
@@ -4699,165 +4639,116 @@ func TestEnsureSlackFieldInAssetIsValid(t *testing.T) {
 			want: noIssues,
 		},
 		{
-			name: "valid channel without hash prefix",
-			asset: &pipeline.Asset{
-				Notifications: &pipeline.Notifications{
-					Slack: []pipeline.SlackNotification{{Channel: "alerts"}},
-				},
-			},
-			want: noIssues,
-		},
-		{
-			name: "empty channel",
+			name: "empty asset-level slack channel",
 			asset: &pipeline.Asset{
 				Notifications: &pipeline.Notifications{
 					Slack: []pipeline.SlackNotification{{Channel: ""}},
 				},
 			},
-			want: []*Issue{{Description: assetSlackFieldEmptyChannel}},
+			want: []*Issue{{Description: slackChannelEmpty}},
 		},
 		{
-			name: "duplicate channel",
+			name: "duplicate asset-level slack channel",
 			asset: &pipeline.Asset{
 				Notifications: &pipeline.Notifications{
-					Slack: []pipeline.SlackNotification{
-						{Channel: "#alerts"},
-						{Channel: "#alerts"},
-					},
+					Slack: []pipeline.SlackNotification{{Channel: "#alerts"}, {Channel: "alerts"}},
 				},
 			},
-			want: []*Issue{{Description: assetSlackChannelFieldNotUnique}},
+			want: []*Issue{{Description: slackChannelNotUnique}},
 		},
 		{
-			name: "duplicate channel with and without hash",
-			asset: &pipeline.Asset{
-				Notifications: &pipeline.Notifications{
-					Slack: []pipeline.SlackNotification{
-						{Channel: "#alerts"},
-						{Channel: "alerts"},
-					},
-				},
-			},
-			want: []*Issue{{Description: assetSlackChannelFieldNotUnique}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			issues, err := EnsureSlackFieldInAssetIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, issues)
-		})
-	}
-}
-
-func TestEnsureMSTeamsFieldInAssetIsValid(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		asset *pipeline.Asset
-		want  []*Issue
-	}{
-		{
-			name:  "no ms teams notifications, no issues",
-			asset: &pipeline.Asset{},
-			want:  noIssues,
-		},
-		{
-			name: "valid connection",
-			asset: &pipeline.Asset{
-				Notifications: &pipeline.Notifications{
-					MSTeams: []pipeline.MSTeamsNotification{{Connection: "teams-webhook"}},
-				},
-			},
-			want: noIssues,
-		},
-		{
-			name: "empty connection",
+			name: "empty asset-level ms teams connection",
 			asset: &pipeline.Asset{
 				Notifications: &pipeline.Notifications{
 					MSTeams: []pipeline.MSTeamsNotification{{Connection: ""}},
 				},
 			},
-			want: []*Issue{{Description: assetMSTeamsConnectionFieldEmpty}},
+			want: []*Issue{{Description: msTeamsConnectionEmpty}},
 		},
 		{
-			name: "duplicate connection",
+			name: "duplicate asset-level discord connection",
 			asset: &pipeline.Asset{
 				Notifications: &pipeline.Notifications{
-					MSTeams: []pipeline.MSTeamsNotification{
-						{Connection: "teams-webhook"},
-						{Connection: "teams-webhook"},
-					},
+					Discord: []pipeline.DiscordNotification{{Connection: "dc"}, {Connection: "dc"}},
 				},
 			},
-			want: []*Issue{{Description: assetMSTeamsConnectionFieldNotUnique}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			issues, err := EnsureMSTeamsFieldInAssetIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, issues)
-		})
-	}
-}
-
-func TestEnsureDiscordFieldInAssetIsValid(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		asset *pipeline.Asset
-		want  []*Issue
-	}{
-		{
-			name:  "no discord notifications, no issues",
-			asset: &pipeline.Asset{},
-			want:  noIssues,
+			want: []*Issue{{Description: discordConnectionNotUnique}},
 		},
 		{
-			name: "valid connection",
+			name: "custom check with empty slack channel",
 			asset: &pipeline.Asset{
-				Notifications: &pipeline.Notifications{
-					Discord: []pipeline.DiscordNotification{{Connection: "discord-conn"}},
-				},
+				CustomChecks: []pipeline.CustomCheck{{
+					Name:          "my_check",
+					Notifications: &pipeline.Notifications{Slack: []pipeline.SlackNotification{{Channel: ""}}},
+				}},
+			},
+			want: []*Issue{{Description: slackChannelEmpty, Context: []string{"custom_check:my_check"}}},
+		},
+		{
+			name: "custom check with duplicate ms teams connection",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{
+					Name: "my_check",
+					Notifications: &pipeline.Notifications{MSTeams: []pipeline.MSTeamsNotification{
+						{Connection: "hook"}, {Connection: "hook"},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: msTeamsConnectionNotUnique, Context: []string{"custom_check:my_check"}}},
+		},
+		{
+			name: "column check with empty discord connection",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "email",
+					Checks: []pipeline.ColumnCheck{{
+						Name:          "not_null",
+						Notifications: &pipeline.Notifications{Discord: []pipeline.DiscordNotification{{Connection: ""}}},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: discordConnectionEmpty, Context: []string{"email.not_null"}}},
+		},
+		{
+			name: "column check with duplicate slack channel",
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{{
+					Name: "age",
+					Checks: []pipeline.ColumnCheck{{
+						Name: "positive",
+						Notifications: &pipeline.Notifications{Slack: []pipeline.SlackNotification{
+							{Channel: "#alerts"}, {Channel: "#alerts"},
+						}},
+					}},
+				}},
+			},
+			want: []*Issue{{Description: slackChannelNotUnique, Context: []string{"age.positive"}}},
+		},
+		{
+			name: "custom check with no notifications is fine",
+			asset: &pipeline.Asset{
+				CustomChecks: []pipeline.CustomCheck{{Name: "my_check"}},
 			},
 			want: noIssues,
 		},
 		{
-			name: "empty connection",
+			name: "column check with no notifications is fine",
 			asset: &pipeline.Asset{
-				Notifications: &pipeline.Notifications{
-					Discord: []pipeline.DiscordNotification{{Connection: ""}},
-				},
+				Columns: []pipeline.Column{{
+					Name:   "id",
+					Checks: []pipeline.ColumnCheck{{Name: "not_null"}},
+				}},
 			},
-			want: []*Issue{{Description: assetDiscordConnectionFieldEmpty}},
-		},
-		{
-			name: "duplicate connection",
-			asset: &pipeline.Asset{
-				Notifications: &pipeline.Notifications{
-					Discord: []pipeline.DiscordNotification{
-						{Connection: "discord-conn"},
-						{Connection: "discord-conn"},
-					},
-				},
-			},
-			want: []*Issue{{Description: assetDiscordConnectionFieldNotUnique}},
+			want: noIssues,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			issues, err := EnsureDiscordFieldInAssetIsValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			got, err := EnsureAssetNotificationsAreValid(context.Background(), &pipeline.Pipeline{}, tt.asset)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, issues)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

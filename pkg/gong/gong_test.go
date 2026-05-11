@@ -3,15 +3,17 @@ package gong
 import (
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildDownloadURL(t *testing.T) {
 	t.Parallel()
 
-	url := buildDownloadURL()
+	url := buildDownloadURL(strings.TrimSpace(Version))
 
 	// URL should contain the base URL
 	assert.Contains(t, url, BaseURL)
@@ -81,9 +83,62 @@ func TestParseVersionOutput(t *testing.T) {
 func TestBuildDownloadURL_Format(t *testing.T) {
 	t.Parallel()
 
-	url := buildDownloadURL()
+	url := buildDownloadURL(strings.TrimSpace(Version))
 
 	// Verify the URL matches the expected pattern
 	// Format: {BaseURL}/releases/{Version}/{os}/gong_{arch}
 	assert.Regexp(t, `^https://storage\.googleapis\.com/gong-release/releases/v\d+\.\d+\.\d+/(darwin|linux|windows)/gong_(amd64|arm64)$`, url)
+}
+
+func TestBuildDownloadURL_RespectsRequestedVersion(t *testing.T) {
+	t.Parallel()
+
+	url := buildDownloadURL("v9.9.9")
+	assert.Contains(t, url, "/releases/v9.9.9/")
+}
+
+func TestChecker_SlotPerVersion(t *testing.T) {
+	t.Parallel()
+
+	c := &Checker{}
+	a := c.slotFor("v1.0.0")
+	b := c.slotFor("v1.0.0")
+	d := c.slotFor("v1.0.5")
+
+	assert.Same(t, a, b, "same version returns the same slot")
+	assert.NotSame(t, a, d, "different versions get different slots")
+
+	// dropSlot must remove only the matching slot.
+	c.dropSlot("v1.0.0", a)
+	a2 := c.slotFor("v1.0.0")
+	assert.NotSame(t, a, a2, "slot should be regenerated after drop")
+
+	// dropSlot with a stale pointer is a no-op.
+	c.dropSlot("v1.0.0", a)
+	a3 := c.slotFor("v1.0.0")
+	assert.Same(t, a2, a3, "stale drop must not evict a fresh slot")
+}
+
+func TestChecker_SlotForIsConcurrencySafe(t *testing.T) {
+	t.Parallel()
+
+	c := &Checker{}
+
+	const goroutines = 32
+	results := make([]*installSlot, goroutines)
+
+	var wg sync.WaitGroup
+	for i := range goroutines {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			results[idx] = c.slotFor("v1.0.0")
+		}(i)
+	}
+	wg.Wait()
+
+	require.NotNil(t, results[0])
+	for _, slot := range results {
+		assert.Same(t, results[0], slot, "all goroutines must observe the same slot for the same version")
+	}
 }

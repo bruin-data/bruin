@@ -1219,7 +1219,8 @@ func (m *Manager) AddSmartsheetConnectionFromConfig(connection *config.Smartshee
 	m.mutex.Unlock()
 
 	client, err := smartsheet.NewClient(smartsheet.Config{
-		AccessToken: connection.AccessToken,
+		AccessToken:  connection.AccessToken,
+		SmartsheetID: connection.SmartsheetID,
 	})
 	if err != nil {
 		return err

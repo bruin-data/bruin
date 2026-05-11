@@ -410,6 +410,8 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 	t.Parallel()
 	attacher := NewLakehouseAttacher()
 
+	boolPtr := func(b bool) *bool { return &b }
+
 	tests := []struct {
 		name    string
 		storage *config.StorageConfig
@@ -480,6 +482,74 @@ func TestLakehouseAttacher_GenerateS3Secret(t *testing.T) {
 				Auth: config.StorageAuth{},
 			},
 			want: "",
+		},
+		{
+			name: "s3-compatible with endpoint only",
+			storage: &config.StorageConfig{
+				Type:     config.StorageTypeS3,
+				Path:     "s3://ducklake/warehouse",
+				Endpoint: "minio.local:9000",
+				Auth: config.StorageAuth{
+					AccessKey: "minioadmin",
+					SecretKey: "minioadmin",
+				},
+			},
+			want: `CREATE OR REPLACE SECRET test_secret (
+    TYPE s3
+,   PROVIDER config
+,   KEY_ID 'minioadmin'
+,   SECRET 'minioadmin'
+,   ENDPOINT 'minio.local:9000'
+,   SCOPE 's3://ducklake/warehouse'
+)`,
+		},
+		{
+			name: "s3-compatible MinIO (endpoint + path style + no SSL)",
+			storage: &config.StorageConfig{
+				Type:     config.StorageTypeS3,
+				Path:     "s3://ducklake/warehouse",
+				Endpoint: "minio.local:9000",
+				URLStyle: "path",
+				UseSSL:   boolPtr(false),
+				Auth: config.StorageAuth{
+					AccessKey: "minioadmin",
+					SecretKey: "minioadmin",
+				},
+			},
+			want: `CREATE OR REPLACE SECRET test_secret (
+    TYPE s3
+,   PROVIDER config
+,   KEY_ID 'minioadmin'
+,   SECRET 'minioadmin'
+,   ENDPOINT 'minio.local:9000'
+,   URL_STYLE 'path'
+,   USE_SSL false
+,   SCOPE 's3://ducklake/warehouse'
+)`,
+		},
+		{
+			name: "s3-compatible Cloudflare R2 (endpoint + region, SSL on)",
+			storage: &config.StorageConfig{
+				Type:     config.StorageTypeS3,
+				Path:     "s3://ducklake/warehouse",
+				Region:   "auto",
+				Endpoint: "abc123.r2.cloudflarestorage.com",
+				UseSSL:   boolPtr(true),
+				Auth: config.StorageAuth{
+					AccessKey: "r2key",
+					SecretKey: "r2secret",
+				},
+			},
+			want: `CREATE OR REPLACE SECRET test_secret (
+    TYPE s3
+,   PROVIDER config
+,   KEY_ID 'r2key'
+,   SECRET 'r2secret'
+,   REGION 'auto'
+,   ENDPOINT 'abc123.r2.cloudflarestorage.com'
+,   USE_SSL true
+,   SCOPE 's3://ducklake/warehouse'
+)`,
 		},
 	}
 

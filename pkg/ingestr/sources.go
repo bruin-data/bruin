@@ -818,6 +818,8 @@ var gongSources = map[string]bool{
 	"jobtread":     true,
 	"posthog":      true,
 	"rabbitmq":     true,
+	"smartsheet":   true,
+	"stripe":       true,
 	"surveymonkey": true,
 }
 

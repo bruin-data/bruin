@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -12,10 +14,128 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 )
+
+// versionPattern matches the bare family marker (vMAJOR) or a fully-qualified
+// vMAJOR.MINOR.PATCH. MAJOR is any non-negative integer with no leading zero
+// (other than the literal "0"). Family selection is decided separately:
+// MAJOR == 0 routes to ingestr, anything else routes to gong.
+var versionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)(\.\d+\.\d+)?$`)
+
+const (
+	versionFamilyIngestr = "v0"
+	versionFamilyGong    = "v1"
+)
+
+// resolvedEngine is the outcome of parsing parameters.version on an ingestr asset.
+type resolvedEngine struct {
+	// family is "v0" (ingestr) or "v1" (gong).
+	family string
+	// ingestrVersion is the PyPI version string (no leading "v"), empty for the bundled default.
+	ingestrVersion string
+	// gongVersion is the gong release tag (with leading "v"), empty for the bundled default.
+	gongVersion string
+}
+
+// resolveIngestrEngine reads parameters.version, validates it, and returns the
+// resolved engine. An empty version defaults to v0 (ingestr) unless use_gong is
+// set — preserving the legacy auto-enable for gong-required sources/destinations.
+// When parameters.version is set explicitly, use_gong is ignored with a
+// deprecation warning.
+func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
+	versionParam := strings.TrimSpace(asset.Parameters["version"])
+	useGongLegacy := asset.Parameters["use_gong"] == "true"
+
+	if versionParam == "" {
+		if useGongLegacy {
+			return resolvedEngine{family: versionFamilyGong}, nil
+		}
+		return resolvedEngine{family: versionFamilyIngestr}, nil
+	}
+
+	match := versionPattern.FindStringSubmatch(versionParam)
+	if match == nil {
+		return resolvedEngine{}, fmt.Errorf("invalid parameters.version %q: expected vMAJOR or vMAJOR.MINOR.PATCH", versionParam)
+	}
+
+	if useGongLegacy {
+		fmt.Fprintf(os.Stderr, "Warning: parameters.use_gong is ignored when parameters.version is set; version=%q wins.\n", versionParam)
+	}
+
+	major := match[1]
+	if major == "0" {
+		out := resolvedEngine{family: versionFamilyIngestr}
+		if versionParam != versionFamilyIngestr {
+			// Strip the leading "v" to get the PyPI version (e.g. v0.14.2 -> 0.14.2).
+			out.ingestrVersion = strings.TrimPrefix(versionParam, "v")
+		}
+		return out, nil
+	}
+
+	out := resolvedEngine{family: versionFamilyGong}
+	// Only fully-qualified versions get pinned; bare family markers (v1, v2, ...)
+	// fall back to bruin's bundled gong default.
+	if match[2] != "" {
+		out.gongVersion = versionParam
+	}
+	return out, nil
+}
+
+// applyIngestrEngine applies the resolved engine choice to ctx and asset:
+//   - For v0: clears use_gong (so downstream code paths run ingestr) and sets
+//     CtxIngestrVersion when an exact version was requested. Warns if the source
+//     or destination scheme is in gongSources/gongDestinations.
+//   - For v1: ensures gong is installed (using the requested version) and sets
+//     CtxGongPath, plus use_gong for legacy code paths that still inspect it.
+func applyIngestrEngine(ctx context.Context, asset *pipeline.Asset, engine resolvedEngine, sourceScheme, destScheme string, installer gongInstaller) (context.Context, error) {
+	if engine.family == versionFamilyIngestr {
+		_, srcAuto := gongSources[sourceScheme]
+		_, dstAuto := gongDestinations[destScheme]
+		if srcAuto || dstAuto {
+			fmt.Fprintf(os.Stderr,
+				"Warning: parameters.version=v0 selected but source/destination (%s/%s) typically requires gong; running on ingestr anyway.\n",
+				sourceScheme, destScheme,
+			)
+		}
+		// Make sure no stale use_gong leaks through to downstream (e.g. the auto-enable
+		// blocks earlier in Run set it). The user explicitly asked for v0.
+		delete(asset.Parameters, "use_gong")
+		if engine.ingestrVersion != "" {
+			ctx = context.WithValue(ctx, python.CtxIngestrVersion, engine.ingestrVersion)
+		}
+		return ctx, nil
+	}
+
+	// v1 (gong)
+	if asset.Parameters == nil {
+		asset.Parameters = make(map[string]string)
+	}
+	asset.Parameters["use_gong"] = "true"
+
+	if ctx.Value(python.CtxGongPath) != nil {
+		// Already installed for this run (e.g. via --gong-path or a prior asset).
+		return ctx, nil
+	}
+	if installer == nil {
+		return ctx, errors.New("gong installer is not available but is required for parameters.version=v1")
+	}
+	gongPath, err := installer.EnsureGongInstalled(ctx, engine.gongVersion)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to install gong %s: %w", displayGongVersion(engine.gongVersion), err)
+	}
+	return context.WithValue(ctx, python.CtxGongPath, gongPath), nil
+}
+
+func displayGongVersion(v string) string {
+	if v == "" {
+		return "(default)"
+	}
+	return v
+}
 
 type repoFinder interface {
 	Repo(path string) (*git.Repo, error)
@@ -26,7 +146,7 @@ type ingestrRunner interface {
 }
 
 type gongInstaller interface {
-	EnsureGongInstalled(ctx context.Context) (string, error)
+	EnsureGongInstalled(ctx context.Context, version string) (string, error)
 }
 
 type BasicOperator struct {
@@ -245,18 +365,25 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		defer duck.UnlockDatabase(sourceURI)
 	}
 
-	if asset.Parameters["use_gong"] == "true" && ctx.Value(python.CtxGongPath) == nil {
-		if o.gong == nil {
-			return errors.New("use_gong is set but gong installer is not available")
-		}
-		gongPath, err := o.gong.EnsureGongInstalled(ctx)
-		if err != nil {
-			return fmt.Errorf("use_gong is set but failed to install gong: %w", err)
-		}
-		ctx = context.WithValue(ctx, python.CtxGongPath, gongPath)
+	engine, err := resolveIngestrEngine(asset)
+	if err != nil {
+		return err
+	}
+	sourceScheme, destScheme := schemeOf(sourceURI), schemeOf(destURI)
+	ctx, err = applyIngestrEngine(ctx, asset, engine, sourceScheme, destScheme, o.gong)
+	if err != nil {
+		return err
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
+}
+
+func schemeOf(uri string) string {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return ""
+	}
+	return parsed.Scheme
 }
 
 func applyClickHouseEngineParams(destURI string, params map[string]string) string {
@@ -385,15 +512,13 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.Wrap(err, "failed to find repo to run Ingestr")
 	}
 
-	if asset.Parameters["use_gong"] == "true" && ctx.Value(python.CtxGongPath) == nil {
-		if o.gong == nil {
-			return errors.New("use_gong is set but gong installer is not available")
-		}
-		gongPath, err := o.gong.EnsureGongInstalled(ctx)
-		if err != nil {
-			return fmt.Errorf("use_gong is set but failed to install gong: %w", err)
-		}
-		ctx = context.WithValue(ctx, python.CtxGongPath, gongPath)
+	engine, err := resolveIngestrEngine(asset)
+	if err != nil {
+		return err
+	}
+	ctx, err = applyIngestrEngine(ctx, asset, engine, schemeOf(sourceURI), schemeOf(destURI), o.gong)
+	if err != nil {
+		return err
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)

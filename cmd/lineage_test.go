@@ -128,7 +128,7 @@ Asset has no downstream dependencies.
 
 			fs := afero.NewOsFs()
 			r := &LineageCommand{
-				builder:      pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil),
+				builder:      pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil, nil),
 				infoPrinter:  mp,
 				errorPrinter: mp,
 			}

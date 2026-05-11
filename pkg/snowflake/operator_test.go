@@ -3,12 +3,14 @@ package snowflake
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockExtractor struct {
@@ -238,4 +240,40 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestQuerySensorTimesOutWhenConfigured(t *testing.T) {
+	t.Parallel()
+
+	client := new(mockQuerierWithResult)
+	extractor := new(mockExtractor)
+	preExtractor := new(mockExtractor)
+	conn := new(mockConnectionFetcher)
+
+	preExtractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).
+		Return(extractor, nil)
+	extractor.On("ExtractQueriesFromString", "select 1").
+		Return([]*query.Query{{Query: "select 1"}}, nil)
+	conn.On("GetConnection", mock.Anything).Return(client)
+	// Always return 0 so the sensor never succeeds.
+	client.On("SelectOnlyLastResult", mock.Anything, mock.Anything).Return([][]interface{}{{int64(0)}}, nil)
+
+	sensor := NewQuerySensor(conn, preExtractor, 0)
+
+	start := time.Now()
+	err := sensor.RunTask(t.Context(), &pipeline.Pipeline{}, &pipeline.Asset{
+		Type: pipeline.AssetTypeSnowflakeQuerySensor,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "test-file.sql",
+			Content: "select 1",
+		},
+		Parameters: pipeline.EmptyStringMap{
+			"query":   "select 1",
+			"timeout": "100ms",
+		},
+	})
+	elapsed := time.Since(start)
+
+	require.ErrorContains(t, err, "Sensor timed out after")
+	assert.Less(t, elapsed, 5*time.Second, "timeout should fire promptly")
 }

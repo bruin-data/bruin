@@ -146,6 +146,49 @@ func TestLakehouseConfig_Validate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "url_style path is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeSQLite,
+				},
+				Storage: StorageConfig{
+					Type:     StorageTypeS3,
+					URLStyle: "path",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "url_style vhost is valid",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeSQLite,
+				},
+				Storage: StorageConfig{
+					Type:     StorageTypeS3,
+					URLStyle: "vhost",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unsupported url_style fails",
+			lh: &LakehouseConfig{
+				Format: LakehouseFormatDuckLake,
+				Catalog: CatalogConfig{
+					Type: CatalogTypeSQLite,
+				},
+				Storage: StorageConfig{
+					Type:     StorageTypeS3,
+					URLStyle: "subdomain",
+				},
+			},
+			wantErr: true,
+			errMsg:  "unsupported url_style",
+		},
 	}
 
 	for _, tt := range tests {
@@ -230,6 +273,37 @@ func TestCatalogAuth_IsPostgres(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, tt.auth.IsPostgres())
+		})
+	}
+}
+
+func TestStorageConfig_IsZero(t *testing.T) {
+	t.Parallel()
+
+	boolPtr := func(b bool) *bool { return &b }
+	useSSLFalse := boolPtr(false)
+	useSSLTrue := boolPtr(true)
+
+	tests := []struct {
+		name    string
+		storage StorageConfig
+		want    bool
+	}{
+		{"empty config", StorageConfig{}, true},
+		{"with type", StorageConfig{Type: StorageTypeS3}, false},
+		{"with path", StorageConfig{Path: "s3://bucket"}, false},
+		{"with region", StorageConfig{Region: "us-east-1"}, false},
+		{"with endpoint", StorageConfig{Endpoint: "minio.local:9000"}, false},
+		{"with url_style", StorageConfig{URLStyle: "path"}, false},
+		{"with use_ssl=false", StorageConfig{UseSSL: useSSLFalse}, false},
+		{"with use_ssl=true", StorageConfig{UseSSL: useSSLTrue}, false},
+		{"with auth", StorageConfig{Auth: StorageAuth{AccessKey: "k", SecretKey: "s"}}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.storage.IsZero())
 		})
 	}
 }
