@@ -107,9 +107,9 @@ func Query() *cli.Command {
 				Usage: "validate the query without executing it; show estimated cost and metadata when available",
 			},
 			&cli.StringFlag{
-				Name:    "agent-id",
-				Sources: cli.EnvVars("BRUIN_AGENT_ID"),
-				Usage:   "agent ID to include in query annotations for tracking purposes",
+				Name:    "query-annotations",
+				Sources: cli.EnvVars("BRUIN_QUERY_ANNOTATIONS"),
+				Usage:   fmt.Sprintf("JSON string containing annotations to be attached to the query for tracking purposes. Use '%s' to only include the default annotations.", ansisql.DefaultQueryAnnotations),
 			},
 			&cli.StringFlag{
 				Name:  "description",
@@ -216,16 +216,17 @@ func Query() *cli.Command {
 				defer timeoutCancel()
 
 				q := query.Query{Query: queryStr}
-				agentID := c.String("agent-id")
-
-				// Apply agent-id annotation based on connection type
-				_, isSnowflake := conn.(snowflake.SfClient)
-				if isSnowflake && agentID != "" {
-					// Snowflake: use query tag via context (Snowflake strips leading SQL comments)
-					timeoutCtx = gosnowflake.WithQueryTag(timeoutCtx, ansisql.BuildAgentIDQueryTag(agentID))
-				} else if agentID != "" {
-					// BigQuery and others: prepend comment to query
-					q = *ansisql.AddAgentIDAnnotationComment(&q, agentID)
+				tag, err := ansisql.BuildAdhocQueryTag(c.String("query-annotations"))
+				if err != nil {
+					return handleError(c.String("output"), err)
+				}
+				if tag != "" {
+					if _, isSnowflake := conn.(snowflake.SfClient); isSnowflake {
+						// Snowflake strips leading SQL comments, so use QUERY_TAG instead.
+						timeoutCtx = gosnowflake.WithQueryTag(timeoutCtx, tag)
+					} else {
+						q.Query = "-- @bruin.config: " + tag + "\n" + q.Query
+					}
 				}
 
 				queryStart := time.Now()

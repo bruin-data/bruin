@@ -654,8 +654,9 @@ func Run(isDebug *bool) *cli.Command {
 				Value: 604800, // 7 days default
 			},
 			&cli.StringFlag{
-				Name:  "query-annotations",
-				Usage: fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
+				Name:    "query-annotations",
+				Sources: cli.EnvVars("BRUIN_QUERY_ANNOTATIONS"),
+				Usage:   fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
 			},
 		},
 		DisableSliceFlagSeparator: true,
