@@ -117,11 +117,6 @@ func Query() *cli.Command {
 				Usage:   "agent ID to include in query annotations for tracking purposes",
 			},
 			&cli.StringFlag{
-				Name:    "user-id",
-				Sources: cli.EnvVars("BRUIN_USER_ID"),
-				Usage:   "ID of the user who triggered the query, included in query annotations",
-			},
-			&cli.StringFlag{
 				Name:    "message-pair-id",
 				Sources: cli.EnvVars("BRUIN_MESSAGE_PAIR_ID"),
 				Usage:   "message pair ID to include in query annotations for tracking purposes",
@@ -234,7 +229,6 @@ func Query() *cli.Command {
 				adhocIDs := ansisql.AdhocQueryIDs{
 					ThreadID:      c.String("thread-id"),
 					AgentID:       c.String("agent-id"),
-					UserID:        c.String("user-id"),
 					MessagePairID: c.String("message-pair-id"),
 				}
 

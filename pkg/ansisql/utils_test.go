@@ -107,11 +107,10 @@ func TestAddAdhocQueryAnnotationComment(t *testing.T) {
 			ids: AdhocQueryIDs{
 				ThreadID:      "t-1",
 				AgentID:       "a-1",
-				UserID:        "u-1",
 				MessagePairID: "mp-1",
 			},
 			query:    "SELECT * FROM table",
-			expected: `-- @bruin.config: {"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query","user_id":"u-1"}` + "\n" + "SELECT * FROM table",
+			expected: `-- @bruin.config: {"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query"}` + "\n" + "SELECT * FROM table",
 		},
 		{
 			name:     "no IDs set",
@@ -221,10 +220,9 @@ func TestBuildAdhocQueryTag(t *testing.T) {
 			ids: AdhocQueryIDs{
 				ThreadID:      "t-1",
 				AgentID:       "a-1",
-				UserID:        "u-1",
 				MessagePairID: "mp-1",
 			},
-			expected: `{"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query","user_id":"u-1"}`,
+			expected: `{"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query"}`,
 		},
 		{
 			name:     "no IDs set still emits type",

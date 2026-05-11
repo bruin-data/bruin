@@ -96,13 +96,12 @@ func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 type AdhocQueryIDs struct {
 	ThreadID      string
 	AgentID       string
-	UserID        string
 	MessagePairID string
 }
 
 // HasAny reports whether at least one tracking ID is set.
 func (a AdhocQueryIDs) HasAny() bool {
-	return a.ThreadID != "" || a.AgentID != "" || a.UserID != "" || a.MessagePairID != ""
+	return a.ThreadID != "" || a.AgentID != "" || a.MessagePairID != ""
 }
 
 // AddAdhocQueryAnnotationComment prepends a tracking annotation comment to the
@@ -133,9 +132,6 @@ func BuildAdhocQueryTag(ids AdhocQueryIDs) string {
 	}
 	if ids.AgentID != "" {
 		annotations["agent_id"] = ids.AgentID
-	}
-	if ids.UserID != "" {
-		annotations["user_id"] = ids.UserID
 	}
 	if ids.MessagePairID != "" {
 		annotations["message_pair_id"] = ids.MessagePairID
