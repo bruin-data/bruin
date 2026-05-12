@@ -117,10 +117,6 @@ func Lint(isDebug *bool) *cli.Command {
 
 			variantName := c.String("variant")
 			vars := c.StringSlice("var")
-			if variantName != "" && len(vars) > 0 {
-				printError(errors.New("--var and --variant cannot be used together"), c.String("output"), "Invalid flags")
-				return cli.Exit("", 1)
-			}
 			if len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
