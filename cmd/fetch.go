@@ -216,7 +216,11 @@ func Query() *cli.Command {
 				defer timeoutCancel()
 
 				q := query.Query{Query: queryStr}
-				tag, err := ansisql.BuildAdhocQueryTag(c.String("query-annotations"))
+				annotationsInput := c.String("query-annotations")
+				if os.Getenv("BRUIN_QUERY_ANNOTATIONS") != "" {
+					annotationsInput = injectAgentName(annotationsInput)
+				}
+				tag, err := ansisql.BuildAdhocQueryTag(annotationsInput)
 				if err != nil {
 					return handleError(c.String("output"), err)
 				}
@@ -1055,6 +1059,25 @@ func formatBigRatAsDecimal(rat *big.Rat) string {
 
 	// BigQuery NUMERIC/BIGNUMERIC scale is up to 38 decimal points.
 	return trimDecimalString(rat.FloatString(38))
+}
+
+// injectAgentName forces type=bruin_agent in the annotations payload so the
+// baseline adhoc_query type is overridden. Used when the annotations value
+// came from the BRUIN_QUERY_ANNOTATIONS env var so downstream systems can
+// distinguish agent-initiated queries.
+func injectAgentName(annotations string) string {
+	merged := map[string]interface{}{}
+	if annotations != "" && annotations != ansisql.DefaultQueryAnnotations {
+		if err := json.Unmarshal([]byte(annotations), &merged); err != nil {
+			merged = map[string]interface{}{}
+		}
+	}
+	merged["type"] = "bruin_agent"
+	b, err := json.Marshal(merged)
+	if err != nil {
+		return annotations
+	}
+	return string(b)
 }
 
 // parseQueryVars parses --var flags into a map of string values.
