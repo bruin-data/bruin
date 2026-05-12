@@ -20,6 +20,7 @@ type QueryResult struct {
 	Columns     []string
 	Rows        [][]interface{}
 	ColumnTypes []string
+	Execution   *QueryExecutionSummary
 }
 
 type QueryExtractor interface {

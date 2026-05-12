@@ -275,13 +275,18 @@ func Query() *cli.Command {
 				output := c.String("output")
 				switch output {
 				case outputFormatPlain:
-					printTable(result.Columns, result.Rows)
+					if shouldOutputExecutionSummary(result) {
+						printQueryExecutionSummary(result.Execution)
+					} else {
+						printTable(result.Columns, result.Rows)
+					}
 				case "json":
 					type jsonResponse struct {
-						Columns  []map[string]string `json:"columns"`
-						Rows     [][]interface{}     `json:"rows"`
-						ConnName string              `json:"connectionName"`
-						Query    string              `json:"query"`
+						Columns   []map[string]string          `json:"columns"`
+						Rows      [][]interface{}              `json:"rows"`
+						ConnName  string                       `json:"connectionName"`
+						Query     string                       `json:"query"`
+						Execution *query.QueryExecutionSummary `json:"execution,omitempty"`
 					}
 
 					// Construct JSON response with structured columns
@@ -300,6 +305,9 @@ func Query() *cli.Command {
 						ConnName: connName,
 						Query:    queryStr,
 					}
+					if shouldOutputExecutionSummary(result) {
+						finalOutput.Execution = result.Execution
+					}
 
 					jsonData, err := json.Marshal(finalOutput)
 					if err != nil {
@@ -309,20 +317,26 @@ func Query() *cli.Command {
 				case "csv":
 					writer := csv.NewWriter(os.Stdout)
 					defer writer.Flush()
-					if err = writer.Write(result.Columns); err != nil {
-						return handleError(output, errors.Wrap(err, "failed to write CSV header"))
-					}
-					for _, row := range result.Rows {
-						rowStrings := make([]string, len(row))
-						for i, val := range row {
-							if val == nil {
-								rowStrings[i] = ""
-							} else {
-								rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
-							}
+					if shouldOutputExecutionSummary(result) {
+						if err = writeExecutionSummaryCSV(writer, result.Execution); err != nil {
+							return handleError(output, err)
 						}
-						if err = writer.Write(rowStrings); err != nil {
-							return handleError(output, errors.Wrap(err, "failed to write CSV row"))
+					} else {
+						if err = writer.Write(result.Columns); err != nil {
+							return handleError(output, errors.Wrap(err, "failed to write CSV header"))
+						}
+						for _, row := range result.Rows {
+							rowStrings := make([]string, len(row))
+							for i, val := range row {
+								if val == nil {
+									rowStrings[i] = ""
+								} else {
+									rowStrings[i] = fmt.Sprintf("%v", formatQueryCellForDisplay(val))
+								}
+							}
+							if err = writer.Write(rowStrings); err != nil {
+								return handleError(output, errors.Wrap(err, "failed to write CSV row"))
+							}
 						}
 					}
 				default:
@@ -631,6 +645,84 @@ func printTable(columnNames []string, rows [][]interface{}) {
 
 	t.SetStyle(table.StyleLight)
 	t.Render()
+}
+
+func shouldOutputExecutionSummary(result *query.QueryResult) bool {
+	return result != nil && result.Execution != nil && len(result.Rows) == 0
+}
+
+func printQueryExecutionSummary(summary *query.QueryExecutionSummary) {
+	fmt.Println("Statement executed successfully")
+
+	for _, row := range queryExecutionSummaryRows(summary) {
+		fmt.Printf("%s: %s\n", row[0], row[1])
+	}
+}
+
+func writeExecutionSummaryCSV(writer *csv.Writer, summary *query.QueryExecutionSummary) error {
+	if err := writer.Write([]string{"metric", "value"}); err != nil {
+		return errors.Wrap(err, "failed to write CSV header")
+	}
+
+	for _, row := range queryExecutionSummaryRows(summary) {
+		if err := writer.Write(row); err != nil {
+			return errors.Wrap(err, "failed to write CSV row")
+		}
+	}
+
+	return nil
+}
+
+func queryExecutionSummaryRows(summary *query.QueryExecutionSummary) [][]string {
+	if summary == nil {
+		return nil
+	}
+
+	rows := make([][]string, 0)
+	if summary.StatementType != "" {
+		rows = append(rows, []string{"Statement type", summary.StatementType})
+	}
+	if summary.DMLAffectedRows != nil {
+		rows = append(rows, []string{"Rows affected", formatNumber(*summary.DMLAffectedRows)})
+	}
+	if summary.DMLStats != nil {
+		if summary.DMLStats.InsertedRowCount > 0 {
+			rows = append(rows, []string{"Rows inserted", formatNumber(summary.DMLStats.InsertedRowCount)})
+		}
+		if summary.DMLStats.DeletedRowCount > 0 {
+			rows = append(rows, []string{"Rows deleted", formatNumber(summary.DMLStats.DeletedRowCount)})
+		}
+		if summary.DMLStats.UpdatedRowCount > 0 {
+			rows = append(rows, []string{"Rows modified", formatNumber(summary.DMLStats.UpdatedRowCount)})
+		}
+	}
+	if summary.DDLOperationPerformed != "" {
+		rows = append(rows, []string{"DDL operation", summary.DDLOperationPerformed})
+	}
+	if summary.DDLTargetTable != "" {
+		rows = append(rows, []string{"DDL target table", summary.DDLTargetTable})
+	}
+	if summary.DDLTargetRoutine != "" {
+		rows = append(rows, []string{"DDL target routine", summary.DDLTargetRoutine})
+	}
+	if summary.TotalBytesProcessed > 0 {
+		rows = append(rows, []string{"Bytes processed", formatBytes(summary.TotalBytesProcessed)})
+	}
+	if summary.TotalBytesBilled > 0 {
+		rows = append(rows, []string{"Bytes billed", formatBytes(summary.TotalBytesBilled)})
+	}
+	if summary.SlotMillis > 0 {
+		rows = append(rows, []string{"Slot time", formatSlotMillis(summary.SlotMillis)})
+	}
+	if summary.JobID != "" {
+		rows = append(rows, []string{"Job", summary.JobID})
+	}
+
+	return rows
+}
+
+func formatSlotMillis(slotMillis int64) string {
+	return (time.Duration(slotMillis) * time.Millisecond).String()
 }
 
 func handleError(output string, err error) error {

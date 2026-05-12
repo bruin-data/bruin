@@ -534,6 +534,33 @@ func TestWriteCSVFile(t *testing.T) {
 	}
 }
 
+func TestQueryExecutionSummaryRows(t *testing.T) {
+	t.Parallel()
+
+	affectedRows := int64(1134)
+	rows := queryExecutionSummaryRows(&query.QueryExecutionSummary{
+		JobID:               "bquxjob_123",
+		StatementType:       "UPDATE",
+		TotalBytesProcessed: 11 * 1024 * 1024 * 1024,
+		TotalBytesBilled:    12 * 1024 * 1024 * 1024,
+		SlotMillis:          2500,
+		DMLAffectedRows:     &affectedRows,
+		DMLStats: &query.DMLStatistics{
+			UpdatedRowCount: 1134,
+		},
+	})
+
+	assert.Equal(t, [][]string{
+		{"Statement type", "UPDATE"},
+		{"Rows affected", "1,134"},
+		{"Rows modified", "1,134"},
+		{"Bytes processed", "11.00 GB"},
+		{"Bytes billed", "12.00 GB"},
+		{"Slot time", "2.5s"},
+		{"Job", "bquxjob_123"},
+	}, rows)
+}
+
 func TestExportResultsToMultipleCSV(t *testing.T) {
 	t.Parallel()
 

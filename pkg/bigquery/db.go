@@ -350,14 +350,96 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 			// Extract the type information from the schema
 			columnTypes = append(columnTypes, string(field.Type))
 		}
-	} else {
+	} else if len(result.Rows) > 0 {
 		return nil, errors.New("schema information is not available")
 	}
 
 	// Store the column types in the result
 	result.ColumnTypes = columnTypes
+	if len(result.Rows) == 0 {
+		summary := d.queryExecutionSummary(ctx, job)
+		if isNonResultStatement(summary) {
+			result.Execution = summary
+		}
+	}
 
 	return result, nil
+}
+
+func (d *Client) queryExecutionSummary(ctx context.Context, job *bigquery.Job) *query.QueryExecutionSummary {
+	summary := &query.QueryExecutionSummary{
+		ConnectionType: "bigquery",
+		JobID:          job.ID(),
+	}
+
+	status, err := job.Status(ctx)
+	if err != nil || status == nil || status.Statistics == nil {
+		return summary
+	}
+
+	summary.TotalBytesProcessed = status.Statistics.TotalBytesProcessed
+	if status.Statistics.TotalSlotDuration > 0 {
+		summary.SlotMillis = int64(status.Statistics.TotalSlotDuration / time.Millisecond)
+	}
+
+	stats, ok := status.Statistics.Details.(*bigquery.QueryStatistics)
+	if !ok || stats == nil {
+		return summary
+	}
+
+	summary.StatementType = stats.StatementType
+	if stats.TotalBytesProcessed > 0 {
+		summary.TotalBytesProcessed = stats.TotalBytesProcessed
+	}
+	summary.TotalBytesBilled = stats.TotalBytesBilled
+	if stats.SlotMillis > 0 {
+		summary.SlotMillis = stats.SlotMillis
+	}
+
+	if isDMLStatement(stats.StatementType) || stats.DMLStats != nil {
+		affectedRows := stats.NumDMLAffectedRows
+		summary.DMLAffectedRows = &affectedRows
+	}
+	if stats.DMLStats != nil {
+		summary.DMLStats = &query.DMLStatistics{
+			InsertedRowCount: stats.DMLStats.InsertedRowCount,
+			DeletedRowCount:  stats.DMLStats.DeletedRowCount,
+			UpdatedRowCount:  stats.DMLStats.UpdatedRowCount,
+		}
+	}
+
+	summary.DDLOperationPerformed = stats.DDLOperationPerformed
+	if stats.DDLTargetTable != nil {
+		if table, err := stats.DDLTargetTable.Identifier(bigquery.StandardSQLID); err == nil {
+			summary.DDLTargetTable = table
+		}
+	}
+	if stats.DDLTargetRoutine != nil {
+		summary.DDLTargetRoutine = stats.DDLTargetRoutine.RoutineID
+	}
+
+	return summary
+}
+
+func isDMLStatement(statementType string) bool {
+	switch strings.ToUpper(statementType) {
+	case "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "TRUNCATE_TABLE":
+		return true
+	default:
+		return false
+	}
+}
+
+func isNonResultStatement(summary *query.QueryExecutionSummary) bool {
+	if summary == nil {
+		return false
+	}
+	if summary.DMLAffectedRows != nil || summary.DMLStats != nil || summary.DDLOperationPerformed != "" {
+		return true
+	}
+
+	statementType := strings.ToUpper(summary.StatementType)
+	return statementType != "" && statementType != "SELECT"
 }
 
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {

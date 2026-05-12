@@ -28,6 +28,28 @@ type DryRunResult struct {
 	ExplainRows *QueryResult `json:"explainRows,omitempty"`
 }
 
+// QueryExecutionSummary holds metadata for a successfully executed statement.
+// Databases populate this when a statement does not return a result set.
+type QueryExecutionSummary struct {
+	ConnectionType        string         `json:"connectionType,omitempty"`
+	JobID                 string         `json:"jobId,omitempty"`
+	StatementType         string         `json:"statementType,omitempty"`
+	TotalBytesProcessed   int64          `json:"totalBytesProcessed,omitempty"`
+	TotalBytesBilled      int64          `json:"totalBytesBilled,omitempty"`
+	SlotMillis            int64          `json:"slotMillis,omitempty"`
+	DMLAffectedRows       *int64         `json:"dmlAffectedRows,omitempty"`
+	DMLStats              *DMLStatistics `json:"dmlStats,omitempty"`
+	DDLOperationPerformed string         `json:"ddlOperationPerformed,omitempty"`
+	DDLTargetTable        string         `json:"ddlTargetTable,omitempty"`
+	DDLTargetRoutine      string         `json:"ddlTargetRoutine,omitempty"`
+}
+
+type DMLStatistics struct {
+	InsertedRowCount int64 `json:"insertedRowCount,omitempty"`
+	DeletedRowCount  int64 `json:"deletedRowCount,omitempty"`
+	UpdatedRowCount  int64 `json:"updatedRowCount,omitempty"`
+}
+
 // QueryDryRunner is an optional interface that database connections can implement
 // to support dry-run / explain functionality for the "bruin query --dry-run" command.
 type QueryDryRunner interface {
