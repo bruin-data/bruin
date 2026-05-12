@@ -1,0 +1,41 @@
+name: "{{ var.client }}_{{ var.region }}_pipeline"
+schedule: "{{ var.schedule }}"
+start_date: "2024-01-01"
+owner: data-platform
+
+default_connections:
+  duckdb: "duckdb-default"
+
+variables:
+  client:
+    type: string
+    default: client_a
+  region:
+    type: string
+    enum: ["us", "eu", "ap"]
+    default: us
+  schedule:
+    type: string
+    default: "@daily"
+  forecast_days:
+    type: integer
+    minimum: 7
+    maximum: 90
+    default: 30
+
+variants:
+  client_alpha:
+    client: alpha
+    region: us
+    schedule: "@hourly"
+    forecast_days: 7
+  client_beta:
+    client: beta
+    region: eu
+    schedule: "0 6 * * *"
+    forecast_days: 60
+  client_gamma:
+    client: gamma
+    region: ap
+    schedule: "@weekly"
+    # forecast_days omitted — uses default (30)

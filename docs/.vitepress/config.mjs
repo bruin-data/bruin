@@ -114,6 +114,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "Scheduling", link: "/pipelines/definition#schedule"},
                     {text: "Default Connections", link: "/pipelines/definition#default-connections"},
                     {text: "Pipeline Defaults", link: "/pipelines/definition#default-pipeline-level-defaults"},
+                    {text: "Variants", link: "/pipelines/variants"},
                     {text: "Concurrency", link: "/getting-started/concurrency"},
                 ],
             },
