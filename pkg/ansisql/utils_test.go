@@ -179,9 +179,9 @@ func TestBuildAdhocQueryTag(t *testing.T) {
 			expected:    `{"type":"adhoc_query"}`,
 		},
 		{
-			name:        "empty annotations returns empty string",
+			name:        "empty annotations emits baseline",
 			annotations: "",
-			expected:    "",
+			expected:    `{"type":"adhoc_query"}`,
 		},
 		{
 			name:        "user JSON can override baseline type",

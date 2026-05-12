@@ -97,9 +97,12 @@ func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 }
 
 // BuildAdhocQueryTag builds the JSON annotation payload for an adhoc query
-// (e.g. `bruin query`). Returns "" when annotations is empty so callers can
-// skip applying it.
+// (e.g. `bruin query`). When annotations is empty, the baseline annotation
+// is still emitted so every adhoc query is tagged.
 func BuildAdhocQueryTag(annotations string) (string, error) {
+	if annotations == "" {
+		annotations = DefaultQueryAnnotations
+	}
 	return mergeAnnotations(annotations, map[string]interface{}{"type": "adhoc_query"})
 }
 
