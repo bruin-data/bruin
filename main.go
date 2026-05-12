@@ -16,7 +16,7 @@ var (
 	version      = "dev"
 	commit       = ""
 	telemetryKey string
-)
+) // Build-time variables injected via ldflags
 
 func init() { //nolint:gochecknoinits
 	// Disable the Snowflake driver's platform detection which runs in a background goroutine on import.
