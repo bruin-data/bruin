@@ -3002,3 +3002,20 @@ func TestApplyAllFilters_SelectorAllowsExcludeTagWithoutDownstream(t *testing.T)
 	}
 	assert.Equal(t, []string{"stg_orders", "int_orders", "fct_orders"}, names)
 }
+
+func TestExistingExcludeTagsSeparatesMissingTags(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Name: "TestPipeline",
+		Assets: []*pipeline.Asset{
+			{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+			{Name: "Task2", Type: pipeline.AssetTypePython, Tags: []string{"skip"}},
+		},
+	}
+
+	existing, missing := existingExcludeTags([]string{"exclude", "missing", "skip"}, p)
+
+	assert.Equal(t, []string{"exclude", "skip"}, existing)
+	assert.Equal(t, []string{"missing"}, missing)
+}
