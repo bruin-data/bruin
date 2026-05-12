@@ -112,6 +112,13 @@ func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 				overrides[key] = value
 			}
 		}
+		if p.SelectedVariant != "" {
+			if variantOverrides, ok := p.Variants[p.SelectedVariant]; ok {
+				for key := range variantOverrides {
+					delete(overrides, key)
+				}
+			}
+		}
 		err := p.Variables.Merge(overrides)
 		if err != nil {
 			return nil, fmt.Errorf("invalid variable overrides: %w", err)

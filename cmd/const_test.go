@@ -73,3 +73,84 @@ func TestRenderAssetHooks_Error(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "error rendering hooks for asset schema.asset")
 }
+
+func TestVariableOverridesMutator_VariantWinsOnOverlap(t *testing.T) {
+	t.Parallel()
+
+	newPipeline := func() *pipeline.Pipeline {
+		return &pipeline.Pipeline{
+			Variables: pipeline.Variables{
+				"client":        {"type": "string", "default": "alpha"},
+				"region":        {"type": "string", "default": "us"},
+				"forecast_days": {"type": "integer", "default": int64(7)},
+				"min_signups":   {"type": "integer", "default": int64(0)},
+			},
+			Variants: pipeline.VariantSet{
+				"client_alpha": {
+					"client":        "alpha",
+					"region":        "us",
+					"forecast_days": int64(7),
+				},
+			},
+			SelectedVariant: "client_alpha",
+		}
+	}
+
+	t.Run("overlapping --var key is dropped, variant value preserved", func(t *testing.T) {
+		t.Parallel()
+		p := newPipeline()
+
+		mutator := variableOverridesMutator([]string{
+			`{"forecast_days": 14}`, // overlaps with variant, must be ignored
+			`{"min_signups": 5}`,    // no overlap, must apply
+		})
+		out, err := mutator(t.Context(), p)
+		require.NoError(t, err)
+
+		vals := out.Variables.Value()
+		assert.Equal(t, int64(7), vals["forecast_days"], "variant value should win over --var")
+		assert.Equal(t, int64(5), vals["min_signups"], "non-overlapping --var should still apply")
+	})
+
+	t.Run("no variant selected: all --var overrides apply", func(t *testing.T) {
+		t.Parallel()
+		p := newPipeline()
+		p.SelectedVariant = ""
+
+		mutator := variableOverridesMutator([]string{
+			`{"forecast_days": 14, "min_signups": 5}`,
+		})
+		out, err := mutator(t.Context(), p)
+		require.NoError(t, err)
+
+		vals := out.Variables.Value()
+		assert.Equal(t, int64(14), vals["forecast_days"])
+		assert.Equal(t, int64(5), vals["min_signups"])
+	})
+
+	t.Run("--var overlapping every variant key is fully suppressed", func(t *testing.T) {
+		t.Parallel()
+		p := newPipeline()
+
+		mutator := variableOverridesMutator([]string{
+			`{"client": "manual", "region": "zz", "forecast_days": 99}`,
+		})
+		out, err := mutator(t.Context(), p)
+		require.NoError(t, err)
+
+		vals := out.Variables.Value()
+		assert.Equal(t, "alpha", vals["client"])
+		assert.Equal(t, "us", vals["region"])
+		assert.Equal(t, int64(7), vals["forecast_days"])
+	})
+
+	t.Run("unknown --var key still errors", func(t *testing.T) {
+		t.Parallel()
+		p := newPipeline()
+
+		mutator := variableOverridesMutator([]string{`{"nope": 1}`})
+		_, err := mutator(t.Context(), p)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, `no such variable "nope"`)
+	})
+}

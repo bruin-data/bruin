@@ -761,10 +761,6 @@ func Run(isDebug *bool) *cli.Command {
 
 			variantName := c.String("variant")
 			vars := c.StringSlice("var")
-			if variantName != "" && len(vars) > 0 {
-				printError(errors.New("--var and --variant cannot be used together"), c.String("output"), "Invalid flags")
-				return cli.Exit("", 1)
-			}
 			if len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
@@ -809,6 +805,8 @@ func Run(isDebug *bool) *cli.Command {
 					printError(fmt.Errorf("pipeline %q does not declare any variants but --variant=%q was provided", preview.Pipeline.Name, variantName), c.String("output"), "Variant not supported")
 					return cli.Exit("", 1)
 				}
+				// --var may co-exist with --variant. When both target the same
+				// variable, the variant's value wins (see variableOverridesMutator).
 				// Materialize the preview pipeline too, so downstream code that
 				// reads preview.Pipeline.Name (e.g. the state path) sees the
 				// rendered name.
