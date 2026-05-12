@@ -70,6 +70,134 @@ func TestVariantSet_Validate(t *testing.T) {
 	})
 }
 
+func TestVariantSet_Validate_TypeChecking(t *testing.T) {
+	t.Parallel()
+
+	vars := pipeline.Variables{
+		"client":   map[string]any{"type": "string", "default": "a"},
+		"limit":    map[string]any{"type": "integer", "default": 10},
+		"ratio":    map[string]any{"type": "number", "default": 1.5},
+		"enabled":  map[string]any{"type": "boolean", "default": true},
+		"tags":     map[string]any{"type": "array", "default": []any{"x"}},
+		"meta":     map[string]any{"type": "object", "default": map[string]any{}},
+		"nullable": map[string]any{"type": "null", "default": nil},
+		"untyped":  map[string]any{"default": "anything"}, // no "type" → permissive
+	}
+
+	t.Run("rejects string variable overridden with int", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"client": 42}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "type mismatch")
+		assert.Contains(t, err.Error(), "expected string")
+	})
+
+	t.Run("rejects integer variable overridden with string", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"limit": "ten"}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected integer")
+	})
+
+	t.Run("rejects boolean variable overridden with string", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"enabled": "true"}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected boolean")
+	})
+
+	t.Run("rejects array variable overridden with string", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"tags": "x,y"}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected array")
+	})
+
+	t.Run("rejects object variable overridden with array", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"meta": []any{"x"}}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected object")
+	})
+
+	t.Run("accepts integer overridden with int", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"limit": 99}}
+		require.NoError(t, vs.Validate(vars))
+	})
+
+	t.Run("accepts integer overridden with int64", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"limit": int64(99)}}
+		require.NoError(t, vs.Validate(vars))
+	})
+
+	t.Run("accepts integer overridden with whole-number float", func(t *testing.T) {
+		t.Parallel()
+		// JSON / YAML loaders may decode "99" as float64 — accept it.
+		vs := pipeline.VariantSet{"v": {"limit": float64(99)}}
+		require.NoError(t, vs.Validate(vars))
+	})
+
+	t.Run("rejects integer overridden with fractional float", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"limit": 1.5}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected integer")
+	})
+
+	t.Run("accepts number overridden with int", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"ratio": 2}}
+		require.NoError(t, vs.Validate(vars))
+	})
+
+	t.Run("accepts number overridden with float", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"ratio": 3.14}}
+		require.NoError(t, vs.Validate(vars))
+	})
+
+	t.Run("accepts null variable overridden with nil", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"nullable": nil}}
+		require.NoError(t, vs.Validate(vars))
+	})
+
+	t.Run("rejects null variable overridden with non-nil", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"v": {"nullable": "not null"}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected null")
+	})
+
+	t.Run("untyped variable accepts any value", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{
+			"v1": {"untyped": "string"},
+			"v2": {"untyped": 42},
+			"v3": {"untyped": true},
+		}
+		require.NoError(t, vs.Validate(vars))
+	})
+
+	t.Run("error message mentions variant and variable names", func(t *testing.T) {
+		t.Parallel()
+		vs := pipeline.VariantSet{"client_alpha": {"limit": "bad"}}
+		err := vs.Validate(vars)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `variant "client_alpha"`)
+		assert.Contains(t, err.Error(), `variable "limit"`)
+	})
+}
+
 func TestPipeline_MaterializeVariant(t *testing.T) {
 	t.Parallel()
 

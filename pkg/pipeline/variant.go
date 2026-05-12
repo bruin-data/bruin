@@ -36,13 +36,68 @@ func (vs VariantSet) Validate(vars Variables) error {
 		if !variantNameRegex.MatchString(name) {
 			return fmt.Errorf("invalid variant name %q: must match [a-zA-Z0-9_-]+", name)
 		}
-		for key := range values {
-			if _, ok := vars[key]; !ok {
+		for key, value := range values {
+			schema, ok := vars[key]
+			if !ok {
 				return fmt.Errorf("variant %q references unknown variable %q", name, key)
+			}
+			if err := validateOverrideType(value, schema); err != nil {
+				return fmt.Errorf("variant %q variable %q: %w", name, key, err)
 			}
 		}
 	}
 	return nil
+}
+
+func validateOverrideType(value any, schema map[string]any) error {
+	declared, ok := schema["type"].(string)
+	if !ok || declared == "" {
+		return nil
+	}
+	if matchesDeclaredType(value, declared) {
+		return nil
+	}
+	return fmt.Errorf("type mismatch: expected %s, got %T (%v)", declared, value, value)
+}
+
+func matchesDeclaredType(value any, declared string) bool {
+	switch declared {
+	case "string":
+		_, ok := value.(string)
+		return ok
+	case "integer":
+		switch v := value.(type) {
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+			return true
+		case float64:
+			return v == float64(int64(v))
+		case float32:
+			return float32(int32(v)) == v
+		default:
+			return false
+		}
+	case "number":
+		switch value.(type) {
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64,
+			float32, float64:
+			return true
+		default:
+			return false
+		}
+	case "boolean":
+		_, ok := value.(bool)
+		return ok
+	case "array":
+		_, ok := value.([]any)
+		return ok
+	case "object":
+		_, ok := value.(map[string]any)
+		return ok
+	case "null":
+		return value == nil
+	default:
+		return true // unknown type — be permissive
+	}
 }
 
 // UnmarshalJSON allows an empty `{}` to clear the variant set, mirroring Variables.
