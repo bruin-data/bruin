@@ -137,7 +137,8 @@ type RunConfig struct {
 	FullRefresh            bool     `json:"fullRefresh"`
 	Selector               string   `json:"selector"`
 	Tag                    string   `json:"tag"`
-	ExcludeTag             string   `json:"excludeTag"`
+	ExcludeTag             string   `json:"excludeTag,omitempty"`
+	ExcludeTags            []string `json:"excludeTags,omitempty"`
 	Only                   []string `json:"only"`
 	Output                 string   `json:"output"`
 	ExpUseWingetForUv      bool     `json:"expUseWingetForUv"`

@@ -566,10 +566,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "single-check",
 				Usage: "runs a single column or custom check by ID",
 			},
-			&cli.StringFlag{
+			&cli.StringSliceFlag{
 				Name:    "exclude-tag",
 				Aliases: []string{"x"},
-				Usage:   "exclude the assets with given tag",
+				Usage:   "exclude assets with the given tag. Can be used multiple times",
 			},
 			&cli.StringSliceFlag{
 				Name:        "only",
@@ -710,7 +710,7 @@ func Run(isDebug *bool) *cli.Command {
 				FullRefresh:            fullRefresh,
 				Selector:               c.String("selector"),
 				Tag:                    c.String("tag"),
-				ExcludeTag:             c.String("exclude-tag"),
+				ExcludeTags:            c.StringSlice("exclude-tag"),
 				Only:                   c.StringSlice("only"),
 				Output:                 c.String("output"),
 				ExpUseWingetForUv:      c.Bool("exp-use-winget-for-uv"),
@@ -861,7 +861,7 @@ func Run(isDebug *bool) *cli.Command {
 				SingleTask:        task,
 				SelectedAssets:    selectedAssets,
 				Selector:          runConfig.Selector,
-				ExcludeTag:        runConfig.ExcludeTag,
+				ExcludeTags:       runConfig.ExcludeTags,
 				singleCheckID: scheduler.CheckUniqueID{
 					ID:    singleCheckID,
 					Asset: task,
@@ -1439,6 +1439,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	filter.PushMetaData = pipelineState.Parameters.PushMetadata
 	filter.Selector = pipelineState.Parameters.Selector
 	filter.ExcludeTag = pipelineState.Parameters.ExcludeTag
+	filter.ExcludeTags = pipelineState.Parameters.ExcludeTags
 	return pipelineState, nil
 }
 
@@ -2391,6 +2392,7 @@ type Filter struct {
 	ModifiedAssets     []*pipeline.Asset // Assets whose files have been modified vs default branch (from `--modified`)
 	Selector           string
 	ExcludeTag         string
+	ExcludeTags        []string
 	selectedBySelector bool
 	singleCheckID      scheduler.CheckUniqueID // ID of the single check to run, if any
 }
@@ -2436,12 +2438,10 @@ func HandleModifiedAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler
 	}
 
 	// Handle exclude-tag if specified
-	if f.ExcludeTag != "" {
-		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
-		if len(excludedAssets) == 0 {
-			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
-		}
-		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	excludeTags, missingExcludeTags := existingExcludeTags(f.excludeTags(), p)
+	warnMissingExcludeTags(missingExcludeTags)
+	for _, tag := range excludeTags {
+		s.MarkByTag(tag, scheduler.Skipped, false)
 	}
 
 	return nil
@@ -2471,15 +2471,17 @@ func HandleMultipleAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler
 	}
 
 	// Handle exclude-tag if specified
-	if f.ExcludeTag != "" {
+	excludeTags, missingExcludeTags := existingExcludeTags(f.excludeTags(), p)
+	if len(excludeTags) > 0 {
 		if !f.IncludeDownstream && !f.selectedBySelector {
 			return errors.New("when specifying assets with --exclude-tag, you must also use --downstream flag")
 		}
-		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
-		if len(excludedAssets) == 0 {
-			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		warnMissingExcludeTags(missingExcludeTags)
+		for _, tag := range excludeTags {
+			s.MarkByTag(tag, scheduler.Skipped, false)
 		}
-		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	} else {
+		warnMissingExcludeTags(missingExcludeTags)
 	}
 
 	return nil
@@ -2507,15 +2509,17 @@ func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p 
 	if f.IncludeTag != "" {
 		return errors.New("you cannot use the '--tag' flag when running a single asset")
 	}
-	if f.ExcludeTag != "" {
+	excludeTags, missingExcludeTags := existingExcludeTags(f.excludeTags(), p)
+	if len(excludeTags) > 0 {
 		if !f.IncludeDownstream {
 			return errors.New("when running a single asset with '--exclude-tag', you must also use the '--downstream' flag")
 		}
-		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
-		if len(excludedAssets) == 0 {
-			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		warnMissingExcludeTags(missingExcludeTags)
+		for _, tag := range excludeTags {
+			s.MarkByTag(tag, scheduler.Skipped, false)
 		}
-		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	} else {
+		warnMissingExcludeTags(missingExcludeTags)
 	}
 	return nil
 }
@@ -2541,19 +2545,58 @@ func HandleIncludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p
 }
 
 func HandleExcludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
-	if f.SingleTask != nil {
+	if f.SingleTask != nil || len(f.SelectedAssets) > 0 || len(f.ModifiedAssets) > 0 {
 		return nil
 	}
-	if f.ExcludeTag == "" {
-		return nil
+	excludeTags, missingExcludeTags := existingExcludeTags(f.excludeTags(), p)
+	warnMissingExcludeTags(missingExcludeTags)
+	for _, tag := range excludeTags {
+		s.MarkByTag(tag, scheduler.Skipped, false)
 	}
-	excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
-	if len(excludedAssets) == 0 {
-		return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
-	}
-	s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
 
 	return nil
+}
+
+func (f *Filter) excludeTags() []string {
+	tags := make([]string, 0, len(f.ExcludeTags)+1)
+	if f.ExcludeTag != "" {
+		tags = append(tags, f.ExcludeTag)
+	}
+	tags = append(tags, f.ExcludeTags...)
+
+	seen := make(map[string]struct{}, len(tags))
+	unique := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		unique = append(unique, tag)
+	}
+	return unique
+}
+
+func existingExcludeTags(tags []string, p *pipeline.Pipeline) ([]string, []string) {
+	existing := make([]string, 0, len(tags))
+	missing := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		excludedAssets := p.GetAssetsByTag(tag)
+		if len(excludedAssets) > 0 {
+			existing = append(existing, tag)
+			continue
+		}
+		missing = append(missing, tag)
+	}
+	return existing, missing
+}
+
+func warnMissingExcludeTags(tags []string) {
+	for _, tag := range tags {
+		warningPrinter.Printf("Warning: no assets found with exclude tag '%s'; continuing without excluding any assets.\n", tag)
+	}
 }
 
 func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
