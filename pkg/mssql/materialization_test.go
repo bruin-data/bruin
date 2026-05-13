@@ -304,6 +304,66 @@ func TestMaterializer_Render(t *testing.T) {
 				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
 				"COMMIT;$",
 		},
+		{
+			name: "ddl materialization creates schema and table from columns",
+			task: &pipeline.Asset{
+				Name: "cfg.ProfileTarget",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "TargetId", Type: "integer", PrimaryKey: true},
+					{Name: "SchemaName", Type: "NVARCHAR(128)"},
+					{Name: "TableName", Type: "NVARCHAR(128)"},
+					{Name: "FilterPredicate", Type: "NVARCHAR(MAX)"},
+					{Name: "IsEnabled", Type: "BIT"},
+					{Name: "Notes", Type: "NVARCHAR(4000)"},
+				},
+			},
+			query: "",
+			want: "^IF SCHEMA_ID\\(N'cfg'\\) IS NULL\n" +
+				"    EXEC\\(N'CREATE SCHEMA \\[cfg\\]'\\);\n" +
+				"IF OBJECT_ID\\(N'cfg\\.ProfileTarget', N'U'\\) IS NULL\n" +
+				"BEGIN\n" +
+				"CREATE TABLE \\[cfg\\]\\.\\[ProfileTarget\\] \\(\n" +
+				"    \\[TargetId\\] integer NOT NULL,\n" +
+				"    \\[SchemaName\\] NVARCHAR\\(128\\),\n" +
+				"    \\[TableName\\] NVARCHAR\\(128\\),\n" +
+				"    \\[FilterPredicate\\] NVARCHAR\\(MAX\\),\n" +
+				"    \\[IsEnabled\\] BIT,\n" +
+				"    \\[Notes\\] NVARCHAR\\(4000\\),\n" +
+				"    PRIMARY KEY \\(\\[TargetId\\]\\)\n" +
+				"\\)\n" +
+				"END;$",
+		},
+		{
+			name: "ddl materialization requires columns",
+			task: &pipeline.Asset{
+				Name: "cfg.ProfileTarget",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+			},
+			query:   "",
+			wantErr: true,
+		},
+		{
+			name: "ddl materialization requires column types",
+			task: &pipeline.Asset{
+				Name: "cfg.ProfileTarget",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "TargetId", PrimaryKey: true},
+				},
+			},
+			query:   "",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
