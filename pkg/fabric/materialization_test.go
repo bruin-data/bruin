@@ -122,7 +122,8 @@ func TestBuildDDLQuery(t *testing.T) {
 		"BEGIN\n" +
 		"CREATE TABLE [dbo].[Table] (\n" +
 		"    [id] INT NOT NULL,\n" +
-		"    [name] VARCHAR(100) NOT NULL\n" +
+		"    [name] VARCHAR(100) NOT NULL,\n" +
+		"    PRIMARY KEY ([id])\n" +
 		")\n" +
 		"END;"
 	assert.Equal(t, expected, result)

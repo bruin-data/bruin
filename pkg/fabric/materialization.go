@@ -117,7 +117,8 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
 
-	columnDefs := make([]string, 0, len(asset.Columns))
+	columnDefs := make([]string, 0, len(asset.Columns)+1)
+	primaryKeys := make([]string, 0)
 	for _, col := range asset.Columns {
 		if col.Type == "" {
 			return "", fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
@@ -128,6 +129,14 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 			definition += " NOT NULL"
 		}
 		columnDefs = append(columnDefs, definition)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, QuoteIdentifier(col.Name))
+		}
+	}
+
+	if len(primaryKeys) > 0 {
+		columnDefs = append(columnDefs, fmt.Sprintf("    PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
 	}
 
 	return fmt.Sprintf(
