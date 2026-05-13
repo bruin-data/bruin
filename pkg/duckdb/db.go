@@ -331,7 +331,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 		}
 
 		var rowsAffected *int64
-		if affected, err := execResult.RowsAffected(); err == nil {
+		if affected, err := execResult.RowsAffected(); err == nil && affected > 0 {
 			rowsAffected = &affected
 		}
 

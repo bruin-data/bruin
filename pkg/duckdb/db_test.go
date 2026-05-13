@@ -20,10 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func int64Ptr(value int64) *int64 {
-	return &value
-}
-
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
 
@@ -175,10 +171,10 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "update with schema returns execution summary",
+			name: "update with schema returns execution summary without unavailable affected rows",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("UPDATE users SET name = 'Ada' WHERE id = 1").
-					WillReturnResult(sqlmock.NewResult(0, 2))
+					WillReturnResult(sqlmock.NewResult(0, 0))
 			},
 			query: query.Query{
 				Query: "UPDATE users SET name = 'Ada' WHERE id = 1",
@@ -188,9 +184,8 @@ func TestDB_SelectWithSchema(t *testing.T) {
 				Rows:        [][]interface{}{},
 				ColumnTypes: []string{},
 				Execution: &query.QueryExecutionSummary{
-					ConnectionType:  "duckdb",
-					StatementType:   "UPDATE",
-					DMLAffectedRows: int64Ptr(2),
+					ConnectionType: "duckdb",
+					StatementType:  "UPDATE",
 				},
 			},
 			wantErr: false,
