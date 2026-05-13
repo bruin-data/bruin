@@ -13,6 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func int64Ptr(value int64) *int64 {
+	return &value
+}
+
 func TestClient_Select(t *testing.T) {
 	t.Parallel()
 
@@ -158,6 +162,56 @@ func TestClient_SelectWithSchema(t *testing.T) {
 					pgconn.FieldDescription{Name: "name", DataTypeOID: 1043}, // VARCHAR
 				)
 				mock.ExpectQuery("SELECT \\* FROM table").WillReturnRows(rows)
+			},
+		},
+		{
+			name:  "test update returns execution summary",
+			query: "UPDATE table SET name = 'Jane' WHERE id = 1",
+			expected: &query.QueryResult{
+				Columns:     []string{},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{},
+				Execution: &query.QueryExecutionSummary{
+					ConnectionType:  "postgres",
+					StatementType:   "UPDATE",
+					DMLAffectedRows: int64Ptr(3),
+				},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRows(nil).AddCommandTag(pgconn.NewCommandTag("UPDATE 3"))
+				mock.ExpectQuery("UPDATE table SET name = 'Jane' WHERE id = 1").WillReturnRows(rows)
+			},
+		},
+		{
+			name:  "test create table returns execution summary",
+			query: "CREATE TABLE users (id INTEGER)",
+			expected: &query.QueryResult{
+				Columns:     []string{},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{},
+				Execution: &query.QueryExecutionSummary{
+					ConnectionType: "postgres",
+					StatementType:  "CREATE TABLE",
+				},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRows(nil).AddCommandTag(pgconn.NewCommandTag("CREATE TABLE"))
+				mock.ExpectQuery("CREATE TABLE users \\(id INTEGER\\)").WillReturnRows(rows)
+			},
+		},
+		{
+			name:  "test insert returning empty rows does not return execution summary",
+			query: "INSERT INTO users (id) VALUES (1) RETURNING id",
+			expected: &query.QueryResult{
+				Columns:     []string{"id"},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{"int8"},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "id", DataTypeOID: 20}, // BIGINT
+				).AddCommandTag(pgconn.NewCommandTag("INSERT 0 0"))
+				mock.ExpectQuery("INSERT INTO users \\(id\\) VALUES \\(1\\) RETURNING id").WillReturnRows(rows)
 			},
 		},
 		{

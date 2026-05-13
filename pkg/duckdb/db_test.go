@@ -20,6 +20,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func int64Ptr(value int64) *int64 {
+	return &value
+}
+
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
 
@@ -167,6 +171,47 @@ func TestDB_SelectWithSchema(t *testing.T) {
 					{int64(4), int64(5), int64(6)},
 				},
 				ColumnTypes: []string{"BIGINT", "BIGINT", "BIGINT"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "update with schema returns execution summary",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("UPDATE users SET name = 'Ada' WHERE id = 1").
+					WillReturnResult(sqlmock.NewResult(0, 2))
+			},
+			query: query.Query{
+				Query: "UPDATE users SET name = 'Ada' WHERE id = 1",
+			},
+			want: &query.QueryResult{
+				Columns:     []string{},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{},
+				Execution: &query.QueryExecutionSummary{
+					ConnectionType:  "duckdb",
+					StatementType:   "UPDATE",
+					DMLAffectedRows: int64Ptr(2),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "create table with schema returns execution summary",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("CREATE TABLE users (id INTEGER)").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			query: query.Query{
+				Query: "CREATE TABLE users (id INTEGER)",
+			},
+			want: &query.QueryResult{
+				Columns:     []string{},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{},
+				Execution: &query.QueryExecutionSummary{
+					ConnectionType: "duckdb",
+					StatementType:  "CREATE TABLE",
+				},
 			},
 			wantErr: false,
 		},

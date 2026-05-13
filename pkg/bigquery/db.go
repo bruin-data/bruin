@@ -356,9 +356,9 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 
 	// Store the column types in the result
 	result.ColumnTypes = columnTypes
-	if len(result.Rows) == 0 && !isLikelyResultQuery(queryObj.String()) {
+	if len(result.Rows) == 0 && !query.IsLikelyResultQuery(queryObj.String()) {
 		summary := d.queryExecutionSummary(ctx, job)
-		if isNonResultStatement(summary) {
+		if query.IsNonResultStatement(summary) {
 			result.Execution = summary
 		}
 	}
@@ -396,7 +396,7 @@ func (d *Client) queryExecutionSummary(ctx context.Context, job *bigquery.Job) *
 		summary.SlotMillis = stats.SlotMillis
 	}
 
-	if isDMLStatement(stats.StatementType) || stats.DMLStats != nil {
+	if query.IsDMLStatement(stats.StatementType) || stats.DMLStats != nil {
 		affectedRows := stats.NumDMLAffectedRows
 		summary.DMLAffectedRows = &affectedRows
 	}
@@ -423,52 +423,6 @@ func (d *Client) queryExecutionSummary(ctx context.Context, job *bigquery.Job) *
 	}
 
 	return summary
-}
-
-func isDMLStatement(statementType string) bool {
-	switch strings.ToUpper(statementType) {
-	case "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "TRUNCATE_TABLE":
-		return true
-	default:
-		return false
-	}
-}
-
-func isLikelyResultQuery(sql string) bool {
-	sql = strings.TrimSpace(sql)
-	for {
-		if strings.HasPrefix(sql, "--") {
-			if newline := strings.IndexByte(sql, '\n'); newline >= 0 {
-				sql = strings.TrimSpace(sql[newline+1:])
-				continue
-			}
-			return true
-		}
-		if strings.HasPrefix(sql, "/*") {
-			end := strings.Index(sql, "*/")
-			if end >= 0 {
-				sql = strings.TrimSpace(sql[end+2:])
-				continue
-			}
-			return true
-		}
-		break
-	}
-
-	upper := strings.ToUpper(sql)
-	return strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "WITH")
-}
-
-func isNonResultStatement(summary *query.QueryExecutionSummary) bool {
-	if summary == nil {
-		return false
-	}
-	if summary.DMLAffectedRows != nil || summary.DMLStats != nil || summary.DDLOperationPerformed != "" {
-		return true
-	}
-
-	statementType := strings.ToUpper(summary.StatementType)
-	return statementType != "" && statementType != "SELECT"
 }
 
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
