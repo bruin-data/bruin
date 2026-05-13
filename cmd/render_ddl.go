@@ -14,16 +14,20 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
+	"github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/bruin-data/bruin/pkg/trino"
+	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v3"
@@ -211,27 +215,36 @@ func RenderDDL() *cli.Command {
 					Renderer: forAsset,
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
-					pipeline.AssetTypeMySQLQuery:            mysql.NewMaterializer(false),
-					pipeline.AssetTypeBigqueryQuery:         bigquery.NewMaterializer(false),
-					pipeline.AssetTypeBigqueryQuerySensor:   bigquery.NewMaterializer(false),
-					pipeline.AssetTypeSnowflakeQuery:        snowflake.NewMaterializer(false),
-					pipeline.AssetTypeSnowflakeQuerySensor:  snowflake.NewMaterializer(false),
-					pipeline.AssetTypeRedshiftQuery:         postgres.NewMaterializer(false),
-					pipeline.AssetTypeRedshiftQuerySensor:   postgres.NewMaterializer(false),
-					pipeline.AssetTypePostgresQuery:         postgres.NewMaterializer(false),
-					pipeline.AssetTypePostgresQuerySensor:   postgres.NewMaterializer(false),
-					pipeline.AssetTypeMsSQLQuery:            mssql.NewMaterializer(false),
-					pipeline.AssetTypeMsSQLQuerySensor:      mssql.NewMaterializer(false),
-					pipeline.AssetTypeDatabricksQuery:       databricks.NewRenderer(false),
-					pipeline.AssetTypeDatabricksQuerySensor: databricks.NewRenderer(false),
-					pipeline.AssetTypeSynapseQuery:          synapse.NewRenderer(false),
-					pipeline.AssetTypeSynapseQuerySensor:    synapse.NewRenderer(false),
-					pipeline.AssetTypeAthenaQuery:           athena.NewRenderer(false, resultsLocation),
-					pipeline.AssetTypeAthenaSQLSensor:       athena.NewRenderer(false, resultsLocation),
-					pipeline.AssetTypeDuckDBQuery:           duck.NewMaterializer(false),
-					pipeline.AssetTypeDuckDBQuerySensor:     duck.NewMaterializer(false),
-					pipeline.AssetTypeClickHouse:            clickhouse.NewRenderer(false),
-					pipeline.AssetTypeClickHouseQuerySensor: clickhouse.NewRenderer(false),
+					pipeline.AssetTypeMySQLQuery:              mysql.NewMaterializer(false),
+					pipeline.AssetTypeBigqueryQuery:           bigquery.NewMaterializer(false),
+					pipeline.AssetTypeBigqueryQuerySensor:     bigquery.NewMaterializer(false),
+					pipeline.AssetTypeSnowflakeQuery:          snowflake.NewMaterializer(false),
+					pipeline.AssetTypeSnowflakeQuerySensor:    snowflake.NewMaterializer(false),
+					pipeline.AssetTypeRedshiftQuery:           postgres.NewMaterializer(false),
+					pipeline.AssetTypeRedshiftQuerySensor:     postgres.NewMaterializer(false),
+					pipeline.AssetTypePostgresQuery:           postgres.NewMaterializer(false),
+					pipeline.AssetTypePostgresQuerySensor:     postgres.NewMaterializer(false),
+					pipeline.AssetTypeTrinoQuery:              trino.NewMaterializer(false),
+					pipeline.AssetTypeTrinoQuerySensor:        trino.NewMaterializer(false),
+					pipeline.AssetTypeOracleQuery:             oracle.NewMaterializer(false),
+					pipeline.AssetTypeMsSQLQuery:              mssql.NewMaterializer(false),
+					pipeline.AssetTypeMsSQLQuerySensor:        mssql.NewMaterializer(false),
+					pipeline.AssetTypeDatabricksQuery:         databricks.NewRenderer(false),
+					pipeline.AssetTypeDatabricksQuerySensor:   databricks.NewRenderer(false),
+					pipeline.AssetTypeSynapseQuery:            synapse.NewRenderer(false),
+					pipeline.AssetTypeSynapseQuerySensor:      synapse.NewRenderer(false),
+					pipeline.AssetTypeVerticaQuery:            vertica.NewMaterializer(false),
+					pipeline.AssetTypeVerticaQuerySensor:      vertica.NewMaterializer(false),
+					pipeline.AssetTypeFabricQuery:             fabric.NewMaterializer(false),
+					pipeline.AssetTypeFabricQueryLegacy:       fabric.NewMaterializer(false),
+					pipeline.AssetTypeFabricQuerySensor:       fabric.NewMaterializer(false),
+					pipeline.AssetTypeFabricQuerySensorLegacy: fabric.NewMaterializer(false),
+					pipeline.AssetTypeAthenaQuery:             athena.NewRenderer(false, resultsLocation),
+					pipeline.AssetTypeAthenaSQLSensor:         athena.NewRenderer(false, resultsLocation),
+					pipeline.AssetTypeDuckDBQuery:             duck.NewMaterializer(false),
+					pipeline.AssetTypeDuckDBQuerySensor:       duck.NewMaterializer(false),
+					pipeline.AssetTypeClickHouse:              clickhouse.NewRenderer(false),
+					pipeline.AssetTypeClickHouseQuerySensor:   clickhouse.NewRenderer(false),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
