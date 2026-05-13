@@ -326,34 +326,42 @@ func notificationsOrNil(n Notifications) *Notifications {
 }
 
 type taskDefinition struct {
-	Name              string            `yaml:"name"`
-	URI               string            `yaml:"uri"`
-	Description       string            `yaml:"description"`
-	Type              string            `yaml:"type"`
-	RunFile           string            `yaml:"run"`
-	Depends           depends           `yaml:"depends"`
-	Parameters        map[string]string `yaml:"parameters"`
-	Connections       map[string]string `yaml:"connections"`
-	Secrets           []secretMapping   `yaml:"secrets"`
-	Connection        string            `yaml:"connection"`
-	Image             string            `yaml:"image"`
-	Instance          string            `yaml:"instance"`
-	Materialization   materialization   `yaml:"materialization"`
-	Owner             string            `yaml:"owner"`
-	StartDate         string            `yaml:"start_date"`
-	Extends           []string          `yaml:"extends"`
-	Columns           []column          `yaml:"columns"`
-	CustomChecks      []customCheck     `yaml:"custom_checks"`
-	Hooks             Hooks             `yaml:"hooks"`
-	Tags              []string          `yaml:"tags"`
-	Snowflake         snowflake         `yaml:"snowflake"`
-	Athena            athena            `yaml:"athena"`
-	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
-	Domains           []string          `yaml:"domains"`
-	Meta              map[string]string `yaml:"meta"`
-	RerunCooldown     *int              `yaml:"rerun_cooldown"`
-	RefreshRestricted *bool             `yaml:"refresh_restricted,omitempty"`
-	Notifications     Notifications     `yaml:"notifications"`
+	Name                  string            `yaml:"name"`
+	URI                   string            `yaml:"uri"`
+	Description           string            `yaml:"description"`
+	Type                  string            `yaml:"type"`
+	RunFile               string            `yaml:"run"`
+	Depends               depends           `yaml:"depends"`
+	Parameters            map[string]string `yaml:"parameters"`
+	Connections           map[string]string `yaml:"connections"`
+	Secrets               []secretMapping   `yaml:"secrets"`
+	Connection            string            `yaml:"connection"`
+	Image                 string            `yaml:"image"`
+	Instance              string            `yaml:"instance"`
+	Materialization       materialization   `yaml:"materialization"`
+	Owner                 string            `yaml:"owner"`
+	StartDate             string            `yaml:"start_date"`
+	Extends               []string          `yaml:"extends"`
+	Columns               []column          `yaml:"columns"`
+	CustomChecks          []customCheck     `yaml:"custom_checks"`
+	Hooks                 Hooks             `yaml:"hooks"`
+	Tags                  []string          `yaml:"tags"`
+	Snowflake             snowflake         `yaml:"snowflake"`
+	Athena                athena            `yaml:"athena"`
+	IntervalModifiers     IntervalModifiers `yaml:"interval_modifiers"`
+	Domains               []string          `yaml:"domains"`
+	Meta                  map[string]string `yaml:"meta"`
+	RerunCooldown         *int              `yaml:"rerun_cooldown"`
+	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
+	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
+	Notifications         Notifications     `yaml:"notifications"`
+}
+
+func (d taskDefinition) refreshRestricted() *bool {
+	if d.FullRefreshRestricted != nil {
+		return d.FullRefreshRestricted
+	}
+	return d.RefreshRestricted
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -534,7 +542,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Domains:           definition.Domains,
 		Meta:              definition.Meta,
 		RerunCooldown:     definition.RerunCooldown,
-		RefreshRestricted: definition.RefreshRestricted,
+		RefreshRestricted: definition.refreshRestricted(),
 		Notifications:     notificationsOrNil(definition.Notifications),
 	}
 

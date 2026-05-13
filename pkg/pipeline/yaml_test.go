@@ -340,6 +340,62 @@ func TestUpstreams(t *testing.T) {
 	require.Equal(t, expected, got)
 }
 
+func TestConvertYamlToTask_FullRefreshRestrictedAlias(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name: "existing refresh_restricted field",
+			content: `
+name: dataset.asset
+type: duckdb.sql
+refresh_restricted: true
+`,
+		},
+		{
+			name: "full_refresh_restricted alias",
+			content: `
+name: dataset.asset
+type: duckdb.sql
+full_refresh_restricted: true
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(tt.content)))
+			require.NoError(t, err)
+			require.NotNil(t, task.RefreshRestricted)
+			require.True(t, *task.RefreshRestricted)
+		})
+	}
+}
+
+func TestCreateTaskFromFileComments_FullRefreshRestrictedAlias(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	err := afero.WriteFile(fs, "asset.sql", []byte(strings.TrimSpace(`
+-- @bruin.name: dataset.asset
+-- @bruin.type: duckdb.sql
+-- @bruin.full_refresh_restricted: true
+select 1
+`)), 0o644)
+	require.NoError(t, err)
+
+	creator := pipeline.CreateTaskFromFileComments(fs)
+	task, err := creator("asset.sql")
+	require.NoError(t, err)
+	require.NotNil(t, task.RefreshRestricted)
+	require.True(t, *task.RefreshRestricted)
+}
+
 func TestConvertYamlToTask_Hooks(t *testing.T) {
 	t.Parallel()
 
