@@ -25,6 +25,7 @@ You can run it in three modes:
 | `--export`           |       | Export results to a CSV file.                                              |
 | `--split-rows`       |       | Split export into multiple CSV files with at most this many rows per file (requires `--export`). |
 | `--config-file`      |       | The path to the `.bruin.yml` file.                                         |
+| `--dangerously-bypass-soft-limits` | | Bypass BigQuery soft query limits configured on the connection. |
 
 ## Example
 
