@@ -72,7 +72,7 @@ func matchesDeclaredType(value any, declared string) bool {
 		case float64:
 			return v == float64(int64(v))
 		case float32:
-			return float32(int32(v)) == v
+			return float32(int64(v)) == v
 		default:
 			return false
 		}
