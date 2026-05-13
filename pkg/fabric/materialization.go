@@ -22,6 +22,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:   buildDeleteInsertQuery,
 		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 	},
 }
 
@@ -109,6 +110,32 @@ func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, erro
 		"INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"),
 	}
 	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	columnDefs := make([]string, 0, len(asset.Columns))
+	for _, col := range asset.Columns {
+		if col.Type == "" {
+			return "", fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
+		}
+
+		definition := fmt.Sprintf("    %s %s", QuoteIdentifier(col.Name), col.Type)
+		if col.PrimaryKey || !col.Nullable.Bool() {
+			definition += " NOT NULL"
+		}
+		columnDefs = append(columnDefs, definition)
+	}
+
+	return fmt.Sprintf(
+		"IF OBJECT_ID('%s', 'U') IS NULL\nBEGIN\nCREATE TABLE %s (\n%s\n)\nEND;",
+		strings.ReplaceAll(asset.Name, "'", "''"),
+		QuoteIdentifier(asset.Name),
+		strings.Join(columnDefs, ",\n"),
+	), nil
 }
 
 func getPrimaryKeyColumns(asset *pipeline.Asset) []string {

@@ -327,6 +327,67 @@ END;`,
 			query:   "SELECT 1",
 			wantErr: true,
 		},
+		{
+			name: "ddl builds create table",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "NUMBER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR2(100)", Description: "Customer's name"},
+				},
+			},
+			query: "SELECT 1",
+			want: strings.Join([]string{
+				"BEGIN",
+				"   BEGIN",
+				"      EXECUTE IMMEDIATE 'CREATE TABLE my.asset (",
+				"   id NUMBER NOT NULL,",
+				"   name VARCHAR2(100),",
+				"   PRIMARY KEY (id)",
+				")';",
+				"   EXCEPTION",
+				"      WHEN OTHERS THEN",
+				"         IF SQLCODE != -955 THEN",
+				"            RAISE;",
+				"         END IF;",
+				"   END;",
+				"   EXECUTE IMMEDIATE 'COMMENT ON COLUMN my.asset.name IS ''Customer''''s name''';",
+				"END;",
+			}, "\n"),
+		},
+		{
+			name: "ddl is preserved on full refresh",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "NUMBER"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT 1",
+			want: strings.Join([]string{
+				"BEGIN",
+				"   BEGIN",
+				"      EXECUTE IMMEDIATE 'CREATE TABLE my.asset (",
+				"   id NUMBER",
+				")';",
+				"   EXCEPTION",
+				"      WHEN OTHERS THEN",
+				"         IF SQLCODE != -955 THEN",
+				"            RAISE;",
+				"         END IF;",
+				"   END;",
+				"END;",
+			}, "\n"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -60,7 +60,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if len(queries) == 0 {
-		return nil
+		if t.Materialization.Strategy != pipeline.MaterializationStrategyDDL {
+			return nil
+		}
+		queries = []*query.Query{{Query: ""}}
 	}
 
 	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
