@@ -315,6 +315,12 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	sensorTimeout := helpers.GetSensorTimeout(t)
 	timeout := time.After(sensorTimeout)
 	var lastJobID string
+	if checker, ok := conn.(queryLimitChecker); ok {
+		if err := checker.CheckQueryLimits(ctx, qry[0]); err != nil {
+			return err
+		}
+		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
+	}
 	sinkCtx := query.WithQueryIDSink(ctx, &lastJobID)
 	for {
 		select {
@@ -409,6 +415,12 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	sensorTimeout := helpers.GetSensorTimeout(t)
 	timeout := time.After(sensorTimeout)
 	var lastJobID string
+	if checker, ok := conn.(queryLimitChecker); ok {
+		if err := checker.CheckQueryLimits(ctx, extractedQuery); err != nil {
+			return err
+		}
+		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
+	}
 	sinkCtx := query.WithQueryIDSink(ctx, &lastJobID)
 	for {
 		select {

@@ -342,7 +342,7 @@ func TestClientValidateQueryLimits(t *testing.T) {
 				TotalBytesProcessed: 1_001,
 			},
 			enforceSoftLimits: true,
-			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated billable bytes 1001 exceeds max_billable_bytes_soft 1000. Estimated query cost: $0.000000. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
+			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated billable bytes 1001 exceeds max_billable_bytes_soft 1000. Estimated query cost: $5.005e-09. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
 		},
 		{
 			name: "soft query cost over limit",
@@ -421,6 +421,14 @@ func TestClientHasActiveQueryLimits(t *testing.T) {
 			assert.Equal(t, tt.want, d.hasActiveQueryLimits(ctx))
 		})
 	}
+}
+
+func TestFormatBigQueryCostUSD(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "$0.000000", formatBigQueryCostUSD(0))
+	assert.Equal(t, "$5.005e-09", formatBigQueryCostUSD(0.000000005005))
+	assert.Equal(t, "$0.015000", formatBigQueryCostUSD(0.015))
 }
 
 func TestBuildSchemaQuery(t *testing.T) {

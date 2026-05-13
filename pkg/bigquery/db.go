@@ -454,11 +454,19 @@ func (d *Client) validateQueryLimits(stats *bigquery.QueryStatistics, enforceSof
 			softViolations = append(softViolations, fmt.Sprintf("estimated query cost $%.6f exceeds max_query_cost_soft $%.6f", estimatedCost, *d.config.MaxQueryCostSoft))
 		}
 		if len(softViolations) > 0 {
-			return fmt.Errorf("BigQuery query exceeds configured soft limits for bruin query: %s. Estimated query cost: $%.6f. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits", strings.Join(softViolations, "; "), estimatedCost)
+			return fmt.Errorf("BigQuery query exceeds configured soft limits for bruin query: %s. Estimated query cost: %s. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits", strings.Join(softViolations, "; "), formatBigQueryCostUSD(estimatedCost))
 		}
 	}
 
 	return nil
+}
+
+func formatBigQueryCostUSD(cost float64) string {
+	if cost > 0 && cost < 0.000001 {
+		return fmt.Sprintf("$%.3e", cost)
+	}
+
+	return fmt.Sprintf("$%.6f", cost)
 }
 
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
@@ -506,7 +514,7 @@ func (d *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRun
 		ConnectionType:      "bigquery",
 		Valid:               true,
 		TotalBytesProcessed: stats.TotalBytesProcessed,
-		EstimatedCostUSD:    float64(stats.TotalBytesProcessed) / 1e12 * 5.0,
+		EstimatedCostUSD:    float64(stats.TotalBytesProcessed) / 1e12 * bigQueryOnDemandCostPerTBUSD,
 		StatementType:       stats.StatementType,
 	}
 
