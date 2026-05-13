@@ -59,6 +59,7 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/rudderlabs/analytics-go/v4 v4.2.1
 	github.com/samber/lo v1.51.0
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/sergi/go-diff v1.4.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/snowflakedb/gosnowflake v1.17.1

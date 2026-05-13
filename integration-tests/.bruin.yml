@@ -266,6 +266,11 @@ environments:
       duckdb:
         - name: "duckdb-query-asset"
           path: "duckdb-files/query-asset.db"
+  env-semantic-query:
+    connections:
+      duckdb:
+        - name: "duckdb-semantic-query"
+          path: "duckdb-files/semantic-query.db"
   env-time-materialization:
     connections:
       duckdb:

@@ -252,6 +252,7 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 		"Pipeline.Commit":              true,
 		"Pipeline.Snapshot":            true,
 		"Pipeline.SelectedVariant":     true,
+		"Pipeline.SemanticPath":        true,
 		"Pipeline.DefinitionFile.Name": true,
 		"Pipeline.DefinitionFile.Path": true,
 		"Pipeline.Macros[]":            true, // macro bodies are run-time Jinja

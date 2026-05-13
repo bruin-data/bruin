@@ -245,7 +245,7 @@ func TestValidateFlags(t *testing.T) {
 			t.Parallel()
 
 			// First validate the flags
-			err := validateFlags(tt.connection, tt.query, tt.asset)
+			err := validateFlags(tt.connection, tt.query, tt.asset, "", false, "")
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -266,6 +266,205 @@ func TestValidateFlags(t *testing.T) {
 				limitedQuery := addLimitToQuery(tt.query, tt.limit, conn, nil, "")
 				assert.Equal(t, tt.limitedQuery, limitedQuery)
 			}
+		})
+	}
+}
+
+func TestValidateFlagsSemanticMode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		connection       string
+		query            string
+		asset            string
+		pipeline         string
+		hasSemanticFlags bool
+		semanticModel    string
+		wantErr          string
+	}{
+		{
+			name:             "asset semantic mode infers connection",
+			asset:            "path/to/asset.sql",
+			hasSemanticFlags: true,
+			semanticModel:    "sales",
+		},
+		{
+			name:             "pipeline semantic mode requires explicit connection",
+			connection:       "duckdb-default",
+			pipeline:         "path/to/pipeline",
+			hasSemanticFlags: true,
+			semanticModel:    "sales",
+		},
+		{
+			name:             "semantic flags require model",
+			asset:            "path/to/asset.sql",
+			hasSemanticFlags: true,
+			wantErr:          "--semantic-model is required when using semantic query flags",
+		},
+		{
+			name:             "semantic mode rejects raw SQL query",
+			asset:            "path/to/asset.sql",
+			query:            "select 1",
+			hasSemanticFlags: true,
+			semanticModel:    "sales",
+			wantErr:          "semantic query mode cannot be combined with --query",
+		},
+		{
+			name:             "semantic mode requires asset or pipeline",
+			hasSemanticFlags: true,
+			semanticModel:    "sales",
+			wantErr:          "semantic query mode requires --asset or --pipeline",
+		},
+		{
+			name:             "pipeline semantic mode requires connection without asset",
+			pipeline:         "path/to/pipeline",
+			hasSemanticFlags: true,
+			semanticModel:    "sales",
+			wantErr:          "semantic query mode with --pipeline requires --connection",
+		},
+		{
+			name:     "pipeline flag is semantic-only",
+			pipeline: "path/to/pipeline",
+			wantErr:  "--pipeline can only be used with --semantic-model",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateFlags(tt.connection, tt.query, tt.asset, tt.pipeline, tt.hasSemanticFlags, tt.semanticModel)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr, err.Error())
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestParseSemanticDimensionRef(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		raw     string
+		want    string
+		gran    string
+		wantErr bool
+	}{
+		{name: "plain dimension", raw: "country", want: "country"},
+		{name: "time granularity", raw: "order_date:month", want: "order_date", gran: "month"},
+		{name: "empty", raw: "", wantErr: true},
+		{name: "too many separators", raw: "a:b:c", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parseSemanticDimensionRef(tt.raw)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.Name)
+			assert.Equal(t, tt.gran, got.Granularity)
+		})
+	}
+}
+
+func TestParseSemanticSortSpec(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		raw     string
+		want    string
+		dir     string
+		wantErr bool
+	}{
+		{name: "default direction", raw: "country", want: "country"},
+		{name: "descending", raw: "revenue:desc", want: "revenue", dir: "desc"},
+		{name: "uppercase direction", raw: "order_date:ASC", want: "order_date", dir: "asc"},
+		{name: "invalid direction", raw: "revenue:sideways", wantErr: true},
+		{name: "too many separators", raw: "a:b:c", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parseSemanticSortSpec(tt.raw)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.Name)
+			assert.Equal(t, tt.dir, got.Direction)
+		})
+	}
+}
+
+func TestSemanticFilterInputs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		raw     []string
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "single filter",
+			raw:  []string{`{"dimension":"country","operator":"equals","value":"US"}`},
+			want: []string{`{"dimension":"country","operator":"equals","value":"US"}`},
+		},
+		{
+			name: "comma split object",
+			raw:  []string{`{"dimension":"country"`, `"operator":"equals"`, `"value":"US"}`},
+			want: []string{`{"dimension":"country","operator":"equals","value":"US"}`},
+		},
+		{
+			name: "comma split array value",
+			raw:  []string{`{"dimension":"country"`, `"operator":"in"`, `"value":["US"`, `"DE"]}`},
+			want: []string{`{"dimension":"country","operator":"in","value":["US","DE"]}`},
+		},
+		{
+			name: "multiple filters",
+			raw: []string{
+				`{"dimension":"country"`,
+				`"operator":"equals"`,
+				`"value":"US"}`,
+				`{"dimension":"status","operator":"equals","value":"completed"}`,
+			},
+			want: []string{
+				`{"dimension":"country","operator":"equals","value":"US"}`,
+				`{"dimension":"status","operator":"equals","value":"completed"}`,
+			},
+		},
+		{
+			name:    "incomplete object",
+			raw:     []string{`{"dimension":"country"`},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := semanticFilterInputs(tt.raw)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
