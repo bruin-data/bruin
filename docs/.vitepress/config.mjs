@@ -390,6 +390,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     {text: "clickhouse", link: "/getting-started/templates-docs/clickhouse-README"},
                     {text: "chess", link: "/getting-started/templates-docs/chess-README"},
                     {text: "duckdb", link: "/getting-started/templates-docs/duckdb-README"},
+                    {text: "ecommerce", link: "/getting-started/templates-docs/ecommerce-README"},
                     {text: "firebase", link: "/getting-started/templates-docs/firebase-README"},
                     {text: "frankfurter", link: "/getting-started/templates-docs/frankfurter-README"},
                     {text: "gorgias", link: "/getting-started/templates-docs/gorgias-README"},
