@@ -32,6 +32,10 @@ type devEnv interface {
 	RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error
 }
 
+type queryLimitChecker interface {
+	CheckQueryLimits(ctx context.Context, q *query.Query) error
+}
+
 type BasicOperator struct {
 	connection   config.ConnectionGetter
 	extractor    query.QueryExtractor
@@ -111,6 +115,26 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("connection '%s' is not a bigquery connection", connName)
 	}
 
+	queryToRun := q
+	if o.devEnv != nil {
+		queryToRun, err = o.devEnv.Modify(ctx, p, t, q)
+		if err != nil {
+			return err
+		}
+	}
+
+	annotatedQuery, err := ansisql.AddAnnotationComment(ctx, queryToRun, t.Name, "main", p.Name)
+	if err != nil {
+		return err
+	}
+
+	if checker, ok := conn.(queryLimitChecker); ok {
+		if err := checker.CheckQueryLimits(ctx, annotatedQuery); err != nil {
+			return err
+		}
+		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
+	}
+
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
 		if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
 			return err
@@ -124,11 +148,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	annotatedQuery, err := ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name)
-	if err != nil {
-		return err
-	}
-
 	// Print SQL query in verbose mode
 	if verbose := ctx.Value(executor.KeyVerbose); verbose != nil && verbose.(bool) {
 		if w, ok := writer.(io.Writer); ok {
@@ -140,28 +159,16 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	if o.devEnv == nil {
-		return conn.RunQueryWithoutResult(ctx, annotatedQuery)
-	}
-
-	q, err = o.devEnv.Modify(ctx, p, t, q)
-	if err != nil {
-		return err
-	}
-
-	annotatedQuery, err = ansisql.AddAnnotationComment(ctx, q, t.Name, "main", p.Name)
-	if err != nil {
-		return err
-	}
-
 	err = conn.RunQueryWithoutResult(ctx, annotatedQuery)
 	if err != nil {
 		return err
 	}
 
-	err = o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, q)
-	if err != nil {
-		return errors.Wrap(err, "cannot register asset for schema cache")
+	if o.devEnv != nil {
+		err = o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, queryToRun)
+		if err != nil {
+			return errors.Wrap(err, "cannot register asset for schema cache")
+		}
 	}
 
 	return nil
@@ -308,6 +315,12 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	sensorTimeout := helpers.GetSensorTimeout(t)
 	timeout := time.After(sensorTimeout)
 	var lastJobID string
+	if checker, ok := conn.(queryLimitChecker); ok {
+		if err := checker.CheckQueryLimits(ctx, qry[0]); err != nil {
+			return err
+		}
+		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
+	}
 	sinkCtx := query.WithQueryIDSink(ctx, &lastJobID)
 	for {
 		select {
@@ -402,6 +415,12 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	sensorTimeout := helpers.GetSensorTimeout(t)
 	timeout := time.After(sensorTimeout)
 	var lastJobID string
+	if checker, ok := conn.(queryLimitChecker); ok {
+		if err := checker.CheckQueryLimits(ctx, extractedQuery); err != nil {
+			return err
+		}
+		ctx = context.WithValue(ctx, queryLimitsCheckedContextKey{}, true)
+	}
 	sinkCtx := query.WithQueryIDSink(ctx, &lastJobID)
 	for {
 		select {

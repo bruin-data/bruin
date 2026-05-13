@@ -117,7 +117,7 @@ select 2 as one
 
 The result will be a table `dashboard.hello_bq` with the result of the query.
 
-## Full Refresh and `refresh_restricted`
+## Full Refresh and `full_refresh_restricted`
 
 When running assets with the `--full-refresh` flag, Bruin will drop and recreate tables to ensure a clean state. However, there are cases where you may want to protect certain tables from being dropped during a full refresh, such as:
 
@@ -125,7 +125,7 @@ When running assets with the `--full-refresh` flag, Bruin will drop and recreate
 - Tables that take a long time to rebuild
 - Critical production tables that should never be accidentally dropped
 
-You can use the `refresh_restricted` flag to prevent an asset from being dropped during a full refresh:
+You can use the `full_refresh_restricted` flag to prevent an asset from being dropped during a full refresh:
 
 ```bruin-sql
 /* @bruin
@@ -136,7 +136,7 @@ type: bq.sql
 materialization:
     type: table
 
-refresh_restricted: true
+full_refresh_restricted: true
 
 @bruin */
 
@@ -145,8 +145,21 @@ select * from important_data
 
 **Behavior:**
 
-- `refresh_restricted: true` - Table will NOT be dropped during full refresh. The asset will use its normal materialization strategy instead.
-- `refresh_restricted: false` or not set - Table will be dropped and recreated during full refresh (default behavior).
+- `full_refresh_restricted: true` - Table will NOT be dropped during full refresh. The asset will use its normal materialization strategy instead.
+- `full_refresh_restricted: false` or not set - Table will be dropped and recreated during full refresh (default behavior).
+
+The older asset-level `refresh_restricted` field is still supported as an alias.
+
+You can also apply the same protection to every asset in an environment from `.bruin.yml`:
+
+```yaml
+environments:
+  production:
+    config:
+      full_refresh_restricted: true
+    connections:
+      # ...
+```
 
 This is useful when you want to run `bruin run --full-refresh` on your entire pipeline but protect specific critical tables from being dropped.
 

@@ -2448,6 +2448,26 @@ environments:
 	}
 }
 
+func TestLoadFromFileOrEnv_EnvironmentConfig(t *testing.T) {
+	t.Setenv("BRUIN_CONFIG_FILE_CONTENT", `default_environment: prod
+environments:
+  prod:
+    config:
+      full_refresh_restricted: true
+    connections:
+      duckdb:
+        - name: duckdb-default
+          path: duckdb.db`)
+
+	fs := afero.NewReadOnlyFs(afero.NewOsFs())
+	got, err := LoadFromFileOrEnv(fs, "testdata/nonexistent.yml")
+	require.NoError(t, err)
+
+	require.NotNil(t, got.SelectedEnvironment.Config)
+	assert.True(t, got.SelectedEnvironment.Config.RefreshRestricted)
+	assert.True(t, got.Environments["prod"].Config.RefreshRestricted)
+}
+
 func TestSnowflakeConnection_MarshalYAML_PrivateKey(t *testing.T) {
 	t.Parallel()
 

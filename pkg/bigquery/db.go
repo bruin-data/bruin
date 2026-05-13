@@ -31,6 +31,8 @@ var scopes = []string{
 	"https://www.googleapis.com/auth/drive",
 }
 
+const bigQueryOnDemandCostPerTBUSD = 5.0
+
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Ping(ctx context.Context) error
@@ -64,6 +66,16 @@ var (
 	datasetNameCache sync.Map // Global cache for dataset existence
 	datasetLocks     sync.Map // Global map for dataset-specific locks
 )
+
+type (
+	queryLimitsCheckedContextKey struct{}
+	softQueryLimitsContextKey    struct{}
+)
+
+// WithSoftQueryLimits enables BigQuery soft-limit checks for query execution paths.
+func WithSoftQueryLimits(ctx context.Context) context.Context {
+	return context.WithValue(ctx, softQueryLimitsContextKey{}, true)
+}
 
 type Client struct {
 	client      *bigquery.Client
@@ -252,7 +264,10 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return err
 	}
-	bqQuery := d.client.Query(q.String())
+	if err := d.checkQueryLimits(ctx, q); err != nil {
+		return err
+	}
+	bqQuery := d.queryForExecution(q.String())
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return formatError(err)
@@ -270,7 +285,10 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
-	bqQuery := d.client.Query(q.String())
+	if err := d.checkQueryLimits(ctx, q); err != nil {
+		return nil, err
+	}
+	bqQuery := d.queryForExecution(q.String())
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return nil, formatError(err)
@@ -307,7 +325,10 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
-	bqQuery := d.client.Query(queryObj.String())
+	if err := d.checkQueryLimits(ctx, queryObj); err != nil {
+		return nil, err
+	}
+	bqQuery := d.queryForExecution(queryObj.String())
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
@@ -425,6 +446,94 @@ func (d *Client) queryExecutionSummary(ctx context.Context, job *bigquery.Job) *
 	return summary
 }
 
+func (d *Client) checkQueryLimits(ctx context.Context, queryObj *query.Query) error {
+	if d == nil || d.config == nil || !d.hasActiveQueryLimits(ctx) {
+		return nil
+	}
+	if checked, ok := ctx.Value(queryLimitsCheckedContextKey{}).(bool); ok && checked {
+		return nil
+	}
+
+	stats, err := d.QueryDryRun(ctx, queryObj)
+	if err != nil {
+		return fmt.Errorf("failed to estimate BigQuery query cost before execution: %w", err)
+	}
+
+	return d.validateQueryLimits(stats, d.shouldEnforceSoftQueryLimits(ctx))
+}
+
+// CheckQueryLimits estimates a query and returns an error when configured limits are exceeded.
+func (d *Client) CheckQueryLimits(ctx context.Context, queryObj *query.Query) error {
+	return d.checkQueryLimits(ctx, queryObj)
+}
+
+func (d *Client) hasActiveQueryLimits(ctx context.Context) bool {
+	if d.config.MaxBillableBytes != nil || d.config.MaxQueryCost != nil {
+		return true
+	}
+
+	return d.shouldEnforceSoftQueryLimits(ctx) && (d.config.MaxBillableBytesSoft != nil || d.config.MaxQueryCostSoft != nil)
+}
+
+func (d *Client) shouldEnforceSoftQueryLimits(ctx context.Context) bool {
+	enforce, _ := ctx.Value(softQueryLimitsContextKey{}).(bool)
+	return enforce
+}
+
+func (d *Client) queryForExecution(queryString string) *bigquery.Query {
+	bqQuery := d.client.Query(queryString)
+	if d.config != nil && d.config.MaxBillableBytes != nil {
+		bqQuery.MaxBytesBilled = *d.config.MaxBillableBytes
+	}
+	return bqQuery
+}
+
+func (d *Client) validateQueryLimits(stats *bigquery.QueryStatistics, enforceSoftLimits bool) error {
+	if d == nil || d.config == nil || stats == nil {
+		return nil
+	}
+
+	estimatedBillableBytes := stats.TotalBytesBilled
+	if estimatedBillableBytes == 0 {
+		estimatedBillableBytes = stats.TotalBytesProcessed
+	}
+	estimatedCost := float64(estimatedBillableBytes) / 1e12 * bigQueryOnDemandCostPerTBUSD
+
+	var violations []string
+	if d.config.MaxBillableBytes != nil && estimatedBillableBytes > *d.config.MaxBillableBytes {
+		violations = append(violations, fmt.Sprintf("estimated billable bytes %d exceeds max_billable_bytes %d", estimatedBillableBytes, *d.config.MaxBillableBytes))
+	}
+	if d.config.MaxQueryCost != nil && estimatedCost > *d.config.MaxQueryCost {
+		violations = append(violations, fmt.Sprintf("estimated query cost $%.6f exceeds max_query_cost $%.6f", estimatedCost, *d.config.MaxQueryCost))
+	}
+	if len(violations) > 0 {
+		return fmt.Errorf("BigQuery query exceeds configured cost limits: %s. Query was not executed", strings.Join(violations, "; "))
+	}
+
+	if enforceSoftLimits {
+		var softViolations []string
+		if d.config.MaxBillableBytesSoft != nil && estimatedBillableBytes > *d.config.MaxBillableBytesSoft {
+			softViolations = append(softViolations, fmt.Sprintf("estimated billable bytes %d exceeds max_billable_bytes_soft %d", estimatedBillableBytes, *d.config.MaxBillableBytesSoft))
+		}
+		if d.config.MaxQueryCostSoft != nil && estimatedCost > *d.config.MaxQueryCostSoft {
+			softViolations = append(softViolations, fmt.Sprintf("estimated query cost $%.6f exceeds max_query_cost_soft $%.6f", estimatedCost, *d.config.MaxQueryCostSoft))
+		}
+		if len(softViolations) > 0 {
+			return fmt.Errorf("BigQuery query exceeds configured soft limits for bruin query: %s. Estimated query cost: %s. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits", strings.Join(softViolations, "; "), formatBigQueryCostUSD(estimatedCost))
+		}
+	}
+
+	return nil
+}
+
+func formatBigQueryCostUSD(cost float64) string {
+	if cost > 0 && cost < 0.000001 {
+		return fmt.Sprintf("$%.3e", cost)
+	}
+
+	return fmt.Sprintf("$%.6f", cost)
+}
+
 func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigquery.QueryStatistics, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
@@ -470,7 +579,7 @@ func (d *Client) DryRunQuery(ctx context.Context, q *query.Query) (*query.DryRun
 		ConnectionType:      "bigquery",
 		Valid:               true,
 		TotalBytesProcessed: stats.TotalBytesProcessed,
-		EstimatedCostUSD:    float64(stats.TotalBytesProcessed) / 1e12 * 5.0,
+		EstimatedCostUSD:    float64(stats.TotalBytesProcessed) / 1e12 * bigQueryOnDemandCostPerTBUSD,
 		StatementType:       stats.StatementType,
 	}
 

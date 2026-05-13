@@ -19,16 +19,20 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
+	"github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/bruin-data/bruin/pkg/trino"
+	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/muesli/termenv"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -193,6 +197,15 @@ func Render() *cli.Command {
 				}
 			}
 
+			cm, err := loadRenderConfig(fs, inputPath, c.String("config-file"), false)
+			if err != nil {
+				printError(err, c.String("output"), "Failed to load the config file:")
+				return cli.Exit("", 1)
+			}
+			if cm != nil {
+				applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, asset)
+			}
+
 			resultsLocation := "s3://{destination-bucket}"
 			if asset.Type == pipeline.AssetTypeAthenaQuery {
 				connName, err := pl.GetConnectionNameForAsset(asset)
@@ -201,20 +214,13 @@ func Render() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				configFilePath := c.String("config-file")
-				if configFilePath == "" {
-					repoRoot, err := git.FindRepoFromPath(inputPath)
+				if cm == nil {
+					cm, err = loadRenderConfig(fs, inputPath, c.String("config-file"), true)
 					if err != nil {
-						printError(err, c.String("output"), "Failed to find the git repository root:")
+						printError(err, c.String("output"), "Failed to load the config file:")
 						return cli.Exit("", 1)
 					}
-					configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
-				}
-
-				cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
-				if err != nil {
-					printError(err, c.String("output"), fmt.Sprintf("Failed to load the config file at '%s':", configFilePath))
-					return cli.Exit("", 1)
+					applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, asset)
 				}
 
 				for _, conn := range cm.SelectedEnvironment.Connections.AthenaConnection {
@@ -255,27 +261,36 @@ func Render() *cli.Command {
 					Renderer: forAsset,
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
-					pipeline.AssetTypeMySQLQuery:            mysql.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeBigqueryQuery:         bigquery.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeBigqueryQuerySensor:   bigquery.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeSnowflakeQuery:        snowflake.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeSnowflakeQuerySensor:  snowflake.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeRedshiftQuery:         postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeRedshiftQuerySensor:   postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypePostgresQuery:         postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypePostgresQuerySensor:   postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeMsSQLQuery:            mssql.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeMsSQLQuerySensor:      mssql.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeDatabricksQuery:       databricks.NewRenderer(fullRefresh),
-					pipeline.AssetTypeDatabricksQuerySensor: databricks.NewRenderer(fullRefresh),
-					pipeline.AssetTypeSynapseQuery:          synapse.NewRenderer(fullRefresh),
-					pipeline.AssetTypeSynapseQuerySensor:    synapse.NewRenderer(fullRefresh),
-					pipeline.AssetTypeAthenaQuery:           athena.NewRenderer(fullRefresh, resultsLocation),
-					pipeline.AssetTypeAthenaSQLSensor:       athena.NewRenderer(fullRefresh, resultsLocation),
-					pipeline.AssetTypeDuckDBQuery:           duck.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeDuckDBQuerySensor:     duck.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeClickHouse:            clickhouse.NewRenderer(fullRefresh),
-					pipeline.AssetTypeClickHouseQuerySensor: clickhouse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeMySQLQuery:              mysql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeBigqueryQuery:           bigquery.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeBigqueryQuerySensor:     bigquery.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSnowflakeQuery:          snowflake.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSnowflakeQuerySensor:    snowflake.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeRedshiftQuery:           postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeRedshiftQuerySensor:     postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypePostgresQuery:           postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypePostgresQuerySensor:     postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeTrinoQuery:              trino.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeTrinoQuerySensor:        trino.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeOracleQuery:             oracle.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeMsSQLQuery:              mssql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeMsSQLQuerySensor:        mssql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDatabricksQuery:         databricks.NewRenderer(fullRefresh),
+					pipeline.AssetTypeDatabricksQuerySensor:   databricks.NewRenderer(fullRefresh),
+					pipeline.AssetTypeSynapseQuery:            synapse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeSynapseQuerySensor:      synapse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeVerticaQuery:            vertica.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeVerticaQuerySensor:      vertica.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeFabricQuery:             fabric.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeFabricQueryLegacy:       fabric.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeFabricQuerySensor:       fabric.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeFabricQuerySensorLegacy: fabric.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeAthenaQuery:             athena.NewRenderer(fullRefresh, resultsLocation),
+					pipeline.AssetTypeAthenaSQLSensor:         athena.NewRenderer(fullRefresh, resultsLocation),
+					pipeline.AssetTypeDuckDBQuery:             duck.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDuckDBQuerySensor:       duck.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeClickHouse:              clickhouse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeClickHouseQuerySensor:   clickhouse.NewRenderer(fullRefresh),
 				},
 				builder:  DefaultPipelineBuilder,
 				writer:   os.Stdout,
@@ -291,6 +306,41 @@ func Render() *cli.Command {
 			return r.Run(pl, asset, modifierInfo)
 		},
 	}
+}
+
+func loadRenderConfig(renderFS afero.Fs, inputPath, configuredConfigFilePath string, createIfMissing bool) (*config.Config, error) {
+	configFilePath := configuredConfigFilePath
+	if configFilePath == "" {
+		repoRoot, err := git.FindRepoFromPath(inputPath)
+		if err != nil {
+			switch {
+			case os.Getenv("BRUIN_CONFIG_FILE_CONTENT") != "":
+				configFilePath = ".bruin.yml"
+			case createIfMissing:
+				return nil, err
+			default:
+				return nil, nil
+			}
+		} else {
+			configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+		}
+	}
+
+	if createIfMissing {
+		return config.LoadOrCreate(renderFS, configFilePath)
+	}
+
+	if configuredConfigFilePath == "" && os.Getenv("BRUIN_CONFIG_FILE_CONTENT") == "" {
+		exists, err := afero.Exists(renderFS, configFilePath)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, nil
+		}
+	}
+
+	return config.LoadFromFileOrEnv(renderFS, configFilePath)
 }
 
 type queryExtractor interface {

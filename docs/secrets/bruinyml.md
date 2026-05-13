@@ -13,6 +13,8 @@ default_environment: <environment_name>
 environments:
   <environment_name>:
     schema_prefix: <optional_prefix>
+    config:
+      full_refresh_restricted: true
     connections:
       <connection_type>:
         - name: "<connection_name>"
@@ -59,6 +61,7 @@ Each environment contains:
 |-------|------|----------|-------------|
 | `connections` | object | Yes | Connection definitions grouped by type. |
 | `schema_prefix` | string | No | Prefix added to schema names (useful for dev/staging environments). |
+| `config.full_refresh_restricted` | boolean | No | Prevents `--full-refresh` from dropping and recreating tables for all assets in this environment. |
 
 ## Environment Variables
 

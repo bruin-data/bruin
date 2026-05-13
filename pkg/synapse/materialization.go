@@ -30,6 +30,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
 		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 	},
 }
 
@@ -180,6 +181,68 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name, query),
 	}
+
+	return queries, nil
+}
+
+func quoteIdentifier(identifier string) string {
+	parts := strings.Split(identifier, ".")
+	quotedParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		quotedParts = append(quotedParts, "["+strings.ReplaceAll(part, "]", "]]")+"]")
+	}
+
+	return strings.Join(quotedParts, ".")
+}
+
+func sqlStringLiteral(value string) string {
+	return "N'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+func buildDDLQuery(asset *pipeline.Asset, _ string) ([]string, error) {
+	if len(asset.Columns) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	nameParts := strings.Split(asset.Name, ".")
+	queries := make([]string, 0, 2)
+	if len(nameParts) == 2 {
+		schemaName := nameParts[0]
+		queries = append(queries, fmt.Sprintf(
+			"IF SCHEMA_ID(%s) IS NULL\n    EXEC(N'CREATE SCHEMA %s')",
+			sqlStringLiteral(schemaName),
+			strings.ReplaceAll(quoteIdentifier(schemaName), "'", "''"),
+		))
+	}
+
+	columnDefs := make([]string, 0, len(asset.Columns)+1)
+	primaryKeys := make([]string, 0)
+	for _, col := range asset.Columns {
+		if col.Type == "" {
+			return nil, fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
+		}
+
+		definition := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.Type)
+		if col.PrimaryKey || !col.Nullable.Bool() {
+			definition += " NOT NULL"
+		}
+		columnDefs = append(columnDefs, definition)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, quoteIdentifier(col.Name))
+		}
+	}
+
+	if len(primaryKeys) > 0 {
+		columnDefs = append(columnDefs, fmt.Sprintf("    PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
+	}
+
+	queries = append(queries, fmt.Sprintf(
+		"IF OBJECT_ID(%s, N'U') IS NULL\nBEGIN\nCREATE TABLE %s (\n%s\n)\nEND",
+		sqlStringLiteral(asset.Name),
+		quoteIdentifier(asset.Name),
+		strings.Join(columnDefs, ",\n"),
+	))
 
 	return queries, nil
 }

@@ -473,6 +473,12 @@ func collectCredentials(fields []config.ConnectionFieldDef, inputs []textinput.M
 			} else {
 				creds[f.Name] = val
 			}
+		case "float":
+			if n, err := strconv.ParseFloat(val, 64); err == nil {
+				creds[f.Name] = n
+			} else {
+				creds[f.Name] = val
+			}
 		default:
 			creds[f.Name] = val
 		}

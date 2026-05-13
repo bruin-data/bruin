@@ -17,6 +17,10 @@ type Config struct {
 	Location            string `envconfig:"BIGQUERY_LOCATION"`
 	// Add support for Application Default Credentials
 	UseApplicationDefaultCredentials bool `envconfig:"BIGQUERY_USE_ADC"`
+	MaxBillableBytes                 *int64
+	MaxQueryCost                     *float64
+	MaxBillableBytesSoft             *int64
+	MaxQueryCostSoft                 *float64
 }
 
 func (c Config) IsValid() bool {
