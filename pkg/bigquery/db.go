@@ -356,7 +356,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 
 	// Store the column types in the result
 	result.ColumnTypes = columnTypes
-	if len(result.Rows) == 0 {
+	if len(result.Rows) == 0 && !isLikelyResultQuery(queryObj.String()) {
 		summary := d.queryExecutionSummary(ctx, job)
 		if isNonResultStatement(summary) {
 			result.Execution = summary
@@ -415,7 +415,11 @@ func (d *Client) queryExecutionSummary(ctx context.Context, job *bigquery.Job) *
 		}
 	}
 	if stats.DDLTargetRoutine != nil {
-		summary.DDLTargetRoutine = stats.DDLTargetRoutine.RoutineID
+		summary.DDLTargetRoutine = fmt.Sprintf("%s.%s.%s",
+			stats.DDLTargetRoutine.ProjectID,
+			stats.DDLTargetRoutine.DatasetID,
+			stats.DDLTargetRoutine.RoutineID,
+		)
 	}
 
 	return summary
@@ -428,6 +432,31 @@ func isDMLStatement(statementType string) bool {
 	default:
 		return false
 	}
+}
+
+func isLikelyResultQuery(sql string) bool {
+	sql = strings.TrimSpace(sql)
+	for {
+		if strings.HasPrefix(sql, "--") {
+			if newline := strings.IndexByte(sql, '\n'); newline >= 0 {
+				sql = strings.TrimSpace(sql[newline+1:])
+				continue
+			}
+			return true
+		}
+		if strings.HasPrefix(sql, "/*") {
+			end := strings.Index(sql, "*/")
+			if end >= 0 {
+				sql = strings.TrimSpace(sql[end+2:])
+				continue
+			}
+			return true
+		}
+		break
+	}
+
+	upper := strings.ToUpper(sql)
+	return strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "WITH")
 }
 
 func isNonResultStatement(summary *query.QueryExecutionSummary) bool {
