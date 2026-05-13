@@ -7,15 +7,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 func TestMaterializer_Render(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		matMap      AssetMaterializationMap
-		fullRefresh bool
-		query       string
-		expected    string
+		name              string
+		matMap            AssetMaterializationMap
+		fullRefresh       bool
+		refreshRestricted *bool
+		query             string
+		expected          string
 	}{
 		{
 			name: "no full refresh, remove comments",
@@ -43,6 +48,23 @@ func TestMaterializer_Render(t *testing.T) {
 			query:       "SELECT * FROM table",
 			expected:    "SELECT 1;SELECT * FROM table",
 		},
+		{
+			name: "full refresh respects refresh restricted",
+			matMap: AssetMaterializationMap{
+				MaterializationTypeTable: {
+					MaterializationStrategyMerge: func(task *Asset, query string) (string, error) {
+						return "MERGE;" + query, nil
+					},
+					MaterializationStrategyCreateReplace: func(task *Asset, query string) (string, error) {
+						return "CREATE OR REPLACE;" + query, nil
+					},
+				},
+			},
+			fullRefresh:       true,
+			refreshRestricted: boolPtr(true),
+			query:             "SELECT * FROM table",
+			expected:          "MERGE;SELECT * FROM table",
+		},
 	}
 
 	for _, tt := range tests {
@@ -59,6 +81,7 @@ func TestMaterializer_Render(t *testing.T) {
 					Type:     MaterializationTypeTable,
 					Strategy: MaterializationStrategyMerge,
 				},
+				RefreshRestricted: tt.refreshRestricted,
 			}
 
 			result, err := materializer.Render(asset, tt.query)

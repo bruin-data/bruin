@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -2926,6 +2927,46 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestApplyEnvironmentRefreshRestriction(t *testing.T) {
+	t.Parallel()
+
+	explicitFalse := false
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{Name: "asset-without-setting"},
+			{Name: "asset-with-explicit-false", RefreshRestricted: &explicitFalse},
+		},
+	}
+	env := &config.Environment{
+		Config: &config.EnvironmentConfig{RefreshRestricted: true},
+	}
+
+	applyEnvironmentRefreshRestriction(env, p)
+
+	for _, asset := range p.Assets {
+		require.NotNil(t, asset.RefreshRestricted)
+		assert.True(t, *asset.RefreshRestricted)
+	}
+}
+
+func TestApplyEnvironmentRefreshRestriction_NoConfig(t *testing.T) {
+	t.Parallel()
+
+	explicitFalse := false
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{Name: "asset-without-setting"},
+			{Name: "asset-with-explicit-false", RefreshRestricted: &explicitFalse},
+		},
+	}
+
+	applyEnvironmentRefreshRestriction(&config.Environment{}, p)
+
+	assert.Nil(t, p.Assets[0].RefreshRestricted)
+	require.NotNil(t, p.Assets[1].RefreshRestricted)
+	assert.False(t, *p.Assets[1].RefreshRestricted)
 }
 
 func TestApplyAllFilters_SelectorAllowsExcludeTagWithoutDownstream(t *testing.T) {

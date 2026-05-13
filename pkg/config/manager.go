@@ -211,8 +211,13 @@ func (c *Connections) buildConnectionKeyMap() {
 }
 
 type Environment struct {
-	Connections  *Connections `yaml:"connections" json:"connections" mapstructure:"connections"`
-	SchemaPrefix string       `yaml:"schema_prefix,omitempty" json:"schema_prefix" mapstructure:"schema_prefix"`
+	Connections  *Connections       `yaml:"connections" json:"connections" mapstructure:"connections"`
+	SchemaPrefix string             `yaml:"schema_prefix,omitempty" json:"schema_prefix" mapstructure:"schema_prefix"`
+	Config       *EnvironmentConfig `yaml:"config,omitempty" json:"config,omitempty" mapstructure:"config"`
+}
+
+type EnvironmentConfig struct {
+	RefreshRestricted bool `yaml:"full_refresh_restricted,omitempty" json:"full_refresh_restricted,omitempty" mapstructure:"full_refresh_restricted"`
 }
 
 type EnvContextKey string

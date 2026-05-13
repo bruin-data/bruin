@@ -904,6 +904,8 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return err
 			}
+			applyEnvironmentRefreshRestriction(cm.SelectedEnvironment, pipelineInfo.Pipeline)
+			applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, task)
 
 			// Auto-enable gong for CDC mode assets
 			if !runConfig.UseGong {
@@ -2694,6 +2696,25 @@ func ensurePythonCacheGitignore(fs afero.Fs, repoRoot string) error {
 		}
 	}
 	return nil
+}
+
+func applyEnvironmentRefreshRestriction(env *config.Environment, p *pipeline.Pipeline) {
+	if p == nil {
+		return
+	}
+
+	for _, asset := range p.Assets {
+		applyEnvironmentRefreshRestrictionToAsset(env, asset)
+	}
+}
+
+func applyEnvironmentRefreshRestrictionToAsset(env *config.Environment, asset *pipeline.Asset) {
+	if env == nil || env.Config == nil || !env.Config.RefreshRestricted || asset == nil {
+		return
+	}
+
+	refreshRestricted := true
+	asset.RefreshRestricted = &refreshRestricted
 }
 
 // loadAssetsFromPaths loads assets from a list of paths or names.

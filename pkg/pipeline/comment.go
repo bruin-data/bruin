@@ -270,6 +270,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			task.RerunCooldown = &rerunCooldown
 
 			continue
+		case "refresh_restricted", "full_refresh_restricted":
+			refreshRestricted, err := strconv.ParseBool(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse %s value '%s'", key, value)
+			}
+			task.RefreshRestricted = &refreshRestricted
+
+			continue
 		case "secrets":
 			values := strings.Split(value, ",")
 			for _, v := range values {

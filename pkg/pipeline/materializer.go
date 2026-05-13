@@ -30,7 +30,7 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	if m.FullRefresh && mat.Type == MaterializationTypeTable {
 		// Only override to CreateReplace if strategy is not explicitly set to DDL
 		// This strategy should never be overridden, even with full refresh
-		// Also respect refresh_restricted flag - if true, don't drop/recreate the table
+		// Also respect full refresh restriction - if true, don't drop/recreate the table
 		if mat.Strategy != MaterializationStrategyDDL && (asset.RefreshRestricted == nil || !*asset.RefreshRestricted) {
 			strategy = MaterializationStrategyCreateReplace
 		}
