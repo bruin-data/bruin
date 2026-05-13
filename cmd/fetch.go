@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -105,6 +106,10 @@ func Query() *cli.Command {
 			&cli.BoolFlag{
 				Name:  "dry-run",
 				Usage: "validate the query without executing it; show estimated cost and metadata when available",
+			},
+			&cli.BoolFlag{
+				Name:  "dangerously-bypass-soft-limits",
+				Usage: "bypass BigQuery soft query limits configured on the connection",
 			},
 			&cli.StringFlag{
 				Name:    "query-annotations",
@@ -214,6 +219,9 @@ func Query() *cli.Command {
 
 				timeoutCtx, timeoutCancel := context.WithTimeout(ctx, time.Duration(c.Int("timeout"))*time.Second)
 				defer timeoutCancel()
+				if !c.Bool("dangerously-bypass-soft-limits") {
+					timeoutCtx = bigquery.WithSoftQueryLimits(timeoutCtx)
+				}
 
 				q := query.Query{Query: queryStr}
 				annotationsInput := c.String("query-annotations")

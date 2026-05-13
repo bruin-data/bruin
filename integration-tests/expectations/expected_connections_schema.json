@@ -1803,6 +1803,18 @@
         },
         "use_application_default_credentials": {
           "type": "boolean"
+        },
+        "max_billable_bytes": {
+          "type": "integer"
+        },
+        "max_query_cost": {
+          "type": "number"
+        },
+        "max_billable_bytes_soft": {
+          "type": "integer"
+        },
+        "max_query_cost_soft": {
+          "type": "number"
         }
       },
       "additionalProperties": false,
