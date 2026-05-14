@@ -1610,6 +1610,11 @@ func (l *LockDependenciesCommand) FindDependencyPath(inputPath string) (*LockDep
 		}, nil
 	}
 
+	switch strings.ToLower(filepath.Ext(inputPath)) {
+	case ".sql", ".r":
+		return nil, errors2.New("asset is not a Python asset")
+	}
+
 	// Parse the asset
 	asset, err := l.builder.CreateAssetFromFile(absolutePath, nil)
 	if err != nil {

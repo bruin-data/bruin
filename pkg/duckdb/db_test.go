@@ -171,6 +171,46 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "update with schema returns execution summary without unavailable affected rows",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("UPDATE users SET name = 'Ada' WHERE id = 1").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			query: query.Query{
+				Query: "UPDATE users SET name = 'Ada' WHERE id = 1",
+			},
+			want: &query.QueryResult{
+				Columns:     []string{},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{},
+				Execution: &query.QueryExecutionSummary{
+					ConnectionType: "duckdb",
+					StatementType:  "UPDATE",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "create table with schema returns execution summary",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("CREATE TABLE users (id INTEGER)").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			query: query.Query{
+				Query: "CREATE TABLE users (id INTEGER)",
+			},
+			want: &query.QueryResult{
+				Columns:     []string{},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{},
+				Execution: &query.QueryExecutionSummary{
+					ConnectionType: "duckdb",
+					StatementType:  "CREATE TABLE",
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "error in query is properly handled",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery("SELECT 1, 2, 3").
