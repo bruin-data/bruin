@@ -30,6 +30,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/vertica"
@@ -255,11 +256,24 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// Best-effort: the sql parser drives DECLARE hoisting in
+			// hook-wrapped SQL. If it can't be created (Python unavailable
+			// in stripped builds, etc.), we render without hoisting rather
+			// than fail the command.
+			var hoister pipeline.DeclareHoister
+			if sp, parserErr := sqlparser.NewSQLParser(false); parserErr == nil {
+				defer sp.Close()
+				if startErr := sp.Start(); startErr == nil {
+					hoister = sp
+				}
+			}
+
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
 					Renderer: forAsset,
 				},
+				hoister: hoister,
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeMySQLQuery:              mysql.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeBigqueryQuery:           bigquery.NewMaterializer(fullRefresh),
@@ -359,6 +373,7 @@ type RenderCommand struct {
 	extractor     queryExtractor
 	materializers map[pipeline.AssetType]queryMaterializer
 	builder       taskCreator
+	hoister       pipeline.DeclareHoister
 
 	output   string
 	writer   io.Writer
@@ -414,7 +429,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 				}
 				qq.Query = rextractedQueries[0].Query
 			}
-			qq.Query = pipeline.WrapHooks(qq.Query, task.Hooks)
+			qq.Query = pipeline.WrapHooks(qq.Query, task.Hooks, r.hoister, task.Type)
 		}
 	}
 

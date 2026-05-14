@@ -8,6 +8,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// stubHoister is a test double for DeclareHoister that captures the inputs
+// it was called with and returns the configured response. It does not parse
+// SQL — the real sqlglot-backed behavior is verified in pkg/sqlparser.
+type stubHoister struct {
+	capturedSQL     string
+	capturedList    []string
+	returnSQL       string
+	returnList      []string
+	returnErr       error
+	calledHoist     bool
+	calledHoistList bool
+}
+
+func (s *stubHoister) HoistDeclares(sql string, _ AssetType) (string, error) {
+	s.calledHoist = true
+	s.capturedSQL = sql
+	if s.returnErr != nil {
+		return sql, s.returnErr
+	}
+	if s.returnSQL != "" {
+		return s.returnSQL, nil
+	}
+	return sql, nil
+}
+
+func (s *stubHoister) HoistDeclaresList(queries []string, _ AssetType) ([]string, error) {
+	s.calledHoistList = true
+	s.capturedList = queries
+	if s.returnErr != nil {
+		return queries, s.returnErr
+	}
+	if s.returnList != nil {
+		return s.returnList, nil
+	}
+	return queries, nil
+}
+
 func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
 	t.Parallel()
 
@@ -71,204 +108,58 @@ func TestWrapHooks_TrimsAndSkipsEmpty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, WrapHooks(tt.query, tt.hooks))
+			// nil hoister: verifies the pure join behavior independent of sqlglot.
+			assert.Equal(t, tt.want, WrapHooks(tt.query, tt.hooks, nil, AssetTypeBigqueryQuery))
 		})
 	}
 }
 
-func TestWrapHooks_HoistsDeclares(t *testing.T) {
+func TestWrapHooks_DelegatesToHoister(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name  string
-		query string
-		hooks Hooks
-		want  string
-	}{
-		{
-			name: "materialization DECLARE bubbles past pre-hook SET",
-			query: "DECLARE distinct_keys array<STRING>;\n" +
-				"BEGIN TRANSACTION;\n" +
-				"SELECT 1;\n" +
-				"COMMIT TRANSACTION",
-			hooks: Hooks{
-				Pre: []Hook{
-					{Query: "DECLARE my_var DATE"},
-					{Query: "SET my_var = DATE('2026-01-01')"},
-				},
-			},
-			want: "DECLARE my_var DATE;\n" +
-				"DECLARE distinct_keys array<STRING>;\n" +
-				"SET my_var = DATE('2026-01-01');\n" +
-				"BEGIN TRANSACTION;\n" +
-				"SELECT 1;\n" +
-				"COMMIT TRANSACTION;",
-		},
-		{
-			name:  "lowercase declare also hoisted",
-			query: "select 1",
-			hooks: Hooks{
-				Pre: []Hook{
-					{Query: "set x = 1"},
-					{Query: "declare y int64"},
-				},
-			},
-			want: "declare y int64;\n" +
-				"set x = 1;\n" +
-				"select 1;",
-		},
-		{
-			name:  "declare preceded by line comment is still detected",
-			query: "select 1",
-			hooks: Hooks{
-				Pre: []Hook{
-					{Query: "SET x = 1"},
-					{Query: "-- setup\nDECLARE y INT64"},
-				},
-			},
-			want: "-- setup\nDECLARE y INT64;\n" +
-				"SET x = 1;\n" +
-				"select 1;",
-		},
-	}
+	hoister := &stubHoister{returnSQL: "HOISTED OUTPUT"}
+	got := WrapHooks("select 9", Hooks{
+		Pre:  []Hook{{Query: "DECLARE x INT64"}},
+		Post: []Hook{{Query: "select 2"}},
+	}, hoister, AssetTypeBigqueryQuery)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.want, WrapHooks(tt.query, tt.hooks))
-		})
-	}
+	require.True(t, hoister.calledHoist)
+	// Hoister should receive the fully joined script before reordering.
+	assert.Equal(t, "DECLARE x INT64;\nselect 9;\nselect 2;", hoister.capturedSQL)
+	// The hoister's return value is what callers see.
+	assert.Equal(t, "HOISTED OUTPUT", got)
 }
 
-func TestHoistDeclares(t *testing.T) {
+func TestWrapHooks_FallsBackOnHoisterError(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{
-			name: "no declare is a no-op",
-			in:   "SELECT 1;\nSELECT 2;",
-			want: "SELECT 1;\nSELECT 2;",
-		},
-		{
-			name: "single statement is a no-op",
-			in:   "SELECT 1",
-			want: "SELECT 1",
-		},
-		{
-			name: "leading declare is a no-op",
-			in:   "DECLARE x INT64;\nSELECT 1;",
-			want: "DECLARE x INT64;\nSELECT 1;",
-		},
-		{
-			name: "already-ordered declares preserve original separators",
-			in:   "DECLARE x INT64; SELECT 1;",
-			want: "DECLARE x INT64; SELECT 1;",
-		},
-		{
-			name: "multiple already-ordered declares preserve original formatting",
-			in:   "DECLARE x INT64;DECLARE y STRING;\n\nSELECT 1;",
-			want: "DECLARE x INT64;DECLARE y STRING;\n\nSELECT 1;",
-		},
-		{
-			name: "declare after non-declare gets hoisted",
-			in:   "SET x = 1;\nDECLARE y INT64;\nSELECT 1;",
-			want: "DECLARE y INT64;\nSET x = 1;\nSELECT 1;",
-		},
-		{
-			name: "multiple declares preserve relative order",
-			in:   "SET x = 1;\nDECLARE y INT64;\nSET z = 2;\nDECLARE w STRING;",
-			want: "DECLARE y INT64;\nDECLARE w STRING;\nSET x = 1;\nSET z = 2;",
-		},
-		{
-			name: "case-insensitive detection",
-			in:   "set x = 1;\ndeclare y int64",
-			want: "declare y int64;\nset x = 1;",
-		},
-		{
-			name: "leading comment before declare is tolerated",
-			in:   "SET x = 1;\n-- a comment\nDECLARE y INT64",
-			want: "-- a comment\nDECLARE y INT64;\nSET x = 1;",
-		},
-		{
-			name: "block comment before declare is tolerated",
-			in:   "SET x = 1;\n/* block */ DECLARE y INT64",
-			want: "/* block */ DECLARE y INT64;\nSET x = 1;",
-		},
-		{
-			name: "empty parts are dropped",
-			in:   "SET x = 1;;\nDECLARE y INT64;",
-			want: "DECLARE y INT64;\nSET x = 1;",
-		},
-		{
-			name: "semicolon inside single-quoted literal is left untouched",
-			in:   "SET separator = ';';\nDECLARE y INT64;",
-			want: "SET separator = ';';\nDECLARE y INT64;",
-		},
-		{
-			name: "declare keyword inside string literal does not trigger reordering",
-			in:   "SELECT 'declare bankruptcy' AS msg;",
-			want: "SELECT 'declare bankruptcy' AS msg;",
-		},
-		{
-			name: "declare as a column alias does not trigger reordering",
-			in:   "SELECT 1 AS declare;",
-			want: "SELECT 1 AS declare;",
-		},
-		{
-			name: "semicolon inside double-quoted literal is left untouched",
-			in:   "SET label = \"a;b\";\nDECLARE y INT64;",
-			want: "SET label = \"a;b\";\nDECLARE y INT64;",
-		},
-		{
-			name: "escaped quote inside literal does not trip the guard",
-			in:   "SET msg = 'it''s fine';\nDECLARE y INT64;",
-			want: "DECLARE y INT64;\nSET msg = 'it''s fine';",
-		},
-	}
+	hoister := &stubHoister{returnErr: errors.New("python crashed")}
+	joined := "DECLARE x INT64;\nselect 9;"
+	got := WrapHooks("select 9", Hooks{
+		Pre: []Hook{{Query: "DECLARE x INT64"}},
+	}, hoister, AssetTypeBigqueryQuery)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.want, hoistDeclares(tt.in))
-		})
-	}
+	require.True(t, hoister.calledHoist)
+	assert.Equal(t, joined, got)
 }
 
-func TestHoistDeclaresList(t *testing.T) {
+func TestWrapHooks_SkipsHoisterWhenNoHooks(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name string
-		in   []string
-		want []string
-	}{
-		{
-			name: "no declare is a no-op",
-			in:   []string{"SELECT 1", "SELECT 2"},
-			want: []string{"SELECT 1", "SELECT 2"},
-		},
-		{
-			name: "declare after non-declare gets hoisted",
-			in:   []string{"SET x = 1", "DECLARE y INT64", "SELECT 1"},
-			want: []string{"DECLARE y INT64", "SET x = 1", "SELECT 1"},
-		},
-		{
-			name: "case-insensitive",
-			in:   []string{"set x = 1", "declare y int64"},
-			want: []string{"declare y int64", "set x = 1"},
-		},
-	}
+	// With no hooks AND no hoister, the input is returned unchanged.
+	got := WrapHooks("select 1", Hooks{}, nil, AssetTypeBigqueryQuery)
+	assert.Equal(t, "select 1", got)
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.want, hoistDeclaresList(tt.in))
-		})
-	}
+func TestWrapHooks_CallsHoisterEvenWithoutHooks(t *testing.T) {
+	t.Parallel()
+
+	// A materialization can produce its own DECLAREs even with no hooks
+	// configured. The hoister must still run on the bare query.
+	hoister := &stubHoister{returnSQL: "REORDERED"}
+	got := WrapHooks("DECLARE x INT64;\nSET x = 1;", Hooks{}, hoister, AssetTypeBigqueryQuery)
+	require.True(t, hoister.calledHoist)
+	assert.Equal(t, "REORDERED", got)
 }
 
 func TestWrapHookQueriesList(t *testing.T) {
@@ -309,9 +200,78 @@ func TestWrapHookQueriesList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, wrapHookQueriesList(tt.queries, tt.hooks))
+			assert.Equal(t, tt.want, wrapHookQueriesList(tt.queries, tt.hooks, nil, AssetTypeBigqueryQuery))
 		})
 	}
+}
+
+func TestWrapHookQueriesList_DelegatesToHoister(t *testing.T) {
+	t.Parallel()
+
+	hoister := &stubHoister{returnList: []string{"DECLARE y;", "SET x = 1;", "select 1"}}
+	got := wrapHookQueriesList(
+		[]string{"select 1"},
+		Hooks{
+			Pre: []Hook{{Query: "SET x = 1"}, {Query: "DECLARE y"}},
+		},
+		hoister,
+		AssetTypeBigqueryQuery,
+	)
+
+	require.True(t, hoister.calledHoistList)
+	assert.Equal(t, []string{"SET x = 1;", "DECLARE y;", "select 1"}, hoister.capturedList)
+	assert.Equal(t, []string{"DECLARE y;", "SET x = 1;", "select 1"}, got)
+}
+
+func TestWrapHookQueriesList_FallsBackOnHoisterError(t *testing.T) {
+	t.Parallel()
+
+	hoister := &stubHoister{returnErr: errors.New("boom")}
+	got := wrapHookQueriesList(
+		[]string{"select 1"},
+		Hooks{Pre: []Hook{{Query: "DECLARE y"}}},
+		hoister,
+		AssetTypeBigqueryQuery,
+	)
+
+	require.True(t, hoister.calledHoistList)
+	assert.Equal(t, []string{"DECLARE y;", "select 1"}, got)
+}
+
+// Confirm AssetType reaches the hoister. Important for dialect routing on the
+// Python side.
+func TestWrapHooks_PassesAssetType(t *testing.T) {
+	t.Parallel()
+
+	var capturedType AssetType
+	hoister := &recordingHoister{
+		onHoist: func(sql string, t AssetType) (string, error) {
+			capturedType = t
+			return sql, nil
+		},
+	}
+
+	WrapHooks("select 1", Hooks{Pre: []Hook{{Query: "select 0"}}}, hoister, AssetTypeSnowflakeQuery)
+	assert.Equal(t, AssetTypeSnowflakeQuery, capturedType)
+}
+
+type recordingHoister struct {
+	onHoist     func(string, AssetType) (string, error)
+	onHoistList func([]string, AssetType) ([]string, error)
+}
+
+func (r *recordingHoister) HoistDeclares(sql string, t AssetType) (string, error) {
+	if r.onHoist != nil {
+		return r.onHoist(sql, t)
+	}
+	return sql, nil
+}
+
+func (r *recordingHoister) HoistDeclaresList(q []string, t AssetType) ([]string, error) {
+	if r.onHoistList != nil {
+		return r.onHoistList(q, t)
+	}
+	return q, nil
 }
 
 type hookRendererStub struct {

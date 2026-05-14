@@ -432,6 +432,95 @@ func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error
 	return resp.IsSingleSelect, nil
 }
 
+// HoistDeclares reorders the top-level statements in a multi-statement SQL
+// script so DECLARE statements appear first, leaving DECLAREs nested inside
+// stored procedure / BEGIN..END blocks in place. Uses sqlglot to parse the
+// SQL, so unlike a naive regex split it is dialect-aware and correctly
+// handles string literals, comments, and nested blocks.
+//
+// When no reordering is needed (no DECLAREs, or DECLAREs already lead the
+// script), the original SQL is returned unchanged byte-for-byte. On a
+// dialect lookup or parse failure, returns the original SQL together with
+// the error so callers can decide whether to fall back to the input.
+func (s *SQLParser) HoistDeclares(sql string, assetType pipeline.AssetType) (string, error) {
+	dialect, err := AssetTypeToDialect(assetType)
+	if err != nil {
+		return sql, err
+	}
+
+	if err := s.Start(); err != nil {
+		return sql, errors.Wrap(err, "failed to start sql parser")
+	}
+
+	command := parserCommand{
+		Command: "hoist-declares",
+		Contents: map[string]interface{}{
+			"query":   sql,
+			"dialect": dialect,
+		},
+	}
+
+	responsePayload, err := s.sendCommand(&command)
+	if err != nil {
+		return sql, errors.Wrap(err, "failed to send command")
+	}
+
+	var resp struct {
+		Query string `json:"query"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(responsePayload), &resp); err != nil {
+		return sql, errors.Wrap(err, "failed to unmarshal response")
+	}
+
+	if resp.Error != "" {
+		return sql, errors.New(resp.Error)
+	}
+
+	return resp.Query, nil
+}
+
+// HoistDeclaresList reorders a list of pre-split SQL statements so DECLAREs
+// lead. Each element's original text is preserved (no re-serialization).
+// On any failure, returns the original list together with the error.
+func (s *SQLParser) HoistDeclaresList(queries []string, assetType pipeline.AssetType) ([]string, error) {
+	dialect, err := AssetTypeToDialect(assetType)
+	if err != nil {
+		return queries, err
+	}
+
+	if err := s.Start(); err != nil {
+		return queries, errors.Wrap(err, "failed to start sql parser")
+	}
+
+	command := parserCommand{
+		Command: "hoist-declares-list",
+		Contents: map[string]interface{}{
+			"queries": queries,
+			"dialect": dialect,
+		},
+	}
+
+	responsePayload, err := s.sendCommand(&command)
+	if err != nil {
+		return queries, errors.Wrap(err, "failed to send command")
+	}
+
+	var resp struct {
+		Queries []string `json:"queries"`
+		Error   string   `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(responsePayload), &resp); err != nil {
+		return queries, errors.Wrap(err, "failed to unmarshal response")
+	}
+
+	if resp.Error != "" {
+		return queries, errors.New(resp.Error)
+	}
+
+	return resp.Queries, nil
+}
+
 func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
 	return getMissingDependenciesForAsset(s, asset, pipeline, renderer)
 }
