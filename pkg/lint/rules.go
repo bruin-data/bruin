@@ -1217,7 +1217,7 @@ func ensureDataVaultLinkColumnsAreValid(asset *pipeline.Asset) []*Issue {
 
 	linkHashKeyName := ""
 	for _, col := range asset.Columns {
-		if dataVaultColumnMatches(col, []string{"link_hash_key", "hash_key"}) || col.PrimaryKey {
+		if dataVaultColumnMatches(col, []string{"link_hash_key", "hash_key"}) || col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk") {
 			linkHashKeyName = col.Name
 			break
 		}

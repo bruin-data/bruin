@@ -1440,6 +1440,26 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "table materialization has datavault_link with hk suffix link key and it is successful",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultLink,
+					},
+					Columns: []pipeline.Column{
+						{Name: "customer_order_hk", Type: "text"},
+						{Name: "customer_key", Type: "text", Meta: map[string]string{"datavault_role": "hub_hash_key"}},
+						{Name: "order_key", Type: "text", Meta: map[string]string{"datavault_role": "hub_hash_key"}},
+						{Name: "load_dts", Type: "timestamptz"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "table materialization has datavault_satellite and it is successful",
 			assets: []*pipeline.Asset{
 				{
