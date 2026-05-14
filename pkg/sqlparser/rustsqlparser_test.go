@@ -135,6 +135,38 @@ func TestRustSQLParser_HoistDeclares(t *testing.T) {
 		require.Equal(t, "DECLARE distinct_keys array<STRING>;\nSET x = 1;", got)
 	})
 
+	t.Run("BEGIN TRANSACTION does not swallow following semicolons", func(t *testing.T) {
+		t.Parallel()
+		// `BEGIN TRANSACTION` emits TokenType::Begin without a matching
+		// END (COMMIT/ROLLBACK don't produce TokenType::End). If we
+		// blindly tracked it as a block, every ';' after it would be
+		// classified as nested and the script would collapse into one
+		// non-DECLARE slice.
+		in := "DECLARE distinct_keys array<STRING>;\n" +
+			"BEGIN TRANSACTION;\n" +
+			"SELECT 1;\n" +
+			"COMMIT TRANSACTION;"
+		got, err := parser.HoistDeclares(in, pipeline.AssetTypeBigqueryQuery)
+		require.NoError(t, err)
+		// Already-ordered: input returned verbatim.
+		require.Equal(t, in, got)
+	})
+
+	t.Run("hoist past BEGIN TRANSACTION", func(t *testing.T) {
+		t.Parallel()
+		// A DECLARE appearing after a BEGIN TRANSACTION must still be
+		// recognized as top-level and hoisted to the front. Without the
+		// BEGIN TRANSACTION lookahead, it would be wrongly treated as
+		// nested inside the transaction "block" and skipped.
+		in := "BEGIN TRANSACTION;\nSET x = 1;\nDECLARE y INT64;\nCOMMIT TRANSACTION;"
+		got, err := parser.HoistDeclares(in, pipeline.AssetTypeBigqueryQuery)
+		require.NoError(t, err)
+		require.Equal(t,
+			"DECLARE y INT64;\nBEGIN TRANSACTION;\nSET x = 1;\nCOMMIT TRANSACTION;",
+			got,
+		)
+	})
+
 	t.Run("unmapped asset type returns error and input unchanged", func(t *testing.T) {
 		t.Parallel()
 		in := "SET x = 1;\nDECLARE y INT64;"

@@ -2268,7 +2268,8 @@ fn find_top_level_semicolons(query: &str, dialect: DialectType) -> Result<Vec<us
     let mut case_depth: i32 = 0;
     let mut positions = Vec::new();
 
-    for token in &tokens {
+    for i in 0..tokens.len() {
+        let token = &tokens[i];
         match token.token_type {
             TokenType::LParen => paren_depth += 1,
             TokenType::RParen => {
@@ -2277,7 +2278,20 @@ fn find_top_level_semicolons(query: &str, dialect: DialectType) -> Result<Vec<us
                 }
             }
             TokenType::Case => case_depth += 1,
-            TokenType::Begin => begin_end_depth += 1,
+            TokenType::Begin => {
+                // `BEGIN TRANSACTION` is a transaction-control statement,
+                // not a procedural block opener: it has no matching END,
+                // so tracking it as a block would mark every following
+                // semicolon as nested. Only plain `BEGIN` (i.e. not
+                // followed by TRANSACTION) opens a BEGIN..END block.
+                let next_is_transaction = tokens
+                    .get(i + 1)
+                    .map(|t| t.token_type == TokenType::Transaction)
+                    .unwrap_or(false);
+                if !next_is_transaction {
+                    begin_end_depth += 1;
+                }
+            }
             TokenType::End => {
                 if case_depth > 0 {
                     case_depth -= 1;
