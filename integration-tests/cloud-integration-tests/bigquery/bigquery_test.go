@@ -132,12 +132,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.ddl_drop_pipeline_ddl;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 						{
@@ -234,12 +232,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.ddl_drop_pipeline_ddl;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 					},
@@ -284,12 +280,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.asset_query_products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 					},
@@ -372,12 +366,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.merge_with_nulls_nulltable;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 					},
@@ -395,8 +387,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.merge_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 						{
 							Name:     "merge: create initial table",
@@ -443,8 +435,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.merge_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
@@ -461,8 +453,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.append_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 						{
 							Name:     "append: create initial table",
@@ -509,8 +501,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.append_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
@@ -527,8 +519,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.truncate_insert_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 						{
 							Name:     "truncate-insert: create initial table",
@@ -575,8 +567,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.truncate_insert_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
@@ -593,8 +585,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.delete_insert_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 						{
 							Name:     "delete-insert: create initial table",
@@ -641,8 +633,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.delete_insert_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
@@ -659,8 +651,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.time_interval_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 						{
 							Name:     "time-interval: create initial table",
@@ -707,8 +699,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.time_interval_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
@@ -725,8 +717,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.table_sensor_datatable;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 						{
 							Name:     "table-sensor: run the table sensor (expect failure)",
@@ -757,8 +749,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.table_sensor_datatable;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
@@ -775,8 +767,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.ddl_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 						{
 							Name:     "ddl: confirm the table is dropped",
@@ -807,8 +799,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command:  binary,
 							Args:     append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.ddl_materialization_products;"),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
@@ -826,12 +818,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_column_menu;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 						{
@@ -949,17 +939,15 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
+							Name:    "scd2-by-column: drop the table",
 							Command: binary,
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_column_menu;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 						{
@@ -990,12 +978,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_time_products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 						{
@@ -1113,17 +1099,15 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "scd2-by-time: drop the table (expect error but table will be dropped)",
+							Name:    "scd2-by-time: drop the table",
 							Command: binary,
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.scd2_by_time_products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 						{
@@ -1192,12 +1176,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							Command: binary,
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS cloud_integration_test.dry_run_table;"),
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 					},
@@ -1228,12 +1210,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 							`),
 							Env: []string{},
 							Expected: e2e.Output{
-								ExitCode: 1,
-								Contains: []string{"schema information is not available"},
+								ExitCode: 0,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								e2e.AssertByContains,
 							},
 						},
 						{
@@ -1318,8 +1298,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 								DROP TABLE IF EXISTS cloud_integration_test.drop_on_mismatch_ts_truncate_04;
 							`),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
@@ -1381,8 +1361,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 								`,
 							),
 							Env:      []string{},
-							Expected: e2e.Output{ExitCode: 1, Contains: []string{"schema information is not available"}},
-							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode, e2e.AssertByContains},
+							Expected: e2e.Output{ExitCode: 0},
+							Asserts:  []func(*e2e.Task) error{e2e.AssertByExitCode},
 						},
 					},
 				}
