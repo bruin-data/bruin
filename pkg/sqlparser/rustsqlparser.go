@@ -23,6 +23,12 @@ func NewRustSQLParserWithConfig(_ bool, maxQueryLength int) (*RustSQLParser, err
 	}, nil
 }
 
+// Start is idempotent and effectively free: the Rust SQL parser lives
+// in-process behind CGo, with no subprocess to spin up or state to track.
+// It only verifies that the FFI library is linked (a compile-time guarantee
+// on darwin/linux) and otherwise returns nil. Calling it repeatedly — or
+// not at all — has no effect. Methods like HoistDeclares do not call it
+// internally, so there is no double-start hazard.
 func (s *RustSQLParser) Start() error {
 	return ensureRustSQLParserFFI()
 }
