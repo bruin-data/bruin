@@ -1,0 +1,4 @@
+customer_hk,customer_bk,load_dts,record_source
+cust_1_hk,C001,2024-01-01 00:00:00,CRM
+cust_2_hk,C002,2024-01-01 00:00:00,CRM
+cust_3_hk,C003,2024-01-03 00:00:00,ERP

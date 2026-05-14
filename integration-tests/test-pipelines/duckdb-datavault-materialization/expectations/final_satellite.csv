@@ -1,0 +1,5 @@
+customer_hk,hashdiff,load_dts,customer_name,email
+cust_1_hk,hash_alice_v1,2024-01-01 00:00:00,Alice,alice@example.com
+cust_1_hk,hash_alice_v2,2024-01-03 00:00:00,Alice A.,alice.a@example.com
+cust_2_hk,hash_bob_v1,2024-01-01 00:00:00,Bob,bob@example.com
+cust_3_hk,hash_carol_v1,2024-01-03 00:00:00,Carol,carol@example.com

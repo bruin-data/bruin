@@ -25,16 +25,19 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
 	},
 	pipeline.MaterializationTypeTable: {
-		pipeline.MaterializationStrategyNone:           buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyAppend:         buildAppendQuery,
-		pipeline.MaterializationStrategyCreateReplace:  buildCreateReplaceQuery,
-		pipeline.MaterializationStrategyDeleteInsert:   buildIncrementalQuery,
-		pipeline.MaterializationStrategyTruncateInsert: ansisql.BuildTruncateInsertQuery,
-		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
-		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
-		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByTime:     buildSCD2ByTimeQuery,
-		pipeline.MaterializationStrategySCD2ByColumn:   buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategyNone:               buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:             buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace:      buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:       buildIncrementalQuery,
+		pipeline.MaterializationStrategyTruncateInsert:     ansisql.BuildTruncateInsertQuery,
+		pipeline.MaterializationStrategyMerge:              buildMergeQuery,
+		pipeline.MaterializationStrategyTimeInterval:       buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:                buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByTime:         buildSCD2ByTimeQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:       buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategyDataVaultHub:       buildDataVaultHubQuery,
+		pipeline.MaterializationStrategyDataVaultLink:      buildDataVaultLinkQuery,
+		pipeline.MaterializationStrategyDataVaultSatellite: buildDataVaultSatelliteQuery,
 	},
 }
 
@@ -171,6 +174,15 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	}
 	if task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn {
 		return buildSCD2ByColumnfullRefresh(task, query)
+	}
+	if task.Materialization.Strategy == pipeline.MaterializationStrategyDataVaultHub {
+		return buildDataVaultHubQueryWithOptions(task, query, true)
+	}
+	if task.Materialization.Strategy == pipeline.MaterializationStrategyDataVaultLink {
+		return buildDataVaultLinkQueryWithOptions(task, query, true)
+	}
+	if task.Materialization.Strategy == pipeline.MaterializationStrategyDataVaultSatellite {
+		return buildDataVaultSatelliteQueryWithOptions(task, query, true)
 	}
 	query = strings.TrimSuffix(query, ";")
 	return fmt.Sprintf(
