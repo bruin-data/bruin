@@ -260,6 +260,35 @@ environments:
 - **Rollback on failure**: If validation fails after enhancement, the original file is automatically restored
 - **Idempotent**: Running the command multiple times on the same asset won't duplicate checks or descriptions
 
+## Query Cost Safety (BigQuery only)
+
+When the asset is backed by a BigQuery connection, the AI agent is instructed to check the connection in `.bruin.yml` for cost guards before running any query against your warehouse. See [BigQuery: query safety limits](/platforms/bigquery#connection) for the configuration keys.
+
+The relevant keys on a `google_cloud_platform` connection are:
+
+| Key | Type | Effect |
+|-----|------|--------|
+| `max_query_cost` | Hard limit (USD) | Bruin dry-runs every query and refuses to execute if the estimate exceeds this value. |
+| `max_billable_bytes` | Hard limit (bytes) | Same as above, expressed in scanned bytes. |
+| `max_query_cost_soft` | Soft limit (USD) | Applied to `bruin query` (which the agent uses to inspect data). Can be bypassed with `--dangerously-bypass-soft-limits` only after explicit user confirmation. |
+| `max_billable_bytes_soft` | Soft limit (bytes) | Same as above, in bytes. |
+
+**If at least one limit is configured**, the agent will:
+
+- Dry-run each query first via `bruin query --connection <name> --query "<sql>" --dry-run`.
+- Read the estimated bytes and cost from the dry-run output and compare against the configured limits.
+- If the estimate exceeds a limit, rewrite the query to scan less data (narrower columns, tighter filters, smaller date range, `LIMIT`, partitioning predicates) and dry-run again.
+- Never pass `--dangerously-bypass-soft-limits` unless you have explicitly confirmed the cost in the session.
+
+**If no limit is configured**, the agent will:
+
+- Stop before running any query and warn you that running queries from the agent could incur uncapped cost on this connection.
+- Offer to add `max_query_cost` / `max_query_cost_soft` (or the `*_billable_bytes` equivalents) to `.bruin.yml` before continuing, and suggest a starting value.
+- Require an explicit acknowledgement that you accept the cost risk before proceeding without a limit.
+
+> [!NOTE]
+> This safety check is BigQuery-only today. Other warehouses (Snowflake, Postgres, DuckDB, Redshift, etc.) do not currently support Bruin cost guards.
+
 ## See Also
 
 - [Patch Command](/commands/patch) - Fill columns from database without AI
