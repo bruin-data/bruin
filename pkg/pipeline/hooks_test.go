@@ -162,6 +162,78 @@ func TestWrapHooks_CallsHoisterEvenWithoutHooks(t *testing.T) {
 	assert.Equal(t, "REORDERED", got)
 }
 
+func TestWrapHooks_SkipsHoisterWhenNoDeclareKeyword(t *testing.T) {
+	t.Parallel()
+
+	// Hot path: hooks without DECLAREs are the common case. The Go-side
+	// substring check must prevent us from calling into the hoister at
+	// all so we don't pay a CGo round trip for a guaranteed no-op.
+	hoister := &stubHoister{returnSQL: "SHOULD NOT BE USED"}
+	got := WrapHooks("SELECT 1", Hooks{
+		Pre:  []Hook{{Query: "SET x = 1"}},
+		Post: []Hook{{Query: "INSERT INTO log VALUES (1)"}},
+	}, hoister, AssetTypeBigqueryQuery)
+
+	require.False(t, hoister.calledHoist, "hoister should not be invoked when no DECLARE keyword is present")
+	assert.Equal(t, "SET x = 1;\nSELECT 1;\nINSERT INTO log VALUES (1);", got)
+}
+
+func TestWrapHooks_DeclareKeywordCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	// Lowercase "declare" must also trigger the pre-check; BigQuery
+	// accepts both casings.
+	hoister := &stubHoister{returnSQL: "HOISTED"}
+	got := WrapHooks("select 1", Hooks{
+		Pre: []Hook{{Query: "set x = 1"}, {Query: "declare y int64"}},
+	}, hoister, AssetTypeBigqueryQuery)
+
+	require.True(t, hoister.calledHoist)
+	assert.Equal(t, "HOISTED", got)
+}
+
+func TestWrapHookQueriesList_SkipsHoisterWhenNoDeclareKeyword(t *testing.T) {
+	t.Parallel()
+
+	hoister := &stubHoister{returnList: []string{"SHOULD NOT BE USED"}}
+	got := wrapHookQueriesList(
+		[]string{"SELECT 1", "SELECT 2"},
+		Hooks{Pre: []Hook{{Query: "SET x = 1"}}},
+		hoister,
+		AssetTypeBigqueryQuery,
+	)
+
+	require.False(t, hoister.calledHoistList)
+	assert.Equal(t, []string{"SET x = 1;", "SELECT 1", "SELECT 2"}, got)
+}
+
+func TestHasDeclareKeyword(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"empty string", "", false},
+		{"no declare", "SELECT 1 FROM t WHERE x = 1", false},
+		{"uppercase declare", "DECLARE x INT64", true},
+		{"lowercase declare", "declare x int64", true},
+		{"mixed case declare", "DeClArE x INT64", true},
+		{"declare at end", "SET x = 1;DECLARE y INT64", true},
+		{"declare embedded in identifier", "predeclared_value", true}, // false positive, OK
+		{"shorter than keyword", "DECL", false},
+		{"substring inside string literal", "SELECT 'declare bankruptcy'", true}, // false positive, OK
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, hasDeclareKeyword(tt.in))
+		})
+	}
+}
+
 func TestWrapHookQueriesList(t *testing.T) {
 	t.Parallel()
 
@@ -251,7 +323,9 @@ func TestWrapHooks_PassesAssetType(t *testing.T) {
 		},
 	}
 
-	WrapHooks("select 1", Hooks{Pre: []Hook{{Query: "select 0"}}}, hoister, AssetTypeSnowflakeQuery)
+	// Include a DECLARE so the cheap pre-check lets the call through to
+	// the hoister; we want to assert the AssetType reaches it.
+	WrapHooks("select 1", Hooks{Pre: []Hook{{Query: "DECLARE x INT64"}}}, hoister, AssetTypeSnowflakeQuery)
 	assert.Equal(t, AssetTypeSnowflakeQuery, capturedType)
 }
 

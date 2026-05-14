@@ -54,7 +54,7 @@ func wrapHookQueriesList(queries []string, hooks Hooks, hoister DeclareHoister, 
 }
 
 func maybeHoist(sql string, hoister DeclareHoister, assetType AssetType) string {
-	if hoister == nil {
+	if hoister == nil || !hasDeclareKeyword(sql) {
 		return sql
 	}
 	hoisted, err := hoister.HoistDeclares(sql, assetType)
@@ -68,11 +68,51 @@ func maybeHoistList(queries []string, hoister DeclareHoister, assetType AssetTyp
 	if hoister == nil {
 		return queries
 	}
+	saw := false
+	for _, q := range queries {
+		if hasDeclareKeyword(q) {
+			saw = true
+			break
+		}
+	}
+	if !saw {
+		return queries
+	}
 	hoisted, err := hoister.HoistDeclaresList(queries, assetType)
 	if err != nil {
 		return queries
 	}
 	return hoisted
+}
+
+// hasDeclareKeyword performs a cheap case-insensitive substring scan for
+// the keyword "declare". When it returns false the input is guaranteed to
+// contain no DECLARE statement and the caller can skip the hoister
+// entirely — saving a CGo round-trip per hook wrap in the common case
+// (hooks without DECLAREs). False positives (e.g. "declare" inside a
+// string literal) are fine: the hoister then runs and classifies them
+// correctly. False negatives are impossible since any real DECLARE
+// statement must contain the keyword.
+func hasDeclareKeyword(s string) bool {
+	const target = "declare"
+	n := len(target)
+	for i := 0; i+n <= len(s); i++ {
+		match := true
+		for j := range n {
+			c := s[i+j]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			if c != target[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
 }
 
 func formatHookQueries(hooks []Hook) []string {
