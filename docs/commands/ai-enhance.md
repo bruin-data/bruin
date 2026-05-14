@@ -262,7 +262,12 @@ environments:
 
 ## Query Cost Safety (BigQuery only)
 
-When the asset is backed by a BigQuery connection, the AI agent is instructed to check the connection in `.bruin.yml` for cost guards before running any query against your warehouse. See [BigQuery: query safety limits](/platforms/bigquery#connection) for the configuration keys.
+When the asset is backed by a BigQuery connection, the AI agent is instructed — as a precondition, **before** Context Discovery or any other step that might issue a query — to:
+
+1. Read the asset file and resolve its `connection` field (falling back to the pipeline's default BigQuery connection if not set).
+2. Look up that exact connection name in `.bruin.yml` and check it for cost-guard keys.
+
+See [BigQuery: query safety limits](/platforms/bigquery#connection) for the configuration keys.
 
 The relevant keys on a `google_cloud_platform` connection are:
 

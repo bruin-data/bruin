@@ -1,6 +1,7 @@
 package enhance
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,5 +35,30 @@ func TestBuildEnhancePrompt(t *testing.T) {
 
 		assert.Contains(t, prompt, "PRE-FETCHED TABLE STATISTICS")
 		assert.Contains(t, prompt, statsJSON)
+	})
+
+	t.Run("includes BigQuery cost guard safety instructions", func(t *testing.T) {
+		t.Parallel()
+		prompt := BuildEnhancePrompt("/path/to/asset.sql", "test", "pipeline", "")
+
+		assert.Contains(t, prompt, "Query Cost Safety")
+		assert.Contains(t, prompt, "max_query_cost")
+		assert.Contains(t, prompt, "max_query_cost_soft")
+		assert.Contains(t, prompt, "max_billable_bytes")
+		assert.Contains(t, prompt, "max_billable_bytes_soft")
+		assert.Contains(t, prompt, "--dry-run")
+		assert.Contains(t, prompt, "--dangerously-bypass-soft-limits")
+	})
+
+	t.Run("cost safety section precedes context discovery", func(t *testing.T) {
+		t.Parallel()
+		prompt := BuildEnhancePrompt("/path/to/asset.sql", "test", "pipeline", "")
+
+		costIdx := strings.Index(prompt, "Query Cost Safety")
+		discoveryIdx := strings.Index(prompt, "Context Discovery")
+
+		assert.NotEqual(t, -1, costIdx, "Query Cost Safety section must exist")
+		assert.NotEqual(t, -1, discoveryIdx, "Context Discovery section must exist")
+		assert.Less(t, costIdx, discoveryIdx, "cost safety must come before context discovery so the agent evaluates it before planning queries")
 	})
 }
