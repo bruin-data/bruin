@@ -148,6 +148,26 @@ Common validation pitfalls to avoid:
 - Only use quality checks that pass the "bruin validate" check
 - Keep YAML indentation consistent (2 spaces).
 
+## Query Cost Safety (BigQuery only)
+
+Before issuing ANY query against a BigQuery asset (for example via bruin query), you MUST first check whether the asset's connection has cost guards configured.
+
+1. Open the project's .bruin.yml (including the relevant environment block) and locate the google_cloud_platform connection used by this asset's pipeline.
+2. Look for any of these keys on that connection: max_query_cost, max_query_cost_soft, max_billable_bytes, max_billable_bytes_soft.
+
+If AT LEAST ONE limit is configured:
+- ALWAYS dry-run the query first by running: bruin query --connection <name> --query "<sql>" --dry-run
+- Read the estimated bytes / cost from the dry-run output and compare against the configured limits.
+- If the estimate exceeds any configured limit, do NOT run the real query. Rewrite it to scan less data (narrower column list, tighter filters, smaller date range, LIMIT, partitioning predicates, etc.) and dry-run again until it fits.
+- Never pass --dangerously-bypass-soft-limits unless the user has explicitly confirmed the cost in this session.
+
+If NO limit is configured on the connection:
+- STOP before running any query. Tell the user plainly: "No BigQuery cost guard is configured on connection <name>. Running queries from this agent could incur uncapped cost."
+- Offer to add max_query_cost and/or max_query_cost_soft (USD), or max_billable_bytes / max_billable_bytes_soft, to .bruin.yml before continuing, and suggest a reasonable starting value.
+- If the user declines to set a limit, require them to explicitly confirm they accept the cost risk before you proceed. Do not assume consent from silence or from a generic "go ahead".
+
+This safety check applies to BigQuery ONLY. Other warehouses (Snowflake, Postgres, DuckDB, Redshift, etc.) do not currently support Bruin cost guards; for those, use ordinary judgment about scan size and no extra confirmation step is required.
+
 ## Guardrails
 - Do not hallucinate business meaning.
 - If unsure, leave the field unchanged.
