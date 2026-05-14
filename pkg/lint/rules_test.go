@@ -1400,6 +1400,81 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "table materialization has datavault_hub and it is successful",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultHub,
+					},
+					Columns: []pipeline.Column{
+						{Name: "customer_hk", Type: "text", PrimaryKey: true},
+						{Name: "customer_bk", Type: "text"},
+						{Name: "load_dts", Type: "timestamptz"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "table materialization has datavault_link and it is successful",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultLink,
+					},
+					Columns: []pipeline.Column{
+						{Name: "customer_order_hk", Type: "text", PrimaryKey: true},
+						{Name: "customer_hk", Type: "text"},
+						{Name: "order_hk", Type: "text"},
+						{Name: "load_dts", Type: "timestamptz"},
+						{Name: "record_source", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "table materialization has datavault_satellite and it is successful",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+					},
+					Columns: []pipeline.Column{
+						{Name: "customer_hk", Type: "text", PrimaryKey: true},
+						{Name: "hashdiff", Type: "text"},
+						{Name: "load_dts", Type: "timestamptz"},
+						{Name: "record_source", Type: "text"},
+						{Name: "customer_name", Type: "text"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "table materialization has datavault_hub but no columns",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDataVaultHub,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Materialization strategy 'datavault_hub' requires the 'columns' field to be set with actual columns",
+			},
+		},
 	}
 	ctx := t.Context()
 	for _, tt := range tests {

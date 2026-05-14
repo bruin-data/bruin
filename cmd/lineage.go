@@ -49,8 +49,12 @@ type printer interface {
 	Print(a ...interface{}) (n int, err error)
 }
 
+type lineagePipelineCreator interface {
+	CreatePipelineFromPath(ctx context.Context, path string, opts ...pipeline.CreatePipelineOption) (*pipeline.Pipeline, error)
+}
+
 type LineageCommand struct {
-	builder      taskCreator
+	builder      lineagePipelineCreator
 	infoPrinter  printer
 	errorPrinter printer
 }
@@ -71,7 +75,7 @@ func (r *LineageCommand) Run(ctx context.Context, assetPath string, fullLineage 
 	if variantName != "" {
 		opts = append(opts, pipeline.WithVariant(variantName))
 	}
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
+	foundPipeline, err := r.builder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
 	if err != nil {
 		printError(err, output, "Failed to build pipeline")
 		r.errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly, and it needs to be inside a pipeline.")

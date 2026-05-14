@@ -1131,6 +1131,12 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 				})
 			}
 
+		case pipeline.MaterializationStrategyDataVaultHub:
+			issues = append(issues, ensureDataVaultHubColumnsAreValid(asset)...)
+		case pipeline.MaterializationStrategyDataVaultLink:
+			issues = append(issues, ensureDataVaultLinkColumnsAreValid(asset)...)
+		case pipeline.MaterializationStrategyDataVaultSatellite:
+			issues = append(issues, ensureDataVaultSatelliteColumnsAreValid(asset)...)
 		case pipeline.MaterializationStrategyTimeInterval:
 			if asset.Materialization.IncrementalKey == "" {
 				issues = append(issues, &Issue{
@@ -1175,6 +1181,180 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	}
 
 	return issues, nil
+}
+
+func ensureDataVaultHubColumnsAreValid(asset *pipeline.Asset) []*Issue {
+	issues := ensureDataVaultColumnsHaveNamesAndTypes(asset, "datavault_hub")
+	if len(asset.Columns) == 0 {
+		return issues
+	}
+
+	if !hasDataVaultColumn(asset, []string{"hash_key", "hub_hash_key"}, func(col pipeline.Column) bool {
+		return col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk")
+	}) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization strategy 'datavault_hub' requires a hash key column",
+		})
+	}
+	if !hasDataVaultColumn(asset, []string{"business_key"}, func(col pipeline.Column) bool {
+		return strings.HasSuffix(strings.ToLower(col.Name), "_bk")
+	}) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization strategy 'datavault_hub' requires at least one business key column",
+		})
+	}
+	appendCommonDataVaultColumnIssues(asset, "datavault_hub", &issues)
+	return issues
+}
+
+func ensureDataVaultLinkColumnsAreValid(asset *pipeline.Asset) []*Issue {
+	issues := ensureDataVaultColumnsHaveNamesAndTypes(asset, "datavault_link")
+	if len(asset.Columns) == 0 {
+		return issues
+	}
+
+	linkHashKeyName := ""
+	for _, col := range asset.Columns {
+		if dataVaultColumnMatches(col, []string{"link_hash_key", "hash_key"}) || col.PrimaryKey {
+			linkHashKeyName = col.Name
+			break
+		}
+	}
+	if linkHashKeyName == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization strategy 'datavault_link' requires a link hash key column",
+		})
+	}
+
+	hasRelatedHashKey := false
+	for _, col := range asset.Columns {
+		if strings.EqualFold(col.Name, linkHashKeyName) {
+			continue
+		}
+		if dataVaultColumnMatches(col, []string{"hub_hash_key", "parent_hash_key", "foreign_hash_key"}) || strings.HasSuffix(strings.ToLower(col.Name), "_hk") {
+			hasRelatedHashKey = true
+			break
+		}
+	}
+	if !hasRelatedHashKey {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization strategy 'datavault_link' requires at least one related hash key column",
+		})
+	}
+	appendCommonDataVaultColumnIssues(asset, "datavault_link", &issues)
+	return issues
+}
+
+func ensureDataVaultSatelliteColumnsAreValid(asset *pipeline.Asset) []*Issue {
+	issues := ensureDataVaultColumnsHaveNamesAndTypes(asset, "datavault_satellite")
+	if len(asset.Columns) == 0 {
+		return issues
+	}
+
+	if !hasDataVaultColumn(asset, []string{"parent_hash_key", "hub_hash_key", "hash_key"}, func(col pipeline.Column) bool {
+		return col.PrimaryKey || strings.HasSuffix(strings.ToLower(col.Name), "_hk")
+	}) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization strategy 'datavault_satellite' requires a parent hash key column",
+		})
+	}
+	if !hasDataVaultColumn(asset, []string{"hashdiff", "hash_diff"}, func(col pipeline.Column) bool {
+		name := strings.ToLower(col.Name)
+		return name == "hashdiff" || name == "hash_diff"
+	}) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Materialization strategy 'datavault_satellite' requires a hashdiff column",
+		})
+	}
+	appendCommonDataVaultColumnIssues(asset, "datavault_satellite", &issues)
+	return issues
+}
+
+func ensureDataVaultColumnsHaveNamesAndTypes(asset *pipeline.Asset, strategy string) []*Issue {
+	issues := make([]*Issue, 0)
+	if len(asset.Columns) == 0 {
+		return append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Materialization strategy '%s' requires the 'columns' field to be set with actual columns", strategy),
+		})
+	}
+
+	for _, col := range asset.Columns {
+		if strings.TrimSpace(col.Name) == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Materialization strategy '%s' requires every column to have a name", strategy),
+			})
+		}
+		if strings.TrimSpace(col.Type) == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Materialization strategy '%s' requires column '%s' to have a type", strategy, col.Name),
+			})
+		}
+	}
+
+	return issues
+}
+
+func appendCommonDataVaultColumnIssues(asset *pipeline.Asset, strategy string, issues *[]*Issue) {
+	if !hasDataVaultColumn(asset, []string{"load_datetime", "load_dts"}, func(col pipeline.Column) bool {
+		switch strings.ToLower(col.Name) {
+		case "load_dts", "load_datetime", "loaded_at":
+			return true
+		default:
+			return false
+		}
+	}) {
+		*issues = append(*issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Materialization strategy '%s' requires a load datetime column", strategy),
+		})
+	}
+	if !hasDataVaultColumn(asset, []string{"record_source"}, func(col pipeline.Column) bool {
+		return strings.EqualFold(col.Name, "record_source")
+	}) {
+		*issues = append(*issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Materialization strategy '%s' requires a record source column", strategy),
+		})
+	}
+}
+
+func hasDataVaultColumn(asset *pipeline.Asset, roles []string, fallback func(pipeline.Column) bool) bool {
+	for _, col := range asset.Columns {
+		if dataVaultColumnMatches(col, roles) {
+			return true
+		}
+	}
+	if fallback == nil {
+		return false
+	}
+	for _, col := range asset.Columns {
+		if fallback(col) {
+			return true
+		}
+	}
+	return false
+}
+
+func dataVaultColumnMatches(col pipeline.Column, roles []string) bool {
+	if len(col.Meta) == 0 {
+		return false
+	}
+	role := strings.ToLower(strings.TrimSpace(col.Meta["datavault_role"]))
+	for _, candidate := range roles {
+		if role == strings.ToLower(candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
