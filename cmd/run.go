@@ -1257,17 +1257,13 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			// The sql parser drives dev-mode table renaming and DECLARE
-			// hoisting in hook-wrapped SQL. We initialize it unconditionally
-			// so the hoister is available on the SQL hook wrappers; on
-			// failure we fall back to a nil parser (no hoist, no rename).
 			var parser *sqlparser.SQLParser
-			parser, err = sqlparser.NewSQLParser(false)
-			if err != nil {
-				printError(err, c.String("output"), "Could not initialize sql parser")
-				parser = nil
-			}
-			if parser != nil {
+			if cm.SelectedEnvironment.SchemaPrefix != "" {
+				// we use the sql parser to rename the tables for dev mode
+				parser, err = sqlparser.NewSQLParser(false)
+				if err != nil {
+					printError(err, c.String("output"), "Could not initialize sql parser")
+				}
 				defer parser.Close()
 
 				go func() {
@@ -1278,7 +1274,21 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, foundPipeline.Commit)
+			// The Rust SQL parser is in-process and effectively free to
+			// instantiate. We use it as the DECLARE hoister on every hook
+			// wrapper so detecting "no reorder needed" is a single CGo
+			// call rather than a Python IPC round trip.
+			var hoister pipeline.DeclareHoister
+			if rustParser, rustErr := sqlparser.NewRustSQLParser(false); rustErr == nil {
+				if startErr := rustParser.Start(); startErr == nil {
+					hoister = rustParser
+				}
+				defer rustParser.Close()
+			} else {
+				printError(rustErr, c.String("output"), "Could not initialize rust sql parser")
+			}
+
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1685,6 +1695,7 @@ func SetupExecutors(
 	sensorMode string,
 	renderer *jinja.Renderer,
 	parser *sqlparser.SQLParser,
+	hoister pipeline.DeclareHoister,
 	commitHash string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
@@ -1719,7 +1730,7 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     bigquery.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
 		if err != nil {
@@ -1768,7 +1779,7 @@ func SetupExecutors(
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     postgres.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		pgTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -1825,7 +1836,7 @@ func SetupExecutors(
 		}
 		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     trino.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
@@ -1841,7 +1852,7 @@ func SetupExecutors(
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
 		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     oracle.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		oracleMetadataPushOperator := postgres.NewMetadataPushOperator(conn) // using Postgres Metadata Push for Oracle if suitable, or skipping it
 
@@ -1859,7 +1870,7 @@ func SetupExecutors(
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     snowflake.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
@@ -1902,11 +1913,11 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseTableSensor) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     mssql.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
 			Mat:     synapse.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
@@ -1966,7 +1977,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeVerticaTableSensor) {
 		verticaOperator := vertica.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     vertica.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		verticaCheckRunner := vertica.NewColumnCheckOperator(conn)
 		verticaQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2002,7 +2013,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensorLegacy) {
 		fabricOperator := fabric.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     fabric.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 
 		fabricCheckRunner := fabric.NewColumnCheckOperator(conn)
@@ -2049,7 +2060,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksTableSensor) {
 		databricksOperator := databricks.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
 			Mat:     databricks.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		databricksCheckRunner := databricks.NewColumnCheckOperator(conn)
 		databricksQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2095,7 +2106,7 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerListWithLocation{
 			Mat:     athena.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
 		athenaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -2123,7 +2134,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuerySensor) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     duck.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		duckDBCheckRunner := duck.NewColumnCheckOperator(conn)
 		duckDBQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2151,7 +2162,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSeed) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseTableSensor) {
 		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
 			Mat:     clickhouse.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		checkRunner := clickhouse.NewColumnCheckOperator(conn)
 		clickHouseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2239,7 +2250,7 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLTableSensor) {
 		mysqlOperator := mysql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
 			Mat:     mysql.NewMaterializer(fullRefresh),
-			Hoister: parser,
+			Hoister: hoister,
 		}, parser)
 		mysqlCheckRunner := mysql.NewColumnCheckOperator(conn)
 		mysqlQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)

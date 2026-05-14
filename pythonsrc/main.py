@@ -7,8 +7,6 @@ from parser.main import (
     get_tables,
     add_limit,
     is_single_select_query,
-    hoist_declares,
-    hoist_declares_list,
 )
 
 from pathlib import Path
@@ -65,14 +63,6 @@ def main():
                 logging.info("got is-single-select command")
                 c = cmd["contents"]
                 result = is_single_select_query(c["query"], c["dialect"])
-            elif cmd["command"] == "hoist-declares":
-                logging.info("got hoist-declares command")
-                c = cmd["contents"]
-                result = hoist_declares(c["query"], c.get("dialect"))
-            elif cmd["command"] == "hoist-declares-list":
-                logging.info("got hoist-declares-list command")
-                c = cmd["contents"]
-                result = hoist_declares_list(c["queries"], c.get("dialect"))
             elif cmd["command"] == "exit":
                 logging.info("got exit command amx")
                 break

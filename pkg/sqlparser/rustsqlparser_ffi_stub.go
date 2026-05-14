@@ -27,3 +27,11 @@ func rustFFIIsSingleSelect(query, dialect string) (string, error) {
 func rustFFIColumnLineage(query, dialect, schemaJSON string) (string, error) {
 	return "", ensureRustSQLParserFFI()
 }
+
+func rustFFIHoistDeclares(query, dialect string) (string, error) {
+	return "", ensureRustSQLParserFFI()
+}
+
+func rustFFIHoistDeclaresList(queriesJSON, dialect string) (string, error) {
+	return "", ensureRustSQLParserFFI()
+}

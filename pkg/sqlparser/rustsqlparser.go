@@ -152,6 +152,67 @@ func (s *RustSQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pi
 	return getMissingDependenciesForAsset(s, asset, pipeline, renderer)
 }
 
+// HoistDeclares reorders top-level DECLARE statements to the front of a
+// multi-statement script via the in-process Rust SQL parser. Each statement's
+// original text is preserved byte-for-byte; only the order and ';\n'
+// separators are rewritten. DECLAREs nested inside BEGIN..END / CASE..END
+// stay put. On dialect lookup or parse failure the input is returned
+// together with the error so callers can fall back gracefully.
+func (s *RustSQLParser) HoistDeclares(sql string, assetType pipeline.AssetType) (string, error) {
+	dialect, err := AssetTypeToDialect(assetType)
+	if err != nil {
+		return sql, err
+	}
+
+	responsePayload, err := rustFFIHoistDeclares(sql, dialect)
+	if err != nil {
+		return sql, errors.Wrap(err, "failed to hoist declares")
+	}
+
+	var resp struct {
+		Query string `json:"query"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(responsePayload), &resp); err != nil {
+		return sql, errors.Wrap(err, "failed to unmarshal response")
+	}
+	if resp.Error != "" {
+		return sql, errors.New(resp.Error)
+	}
+	return resp.Query, nil
+}
+
+// HoistDeclaresList reorders a list of pre-split SQL statements so DECLAREs
+// lead, preserving each element's text verbatim.
+func (s *RustSQLParser) HoistDeclaresList(queries []string, assetType pipeline.AssetType) ([]string, error) {
+	dialect, err := AssetTypeToDialect(assetType)
+	if err != nil {
+		return queries, err
+	}
+
+	queriesJSON, err := json.Marshal(queries)
+	if err != nil {
+		return queries, errors.Wrap(err, "failed to marshal queries")
+	}
+
+	responsePayload, err := rustFFIHoistDeclaresList(string(queriesJSON), dialect)
+	if err != nil {
+		return queries, errors.Wrap(err, "failed to hoist declares list")
+	}
+
+	var resp struct {
+		Queries []string `json:"queries"`
+		Error   string   `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(responsePayload), &resp); err != nil {
+		return queries, errors.Wrap(err, "failed to unmarshal response")
+	}
+	if resp.Error != "" {
+		return queries, errors.New(resp.Error)
+	}
+	return resp.Queries, nil
+}
+
 func (s *RustSQLParser) Close() error {
 	return nil
 }
