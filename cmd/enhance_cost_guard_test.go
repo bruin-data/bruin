@@ -189,7 +189,7 @@ func setupBQRepo(t *testing.T, assetType, connection, bruinYAML string) (string,
 // FindRepoFromPath doesn't need to walk above the test root.
 func gitInit(t *testing.T, dir string) {
 	t.Helper()
-	cmd := exec.Command("git", "init", "--quiet")
+	cmd := exec.CommandContext(t.Context(), "git", "init", "--quiet")
 	cmd.Dir = dir
 	require.NoError(t, cmd.Run())
 }
@@ -398,7 +398,7 @@ func TestCollectBigQueryConnections_AssetWithoutPipeline(t *testing.T) {
 	t.Parallel()
 	// A path that doesn't lead to a real pipeline should return no connections,
 	// not an error — the regular asset-loading flow will report the issue.
-	out, err := collectBigQueryConnections(t.Context(), filepath.Join(t.TempDir(), "nope.sql"), afero.NewOsFs())
+	out, err := collectBigQueryConnections(t.Context(), filepath.Join(t.TempDir(), "nope.sql"))
 	require.NoError(t, err)
 	assert.Nil(t, out)
 }

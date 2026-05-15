@@ -77,7 +77,7 @@ func (p *stdinCostGuardPrompter) Prompt(connName string) (float64, bool, error) 
 //
 // The function is a no-op when no BigQuery assets are in scope.
 func runBigQueryCostGuard(ctx context.Context, inputPath, environment, output string, fs afero.Fs, prompter costGuardPrompter, isInteractive bool) error {
-	connections, err := collectBigQueryConnections(ctx, inputPath, fs)
+	connections, err := collectBigQueryConnections(ctx, inputPath)
 	if err != nil {
 		return err
 	}
@@ -147,13 +147,14 @@ func runBigQueryCostGuard(ctx context.Context, inputPath, environment, output st
 // collectBigQueryConnections returns the unique connection names used by any
 // BigQuery asset in scope of inputPath (which can be either an asset file or a
 // folder containing assets across one or more pipelines).
-func collectBigQueryConnections(ctx context.Context, inputPath string, fs afero.Fs) ([]string, error) {
+func collectBigQueryConnections(ctx context.Context, inputPath string) ([]string, error) {
 	var assetPaths []string
-	if isPathReferencingAsset(inputPath) {
+	switch {
+	case isPathReferencingAsset(inputPath):
 		assetPaths = []string{inputPath}
-	} else if isDir(inputPath) {
+	case isDir(inputPath):
 		assetPaths = path.GetAllPossibleAssetPaths(inputPath, assetsDirectoryNames, pipeline.SupportedFileSuffixes)
-	} else {
+	default:
 		return nil, nil
 	}
 	if len(assetPaths) == 0 {
