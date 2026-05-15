@@ -39,7 +39,16 @@ Alternatively, you can use `service_account_json` to embed the credentials direc
 
 - `service_account_file`: The path to the service account JSON file
 - `service_account_json`: The content of the service account JSON as a string (use this when you don't have a file, e.g. when using secrets management)
-- `property_id`: It is a unique number that identifies a particular property on Google Analytics. Follow this guide to know about [property ID](https://developers.google.com/analytics/devguides/reporting/data/v1/property-id#what_is_my_property_id).
+- `property_id`: It is a unique number that identifies a particular property on Google Analytics. Follow this guide to know about [property ID](https://developers.google.com/analytics/devguides/reporting/data/v1/property-id?hl=en).
+
+#### Find your GA4 property ID
+
+1. Go to [https://analytics.google.com/](https://analytics.google.com/)
+2. Click **Admin**
+3. Select the property
+4. Select **Property Settings**
+
+The numeric "PROPERTY ID" shown there (e.g. `123456789`) is what you pass to the Data API as `properties/GA_PROPERTY_ID`. If you see a "Tracking ID" like `UA-123...-1` instead, that's Universal Analytics and the Data API v1 won't work on it.
 
 ### Step 2: Create an asset file for data ingestion
 
