@@ -396,9 +396,8 @@ environments:
 
 func TestCollectBigQueryConnections_AssetWithoutPipeline(t *testing.T) {
 	t.Parallel()
-	// A path that doesn't lead to a real pipeline should return no connections,
-	// not an error — the regular asset-loading flow will report the issue.
-	out, err := collectBigQueryConnections(t.Context(), filepath.Join(t.TempDir(), "nope.sql"))
-	require.NoError(t, err)
+	// A path that doesn't lead to a real pipeline should return no connections —
+	// the regular asset-loading flow will report the issue.
+	out := collectBigQueryConnections(t.Context(), filepath.Join(t.TempDir(), "nope.sql"))
 	assert.Nil(t, out)
 }
