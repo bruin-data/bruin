@@ -106,6 +106,12 @@ func enhanceAction(ctx context.Context, c *cli.Command, isDebug *bool) error {
 	isDebugMode := isDebug != nil && *isDebug
 	useTUI := output != "json" && !isDebugMode && term.IsTerminal(int(os.Stderr.Fd())) //nolint:gosec // G115: fd is always safe to convert
 
+	isInteractive := output != "json" && term.IsTerminal(int(os.Stdin.Fd())) //nolint:gosec // G115
+	prompter := &stdinCostGuardPrompter{in: os.Stdin, out: os.Stderr}
+	if err := runBigQueryCostGuard(ctx, inputPath, c.String("environment"), output, fs, prompter, isInteractive); err != nil {
+		return printEnhanceError(output, err)
+	}
+
 	if isPathReferencingAsset(inputPath) {
 		if useTUI {
 			return enhanceSingleAssetWithTUI(ctx, c, inputPath, fs, output, isDebug)

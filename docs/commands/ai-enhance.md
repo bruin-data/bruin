@@ -260,39 +260,34 @@ environments:
 - **Rollback on failure**: If validation fails after enhancement, the original file is automatically restored
 - **Idempotent**: Running the command multiple times on the same asset won't duplicate checks or descriptions
 
-## Query Cost Safety (BigQuery only)
+## BigQuery Cost Guard (Preflight)
 
-When the asset is backed by a BigQuery connection, the AI agent is instructed — as a precondition, **before** Context Discovery or any other step that might issue a query — to:
+Before any AI enhancement runs, `bruin ai enhance` scans the assets in scope for BigQuery assets (`bq.sql`, `bq.seed`, `bq.source`, `bq.sensor.*`). For each BigQuery connection those assets resolve to, it inspects `.bruin.yml` for at least one of these cost-guard keys:
 
-1. Read the asset file and resolve its `connection` field (falling back to the pipeline's default BigQuery connection if not set).
-2. Look up that exact connection name in `.bruin.yml` and check it for cost-guard keys.
+- `max_query_cost` (USD, hard limit)
+- `max_query_cost_soft` (USD, soft limit)
+- `max_billable_bytes` (bytes, hard limit)
+- `max_billable_bytes_soft` (bytes, soft limit)
 
-See [BigQuery: query safety limits](/platforms/bigquery#connection) for the configuration keys.
+If a BigQuery connection has **none** of these set, you'll be prompted interactively:
 
-The relevant keys on a `google_cloud_platform` connection are:
+```text
+No BigQuery cost guard is configured on connection 'bigquery-default'.
+Running queries during AI enhancement could incur uncapped cost.
 
-| Key | Type | Effect |
-|-----|------|--------|
-| `max_query_cost` | Hard limit (USD) | Bruin dry-runs every query and refuses to execute if the estimate exceeds this value. |
-| `max_billable_bytes` | Hard limit (bytes) | Same as above, expressed in scanned bytes. |
-| `max_query_cost_soft` | Soft limit (USD) | Applied to `bruin query` (which the agent uses to inspect data). Can be bypassed with `--dangerously-bypass-soft-limits` only after explicit user confirmation. |
-| `max_billable_bytes_soft` | Soft limit (bytes) | Same as above, in bytes. |
+Enter a per-query limit in USD, or press Enter to use the default ($5):
+```
 
-**If at least one limit is configured**, the agent will:
+You can either:
 
-- Dry-run each query first via `bruin query --connection <name> --query "<sql>" --dry-run`.
-- Read the estimated bytes and cost from the dry-run output and compare against the configured limits.
-- If the estimate exceeds a limit, rewrite the query to scan less data (narrower columns, tighter filters, smaller date range, `LIMIT`, partitioning predicates) and dry-run again.
-- Never pass `--dangerously-bypass-soft-limits` unless you have explicitly confirmed the cost in the session.
+- Type a dollar amount (e.g. `2.5`) — sets `max_query_cost` on that connection in `.bruin.yml`.
+- Press Enter (or type `skip`) — applies the default `$5.00` `max_query_cost` to that connection.
 
-**If no limit is configured**, the agent will:
+The limit is persisted to `.bruin.yml`, so subsequent runs won't re-prompt for the same connection.
 
-- Stop before running any query and warn you that running queries from the agent could incur uncapped cost on this connection.
-- Offer to add `max_query_cost` / `max_query_cost_soft` (or the `*_billable_bytes` equivalents) to `.bruin.yml` before continuing, and suggest a starting value.
-- Require an explicit acknowledgement that you accept the cost risk before proceeding without a limit.
+This preflight runs **before** any AI work begins. If stdin is not a terminal (CI/JSON mode) and no limits are configured, the default `$5` is applied without prompting. The check is BigQuery-only — other warehouses don't yet support Bruin cost guards.
 
-> [!NOTE]
-> This safety check is BigQuery-only today. Other warehouses (Snowflake, Postgres, DuckDB, Redshift, etc.) do not currently support Bruin cost guards.
+See [BigQuery: query safety limits](/platforms/bigquery#connection) for the full configuration reference.
 
 ## See Also
 

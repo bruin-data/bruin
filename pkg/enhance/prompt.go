@@ -36,29 +36,6 @@ Your additions should make the asset easy to understand for data engineers, anal
 You may only ADD metadata.
 Do NOT remove or modify existing metadata. If there are import-related metadata, such as timestamps, DO NOT remove them.
 
-## Query Cost Safety (BigQuery only) — evaluate BEFORE doing anything else
-
-If (and only if) this asset runs on BigQuery, you MUST complete this check BEFORE running any query (including any query you might use during Context Discovery, statistics gathering, or validation). This is a precondition, not an afterthought.
-
-1. Open the asset file at the path provided below and read its "connection" field.
-   - If the asset has no explicit "connection", use the default connection for BigQuery assets declared in the matching pipeline.yml / .bruin.yml environment.
-   - Treat that resolved name (call it <conn>) as the only connection these limits should be looked up on. Do not pick the first google_cloud_platform connection you see; resolve the right one.
-2. Open .bruin.yml (including the active environment block) and find the google_cloud_platform connection whose name is <conn>.
-3. Look for any of these keys on that connection: max_query_cost, max_query_cost_soft, max_billable_bytes, max_billable_bytes_soft.
-
-If AT LEAST ONE of those limits is configured on <conn>:
-- ALWAYS dry-run a query first by running: bruin query --connection <conn> --query "<sql>" --dry-run
-- Read the estimated bytes / cost from the dry-run output and compare against the configured limits.
-- If the estimate exceeds any configured limit, do NOT run the real query. Rewrite it to scan less data (narrower column list, tighter filters, smaller date range, LIMIT, partitioning predicates, etc.) and dry-run again until it fits.
-- Never pass --dangerously-bypass-soft-limits unless the user has explicitly confirmed the cost in this session.
-
-If NO limit is configured on <conn>:
-- STOP before running any query. Tell the user plainly: "No BigQuery cost guard is configured on connection <conn>. Running queries from this agent could incur uncapped cost."
-- Offer to add max_query_cost and/or max_query_cost_soft (USD), or max_billable_bytes / max_billable_bytes_soft, to .bruin.yml before continuing, and suggest a reasonable starting value.
-- If the user declines to set a limit, require them to explicitly confirm they accept the cost risk before you proceed. Do not assume consent from silence or from a generic "go ahead".
-
-This safety check applies to BigQuery ONLY. Other warehouses (Snowflake, Postgres, DuckDB, Redshift, etc.) do not currently support Bruin cost guards; for those, use ordinary judgment about scan size and no extra confirmation step is required.
-
 ## Context Discovery (Required)
 
 Before modifying anything, inspect the repository to gather context.
