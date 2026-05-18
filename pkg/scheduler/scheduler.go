@@ -801,7 +801,7 @@ func (s *Scheduler) drainInFlightResults(timeout time.Duration) []*TaskExecution
 			if remaining > 0 {
 				go func() {
 					sinkDeadline := time.After(sinkTimeoutOnCancel)
-					for i := 0; i < remaining; i++ {
+					for range remaining {
 						select {
 						case <-s.Results:
 						case <-sinkDeadline:
