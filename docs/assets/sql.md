@@ -2,7 +2,7 @@
 
 Bruin supports running SQL assets against a variety of data platforms natively.
 
-You can define SQL assets in a file ending with `.sql`:
+A SQL asset is a single file ending in `.sql` that contains **both** the asset definition and the query body. The definition is a YAML block placed at the top of the file between `/* @bruin` and `@bruin */` markers, followed by the SQL query that produces the asset:
 
 ```bruin-sql
 /* @bruin
@@ -23,6 +23,10 @@ select 2 as one
 The `type` key in the configuration defines what platform to run the query against.
 
 You can see the "Data Platforms" on the left sidebar to see supported types.
+
+::: danger
+The definition and the query body of a SQL asset must live in the **same `.sql` file**. You cannot split them — for example, you cannot keep the SQL in `hello_world.sql` and the YAML definition in a sibling `hello_world.asset.yml`. Bruin treats `<name>.asset.yml` files as standalone YAML assets (used for types like [ingestr](./ingestr.md), [sensor](./sensor.md), [seed](./seed.md), and [dashboard](./dashboard.md)), not as companion files to a `.sql` query. If you want a SQL asset, put the `/* @bruin ... @bruin */` header at the top of the `.sql` file containing the query.
+:::
 
 ## Examples
 
