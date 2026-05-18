@@ -1341,7 +1341,21 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, foundPipeline.Commit)
+			// The Rust SQL parser is in-process and effectively free to
+			// instantiate. We use it as the DECLARE hoister on every hook
+			// wrapper so detecting "no reorder needed" is a single CGo
+			// call rather than a Python IPC round trip.
+			var hoister pipeline.DeclareHoister
+			if rustParser, rustErr := sqlparser.NewRustSQLParser(false); rustErr == nil {
+				if startErr := rustParser.Start(); startErr == nil {
+					hoister = rustParser
+				}
+				defer rustParser.Close()
+			} else {
+				printError(rustErr, c.String("output"), "Could not initialize rust sql parser")
+			}
+
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1752,6 +1766,7 @@ func SetupExecutors(
 	sensorMode string,
 	renderer *jinja.Renderer,
 	parser *sqlparser.SQLParser,
+	hoister pipeline.DeclareHoister,
 	commitHash string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
@@ -1785,7 +1800,8 @@ func SetupExecutors(
 	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: bigquery.NewMaterializer(fullRefresh),
+			Mat:     bigquery.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
 		if err != nil {
@@ -1833,7 +1849,8 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypePostgresQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypePostgresTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftTableSensor) {
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: postgres.NewMaterializer(fullRefresh),
+			Mat:     postgres.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		pgTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -1889,7 +1906,8 @@ func SetupExecutors(
 			Renderer: renderer,
 		}
 		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: trino.NewMaterializer(fullRefresh),
+			Mat:     trino.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
@@ -1904,7 +1922,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
 		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: oracle.NewMaterializer(fullRefresh),
+			Mat:     oracle.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		oracleMetadataPushOperator := postgres.NewMetadataPushOperator(conn) // using Postgres Metadata Push for Oracle if suitable, or skipping it
 
@@ -1921,7 +1940,8 @@ func SetupExecutors(
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeTableSensor)
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: snowflake.NewMaterializer(fullRefresh),
+			Mat:     snowflake.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
@@ -1963,10 +1983,12 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseTableSensor) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: mssql.NewMaterializer(fullRefresh),
+			Mat:     mssql.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
-			Mat: synapse.NewMaterializer(fullRefresh),
+			Mat:     synapse.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
@@ -2025,7 +2047,8 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeVerticaSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeVerticaTableSensor) {
 		verticaOperator := vertica.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: vertica.NewMaterializer(fullRefresh),
+			Mat:     vertica.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		verticaCheckRunner := vertica.NewColumnCheckOperator(conn)
 		verticaQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2060,7 +2083,8 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensorLegacy) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensorLegacy) {
 		fabricOperator := fabric.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: fabric.NewMaterializer(fullRefresh),
+			Mat:     fabric.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 
 		fabricCheckRunner := fabric.NewColumnCheckOperator(conn)
@@ -2106,7 +2130,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuery) || estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksTableSensor) {
 		databricksOperator := databricks.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
-			Mat: databricks.NewMaterializer(fullRefresh),
+			Mat:     databricks.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		databricksCheckRunner := databricks.NewColumnCheckOperator(conn)
 		databricksQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2151,7 +2176,8 @@ func SetupExecutors(
 	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerListWithLocation{
-			Mat: athena.NewMaterializer(fullRefresh),
+			Mat:     athena.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
 		athenaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -2178,7 +2204,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuerySensor) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: duck.NewMaterializer(fullRefresh),
+			Mat:     duck.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		duckDBCheckRunner := duck.NewColumnCheckOperator(conn)
 		duckDBQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2205,7 +2232,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeClickHouse) || estimateCustomCheckType == pipeline.AssetTypeClickHouse ||
 		s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSeed) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseTableSensor) {
 		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
-			Mat: clickhouse.NewMaterializer(fullRefresh),
+			Mat:     clickhouse.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		checkRunner := clickhouse.NewColumnCheckOperator(conn)
 		clickHouseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2292,7 +2320,8 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuerySensor) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLTableSensor) {
 		mysqlOperator := mysql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: mysql.NewMaterializer(fullRefresh),
+			Mat:     mysql.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		mysqlCheckRunner := mysql.NewColumnCheckOperator(conn)
 		mysqlQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)

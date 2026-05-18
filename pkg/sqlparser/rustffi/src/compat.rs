@@ -1,4 +1,6 @@
+use polyglot_sql::dialects::Dialect;
 use polyglot_sql::lineage::{lineage, lineage_with_schema};
+use polyglot_sql::tokens::TokenType;
 use polyglot_sql::validation::{
     mapping_schema_from_validation_schema, SchemaColumn, SchemaTable, ValidationSchema,
 };
@@ -2223,5 +2225,201 @@ pub fn get_column_lineage(query: &str, schema: &Value, dialect: DialectType) -> 
         columns: results,
         non_selected_columns: non_selected,
         errors: Vec::new(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DECLARE hoisting
+//
+// Some SQL dialects (notably BigQuery) require every DECLARE in a multi-
+// statement script to appear before any other statement. When pre-hooks
+// emit SET / IF statements ahead of a materialization's own DECLAREs, the
+// script becomes invalid. `hoist_declares` reorders top-level DECLAREs to
+// the front while preserving each statement's original source text
+// byte-for-byte: we use polyglot-sql's dialect-aware tokenizer to find
+// top-level ';' boundaries (skipping ';' inside parens, BEGIN..END blocks,
+// and CASE..END expressions), slice the original SQL by those boundaries,
+// and classify each slice by parsing it once and checking for
+// `Expression::Declare`. The only thing we re-emit is the ';\n' separator.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct HoistDeclaresResponse {
+    pub query: String,
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct HoistDeclaresListResponse {
+    pub queries: Vec<String>,
+    pub error: String,
+}
+
+fn find_top_level_semicolons(query: &str, dialect: DialectType) -> Result<Vec<usize>, String> {
+    let tokens = Dialect::get(dialect)
+        .tokenize(query)
+        .map_err(|err| err.to_string())?;
+
+    let mut paren_depth: i32 = 0;
+    let mut begin_end_depth: i32 = 0;
+    // CASE..END is an expression that shares its closing token with
+    // BEGIN..END. Pop CASE first so a CASE inside a BEGIN body doesn't
+    // prematurely close the procedural block.
+    let mut case_depth: i32 = 0;
+    let mut positions = Vec::new();
+
+    for i in 0..tokens.len() {
+        let token = &tokens[i];
+        match token.token_type {
+            TokenType::LParen => paren_depth += 1,
+            TokenType::RParen => {
+                if paren_depth > 0 {
+                    paren_depth -= 1;
+                }
+            }
+            TokenType::Case => case_depth += 1,
+            TokenType::Begin => {
+                // `BEGIN TRANSACTION` is a transaction-control statement,
+                // not a procedural block opener: it has no matching END,
+                // so tracking it as a block would mark every following
+                // semicolon as nested. Only plain `BEGIN` (i.e. not
+                // followed by TRANSACTION) opens a BEGIN..END block.
+                let next_is_transaction = tokens
+                    .get(i + 1)
+                    .map(|t| t.token_type == TokenType::Transaction)
+                    .unwrap_or(false);
+                if !next_is_transaction {
+                    begin_end_depth += 1;
+                }
+            }
+            TokenType::End => {
+                if case_depth > 0 {
+                    case_depth -= 1;
+                } else if begin_end_depth > 0 {
+                    begin_end_depth -= 1;
+                }
+            }
+            TokenType::Semicolon => {
+                if paren_depth == 0 && begin_end_depth == 0 {
+                    positions.push(token.span.start);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(positions)
+}
+
+fn is_declare_statement(slice: &str, dialect: DialectType) -> bool {
+    matches!(parse_one(slice, dialect), Ok(Expression::Declare(_)))
+}
+
+pub fn hoist_declares(query: &str, dialect: DialectType) -> HoistDeclaresResponse {
+    if query.trim().is_empty() {
+        return HoistDeclaresResponse {
+            query: query.to_string(),
+            error: String::new(),
+        };
+    }
+
+    let positions = match find_top_level_semicolons(query, dialect) {
+        Ok(positions) => positions,
+        Err(err) => {
+            return HoistDeclaresResponse {
+                query: query.to_string(),
+                error: err,
+            };
+        }
+    };
+
+    // Slice the original source by top-level ';' positions. Each slice is
+    // the user's verbatim text for one statement, including its comments,
+    // whitespace, and dialect-specific syntax.
+    let mut slices: Vec<&str> = Vec::with_capacity(positions.len() + 1);
+    let mut prev = 0usize;
+    for &pos in &positions {
+        slices.push(&query[prev..pos]);
+        prev = pos + 1;
+    }
+    if prev < query.len() {
+        slices.push(&query[prev..]);
+    }
+
+    let mut declares: Vec<String> = Vec::new();
+    let mut rest: Vec<String> = Vec::new();
+    let mut saw_non_declare = false;
+    let mut needs_reorder = false;
+
+    for slice in slices {
+        let stripped = slice.trim();
+        if stripped.is_empty() {
+            continue;
+        }
+        if is_declare_statement(stripped, dialect) {
+            declares.push(stripped.to_string());
+            if saw_non_declare {
+                needs_reorder = true;
+            }
+        } else {
+            rest.push(stripped.to_string());
+            saw_non_declare = true;
+        }
+    }
+
+    if declares.is_empty() || !needs_reorder {
+        return HoistDeclaresResponse {
+            query: query.to_string(),
+            error: String::new(),
+        };
+    }
+
+    let mut reordered = declares;
+    reordered.extend(rest);
+    HoistDeclaresResponse {
+        query: format!("{};", reordered.join(";\n")),
+        error: String::new(),
+    }
+}
+
+pub fn hoist_declares_list(
+    queries: Vec<String>,
+    dialect: DialectType,
+) -> HoistDeclaresListResponse {
+    if queries.is_empty() {
+        return HoistDeclaresListResponse {
+            queries,
+            error: String::new(),
+        };
+    }
+
+    let mut declares: Vec<String> = Vec::new();
+    let mut rest: Vec<String> = Vec::new();
+    let mut saw_non_declare = false;
+    let mut needs_reorder = false;
+
+    for query in &queries {
+        if is_declare_statement(query.trim(), dialect) {
+            declares.push(query.clone());
+            if saw_non_declare {
+                needs_reorder = true;
+            }
+        } else {
+            rest.push(query.clone());
+            saw_non_declare = true;
+        }
+    }
+
+    if declares.is_empty() || !needs_reorder {
+        return HoistDeclaresListResponse {
+            queries,
+            error: String::new(),
+        };
+    }
+
+    declares.extend(rest);
+    HoistDeclaresListResponse {
+        queries: declares,
+        error: String::new(),
     }
 }
