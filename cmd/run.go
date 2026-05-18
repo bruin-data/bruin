@@ -89,11 +89,17 @@ type ExecutionSummary struct {
 	SuccessfulTasks int
 	FailedTasks     int
 	SkippedTasks    int
+	NotStartedTasks int // tasks still Pending/Queued at the time of report (run aborted)
 
 	Assets       TaskTypeStats
 	ColumnChecks TaskTypeStats
 	CustomChecks TaskTypeStats
 	MetadataPush TaskTypeStats
+
+	// Cancelled indicates the run finished with at least one task that never
+	// reached a terminal state (e.g. user aborted with Ctrl+C). The summary
+	// reflects whatever state was observed before the abort.
+	Cancelled bool
 
 	Duration time.Duration
 }
@@ -104,6 +110,7 @@ type TaskTypeStats struct {
 	Failed            int // Failed in main execution
 	FailedDueToChecks int // Failed only due to checks (main execution succeeded)
 	Skipped           int
+	NotStarted        int // task did not complete (run was aborted)
 }
 
 func (s TaskTypeStats) HasAny() bool {
@@ -253,11 +260,16 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 	hasFailures := summary.FailedTasks > 0
 
 	// Header with status and task count
-	if hasFailures {
+	switch {
+	case summary.Cancelled:
+		summaryPrinter.Printf("\n\nbruin run %s after %s\n\n",
+			color.New(color.FgYellow).Sprint("aborted"),
+			duration.Truncate(time.Millisecond).String())
+	case hasFailures:
 		summaryPrinter.Printf("\n\nbruin run completed with %s in %s\n\n",
 			color.New(color.FgRed).Sprint("failures"),
 			duration.Truncate(time.Millisecond).String())
-	} else {
+	default:
 		summaryPrinter.Printf("\n\nbruin run completed %s in %s\n\n",
 			color.New(color.FgGreen).Sprint("successfully"),
 			duration.Truncate(time.Millisecond).String())
@@ -265,10 +277,10 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 
 	// Assets executed (only actual assets, not including quality checks)
 	if summary.Assets.HasAny() {
-		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 {
+		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 || summary.Assets.NotStarted > 0 {
 			summaryPrinter.Printf(" %s Assets executed      %s\n",
 				color.New(color.FgRed).Sprint("✗"),
-				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped))
+				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped, summary.Assets.NotStarted))
 		} else {
 			summaryPrinter.Printf(" %s Assets executed      %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
@@ -280,11 +292,12 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 	totalChecks := summary.ColumnChecks.Total + summary.CustomChecks.Total
 	totalCheckFailures := summary.ColumnChecks.Failed + summary.CustomChecks.Failed
 	totalCheckSkipped := summary.ColumnChecks.Skipped + summary.CustomChecks.Skipped
+	totalCheckNotStarted := summary.ColumnChecks.NotStarted + summary.CustomChecks.NotStarted
 	if totalChecks > 0 {
-		if totalCheckFailures > 0 || totalCheckSkipped > 0 {
+		if totalCheckFailures > 0 || totalCheckSkipped > 0 || totalCheckNotStarted > 0 {
 			summaryPrinter.Printf(" %s Quality checks       %s\n",
 				color.New(color.FgRed).Sprint("✗"),
-				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped))
+				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped, totalCheckNotStarted))
 		} else {
 			summaryPrinter.Printf(" %s Quality checks       %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
@@ -316,8 +329,8 @@ func formatCount(total, failed int) string {
 		color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
 }
 
-func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) string {
-	succeeded := total - failed - failedDueToChecks - skipped
+func formatCountWithSkipped(total, failed, failedDueToChecks, skipped, notStarted int) string {
+	succeeded := total - failed - failedDueToChecks - skipped - notStarted
 
 	var parts []string
 	if failed > 0 {
@@ -332,11 +345,14 @@ func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) strin
 	if skipped > 0 {
 		parts = append(parts, color.New(color.Faint).Sprintf("%d skipped", skipped))
 	}
+	if notStarted > 0 {
+		parts = append(parts, color.New(color.FgYellow).Sprintf("%d not started", notStarted))
+	}
 
 	if len(parts) == 0 {
 		return "0"
 	}
-	if len(parts) == 1 && failed == 0 && failedDueToChecks == 0 && skipped == 0 {
+	if len(parts) == 1 && failed == 0 && failedDueToChecks == 0 && skipped == 0 && notStarted == 0 {
 		return strconv.Itoa(succeeded)
 	}
 
@@ -460,6 +476,57 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 
 	// Update total tasks to include skipped ones
 	summary.TotalTasks += summary.SkippedTasks
+
+	// Track instances that already appear in `results` so we don't also
+	// count them as not-started below. In production these instances would
+	// have their scheduler status updated to Succeeded/Failed by Tick, but
+	// callers that bypass Tick (e.g. unit tests, or callers that synthesize
+	// results) can leave the status untouched.
+	seenInResults := make(map[scheduler.TaskInstance]struct{}, len(results))
+	for _, r := range results {
+		seenInResults[r.Instance] = struct{}{}
+	}
+
+	// Count tasks that never reached a terminal state — the run was aborted
+	// (e.g. SIGINT) before they finished. Treat Pending and Queued the same
+	// way: from the user's perspective neither produced a result.
+	notStartedByAsset := make(map[string]bool)
+	for _, inst := range s.GetTaskInstances() {
+		if _, seen := seenInResults[inst]; seen {
+			continue
+		}
+		st := inst.GetStatus()
+		if st != scheduler.Pending && st != scheduler.Queued {
+			continue
+		}
+		summary.NotStartedTasks++
+		summary.Cancelled = true
+
+		assetName := inst.GetAsset().Name
+		switch inst.(type) {
+		case *scheduler.ColumnCheckInstance:
+			summary.ColumnChecks.Total++
+			summary.ColumnChecks.NotStarted++
+		case *scheduler.CustomCheckInstance:
+			summary.CustomChecks.Total++
+			summary.CustomChecks.NotStarted++
+		case *scheduler.MetadataPushInstance:
+			summary.MetadataPush.Total++
+			summary.MetadataPush.NotStarted++
+		case *scheduler.AssetInstance:
+			// Avoid double-counting an asset that already appears via
+			// completed results, upstream-failed, or another not-started
+			// instance for the same asset.
+			if assetNames[assetName] || upstreamFailedAssets[assetName] || notStartedByAsset[assetName] {
+				continue
+			}
+			notStartedByAsset[assetName] = true
+			summary.Assets.Total++
+			summary.Assets.NotStarted++
+		}
+	}
+
+	summary.TotalTasks += summary.NotStartedTasks
 
 	return summary
 }
@@ -1340,7 +1407,9 @@ func Run(isDebug *bool) *cli.Command {
 				ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 				start := time.Now()
-				results := s.Run(runCtx)
+				// Use the signal-aware exeCtx so the scheduler exits and surfaces
+				// a partial summary when the user aborts with Ctrl+C.
+				results := s.Run(exeCtx)
 				duration := time.Since(start)
 
 				// Stop the TUI before printing the summary so the render loop
@@ -1381,7 +1450,9 @@ func Run(isDebug *bool) *cli.Command {
 				ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 				start := time.Now()
-				results := s.Run(runCtx)
+				// Use the signal-aware exeCtx so the scheduler exits and surfaces
+				// a partial summary when the user aborts with Ctrl+C.
+				results := s.Run(exeCtx)
 				duration := time.Since(start)
 
 				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {

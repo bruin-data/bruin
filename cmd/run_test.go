@@ -2010,6 +2010,27 @@ func TestCollectAssetResults(t *testing.T) {
 				{name: "assetC"},
 			},
 		},
+		{
+			// Simulates BRU-4252: user aborts after A succeeds but before
+			// B / C run. Both should appear in the per-asset list as
+			// not-started so the summary tells the user what was missed.
+			name: "run aborted after A - B and C marked as not started",
+			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
+				mainType := scheduler.TaskInstanceTypeMain
+				aMains := helperFindInstances(s, "assetA", &mainType)
+				results := make([]*scheduler.TaskExecutionResult, 0, len(aMains))
+				for _, inst := range aMains {
+					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+					results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
+				}
+				return results
+			},
+			want: []assetResult{
+				{name: "assetA"},
+				{name: "assetB", notStarted: true},
+				{name: "assetC", notStarted: true},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2026,9 +2047,45 @@ func TestCollectAssetResults(t *testing.T) {
 				assert.Equal(t, w.failed, got[i].failed, "asset[%d] failed", i)
 				assert.Equal(t, w.checkFailed, got[i].checkFailed, "asset[%d] checkFailed", i)
 				assert.Equal(t, w.upstreamFailed, got[i].upstreamFailed, "asset[%d] upstreamFailed", i)
+				assert.Equal(t, w.notStarted, got[i].notStarted, "asset[%d] notStarted", i)
 			}
 		})
 	}
+}
+
+func TestAnalyzeResults_AbortedRun(t *testing.T) {
+	t.Parallel()
+
+	assetA := &pipeline.Asset{Name: "assetA", Type: pipeline.AssetTypeBigqueryQuery}
+	assetB := &pipeline.Asset{
+		Name:      "assetB",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "assetA"}},
+		Columns: []pipeline.Column{
+			{Name: "col1", Type: "STRING", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+		},
+		CustomChecks: []pipeline.CustomCheck{{Name: "row_count"}},
+	}
+	p := &pipeline.Pipeline{Name: "test-pipeline", Assets: []*pipeline.Asset{assetA, assetB}}
+
+	s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+
+	// Simulate "ran A, aborted before B".
+	mainType := scheduler.TaskInstanceTypeMain
+	aMains := helperFindInstances(s, "assetA", &mainType)
+	results := make([]*scheduler.TaskExecutionResult, 0, len(aMains))
+	for _, inst := range aMains {
+		s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+		results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
+	}
+
+	summary := analyzeResults(results, s)
+	assert.True(t, summary.Cancelled, "summary should flag the run as cancelled")
+	assert.Equal(t, 1, summary.Assets.NotStarted, "assetB main task should count as not started")
+	assert.Equal(t, 1, summary.Assets.Succeeded)
+	assert.Equal(t, 2, summary.Assets.Total)
+	assert.Equal(t, 1, summary.ColumnChecks.NotStarted)
+	assert.Equal(t, 1, summary.CustomChecks.NotStarted)
 }
 
 func TestValidateDateRange(t *testing.T) {

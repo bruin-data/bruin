@@ -26,10 +26,10 @@ func printTUISummary(w io.Writer, results []*scheduler.TaskExecutionResult, s *s
 
 	// Assets
 	if summary.Assets.HasAny() {
-		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 {
+		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 || summary.Assets.NotStarted > 0 {
 			fmt.Fprintf(w, "  %s Assets executed      %s\n",
 				color.New(color.FgRed).Sprint("✗"),
-				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped))
+				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped, summary.Assets.NotStarted))
 		} else {
 			fmt.Fprintf(w, "  %s Assets executed      %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
@@ -54,6 +54,9 @@ func printTUISummary(w io.Writer, results []*scheduler.TaskExecutionResult, s *s
 			case a.upstreamFailed:
 				icon = color.New(color.FgYellow).Sprint("↑")
 				nameStr = color.New(color.FgYellow).Sprint(a.name)
+			case a.notStarted:
+				icon = color.New(color.FgYellow).Sprint("⊘")
+				nameStr = color.New(color.FgYellow).Sprint(a.name)
 			}
 			fmt.Fprintf(w, "    %s %s\n", icon, nameStr)
 		}
@@ -63,12 +66,13 @@ func printTUISummary(w io.Writer, results []*scheduler.TaskExecutionResult, s *s
 	totalChecks := summary.ColumnChecks.Total + summary.CustomChecks.Total
 	totalCheckFailures := summary.ColumnChecks.Failed + summary.CustomChecks.Failed
 	totalCheckSkipped := summary.ColumnChecks.Skipped + summary.CustomChecks.Skipped
+	totalCheckNotStarted := summary.ColumnChecks.NotStarted + summary.CustomChecks.NotStarted
 	if totalChecks > 0 {
 		fmt.Fprintln(w)
-		if totalCheckFailures > 0 || totalCheckSkipped > 0 {
+		if totalCheckFailures > 0 || totalCheckSkipped > 0 || totalCheckNotStarted > 0 {
 			fmt.Fprintf(w, "  %s Quality checks       %s\n",
 				color.New(color.FgRed).Sprint("✗"),
-				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped))
+				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped, totalCheckNotStarted))
 		} else {
 			fmt.Fprintf(w, "  %s Quality checks       %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
@@ -92,10 +96,14 @@ func printTUISummary(w io.Writer, results []*scheduler.TaskExecutionResult, s *s
 	fmt.Fprintf(w, "\n%s\n", dimText(separator))
 
 	// Overall status
-	if hasFailures {
+	switch {
+	case summary.Cancelled:
+		fmt.Fprintf(w, "\n  %s\n\n",
+			color.New(color.FgYellow, color.Bold).Sprintf("Run aborted — %d task(s) did not complete", summary.NotStartedTasks))
+	case hasFailures:
 		fmt.Fprintf(w, "\n  %s\n\n",
 			color.New(color.FgRed, color.Bold).Sprint("Run completed with failures"))
-	} else {
+	default:
 		fmt.Fprintf(w, "\n  %s\n\n",
 			color.New(color.FgGreen, color.Bold).Sprint("Run completed successfully"))
 	}
@@ -106,6 +114,7 @@ type assetResult struct {
 	failed         bool // main execution failed
 	checkFailed    bool // main ok but checks failed
 	upstreamFailed bool
+	notStarted     bool // main task was Pending or Queued when the run ended
 }
 
 // collectAssetResults extracts a per-asset summary from the execution results,
@@ -142,6 +151,25 @@ func collectAssetResults(results []*scheduler.TaskExecutionResult, s *scheduler.
 			seen[name] = len(out)
 			out = append(out, assetResult{name: name, upstreamFailed: true})
 		}
+	}
+
+	// Include assets whose main task never reached a terminal state (run aborted).
+	for _, inst := range s.GetTaskInstances() {
+		// Only the main asset row is listed here — check and metadata-push
+		// instances share an asset name but aren't separate rows.
+		if inst.GetType() != scheduler.TaskInstanceTypeMain {
+			continue
+		}
+		st := inst.GetStatus()
+		if st != scheduler.Pending && st != scheduler.Queued {
+			continue
+		}
+		name := inst.GetAsset().Name
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = len(out)
+		out = append(out, assetResult{name: name, notStarted: true})
 	}
 
 	return out
