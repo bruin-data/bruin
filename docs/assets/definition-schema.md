@@ -52,7 +52,7 @@ union all
 select 2 as one
 ```
 
-And here's an equivalent standalone YAML asset (e.g. an ingestr or sensor asset) saved as `<name>.asset.yml`:
+And here's an example of a standalone YAML asset (e.g. an ingestr or sensor asset) saved as `<name>.asset.yml` — a different kind of asset with no inline code body:
 
 ```yaml
 name: raw.hello_external
