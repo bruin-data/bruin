@@ -745,6 +745,12 @@ func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
 // the summary indefinitely.
 const drainTimeoutOnCancel = 30 * time.Second
 
+// sinkTimeoutOnCancel bounds the background sink that absorbs late results
+// from straggler workers after Run has already returned. Without this bound,
+// a worker that never sends would leave the sink goroutine blocked forever
+// on the unbuffered Results channel.
+const sinkTimeoutOnCancel = 5 * time.Minute
+
 // stopAndCloseWorkQueue marks the scheduler stopped and closes WorkQueue,
 // holding the lock so a concurrent Tick (e.g. from Kickstart) cannot push
 // to the channel after it has been closed.
@@ -787,11 +793,23 @@ func (s *Scheduler) drainInFlightResults(timeout time.Duration) []*TaskExecution
 		case <-deadline:
 			// Absorb any further sends so stuck workers can return once
 			// they observe the closed WorkQueue, avoiding a permanent
-			// blocked send on the unbuffered Results channel.
-			go func() {
-				for range s.Results {
-				}
-			}()
+			// blocked send on the unbuffered Results channel. Bound the
+			// sink: expect at most one send per still-Queued instance, and
+			// give up after sinkTimeoutOnCancel so a worker that never
+			// returns can't keep this goroutine alive forever.
+			remaining := s.InstanceCountByStatus(Queued)
+			if remaining > 0 {
+				go func() {
+					sinkDeadline := time.After(sinkTimeoutOnCancel)
+					for i := 0; i < remaining; i++ {
+						select {
+						case <-s.Results:
+						case <-sinkDeadline:
+							return
+						}
+					}
+				}()
+			}
 			return drained
 		}
 	}
