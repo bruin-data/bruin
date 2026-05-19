@@ -2,7 +2,6 @@ package bigquery
 
 import (
 	"context"
-	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -61,8 +60,8 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 	// For view-materialized assets, mirror what the runner will actually submit:
 	// CREATE OR REPLACE VIEW <name> AS <body>. Dry-running the raw SELECT body
 	// reports the underlying scan bytes (often many TB), whereas BigQuery dry-runs
-	// view DDL at 0 bytes. Skip when the body is already a view DDL.
-	if a.Materialization.Type == pipeline.MaterializationTypeView && !isViewDDL(q.Query) {
+	// view DDL at 0 bytes.
+	if a.Materialization.Type == pipeline.MaterializationTypeView {
 		wrapped, wrapErr := viewMaterializer(&a, q.Query)
 		if wrapErr != nil {
 			return nil, wrapErr
@@ -96,37 +95,4 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 	return map[string]any{
 		"bigquery": meta,
 	}, nil
-}
-
-func isViewDDL(q string) bool {
-	stripped := stripLeadingWhitespaceAndComments(q)
-	upper := strings.ToUpper(stripped)
-	return strings.HasPrefix(upper, "CREATE OR REPLACE VIEW") ||
-		strings.HasPrefix(upper, "CREATE VIEW")
-}
-
-// stripLeadingWhitespaceAndComments skips past leading whitespace, `-- line`
-// comments, and `/* block */` comments so the caller can inspect the first
-// meaningful token. WholeFileExtractor does not strip comments, so a view body
-// can legitimately start with a banner comment before the DDL keyword.
-func stripLeadingWhitespaceAndComments(s string) string {
-	for {
-		s = strings.TrimLeft(s, " \t\r\n")
-		switch {
-		case strings.HasPrefix(s, "--"):
-			if idx := strings.IndexByte(s, '\n'); idx >= 0 {
-				s = s[idx+1:]
-				continue
-			}
-			return ""
-		case strings.HasPrefix(s, "/*"):
-			if idx := strings.Index(s, "*/"); idx >= 0 {
-				s = s[idx+2:]
-				continue
-			}
-			return ""
-		default:
-			return s
-		}
-	}
 }
