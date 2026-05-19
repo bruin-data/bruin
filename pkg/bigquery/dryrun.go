@@ -57,6 +57,21 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 	}
 	q := queries[0]
 
+	// For view-materialized assets, mirror what the runner will actually submit:
+	// CREATE OR REPLACE VIEW <name> AS <body>. Dry-running the raw SELECT body
+	// reports the underlying scan bytes (often many TB), whereas BigQuery dry-runs
+	// view DDL at 0 bytes.
+	if a.Materialization.Type == pipeline.MaterializationTypeView {
+		wrapped, wrapErr := viewMaterializer(&a, q.Query)
+		if wrapErr != nil {
+			return nil, wrapErr
+		}
+		q = &query.Query{
+			VariableDefinitions: q.VariableDefinitions,
+			Query:               wrapped,
+		}
+	}
+
 	connName, err := p.GetConnectionNameForAsset(&a)
 	if err != nil {
 		return nil, err
@@ -77,7 +92,7 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"bigquery": meta,
 	}, nil
 }
