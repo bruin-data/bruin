@@ -139,3 +139,34 @@ pub extern "C" fn bruin_rustsqlparser_column_lineage(
         serde_json::to_string(&result).map_err(|e| e.to_string())
     })
 }
+
+#[no_mangle]
+pub extern "C" fn bruin_rustsqlparser_hoist_declares(
+    query: *const c_char,
+    dialect: *const c_char,
+) -> *mut c_char {
+    ffi_call(|| {
+        let query = read_cstr(query)?;
+        let dialect = read_dialect(dialect)?;
+        let result = compat::hoist_declares(query, dialect);
+        serde_json::to_string(&result).map_err(|e| e.to_string())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn bruin_rustsqlparser_hoist_declares_list(
+    queries_json: *const c_char,
+    dialect: *const c_char,
+) -> *mut c_char {
+    ffi_call(|| {
+        let queries_str = read_cstr(queries_json)?;
+        let dialect = read_dialect(dialect)?;
+        let queries: Vec<String> = if queries_str.is_empty() {
+            Vec::new()
+        } else {
+            serde_json::from_str(queries_str).map_err(|e| e.to_string())?
+        };
+        let result = compat::hoist_declares_list(queries, dialect);
+        serde_json::to_string(&result).map_err(|e| e.to_string())
+    })
+}

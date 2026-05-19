@@ -324,6 +324,29 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	c.lockIfNeeded()
 	defer c.unlockIfNeeded()
 
+	if !query.IsLikelyResultQuery(queryObject.String()) {
+		execResult, err := c.connection.ExecContext(ctx, queryObject.String())
+		if err != nil {
+			return nil, err
+		}
+
+		var rowsAffected *int64
+		if affected, err := execResult.RowsAffected(); err == nil && affected > 0 {
+			rowsAffected = &affected
+		}
+
+		return &query.QueryResult{
+			Columns:     []string{},
+			Rows:        [][]interface{}{},
+			ColumnTypes: []string{},
+			Execution: query.NewExecutionSummaryFromStatement(
+				"duckdb",
+				query.SQLStatementType(queryObject.String()),
+				rowsAffected,
+			),
+		}, nil
+	}
+
 	rows, err := c.connection.QueryContext(ctx, queryObject.String())
 	if err != nil {
 		return nil, err

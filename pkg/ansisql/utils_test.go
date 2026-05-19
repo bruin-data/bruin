@@ -87,44 +87,6 @@ func TestAddAnnotationComment(t *testing.T) {
 	}
 }
 
-func TestAddAgentIDAnnotationComment(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		agentID  string
-		query    string
-		expected string
-	}{
-		{
-			name:     "with agent ID",
-			agentID:  "my-agent-123",
-			query:    "SELECT * FROM table",
-			expected: `-- @bruin.config: {"agent_id":"my-agent-123","type":"adhoc_query"}` + "\n" + "SELECT * FROM table",
-		},
-		{
-			name:     "empty agent ID",
-			agentID:  "",
-			query:    "SELECT * FROM table",
-			expected: "SELECT * FROM table",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			q := &query.Query{Query: tt.query}
-			result := AddAgentIDAnnotationComment(q, tt.agentID)
-
-			assert.NotNil(t, result)
-			assert.Equal(t, tt.expected, result.Query)
-			// Original query should remain unchanged
-			assert.Equal(t, tt.query, q.Query)
-		})
-	}
-}
-
 func TestBuildAnnotationJSON(t *testing.T) {
 	t.Parallel()
 
@@ -192,23 +154,44 @@ func TestBuildAnnotationJSON(t *testing.T) {
 	}
 }
 
-func TestBuildAgentIDQueryTag(t *testing.T) {
+func TestBuildAdhocQueryTag(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		agentID  string
-		expected string
+		name        string
+		annotations string
+		expected    string
+		expectError bool
 	}{
 		{
-			name:     "with agent ID",
-			agentID:  "my-agent-123",
-			expected: `{"agent_id":"my-agent-123","type":"adhoc_query"}`,
+			name:        "single field via JSON",
+			annotations: `{"thread_id":"my-thread-123"}`,
+			expected:    `{"thread_id":"my-thread-123","type":"adhoc_query"}`,
 		},
 		{
-			name:     "empty agent ID returns empty JSON",
-			agentID:  "",
-			expected: `{"agent_id":"","type":"adhoc_query"}`,
+			name:        "multiple fields via JSON",
+			annotations: `{"thread_id":"t-1","agent_id":"a-1","message_pair_id":"mp-1"}`,
+			expected:    `{"agent_id":"a-1","message_pair_id":"mp-1","thread_id":"t-1","type":"adhoc_query"}`,
+		},
+		{
+			name:        "default sentinel emits only baseline",
+			annotations: DefaultQueryAnnotations,
+			expected:    `{"type":"adhoc_query"}`,
+		},
+		{
+			name:        "empty annotations emits baseline",
+			annotations: "",
+			expected:    `{"type":"adhoc_query"}`,
+		},
+		{
+			name:        "user JSON can override baseline type",
+			annotations: `{"type":"custom"}`,
+			expected:    `{"type":"custom"}`,
+		},
+		{
+			name:        "invalid JSON returns error",
+			annotations: `{"bad"`,
+			expectError: true,
 		},
 	}
 
@@ -216,7 +199,12 @@ func TestBuildAgentIDQueryTag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := BuildAgentIDQueryTag(tt.agentID)
+			result, err := BuildAdhocQueryTag(tt.annotations)
+			if tt.expectError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

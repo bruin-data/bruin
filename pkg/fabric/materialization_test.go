@@ -98,3 +98,33 @@ func TestBuildDeleteInsertQuery(t *testing.T) {
 		assert.Equal(t, expected, result)
 	})
 }
+
+func TestBuildDDLQuery(t *testing.T) {
+	t.Parallel()
+
+	nullable := false
+	asset := &pipeline.Asset{
+		Name: "dbo.Table",
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyDDL,
+		},
+		Columns: []pipeline.Column{
+			{Name: "id", Type: "INT", PrimaryKey: true},
+			{Name: "name", Type: "VARCHAR(100)", Nullable: pipeline.DefaultTrueBool{Value: &nullable}},
+		},
+	}
+
+	result, err := buildDDLQuery(asset, "")
+	require.NoError(t, err)
+
+	expected := "IF OBJECT_ID('dbo.Table', 'U') IS NULL\n" +
+		"BEGIN\n" +
+		"CREATE TABLE [dbo].[Table] (\n" +
+		"    [id] INT NOT NULL,\n" +
+		"    [name] VARCHAR(100) NOT NULL,\n" +
+		"    PRIMARY KEY ([id])\n" +
+		")\n" +
+		"END;"
+	assert.Equal(t, expected, result)
+}

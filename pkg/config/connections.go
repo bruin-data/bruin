@@ -25,12 +25,16 @@ func (c AwsConnection) GetName() string {
 }
 
 type GoogleCloudPlatformConnection struct { //nolint:recvcheck
-	Name                             string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	ServiceAccountJSON               string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
-	ServiceAccountFile               string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
-	ProjectID                        string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
-	Location                         string `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
-	UseApplicationDefaultCredentials bool   `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" mapstructure:"use_application_default_credentials"`
+	Name                             string   `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountJSON               string   `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile               string   `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	ProjectID                        string   `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	Location                         string   `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
+	UseApplicationDefaultCredentials bool     `yaml:"use_application_default_credentials,omitempty" json:"use_application_default_credentials,omitempty" mapstructure:"use_application_default_credentials"`
+	MaxBillableBytes                 *int64   `yaml:"max_billable_bytes,omitempty" json:"max_billable_bytes,omitempty" mapstructure:"max_billable_bytes"`
+	MaxQueryCost                     *float64 `yaml:"max_query_cost,omitempty" json:"max_query_cost,omitempty" mapstructure:"max_query_cost"`
+	MaxBillableBytesSoft             *int64   `yaml:"max_billable_bytes_soft,omitempty" json:"max_billable_bytes_soft,omitempty" mapstructure:"max_billable_bytes_soft"`
+	MaxQueryCostSoft                 *float64 `yaml:"max_query_cost_soft,omitempty" json:"max_query_cost_soft,omitempty" mapstructure:"max_query_cost_soft"`
 	rawCredentials                   *google.Credentials
 }
 
@@ -53,6 +57,18 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 
 	if c.UseApplicationDefaultCredentials {
 		m["use_application_default_credentials"] = c.UseApplicationDefaultCredentials
+	}
+	if c.MaxBillableBytes != nil {
+		m["max_billable_bytes"] = *c.MaxBillableBytes
+	}
+	if c.MaxQueryCost != nil {
+		m["max_query_cost"] = *c.MaxQueryCost
+	}
+	if c.MaxBillableBytesSoft != nil {
+		m["max_billable_bytes_soft"] = *c.MaxBillableBytesSoft
+	}
+	if c.MaxQueryCostSoft != nil {
+		m["max_query_cost_soft"] = *c.MaxQueryCostSoft
 	}
 
 	// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
@@ -82,14 +98,28 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 		c.ServiceAccountJSON = string(contents)
 	}
 
-	return json.Marshal(map[string]string{
+	payload := map[string]interface{}{
 		"name":                                c.Name,
 		"service_account_json":                c.ServiceAccountJSON,
 		"service_account_file":                c.ServiceAccountFile,
 		"project_id":                          c.ProjectID,
 		"location":                            c.Location,
 		"use_application_default_credentials": strconv.FormatBool(c.UseApplicationDefaultCredentials),
-	})
+	}
+	if c.MaxBillableBytes != nil {
+		payload["max_billable_bytes"] = *c.MaxBillableBytes
+	}
+	if c.MaxQueryCost != nil {
+		payload["max_query_cost"] = *c.MaxQueryCost
+	}
+	if c.MaxBillableBytesSoft != nil {
+		payload["max_billable_bytes_soft"] = *c.MaxBillableBytesSoft
+	}
+	if c.MaxQueryCostSoft != nil {
+		payload["max_query_cost_soft"] = *c.MaxQueryCostSoft
+	}
+
+	return json.Marshal(payload)
 }
 
 type AthenaConnection struct { //nolint:recvcheck

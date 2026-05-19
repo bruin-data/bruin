@@ -7,6 +7,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -503,6 +504,34 @@ func TestRenderCommand_Run_QuerySensors(t *testing.T) { //nolint:paralleltest
 			writer.AssertExpectations(t)
 		})
 	}
+}
+
+func TestLoadRenderConfig_AppliesFullRefreshRestriction(t *testing.T) {
+	t.Parallel()
+
+	renderFS := afero.NewMemMapFs()
+	configPath := "/repo/.bruin.yml"
+	err := afero.WriteFile(renderFS, configPath, []byte(`default_environment: prod
+environments:
+  prod:
+    config:
+      full_refresh_restricted: true
+    connections:
+      duckdb:
+        - name: duckdb-default
+          path: duckdb.db
+`), 0o644)
+	require.NoError(t, err)
+
+	cm, err := loadRenderConfig(renderFS, "/repo/pipeline/assets/asset.sql", configPath, false)
+	require.NoError(t, err)
+	require.NotNil(t, cm)
+
+	asset := &pipeline.Asset{Name: "asset"}
+	applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, asset)
+
+	require.NotNil(t, asset.RefreshRestricted)
+	assert.True(t, *asset.RefreshRestricted)
 }
 
 func TestIsQuerySensorAsset(t *testing.T) {

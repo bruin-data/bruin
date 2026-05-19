@@ -287,6 +287,45 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  "BEGIN TRANSACTION;\nTRUNCATE TABLE my.asset;\nINSERT INTO my.asset SELECT 1;\nCOMMIT;",
 		},
 		{
+			name: "ddl builds create table",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR(100)", Description: "Customer's name"},
+				},
+			},
+			query: "SELECT 1",
+			want: "^CREATE TABLE IF NOT EXISTS \"my\"\\.\"asset\" \\(\n" +
+				"\"id\" INTEGER NOT NULL,\n" +
+				"\"name\" VARCHAR\\(100\\),\n" +
+				"PRIMARY KEY \\(\"id\"\\)\n" +
+				"\\);\n" +
+				"COMMENT ON COLUMN \"my\"\\.\"asset\"\\.\"name\" IS 'Customer''s name';$",
+		},
+		{
+			name: "ddl is preserved on full refresh",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT 1",
+			want: "^CREATE TABLE IF NOT EXISTS \"my\"\\.\"asset\" \\(\n" +
+				"\"id\" INTEGER\n" +
+				"\\);$",
+		},
+		{
 			name: "view with append strategy is unsupported",
 			task: &pipeline.Asset{
 				Name: "my.asset",

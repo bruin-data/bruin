@@ -253,6 +253,8 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 				}
 			}
 
+			logIngestrEngine(ctx, path)
+
 			// Use gong binary directly instead of ingestr
 			err := u.Cmd.Run(ctx, repo, &CommandInstance{
 				Name: path,
@@ -289,6 +291,28 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 
 	return u.Cmd.Run(ctx, repo, noDependencyCommand)
+}
+
+func logIngestrEngine(ctx context.Context, path string) {
+	debug, ok := ctx.Value(executor.KeyIsDebug).(*bool)
+	if !ok || debug == nil || !*debug {
+		return
+	}
+	printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if !ok || printer == nil {
+		return
+	}
+
+	reportedVersion := ""
+	if out, err := exec.CommandContext(ctx, path, "--version").CombinedOutput(); err == nil {
+		reportedVersion = strings.TrimSpace(string(out))
+	}
+
+	if reportedVersion != "" {
+		_, _ = fmt.Fprintf(printer, "ingestr engine: %s (%s)\n", path, reportedVersion)
+	} else {
+		_, _ = fmt.Fprintf(printer, "ingestr engine: %s (version check failed)\n", path)
+	}
 }
 
 func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {

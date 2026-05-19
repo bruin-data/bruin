@@ -29,6 +29,16 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
               "type": "service_account",
               ...
             }
+
+          # Optional query safety limits. When set, Bruin dry-runs each BigQuery
+          # query before execution and stops if the estimate exceeds either limit.
+          max_billable_bytes: 1000000000000
+          max_query_cost: 5.00 # USD
+
+          # Optional soft limits for `bruin query` only. Agents receive a
+          # descriptive error unless they pass --dangerously-bypass-soft-limits.
+          max_billable_bytes_soft: 100000000000
+          max_query_cost_soft: 0.50 # USD
 ```
 
 ### Authentication Options

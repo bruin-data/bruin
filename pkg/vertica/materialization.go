@@ -25,6 +25,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyTruncateInsert: ansisql.BuildTruncateInsertQuery,
 		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 	},
 }
 
@@ -173,6 +174,50 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			strings.TrimSuffix(query, ";")),
 		"COMMIT",
 	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	columnDefs := make([]string, 0, len(asset.Columns)+1)
+	primaryKeys := make([]string, 0)
+	columnComments := make([]string, 0)
+	for _, col := range asset.Columns {
+		if col.Type == "" {
+			return "", fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
+		}
+
+		quotedColName := QuoteIdentifier(col.Name)
+		definition := fmt.Sprintf("%s %s", quotedColName, col.Type)
+		if col.PrimaryKey || !col.Nullable.Bool() {
+			definition += " NOT NULL"
+		}
+		columnDefs = append(columnDefs, definition)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, quotedColName)
+		}
+		if col.Description != "" {
+			columnComments = append(columnComments, fmt.Sprintf(
+				"COMMENT ON COLUMN %s.%s IS '%s'",
+				QuoteIdentifier(asset.Name),
+				quotedColName,
+				strings.ReplaceAll(col.Description, "'", "''"),
+			))
+		}
+	}
+
+	if len(primaryKeys) > 0 {
+		columnDefs = append(columnDefs, fmt.Sprintf("PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
+	}
+
+	queries := make([]string, 0, 1+len(columnComments))
+	queries = append(queries, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n%s\n)", QuoteIdentifier(asset.Name), strings.Join(columnDefs, ",\n")))
+	queries = append(queries, columnComments...)
 
 	return strings.Join(queries, ";\n") + ";", nil
 }

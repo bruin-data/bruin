@@ -19,32 +19,38 @@ const (
 	QueryLogCharacterLimit  = 10000
 )
 
+// mergeAnnotations marshals the baseline fields merged with the user-provided
+// annotations. User fields win on conflict. Returns "" when annotations is
+// empty; treats the DefaultQueryAnnotations sentinel as "baseline only".
+func mergeAnnotations(annotations string, baseline map[string]interface{}) (string, error) {
+	if annotations == "" {
+		return "", nil
+	}
+
+	merged := make(map[string]interface{}, len(baseline))
+	maps.Copy(merged, baseline)
+
+	if annotations != DefaultQueryAnnotations {
+		userAnnotations := make(map[string]interface{})
+		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
+			return "", errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
+		}
+		maps.Copy(merged, userAnnotations)
+	}
+
+	finalJSON, err := json.Marshal(merged)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to marshal annotations")
+	}
+	return string(finalJSON), nil
+}
+
 // BuildAnnotationJSON builds the annotation JSON string by merging standard fields
 // with any user-provided annotations from the context. Returns empty string if
 // annotations are not enabled.
 func BuildAnnotationJSON(ctx context.Context, fields map[string]interface{}) (string, error) {
-	annotations, ok := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
-	if !ok || annotations == "" {
-		return "", nil
-	}
-
-	userAnnotations := make(map[string]interface{})
-	if annotations != DefaultQueryAnnotations {
-		if err := json.Unmarshal([]byte(annotations), &userAnnotations); err != nil {
-			return "", errors.Wrapf(err, "invalid JSON in annotations: %s", annotations)
-		}
-	}
-
-	finalAnnotations := make(map[string]interface{}, len(fields)+len(userAnnotations))
-	maps.Copy(finalAnnotations, fields)
-	maps.Copy(finalAnnotations, userAnnotations)
-
-	finalJSON, err := json.Marshal(finalAnnotations)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal final annotations")
-	}
-
-	return string(finalJSON), nil
+	annotations, _ := ctx.Value(pipeline.RunConfigQueryAnnotations).(string)
+	return mergeAnnotations(annotations, fields)
 }
 
 func prependAnnotationComment(ctx context.Context, q *query.Query, fields map[string]interface{}) (*query.Query, error) {
@@ -90,37 +96,14 @@ func AddCustomCheckAnnotationComment(ctx context.Context, q *query.Query, assetN
 	})
 }
 
-// AddAgentIDAnnotationComment adds an agent ID annotation comment to the query.
-// This is used for adhoc queries to track which agent executed them.
-// The comment is prepended to the beginning of the query (works for BigQuery and others).
-// For Snowflake, use BuildAgentIDQueryTag with gosnowflake.WithQueryTag instead.
-func AddAgentIDAnnotationComment(q *query.Query, agentID string) *query.Query {
-	if agentID == "" {
-		return q
+// BuildAdhocQueryTag builds the JSON annotation payload for an adhoc query
+// (e.g. `bruin query`). When annotations is empty, the baseline annotation
+// is still emitted so every adhoc query is tagged.
+func BuildAdhocQueryTag(annotations string) (string, error) {
+	if annotations == "" {
+		annotations = DefaultQueryAnnotations
 	}
-
-	comment := "-- @bruin.config: " + BuildAgentIDQueryTag(agentID)
-
-	return &query.Query{
-		Query: comment + "\n" + q.Query,
-	}
-}
-
-// BuildAgentIDQueryTag builds the JSON query tag string for agent ID annotation.
-// This is used for Snowflake's QUERY_TAG via gosnowflake.WithQueryTag.
-func BuildAgentIDQueryTag(agentID string) string {
-	annotations := map[string]interface{}{
-		"agent_id": agentID,
-		"type":     "adhoc_query",
-	}
-
-	finalJSON, err := json.Marshal(annotations)
-	if err != nil {
-		// If marshaling fails, return just the agent ID
-		return agentID
-	}
-
-	return string(finalJSON)
+	return mergeAnnotations(annotations, map[string]interface{}{"type": "adhoc_query"})
 }
 
 // LogQueryIfVerbose logs the SQL query to the writer if verbose mode is enabled.

@@ -111,7 +111,7 @@ func extractFields(t reflect.Type) []ConnectionFieldDef {
 			continue
 		}
 
-		fieldType := kindToTypeString(sf.Type.Kind())
+		fieldType := kindToTypeString(sf.Type)
 		if fieldType == "" {
 			continue
 		}
@@ -149,12 +149,19 @@ func extractFields(t reflect.Type) []ConnectionFieldDef {
 	return fields
 }
 
-func kindToTypeString(k reflect.Kind) string {
+func kindToTypeString(t reflect.Type) string {
+	k := t.Kind()
+	if k == reflect.Ptr {
+		k = t.Elem().Kind()
+	}
+
 	switch k { //nolint:exhaustive
 	case reflect.String:
 		return "string"
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return "int"
+	case reflect.Float32, reflect.Float64:
+		return "float"
 	case reflect.Bool:
 		return "bool"
 	default:

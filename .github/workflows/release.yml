@@ -40,7 +40,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             pkg/sqlparser/rustffi/target
-          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml') }}
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml', 'pkg/sqlparser/rustffi/src/**/*.rs') }}
           restore-keys: |
             rust-${{ runner.os }}-
       - name: Touch cached Rust lib
@@ -99,7 +99,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             pkg/sqlparser/rustffi/target
-          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml') }}
+          key: rust-${{ runner.os }}-${{ hashFiles('pkg/sqlparser/rustffi/Cargo.lock', 'pkg/sqlparser/rustffi/Cargo.toml', 'pkg/sqlparser/rustffi/src/**/*.rs') }}
           restore-keys: |
             rust-${{ runner.os }}-
       - name: Touch cached Rust lib

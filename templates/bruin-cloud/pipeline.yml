@@ -1,0 +1,7 @@
+name: bruin-cloud
+catchup: false
+default:
+  type: ingestr
+  parameters:
+    source_connection: bruin-cloud-default
+    destination: duckdb

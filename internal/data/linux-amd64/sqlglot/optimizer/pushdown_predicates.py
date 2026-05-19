@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import typing as t
 
 from sqlglot import exp
@@ -25,9 +26,9 @@ def pushdown_predicates(expression: E, dialect: DialectType = None) -> E:
         'SELECT y.a AS a FROM (SELECT x.a AS a FROM x AS x WHERE x.a = 1) AS y WHERE TRUE'
 
     Args:
-        expression (sqlglot.Expression): expression to optimize
+        expression (sqlglot.Expr): expression to optimize
     Returns:
-        sqlglot.Expression: optimized expression
+        sqlglot.Expr: optimized expression
     """
     from sqlglot.dialects.athena import Athena
     from sqlglot.dialects.presto import Presto
@@ -80,7 +81,13 @@ def pushdown_predicates(expression: E, dialect: DialectType = None) -> E:
     return expression
 
 
-def pushdown(condition, sources, scope_ref_count, dialect, join_index=None):
+def pushdown(
+    condition: exp.Expr | None,
+    sources,
+    scope_ref_count,
+    dialect: DialectType,
+    join_index: Mapping[str, int] | None = None,
+):
     if not condition:
         return
 
@@ -96,26 +103,26 @@ def pushdown(condition, sources, scope_ref_count, dialect, join_index=None):
     if cnf_like:
         pushdown_cnf(predicates, sources, scope_ref_count, join_index=join_index)
     else:
-        pushdown_dnf(predicates, sources, scope_ref_count)
+        pushdown_dnf(predicates, sources, scope_ref_count, join_index=join_index)
 
 
-def pushdown_cnf(predicates, sources, scope_ref_count, join_index=None):
+def pushdown_cnf(predicates, sources, scope_ref_count, join_index: Mapping[str, int] | None = None):
     """
     If the predicates are in CNF like form, we can simply replace each block in the parent.
     """
-    join_index = join_index or {}
     for predicate in predicates:
         for node in nodes_for_predicate(predicate, sources, scope_ref_count).values():
             if isinstance(node, exp.Join):
                 name = node.alias_or_name
                 predicate_tables = exp.column_table_names(predicate, name)
 
-                # Don't push the predicate if it references tables that appear in later joins
-                this_index = join_index[name]
-                if all(join_index.get(table, -1) < this_index for table in predicate_tables):
-                    predicate.replace(exp.true())
-                    node.on(predicate, copy=False)
-                    break
+                if join_index:
+                    # Don't push the predicate if it references tables that appear in later joins
+                    this_index = join_index[name]
+                    if all(join_index.get(table, -1) < this_index for table in predicate_tables):
+                        predicate.replace(exp.true())
+                        node.on(predicate, copy=False)
+                        break
             if isinstance(node, exp.Select):
                 predicate.replace(exp.true())
                 inner_predicate = replace_aliases(node, predicate)
@@ -125,7 +132,7 @@ def pushdown_cnf(predicates, sources, scope_ref_count, join_index=None):
                     node.where(inner_predicate, copy=False)
 
 
-def pushdown_dnf(predicates, sources, scope_ref_count):
+def pushdown_dnf(predicates, sources, scope_ref_count, join_index=None):
     """
     If the predicates are in DNF form, we can only push down conditions that are in all blocks.
     Additionally, we can't remove predicates from their original form.
@@ -165,6 +172,11 @@ def pushdown_dnf(predicates, sources, scope_ref_count):
             predicate = conditions[name]
 
             if isinstance(node, exp.Join):
+                if join_index:
+                    this_index = join_index[name]
+                    predicate_tables = exp.column_table_names(predicate, name)
+                    if not all(join_index.get(t, -1) < this_index for t in predicate_tables):
+                        continue
                 node.on(predicate, copy=False)
             elif isinstance(node, exp.Select):
                 inner_predicate = replace_aliases(node, predicate)
@@ -214,8 +226,8 @@ def nodes_for_predicate(predicate, sources, scope_ref_count):
     return nodes
 
 
-def replace_aliases(source, predicate):
-    aliases = {}
+def replace_aliases(source: exp.Select, predicate: exp.Expr) -> exp.Expr:
+    aliases: dict[str, exp.Expr] = {}
 
     for select in source.selects:
         if isinstance(select, exp.Alias):
@@ -223,7 +235,7 @@ def replace_aliases(source, predicate):
         else:
             aliases[select.name] = select
 
-    def _replace_alias(column):
+    def _replace_alias(column: exp.Expr) -> exp.Expr:
         if isinstance(column, exp.Column) and column.name in aliases:
             return aliases[column.name].copy()
         return column

@@ -47,6 +47,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyTruncateInsert: buildTruncateInsertQuery,
 		pipeline.MaterializationStrategyMerge:          buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:   buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:            buildDDLQuery,
 		pipeline.MaterializationStrategySCD2ByTime:     buildSCD2ByTimeQuery,
 	},
 }
@@ -190,6 +191,67 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 %s
 ;
 END;`, asset.Name, asset.Materialization.IncrementalKey, startVar, endVar, asset.Name, query), nil
+}
+
+func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
+	if err := validateIdentifier(asset.Name, "table name"); err != nil {
+		return "", err
+	}
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	columnDefs := make([]string, 0, len(asset.Columns)+1)
+	primaryKeys := make([]string, 0)
+	commentStatements := make([]string, 0)
+	for _, col := range asset.Columns {
+		if err := validateIdentifier(col.Name, "column name"); err != nil {
+			return "", err
+		}
+		if col.Type == "" {
+			return "", fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
+		}
+
+		definition := fmt.Sprintf("   %s %s", col.Name, col.Type)
+		if col.PrimaryKey || !col.Nullable.Bool() {
+			definition += " NOT NULL"
+		}
+		columnDefs = append(columnDefs, definition)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+		if col.Description != "" {
+			commentStatements = append(commentStatements, fmt.Sprintf(
+				"   EXECUTE IMMEDIATE 'COMMENT ON COLUMN %s.%s IS ''%s''';",
+				escapeOracleString(asset.Name),
+				escapeOracleString(col.Name),
+				escapeOracleString(escapeOracleString(col.Description)),
+			))
+		}
+	}
+
+	if len(primaryKeys) > 0 {
+		columnDefs = append(columnDefs, fmt.Sprintf("   PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
+	}
+
+	createTable := fmt.Sprintf("CREATE TABLE %s (\n%s\n)", asset.Name, strings.Join(columnDefs, ",\n"))
+	parts := make([]string, 0, 10+len(commentStatements))
+	parts = append(parts,
+		"BEGIN",
+		"   BEGIN",
+		fmt.Sprintf("      EXECUTE IMMEDIATE '%s';", escapeOracleString(createTable)),
+		"   EXCEPTION",
+		"      WHEN OTHERS THEN",
+		"         IF SQLCODE != -955 THEN",
+		"            RAISE;",
+		"         END IF;",
+		"   END;",
+	)
+	parts = append(parts, commentStatements...)
+	parts = append(parts, "END;")
+
+	return strings.Join(parts, "\n"), nil
 }
 
 func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {

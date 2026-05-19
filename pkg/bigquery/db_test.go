@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,7 +27,10 @@ import (
 	"google.golang.org/api/option"
 )
 
-const testProjectID = "test-project"
+const (
+	testProjectID = "test-project"
+	testJobID     = "test-job"
+)
 
 func TestDB_IsValid(t *testing.T) {
 	t.Parallel()
@@ -157,7 +161,7 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 	t.Parallel()
 
 	projectID := testProjectID
-	jobID := "test-job"
+	jobID := testJobID
 
 	tests := []struct {
 		name                string
@@ -261,6 +265,174 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClientValidateQueryLimits(t *testing.T) {
+	t.Parallel()
+
+	maxBytes := int64(1_000)
+	maxCost := 0.01
+
+	tests := []struct {
+		name              string
+		config            *Config
+		stats             *bigquery.QueryStatistics
+		enforceSoftLimits bool
+		wantErr           string
+	}{
+		{
+			name:   "no limits configured",
+			config: &Config{},
+			stats: &bigquery.QueryStatistics{
+				TotalBytesProcessed: 10_000,
+			},
+		},
+		{
+			name: "within configured limits",
+			config: &Config{
+				MaxBillableBytes: &maxBytes,
+				MaxQueryCost:     &maxCost,
+			},
+			stats: &bigquery.QueryStatistics{
+				TotalBytesProcessed: 1_000,
+			},
+		},
+		{
+			name: "billable bytes over limit",
+			config: &Config{
+				MaxBillableBytes: &maxBytes,
+			},
+			stats: &bigquery.QueryStatistics{
+				TotalBytesProcessed: 1_001,
+			},
+			wantErr: "BigQuery query exceeds configured cost limits: estimated billable bytes 1001 exceeds max_billable_bytes 1000. Query was not executed",
+		},
+		{
+			name: "query cost over limit",
+			config: &Config{
+				MaxQueryCost: &maxCost,
+			},
+			stats: &bigquery.QueryStatistics{
+				TotalBytesProcessed: 3_000_000_000,
+			},
+			wantErr: "BigQuery query exceeds configured cost limits: estimated query cost $0.015000 exceeds max_query_cost $0.010000. Query was not executed",
+		},
+		{
+			name: "uses billed bytes when available",
+			config: &Config{
+				MaxBillableBytes: &maxBytes,
+			},
+			stats: &bigquery.QueryStatistics{
+				TotalBytesBilled:    2_000,
+				TotalBytesProcessed: 1,
+			},
+			wantErr: "BigQuery query exceeds configured cost limits: estimated billable bytes 2000 exceeds max_billable_bytes 1000. Query was not executed",
+		},
+		{
+			name: "soft limit ignored unless enforced",
+			config: &Config{
+				MaxBillableBytesSoft: &maxBytes,
+			},
+			stats: &bigquery.QueryStatistics{
+				TotalBytesProcessed: 1_001,
+			},
+		},
+		{
+			name: "soft billable bytes over limit",
+			config: &Config{
+				MaxBillableBytesSoft: &maxBytes,
+			},
+			stats: &bigquery.QueryStatistics{
+				TotalBytesProcessed: 1_001,
+			},
+			enforceSoftLimits: true,
+			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated billable bytes 1001 exceeds max_billable_bytes_soft 1000. Estimated query cost: $5.005e-09. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
+		},
+		{
+			name: "soft query cost over limit",
+			config: &Config{
+				MaxQueryCostSoft: &maxCost,
+			},
+			stats: &bigquery.QueryStatistics{
+				TotalBytesProcessed: 3_000_000_000,
+			},
+			enforceSoftLimits: true,
+			wantErr:           "BigQuery query exceeds configured soft limits for bruin query: estimated query cost $0.015000 exceeds max_query_cost_soft $0.010000. Estimated query cost: $0.015000. Query was not executed. If you are an AI agent, rewrite the query to scan less data, for example by adding partition/date filters or narrowing selected columns. If you still need to run it, get explicit confirmation from the user before passing --dangerously-bypass-soft-limits",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			d := Client{config: tt.config}
+			err := d.validateQueryLimits(tt.stats, tt.enforceSoftLimits)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestClientHasActiveQueryLimits(t *testing.T) {
+	t.Parallel()
+
+	maxBytes := int64(1_000)
+	tests := []struct {
+		name     string
+		withSoft bool
+		cfg      *Config
+		want     bool
+	}{
+		{
+			name: "no limits",
+			cfg:  &Config{},
+		},
+		{
+			name: "hard limits active without context",
+			cfg: &Config{
+				MaxBillableBytes: &maxBytes,
+			},
+			want: true,
+		},
+		{
+			name: "soft limits inactive without context",
+			cfg: &Config{
+				MaxBillableBytesSoft: &maxBytes,
+			},
+		},
+		{
+			name:     "soft limits active with query context",
+			withSoft: true,
+			cfg: &Config{
+				MaxBillableBytesSoft: &maxBytes,
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+			if tt.withSoft {
+				ctx = WithSoftQueryLimits(ctx)
+			}
+			d := Client{config: tt.cfg}
+			assert.Equal(t, tt.want, d.hasActiveQueryLimits(ctx))
+		})
+	}
+}
+
+func TestFormatBigQueryCostUSD(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "$0.000000", formatBigQueryCostUSD(0))
+	assert.Equal(t, "$5.005e-09", formatBigQueryCostUSD(0.000000005005))
+	assert.Equal(t, "$0.015000", formatBigQueryCostUSD(0.015))
 }
 
 func TestBuildSchemaQuery(t *testing.T) {
@@ -466,7 +638,7 @@ func TestDB_Select(t *testing.T) {
 	t.Parallel()
 
 	projectID := testProjectID
-	jobID := "test-job"
+	jobID := testJobID
 
 	tests := []struct {
 		name                string
@@ -814,7 +986,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 	t.Parallel()
 
 	projectID := testProjectID
-	jobID := "test-job"
+	jobID := testJobID
 
 	tests := []struct {
 		name                string
@@ -971,6 +1143,295 @@ func TestDB_SelectWithSchema(t *testing.T) {
 				assert.EqualError(t, err, tt.err.Error())
 			}
 		})
+	}
+}
+
+func TestDB_SelectWithSchemaReturnsExecutionSummaryForNoResultStatement(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	jobID := testJobID
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)):
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				Configuration: &bigquery2.JobConfiguration{
+					Query: &bigquery2.JobConfigurationQuery{
+						Query: "UPDATE dataset.table SET name = 'updated' WHERE id = 1",
+					},
+				},
+				JobReference: &bigquery2.JobReference{
+					JobId:     jobID,
+					ProjectId: projectID,
+					Location:  "US",
+				},
+				Status: &bigquery2.JobStatus{
+					State: "DONE",
+				},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)):
+			writeBqTestJSON(t, w, &bigquery2.GetQueryResultsResponse{
+				JobReference: &bigquery2.JobReference{
+					JobId:     jobID,
+					ProjectId: projectID,
+					Location:  "US",
+				},
+				JobComplete: true,
+				Schema: &bigquery2.TableSchema{
+					Fields: []*bigquery2.TableFieldSchema{
+						{Name: "id", Type: "INTEGER"},
+						{Name: "note", Type: "STRING"},
+					},
+				},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s?", projectID, jobID)):
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				JobReference: &bigquery2.JobReference{
+					JobId:     jobID,
+					ProjectId: projectID,
+					Location:  "US",
+				},
+				Status: &bigquery2.JobStatus{
+					State: "DONE",
+				},
+				Statistics: &bigquery2.JobStatistics{
+					TotalBytesProcessed: 12 * 1024 * 1024,
+					TotalSlotMs:         2500,
+					Query: &bigquery2.JobStatistics2{
+						StatementType:       "UPDATE",
+						NumDmlAffectedRows:  3,
+						TotalBytesProcessed: 12 * 1024 * 1024,
+						TotalBytesBilled:    20 * 1024 * 1024,
+						TotalSlotMs:         2500,
+						DmlStats: &bigquery2.DmlStatistics{
+							UpdatedRowCount: 3,
+						},
+					},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte("unexpected request: " + r.Method + " " + r.RequestURI))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}))
+	defer server.Close()
+
+	client, err := bigquery.NewClient(
+		t.Context(),
+		projectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID: projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: "some-token",
+			}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	d := Client{client: client}
+
+	got, err := d.SelectWithSchema(t.Context(), &query.Query{Query: "UPDATE dataset.table SET name = 'updated' WHERE id = 1"})
+	require.NoError(t, err)
+	require.NotNil(t, got.Execution)
+
+	assert.Equal(t, []string{"id", "note"}, got.Columns)
+	assert.Empty(t, got.Rows)
+	assert.Equal(t, "bigquery", got.Execution.ConnectionType)
+	assert.Equal(t, jobID, got.Execution.JobID)
+	assert.Equal(t, "UPDATE", got.Execution.StatementType)
+	require.NotNil(t, got.Execution.DMLAffectedRows)
+	assert.Equal(t, int64(3), *got.Execution.DMLAffectedRows)
+	require.NotNil(t, got.Execution.DMLStats)
+	assert.Equal(t, int64(3), got.Execution.DMLStats.UpdatedRowCount)
+	assert.Equal(t, int64(12*1024*1024), got.Execution.TotalBytesProcessed)
+	assert.Equal(t, int64(20*1024*1024), got.Execution.TotalBytesBilled)
+	assert.Equal(t, int64(2500), got.Execution.SlotMillis)
+}
+
+func TestDB_SelectWithSchemaReturnsFullyQualifiedRoutineSummary(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	jobID := testJobID
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)):
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				Configuration: &bigquery2.JobConfiguration{
+					Query: &bigquery2.JobConfigurationQuery{
+						Query: "CREATE FUNCTION dataset.fn() AS (1)",
+					},
+				},
+				JobReference: &bigquery2.JobReference{
+					JobId:     jobID,
+					ProjectId: projectID,
+					Location:  "US",
+				},
+				Status: &bigquery2.JobStatus{
+					State: "DONE",
+				},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)):
+			writeBqTestJSON(t, w, &bigquery2.GetQueryResultsResponse{
+				JobReference: &bigquery2.JobReference{
+					JobId:     jobID,
+					ProjectId: projectID,
+					Location:  "US",
+				},
+				JobComplete: true,
+				Schema:      &bigquery2.TableSchema{},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s?", projectID, jobID)):
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				JobReference: &bigquery2.JobReference{
+					JobId:     jobID,
+					ProjectId: projectID,
+					Location:  "US",
+				},
+				Status: &bigquery2.JobStatus{
+					State: "DONE",
+				},
+				Statistics: &bigquery2.JobStatistics{
+					Query: &bigquery2.JobStatistics2{
+						StatementType:         "CREATE_FUNCTION",
+						DdlOperationPerformed: "CREATE",
+						DdlTargetRoutine: &bigquery2.RoutineReference{
+							ProjectId: projectID,
+							DatasetId: "dataset",
+							RoutineId: "fn",
+						},
+					},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte("unexpected request: " + r.Method + " " + r.RequestURI))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}))
+	defer server.Close()
+
+	client, err := bigquery.NewClient(
+		t.Context(),
+		projectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID: projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: "some-token",
+			}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	d := Client{client: client}
+
+	got, err := d.SelectWithSchema(t.Context(), &query.Query{Query: "CREATE FUNCTION dataset.fn() AS (1)"})
+	require.NoError(t, err)
+	require.NotNil(t, got.Execution)
+
+	assert.Equal(t, "CREATE_FUNCTION", got.Execution.StatementType)
+	assert.Equal(t, "CREATE", got.Execution.DDLOperationPerformed)
+	assert.Equal(t, "test-project.dataset.fn", got.Execution.DDLTargetRoutine)
+}
+
+func TestDB_SelectWithSchemaSkipsExecutionSummaryForEmptySelect(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	jobID := testJobID
+	var statusRequests atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs", projectID)):
+			writeBqTestJSON(t, w, &bigquery2.Job{
+				Configuration: &bigquery2.JobConfiguration{
+					Query: &bigquery2.JobConfigurationQuery{
+						Query: "SELECT id FROM UNNEST(CAST([] AS ARRAY<STRUCT<id INT64>>))",
+					},
+				},
+				JobReference: &bigquery2.JobReference{
+					JobId:     jobID,
+					ProjectId: projectID,
+					Location:  "US",
+				},
+				Status: &bigquery2.JobStatus{
+					State: "DONE",
+				},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)):
+			writeBqTestJSON(t, w, &bigquery2.GetQueryResultsResponse{
+				JobReference: &bigquery2.JobReference{
+					JobId:     jobID,
+					ProjectId: projectID,
+					Location:  "US",
+				},
+				JobComplete: true,
+				Schema: &bigquery2.TableSchema{
+					Fields: []*bigquery2.TableFieldSchema{
+						{Name: "id", Type: "INTEGER"},
+					},
+				},
+			})
+		case r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/jobs/%s?", projectID, jobID)):
+			statusRequests.Add(1)
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte("unexpected request: " + r.Method + " " + r.RequestURI))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}))
+	defer server.Close()
+
+	client, err := bigquery.NewClient(
+		t.Context(),
+		projectID,
+		option.WithEndpoint(server.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID: projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: "some-token",
+			}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	d := Client{client: client}
+
+	got, err := d.SelectWithSchema(t.Context(), &query.Query{Query: "SELECT id FROM UNNEST(CAST([] AS ARRAY<STRUCT<id INT64>>))"})
+	require.NoError(t, err)
+
+	assert.Nil(t, got.Execution)
+	assert.Zero(t, statusRequests.Load())
+}
+
+func writeBqTestJSON(t *testing.T, w http.ResponseWriter, response any) {
+	t.Helper()
+	w.WriteHeader(http.StatusOK)
+
+	data, err := json.Marshal(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = w.Write(data)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

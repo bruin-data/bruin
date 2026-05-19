@@ -137,7 +137,8 @@ type RunConfig struct {
 	FullRefresh            bool     `json:"fullRefresh"`
 	Selector               string   `json:"selector"`
 	Tag                    string   `json:"tag"`
-	ExcludeTag             string   `json:"excludeTag"`
+	ExcludeTag             string   `json:"excludeTag,omitempty"`
+	ExcludeTags            []string `json:"excludeTags,omitempty"`
 	Only                   []string `json:"only"`
 	Output                 string   `json:"output"`
 	ExpUseWingetForUv      bool     `json:"expUseWingetForUv"`
@@ -322,6 +323,11 @@ type Scheduler struct {
 
 	WorkQueue chan TaskInstance
 	Results   chan *TaskExecutionResult
+
+	// stopped is set under taskScheduleLock when Run exits due to context
+	// cancellation. Tick checks it before pushing to WorkQueue to avoid
+	// sending on a channel that Run has closed.
+	stopped bool
 
 	runID          string
 	onStatusChange func(StatusChangeEvent)
@@ -718,7 +724,9 @@ func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
 	for {
 		select {
 		case <-ctx.Done():
-			close(s.WorkQueue)
+			s.logger.Debug("scheduler context cancelled, stopping and draining in-flight results")
+			s.stopAndCloseWorkQueue()
+			results = append(results, s.drainInFlightResults(drainTimeoutOnCancel)...)
 			return results
 		case result := <-s.Results:
 			s.logger.Debug("received task result: ", result.Instance.GetAsset().Name)
@@ -728,6 +736,81 @@ func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
 				s.logger.Debug("pipeline has completed, finishing the scheduler loop")
 				return results
 			}
+		}
+	}
+}
+
+// drainTimeoutOnCancel bounds how long Run will wait for in-flight worker
+// results after the run is cancelled, so a non-cancellable task can't block
+// the summary indefinitely.
+const drainTimeoutOnCancel = 30 * time.Second
+
+// sinkTimeoutOnCancel bounds the background sink that absorbs late results
+// from straggler workers after Run has already returned. Without this bound,
+// a worker that never sends would leave the sink goroutine blocked forever
+// on the unbuffered Results channel.
+const sinkTimeoutOnCancel = 5 * time.Minute
+
+// stopAndCloseWorkQueue marks the scheduler stopped and closes WorkQueue,
+// holding the lock so a concurrent Tick (e.g. from Kickstart) cannot push
+// to the channel after it has been closed.
+func (s *Scheduler) stopAndCloseWorkQueue() {
+	s.taskScheduleLock.Lock()
+	defer s.taskScheduleLock.Unlock()
+	if s.stopped {
+		return
+	}
+	s.stopped = true
+	close(s.WorkQueue)
+}
+
+// drainInFlightResults collects results from workers that were already
+// executing a task when the context was cancelled, so the final summary
+// reflects them. It returns once every task has left the Queued state or
+// the timeout elapses; any later sends are absorbed by a background sink
+// so workers can exit cleanly when WorkQueue closes.
+func (s *Scheduler) drainInFlightResults(timeout time.Duration) []*TaskExecutionResult {
+	drained := make([]*TaskExecutionResult, 0)
+	deadline := time.After(timeout)
+	for {
+		if s.InstanceCountByStatus(Queued) == 0 {
+			return drained
+		}
+		select {
+		case res := <-s.Results:
+			drained = append(drained, res)
+			// Record the task's final state but do not propagate failures
+			// to downstream — the run is aborting, downstream should remain
+			// in their pre-abort state (typically Pending/Queued) so the
+			// summary can report them as not-completed.
+			if res.Instance.GetStatus() != Skipped {
+				if res.Error != nil {
+					s.MarkTaskInstance(res.Instance, Failed, false)
+				} else {
+					s.MarkTaskInstance(res.Instance, Succeeded, false)
+				}
+			}
+		case <-deadline:
+			// Absorb any further sends so stuck workers can return once
+			// they observe the closed WorkQueue, avoiding a permanent
+			// blocked send on the unbuffered Results channel. Bound the
+			// sink: expect at most one send per still-Queued instance, and
+			// give up after sinkTimeoutOnCancel so a worker that never
+			// returns can't keep this goroutine alive forever.
+			remaining := s.InstanceCountByStatus(Queued)
+			if remaining > 0 {
+				go func() {
+					sinkDeadline := time.After(sinkTimeoutOnCancel)
+					for range remaining {
+						select {
+						case <-s.Results:
+						case <-sinkDeadline:
+							return
+						}
+					}
+				}()
+			}
+			return drained
 		}
 	}
 }
@@ -745,7 +828,13 @@ func (s *Scheduler) Tick(result *TaskExecutionResult) bool {
 		s.markTaskInstanceFailedWithDownstream(result.Instance)
 	}
 
+	// Run has already closed WorkQueue (cancellation); don't schedule more.
+	if s.stopped {
+		return false
+	}
+
 	if s.hasPipelineFinished() {
+		s.stopped = true
 		close(s.WorkQueue)
 		return true
 	}

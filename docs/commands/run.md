@@ -59,6 +59,7 @@ table td:first-child {
 | `--interactive`, `-i` | bool | `false` | Use an interactive TUI that shows live progress of asset execution. |
 | `--timeout` | int | `604800` | Timeout for the entire pipeline run in seconds. |
 | `--var` | []str | - | Override pipeline [variables](/variables/overview) with custom values. |
+| `--variant` | str | - | Materialize the named [variant](/pipelines/variants) of a variant-bearing pipeline. Required when the pipeline declares variants. |
 | `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
 
 ### Continue from the last failed asset
@@ -213,7 +214,7 @@ bruin run --full-refresh
 ```
 
 > [!TIP]
-> You can protect specific assets from being dropped during full refresh by setting `refresh_restricted: true` in the asset definition. See [Materialization](../assets/materialization.md#full-refresh-and-refresh_restricted) for more details.
+> You can protect assets from being dropped during full refresh by setting `full_refresh_restricted: true` in an asset definition, or for an entire environment under `.bruin.yml` `config.full_refresh_restricted`. Asset-level `refresh_restricted` is still supported as an alias. See [Materialization](../assets/materialization.md#full-refresh-and-full_refresh_restricted) for more details.
 
 Run with default query annotations:
 

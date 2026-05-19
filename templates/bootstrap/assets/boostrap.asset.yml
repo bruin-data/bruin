@@ -1,5 +1,6 @@
 name: public.bootstrap
 type: duckdb.seed
+connection: duckdb-default
 
 parameters:
     path: seed.csv

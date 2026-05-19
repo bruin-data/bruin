@@ -97,6 +97,27 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	defer rows.Close()
 	// Retrieve column metadata using FieldDescriptions
 	fieldDescriptions := rows.FieldDescriptions()
+	if len(fieldDescriptions) == 0 && !query.IsLikelyResultQuery(queryObj.String()) {
+		for rows.Next() {
+		}
+		if err := rows.Err(); err != nil {
+			return nil, errors.Wrap(err, "failed to execute query")
+		}
+
+		commandTag := rows.CommandTag()
+		rowsAffected := commandTag.RowsAffected()
+		statementType := query.StatementTypeFromCommandTag(commandTag.String())
+		if statementType == "" {
+			statementType = query.SQLStatementType(queryObj.String())
+		}
+
+		return &query.QueryResult{
+			Columns:     []string{},
+			Rows:        [][]interface{}{},
+			ColumnTypes: []string{},
+			Execution:   query.NewExecutionSummaryFromStatement("postgres", statementType, &rowsAffected),
+		}, nil
+	}
 	if fieldDescriptions == nil {
 		return nil, errors.New("field descriptions are not available")
 	}

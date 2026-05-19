@@ -93,6 +93,33 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "no queries found in DDL asset runs materialized metadata query",
+			setup: func(f *fields) {
+				f.e.On("ExtractQueriesFromString", "").
+					Return([]*query.Query{}, nil)
+
+				f.m.On("Render", mock.Anything, "").
+					Return("CREATE TABLE cfg.ProfileTarget (TargetId integer)", nil)
+
+				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE cfg.ProfileTarget (TargetId integer)"}).
+					Return(nil)
+			},
+			args: args{
+				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeMsSQLQuery,
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDDL,
+					},
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "test-file.sql",
+						Content: "",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "multiple queries found but materialization is enabled, should fail",
 			setup: func(f *fields) {
 				f.e.On("ExtractQueriesFromString", "some content").

@@ -220,6 +220,50 @@ func TestMaterializer_Render(t *testing.T) {
 				"INSERT INTO my.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			},
 		},
+		{
+			name: "ddl builds schema and create table statements",
+			task: &pipeline.Asset{
+				Name: "dbo.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR(100)"},
+				},
+			},
+			query: "SELECT 1",
+			want: []string{
+				"^IF SCHEMA_ID\\(N'dbo'\\) IS NULL\n    EXEC\\(N'CREATE SCHEMA \\[dbo\\]'\\)$",
+				"^IF OBJECT_ID\\(N'dbo\\.asset', N'U'\\) IS NULL\nBEGIN\nCREATE TABLE \\[dbo\\]\\.\\[asset\\] \\(\n" +
+					"    \\[id\\] INT NOT NULL,\n" +
+					"    \\[name\\] VARCHAR\\(100\\),\n" +
+					"    PRIMARY KEY \\(\\[id\\]\\)\n" +
+					"\\)\nEND$",
+			},
+		},
+		{
+			name: "ddl is preserved on full refresh",
+			task: &pipeline.Asset{
+				Name: "dbo.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT 1",
+			want: []string{
+				"^IF SCHEMA_ID\\(N'dbo'\\) IS NULL\n    EXEC\\(N'CREATE SCHEMA \\[dbo\\]'\\)$",
+				"^IF OBJECT_ID\\(N'dbo\\.asset', N'U'\\) IS NULL\nBEGIN\nCREATE TABLE \\[dbo\\]\\.\\[asset\\] \\(\n" +
+					"    \\[id\\] INT\n" +
+					"\\)\nEND$",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

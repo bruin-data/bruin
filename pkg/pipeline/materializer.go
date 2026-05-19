@@ -30,7 +30,7 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	if m.FullRefresh && mat.Type == MaterializationTypeTable {
 		// Only override to CreateReplace if strategy is not explicitly set to DDL
 		// This strategy should never be overridden, even with full refresh
-		// Also respect refresh_restricted flag - if true, don't drop/recreate the table
+		// Also respect full refresh restriction - if true, don't drop/recreate the table
 		if mat.Strategy != MaterializationStrategyDDL && (asset.RefreshRestricted == nil || !*asset.RefreshRestricted) {
 			strategy = MaterializationStrategyCreateReplace
 		}
@@ -83,6 +83,7 @@ type HookWrapperMaterializer struct {
 	Mat interface {
 		Render(asset *Asset, query string) (string, error)
 	}
+	Hoister DeclareHoister
 }
 
 func (m HookWrapperMaterializer) Render(asset *Asset, query string) (string, error) {
@@ -95,7 +96,7 @@ func (m HookWrapperMaterializer) Render(asset *Asset, query string) (string, err
 		return "", err
 	}
 
-	return WrapHooks(materialized, asset.Hooks), nil
+	return WrapHooks(materialized, asset.Hooks, m.Hoister, asset.Type), nil
 }
 
 func (m HookWrapperMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {
@@ -134,6 +135,7 @@ type HookWrapperMaterializerList struct {
 	Mat interface {
 		Render(asset *Asset, query string) ([]string, error)
 	}
+	Hoister DeclareHoister
 }
 
 func (m HookWrapperMaterializerList) Render(asset *Asset, query string) ([]string, error) {
@@ -146,7 +148,7 @@ func (m HookWrapperMaterializerList) Render(asset *Asset, query string) ([]strin
 		return nil, err
 	}
 
-	return wrapHookQueriesList(materialized, asset.Hooks), nil
+	return wrapHookQueriesList(materialized, asset.Hooks, m.Hoister, asset.Type), nil
 }
 
 func (m HookWrapperMaterializerList) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {
@@ -170,6 +172,7 @@ type HookWrapperMaterializerListWithLocation struct {
 	Mat interface {
 		Render(asset *Asset, query, location string) ([]string, error)
 	}
+	Hoister DeclareHoister
 }
 
 func (m HookWrapperMaterializerListWithLocation) Render(asset *Asset, query, location string) ([]string, error) {
@@ -182,7 +185,7 @@ func (m HookWrapperMaterializerListWithLocation) Render(asset *Asset, query, loc
 		return nil, err
 	}
 
-	return wrapHookQueriesList(materialized, asset.Hooks), nil
+	return wrapHookQueriesList(materialized, asset.Hooks, m.Hoister, asset.Type), nil
 }
 
 func (m HookWrapperMaterializerListWithLocation) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {

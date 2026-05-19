@@ -89,11 +89,17 @@ type ExecutionSummary struct {
 	SuccessfulTasks int
 	FailedTasks     int
 	SkippedTasks    int
+	NotStartedTasks int // tasks still Pending/Queued at the time of report (run aborted)
 
 	Assets       TaskTypeStats
 	ColumnChecks TaskTypeStats
 	CustomChecks TaskTypeStats
 	MetadataPush TaskTypeStats
+
+	// Cancelled indicates the run finished with at least one task that never
+	// reached a terminal state (e.g. user aborted with Ctrl+C). The summary
+	// reflects whatever state was observed before the abort.
+	Cancelled bool
 
 	Duration time.Duration
 }
@@ -104,6 +110,7 @@ type TaskTypeStats struct {
 	Failed            int // Failed in main execution
 	FailedDueToChecks int // Failed only due to checks (main execution succeeded)
 	Skipped           int
+	NotStarted        int // task did not complete (run was aborted)
 }
 
 func (s TaskTypeStats) HasAny() bool {
@@ -253,11 +260,16 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 	hasFailures := summary.FailedTasks > 0
 
 	// Header with status and task count
-	if hasFailures {
+	switch {
+	case summary.Cancelled:
+		summaryPrinter.Printf("\n\nbruin run %s after %s\n\n",
+			color.New(color.FgYellow).Sprint("aborted"),
+			duration.Truncate(time.Millisecond).String())
+	case hasFailures:
 		summaryPrinter.Printf("\n\nbruin run completed with %s in %s\n\n",
 			color.New(color.FgRed).Sprint("failures"),
 			duration.Truncate(time.Millisecond).String())
-	} else {
+	default:
 		summaryPrinter.Printf("\n\nbruin run completed %s in %s\n\n",
 			color.New(color.FgGreen).Sprint("successfully"),
 			duration.Truncate(time.Millisecond).String())
@@ -265,10 +277,10 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 
 	// Assets executed (only actual assets, not including quality checks)
 	if summary.Assets.HasAny() {
-		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 {
+		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 || summary.Assets.NotStarted > 0 {
 			summaryPrinter.Printf(" %s Assets executed      %s\n",
 				color.New(color.FgRed).Sprint("✗"),
-				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped))
+				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped, summary.Assets.NotStarted))
 		} else {
 			summaryPrinter.Printf(" %s Assets executed      %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
@@ -280,11 +292,12 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 	totalChecks := summary.ColumnChecks.Total + summary.CustomChecks.Total
 	totalCheckFailures := summary.ColumnChecks.Failed + summary.CustomChecks.Failed
 	totalCheckSkipped := summary.ColumnChecks.Skipped + summary.CustomChecks.Skipped
+	totalCheckNotStarted := summary.ColumnChecks.NotStarted + summary.CustomChecks.NotStarted
 	if totalChecks > 0 {
-		if totalCheckFailures > 0 || totalCheckSkipped > 0 {
+		if totalCheckFailures > 0 || totalCheckSkipped > 0 || totalCheckNotStarted > 0 {
 			summaryPrinter.Printf(" %s Quality checks       %s\n",
 				color.New(color.FgRed).Sprint("✗"),
-				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped))
+				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped, totalCheckNotStarted))
 		} else {
 			summaryPrinter.Printf(" %s Quality checks       %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
@@ -316,8 +329,8 @@ func formatCount(total, failed int) string {
 		color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
 }
 
-func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) string {
-	succeeded := total - failed - failedDueToChecks - skipped
+func formatCountWithSkipped(total, failed, failedDueToChecks, skipped, notStarted int) string {
+	succeeded := total - failed - failedDueToChecks - skipped - notStarted
 
 	var parts []string
 	if failed > 0 {
@@ -332,11 +345,14 @@ func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) strin
 	if skipped > 0 {
 		parts = append(parts, color.New(color.Faint).Sprintf("%d skipped", skipped))
 	}
+	if notStarted > 0 {
+		parts = append(parts, color.New(color.FgYellow).Sprintf("%d not started", notStarted))
+	}
 
 	if len(parts) == 0 {
 		return "0"
 	}
-	if len(parts) == 1 && failed == 0 && failedDueToChecks == 0 && skipped == 0 {
+	if len(parts) == 1 && failed == 0 && failedDueToChecks == 0 && skipped == 0 && notStarted == 0 {
 		return strconv.Itoa(succeeded)
 	}
 
@@ -461,6 +477,57 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 	// Update total tasks to include skipped ones
 	summary.TotalTasks += summary.SkippedTasks
 
+	// Track instances that already appear in `results` so we don't also
+	// count them as not-started below. In production these instances would
+	// have their scheduler status updated to Succeeded/Failed by Tick, but
+	// callers that bypass Tick (e.g. unit tests, or callers that synthesize
+	// results) can leave the status untouched.
+	seenInResults := make(map[scheduler.TaskInstance]struct{}, len(results))
+	for _, r := range results {
+		seenInResults[r.Instance] = struct{}{}
+	}
+
+	// Count tasks that never reached a terminal state — the run was aborted
+	// (e.g. SIGINT) before they finished. Treat Pending and Queued the same
+	// way: from the user's perspective neither produced a result.
+	notStartedByAsset := make(map[string]bool)
+	for _, inst := range s.GetTaskInstances() {
+		if _, seen := seenInResults[inst]; seen {
+			continue
+		}
+		st := inst.GetStatus()
+		if st != scheduler.Pending && st != scheduler.Queued {
+			continue
+		}
+		summary.NotStartedTasks++
+		summary.Cancelled = true
+
+		assetName := inst.GetAsset().Name
+		switch inst.(type) {
+		case *scheduler.ColumnCheckInstance:
+			summary.ColumnChecks.Total++
+			summary.ColumnChecks.NotStarted++
+		case *scheduler.CustomCheckInstance:
+			summary.CustomChecks.Total++
+			summary.CustomChecks.NotStarted++
+		case *scheduler.MetadataPushInstance:
+			summary.MetadataPush.Total++
+			summary.MetadataPush.NotStarted++
+		case *scheduler.AssetInstance:
+			// Avoid double-counting an asset that already appears via
+			// completed results, upstream-failed, or another not-started
+			// instance for the same asset.
+			if assetNames[assetName] || upstreamFailedAssets[assetName] || notStartedByAsset[assetName] {
+				continue
+			}
+			notStartedByAsset[assetName] = true
+			summary.Assets.Total++
+			summary.Assets.NotStarted++
+		}
+	}
+
+	summary.TotalTasks += summary.NotStartedTasks
+
 	return summary
 }
 
@@ -566,10 +633,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "single-check",
 				Usage: "runs a single column or custom check by ID",
 			},
-			&cli.StringFlag{
+			&cli.StringSliceFlag{
 				Name:    "exclude-tag",
 				Aliases: []string{"x"},
-				Usage:   "exclude the assets with given tag",
+				Usage:   "exclude assets with the given tag. Can be used multiple times",
 			},
 			&cli.StringSliceFlag{
 				Name:        "only",
@@ -654,8 +721,9 @@ func Run(isDebug *bool) *cli.Command {
 				Value: 604800, // 7 days default
 			},
 			&cli.StringFlag{
-				Name:  "query-annotations",
-				Usage: fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
+				Name:    "query-annotations",
+				Sources: cli.EnvVars("BRUIN_QUERY_ANNOTATIONS"),
+				Usage:   fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
 			},
 		},
 		DisableSliceFlagSeparator: true,
@@ -709,7 +777,7 @@ func Run(isDebug *bool) *cli.Command {
 				FullRefresh:            fullRefresh,
 				Selector:               c.String("selector"),
 				Tag:                    c.String("tag"),
-				ExcludeTag:             c.String("exclude-tag"),
+				ExcludeTags:            c.StringSlice("exclude-tag"),
 				Only:                   c.StringSlice("only"),
 				Output:                 c.String("output"),
 				ExpUseWingetForUv:      c.Bool("exp-use-winget-for-uv"),
@@ -760,10 +828,6 @@ func Run(isDebug *bool) *cli.Command {
 
 			variantName := c.String("variant")
 			vars := c.StringSlice("var")
-			if variantName != "" && len(vars) > 0 {
-				printError(errors.New("--var and --variant cannot be used together"), c.String("output"), "Invalid flags")
-				return cli.Exit("", 1)
-			}
 			if len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
@@ -808,6 +872,8 @@ func Run(isDebug *bool) *cli.Command {
 					printError(fmt.Errorf("pipeline %q does not declare any variants but --variant=%q was provided", preview.Pipeline.Name, variantName), c.String("output"), "Variant not supported")
 					return cli.Exit("", 1)
 				}
+				// --var may co-exist with --variant. When both target the same
+				// variable, the variant's value wins (see variableOverridesMutator).
 				// Materialize the preview pipeline too, so downstream code that
 				// reads preview.Pipeline.Name (e.g. the state path) sees the
 				// rendered name.
@@ -833,6 +899,14 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
 					return cli.Exit("", 1)
 				}
+
+				if preview.Pipeline.SelectedVariant != "" {
+					render := jinja.VariantRendererFactory(preview.Pipeline.Variables.Value(), preview.Pipeline.SelectedVariant)
+					if err := pipeline.RenderAssetTemplatedFields(task, render); err != nil {
+						errorPrinter.Printf("Failed to render variant fields on asset: %v\n", err)
+						return cli.Exit("", 1)
+					}
+				}
 			}
 
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", preview.Pipeline.Name)
@@ -854,7 +928,7 @@ func Run(isDebug *bool) *cli.Command {
 				SingleTask:        task,
 				SelectedAssets:    selectedAssets,
 				Selector:          runConfig.Selector,
-				ExcludeTag:        runConfig.ExcludeTag,
+				ExcludeTags:       runConfig.ExcludeTags,
 				singleCheckID: scheduler.CheckUniqueID{
 					ID:    singleCheckID,
 					Asset: task,
@@ -897,6 +971,8 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return err
 			}
+			applyEnvironmentRefreshRestriction(cm.SelectedEnvironment, pipelineInfo.Pipeline)
+			applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, task)
 
 			// Auto-enable gong for CDC mode assets
 			if !runConfig.UseGong {
@@ -1265,7 +1341,21 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, foundPipeline.Commit)
+			// The Rust SQL parser is in-process and effectively free to
+			// instantiate. We use it as the DECLARE hoister on every hook
+			// wrapper so detecting "no reorder needed" is a single CGo
+			// call rather than a Python IPC round trip.
+			var hoister pipeline.DeclareHoister
+			if rustParser, rustErr := sqlparser.NewRustSQLParser(false); rustErr == nil {
+				if startErr := rustParser.Start(); startErr == nil {
+					hoister = rustParser
+				}
+				defer rustParser.Close()
+			} else {
+				printError(rustErr, c.String("output"), "Could not initialize rust sql parser")
+			}
+
+			mainExecutors, err := SetupExecutors(s, connectionManager, startDate, endDate, defaultExecutionDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.SensorMode, renderer, parser, hoister, foundPipeline.Commit)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -1331,7 +1421,9 @@ func Run(isDebug *bool) *cli.Command {
 				ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 				start := time.Now()
-				results := s.Run(runCtx)
+				// Use the signal-aware exeCtx so the scheduler exits and surfaces
+				// a partial summary when the user aborts with Ctrl+C.
+				results := s.Run(exeCtx)
 				duration := time.Since(start)
 
 				// Stop the TUI before printing the summary so the render loop
@@ -1372,7 +1464,9 @@ func Run(isDebug *bool) *cli.Command {
 				ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 				start := time.Now()
-				results := s.Run(runCtx)
+				// Use the signal-aware exeCtx so the scheduler exits and surfaces
+				// a partial summary when the user aborts with Ctrl+C.
+				results := s.Run(exeCtx)
 				duration := time.Since(start)
 
 				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
@@ -1432,6 +1526,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	filter.PushMetaData = pipelineState.Parameters.PushMetadata
 	filter.Selector = pipelineState.Parameters.Selector
 	filter.ExcludeTag = pipelineState.Parameters.ExcludeTag
+	filter.ExcludeTags = pipelineState.Parameters.ExcludeTags
 	return pipelineState, nil
 }
 
@@ -1671,6 +1766,7 @@ func SetupExecutors(
 	sensorMode string,
 	renderer *jinja.Renderer,
 	parser *sqlparser.SQLParser,
+	hoister pipeline.DeclareHoister,
 	commitHash string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
@@ -1704,7 +1800,8 @@ func SetupExecutors(
 	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: bigquery.NewMaterializer(fullRefresh),
+			Mat:     bigquery.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
 		if err != nil {
@@ -1752,7 +1849,8 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypePostgresQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypePostgresTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftTableSensor) {
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: postgres.NewMaterializer(fullRefresh),
+			Mat:     postgres.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		pgTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -1808,7 +1906,8 @@ func SetupExecutors(
 			Renderer: renderer,
 		}
 		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: trino.NewMaterializer(fullRefresh),
+			Mat:     trino.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
@@ -1823,7 +1922,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)
 		oracleOperator := oracle.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: oracle.NewMaterializer(fullRefresh),
+			Mat:     oracle.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		oracleMetadataPushOperator := postgres.NewMetadataPushOperator(conn) // using Postgres Metadata Push for Oracle if suitable, or skipping it
 
@@ -1840,7 +1940,8 @@ func SetupExecutors(
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeTableSensor)
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: snowflake.NewMaterializer(fullRefresh),
+			Mat:     snowflake.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
@@ -1882,10 +1983,12 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseTableSensor) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: mssql.NewMaterializer(fullRefresh),
+			Mat:     mssql.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
-			Mat: synapse.NewMaterializer(fullRefresh),
+			Mat:     synapse.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
@@ -1944,7 +2047,8 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeVerticaSeed) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeVerticaQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeVerticaTableSensor) {
 		verticaOperator := vertica.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: vertica.NewMaterializer(fullRefresh),
+			Mat:     vertica.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		verticaCheckRunner := vertica.NewColumnCheckOperator(conn)
 		verticaQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -1979,7 +2083,8 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricQuerySensorLegacy) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeFabricTableSensorLegacy) {
 		fabricOperator := fabric.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: fabric.NewMaterializer(fullRefresh),
+			Mat:     fabric.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 
 		fabricCheckRunner := fabric.NewColumnCheckOperator(conn)
@@ -2025,7 +2130,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuery) || estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksTableSensor) {
 		databricksOperator := databricks.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
-			Mat: databricks.NewMaterializer(fullRefresh),
+			Mat:     databricks.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		databricksCheckRunner := databricks.NewColumnCheckOperator(conn)
 		databricksQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2070,7 +2176,8 @@ func SetupExecutors(
 	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerListWithLocation{
-			Mat: athena.NewMaterializer(fullRefresh),
+			Mat:     athena.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
 		athenaTableSensor := ansisql.NewTableSensor(conn, sensorMode, wholeFileExtractor)
@@ -2097,7 +2204,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuerySensor) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: duck.NewMaterializer(fullRefresh),
+			Mat:     duck.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		duckDBCheckRunner := duck.NewColumnCheckOperator(conn)
 		duckDBQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2124,7 +2232,8 @@ func SetupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypeClickHouse) || estimateCustomCheckType == pipeline.AssetTypeClickHouse ||
 		s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSeed) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseTableSensor) {
 		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializerList{
-			Mat: clickhouse.NewMaterializer(fullRefresh),
+			Mat:     clickhouse.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		checkRunner := clickhouse.NewColumnCheckOperator(conn)
 		clickHouseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2211,7 +2320,8 @@ func SetupExecutors(
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLQuerySensor) ||
 		s.WillRunTaskOfType(pipeline.AssetTypeMySQLTableSensor) {
 		mysqlOperator := mysql.NewBasicOperator(conn, wholeFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat: mysql.NewMaterializer(fullRefresh),
+			Mat:     mysql.NewMaterializer(fullRefresh),
+			Hoister: hoister,
 		}, parser)
 		mysqlCheckRunner := mysql.NewColumnCheckOperator(conn)
 		mysqlQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
@@ -2384,6 +2494,7 @@ type Filter struct {
 	ModifiedAssets     []*pipeline.Asset // Assets whose files have been modified vs default branch (from `--modified`)
 	Selector           string
 	ExcludeTag         string
+	ExcludeTags        []string
 	selectedBySelector bool
 	singleCheckID      scheduler.CheckUniqueID // ID of the single check to run, if any
 }
@@ -2429,12 +2540,10 @@ func HandleModifiedAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler
 	}
 
 	// Handle exclude-tag if specified
-	if f.ExcludeTag != "" {
-		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
-		if len(excludedAssets) == 0 {
-			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
-		}
-		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	excludeTags, missingExcludeTags := existingExcludeTags(f.excludeTags(), p)
+	warnMissingExcludeTags(missingExcludeTags)
+	for _, tag := range excludeTags {
+		s.MarkByTag(tag, scheduler.Skipped, false)
 	}
 
 	return nil
@@ -2464,15 +2573,17 @@ func HandleMultipleAssets(ctx context.Context, f *Filter, s *scheduler.Scheduler
 	}
 
 	// Handle exclude-tag if specified
-	if f.ExcludeTag != "" {
+	excludeTags, missingExcludeTags := existingExcludeTags(f.excludeTags(), p)
+	if len(excludeTags) > 0 {
 		if !f.IncludeDownstream && !f.selectedBySelector {
 			return errors.New("when specifying assets with --exclude-tag, you must also use --downstream flag")
 		}
-		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
-		if len(excludedAssets) == 0 {
-			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		warnMissingExcludeTags(missingExcludeTags)
+		for _, tag := range excludeTags {
+			s.MarkByTag(tag, scheduler.Skipped, false)
 		}
-		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	} else {
+		warnMissingExcludeTags(missingExcludeTags)
 	}
 
 	return nil
@@ -2500,15 +2611,17 @@ func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p 
 	if f.IncludeTag != "" {
 		return errors.New("you cannot use the '--tag' flag when running a single asset")
 	}
-	if f.ExcludeTag != "" {
+	excludeTags, missingExcludeTags := existingExcludeTags(f.excludeTags(), p)
+	if len(excludeTags) > 0 {
 		if !f.IncludeDownstream {
 			return errors.New("when running a single asset with '--exclude-tag', you must also use the '--downstream' flag")
 		}
-		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
-		if len(excludedAssets) == 0 {
-			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		warnMissingExcludeTags(missingExcludeTags)
+		for _, tag := range excludeTags {
+			s.MarkByTag(tag, scheduler.Skipped, false)
 		}
-		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
+	} else {
+		warnMissingExcludeTags(missingExcludeTags)
 	}
 	return nil
 }
@@ -2534,19 +2647,58 @@ func HandleIncludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p
 }
 
 func HandleExcludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
-	if f.SingleTask != nil {
+	if f.SingleTask != nil || len(f.SelectedAssets) > 0 || len(f.ModifiedAssets) > 0 {
 		return nil
 	}
-	if f.ExcludeTag == "" {
-		return nil
+	excludeTags, missingExcludeTags := existingExcludeTags(f.excludeTags(), p)
+	warnMissingExcludeTags(missingExcludeTags)
+	for _, tag := range excludeTags {
+		s.MarkByTag(tag, scheduler.Skipped, false)
 	}
-	excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
-	if len(excludedAssets) == 0 {
-		return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
-	}
-	s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
 
 	return nil
+}
+
+func (f *Filter) excludeTags() []string {
+	tags := make([]string, 0, len(f.ExcludeTags)+1)
+	if f.ExcludeTag != "" {
+		tags = append(tags, f.ExcludeTag)
+	}
+	tags = append(tags, f.ExcludeTags...)
+
+	seen := make(map[string]struct{}, len(tags))
+	unique := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		unique = append(unique, tag)
+	}
+	return unique
+}
+
+func existingExcludeTags(tags []string, p *pipeline.Pipeline) ([]string, []string) {
+	existing := make([]string, 0, len(tags))
+	missing := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		excludedAssets := p.GetAssetsByTag(tag)
+		if len(excludedAssets) > 0 {
+			existing = append(existing, tag)
+			continue
+		}
+		missing = append(missing, tag)
+	}
+	return existing, missing
+}
+
+func warnMissingExcludeTags(tags []string) {
+	for _, tag := range tags {
+		warningPrinter.Printf("Warning: no assets found with exclude tag '%s'; continuing without excluding any assets.\n", tag)
+	}
 }
 
 func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -2644,6 +2796,25 @@ func ensurePythonCacheGitignore(fs afero.Fs, repoRoot string) error {
 		}
 	}
 	return nil
+}
+
+func applyEnvironmentRefreshRestriction(env *config.Environment, p *pipeline.Pipeline) {
+	if p == nil {
+		return
+	}
+
+	for _, asset := range p.Assets {
+		applyEnvironmentRefreshRestrictionToAsset(env, asset)
+	}
+}
+
+func applyEnvironmentRefreshRestrictionToAsset(env *config.Environment, asset *pipeline.Asset) {
+	if env == nil || env.Config == nil || !env.Config.RefreshRestricted || asset == nil {
+		return
+	}
+
+	refreshRestricted := true
+	asset.RefreshRestricted = &refreshRestricted
 }
 
 // loadAssetsFromPaths loads assets from a list of paths or names.

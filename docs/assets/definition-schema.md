@@ -1,10 +1,18 @@
 # Asset Definition
 
-Assets are defined in a YAML format in the same file as the asset code.
-This enables the metadata to be right next to the code, reducing the friction when things change and encapsulating the relevant details in a single file.
-The definition includes all the details around an asset from its name to the quality checks that will be executed.
+Every Bruin asset has a YAML definition — its name, type, dependencies, columns, quality checks, and so on. How that definition is stored depends on the kind of asset:
 
-Here's an example asset definition:
+- **SQL assets (`.sql`)** embed the definition inside the same file as the query, between `/* @bruin` and `@bruin */` markers. The definition and the SQL query body live together in one `.sql` file.
+- **Python assets (`.py`)** embed the definition the same way, between `""" @bruin` and `@bruin """` markers, inside the same `.py` file as the code.
+- **YAML assets (`<name>.asset.yml` / `<name>.asset.yaml`)** are standalone YAML files that contain only the definition. They are used for asset types that have no inline code body — for example [ingestr](./ingestr.md), [sensor](./sensor.md), [seed](./seed.md), and [dashboard](./dashboard.md) assets.
+
+::: danger
+The definition and the query body of a SQL asset **cannot** be split across two files. A `hello_world.sql` file containing the query plus a sibling `hello_world.asset.yml` containing the definition is **not** a valid pattern — Bruin will treat them as two unrelated assets. For SQL assets, always put the `/* @bruin ... @bruin */` header at the top of the same `.sql` file that contains the query.
+:::
+
+Embedding the metadata next to the code reduces friction when things change and keeps everything for an asset in a single file. The definition includes all the details around an asset from its name to the quality checks that will be executed.
+
+Here's an example SQL asset with an inline definition:
 
 ```bruin-sql
 /* @bruin
@@ -44,12 +52,25 @@ union all
 select 2 as one
 ```
 
+And here's an example of a standalone YAML asset (e.g. an ingestr or sensor asset) saved as `<name>.asset.yml` — a different kind of asset with no inline code body:
+
+```yaml
+name: raw.hello_external
+type: ingestr
+owner: my-team@acme-corp.com
+
+parameters:
+  source_connection: my-source
+  source_table: public.hello
+  destination: bigquery
+```
+
 ::: info
 Bruin has [an open-source Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=bruin.bruin) extension that does syntax-highlighting for the definition syntax and more.
 :::
 
 ::: warning
-Assets that are defined as YAML files have to have file names as `<name>.asset.yml` or `<name>.asset.yaml`. The regular `.yml` files are not considered as assets, since they might be configuration used within the repo.
+Standalone YAML assets must use the file name suffix `<name>.asset.yml` or `<name>.asset.yaml`. Plain `.yml` files are ignored, since they are typically configuration kept alongside the repo.
 :::
 
 ## `name`

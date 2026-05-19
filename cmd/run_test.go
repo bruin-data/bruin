@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -741,6 +742,27 @@ func TestApplyFilters(t *testing.T) { //nolint
 			expectError:     true,
 			expectedError:   "when running a single asset with '--exclude-tag', you must also use the '--downstream' flag",
 		},
+		{
+			name: "Single Task with missing exclude-tag warns and continues",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				SingleTask: task4,
+				ExcludeTag: "non-existent-tag",
+			},
+			expectedPending: []string{"Task4"},
+			expectError:     false,
+		},
 
 		{
 			name: "Full pipeline with exclude-tag",
@@ -764,7 +786,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 		},
 
 		{
-			name: "Full pipeline with exclude-tag",
+			name: "Full pipeline with missing exclude-tag warns and continues",
 			pipeline: &pipeline.Pipeline{
 				Name: "TestPipeline",
 				Assets: []*pipeline.Asset{
@@ -780,9 +802,28 @@ func TestApplyFilters(t *testing.T) { //nolint
 			filter: &Filter{
 				ExcludeTag: "non-existent-tag",
 			},
-			expectedPending: []string{},
-			expectError:     true,
-			expectedError:   "no assets found with exclude tag 'non-existent-tag'",
+			expectedPending: []string{"Task0", "Task0:Column0:Check0", "Task0:custom-check:customcheck0", "Task1", "Task2", "Task3", "Task4", "Task5"},
+			expectError:     false,
+		},
+		{
+			name: "Full pipeline with multiple exclude tags",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTags: []string{"tag1", "tag2"},
+			},
+			expectedPending: []string{"Task3"},
+			expectError:     false,
 		},
 		{
 			name: "Exclude Tag and the downstreams",
@@ -855,7 +896,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 		},
 
 		{
-			name: "Exclude and Include Tag (exclude tag non existent)",
+			name: "Exclude and Include Tag with missing exclude tag warns and continues",
 			pipeline: &pipeline.Pipeline{
 				Name: "TestPipeline",
 				Assets: []*pipeline.Asset{
@@ -872,9 +913,29 @@ func TestApplyFilters(t *testing.T) { //nolint
 				IncludeTag:        "tag1",
 				IncludeDownstream: false,
 			},
-			expectedPending: []string{},
-			expectError:     true,
-			expectedError:   "no assets found with exclude tag 'non-existent-tag'",
+			expectedPending: []string{"Task4", "Task5", "Task8"},
+			expectError:     false,
+		},
+		{
+			name: "Exclude and Include Tag with multiple exclude tags",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTags:       []string{"tag3", "exclude"},
+				IncludeTag:        "tag1",
+				IncludeDownstream: false,
+			},
+			expectedPending: []string{"Task5"},
+			expectError:     false,
 		},
 
 		{
@@ -1407,6 +1468,25 @@ func TestReadState(t *testing.T) {
 			expectedRunConfig: &scheduler.RunConfig{},
 		},
 		{
+			name:      "State With Multiple Exclude Tags",
+			statePath: "/logs/run",
+			stateContent: `{
+				"parameters": {
+					"tag": "test-tag",
+					"excludeTags": ["exclude-tag", "skip-tag"]
+				}
+			}`,
+			expectedError: false,
+			filter:        &Filter{},
+			expectedFilter: &Filter{
+				IncludeTag:   "test-tag",
+				ExcludeTags:  []string{"exclude-tag", "skip-tag"},
+				PushMetaData: false,
+			},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+		{
 			name:              "Empty State",
 			statePath:         "/logs/run",
 			stateContent:      `{}`,
@@ -1930,6 +2010,27 @@ func TestCollectAssetResults(t *testing.T) {
 				{name: "assetC"},
 			},
 		},
+		{
+			// Simulates BRU-4252: user aborts after A succeeds but before
+			// B / C run. Both should appear in the per-asset list as
+			// not-started so the summary tells the user what was missed.
+			name: "run aborted after A - B and C marked as not started",
+			setup: func(s *scheduler.Scheduler) []*scheduler.TaskExecutionResult {
+				mainType := scheduler.TaskInstanceTypeMain
+				aMains := helperFindInstances(s, "assetA", &mainType)
+				results := make([]*scheduler.TaskExecutionResult, 0, len(aMains))
+				for _, inst := range aMains {
+					s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+					results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
+				}
+				return results
+			},
+			want: []assetResult{
+				{name: "assetA"},
+				{name: "assetB", notStarted: true},
+				{name: "assetC", notStarted: true},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1946,9 +2047,45 @@ func TestCollectAssetResults(t *testing.T) {
 				assert.Equal(t, w.failed, got[i].failed, "asset[%d] failed", i)
 				assert.Equal(t, w.checkFailed, got[i].checkFailed, "asset[%d] checkFailed", i)
 				assert.Equal(t, w.upstreamFailed, got[i].upstreamFailed, "asset[%d] upstreamFailed", i)
+				assert.Equal(t, w.notStarted, got[i].notStarted, "asset[%d] notStarted", i)
 			}
 		})
 	}
+}
+
+func TestAnalyzeResults_AbortedRun(t *testing.T) {
+	t.Parallel()
+
+	assetA := &pipeline.Asset{Name: "assetA", Type: pipeline.AssetTypeBigqueryQuery}
+	assetB := &pipeline.Asset{
+		Name:      "assetB",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "assetA"}},
+		Columns: []pipeline.Column{
+			{Name: "col1", Type: "STRING", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+		},
+		CustomChecks: []pipeline.CustomCheck{{Name: "row_count"}},
+	}
+	p := &pipeline.Pipeline{Name: "test-pipeline", Assets: []*pipeline.Asset{assetA, assetB}}
+
+	s := scheduler.NewScheduler(zap.NewNop().Sugar(), p, "test")
+
+	// Simulate "ran A, aborted before B".
+	mainType := scheduler.TaskInstanceTypeMain
+	aMains := helperFindInstances(s, "assetA", &mainType)
+	results := make([]*scheduler.TaskExecutionResult, 0, len(aMains))
+	for _, inst := range aMains {
+		s.MarkTaskInstance(inst, scheduler.Succeeded, false)
+		results = append(results, &scheduler.TaskExecutionResult{Instance: inst})
+	}
+
+	summary := analyzeResults(results, s)
+	assert.True(t, summary.Cancelled, "summary should flag the run as cancelled")
+	assert.Equal(t, 1, summary.Assets.NotStarted, "assetB main task should count as not started")
+	assert.Equal(t, 1, summary.Assets.Succeeded)
+	assert.Equal(t, 2, summary.Assets.Total)
+	assert.Equal(t, 1, summary.ColumnChecks.NotStarted)
+	assert.Equal(t, 1, summary.CustomChecks.NotStarted)
 }
 
 func TestValidateDateRange(t *testing.T) {
@@ -2133,6 +2270,26 @@ func TestHandleModifiedAssets(t *testing.T) {
 				IncludeDownstream: true,
 			},
 			expectedPending: []string{"Task2", "Task3"},
+			expectError:     false,
+		},
+		{
+			name: "Modified assets with multiple exclude tags",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+					{Name: "Task2", Type: pipeline.AssetTypePython, Tags: []string{"skip"}, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task1"}}},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task2"}}},
+				},
+			},
+			filter: &Filter{
+				ModifiedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+				},
+				ExcludeTags:       []string{"exclude", "skip", "missing"},
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task3"},
 			expectError:     false,
 		},
 		{
@@ -2373,6 +2530,24 @@ func TestHandleMultipleAssets(t *testing.T) {
 			expectedError:   "when specifying assets with --exclude-tag, you must also use --downstream flag",
 		},
 		{
+			name: "Selected assets with missing exclude tag warns and continues without downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					{Name: "Task2", Type: pipeline.AssetTypePython},
+				},
+			},
+			filter: &Filter{
+				SelectedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+				},
+				ExcludeTags: []string{"missing"},
+			},
+			expectedPending: []string{"Task1"},
+			expectError:     false,
+		},
+		{
 			name: "Selected assets with exclude tag and downstream",
 			pipeline: &pipeline.Pipeline{
 				Name: "TestPipeline",
@@ -2390,6 +2565,26 @@ func TestHandleMultipleAssets(t *testing.T) {
 				IncludeDownstream: true,
 			},
 			expectedPending: []string{"Task2", "Task3"},
+			expectError:     false,
+		},
+		{
+			name: "Selected assets with multiple exclude tags and downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+					{Name: "Task2", Type: pipeline.AssetTypePython, Tags: []string{"skip"}, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task1"}}},
+					{Name: "Task3", Type: pipeline.AssetTypeBigqueryQuery, Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task2"}}},
+				},
+			},
+			filter: &Filter{
+				SelectedAssets: []*pipeline.Asset{
+					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+				},
+				ExcludeTags:       []string{"exclude", "skip"},
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task3"},
 			expectError:     false,
 		},
 	}
@@ -2791,6 +2986,46 @@ func TestDetermineStartDate_AllowsFutureDates(t *testing.T) {
 	}
 }
 
+func TestApplyEnvironmentRefreshRestriction(t *testing.T) {
+	t.Parallel()
+
+	explicitFalse := false
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{Name: "asset-without-setting"},
+			{Name: "asset-with-explicit-false", RefreshRestricted: &explicitFalse},
+		},
+	}
+	env := &config.Environment{
+		Config: &config.EnvironmentConfig{RefreshRestricted: true},
+	}
+
+	applyEnvironmentRefreshRestriction(env, p)
+
+	for _, asset := range p.Assets {
+		require.NotNil(t, asset.RefreshRestricted)
+		assert.True(t, *asset.RefreshRestricted)
+	}
+}
+
+func TestApplyEnvironmentRefreshRestriction_NoConfig(t *testing.T) {
+	t.Parallel()
+
+	explicitFalse := false
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{Name: "asset-without-setting"},
+			{Name: "asset-with-explicit-false", RefreshRestricted: &explicitFalse},
+		},
+	}
+
+	applyEnvironmentRefreshRestriction(&config.Environment{}, p)
+
+	assert.Nil(t, p.Assets[0].RefreshRestricted)
+	require.NotNil(t, p.Assets[1].RefreshRestricted)
+	assert.False(t, *p.Assets[1].RefreshRestricted)
+}
+
 func TestApplyAllFilters_SelectorAllowsExcludeTagWithoutDownstream(t *testing.T) {
 	t.Parallel()
 
@@ -2864,4 +3099,21 @@ func TestApplyAllFilters_SelectorAllowsExcludeTagWithoutDownstream(t *testing.T)
 		names[i] = asset.Name
 	}
 	assert.Equal(t, []string{"stg_orders", "int_orders", "fct_orders"}, names)
+}
+
+func TestExistingExcludeTagsSeparatesMissingTags(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Name: "TestPipeline",
+		Assets: []*pipeline.Asset{
+			{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"exclude"}},
+			{Name: "Task2", Type: pipeline.AssetTypePython, Tags: []string{"skip"}},
+		},
+	}
+
+	existing, missing := existingExcludeTags([]string{"exclude", "missing", "skip"}, p)
+
+	assert.Equal(t, []string{"exclude", "skip"}, existing)
+	assert.Equal(t, []string{"missing"}, missing)
 }
