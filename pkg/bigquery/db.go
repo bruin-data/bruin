@@ -240,11 +240,24 @@ func (d *Client) NewDataTransferClient(ctx context.Context) (*datatransfer.Clien
 	return client, nil
 }
 
+// applyJobIDPrefix tags the BigQuery job with a "bruin_<type>" prefix so the
+// resulting jobId is recognizable in the BigQuery console / job history.
+// AddJobIDSuffix appends a random suffix so repeated calls (e.g. sensors)
+// don't collide.
+func applyJobIDPrefix(ctx context.Context, bqQuery *bigquery.Query) {
+	queryType := query.QueryTypeFromContext(ctx)
+	if queryType == "" {
+		return
+	}
+	bqQuery.JobID = "bruin_" + queryType
+	bqQuery.AddJobIDSuffix = true
+}
+
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return false, err
 	}
-	q := d.client.Query(query.ToDryRunQuery())
+	q := d.queryForExecution(ctx, query.ToDryRunQuery())
 	q.DryRun = true
 
 	job, err := q.Run(ctx)
@@ -267,7 +280,7 @@ func (d *Client) RunQueryWithoutResult(ctx context.Context, q *query.Query) erro
 	if err := d.checkQueryLimits(ctx, q); err != nil {
 		return err
 	}
-	bqQuery := d.queryForExecution(q.String())
+	bqQuery := d.queryForExecution(ctx, q.String())
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return formatError(err)
@@ -288,7 +301,7 @@ func (d *Client) Select(ctx context.Context, q *query.Query) ([][]interface{}, e
 	if err := d.checkQueryLimits(ctx, q); err != nil {
 		return nil, err
 	}
-	bqQuery := d.queryForExecution(q.String())
+	bqQuery := d.queryForExecution(ctx, q.String())
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return nil, formatError(err)
@@ -328,7 +341,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	if err := d.checkQueryLimits(ctx, queryObj); err != nil {
 		return nil, err
 	}
-	bqQuery := d.queryForExecution(queryObj.String())
+	bqQuery := d.queryForExecution(ctx, queryObj.String())
 	job, err := bqQuery.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run query: %w", formatError(err))
@@ -480,11 +493,12 @@ func (d *Client) shouldEnforceSoftQueryLimits(ctx context.Context) bool {
 	return enforce
 }
 
-func (d *Client) queryForExecution(queryString string) *bigquery.Query {
+func (d *Client) queryForExecution(ctx context.Context, queryString string) *bigquery.Query {
 	bqQuery := d.client.Query(queryString)
 	if d.config != nil && d.config.MaxBillableBytes != nil {
 		bqQuery.MaxBytesBilled = *d.config.MaxBillableBytes
 	}
+	applyJobIDPrefix(ctx, bqQuery)
 	return bqQuery
 }
 
@@ -538,7 +552,7 @@ func (d *Client) QueryDryRun(ctx context.Context, queryObj *query.Query) (*bigqu
 	if err := d.ensureClientInitialized(ctx); err != nil {
 		return nil, err
 	}
-	q := d.client.Query(queryObj.String())
+	q := d.queryForExecution(ctx, queryObj.String())
 	q.DryRun = true
 
 	if d.client.Location != "" {

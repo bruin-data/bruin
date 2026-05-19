@@ -1432,7 +1432,7 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 			}
 
 			q := &query.Query{Query: renderedQuery}
-			valid, err := validatorInstance.IsValid(ctx, q)
+			valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), q)
 			if err != nil {
 				issues = append(issues, &Issue{
 					Task:        asset,
@@ -1480,7 +1480,7 @@ func ValidateHookQueryDryRun(connections connectionManager) AssetValidator {
 			}
 
 			q := &query.Query{Query: normalized}
-			valid, err := validatorInstance.IsValid(ctx, q)
+			valid, err := validatorInstance.IsValid(query.WithQueryType(ctx, query.QueryTypeDryRun), q)
 			if err != nil {
 				issues = append(issues, &Issue{
 					Task:        asset,

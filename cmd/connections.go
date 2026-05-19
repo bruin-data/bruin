@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jedib0t/go-pretty/v6/table"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -483,7 +484,7 @@ func PingConnection() *cli.Command {
 			if tester, ok := conn.(interface {
 				Ping(ctx context.Context) error
 			}); ok {
-				testErr := tester.Ping(ctx)
+				testErr := tester.Ping(query.WithQueryType(ctx, query.QueryTypePing))
 				if testErr != nil {
 					printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to test connection '%s'", name)))
 					return cli.Exit("", 1)

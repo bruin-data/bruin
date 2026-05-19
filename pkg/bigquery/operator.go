@@ -61,6 +61,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeMain)
 	extractor, err := o.extractor.CloneForAsset(ctx, p, t)
 	if err != nil {
 		return errors.Wrapf(err, "failed to clone extractor for asset %s", t.Name)
@@ -199,6 +200,7 @@ func NewColumnCheckOperator(manager config.ConnectionGetter) (*ColumnCheckOperat
 }
 
 func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeColumn)
 	test, ok := ti.(*scheduler.ColumnCheckInstance)
 	if !ok {
 		return errors.New("cannot run a non-column check instance")
@@ -276,6 +278,7 @@ func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error 
 }
 
 func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeSensor)
 	if o.sensorMode == "skip" {
 		return nil
 	}
@@ -375,6 +378,7 @@ func (ts *TableSensor) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeSensor)
 	if ts.sensorMode == "skip" {
 		return nil
 	}

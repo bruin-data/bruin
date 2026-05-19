@@ -115,7 +115,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager conf
 		queryStr = "SELECT * FROM " + tableName + " WHERE 1=0"
 	}
 	q := &query.Query{Query: queryStr}
-	result, err := querier.SelectWithSchema(context.Background(), q)
+	result, err := querier.SelectWithSchema(query.WithQueryType(context.Background(), query.QueryTypePatch), q)
 	if err != nil {
 		return fillStatusFailed, fmt.Errorf("failed to query columns for asset '%s': %w", pp.Asset.Name, err)
 	}

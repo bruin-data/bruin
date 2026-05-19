@@ -329,6 +329,7 @@ func NewColumnCheckOperator(checks map[string]CheckRunner) *ColumnCheckOperator 
 }
 
 func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeColumn)
 	test, ok := ti.(*scheduler.ColumnCheckInstance)
 	if !ok {
 		return errors.New("cannot run a non-column check instance")
@@ -357,6 +358,7 @@ func NewCustomCheckOperator(manager config.ConnectionGetter, r jinja.RendererInt
 }
 
 func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	ctx = query.WithQueryType(ctx, query.QueryTypeCustom)
 	instance, ok := ti.(*scheduler.CustomCheckInstance)
 	if !ok {
 		return errors.New("cannot run a non-custom check instance")

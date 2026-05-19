@@ -39,6 +39,34 @@ func TestLogQueryID(t *testing.T) {
 	})
 }
 
+func TestQueryType(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns empty when not set", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, QueryTypeFromContext(context.Background()))
+	})
+
+	t.Run("round-trips a value", func(t *testing.T) {
+		t.Parallel()
+		ctx := WithQueryType(context.Background(), QueryTypeMain)
+		assert.Equal(t, "main", QueryTypeFromContext(ctx))
+	})
+
+	t.Run("ignores empty values", func(t *testing.T) {
+		t.Parallel()
+		ctx := WithQueryType(context.Background(), "")
+		assert.Empty(t, QueryTypeFromContext(ctx))
+	})
+
+	t.Run("inner WithQueryType overrides outer", func(t *testing.T) {
+		t.Parallel()
+		ctx := WithQueryType(context.Background(), QueryTypeMain)
+		ctx = WithQueryType(ctx, QueryTypeSensor)
+		assert.Equal(t, "sensor", QueryTypeFromContext(ctx))
+	})
+}
+
 func TestLogOrSinkQueryID(t *testing.T) {
 	t.Parallel()
 
