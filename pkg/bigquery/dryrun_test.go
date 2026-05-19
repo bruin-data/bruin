@@ -255,6 +255,161 @@ func TestDryRunner_DryRun(t *testing.T) {
 		queryExtractor.AssertExpectations(t)
 		mockDryRunnerQuerier.AssertExpectations(t)
 	})
+
+	t.Run("view materialization wraps SELECT body in CREATE OR REPLACE VIEW DDL", func(t *testing.T) {
+		t.Parallel()
+		connGetter := &mockConnectionGetter{}
+		queryExtractor := &mockQueryExtractor{}
+
+		asset := pipeline.Asset{
+			Name:       "project.dataset.events",
+			Type:       pipeline.AssetTypeBigqueryQuery,
+			Connection: "bq-conn",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT * FROM huge_table",
+			},
+			Materialization: pipeline.Materialization{
+				Type: pipeline.MaterializationTypeView,
+			},
+		}
+
+		pl := &pipeline.Pipeline{}
+
+		queryExtractor.On("ExtractQueriesFromString", "SELECT * FROM huge_table").Return(
+			[]*query.Query{{Query: "SELECT * FROM huge_table"}}, nil,
+		)
+
+		mockDryRunnerQuerier := &mockDryRunnerQuerier{}
+		mockDryRunnerQuerier.On(
+			"QueryDryRun",
+			mock.Anything,
+			mock.MatchedBy(func(q *query.Query) bool {
+				return q.Query == "CREATE OR REPLACE VIEW project.dataset.events AS\nSELECT * FROM huge_table"
+			}),
+		).Return(&bigquery.QueryStatistics{
+			StatementType:       "CREATE_VIEW",
+			TotalBytesProcessed: 0,
+		}, nil)
+
+		connGetter.On("GetConnection", "bq-conn").Return(mockDryRunnerQuerier)
+
+		dryRunner := &DryRunner{
+			ConnectionGetter: connGetter,
+			QueryExtractor:   queryExtractor,
+		}
+
+		result, err := dryRunner.DryRun(t.Context(), *pl, asset, &config.Config{})
+
+		require.NoError(t, err)
+		stats := result["bigquery"].(*bigquery.QueryStatistics)
+		assert.Equal(t, "CREATE_VIEW", stats.StatementType)
+		assert.Equal(t, int64(0), stats.TotalBytesProcessed)
+
+		mockDryRunnerQuerier.AssertExpectations(t)
+	})
+
+	t.Run("view materialization does not double-wrap when body is already view DDL", func(t *testing.T) {
+		t.Parallel()
+		connGetter := &mockConnectionGetter{}
+		queryExtractor := &mockQueryExtractor{}
+
+		body := "CREATE OR REPLACE VIEW project.dataset.events AS SELECT 1"
+		asset := pipeline.Asset{
+			Name:       "project.dataset.events",
+			Type:       pipeline.AssetTypeBigqueryQuery,
+			Connection: "bq-conn",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: body,
+			},
+			Materialization: pipeline.Materialization{
+				Type: pipeline.MaterializationTypeView,
+			},
+		}
+
+		pl := &pipeline.Pipeline{}
+
+		queryExtractor.On("ExtractQueriesFromString", body).Return(
+			[]*query.Query{{Query: body}}, nil,
+		)
+
+		mockDryRunnerQuerier := &mockDryRunnerQuerier{}
+		mockDryRunnerQuerier.On(
+			"QueryDryRun",
+			mock.Anything,
+			mock.MatchedBy(func(q *query.Query) bool {
+				return q.Query == body
+			}),
+		).Return(&bigquery.QueryStatistics{
+			StatementType: "CREATE_VIEW",
+		}, nil)
+
+		connGetter.On("GetConnection", "bq-conn").Return(mockDryRunnerQuerier)
+
+		dryRunner := &DryRunner{
+			ConnectionGetter: connGetter,
+			QueryExtractor:   queryExtractor,
+		}
+
+		result, err := dryRunner.DryRun(t.Context(), *pl, asset, &config.Config{})
+
+		require.NoError(t, err)
+		assert.Equal(t, "CREATE_VIEW", result["bigquery"].(*bigquery.QueryStatistics).StatementType)
+
+		mockDryRunnerQuerier.AssertExpectations(t)
+	})
+
+	t.Run("table materialization is not wrapped", func(t *testing.T) {
+		t.Parallel()
+		connGetter := &mockConnectionGetter{}
+		queryExtractor := &mockQueryExtractor{}
+
+		asset := pipeline.Asset{
+			Name:       "project.dataset.events",
+			Type:       pipeline.AssetTypeBigqueryQuery,
+			Connection: "bq-conn",
+			ExecutableFile: pipeline.ExecutableFile{
+				Content: "SELECT * FROM huge_table",
+			},
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyCreateReplace,
+			},
+		}
+
+		pl := &pipeline.Pipeline{}
+
+		queryExtractor.On("ExtractQueriesFromString", "SELECT * FROM huge_table").Return(
+			[]*query.Query{{Query: "SELECT * FROM huge_table"}}, nil,
+		)
+
+		mockDryRunnerQuerier := &mockDryRunnerQuerier{}
+		mockDryRunnerQuerier.On(
+			"QueryDryRun",
+			mock.Anything,
+			mock.MatchedBy(func(q *query.Query) bool {
+				return q.Query == "SELECT * FROM huge_table"
+			}),
+		).Return(&bigquery.QueryStatistics{
+			StatementType:       "SELECT",
+			TotalBytesProcessed: 12345,
+		}, nil)
+
+		connGetter.On("GetConnection", "bq-conn").Return(mockDryRunnerQuerier)
+
+		dryRunner := &DryRunner{
+			ConnectionGetter: connGetter,
+			QueryExtractor:   queryExtractor,
+		}
+
+		result, err := dryRunner.DryRun(t.Context(), *pl, asset, &config.Config{})
+
+		require.NoError(t, err)
+		stats := result["bigquery"].(*bigquery.QueryStatistics)
+		assert.Equal(t, "SELECT", stats.StatementType)
+		assert.Equal(t, int64(12345), stats.TotalBytesProcessed)
+
+		mockDryRunnerQuerier.AssertExpectations(t)
+	})
 }
 
 func TestDryRunner_DryRun_EdgeCases(t *testing.T) {

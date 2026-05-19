@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -57,6 +58,21 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 	}
 	q := queries[0]
 
+	// For view-materialized assets, mirror what the runner will actually submit:
+	// CREATE OR REPLACE VIEW <name> AS <body>. Dry-running the raw SELECT body
+	// reports the underlying scan bytes (often many TB), whereas BigQuery dry-runs
+	// view DDL at 0 bytes. Skip when the body is already a view DDL.
+	if a.Materialization.Type == pipeline.MaterializationTypeView && !isViewDDL(q.Query) {
+		wrapped, wrapErr := viewMaterializer(&a, q.Query)
+		if wrapErr != nil {
+			return nil, wrapErr
+		}
+		q = &query.Query{
+			VariableDefinitions: q.VariableDefinitions,
+			Query:               wrapped,
+		}
+	}
+
 	connName, err := p.GetConnectionNameForAsset(&a)
 	if err != nil {
 		return nil, err
@@ -77,7 +93,13 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"bigquery": meta,
 	}, nil
+}
+
+func isViewDDL(q string) bool {
+	upper := strings.ToUpper(strings.TrimSpace(q))
+	return strings.HasPrefix(upper, "CREATE OR REPLACE VIEW") ||
+		strings.HasPrefix(upper, "CREATE VIEW")
 }
