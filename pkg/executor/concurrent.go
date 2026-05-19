@@ -38,6 +38,8 @@ const (
 	KeyVerbose contextKey = iota
 	ContextLogger
 	timeFormat = "15:04:05"
+
+	stillRunningLogInterval = 120 * time.Second
 )
 
 type FormattingOptions struct {
@@ -139,7 +141,7 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 			tickerWg.Add(1)
 			go func() {
 				defer tickerWg.Done()
-				ticker := time.NewTicker(10 * time.Second)
+				ticker := time.NewTicker(stillRunningLogInterval)
 				defer ticker.Stop()
 				for {
 					select {
