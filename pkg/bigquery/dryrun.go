@@ -99,7 +99,34 @@ func (r *DryRunner) DryRun(ctx context.Context, p pipeline.Pipeline, a pipeline.
 }
 
 func isViewDDL(q string) bool {
-	upper := strings.ToUpper(strings.TrimSpace(q))
+	stripped := stripLeadingWhitespaceAndComments(q)
+	upper := strings.ToUpper(stripped)
 	return strings.HasPrefix(upper, "CREATE OR REPLACE VIEW") ||
 		strings.HasPrefix(upper, "CREATE VIEW")
+}
+
+// stripLeadingWhitespaceAndComments skips past leading whitespace, `-- line`
+// comments, and `/* block */` comments so the caller can inspect the first
+// meaningful token. WholeFileExtractor does not strip comments, so a view body
+// can legitimately start with a banner comment before the DDL keyword.
+func stripLeadingWhitespaceAndComments(s string) string {
+	for {
+		s = strings.TrimLeft(s, " \t\r\n")
+		switch {
+		case strings.HasPrefix(s, "--"):
+			if idx := strings.IndexByte(s, '\n'); idx >= 0 {
+				s = s[idx+1:]
+				continue
+			}
+			return ""
+		case strings.HasPrefix(s, "/*"):
+			if idx := strings.Index(s, "*/"); idx >= 0 {
+				s = s[idx+2:]
+				continue
+			}
+			return ""
+		default:
+			return s
+		}
+	}
 }
