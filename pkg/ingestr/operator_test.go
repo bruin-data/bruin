@@ -1443,6 +1443,75 @@ func TestSeedOperator_UseGong(t *testing.T) {
 		require.NoError(t, err)
 		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
 	})
+
+	t.Run("default (no version, no use_gong) routes to gong/v1", func(t *testing.T) {
+		t.Parallel()
+
+		runner := new(contextCapturingRunner)
+		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
+
+		gongInst := new(mockGongInstaller)
+		gongInst.On("EnsureGongInstalled", mock.Anything, "").Return("/path/to/gong", nil)
+
+		o := &SeedOperator{
+			conn:   &fetcher,
+			finder: finder,
+			runner: runner,
+			gong:   gongInst,
+		}
+
+		ti := scheduler.AssetInstance{
+			Pipeline: &pipeline.Pipeline{},
+			Asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"path": "seed.csv",
+				},
+			},
+		}
+
+		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+
+		err := o.Run(ctx, &ti)
+		require.NoError(t, err)
+		gongInst.AssertCalled(t, "EnsureGongInstalled", mock.Anything, "")
+		assert.Equal(t, "/path/to/gong", runner.capturedCtx.Value(python.CtxGongPath))
+	})
+
+	t.Run("use_gong=false opts out of gong default", func(t *testing.T) {
+		t.Parallel()
+
+		runner := new(mockRunner)
+		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
+
+		gongInst := new(mockGongInstaller)
+
+		o := &SeedOperator{
+			conn:   &fetcher,
+			finder: finder,
+			runner: runner,
+			gong:   gongInst,
+		}
+
+		ti := scheduler.AssetInstance{
+			Pipeline: &pipeline.Pipeline{},
+			Asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"path":     "seed.csv",
+					"use_gong": "false",
+				},
+			},
+		}
+
+		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+
+		err := o.Run(ctx, &ti)
+		require.NoError(t, err)
+		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
+	})
 }
 
 func TestResolveIngestrEngine(t *testing.T) {
