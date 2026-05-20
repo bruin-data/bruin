@@ -496,6 +496,12 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("source connection not configured")
 	}
 
+	// Seed assets default to v1 (gong, the new ingestr). Users can pin the old
+	// engine with parameters.version=v0 or parameters.use_gong=false.
+	if _, hasUseGong := asset.Parameters["use_gong"]; !hasUseGong && strings.TrimSpace(asset.Parameters["version"]) == "" {
+		asset.Parameters["use_gong"] = "true"
+	}
+
 	sourceURI, err := resolveSeedSourceURI(sourceConnectionPath, asset.Parameters["file_type"], filepath.Dir(asset.ExecutableFile.Path))
 	if err != nil {
 		return err
