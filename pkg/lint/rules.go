@@ -601,6 +601,13 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
+		if !isCSVSeed(seedPath, asset.Parameters["file_type"]) {
+			// For parquet/json/jsonl/ndjson/avro the schema is binary or
+			// semi-structured; column-vs-header validation is left to gongestr
+			// at runtime, just like the URL case above.
+			return issues, nil
+		}
+
 		file, err := os.Open(seedFilePath)
 		if err != nil {
 			issues = append(issues, &Issue{
@@ -636,6 +643,21 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 		}
 	}
 	return issues, nil
+}
+
+// isCSVSeed reports whether the seed should be treated as a CSV file for the
+// purpose of header/column validation. An explicit file_type parameter wins;
+// otherwise the file extension decides.
+func isCSVSeed(seedPath, fileType string) bool {
+	if ft := strings.ToLower(strings.TrimSpace(fileType)); ft != "" {
+		return ft == "csv"
+	}
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(seedPath)), ".")
+	switch ext {
+	case "parquet", "pq", "jsonl", "ndjson", "json", "avro":
+		return false
+	}
+	return true
 }
 
 var arnPattern = regexp.MustCompile(`^arn:[^:\n]*:[^:\n]*:[^:\n]*:[^:\n]*:(?:[^:\/\n]*[:\/])?.*$`)

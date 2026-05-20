@@ -633,6 +633,79 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				"log",
 			},
 		},
+		{
+			name: "parquet seed uses parquet:// scheme",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Type:       pipeline.AssetTypeDuckDBSeed,
+				Parameters: map[string]string{
+					"path": "seed.parquet",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "parquet://seed.parquet", "--source-table", "seed.raw", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "jsonl seed uses jsonl:// scheme",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Type:       pipeline.AssetTypeDuckDBSeed,
+				Parameters: map[string]string{
+					"path": "seed.jsonl",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "jsonl://seed.jsonl", "--source-table", "seed.raw", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "ndjson extension maps to ndjson:// scheme",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Type:       pipeline.AssetTypeDuckDBSeed,
+				Parameters: map[string]string{
+					"path": "seed.ndjson",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "ndjson://seed.ndjson", "--source-table", "seed.raw", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "json seed uses json:// scheme",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Type:       pipeline.AssetTypeDuckDBSeed,
+				Parameters: map[string]string{
+					"path": "seed.json",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "json://seed.json", "--source-table", "seed.raw", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "avro seed uses avro:// scheme",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Type:       pipeline.AssetTypeDuckDBSeed,
+				Parameters: map[string]string{
+					"path": "seed.avro",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "avro://seed.avro", "--source-table", "seed.raw", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "explicit file_type parameter overrides extension",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Type:       pipeline.AssetTypeDuckDBSeed,
+				Parameters: map[string]string{
+					"path":      "seed.dat",
+					"file_type": "parquet",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "parquet://seed.dat", "--source-table", "seed.raw", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -660,6 +733,63 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 
 			err := o.Run(ctx, &ti)
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestResolveSeedSourceURI(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		seedPath  string
+		fileType  string
+		assetDir  string
+		want      string
+		expectErr string
+	}{
+		{name: "csv extension", seedPath: "data.csv", want: "csv://data.csv"},
+		{name: "parquet extension", seedPath: "data.parquet", want: "parquet://data.parquet"},
+		{name: "pq extension maps to parquet", seedPath: "data.pq", want: "parquet://data.pq"},
+		{name: "jsonl extension", seedPath: "data.jsonl", want: "jsonl://data.jsonl"},
+		{name: "ndjson extension", seedPath: "data.ndjson", want: "ndjson://data.ndjson"},
+		{name: "json extension", seedPath: "data.json", want: "json://data.json"},
+		{name: "avro extension", seedPath: "data.avro", want: "avro://data.avro"},
+		{name: "unknown extension falls back to csv", seedPath: "data.dat", want: "csv://data.dat"},
+		{name: "no extension falls back to csv", seedPath: "data", want: "csv://data"},
+		{
+			name:     "explicit file_type overrides extension",
+			seedPath: "data.csv", fileType: "parquet", want: "parquet://data.csv",
+		},
+		{
+			name:     "file_type is case insensitive",
+			seedPath: "data", fileType: "Parquet", want: "parquet://data",
+		},
+		{
+			name:     "asset dir is joined with relative path",
+			seedPath: "seed.parquet", assetDir: "/repo/assets", want: "parquet:///repo/assets/seed.parquet",
+		},
+		{name: "http URL is passed through unchanged", seedPath: "http://example.com/data.parquet", want: "http://example.com/data.parquet"},
+		{name: "https URL is passed through unchanged", seedPath: "https://example.com/data.parquet", want: "https://example.com/data.parquet"},
+		{
+			name:      "invalid file_type returns error",
+			seedPath:  "data.txt",
+			fileType:  "xml",
+			expectErr: "unsupported seed file_type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := resolveSeedSourceURI(tt.seedPath, tt.fileType, tt.assetDir)
+			if tt.expectErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

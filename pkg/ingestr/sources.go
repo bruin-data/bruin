@@ -821,6 +821,11 @@ var gongSources = map[string]bool{
 	"smartsheet":   true,
 	"stripe":       true,
 	"surveymonkey": true,
+	"parquet":      true,
+	"json":         true,
+	"jsonl":        true,
+	"ndjson":       true,
+	"avro":         true,
 }
 
 // gongDestinations is the set of destination schemes that require gong.

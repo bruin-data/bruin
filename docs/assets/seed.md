@@ -1,6 +1,6 @@
 # Seed Assets
 
-Seeds are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your data platform. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the destination platform accurately.
+Seeds are files that contain data prepared outside of your pipeline and loaded into your data platform. Bruin supports seed assets natively, allowing you to drop a CSV, Parquet, JSON, JSONL/NDJSON or Avro file in your pipeline and load it to the destination accurately.
 
 You can define seed assets in a file ending with `.asset.yml` or `.asset.yaml`:
 
@@ -22,11 +22,27 @@ The `parameters` key in the configuration defines the parameters for the seed as
 
 | Parameter | Required | Default | Description |
 | --- | --- | --- | --- |
-| `path` | Yes | - | Path to the CSV file to load. Can be a relative path (relative to the asset definition file) or a URL pointing to a publicly accessible CSV file. |
-| `enforce_schema` | No | `true` | When `true`, enforces column types defined in the `columns` section. Set to `false` to let ingestr infer types from the CSV. |
+| `path` | Yes | - | Path to the seed file to load. Can be a relative path (relative to the asset definition file) or a URL pointing to a publicly accessible file. |
+| `file_type` | No | inferred from file extension | Explicit format override. One of `csv`, `parquet`, `json`, `jsonl`, `ndjson`, `avro`. Useful when the file has a non-standard extension. |
+| `enforce_schema` | No | `true` | When `true`, enforces column types defined in the `columns` section. Set to `false` to let the loader infer types from the file. |
 
-::: warning Column validation skipped for URLs
-When using a URL path, column validation is skipped during `bruin validate`. Column mismatches will be caught at runtime when `bruin run` fetches the data.
+## Supported file formats
+
+Bruin detects the format from the file extension and selects the appropriate loader:
+
+| Extension | Format |
+| --- | --- |
+| `.csv` | CSV |
+| `.parquet`, `.pq` | Parquet |
+| `.jsonl` | JSONL |
+| `.ndjson` | NDJSON |
+| `.json` | JSON |
+| `.avro` | Avro |
+
+Use `file_type` to override the inferred format, for example when the file has no extension or uses a non-standard one.
+
+::: warning Column validation skipped for non-CSV files and URLs
+For Parquet, JSON, JSONL, NDJSON, Avro and URL-based seeds, column validation is skipped during `bruin validate`. Mismatches are caught at runtime instead.
 :::
 
 ::: tip
@@ -91,6 +107,29 @@ parameters:
 ```
 
 This will download the CSV from the URL and load it into the database at runtime.
+
+### Loading Parquet, JSON, JSONL or Avro
+
+Drop the file in your pipeline and Bruin will pick the right loader from the extension:
+
+```yaml
+name: dashboard.orders
+type: duckdb.seed
+
+parameters:
+    path: orders.parquet
+```
+
+To override the inferred format (for example when a Parquet file is named `data.bin`), set `file_type`:
+
+```yaml
+name: dashboard.orders
+type: duckdb.seed
+
+parameters:
+    path: data.bin
+    file_type: parquet
+```
 
 ### Enforcing column types
 
