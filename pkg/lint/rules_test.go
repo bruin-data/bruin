@@ -3913,6 +3913,85 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 	}
 }
 
+func TestValidateAssetSeedValidation_InvalidFileType(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "data.dat"), []byte{}, 0o600))
+
+	asset := &pipeline.Asset{
+		Name: "test_seed",
+		Type: "duckdb.seed",
+		Parameters: map[string]string{
+			"path":      "data.dat",
+			"file_type": "xml",
+		},
+		DefinitionFile: pipeline.TaskDefinitionFile{
+			Path: filepath.Join(tmpDir, "asset.yml"),
+		},
+	}
+
+	issues, err := ValidateAssetSeedValidation(ctx, &pipeline.Pipeline{}, asset)
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Contains(t, issues[0].Description, `Unsupported seed file_type "xml"`)
+}
+
+func TestValidateAssetSeedValidation_NonCSVFormats(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create empty placeholder files for each supported non-CSV format. The
+	// validator should not try to parse them as CSV.
+	for _, name := range []string{"data.parquet", "data.jsonl", "data.ndjson", "data.json", "data.avro", "data.dat"} {
+		path := filepath.Join(tmpDir, name)
+		require.NoError(t, os.WriteFile(path, []byte{}, 0o600))
+	}
+
+	tests := []struct {
+		name     string
+		seedPath string
+		fileType string
+	}{
+		{name: "parquet skips CSV header check", seedPath: "data.parquet"},
+		{name: "jsonl skips CSV header check", seedPath: "data.jsonl"},
+		{name: "ndjson skips CSV header check", seedPath: "data.ndjson"},
+		{name: "json skips CSV header check", seedPath: "data.json"},
+		{name: "avro skips CSV header check", seedPath: "data.avro"},
+		{name: "file_type=parquet on .dat skips CSV header check", seedPath: "data.dat", fileType: "parquet"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{
+				Name: "test_seed",
+				Type: "duckdb.seed",
+				Parameters: map[string]string{
+					"path": tt.seedPath,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{Name: "name"},
+				},
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: filepath.Join(tmpDir, "asset.yml"),
+				},
+			}
+			if tt.fileType != "" {
+				asset.Parameters["file_type"] = tt.fileType
+			}
+
+			issues, err := ValidateAssetSeedValidation(ctx, &pipeline.Pipeline{}, asset)
+			require.NoError(t, err)
+			assert.Empty(t, issues, "non-CSV seeds should not produce header/column issues")
+		})
+	}
+}
+
 func TestValidateTableSensorTableParameter(t *testing.T) {
 	t.Parallel()
 

@@ -386,6 +386,47 @@ func schemeOf(uri string) string {
 	return parsed.Scheme
 }
 
+// seedFileSchemes maps a file_type / extension token to the URI scheme that
+// gongestr expects for local file sources. Keep the keys lower-case.
+var seedFileSchemes = map[string]string{
+	"csv":     "csv",
+	"parquet": "parquet",
+	"pq":      "parquet",
+	"jsonl":   "jsonl",
+	"ndjson":  "ndjson",
+	"json":    "json",
+	"avro":    "avro",
+}
+
+// resolveSeedSourceURI builds the source URI for a seed asset's local file or
+// passes through an http(s) URL unchanged. The scheme is selected from the
+// explicit file_type parameter when set, otherwise inferred from the file
+// extension; unknown types fall back to csv for backward compatibility.
+func resolveSeedSourceURI(seedPath, fileType, assetDir string) (string, error) {
+	lowerPath := strings.ToLower(seedPath)
+	if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
+		return seedPath, nil
+	}
+
+	var scheme string
+	if ft := strings.ToLower(strings.TrimSpace(fileType)); ft != "" {
+		mapped, ok := seedFileSchemes[ft]
+		if !ok {
+			return "", fmt.Errorf("unsupported seed file_type %q (supported: csv, parquet, json, jsonl, ndjson, avro)", fileType)
+		}
+		scheme = mapped
+	} else {
+		ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(seedPath)), ".")
+		mapped, ok := seedFileSchemes[ext]
+		if !ok {
+			mapped = "csv"
+		}
+		scheme = mapped
+	}
+
+	return scheme + "://" + filepath.Join(assetDir, seedPath), nil
+}
+
 func applyClickHouseEngineParams(destURI string, params map[string]string) string {
 	parsedURI, err := url.Parse(destURI)
 	if err != nil {
@@ -455,12 +496,15 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("source connection not configured")
 	}
 
-	var sourceURI string
-	lowerPath := strings.ToLower(sourceConnectionPath)
-	if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
-		sourceURI = sourceConnectionPath
-	} else {
-		sourceURI = "csv://" + filepath.Join(filepath.Dir(asset.ExecutableFile.Path), sourceConnectionPath)
+	sourceURI, err := resolveSeedSourceURI(sourceConnectionPath, asset.Parameters["file_type"], filepath.Dir(asset.ExecutableFile.Path))
+	if err != nil {
+		return err
+	}
+
+	if parsedSource, err := url.Parse(sourceURI); err == nil {
+		if _, ok := gongSources[parsedSource.Scheme]; ok {
+			asset.Parameters["use_gong"] = "true"
+		}
 	}
 
 	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(asset)

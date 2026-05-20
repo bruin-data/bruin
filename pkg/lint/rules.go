@@ -591,6 +591,15 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
+		fileType := strings.ToLower(strings.TrimSpace(asset.Parameters["file_type"]))
+		if fileType != "" && !supportedSeedFileTypes[fileType] {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Unsupported seed file_type %q (supported: csv, parquet, pq, json, jsonl, ndjson, avro)", asset.Parameters["file_type"]),
+			})
+			return issues, nil
+		}
+
 		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), seedPath)
 		_, err := os.Stat(seedFilePath)
 		if os.IsNotExist(err) {
@@ -598,6 +607,13 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 				Task:        asset,
 				Description: "Seed file does not exist or cannot be found",
 			})
+			return issues, nil
+		}
+
+		if !isCSVSeed(seedPath, asset.Parameters["file_type"]) {
+			// For parquet/json/jsonl/ndjson/avro the schema is binary or
+			// semi-structured; column-vs-header validation is left to gongestr
+			// at runtime, just like the URL case above.
 			return issues, nil
 		}
 
@@ -636,6 +652,33 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 		}
 	}
 	return issues, nil
+}
+
+// supportedSeedFileTypes is the set of valid file_type values for seed assets.
+// Must stay in sync with seedFileSchemes in pkg/ingestr/operator.go.
+var supportedSeedFileTypes = map[string]bool{
+	"csv":     true,
+	"parquet": true,
+	"pq":      true,
+	"jsonl":   true,
+	"ndjson":  true,
+	"json":    true,
+	"avro":    true,
+}
+
+// isCSVSeed reports whether the seed should be treated as a CSV file for the
+// purpose of header/column validation. An explicit file_type parameter wins;
+// otherwise the file extension decides.
+func isCSVSeed(seedPath, fileType string) bool {
+	if ft := strings.ToLower(strings.TrimSpace(fileType)); ft != "" {
+		return ft == "csv"
+	}
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(seedPath)), ".")
+	switch ext {
+	case "parquet", "pq", "jsonl", "ndjson", "json", "avro":
+		return false
+	}
+	return true
 }
 
 var arnPattern = regexp.MustCompile(`^arn:[^:\n]*:[^:\n]*:[^:\n]*:[^:\n]*:(?:[^:\/\n]*[:\/])?.*$`)
