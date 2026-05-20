@@ -3913,6 +3913,31 @@ func TestValidateAssetSeedValidation_URLSupport(t *testing.T) {
 	}
 }
 
+func TestValidateAssetSeedValidation_InvalidFileType(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "data.dat"), []byte{}, 0o600))
+
+	asset := &pipeline.Asset{
+		Name: "test_seed",
+		Type: "duckdb.seed",
+		Parameters: map[string]string{
+			"path":      "data.dat",
+			"file_type": "xml",
+		},
+		DefinitionFile: pipeline.TaskDefinitionFile{
+			Path: filepath.Join(tmpDir, "asset.yml"),
+		},
+	}
+
+	issues, err := ValidateAssetSeedValidation(ctx, &pipeline.Pipeline{}, asset)
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Contains(t, issues[0].Description, `Unsupported seed file_type "xml"`)
+}
+
 func TestValidateAssetSeedValidation_NonCSVFormats(t *testing.T) {
 	t.Parallel()
 

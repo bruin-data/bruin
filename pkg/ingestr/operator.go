@@ -503,9 +503,6 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	if parsedSource, err := url.Parse(sourceURI); err == nil {
 		if _, ok := gongSources[parsedSource.Scheme]; ok {
-			if asset.Parameters == nil {
-				asset.Parameters = make(map[string]string)
-			}
 			asset.Parameters["use_gong"] = "true"
 		}
 	}

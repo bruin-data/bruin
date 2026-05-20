@@ -591,6 +591,15 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			return issues, nil
 		}
 
+		fileType := strings.ToLower(strings.TrimSpace(asset.Parameters["file_type"]))
+		if fileType != "" && !supportedSeedFileTypes[fileType] {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Unsupported seed file_type %q (supported: csv, parquet, pq, json, jsonl, ndjson, avro)", asset.Parameters["file_type"]),
+			})
+			return issues, nil
+		}
+
 		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), seedPath)
 		_, err := os.Stat(seedFilePath)
 		if os.IsNotExist(err) {
@@ -643,6 +652,18 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 		}
 	}
 	return issues, nil
+}
+
+// supportedSeedFileTypes is the set of valid file_type values for seed assets.
+// Must stay in sync with seedFileSchemes in pkg/ingestr/operator.go.
+var supportedSeedFileTypes = map[string]bool{
+	"csv":     true,
+	"parquet": true,
+	"pq":      true,
+	"jsonl":   true,
+	"ndjson":  true,
+	"json":    true,
+	"avro":    true,
 }
 
 // isCSVSeed reports whether the seed should be treated as a CSV file for the
