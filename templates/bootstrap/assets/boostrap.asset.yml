@@ -4,3 +4,4 @@ connection: duckdb-default
 
 parameters:
     path: seed.csv
+    version: v0
