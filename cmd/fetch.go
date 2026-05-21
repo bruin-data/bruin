@@ -96,7 +96,7 @@ func Query() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:  "semantic-model",
-				Usage: "Name of the semantic model to compile and query from the pipeline semantic directory.",
+				Usage: "Name of the semantic model to compile and query from the repository semantic directory.",
 			},
 			&cli.StringSliceFlag{
 				Name:  "metric",
@@ -591,9 +591,18 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		}
 	}
 
-	model, ok := pipelineInfo.Pipeline.SemanticModels[semanticModelName]
+	semanticInputPath := pipelinePath
+	if assetPath != "" {
+		semanticInputPath = assetPath
+	}
+	models, semanticPath, err := loadRepoSemanticModels(fs, semanticInputPath)
+	if err != nil {
+		return "", nil, "", "", nil, errors.Wrap(err, "failed to load repo semantic models")
+	}
+
+	model, ok := models[semanticModelName]
 	if !ok {
-		return "", nil, "", "", nil, errors.Errorf("semantic model %q not found", semanticModelName)
+		return "", nil, "", "", nil, errors.Errorf("semantic model %q not found in %s", semanticModelName, semanticPath)
 	}
 
 	semanticQuery, err := semanticQueryFromCommand(c)
@@ -601,7 +610,7 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		return "", nil, "", "", nil, err
 	}
 
-	engine, err := semantic.NewEngine(model)
+	engine, err := semantic.NewEngineWithModels(model, models)
 	if err != nil {
 		return "", nil, "", "", nil, errors.Wrapf(err, "failed to initialize semantic model %q", semanticModelName)
 	}
@@ -622,6 +631,13 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 			return "", nil, "", "", nil, errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
 		}
 		extractor = clonedExtractor
+		if clonedRenderer, ok := clonedExtractor.(*query.WholeFileExtractor); ok {
+			if r, ok := clonedRenderer.Renderer.(*jinja.Renderer); ok {
+				for k, v := range vars {
+					r.SetContextValue(k, v)
+				}
+			}
+		}
 		queryStr, err := extractQuery(compiledQuery, extractor)
 		if err != nil {
 			return "", nil, "", "", nil, err
@@ -659,6 +675,20 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 	}
 }
 
+func loadRepoSemanticModels(fs afero.Fs, inputPath string) (map[string]*semantic.Model, string, error) {
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	semanticPath := filepath.Join(repoRoot.Path, "semantic")
+	models, err := semantic.LoadDirFS(fs, semanticPath)
+	if err != nil {
+		return nil, semanticPath, err
+	}
+	return models, semanticPath, nil
+}
+
 func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate time.Time, endDate time.Time) context.Context {
 	fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
@@ -669,7 +699,7 @@ func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate t
 }
 
 func newSemanticRenderer(pipelineInfo *ppInfo, vars map[string]any, startDate time.Time, endDate time.Time) *jinja.Renderer {
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil)
+	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", pipelineInfo.Pipeline.Variables.Value())
 	for k, v := range vars {
 		renderer.SetContextValue(k, v)
 	}

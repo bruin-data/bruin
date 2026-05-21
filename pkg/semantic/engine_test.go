@@ -125,6 +125,27 @@ func TestLoadDir_FixtureModels(t *testing.T) {
 	}
 }
 
+func TestLoadDir_LoadsNestedModelFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	nested := filepath.Join(dir, "commerce")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("create fixture dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "orders.yml"), []byte("name: orders\nsource:\n  table: analytics.orders\nmetrics:\n  - name: revenue\n    expression: sum(amount)\n"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	models, err := LoadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := models["orders"]; !ok {
+		t.Fatalf("expected nested orders model, got %v", Names(models))
+	}
+}
+
 func TestLoadFile_RejectsInvalidModel(t *testing.T) {
 	t.Parallel()
 
@@ -145,7 +166,7 @@ func TestLoadFile_DefaultsModelSchemaToV1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load model without schema: %v", err)
 	}
-	if model.Schema != "https://getbruin.com/schemas/dac/semantic-model/v1" {
+	if model.Schema != "v1" {
 		t.Fatalf("expected default schema v1, got %q", model.Schema)
 	}
 }
@@ -605,7 +626,7 @@ func TestGenerateSQL_Cases(t *testing.T) {
 				Sort:       []SortSpec{{Name: "order_date", Direction: "asc"}},
 				Limit:      5,
 			},
-			must: []string{") base ORDER BY order_date ASC LIMIT 5"},
+			must: []string{") base ORDER BY base.order_date ASC LIMIT 5"},
 		},
 	}
 
@@ -1165,6 +1186,381 @@ func TestStructuredFilterValidationRejectsInvalidOperatorAndValue(t *testing.T) 
 			}
 		})
 	}
+}
+
+func TestJoinGraphJoinsReachableDimension(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{
+		"orders":    orders,
+		"customers": customers,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "customers.country"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "SELECT customers.country AS customers_country, sum(base.order_total) AS revenue")
+	expectContains(t, sql, "FROM (SELECT * FROM orders) base")
+	expectContains(t, sql, "LEFT JOIN (SELECT * FROM customers) customers ON base.customer_id = customers.customer_id")
+	expectContains(t, sql, "GROUP BY 1")
+}
+
+func TestJoinGraphAllowsUnqualifiedDimensionWhenUnambiguous(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "country"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "customers.country AS country")
+	expectContains(t, sql, "SELECT customers.country AS country, sum(base.order_total) AS revenue")
+}
+
+func TestJoinGraphRejectsFanoutPath(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "order_items", Relationship: "one_to_many", ForeignKey: "order_id"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	orderItems := &Model{
+		Name:       "order_items",
+		Source:     Source{Table: "order_items"},
+		Dimensions: []Dimension{{Name: "product_id", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "order_items": orderItems})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "order_items.product_id"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err == nil {
+		t.Fatal("expected unsafe fanout path to fail")
+	}
+	if !strings.Contains(err.Error(), "join not found or unsafe: order_items") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestJoinGraphSupportsRemoteStructuredFilter(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Metrics: []string{"revenue"},
+		Filters: []Filter{{
+			Dimension: "customers.country",
+			Operator:  "equals",
+			Value:     "US",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "LEFT JOIN (SELECT * FROM customers) customers ON base.customer_id = customers.customer_id")
+	expectContains(t, sql, "WHERE customers.country = 'US'")
+}
+
+func TestJoinGraphSupportsMultiHopSafePath(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "customer_id",
+		Joins: []Join{
+			{Name: "countries", Relationship: "many_to_one", ForeignKey: "country_id"},
+		},
+	}
+	countries := &Model{
+		Name:       "countries",
+		Source:     Source{Table: "countries"},
+		PrimaryKey: "country_id",
+		Dimensions: []Dimension{{Name: "region", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{
+		"orders":    orders,
+		"customers": customers,
+		"countries": countries,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "countries.region"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "LEFT JOIN (SELECT * FROM customers) customers ON base.customer_id = customers.customer_id")
+	expectContains(t, sql, "LEFT JOIN (SELECT * FROM countries) countries ON customers.country_id = countries.country_id")
+	expectContains(t, sql, "countries.region AS countries_region")
+}
+
+func TestJoinGraphUsesTargetModelPrimaryKey(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "customers", Relationship: "many_to_one", ForeignKey: "buyer_id"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "id",
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "customers.country"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "ON base.buyer_id = customers.id")
+}
+
+func TestJoinGraphSupportsTargetKeyOverride(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "customers", Relationship: "many_to_one", ForeignKey: "buyer_email", TargetKey: "email"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "id",
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "customers.country"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "ON base.buyer_email = customers.email")
+}
+
+func TestJoinGraphSupportsSQLOverride(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{
+				Name:         "customer_tiers",
+				Relationship: "many_to_one",
+				SQL:          "{orders}.customer_id = {customer_tiers}.customer_id AND {orders}.order_date BETWEEN {customer_tiers}.valid_from AND {customer_tiers}.valid_to",
+			},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customerTiers := &Model{
+		Name:       "customer_tiers",
+		Source:     Source{Table: "customer_tiers"},
+		Dimensions: []Dimension{{Name: "tier", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customer_tiers": customerTiers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "customer_tiers.tier"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "ON base.customer_id = customer_tiers.customer_id AND base.order_date BETWEEN customer_tiers.valid_from AND customer_tiers.valid_to")
+}
+
+func TestJoinGraphUsesRequestedAliasWhenMultipleJoinsTargetSameModel(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "billing_country", Model: "countries", Relationship: "many_to_one", ForeignKey: "billing_country_id"},
+			{Name: "shipping_country", Model: "countries", Relationship: "many_to_one", ForeignKey: "shipping_country_id"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	countries := &Model{
+		Name:       "countries",
+		Source:     Source{Table: "countries"},
+		PrimaryKey: "id",
+		Dimensions: []Dimension{{Name: "region", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "countries": countries})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "shipping_country.region"}},
+		Metrics:    []string{"revenue"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "shipping_country.region AS shipping_country_region")
+	expectContains(t, sql, "LEFT JOIN (SELECT * FROM countries) shipping_country ON base.shipping_country_id = shipping_country.id")
+	expectNotContains(t, sql, "billing_country")
+}
+
+func TestJoinGraphQualifiesRootFieldsWhenJoined(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"},
+		},
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+		Metrics:    []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+		Segments:   []Segment{{Name: "completed", Filter: "status = 'completed'"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		PrimaryKey: "customer_id",
+		Dimensions: []Dimension{{Name: "segment", Type: "string"}},
+	}
+
+	engine, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := engine.GenerateSQL(&Query{
+		Dimensions: []DimensionRef{{Name: "country"}, {Name: "customers.segment"}},
+		Metrics:    []string{"revenue"},
+		Filters:    []Filter{{Dimension: "country", Operator: "equals", Value: "US"}},
+		Segments:   []string{"completed"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "SELECT base.country AS country, customers.segment AS customers_segment, sum(base.order_total) AS revenue")
+	expectContains(t, sql, "WHERE base.country = 'US' AND base.status = 'completed'")
+	expectContains(t, sql, "GROUP BY 1, 2")
+}
+
+func TestWindowSortOnlyDimensionIsAvailableInOuterOrder(t *testing.T) {
+	t.Parallel()
+
+	engine := minimalEngine(t, richTestModel())
+	sql, err := engine.GenerateSQL(&Query{
+		Metrics: []string{"running_revenue"},
+		Sort:    []SortSpec{{Name: "country", Direction: "asc"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, sql, "country AS country")
+	expectContains(t, sql, "SUM(base.revenue) OVER")
+	expectContains(t, sql, "ORDER BY base.country ASC")
 }
 
 func TestRichFixtureSmoke(t *testing.T) {

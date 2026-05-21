@@ -51,35 +51,27 @@ func LoadFileFS(fs afero.Fs, path string) (*Model, error) {
 	return model, nil
 }
 
-// LoadDir loads every *.yml/*.yaml semantic model from a directory.
+// LoadDir loads every *.yml/*.yaml semantic model from a directory tree.
 func LoadDir(dir string) (map[string]*Model, error) {
 	return LoadDirFS(afero.NewOsFs(), dir)
 }
 
-// LoadDirFS loads every *.yml/*.yaml semantic model from a directory using the given filesystem.
+// LoadDirFS loads every *.yml/*.yaml semantic model from a directory tree using the given filesystem.
 func LoadDirFS(fs afero.Fs, dir string) (map[string]*Model, error) {
 	if dir == "" {
 		return map[string]*Model{}, nil
 	}
 
-	entries, err := afero.ReadDir(fs, dir)
+	files, err := semanticModelFilesFS(fs, dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return map[string]*Model{}, nil
-		}
-		return nil, fmt.Errorf("reading semantic directory: %w", err)
+		return nil, err
 	}
 
 	models := make(map[string]*Model)
-	for _, entry := range entries {
-		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || !isYAMLFile(entry.Name()) {
-			continue
-		}
-
-		path := filepath.Join(dir, entry.Name())
+	for _, path := range files {
 		model, err := LoadFileFS(fs, path)
 		if err != nil {
-			return nil, fmt.Errorf("loading %s: %w", entry.Name(), err)
+			return nil, fmt.Errorf("loading %s: %w", semanticRelPath(dir, path), err)
 		}
 		if _, exists := models[model.Name]; exists {
 			return nil, fmt.Errorf("duplicate semantic model name %q", model.Name)
@@ -103,22 +95,14 @@ func LoadDirPartialFS(fs afero.Fs, dir string) (map[string]*Model, map[string]er
 		return map[string]*Model{}, map[string]error{}, nil
 	}
 
-	entries, err := afero.ReadDir(fs, dir)
+	files, err := semanticModelFilesFS(fs, dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return map[string]*Model{}, map[string]error{}, nil
-		}
-		return nil, nil, fmt.Errorf("reading semantic directory: %w", err)
+		return nil, nil, err
 	}
 
 	models := make(map[string]*Model)
 	invalid := make(map[string]error)
-	for _, entry := range entries {
-		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || !isYAMLFile(entry.Name()) {
-			continue
-		}
-
-		path := filepath.Join(dir, entry.Name())
+	for _, path := range files {
 		model, err := parseFileFS(fs, path)
 		if err != nil {
 			continue
@@ -138,7 +122,7 @@ func LoadDirPartialFS(fs afero.Fs, dir string) (map[string]*Model, map[string]er
 		}
 
 		if _, err := NewEngine(model); err != nil {
-			invalid[model.Name] = fmt.Errorf("loading %s: %w", entry.Name(), err)
+			invalid[model.Name] = fmt.Errorf("loading %s: %w", semanticRelPath(dir, path), err)
 			continue
 		}
 
@@ -155,6 +139,50 @@ func Names(models map[string]*Model) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+func semanticModelFilesFS(fs afero.Fs, dir string) ([]string, error) {
+	if _, err := fs.Stat(dir); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading semantic directory: %w", err)
+	}
+
+	files := make([]string, 0)
+	err := afero.Walk(fs, dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == dir {
+			return nil
+		}
+		if strings.HasPrefix(info.Name(), ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.IsDir() || !isYAMLFile(info.Name()) {
+			return nil
+		}
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading semantic directory: %w", err)
+	}
+
+	sort.Strings(files)
+	return files, nil
+}
+
+func semanticRelPath(dir, path string) string {
+	rel, err := filepath.Rel(dir, path)
+	if err != nil {
+		return path
+	}
+	return rel
 }
 
 func isYAMLFile(name string) bool {

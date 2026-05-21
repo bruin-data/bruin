@@ -9,9 +9,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const SemanticModelV1ID = "https://getbruin.com/schemas/dac/semantic-model/v1"
+const SemanticModelV1ID = "v1"
 
-//go:embed dac/semantic-model/v1/schema.json
+//go:embed semantic-model/v1/schema.json
 var files embed.FS
 
 var registry = struct {
@@ -46,7 +46,7 @@ func compiledSchemas() (map[string]*jsonschema.Schema, error) {
 		compiler.DefaultDraft(jsonschema.Draft2020)
 
 		resources := map[string]string{
-			SemanticModelV1ID: "dac/semantic-model/v1/schema.json",
+			SemanticModelV1ID: "semantic-model/v1/schema.json",
 		}
 		for id, path := range resources {
 			data, err := files.ReadFile(path)

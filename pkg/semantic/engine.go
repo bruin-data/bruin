@@ -27,18 +27,35 @@ func containsAggregateOutsideRefs(expr string) bool {
 // Engine generates SQL from a Model and a Query.
 type Engine struct {
 	model    *Model
+	models   map[string]*Model
 	metrics  map[string]*Metric
 	dims     map[string]*Dimension
 	segments map[string]*Segment
 }
 
 func NewEngine(m *Model) (*Engine, error) {
+	return newEngine(m, nil)
+}
+
+func NewEngineWithModels(m *Model, models map[string]*Model) (*Engine, error) {
+	return newEngine(m, models)
+}
+
+func newEngine(m *Model, models map[string]*Model) (*Engine, error) {
 	if m == nil {
 		return nil, errors.New("model is required")
 	}
 
+	modelSet := map[string]*Model{m.Name: m}
+	for name, model := range models {
+		if model != nil {
+			modelSet[name] = model
+		}
+	}
+
 	e := &Engine{
 		model:    m,
+		models:   modelSet,
 		metrics:  make(map[string]*Metric),
 		dims:     make(map[string]*Dimension),
 		segments: make(map[string]*Segment),
@@ -55,6 +72,11 @@ func NewEngine(m *Model) (*Engine, error) {
 	if err := e.validate(); err != nil {
 		return nil, err
 	}
+	for _, model := range modelSet {
+		if err := validateJoins(model); err != nil {
+			return nil, err
+		}
+	}
 	return e, nil
 }
 
@@ -67,6 +89,9 @@ func (e *Engine) validate() error {
 	}
 	if strings.TrimSpace(e.model.Source.Table) == "" {
 		return errors.New("source.table is required")
+	}
+	if err := validateJoins(e.model); err != nil {
+		return err
 	}
 
 	names := make(map[string]bool)
@@ -221,24 +246,26 @@ func (e *Engine) validateRefs(name string, visited map[string]bool) error {
 
 // GenerateSQL produces a SQL query string for the given Query.
 func (e *Engine) GenerateSQL(q *Query) (string, error) {
-	if err := e.validateQuery(q); err != nil {
+	plan, err := e.planQuery(q)
+	if err != nil {
+		return "", err
+	}
+	if err := e.validateQuery(q, plan); err != nil {
 		return "", err
 	}
 	if e.needsWindowWrap(q.Metrics) {
-		return e.generateWrapped(q)
+		return e.generateWrapped(q, plan)
 	}
-	return e.generateSimple(q)
+	return e.generateSimple(q, plan)
 }
 
-func (e *Engine) validateQuery(q *Query) error {
+func (e *Engine) validateQuery(q *Query, plan *queryPlan) error {
 	if len(q.Dimensions) == 0 && len(q.Metrics) == 0 {
 		return errors.New("query must include at least one dimension or metric")
 	}
 	for _, d := range q.Dimensions {
-		dim := e.dims[d.Name]
-		if dim == nil {
-			return fmt.Errorf("dimension not found: %s", d.Name)
-		}
+		binding := plan.dimensionBinding(d)
+		dim := binding.dimension
 		if d.Granularity != "" {
 			if dim.Type != "time" {
 				return fmt.Errorf("granularity on non-time dimension: %s", d.Name)
@@ -265,33 +292,31 @@ func (e *Engine) validateQuery(q *Query) error {
 		if f.Dimension == "" {
 			return errors.New("filter dimension is required")
 		}
-		if e.dims[f.Dimension] == nil {
-			return fmt.Errorf("filter dimension not found: %s", f.Dimension)
-		}
 		if err := validateStructuredFilter(f); err != nil {
 			return err
 		}
 	}
 	for _, sort := range q.Sort {
-		if e.dims[sort.Name] == nil && e.metrics[sort.Name] == nil {
+		if e.metrics[sort.Name] == nil && plan.sortBinding(sort.Name) == nil {
 			return fmt.Errorf("sort field not found: %s", sort.Name)
 		}
 	}
 	return nil
 }
 
-func (e *Engine) generateSimple(q *Query) (string, error) {
+func (e *Engine) generateSimple(q *Query, plan *queryPlan) (string, error) {
 	var sel []string
 	groupBy := make([]string, 0, len(q.Dimensions))
 
 	for i, d := range q.Dimensions {
-		expr := e.dimExpr(e.dims[d.Name], d.Granularity)
-		sel = append(sel, expr+" AS "+d.Name)
+		binding := plan.dimensionBinding(d)
+		expr := plan.dimensionSQL(binding)
+		sel = append(sel, expr+" AS "+binding.outputAlias)
 		groupBy = append(groupBy, strconv.Itoa(i+1))
 	}
 
 	for _, name := range q.Metrics {
-		expanded, err := e.expandSimple(name, map[string]bool{})
+		expanded, err := e.expandSimple(name, map[string]bool{}, plan)
 		if err != nil {
 			return "", err
 		}
@@ -299,9 +324,9 @@ func (e *Engine) generateSimple(q *Query) (string, error) {
 	}
 
 	sql := "SELECT " + strings.Join(sel, ", ")
-	sql += " FROM " + e.model.Source.Table
+	sql += plan.fromSQL()
 
-	where, having, err := e.buildWhereHaving(q)
+	where, having, err := e.buildWhereHaving(q, plan)
 	if err != nil {
 		return "", err
 	}
@@ -314,11 +339,11 @@ func (e *Engine) generateSimple(q *Query) (string, error) {
 	if having != "" {
 		sql += " HAVING " + having
 	}
-	sql += e.buildOrderAndLimit(q)
+	sql += e.buildOrderAndLimit(q, plan, false)
 	return sql, nil
 }
 
-func (e *Engine) expandSimple(name string, visited map[string]bool) (string, error) {
+func (e *Engine) expandSimple(name string, visited map[string]bool, plan *queryPlan) (string, error) {
 	if visited[name] {
 		return "", fmt.Errorf("circular dependency: %s", name)
 	}
@@ -334,18 +359,22 @@ func (e *Engine) expandSimple(name string, visited map[string]bool) (string, err
 	}
 
 	if !isDerived(m) {
+		expr := m.Expression
+		if plan != nil && plan.hasJoins() {
+			expr = qualifySQLIdentifiers(expr, "base")
+		}
 		if m.Filter != "" {
-			expandedFilter, _, err := e.expandFilterExpr(m.Filter)
+			expandedFilter, _, err := e.expandFilterExpr(m.Filter, plan)
 			if err != nil {
 				return "", err
 			}
-			return applyMetricFilter(m.Expression, expandedFilter), nil
+			return applyMetricFilter(expr, expandedFilter), nil
 		}
-		return m.Expression, nil
+		return expr, nil
 	}
 
 	return expandRefs(m.Expression, func(refName string) (string, error) {
-		expanded, err := e.expandSimple(refName, copyVisited(visited))
+		expanded, err := e.expandSimple(refName, copyVisited(visited), plan)
 		if err != nil {
 			return "", err
 		}
@@ -356,22 +385,33 @@ func (e *Engine) expandSimple(name string, visited map[string]bool) (string, err
 	})
 }
 
-func (e *Engine) generateWrapped(q *Query) (string, error) {
+func (e *Engine) generateWrapped(q *Query, plan *queryPlan) (string, error) {
 	innerMetrics := e.collectInnerMetrics(q.Metrics)
 	innerDimensions := e.collectInnerDimensions(q)
 
 	var innerSel []string
 	groupBy := make([]string, 0, len(innerDimensions))
 	for i, d := range innerDimensions {
-		expr := e.dimExpr(e.dims[d.Name], d.Granularity)
-		innerSel = append(innerSel, expr+" AS "+d.Name)
+		binding := plan.dimensionBinding(d)
+		if binding == nil {
+			var err error
+			binding, err = e.resolveDimension(d)
+			if err != nil {
+				return "", err
+			}
+			if err := plan.addDimension(binding); err != nil {
+				return "", err
+			}
+		}
+		expr := plan.dimensionSQL(binding)
+		innerSel = append(innerSel, expr+" AS "+binding.outputAlias)
 		groupBy = append(groupBy, strconv.Itoa(i+1))
 	}
 	for _, name := range innerMetrics {
 		if err := e.validateMetricFiltersForWrapped(name, map[string]bool{}); err != nil {
 			return "", err
 		}
-		expr, err := e.expandSimple(name, map[string]bool{})
+		expr, err := e.expandSimple(name, map[string]bool{}, plan)
 		if err != nil {
 			return "", err
 		}
@@ -379,9 +419,9 @@ func (e *Engine) generateWrapped(q *Query) (string, error) {
 	}
 
 	inner := "SELECT " + strings.Join(innerSel, ", ")
-	inner += " FROM " + e.model.Source.Table
+	inner += plan.fromSQL()
 
-	where, having, err := e.buildWhereHaving(q)
+	where, having, err := e.buildWhereHaving(q, plan)
 	if err != nil {
 		return "", err
 	}
@@ -397,7 +437,8 @@ func (e *Engine) generateWrapped(q *Query) (string, error) {
 
 	var outerSel []string
 	for _, d := range q.Dimensions {
-		outerSel = append(outerSel, "base."+d.Name)
+		binding := plan.dimensionBinding(d)
+		outerSel = append(outerSel, "base."+binding.outputAlias)
 	}
 	for _, name := range q.Metrics {
 		expanded, err := e.expandOuter(name, map[string]bool{})
@@ -409,7 +450,7 @@ func (e *Engine) generateWrapped(q *Query) (string, error) {
 
 	sql := "SELECT " + strings.Join(outerSel, ", ")
 	sql += " FROM (" + inner + ") base"
-	sql += e.buildOrderAndLimit(q)
+	sql += e.buildOrderAndLimit(q, plan, true)
 	return sql, nil
 }
 
@@ -580,7 +621,7 @@ func (e *Engine) dimExpr(d *Dimension, granularity string) string {
 	return d.Name
 }
 
-func (e *Engine) buildWhereHaving(q *Query) (where, having string, err error) {
+func (e *Engine) buildWhereHaving(q *Query, plan *queryPlan) (where, having string, err error) {
 	var whereParts, havingParts []string
 
 	for _, f := range q.Filters {
@@ -588,9 +629,9 @@ func (e *Engine) buildWhereHaving(q *Query) (where, having string, err error) {
 		if f.Expression != "" {
 			raw = f.Expression
 		} else {
-			raw = e.filterToSQL(f)
+			raw = e.filterToSQL(f, plan)
 		}
-		expanded, needsHaving, err := e.expandFilterExpr(raw)
+		expanded, needsHaving, err := e.expandFilterExpr(raw, plan)
 		if err != nil {
 			return "", "", err
 		}
@@ -602,7 +643,7 @@ func (e *Engine) buildWhereHaving(q *Query) (where, having string, err error) {
 	}
 
 	for _, name := range q.Segments {
-		expanded, needsHaving, err := e.expandFilterExpr(e.segments[name].Filter)
+		expanded, needsHaving, err := e.expandFilterExpr(e.segments[name].Filter, plan)
 		if err != nil {
 			return "", "", err
 		}
@@ -616,10 +657,13 @@ func (e *Engine) buildWhereHaving(q *Query) (where, having string, err error) {
 	return strings.Join(whereParts, " AND "), strings.Join(havingParts, " AND "), nil
 }
 
-func (e *Engine) expandFilterExpr(expr string) (string, bool, error) {
+func (e *Engine) expandFilterExpr(expr string, plan *queryPlan) (string, bool, error) {
 	masked := maskTemplateDelimiters(expr)
 	hasAggregate := containsAggregateOutsideRefs(expr)
 	if !refPattern.MatchString(masked) {
+		if plan != nil && plan.hasJoins() {
+			expr = qualifySQLIdentifiers(expr, "base")
+		}
 		return expr, hasAggregate, nil
 	}
 
@@ -630,12 +674,26 @@ func (e *Engine) expandFilterExpr(expr string) (string, bool, error) {
 		refName := match[1 : len(match)-1]
 
 		if dim, ok := e.dims[refName]; ok {
-			return e.dimExpr(dim, "")
+			expr := e.dimExpr(dim, "")
+			if plan != nil && plan.hasJoins() {
+				expr = qualifySQLIdentifiers(expr, "base")
+			}
+			return expr
+		}
+
+		if plan != nil {
+			if binding, err := e.resolveDimension(DimensionRef{Name: refName}); err == nil && binding.model != e.model {
+				if err := plan.addDimension(binding); err != nil {
+					expandErr = err
+					return match
+				}
+				return plan.dimensionSQL(binding)
+			}
 		}
 
 		if _, ok := e.metrics[refName]; ok {
 			hasMetricRef = true
-			expanded, err := e.expandSimple(refName, map[string]bool{})
+			expanded, err := e.expandSimple(refName, map[string]bool{}, plan)
 			if err != nil {
 				expandErr = err
 				return match
@@ -651,7 +709,7 @@ func (e *Engine) expandFilterExpr(expr string) (string, bool, error) {
 	return result, hasMetricRef || hasAggregate, expandErr
 }
 
-func (e *Engine) buildOrderAndLimit(q *Query) string {
+func (e *Engine) buildOrderAndLimit(q *Query, plan *queryPlan, outer bool) string {
 	var s string
 	if len(q.Sort) > 0 {
 		parts := make([]string, 0, len(q.Sort))
@@ -660,7 +718,14 @@ func (e *Engine) buildOrderAndLimit(q *Query) string {
 			if dir == "" {
 				dir = "ASC"
 			}
-			parts = append(parts, sort.Name+" "+dir)
+			name := sort.Name
+			if binding := plan.sortBinding(sort.Name); binding != nil {
+				name = binding.outputAlias
+				if outer {
+					name = "base." + name
+				}
+			}
+			parts = append(parts, name+" "+dir)
 		}
 		s += " ORDER BY " + strings.Join(parts, ", ")
 	}
@@ -684,13 +749,13 @@ func validateStructuredFilter(f Filter) error {
 	}
 }
 
-func (e *Engine) filterToSQL(f Filter) string {
+func (e *Engine) filterToSQL(f Filter, plan *queryPlan) string {
 	if f.Expression != "" {
 		return f.Expression
 	}
 	dim := f.Dimension
-	if d := e.dims[f.Dimension]; d != nil {
-		dim = e.dimExpr(d, "")
+	if binding := plan.dimensionBinding(DimensionRef{Name: f.Dimension}); binding != nil {
+		dim = plan.dimensionSQL(binding)
 	}
 	switch f.Operator {
 	case "equals":
@@ -882,6 +947,13 @@ func (e *Engine) collectInnerDimensions(q *Query) []DimensionRef {
 	for _, d := range result {
 		seen[d.Name] = true
 	}
+	for _, sort := range q.Sort {
+		if e.metrics[sort.Name] != nil || seen[sort.Name] {
+			continue
+		}
+		result = append(result, DimensionRef{Name: sort.Name})
+		seen[sort.Name] = true
+	}
 
 	var collect func(string)
 	collect = func(name string) {
@@ -928,7 +1000,7 @@ func (e *Engine) validateMetricFiltersForWrapped(name string, visited map[string
 		return nil
 	}
 	if m.Filter != "" {
-		_, filterNeedsHaving, err := e.expandFilterExpr(m.Filter)
+		_, filterNeedsHaving, err := e.expandFilterExpr(m.Filter, nil)
 		if err != nil {
 			return err
 		}

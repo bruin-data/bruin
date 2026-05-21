@@ -327,13 +327,13 @@ func Test_Builder_ParseGitMetadata(t *testing.T) {
 	assert.Equal(t, commit, pipeline.Commit)
 }
 
-func Test_pipelineBuilder_LoadsSemanticModels(t *testing.T) {
+func Test_pipelineBuilder_DoesNotLoadPipelineSemanticModels(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pipeline.yml"), []byte("name: semantic-pipeline\n"), 0o644))
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "semantic"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "semantic", "sales.yml"), []byte(`schema: https://getbruin.com/schemas/dac/semantic-model/v1
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "semantic", "sales.yml"), []byte(`schema: v1
 name: sales
 label: Sales
 description: Sales analytics model
@@ -366,12 +366,10 @@ segments:
 	got, err := builder.CreatePipelineFromPath(t.Context(), dir, pipeline.WithMutate())
 	require.NoError(t, err)
 
-	require.Contains(t, got.SemanticModels, "sales")
-	assert.Equal(t, "analytics.orders", got.SemanticModels["sales"].Source.Table)
-	assert.Equal(t, "revenue", got.SemanticModels["sales"].Metrics[0].Name)
+	assert.Equal(t, "semantic-pipeline", got.Name)
 }
 
-func Test_pipelineBuilder_InvalidSemanticModelFails(t *testing.T) {
+func Test_pipelineBuilder_IgnoresInvalidPipelineSemanticModels(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -388,10 +386,9 @@ source: {}
 		TasksFileSuffixes:   []string{"asset.yml", "asset.yaml"},
 	}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil, nil)
 
-	_, err := builder.CreatePipelineFromPath(t.Context(), dir, pipeline.WithMutate())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "error parsing semantic models")
-	assert.Contains(t, err.Error(), "broken.yml")
+	got, err := builder.CreatePipelineFromPath(t.Context(), dir, pipeline.WithMutate())
+	require.NoError(t, err)
+	assert.Equal(t, "semantic-pipeline", got.Name)
 }
 
 func TestTask_RelativePathToPipelineRoot(t *testing.T) {

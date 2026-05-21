@@ -822,6 +822,35 @@ func TestIndividualTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "query-semantic-entity-graph",
+			task: e2e.Task{
+				Name:    "query-semantic-entity-graph",
+				Command: binary,
+				Args: []string{
+					"query",
+					"--config-file", filepath.Join(currentFolder, ".bruin.yml"),
+					"--env", "env-semantic-query",
+					"--pipeline", filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline"),
+					"--connection", "duckdb-semantic-query",
+					"--semantic-model", "orders",
+					"--dimension", "customers.country",
+					"--metric", "revenue",
+					"--segment", "completed",
+					"--sort", "revenue:desc",
+					"--output", "csv",
+				},
+				Env: []string{},
+				Expected: e2e.Output{
+					ExitCode: 0,
+					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline/expectations/expected-customer-country.csv")),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByOutputString,
+				},
+			},
+		},
+		{
 			name: "query-semantic-unknown-metric",
 			task: e2e.Task{
 				Name:    "query-semantic-unknown-metric",

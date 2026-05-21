@@ -8,6 +8,7 @@ You can run it in three modes:
 - **Direct query**: provide `--connection` and `--query`
 - **Asset query**: provide `--asset` (optional `--environment`) to execute the SQL from an asset file
 - **Auto-detect**: provide `--asset` + `--query` to run an ad-hoc query using the asset's connection and dialect
+- **Semantic query**: provide `--semantic-model` with `--asset` or `--pipeline` to query a [semantic model](/core-concepts/semantic-layer)
 
 **Flags:**
 
@@ -16,7 +17,14 @@ You can run it in three modes:
 | `--connection`       | `-c`  | The name of the connection to use (direct query mode).                     |
 | `--query`            | `-q`  | The SQL query to execute.                                                  |
 | `--asset`            |       | Path to a SQL asset file within a Bruin pipeline.                          |
+| `--pipeline`         |       | Path to a Bruin pipeline. Used with `--semantic-model` when no asset is provided. |
 | `--environment`      | `--env` | Target environment name as defined in `.bruin.yml`.                      |
+| `--semantic-model`   |       | Semantic model name to compile and query.                                  |
+| `--metric`           |       | Semantic metric to select. Can be passed multiple times.                   |
+| `--dimension`        |       | Semantic dimension to select. Use `name:granularity` for time dimensions. Can be passed multiple times. |
+| `--filter`           |       | Semantic filter as JSON, for example `{"dimension":"country","operator":"equals","value":"US"}`. Can be passed multiple times. |
+| `--segment`          |       | Semantic segment to apply. Can be passed multiple times.                   |
+| `--sort`             |       | Semantic sort field. Use `name:asc` or `name:desc`. Can be passed multiple times. |
 | `--start-date`       |       | Start date for query variables in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`.    |
 | `--end-date`         |       | End date for query variables in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`.      |
 | `--limit`            | `-l`  | Limit the number of rows returned.                                         |
@@ -60,8 +68,43 @@ bruin query --connection my_connection --query "SELECT * FROM large_table" --exp
 ```
 
 If your query returns 1,000,000 rows with `--split-rows 400000`, you'll get 3 files:
+
 - `query_result_<timestamp>_part1.csv` (400,000 rows)
 - `query_result_<timestamp>_part2.csv` (400,000 rows)
 - `query_result_<timestamp>_part3.csv` (200,000 rows)
 
 Each file includes the header row with column names.
+
+## Semantic Queries
+
+Semantic query mode compiles metrics, dimensions, segments, filters, joins, and windows from YAML models in the repository-level `semantic` directory. See the [semantic layer documentation](/core-concepts/semantic-layer) for model syntax.
+
+Use an asset path when you want Bruin to infer the pipeline, connection, and SQL dialect from an existing SQL asset:
+
+```bash
+bruin query \
+  --asset ./pipelines/daily-orders/assets/orders.sql \
+  --semantic-model orders \
+  --dimension order_date:month \
+  --metric revenue \
+  --metric avg_order_value \
+  --filter '{"dimension":"country","operator":"equals","value":"US"}' \
+  --segment completed \
+  --sort order_date:asc \
+  --output json
+```
+
+Use a pipeline path when there is no anchor asset. In this mode, pass the connection explicitly:
+
+```bash
+bruin query \
+  --pipeline ./pipelines/daily-orders \
+  --connection warehouse \
+  --semantic-model orders \
+  --dimension customers.country \
+  --metric revenue \
+  --sort revenue:desc \
+  --output csv
+```
+
+Semantic query mode cannot be combined with `--query`.

@@ -91,6 +91,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Commands", link: "/commands/overview"},
                             {text: "Project", link: "/core-concepts/project"},
                             {text: "Variables", link: "/variables/overview"},
+                            {text: "Semantic Layer", link: "/core-concepts/semantic-layer"},
                         ],
                     },
                     {text: "Design Principles", link: "/getting-started/design-principles"},

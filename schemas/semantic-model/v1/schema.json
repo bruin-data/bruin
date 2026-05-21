@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://getbruin.com/schemas/dac/semantic-model/v1",
-  "title": "Bruin DAC Semantic Model",
+  "$id": "v1",
+  "title": "Bruin Semantic Model",
   "type": "object",
   "required": ["name", "source"],
   "properties": {
     "schema": {
-      "const": "https://getbruin.com/schemas/dac/semantic-model/v1"
+      "const": "v1"
     },
     "name": {
       "type": "string",
@@ -20,6 +20,15 @@
     },
     "source": {
       "$ref": "#/$defs/source"
+    },
+    "primary_key": {
+      "type": "string"
+    },
+    "joins": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/join"
+      }
     },
     "dimensions": {
       "type": "array",
@@ -52,6 +61,36 @@
         "table": {
           "type": "string",
           "minLength": 1
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "additionalProperties": false
+    },
+    "join": {
+      "type": "object",
+      "required": ["name", "relationship"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relationship": {
+          "enum": ["one_to_one", "many_to_one", "one_to_many", "many_to_many"]
+        },
+        "foreign_key": {
+          "type": "string"
+        },
+        "target_key": {
+          "type": "string"
+        },
+        "sql": {
+          "type": "string"
         }
       },
       "patternProperties": {

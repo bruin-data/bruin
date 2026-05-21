@@ -17,7 +17,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
-	"github.com/bruin-data/bruin/pkg/semantic"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
@@ -1557,38 +1556,36 @@ type Macro string
 // materialization picks it up. The TestVariantVisitorCoversStringFields test
 // guards against silently regressing this.
 type Pipeline struct {
-	LegacyID           string                     `json:"legacy_id" yaml:"id,omitempty" mapstructure:"id"`
-	Name               string                     `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Tags               EmptyStringArray           `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
-	Domains            EmptyStringArray           `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
-	Meta               EmptyStringMap             `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
-	Owner              string                     `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
-	Schedule           Schedule                   `json:"schedule" yaml:"schedule,omitempty" mapstructure:"schedule"`
-	StartDate          string                     `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
-	DefinitionFile     DefinitionFile             `json:"definition_file" yaml:"-"`
-	DefaultConnections EmptyStringMap             `json:"default_connections" yaml:"default_connections,omitempty" mapstructure:"default_connections"`
-	Assets             []*Asset                   `json:"assets" yaml:"assets,omitempty"`
-	SemanticModels     map[string]*semantic.Model `json:"semantic_models,omitempty" yaml:"-" mapstructure:"-"`
-	Notifications      Notifications              `json:"notifications" yaml:"notifications,omitempty" mapstructure:"notifications"`
-	Catchup            bool                       `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
-	CatchupMode        string                     `json:"catchup_mode" yaml:"catchup_mode,omitempty" mapstructure:"catchup_mode"`
-	MetadataPush       MetadataPush               `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
-	Retries            int                        `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
-	RetriesDelay       *int                       `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
-	Concurrency        int                        `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
-	MaxActiveSteps     *int                       `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
-	DefaultValues      *DefaultValues             `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
-	Commit             string                     `json:"commit" yaml:"commit,omitempty"`
-	Snapshot           string                     `json:"snapshot" yaml:"snapshot,omitempty"`
-	Agent              bool                       `json:"agent" yaml:"agent,omitempty" mapstructure:"agent"`
-	Variables          Variables                  `json:"variables" yaml:"variables,omitempty" mapstructure:"variables"`
-	Variants           VariantSet                 `json:"variants,omitempty" yaml:"variants,omitempty" mapstructure:"variants"`
-	SelectedVariant    string                     `json:"selected_variant" yaml:"-"`
-	TasksByType        map[AssetType][]*Asset     `json:"-" yaml:"-"`
-	tasksByName        map[string]*Asset          `yaml:"-"`
-	MacrosPath         string                     `json:"-" yaml:"-"`
-	Macros             []Macro                    `json:"macros" yaml:"macros,omitempty" mapstructure:"macros"`
-	SemanticPath       string                     `json:"-" yaml:"-"`
+	LegacyID           string                 `json:"legacy_id" yaml:"id,omitempty" mapstructure:"id"`
+	Name               string                 `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Tags               EmptyStringArray       `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains            EmptyStringArray       `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta               EmptyStringMap         `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
+	Owner              string                 `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Schedule           Schedule               `json:"schedule" yaml:"schedule,omitempty" mapstructure:"schedule"`
+	StartDate          string                 `json:"start_date" yaml:"start_date,omitempty" mapstructure:"start_date"`
+	DefinitionFile     DefinitionFile         `json:"definition_file" yaml:"-"`
+	DefaultConnections EmptyStringMap         `json:"default_connections" yaml:"default_connections,omitempty" mapstructure:"default_connections"`
+	Assets             []*Asset               `json:"assets" yaml:"assets,omitempty"`
+	Notifications      Notifications          `json:"notifications" yaml:"notifications,omitempty" mapstructure:"notifications"`
+	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
+	CatchupMode        string                 `json:"catchup_mode" yaml:"catchup_mode,omitempty" mapstructure:"catchup_mode"`
+	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
+	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
+	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
+	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
+	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
+	Commit             string                 `json:"commit" yaml:"commit,omitempty"`
+	Snapshot           string                 `json:"snapshot" yaml:"snapshot,omitempty"`
+	Agent              bool                   `json:"agent" yaml:"agent,omitempty" mapstructure:"agent"`
+	Variables          Variables              `json:"variables" yaml:"variables,omitempty" mapstructure:"variables"`
+	Variants           VariantSet             `json:"variants,omitempty" yaml:"variants,omitempty" mapstructure:"variants"`
+	SelectedVariant    string                 `json:"selected_variant" yaml:"-"`
+	TasksByType        map[AssetType][]*Asset `json:"-" yaml:"-"`
+	tasksByName        map[string]*Asset      `yaml:"-"`
+	MacrosPath         string                 `json:"-" yaml:"-"`
+	Macros             []Macro                `json:"macros" yaml:"macros,omitempty" mapstructure:"macros"`
 }
 
 func validateCatchupMode(mode string) error {
@@ -2117,12 +2114,6 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 
 	if config.onlyPipeline {
 		return pipeline, nil
-	}
-
-	pipeline.SemanticPath = filepath.Join(pathToPipeline, "semantic")
-	pipeline.SemanticModels, err = semantic.LoadDirFS(b.fs, pipeline.SemanticPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing semantic models at '%s'", pipeline.SemanticPath)
 	}
 
 	taskFiles := make([]string, 0)

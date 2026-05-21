@@ -7,6 +7,8 @@ type Model struct {
 	Label       string      `yaml:"label,omitempty" json:"label,omitempty"`
 	Description string      `yaml:"description,omitempty" json:"description,omitempty"`
 	Source      Source      `yaml:"source" json:"source"`
+	PrimaryKey  string      `yaml:"primary_key,omitempty" json:"primary_key,omitempty"`
+	Joins       []Join      `yaml:"joins,omitempty" json:"joins,omitempty"`
 	Dimensions  []Dimension `yaml:"dimensions,omitempty" json:"dimensions,omitempty"`
 	Metrics     []Metric    `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	Segments    []Segment   `yaml:"segments,omitempty" json:"segments,omitempty"`
@@ -14,6 +16,15 @@ type Model struct {
 
 type Source struct {
 	Table string `yaml:"table" json:"table"`
+}
+
+type Join struct {
+	Name         string `yaml:"name" json:"name"`
+	Model        string `yaml:"model,omitempty" json:"model,omitempty"`
+	Relationship string `yaml:"relationship" json:"relationship"` // one_to_one, many_to_one, one_to_many, many_to_many
+	ForeignKey   string `yaml:"foreign_key,omitempty" json:"foreign_key,omitempty"`
+	TargetKey    string `yaml:"target_key,omitempty" json:"target_key,omitempty"`
+	SQL          string `yaml:"sql,omitempty" json:"sql,omitempty"`
 }
 
 type Dimension struct {
