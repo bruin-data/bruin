@@ -65,13 +65,29 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 	return nil
 }
 
+// buildOverrideManager builds a connection manager scoped to the given environment.
+// It's invoked once per `bruin patch fill-columns-from-db --connection ...` invocation
+// (before any per-asset loop) so that we don't re-initialise every configured connection
+// for each asset in a pipeline.
+func buildOverrideManager(ctx context.Context, cfg *config.Config, environment string) (config.ConnectionGetter, error) {
+	if environment != "" {
+		if err := cfg.SelectEnvironment(environment); err != nil {
+			return nil, errors.Wrapf(err, "failed to use the environment '%s'", environment)
+		}
+	}
+	m, errs := connection.NewManagerFromConfigWithContext(ctx, cfg)
+	if len(errs) > 0 {
+		return nil, errors.Wrap(errs[0], "failed to create connection manager")
+	}
+	return m, nil
+}
+
 // Returns: status ("updated", "skipped", "failed").
 func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment, connectionOverride string, manager config.ConnectionGetter) (string, error) {
 	var conn interface{}
 	var err error
 
-	switch {
-	case manager != nil:
+	if manager != nil {
 		connName := connectionOverride
 		if connName == "" {
 			connName, err = pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
@@ -92,29 +108,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment, connectionOverride 
 				},
 			)
 		}
-	case connectionOverride != "":
-		if environment != "" {
-			if err := pp.Config.SelectEnvironment(environment); err != nil {
-				return fillStatusFailed, errors.Wrapf(err, "failed to use the environment '%s'", environment)
-			}
-		}
-		m, errs := connection.NewManagerFromConfigWithContext(context.Background(), pp.Config)
-		if len(errs) > 0 {
-			return fillStatusFailed, errors.Wrap(errs[0], "failed to create connection manager")
-		}
-		conn = m.GetConnection(connectionOverride)
-		if conn == nil {
-			return fillStatusFailed, fmt.Errorf(
-				"failed to get connection for asset '%s': %w",
-				pp.Asset.Name,
-				&config.MissingConnectionError{
-					Name:            connectionOverride,
-					ConfigFilePath:  pp.Config.Path(),
-					EnvironmentName: pp.Config.SelectedEnvironmentName,
-				},
-			)
-		}
-	default:
+	} else {
 		_, conn, err = getConnectionFromPipelineInfoWithContext(context.Background(), pp, environment)
 		if err != nil {
 			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
@@ -416,7 +410,15 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, err)
 							return cli.Exit("", 1)
 						}
-						status, err := fillColumnsFromDB(pp, fs, environment, connectionOverride, nil) //nolint:contextcheck
+						var overrideManager config.ConnectionGetter
+						if connectionOverride != "" {
+							overrideManager, err = buildOverrideManager(ctx, pp.Config, environment)
+							if err != nil {
+								printErrorForOutput(output, err)
+								return cli.Exit("", 1)
+							}
+						}
+						status, err := fillColumnsFromDB(pp, fs, environment, connectionOverride, overrideManager) //nolint:contextcheck
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s': %w", pp.Asset.Name, err))
 							return cli.Exit("", 1)
@@ -451,6 +453,14 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, fmt.Errorf("failed to load the config file: %w", err))
 							return cli.Exit("", 1)
 						}
+						var overrideManager config.ConnectionGetter
+						if connectionOverride != "" {
+							overrideManager, err = buildOverrideManager(ctx, cm, environment)
+							if err != nil {
+								printErrorForOutput(output, err)
+								return cli.Exit("", 1)
+							}
+						}
 						updatedAssets := []string{}
 						skippedAssets := []string{}
 						failedAssets := []string{}
@@ -459,7 +469,7 @@ func Patch() *cli.Command {
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, fs, environment, connectionOverride, nil) //nolint:contextcheck
+							status, err := fillColumnsFromDB(pp, fs, environment, connectionOverride, overrideManager) //nolint:contextcheck
 							processedAssets++
 							assetName := asset.Name
 							switch status {

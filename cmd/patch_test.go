@@ -253,6 +253,10 @@ func TestFillColumnsFromDB(t *testing.T) {
 	}
 }
 
+// TestFillColumnsFromDB_ConnectionOverride exercises the production path the CLI
+// uses for `--connection`: the action layer builds the manager once, then passes
+// it together with the override name into fillColumnsFromDB. The override must
+// take precedence over the asset's destination connection.
 func TestFillColumnsFromDB_ConnectionOverride(t *testing.T) {
 	t.Parallel()
 
@@ -263,8 +267,9 @@ func TestFillColumnsFromDB_ConnectionOverride(t *testing.T) {
 	}, nil)
 
 	mockManager := new(MockConnectionManager)
-	// Override should bypass the asset's destination connection and use the override name.
 	mockManager.On("GetConnection", "source_connection").Return(mockConn, nil)
+	// The destination connection must never be looked up when --connection is set.
+	mockManager.AssertNotCalled(t, "GetConnection", "destination_connection")
 
 	asset := &pipeline.Asset{
 		Name:       "test_asset",
@@ -274,16 +279,12 @@ func TestFillColumnsFromDB_ConnectionOverride(t *testing.T) {
 	}
 
 	pp := &ppInfo{
-		Asset: asset,
-		Pipeline: &pipeline.Pipeline{
-			Name: "test_pipeline",
-		},
-		Config: &config.Config{},
+		Asset:    asset,
+		Pipeline: &pipeline.Pipeline{Name: "test_pipeline"},
+		Config:   &config.Config{},
 	}
 
-	fs := afero.NewMemMapFs()
-
-	status, err := fillColumnsFromDB(pp, fs, "", "source_connection", mockManager)
+	status, err := fillColumnsFromDB(pp, afero.NewMemMapFs(), "", "source_connection", mockManager)
 	require.NoError(t, err)
 	assert.Equal(t, fillStatusUpdated, status)
 	assert.Equal(t, []pipeline.Column{
@@ -295,6 +296,10 @@ func TestFillColumnsFromDB_ConnectionOverride(t *testing.T) {
 	mockManager.AssertExpectations(t)
 }
 
+// TestFillColumnsFromDB_ConnectionOverrideMissing covers the failure case where
+// the user passes a connection name that doesn't exist. The action layer builds
+// the manager fine (the name is only invalid at lookup time), so the error must
+// surface from fillColumnsFromDB with the override name in the message.
 func TestFillColumnsFromDB_ConnectionOverrideMissing(t *testing.T) {
 	t.Parallel()
 
@@ -319,4 +324,23 @@ func TestFillColumnsFromDB_ConnectionOverrideMissing(t *testing.T) {
 	assert.Contains(t, err.Error(), "missing_connection")
 
 	mockManager.AssertExpectations(t)
+}
+
+// TestBuildOverrideManager_UnknownEnvironment makes sure the CLI action gives a
+// useful error when --environment names a missing environment, instead of
+// silently proceeding with the default. This is the only code path that runs
+// before fillColumnsFromDB, so it's worth covering here.
+func TestBuildOverrideManager_UnknownEnvironment(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.Config{
+		DefaultEnvironmentName: "default",
+		Environments: map[string]config.Environment{
+			"default": {Connections: &config.Connections{}},
+		},
+	}
+
+	_, err := buildOverrideManager(t.Context(), cfg, "does-not-exist")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does-not-exist")
 }
