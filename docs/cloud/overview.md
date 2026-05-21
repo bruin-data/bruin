@@ -1,62 +1,37 @@
-# Overview
+# Bruin Cloud
 
-[Bruin Cloud](https://cloud.getbruin.com/register) is a managed cloud platform built on top of the open-source Bruin CLI. It provides a fully managed infrastructure for running, monitoring, and managing your Bruin pipelines at scale.
+[Bruin Cloud](https://cloud.getbruin.com/register) is a managed platform built on top of the open-source Bruin CLI. It runs your pipelines on a schedule, stores your connections securely, gives you a UI for monitoring runs and lineage, and ships an AI layer that can chat with your data, build dashboards, and answer questions in Slack.
 
-## What is Bruin Cloud?
+> [!INFO]
+> This section of the documentation covers Bruin Cloud. If you are looking for the open-source CLI, start at the [Quickstart](/getting-started/introduction/quickstart).
 
-Bruin Cloud takes the power of the open-source Bruin CLI and wraps it in a managed infrastructure, so you can focus on building data pipelines without worrying about deployment, scheduling, or infrastructure management.
+## What you get
 
-### Key Features
+- **Managed scheduling** — pipelines defined in your Git repo run on their configured schedule without you running a server.
+- **Connections and secrets** — connect to BigQuery, Snowflake, Postgres, Databricks, S3, and dozens of other platforms through the UI. Credentials are encrypted at rest with [HashiCorp Vault](/secrets/vault).
+- **Run monitoring** — runs, logs, lineage, backfills, manual runs, and per-asset history for every pipeline.
+- **AI agents** — configurable agents scoped to projects and connection sets. Use them in chat, embed them in Slack/Teams/Discord/WhatsApp, schedule them, or build dashboards with them.
+- **Cross-pipeline dependencies** — depend on assets that live in a different pipeline or repo using URIs.
+- **Developer environments** — browser-based IDEs preconfigured with your repo and credentials.
+- **Insights** — cost explorer, pipeline health, and risk reports.
 
-- **Repository Integration**: Connects directly to your Git repositories and automatically deploys your Bruin pipelines
-- **Managed Secrets & Connections**: Add and manage your database connections and secrets securely through the cloud interface
-- **Automated Scheduling**: Enable pipelines to run on their defined schedules automatically
-- **Flexible Run Options**: Create runs manually with options for regular runs, full refresh, and batched backfills
-- **Comprehensive Monitoring**: Monitor runs, check logs, explore lineage, review quality checks, and analyze cost reports
-- **Data Quality**: View table-level and column-level health checks to ensure data integrity
-- **Built-in Data Catalog**: Discover and understand your data assets
-- **Advanced Lineage**: Track data flow with column-level lineage capabilities
-- **Cost & Usage Reporting**: Understand resource consumption and optimize costs
-- **Dedicated Support**: Get support directly from the founding team
+## How to read these docs
 
-## How It Works
+If you are new to Bruin Cloud, start with [Getting Started](/cloud/getting-started). It walks through wiring up a Git repo, adding connections, and enabling your first pipeline.
 
-1. **Connect Your Repository**: Link your Git repository containing Bruin pipelines to Bruin Cloud
-2. **Configure Connections**: Add your database connections and secrets through the cloud interface
-3. **Enable Pipelines**: Once enabled, pipelines start running automatically based on their defined schedules
-4. **Monitor & Manage**: Use the cloud dashboard to monitor runs, debug issues, and track data quality
+From there:
 
-## Cloud Interface Sections
-
-### Dashboard
-The central hub providing an overview of your pipelines, recent runs, and key metrics at a glance.
-
-### Pipelines
-Browse, enable, and manage all your Bruin pipelines. Configure schedules and trigger manual runs.
-
-### Assets
-Explore your data assets with a built-in data catalog. View metadata, schemas, and documentation for all your tables and views.
-
-### Lineage
-Visualize data flow across your pipelines with interactive lineage graphs, including column-level lineage tracking.
-
-### Runs
-Monitor pipeline executions, view detailed logs, track run history, and debug failed runs.
-
-### Glossary
-Define and manage business terms and definitions to create a shared vocabulary across your organization.
-
-### Insights
-
-The Insights section provides analytics and reporting capabilities:
-
-- **Cost Explorer**: Analyze resource consumption and costs across your pipelines and infrastructure
-- **Pipeline Health**: Monitor the health and reliability of your pipelines over time
-- **Risk Report**: Identify potential issues and risks in your data pipelines before they impact your business
+- **[Projects](/cloud/projects)** — connect a Git repo, manage Git authentication (GitHub App vs personal access token), migrate existing projects.
+- **[Connections](/cloud/connections)** — configure the connections your pipelines and agents use.
+- **[Pipelines](/cloud/pipelines)** — enable pipelines, trigger runs, manage backfills, view lineage.
+- **[AI Agents](/cloud/ai-agents/overview)** — create agents, chat with them, schedule them, deploy to Slack.
+- **[Notifications](/cloud/notifications)** — Slack, Teams, Discord, and webhook notifications.
+- **[Cross-pipeline dependencies](/cloud/cross-pipeline)** — depend on assets that live in other pipelines.
+- **[Developer Environments](/cloud/developer-environments)** — browser-based IDEs.
+- **[Instance Types](/cloud/instance-types)** — sizing assets at run time.
+- **[dbt Projects](/cloud/dbt)** — running dbt projects on Bruin Cloud.
+- **[Cloud MCP](/cloud/mcp-setup)** — talk to Bruin Cloud from Cursor, Claude Code, or Codex.
 
 ---
 
-If you are interested in Bruin Cloud, you can [sign up here](https://cloud.getbruin.com/register) or drop your email at [getbruin.com](https://getbruin.com).
-
-> [!INFO]
-> This part of the documentation is relevant for Bruin Cloud customers.
+[Sign up for Bruin Cloud →](https://cloud.getbruin.com/register)
