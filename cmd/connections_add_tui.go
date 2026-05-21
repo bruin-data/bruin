@@ -75,8 +75,9 @@ type addConnectionModel struct {
 	step int
 
 	// Step 0: environment selection
-	envList list.Model
-	envs    []string
+	envList          list.Model
+	envs             []string
+	skipEnvSelection bool
 
 	// Step 1: name input
 	nameInput textinput.Model
@@ -117,6 +118,11 @@ func newAddConnectionModel(cfg *config.Config) addConnectionModel {
 	envs := cfg.GetEnvironmentNames()
 	sort.Strings(envs)
 	m.envs = envs
+	if len(envs) == 1 {
+		m.step = stepEnterName
+		m.environment = envs[0]
+		m.skipEnvSelection = true
+	}
 
 	items := make([]list.Item, len(envs))
 	for i, e := range envs {
@@ -133,6 +139,9 @@ func newAddConnectionModel(cfg *config.Config) addConnectionModel {
 	m.nameInput = textinput.New()
 	m.nameInput.Placeholder = "my-connection"
 	m.nameInput.CharLimit = 128
+	if m.skipEnvSelection {
+		m.nameInput.Focus()
+	}
 
 	// Step 2: type list
 	typeNames := config.GetConnectionTypeNames()
@@ -216,6 +225,9 @@ func (m addConnectionModel) updateEnterName(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "esc":
+			if m.skipEnvSelection {
+				return m, nil
+			}
 			m.step = stepSelectEnv
 			m.nameErr = ""
 			return m, nil
