@@ -24,8 +24,7 @@ import (
 var Version string
 
 const (
-	BaseURL = "https://storage.googleapis.com/gong-release"
-
+	BaseURL         = "https://storage.googleapis.com/gong-release"
 	binDir          = "bin"
 	httpTimeout     = 5 * time.Minute
 	filePermissions = 0o755
@@ -35,8 +34,10 @@ const (
 // It supports installing multiple versions side-by-side; concurrent installs of
 // the same version are deduplicated, while different versions install in parallel.
 type Checker struct {
-	mu    sync.Mutex
-	slots map[string]*installSlot
+	mu         sync.Mutex
+	slots      map[string]*installSlot
+	baseURL    string // overridden in tests to redirect downloads to a local HTTP server
+	installDir string // overridden in tests to install to a temporary directory
 }
 
 type installSlot struct {
@@ -61,6 +62,7 @@ func (g *Checker) EnsureGongInstalled(ctx context.Context, version string) (stri
 			g.dropSlot(resolvedVersion, slot)
 		}
 	})
+
 	return slot.path, slot.err
 }
 
@@ -86,14 +88,29 @@ func (g *Checker) dropSlot(version string, slot *installSlot) {
 	}
 }
 
-func (g *Checker) binaryPath(version string) (string, error) {
-	m := user.NewConfigManager(afero.NewOsFs())
-	bruinHomeDirAbsPath, err := m.EnsureAndGetBruinHomeDir()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get bruin home directory")
+// effectiveBaseURL returns the base URL to use for downloads.
+// Tests set g.baseURL to a local httptest.Server address; production code
+// leaves it empty and falls back to the package-level BaseURL constant.
+func (g *Checker) effectiveBaseURL() string {
+	if g.baseURL != "" {
+		return g.baseURL
 	}
+	return BaseURL
+}
 
-	binDirPath := filepath.Join(bruinHomeDirAbsPath, binDir)
+func (g *Checker) binaryPath(version string) (string, error) {
+	var binDirPath string
+	if g.installDir != "" {
+		// Used by tests to redirect installs to a temporary directory.
+		binDirPath = g.installDir
+	} else {
+		m := user.NewConfigManager(afero.NewOsFs())
+		bruinHomeDirAbsPath, err := m.EnsureAndGetBruinHomeDir()
+		if err != nil {
+			return "", errors.Wrap(err, "failed to get bruin home directory")
+		}
+		binDirPath = filepath.Join(bruinHomeDirAbsPath, binDir)
+	}
 	if err := os.MkdirAll(binDirPath, filePermissions); err != nil {
 		return "", errors.Wrap(err, "failed to create bin directory")
 	}
@@ -134,11 +151,44 @@ func (g *Checker) ensureInstalled(ctx context.Context, version string) (string, 
 	return gongBinaryPath, nil
 }
 
-// buildDownloadURL constructs the download URL for the gong binary based on OS and architecture.
+// buildDownloadURL constructs the download URL for the gong binary using the
+// package-level BaseURL constant. Existing callers and unit tests use this form.
 func buildDownloadURL(version string) string {
-	osName := getOSName()
-	archName := getArchName()
-	return fmt.Sprintf("%s/releases/%s/%s/gong_%s", BaseURL, version, osName, archName)
+	return buildDownloadURLWithBase(BaseURL, version)
+}
+
+// buildDownloadURLWithBase is like buildDownloadURL but accepts an explicit base
+// URL so that tests can redirect downloads to a local HTTP server.
+func buildDownloadURLWithBase(base, version string) string {
+	return fmt.Sprintf("%s/releases/%s/%s/gong_%s", base, version, getOSName(), getArchName())
+}
+
+// buildChecksumURL returns the URL of the SHA256 checksum manifest published
+// alongside a gong release. The manifest uses the standard sha256sum format.
+func buildChecksumURL(base, version string) string {
+	return fmt.Sprintf("%s/releases/%s/checksums.txt", base, version)
+}
+
+// downloadChecksumManifest fetches the raw bytes of the checksum manifest at
+// the given URL. The caller is responsible for parsing the returned bytes.
+func downloadChecksumManifest(ctx context.Context, url string, client *http.Client) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create checksum request: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download checksum file: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to download checksum file: server returned status %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MiB cap
+	if err != nil {
+		return nil, fmt.Errorf("failed to read checksum file: %w", err)
+	}
+	return data, nil
 }
 
 func getOSName() string {
@@ -192,7 +242,10 @@ func (g *Checker) downloadGong(ctx context.Context, version, destPath string) er
 	_, _ = fmt.Fprintf(output, "This is a one-time operation.\n")
 	_, _ = fmt.Fprintf(output, "\n")
 
-	downloadURL := buildDownloadURL(version)
+	base := g.effectiveBaseURL()
+	artifactName := fmt.Sprintf("gong_%s_%s", getOSName(), getArchName())
+	downloadURL := buildDownloadURLWithBase(base, version)
+
 	_, _ = fmt.Fprintf(output, "Downloading from %s\n", downloadURL)
 
 	client := &http.Client{
@@ -239,6 +292,20 @@ func (g *Checker) downloadGong(ctx context.Context, version, destPath string) er
 		return fmt.Errorf("failed to close temporary file: %w", err)
 	}
 
+	// Verify the downloaded binary against the published checksum manifest before
+	// granting executable permissions or moving it to the final destination.
+	// On any failure the deferred os.Remove cleans up tmpPath automatically.
+	manifest, err := downloadChecksumManifest(ctx, buildChecksumURL(base, version), client)
+	if err != nil {
+		return err
+	}
+	expectedChecksum, err := parseChecksumManifest(manifest, artifactName)
+	if err != nil {
+		return err
+	}
+	if err := verifySHA256(tmpPath, expectedChecksum); err != nil {
+		return err
+	}
 	// Set executable permissions (on Windows this is a no-op effectively)
 	if err := os.Chmod(tmpPath, filePermissions); err != nil {
 		return fmt.Errorf("failed to set executable permissions: %w", err)
