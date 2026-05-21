@@ -12,7 +12,7 @@ From the **AI** menu, open **Chats**.
 
 ### 2. Pick an agent
 
-Use the dropdown to select the agent you want to talk to. Each agent comes with the project, connection set, integrations, and system prompt configured for it.
+Use the dropdown to select the agent you want to talk to. Each agent comes with the project, [connection set](/cloud/connections#connection-sets-for-ai-agents), integrations, and system prompt configured for it.
 
 ### 3. Send a prompt
 
@@ -21,7 +21,7 @@ Type your question and send.
 > [!TIP]
 > A useful first prompt is to ask the agent what it has access to. This makes it inspect its environment and tell you what data it can query before you dig in.
 
-## Example — generate a financial report
+## Example: generate a financial report
 
 Suppose the agent has access to a warehouse with stock-market data.
 
@@ -36,7 +36,7 @@ From the prompt and the warehouse metadata, the agent:
 
 This kind of task typically completes in around 20 steps and a handful of queries.
 
-## Example — operate Bruin Cloud via CLI
+## Example: operate Bruin Cloud via CLI
 
 If the agent has Cloud CLI access enabled, you can also use it for data engineering tasks. It can:
 
@@ -48,13 +48,11 @@ If the agent has Cloud CLI access enabled, you can also use it for data engineer
 
 The agent runs the CLI commands it needs and reports back with the numbers and the failing run IDs.
 
-## Key points
+## How chats are scoped
 
-- Pick the agent in the chat dropdown — its access (project, connection set, CLI) is set on the agent itself.
-- Ask the agent what it has access to before diving into specific questions.
-- Data-analyst use cases — schema exploration, queries, charts, PDF reports.
-- Engineering use cases — pipeline status, run history, catalog lookups, triggering runs.
-- Each chat runs in a sandbox that clones the connected repo and builds context from your `AGENTS.md` files.
+- The agent's project, connection set, integrations, and CLI access are set on the agent itself. Pick the agent in the chat dropdown to switch context.
+- Each chat runs in a sandbox that clones the connected repo and builds context from your `AGENTS.md` files. See the [Slack AI Analyst tutorial](/cloud/ai-agents/slack-ai-analyst#6-add-agent-instructions) for an example `AGENTS.md`.
+- For data access and retention details, see [Does the agent see my actual data?](/cloud/faq#does-the-agent-see-my-actual-data) in the FAQ.
 
 ## Next
 

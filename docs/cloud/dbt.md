@@ -13,3 +13,9 @@ You can define any schedule you want using the cron syntax. The above example wi
 
 > [!NOTE]
 > The `bruin_schedule` variable is optional. If you don't define it, your dbt pipeline will not run automatically.
+
+## Related
+
+- [Pipelines](/cloud/pipelines) for how dbt assets show up in the pipeline page.
+- [Projects](/cloud/projects) for connecting the Git repo that holds your dbt project.
+- [Connections](/cloud/connections) for the warehouse credentials dbt needs.

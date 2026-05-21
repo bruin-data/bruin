@@ -1,8 +1,8 @@
 # Connections
 
-[Connections](/connections/overview) are named configurations that let Bruin authenticate and talk to external systems — data sources, destinations, and any other platform a pipeline or agent depends on.
+[Connections](/connections/overview) are named configurations that let Bruin authenticate and talk to external systems: data sources, destinations, and any other platform a pipeline or agent depends on.
 
-Locally, you define connections in `.bruin.yml`. That file should be gitignored — it holds [secrets](/core-concepts/secrets#secrets) and credentials. In Bruin Cloud, you configure the same connections through the UI. They need to match the names referenced in your pipelines, and they are encrypted at rest using [HashiCorp Vault](/secrets/vault) as the secrets backend.
+Locally, you define connections in `.bruin.yml`. That file should be gitignored since it holds [secrets](/core-concepts/secrets#secrets) and credentials. In Bruin Cloud, you configure the same connections through the UI. The names need to match the ones referenced in your pipelines, and they are encrypted at rest using [HashiCorp Vault](/secrets/vault) as the secrets backend.
 
 ## Add a connection
 
@@ -18,7 +18,7 @@ From **Manage team**, go to **Connections** and click **New connection**.
 
 ### 3. Pick the connection type
 
-Select the type that matches your data platform — BigQuery, Postgres, Snowflake, Databricks, and so on — or pick a **generic secret** for API keys, tokens, and other text-based credentials. See [Platforms](/platforms/aws) for the full list of supported types.
+Select the type that matches your data platform (BigQuery, Postgres, Snowflake, Databricks, etc.) or pick a **generic secret** for API keys, tokens, and other text-based credentials. See [Connections overview](/connections/overview) and the [platforms](/platforms/bigquery) section for the full list of supported types and per-platform config.
 
 ### 4. Match the name
 
@@ -26,7 +26,7 @@ The connection name must match the one referenced in your pipeline exactly. If t
 
 ### 5. Fill in the details
 
-Enter the rest of the connection details. Each platform asks for different fields — access key, host, project ID, username and password, and so on.
+Enter the rest of the connection details. Each platform asks for different fields: access key, host, project ID, username and password, and so on.
 
 ### 6. Create and validate
 
@@ -38,7 +38,7 @@ Go back to your pipeline. The connection should appear in the right-hand list wi
 
 ## Generic secrets
 
-For text-based credentials that are not tied to a specific data platform (API keys, OAuth tokens, third-party secrets), use the **generic secret** connection type. These work the same way as named connections in `.bruin.yml` — they are referenced by name from your pipelines and assets.
+For text-based credentials that are not tied to a specific data platform (API keys, OAuth tokens, third-party secrets), use the **generic secret** connection type. They work the same way as named connections in `.bruin.yml`: pipelines and assets reference them by name.
 
 ## Connection sets (for AI agents)
 
@@ -48,4 +48,9 @@ A **connection set** is a named bundle of connections used by an [AI agent](/clo
 - Give agents read-only access where pipelines have read/write.
 - Apply granular, agent-specific permissions without touching pipeline credentials.
 
-To create a connection set, open **Connections** in team settings, click **New connection set**, give it a name, and pick the data platform connections it should include. Then attach it to an agent from the [agent configuration page](/cloud/ai-agents/configure).
+To create a connection set, open **Connections** in team settings, click **New connection set**, name it, and pick the data platform connections it should include. Then attach it to an agent from the [agent configuration page](/cloud/ai-agents/configure).
+
+## Next
+
+- [Pipelines](/cloud/pipelines) for enabling pipelines that use these connections.
+- [AI Agents](/cloud/ai-agents/overview) for attaching connection sets to agents.

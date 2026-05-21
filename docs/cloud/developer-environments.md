@@ -8,7 +8,7 @@ Author and deploy your pipelines—all without leaving your browser.
 
 ## Configuration
 
-In order to use Developer Environments, you need to at least have a Git secret configured.
+To use Developer Environments, you need at least a Git secret configured.
 
 ### Git Secret
 
@@ -57,7 +57,7 @@ Developer Environments are now ready for use.
 
 ### Environment Secrets
 
-Your Developer Environments can be pre-configured with [secrets](/secrets/bruinyml.md). This means that when you launch a Developer Environment, you can run your pipelines directly without having to configure individual connections.
+Your Developer Environments can be pre-configured with [secrets](/secrets/bruinyml). This means that when you launch a Developer Environment, you can run your pipelines directly without having to configure individual connections.
 
 > [!NOTE]
 > Environment Secrets are user-scoped. This contrasts with Git secrets, which are team-scoped.
@@ -82,3 +82,8 @@ Now, any Developer Environment instances launched by the current user will have 
 - Click the `Launch` button once the instance status becomes `Active`.
 
 Your Developer Environment should launch shortly. Happy coding!
+
+## Related
+
+- [Connections](/cloud/connections) for the cloud-managed equivalent (used by scheduled pipeline runs).
+- [Projects](/cloud/projects) for how repos are wired into Bruin Cloud.

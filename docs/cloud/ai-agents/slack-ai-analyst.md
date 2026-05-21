@@ -1,14 +1,14 @@
 # Slack AI Analyst Tutorial
 
-End-to-end walkthrough: build a stock-market analyst pipeline with the Bruin CLI, deploy it to Bruin Cloud, and expose it as a Slack agent your team can query from any channel.
+End-to-end walkthrough: build a stock-market analyst pipeline with the Bruin CLI, deploy it to Bruin Cloud, and expose it as a [Slack](/cloud/integrations/slack) agent your team can query from any channel.
 
-**Audience** — data professionals deploying an AI analyst to Bruin Cloud and Slack.
+**Audience:** data professionals deploying an AI analyst to Bruin Cloud and Slack.
 
 **Prerequisites**
 
 - [Bruin CLI](/getting-started/introduction/installation) installed and authenticated.
-- Claude Code available for pipeline generation and `bruin ai enhance`.
-- A Bruin Cloud account with access to Team settings and Projects.
+- Claude Code available for pipeline generation and [`bruin ai enhance`](/commands/ai-enhance).
+- A Bruin Cloud account with access to Team settings and [Projects](/cloud/projects).
 - A Git repo containing your Bruin project.
 - Slack workspace with bot credentials and channel access.
 
@@ -20,11 +20,11 @@ See [Project](/core-concepts/project) for context on Bruin projects.
 
 ## 2. Build the pipeline
 
-Use Claude to extract stock data from Yahoo Finance and Wikipedia. Build assets that clean and join the data into something useful for an analyst — daily price tables, market-cap rankings, revenue and free-cash-flow rollups, and so on.
+Use Claude to extract stock data from Yahoo Finance and Wikipedia. Build assets that clean and join the data into something useful for an analyst: daily price tables, market-cap rankings, revenue and free-cash-flow rollups, and so on.
 
 ## 3. Enhance metadata
 
-Run `bruin ai enhance` across the assets — this adds descriptions, column metadata, quality checks, and lineage. See [`ai enhance`](/commands/ai-enhance) for flag options. Review the output before committing.
+Run [`bruin ai enhance`](/commands/ai-enhance) across the assets. This adds descriptions, column metadata, [quality checks](/quality/overview), and lineage. Review the output before committing.
 
 ## 4. Add the repo to Bruin Cloud
 
@@ -51,7 +51,7 @@ Create an `AGENTS.md` file in the project root with the pretext, context, rules,
 
 ## 7. Test in Bruin Cloud
 
-- Open the agent's chat in Bruin Cloud and ask a few questions.
+- Open the agent's chat in Bruin Cloud and ask a few questions. See [Chat with Agents](/cloud/ai-agents/chat).
 - Confirm it can query the data and self-correct when its first query is wrong.
 
 ## 8. Test in Slack
@@ -65,10 +65,15 @@ Create an `AGENTS.md` file in the project root with the pretext, context, rules,
 - *"Which companies had their free cash flow margin improve in the past 4 quarters but saw their stock price decrease more than 10% during the same period?"*
 - *"Summarize the top 10 tickers by revenue growth and generate a PDF report."*
 
+## Next
+
+- [Scheduled Agents](/cloud/ai-agents/scheduled) to send recurring reports to the same Slack channel.
+- [Integrations overview](/cloud/integrations/overview) to deploy the same agent to Teams, Discord, WhatsApp, or Telegram.
+
 ## Helpful links
 
 - [Bruin installation](/getting-started/introduction/installation)
 - [`bruin ai enhance`](/commands/ai-enhance)
 - [Projects in Bruin Cloud](/cloud/projects)
 - [Configure Agents](/cloud/ai-agents/configure)
-- [Slack](/cloud/integrations/slack)
+- [Slack integration](/cloud/integrations/slack)

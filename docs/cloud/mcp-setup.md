@@ -102,3 +102,9 @@ Once the Bruin Cloud MCP server is connected, you can ask in natural language, f
 - **Cursor, tools not showing:** Ensure `.cursor/mcp.json` is valid JSON and restart Cursor.
 - **Claude Code, server not found:** Run `claude mcp list` to confirm the server is configured; use `claude mcp get bruin_cloud` to check its URL and headers.
 - **Codex CLI, tools not available:** Ensure `~/.codex/config.toml` is valid toml and restart Codex CLI.
+
+## Related
+
+- [Pipelines](/cloud/pipelines) for the operations the MCP can drive (runs, backfills, status).
+- [Connections](/cloud/connections) for the connections the MCP can list and create.
+- [Bruin MCP (local)](/getting-started/bruin-mcp) for the local-CLI MCP, separate from the cloud-hosted one.

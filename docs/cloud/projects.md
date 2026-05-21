@@ -27,7 +27,7 @@ Rename the project or leave it matching the repo name, then click **Create proje
 
 ### 5. Wait for the sync
 
-Bruin Cloud syncs the pipelines in your repo. This can take a few minutes. You can keep working while it runs — start adding connections in parallel.
+Bruin Cloud syncs the pipelines in your repo. This can take a few minutes. You can keep working while it runs. Start adding connections in parallel.
 
 ### 6. Add connections
 
@@ -42,14 +42,14 @@ Bruin Cloud supports two ways to authenticate with GitHub.
 - Installed once per GitHub organization (or personal account).
 - Scoped to specific repositories.
 - No expiring tokens.
-- Once installed, every new project you create lists the repos the app has access to — no per-project setup.
+- Once installed, every new project you create lists the repos the app has access to, no per-project setup.
 
 To grant access to more repos later, open the [Bruin Cloud GitHub App page](https://github.com/apps/bruin-cloud) on GitHub and click **Configure**. (You can also reach it from GitHub: **Settings → Applications → Bruin Cloud → Configure**.)
 
 ### Personal access token (PAT)
 
 - A single user's token used to authenticate Bruin Cloud against your repo.
-- Tokens expire and are tied to the user who created them — if that user leaves, the project loses access.
+- Tokens expire and are tied to the user who created them. If that user leaves, the project loses access.
 
 We recommend migrating PAT-based projects to the GitHub App.
 
@@ -63,14 +63,14 @@ Click your team name in the top bar and choose **Team Settings**.
 
 ### 2. Go to the Projects section
 
-In Team Settings, open the **Projects** tab from the left sidebar — this is where every project connected to your team lives.
+In Team Settings, open the **Projects** tab from the left sidebar. This is where every project connected to your team lives.
 
 ### 3. Click "Migrate to GitHub App"
 
 Scroll down to your existing projects. Any project still using a PAT shows a **Migrate to GitHub App** action. Click it to start.
 
 > [!TIP]
-> If the Bruin GitHub App is already installed on the organization that owns the repo, the migration finishes immediately — the next two steps are skipped.
+> If the Bruin GitHub App is already installed on the organization that owns the repo, the migration finishes immediately. The next two steps are skipped.
 
 ### 4. Choose where to install the app
 
@@ -84,7 +84,7 @@ We recommend granting access only to the repositories you actually use with Brui
 
 ### 6. Back to Bruin
 
-After you confirm on GitHub, you are redirected back to Bruin and the migration finishes automatically. The migrated project no longer shows the **Migrate to GitHub App** action — that is how you know it is using the GitHub App now.
+After you confirm on GitHub, you are redirected back to Bruin and the migration finishes automatically. The migrated project no longer shows the **Migrate to GitHub App** action. That is how you know it is using the GitHub App now.
 
 ## Adding a new project from a different repo
 
@@ -95,4 +95,9 @@ If the repo you want is not in the list, grant the Bruin GitHub App access to it
 1. Open the [Bruin Cloud GitHub App page](https://github.com/apps/bruin-cloud) and click **Configure**.
 2. Pick the installation (account or organization) where the app lives.
 3. Under **Repository access**, click **Select repositories** and add the new repo. Hit **Save**.
-4. Back in Bruin Cloud, the newly granted repo appears automatically in the **Connect with GitHub** list — no reinstall needed.
+4. Back in Bruin Cloud, the newly granted repo appears automatically in the **Connect with GitHub** list. No reinstall needed.
+
+## Next
+
+- [Connections](/cloud/connections) for setting up the data sources and secrets the project's pipelines need.
+- [Pipelines](/cloud/pipelines) for enabling and operating the pipelines once they finish syncing.

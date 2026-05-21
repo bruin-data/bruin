@@ -1,8 +1,8 @@
 # Getting Started
 
-This page is the shortest path from a Bruin Cloud sign-up to a pipeline running on a schedule.
+The shortest path from a Bruin Cloud sign-up to a pipeline running on a schedule.
 
-If you would rather start with the AI side — connect a warehouse and ask questions in chat or Slack — jump to [AI Analyst onboarding](#ai-analyst-onboarding) at the bottom.
+If you would rather start with the AI side (connect a warehouse and ask questions in chat or Slack), jump to [AI Analyst onboarding](#ai-analyst-onboarding) at the bottom.
 
 ## 1. Sign up
 
@@ -21,7 +21,7 @@ You can switch tracks at any time from **Getting Started** on the home page.
 
 A [project](/core-concepts/project) in Bruin Cloud maps one-to-one with a Git repository. Creating a project syncs the pipelines in that repo, and gives you a place to manage the connections those pipelines need.
 
-See [Projects](/cloud/projects) for the full walkthrough — picking GitHub authentication, selecting a repo, naming the project, waiting for the initial sync.
+See [Projects](/cloud/projects) for the full walkthrough: picking GitHub authentication, selecting a repo, naming the project, waiting for the initial sync.
 
 ## 4. Add connections
 
@@ -35,7 +35,7 @@ Pipelines synced from a repo start disabled. Open **Catalog → Pipelines**, pic
 
 The first run triggers automatically when you enable a new pipeline.
 
-See [Pipelines](/cloud/pipelines) for the full walkthrough — including runs, backfills, lineage, and manual runs.
+See [Pipelines](/cloud/pipelines) for the full walkthrough, including runs, backfills, lineage, and manual runs.
 
 ## 6. Monitor and operate
 
@@ -47,13 +47,21 @@ Once a pipeline is active, the pipeline page is where you operate it:
 - Use **Lineage** to see how assets connect.
 - Use **New run** for ad-hoc runs, full refreshes, and backfills.
 
+For pipeline-level Slack, Teams, Discord, or webhook notifications on success/failure, see [Notifications](/cloud/notifications). For dependencies across pipelines, see [Cross-pipeline dependencies](/cloud/cross-pipeline).
+
 ## AI Analyst onboarding
 
 Want to start by asking questions in chat or Slack instead of wiring pipelines? The AI track is:
 
-1. **Connect a warehouse.** Add a connection for BigQuery, Postgres, MySQL, SQL Server, Snowflake, Databricks, or Redshift. We recommend creating with validation so Bruin can confirm credentials work. If you do not have warehouse access yourself, invite a teammate from your data team to the workspace and have them set it up.
-2. **Open AI → Chats.** Pick the default agent and ask a question. A good first prompt is "What data do you have access to?" — the agent will inspect the schema and tell you what is available.
-3. **Add a chat integration.** From the **Agents** page, open the agent and connect Slack, Teams, Discord, WhatsApp, or Telegram. See [Configure Agents](/cloud/ai-agents/configure) and the [Integrations overview](/cloud/integrations/overview).
+1. **Connect a warehouse.** Add a [connection](/cloud/connections) for BigQuery, Postgres, MySQL, SQL Server, Snowflake, Databricks, or Redshift. We recommend creating with validation so Bruin can confirm credentials work. If you do not have warehouse access yourself, invite a teammate from your data team to the workspace and have them set it up.
+2. **Open AI → Chats.** Pick the default agent and ask a question. A good first prompt is "What data do you have access to?" The agent will inspect the schema and tell you what is available. See [Chat with Agents](/cloud/ai-agents/chat).
+3. **Add a chat integration.** From the **Agents** page, open the agent and connect [Slack](/cloud/integrations/slack), [Microsoft Teams](/cloud/integrations/teams), [Discord](/cloud/integrations/discord), [WhatsApp](/cloud/integrations/whatsapp), or [Telegram](/cloud/integrations/telegram). See [Configure Agents](/cloud/ai-agents/configure) and the [Integrations overview](/cloud/integrations/overview).
 4. **Build a dashboard.** Use the agent to assemble charts and filters from natural language, then publish.
-5. **Schedule a report.** Have the agent run on a cadence and post results to Slack — see [Scheduled Agents](/cloud/ai-agents/scheduled).
-6. **Optional — add a context layer.** Connect a Git repo (your dbt or Bruin semantic layer), or describe tables manually, so the agent gets accuracy on your team's metrics.
+5. **Schedule a report.** Have the agent run on a cadence and post results to Slack. See [Scheduled Agents](/cloud/ai-agents/scheduled).
+6. **Optional: add a context layer.** Connect a Git repo (your dbt or Bruin semantic layer), or describe tables manually, so the agent gets accuracy on your team's metrics.
+
+## Next
+
+- [Projects](/cloud/projects) and [Connections](/cloud/connections) for the pipeline track.
+- [AI Agents](/cloud/ai-agents/overview) for the AI track.
+- [FAQ](/cloud/faq) for common questions and patterns that aren't real features.

@@ -8,7 +8,7 @@ Bruin considers assets unique; however, asset names often do not fulfill the uni
 
 However, even if they have assets with the same name, in reality they have separate tables in their data warehouse.
 
-In order to uniquely identify what the individual assets contain or where they are located, Bruin has a concept of a URI. A URI is a unique identifier for an asset, and it is expected to be unique across all pipelines and repos of the customer.
+To uniquely identify what individual assets contain or where they are located, Bruin uses URIs. A URI is a unique identifier for an asset, and it is expected to be unique across all pipelines and repos of the customer.
 
 > [!WARNING]
 > URI is a required field for cross-pipeline dependencies. If you do not provide a URI, Bruin will not be able to resolve the dependency.
@@ -26,7 +26,7 @@ Here are some common examples for major data warehouses:
 
 ## Defining dependencies
 
-In order to depend on an upstream that lives elsewhere, Bruin Cloud utilizes URIs, and identifies the upstream asset by the URI.
+To depend on an upstream that lives elsewhere, Bruin Cloud uses URIs to identify the upstream asset.
 
 Let's say you have an upstream asset with a URI:
 
@@ -37,7 +37,7 @@ name: asset1
 uri: external://some_external_asset
 ```
 
-In order to define a dependency on this upstream asset that might be living anywhere across your repos and pipelines, you can use the new `uri` key in the `depends` array:
+To define a dependency on that upstream asset, wherever it lives across your repos and pipelines, use the `uri` key in the `depends` array:
 
 ```yaml
 name: domain.my_asset
@@ -94,3 +94,8 @@ For example for the aforementioned `2025-10-11 15:30:00`to `2025-10-11 15:35:00`
 - `2025-10-11 15:34:00`to `2025-10-11 15:36:00`
 
 These intervals fully cover the original downstream interval and thus the downstream can run.
+
+## Related
+
+- [Pipelines](/cloud/pipelines) for enabling, monitoring, and triggering runs.
+- [Asset definition](/assets/definition-schema) for the `uri` and `depends` fields.

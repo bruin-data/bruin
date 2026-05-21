@@ -36,3 +36,8 @@ Larger instances consume more of your tenant's resource pool. See [Concurrency &
 ## Custom Instance Types
 
 Bruin Cloud supports custom instance types. You can specify a custom instance type by setting the `instance` field to the name of the instance type you want to use. Talk to your account manager to get access to custom instance types.
+
+## Related
+
+- [Pipelines](/cloud/pipelines) for how scheduled and manual runs use these instances.
+- [Asset definition](/assets/definition-schema) for setting the `instance` field on an asset.

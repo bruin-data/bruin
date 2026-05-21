@@ -4,7 +4,7 @@ The **Pipelines** page in Bruin Cloud is where you enable pipelines, trigger run
 
 ## Enable a pipeline
 
-Pipelines synced from a repo start disabled. Enabling one tells Bruin Cloud to run it on schedule. If connections are missing, you are prompted to add them inline.
+Pipelines synced from a repo start disabled. Enabling one tells Bruin Cloud to run it on schedule. If [connections](/cloud/connections) are missing, you are prompted to add them inline.
 
 ### 1. Open your pipelines
 
@@ -16,10 +16,10 @@ Pick a pipeline and click **Enable selected pipelines**.
 
 ### 3. Add missing connections
 
-If the pipeline references connections you have not configured, Bruin Cloud lists them. For each:
+If the pipeline references connections you have not configured, Bruin Cloud lists them. For each one:
 
-1. Click the missing connection — the name is filled in for you.
-2. Pick the **connection type** — a built-in (BigQuery, Postgres, Snowflake, etc.) or a generic secret.
+1. Click the missing connection. The name is filled in for you.
+2. Pick the **connection type**: a built-in (BigQuery, Postgres, Snowflake, etc.) or a generic secret.
 3. Enter the credentials.
 4. Click **Create**. Bruin Cloud validates the connection. To skip validation, click **Create without validation**.
 
@@ -27,11 +27,11 @@ Repeat until the list is empty. See [Connections](/cloud/connections) for the lo
 
 ### 4. First run
 
-The first run triggers automatically when a new pipeline is enabled — no need to click **New run**.
+The first run triggers automatically when a new pipeline is enabled. You do not need to click **New run**.
 
 ### 5. Confirm it is running
 
-Open the pipeline page and check:
+Open the pipeline page and check that:
 
 - Status is **active**.
 - A new run appears in the runs list.
@@ -71,24 +71,24 @@ The lineage panel shows how assets connect. Click any asset to jump to it. Expan
 
 The right panel shows:
 
-- **Name**, **schedule**, **start date**, **owner**
-- **Last commit** from the connected repo
-- **Run durations** — recent runs at a glance, so failures stand out
-- **Connections** used by this pipeline
-- **Activity** — a log of manual actions taken by users
+- Name, schedule, start date, and owner.
+- Last commit from the connected repo.
+- Run durations: recent runs at a glance, so failures stand out.
+- Connections used by this pipeline. See [Connections](/cloud/connections) to add or fix any that are flagged.
+- Activity: a log of manual actions taken by users.
 
 ### New run
 
 The **New run** button (top right) triggers a manual run. Options:
 
 - Toggle **full refresh**.
-- Add **notes** and **tags** — they show up in the activity log.
+- Add **notes** and **tags**. They show up in the activity log.
 - Run a single interval, or create multiple jobs across intervals.
 
 #### Backfills
 
-- **Auto split by schedule** — one job per scheduled interval. A 23-day range on a daily schedule produces 23 jobs.
-- **Manual split** — pick the interval and the number of splits. Useful for processing data in chunks.
+- **Auto split by schedule:** one job per scheduled interval. A 23-day range on a daily schedule produces 23 jobs.
+- **Manual split:** pick the interval and the number of splits. Useful for processing data in chunks.
 
 ### Status
 
@@ -102,3 +102,9 @@ The menu (top right) lets you **disable** or **delete** the pipeline.
 > [!TIP]
 > Want to exclude a single asset from the pipeline's scheduled runs? See [Can I skip a single asset from scheduled runs?](/cloud/faq#can-i-skip-a-single-asset-from-scheduled-runs) in the FAQ.
 
+## Related
+
+- [Cross-pipeline dependencies](/cloud/cross-pipeline) for depending on assets in other pipelines.
+- [Notifications](/cloud/notifications) for Slack/Teams/Discord/webhook alerts on success and failure.
+- [Instance Types](/cloud/instance-types) for sizing assets at run time.
+- [FAQ](/cloud/faq) for common scheduling and run questions.
