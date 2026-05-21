@@ -396,7 +396,7 @@ func enhanceSingleAsset(ctx context.Context, c *cli.Command, assetPath string, f
 		if pp.Asset.Name != "" {
 			logPrefix = pp.Asset.Name
 		}
-		status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), nil) //nolint:contextcheck
+		status, fillErr := fillColumnsFromDB(pp, fs, c.String("environment"), "", nil) //nolint:contextcheck
 		if fillErr != nil && !quiet && output != "json" {
 			warningPrinter.Printf("[%s] Warning: fill columns failed: %v\n", logPrefix, fillErr)
 		} else if status == fillStatusUpdated && !quiet && output != "json" {

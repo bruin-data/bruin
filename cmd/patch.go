@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -65,14 +66,18 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 }
 
 // Returns: status ("updated", "skipped", "failed").
-func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager config.ConnectionGetter) (string, error) {
+func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment, connectionOverride string, manager config.ConnectionGetter) (string, error) {
 	var conn interface{}
 	var err error
 
-	if manager != nil {
-		connName, err := pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
-		if err != nil {
-			return fillStatusFailed, err
+	switch {
+	case manager != nil:
+		connName := connectionOverride
+		if connName == "" {
+			connName, err = pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
+			if err != nil {
+				return fillStatusFailed, err
+			}
 		}
 
 		conn = manager.GetConnection(connName)
@@ -87,7 +92,29 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager conf
 				},
 			)
 		}
-	} else {
+	case connectionOverride != "":
+		if environment != "" {
+			if err := pp.Config.SelectEnvironment(environment); err != nil {
+				return fillStatusFailed, errors.Wrapf(err, "failed to use the environment '%s'", environment)
+			}
+		}
+		m, errs := connection.NewManagerFromConfigWithContext(context.Background(), pp.Config)
+		if len(errs) > 0 {
+			return fillStatusFailed, errors.Wrap(errs[0], "failed to create connection manager")
+		}
+		conn = m.GetConnection(connectionOverride)
+		if conn == nil {
+			return fillStatusFailed, fmt.Errorf(
+				"failed to get connection for asset '%s': %w",
+				pp.Asset.Name,
+				&config.MissingConnectionError{
+					Name:            connectionOverride,
+					ConfigFilePath:  pp.Config.Path(),
+					EnvironmentName: pp.Config.SelectedEnvironmentName,
+				},
+			)
+		}
+	default:
 		_, conn, err = getConnectionFromPipelineInfoWithContext(context.Background(), pp, environment)
 		if err != nil {
 			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
@@ -364,6 +391,11 @@ func Patch() *cli.Command {
 						Aliases: []string{"env"},
 						Usage:   "Target environment name as defined in .bruin.yml.",
 					},
+					&cli.StringFlag{
+						Name:    "connection",
+						Aliases: []string{"c"},
+						Usage:   "Override the connection used to read the schema (defaults to the asset's destination connection).",
+					},
 				},
 				Action: func(ctx context.Context, c *cli.Command) error {
 					inputPath := c.Args().First()
@@ -373,6 +405,7 @@ func Patch() *cli.Command {
 
 					output := c.String("output")
 					environment := c.String("environment")
+					connectionOverride := c.String("connection")
 					fs := afero.NewOsFs()
 					// ctx is already available from function signature
 
@@ -383,7 +416,7 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, err)
 							return cli.Exit("", 1)
 						}
-						status, err := fillColumnsFromDB(pp, fs, environment, nil) //nolint:contextcheck
+						status, err := fillColumnsFromDB(pp, fs, environment, connectionOverride, nil) //nolint:contextcheck
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s': %w", pp.Asset.Name, err))
 							return cli.Exit("", 1)
@@ -426,7 +459,7 @@ func Patch() *cli.Command {
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, fs, environment, nil) //nolint:contextcheck
+							status, err := fillColumnsFromDB(pp, fs, environment, connectionOverride, nil) //nolint:contextcheck
 							processedAssets++
 							assetName := asset.Name
 							switch status {
