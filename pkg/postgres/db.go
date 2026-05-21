@@ -270,6 +270,9 @@ ORDER BY table_schema, table_name;
 }
 
 func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
+	if databaseName == "" && c.config != nil {
+		databaseName = c.config.GetDatabase()
+	}
 	if databaseName == "" {
 		return nil, errors.New("database name cannot be empty")
 	}
@@ -294,6 +297,28 @@ func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string)
 		return nil, fmt.Errorf("invalid table name format: %s", tableName)
 	}
 
+	return c.getColumns(ctx, databaseName, schemaName, tableNameOnly, tableName)
+}
+
+func (c *Client) GetColumnsForTable(ctx context.Context, schemaName, tableName string) ([]*ansisql.DBColumn, error) {
+	var databaseName string
+	if c.config != nil {
+		databaseName = c.config.GetDatabase()
+	}
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+	if schemaName == "" {
+		return nil, errors.New("schema name cannot be empty")
+	}
+	if tableName == "" {
+		return nil, errors.New("table name cannot be empty")
+	}
+
+	return c.getColumns(ctx, databaseName, schemaName, tableName, schemaName+"."+tableName)
+}
+
+func (c *Client) getColumns(ctx context.Context, databaseName, schemaName, tableNameOnly, displayTableName string) ([]*ansisql.DBColumn, error) {
 	q := `
 SELECT
     column_name,
@@ -310,7 +335,7 @@ ORDER BY ordinal_position;
 
 	rows, err := c.connection.Query(ctx, q, databaseName, schemaName, tableNameOnly)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
+		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, displayTableName, err)
 	}
 	defer rows.Close()
 
@@ -375,8 +400,23 @@ ORDER BY ordinal_position;
 }
 
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	return c.getDatabaseSummary(ctx, nil)
+}
+
+func (c *Client) GetDatabaseSummaryForSchemas(ctx context.Context, schemaNames []string) (*ansisql.DBDatabase, error) {
+	return c.getDatabaseSummary(ctx, schemaNames)
+}
+
+func (c *Client) getDatabaseSummary(ctx context.Context, schemaNames []string) (*ansisql.DBDatabase, error) {
 	db := c.config.GetDatabase()
-	q := `
+	schemaFilter := ""
+	args := []any{db}
+	if len(schemaNames) > 0 {
+		schemaFilter = "\n    AND t.table_schema = ANY($2)"
+		args = append(args, schemaNames)
+	}
+
+	q := fmt.Sprintf(`
 SELECT
     t.table_schema,
     t.table_name,
@@ -399,12 +439,13 @@ LEFT JOIN
 WHERE
 	t.table_catalog = $1 
     AND t.table_schema NOT IN ('pg_catalog', 'information_schema')
+    %s
     AND t.table_type IN ('BASE TABLE', 'VIEW')
     AND (n.nspname = t.table_schema OR n.nspname IS NULL)
 ORDER BY t.table_schema, t.table_name;
-`
+`, schemaFilter)
 
-	rows, err := c.connection.Query(ctx, q, db)
+	rows, err := c.connection.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

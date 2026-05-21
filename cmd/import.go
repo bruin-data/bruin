@@ -354,6 +354,25 @@ func resolvePipelinePath(pipelinePath string) string {
 }
 
 func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn interface{}, schemaName, tableName string) error {
+	// Prefer database-native column metadata when available. PostgreSQL supports
+	// this through information_schema, which avoids relying on SELECT field
+	// descriptions that are not always returned by the driver.
+	if columnFetcher, ok := conn.(interface {
+		GetColumnsForTable(ctx context.Context, schemaName, tableName string) ([]*ansisql.DBColumn, error)
+	}); ok {
+		dbColumns, err := columnFetcher.GetColumnsForTable(ctx, schemaName, tableName)
+		if err != nil {
+			return errors2.Wrapf(err, "failed to query columns for table %s.%s", schemaName, tableName)
+		}
+		if len(dbColumns) == 0 {
+			return fmt.Errorf("no columns found for table %s.%s", schemaName, tableName)
+		}
+
+		columnDescriptions := fetchColumnDescriptions(ctx, conn, schemaName, tableName)
+		asset.Columns = buildPipelineColumns(dbColumns, columnDescriptions)
+		return nil
+	}
+
 	// Check if connection supports schema introspection
 	querier, ok := conn.(interface {
 		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
@@ -420,6 +439,36 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 
 	asset.Columns = columns
 	return nil
+}
+
+func buildPipelineColumns(dbColumns []*ansisql.DBColumn, columnDescriptions map[string]string) []pipeline.Column {
+	skipColumns := map[string]bool{
+		"_IS_CURRENT":  true,
+		"_VALID_UNTIL": true,
+		"_VALID_FROM":  true,
+	}
+
+	columns := make([]pipeline.Column, 0, len(dbColumns))
+	for _, col := range dbColumns {
+		if skipColumns[col.Name] {
+			continue
+		}
+
+		description := col.Description
+		if description == "" {
+			description = columnDescriptions[col.Name]
+		}
+
+		columns = append(columns, pipeline.Column{
+			Name:        col.Name,
+			Type:        col.Type,
+			Description: description,
+			Checks:      []pipeline.ColumnCheck{},
+			Upstreams:   []*pipeline.UpstreamColumn{},
+		})
+	}
+
+	return columns
 }
 
 // fetchColumnDescriptions fetches column descriptions from the database's information schema.
