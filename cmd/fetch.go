@@ -595,7 +595,7 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 	if assetPath != "" {
 		semanticInputPath = assetPath
 	}
-	models, semanticPath, err := loadRepoSemanticModels(fs, semanticInputPath)
+	models, semanticPath, err := loadRepoSemanticModels(fs, pipelineInfo.Config.Path(), semanticInputPath)
 	if err != nil {
 		return "", nil, "", "", nil, errors.Wrap(err, "failed to load repo semantic models")
 	}
@@ -675,13 +675,20 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 	}
 }
 
-func loadRepoSemanticModels(fs afero.Fs, inputPath string) (map[string]*semantic.Model, string, error) {
-	repoRoot, err := git.FindRepoFromPath(inputPath)
-	if err != nil {
-		return nil, "", err
+func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[string]*semantic.Model, string, error) {
+	semanticRoot := ""
+	if configFilePath != "" {
+		semanticRoot = filepath.Dir(configFilePath)
+	}
+	if semanticRoot == "" {
+		repoRoot, err := git.FindRepoFromPath(inputPath)
+		if err != nil {
+			return nil, "", err
+		}
+		semanticRoot = repoRoot.Path
 	}
 
-	semanticPath := filepath.Join(repoRoot.Path, "semantic")
+	semanticPath := filepath.Join(semanticRoot, "semantic")
 	models, err := semantic.LoadDirFS(fs, semanticPath)
 	if err != nil {
 		return nil, semanticPath, err

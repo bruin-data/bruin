@@ -120,7 +120,7 @@ Semantic query mode cannot be combined with `--query`.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `schema` | No | Schema version. Use `v1`; omitted models default to `v1`. |
-| `name` | Yes | Unique model name inside the pipeline. |
+| `name` | Yes | Unique model name inside the repository. |
 | `label` | No | Human-readable display label. |
 | `description` | No | Longer model description. |
 | `source.table` | Yes | Table, view, or SQL subquery used as the model source. |

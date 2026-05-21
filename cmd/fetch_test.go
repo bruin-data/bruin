@@ -13,6 +13,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -467,6 +468,43 @@ func TestSemanticFilterInputs(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestLoadRepoSemanticModelsUsesConfigDirectory(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	projectDir := filepath.Join(tmpDir, "project")
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "semantic"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(projectDir, "semantic"), 0o755))
+
+	rootModel := []byte(`schema: v1
+name: root_orders
+source:
+  table: root_orders
+metrics:
+  - name: revenue
+    expression: sum(amount)
+`)
+	projectModel := []byte(`schema: v1
+name: orders
+source:
+  table: orders
+metrics:
+  - name: revenue
+    expression: sum(amount)
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "semantic", "root_orders.yml"), rootModel, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "semantic", "orders.yml"), projectModel, 0o644))
+
+	configPath := filepath.Join(projectDir, ".bruin.yml")
+	models, semanticPath, err := loadRepoSemanticModels(afero.NewOsFs(), configPath, filepath.Join(projectDir, "pipelines", "daily", "assets", "orders.sql"))
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(projectDir, "semantic"), semanticPath)
+	assert.Contains(t, models, "orders")
+	assert.NotContains(t, models, "root_orders")
 }
 
 // MockMSSQLDB implements the Limiter interface like mssql.DB does.
