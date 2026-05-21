@@ -10,11 +10,11 @@ Locally, you define connections in `.bruin.yml`. That file should be gitignored 
 
 Open a pipeline. On the right-hand side, Bruin Cloud lists the connections it uses. Any connection referenced in your pipelines but not configured in Bruin Cloud is flagged so you know what to fix.
 
-You can also work from a clean slate: open **Manage team → Connections**.
+You can also work from a clean slate: open the team menu in the top bar and click **Connections** (under the **Manage Team** section).
 
 ### 2. Open Connections and click "New connection"
 
-From **Manage team**, go to **Connections** and click **New connection**.
+From the team menu, click **Connections** and then **New connection**.
 
 ### 3. Pick the connection type
 
@@ -30,7 +30,7 @@ Enter the rest of the connection details. Each platform asks for different field
 
 ### 6. Create and validate
 
-Click **Create**. For most data platforms, Bruin Cloud validates the connection by running a `SELECT 1` against the database. If you do not want that, choose **Create without validation**.
+Click **Create**. For most data platforms, Bruin Cloud validates the connection by running a `SELECT 1` against the database. If you do not want that, choose **Create Without Validation**.
 
 ### 7. Confirm it is active
 
@@ -48,7 +48,7 @@ A **connection set** is a named bundle of connections used by an [AI agent](/clo
 - Give agents read-only access where pipelines have read/write.
 - Apply granular, agent-specific permissions without touching pipeline credentials.
 
-To create a connection set, open **Connections** in team settings, click **New connection set**, name it, and pick the data platform connections it should include. Then attach it to an agent from the [agent configuration page](/cloud/ai-agents/configure).
+To create a connection set, open **AI → Connection Sets** (in the AI Agent Settings sidebar), click **New connection set**, name it, and pick the data platform connections it should include. Then attach it to an agent from the [agent configuration page](/cloud/ai-agents/configure).
 
 ## Next
 

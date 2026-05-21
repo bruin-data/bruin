@@ -12,10 +12,10 @@ Create an account at [cloud.getbruin.com/register](https://cloud.getbruin.com/re
 
 After sign-up, Bruin Cloud asks which track you want to start with:
 
-- **Data engineering** — wire your Git repo, configure connections, enable pipelines on a schedule. Continue with this page.
+- **ETL/ELT Pipeline** — wire your Git repo, configure connections, enable pipelines on a schedule. Continue with this page.
 - **AI Data Analyst** — connect a warehouse and chat with your data right away. Skip to [AI Analyst onboarding](#ai-analyst-onboarding).
 
-You can switch tracks at any time from **Getting Started** on the home page.
+You can switch tracks at any time from **Getting Started** on the home page (the toggle is labelled **AI Analyst** / **Data Engineer**).
 
 ## 3. Create a project
 

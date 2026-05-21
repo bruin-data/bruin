@@ -45,9 +45,9 @@ Developer Environments use Personal Access Tokens (PAT) to access your Bruin Git
 
 - Click on `Team Settings` from the Team Selector Dropdown. <img style="padding: 1rem 0" src="/public/dev-env/dropdown-team-settings.png" alt="Team Selector Dropdown menu with Team Settings option highlighted">
 - Scroll down to `Git Secrets` section and add:
-  - **Token Name**: We recommend giving it the same name as the one you used when generating the token.
+  - **Secret Name**: We recommend giving it the same name as the one you used when generating the token.
   - **Username**: The username of the account that created the token.
-  - **Token**: The token itself.
+  - **Git Token**: The token itself.
 
 <img style="padding: 1rem 1.5rem" src="/public/dev-env/git-secret.png" alt="Git Secrets configuration form with fields for Token Name, Username, and Token">
 
@@ -78,7 +78,7 @@ Now, any Developer Environment instances launched by the current user will have 
 
 - Click on `Developer Environments` from the Team Selector Dropdown. <img style="padding: 1rem 0" src="/public/dev-env/dropdown-developer-environments.png" alt="Team Selector Dropdown menu with Developer Environments option highlighted">
 - Click the `New Instance` button in the top right. <img style="padding: 1rem 0" src="/public/dev-env/new-instance.png" alt="Developer Environments interface with New Instance button located in the top right corner">
-- Give your instance a name, select the Bruin Git repository you want to launch the instance with, and click `Create Instance`. <img style="padding: 1rem 0" src="/public/dev-env/create-instance-modal.png" alt="Create Instance modal form with fields for instance name and Git repository selection">
+- Give your instance a name, pick the Bruin project (which maps to a Git repository), and click `Create Instance`. <img style="padding: 1rem 0" src="/public/dev-env/create-instance-modal.png" alt="Create Instance modal form with fields for instance name and project selection">
 - Click the `Launch` button once the instance status becomes `Active`.
 
 Your Developer Environment should launch shortly. Happy coding!

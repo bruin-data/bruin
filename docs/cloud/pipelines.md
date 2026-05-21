@@ -21,7 +21,7 @@ If the pipeline references connections you have not configured, Bruin Cloud list
 1. Click the missing connection. The name is filled in for you.
 2. Pick the **connection type**: a built-in (BigQuery, Postgres, Snowflake, etc.) or a generic secret.
 3. Enter the credentials.
-4. Click **Create**. Bruin Cloud validates the connection. To skip validation, click **Create without validation**.
+4. Click **Create**. Bruin Cloud validates the connection. To skip validation, click **Create Without Validation**.
 
 Repeat until the list is empty. See [Connections](/cloud/connections) for the longer walkthrough.
 
@@ -45,7 +45,7 @@ Once a pipeline is enabled, the pipeline page is where you operate it. Runs, ass
 Two ways from the **Overview** page:
 
 - Click a pipeline in the left sidebar.
-- Open **Catalogs → Pipelines** and pick one.
+- Open **Catalog → Pipelines** and pick one.
 
 ### Runs
 
@@ -87,8 +87,8 @@ The **New run** button (top right) triggers a manual run. Options:
 
 #### Backfills
 
-- **Auto split by schedule:** one job per scheduled interval. A 23-day range on a daily schedule produces 23 jobs.
-- **Manual split:** pick the interval and the number of splits. Useful for processing data in chunks.
+- **Auto-split by schedule:** one job per scheduled interval. A 23-day range on a daily schedule produces 23 jobs.
+- **Manual split:** pick the interval and the chunk size. Useful for processing data in chunks. Splits are capped below 250.
 
 ### Status
 

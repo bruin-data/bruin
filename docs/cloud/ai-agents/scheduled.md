@@ -8,11 +8,11 @@ If you have not created an agent yet, see [Configure Agents](/cloud/ai-agents/co
 
 ### 1. Open Scheduled Agents
 
-From the **AI** menu, open **Scheduled agents**.
+From the **AI** menu, open **Scheduled Agents**.
 
 ### 2. New scheduled agent
 
-Click **New scheduled agent**, give it a name, and pick the underlying agent it should use. The schedule inherits whatever connections, integrations, and CLI access that agent already has.
+Click **New Scheduled Agent**, give it a name, and pick the underlying agent it should use. The schedule inherits whatever connections, integrations, and CLI access that agent already has.
 
 ### 3. Configure the task
 
@@ -56,8 +56,8 @@ After a minute or so, the configuration agent builds the full setup:
 
 Once the configuration looks right:
 
-- **Enable** the scheduled agent. You will see the next run time (UTC).
-- Use **New run** to trigger it manually any time.
+- **Activate** the scheduled agent (the status toggle flips from **Paused** to **Active**). You will see the next run time (UTC).
+- Use **Run Now** to trigger it manually any time.
 - Open the **Runs** tab to see history and status, and jump into any specific run.
 
 ## Where the runs live

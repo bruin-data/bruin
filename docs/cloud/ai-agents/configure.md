@@ -35,7 +35,7 @@ If you do not pick an integration, the agent is still usable in the Bruin Cloud 
 
 ### 5. Attach a connection set
 
-Under **Connections**, pick the connection set the agent should use.
+Under **Connection Set (optional)**, pick the connection set the agent should use.
 
 A [connection set](/cloud/connections#connection-sets-for-ai-agents) is a named bundle of connections to data platforms, kept separate from the connections your pipelines use. This separation lets you:
 
@@ -59,7 +59,7 @@ Add a system prompt to give the agent specific instructions, a role, or constrai
 
 ### 8. Create the agent
 
-Click **Create**. The agent is now available in the agents list and ready to use in chat, dashboards, scheduled runs, or any connected messaging platform.
+Click **Create Agent**. The agent is now available in the agents list and ready to use in chat, dashboards, scheduled runs, or any connected messaging platform.
 
 ## Reconfigure an agent
 
