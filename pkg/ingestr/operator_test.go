@@ -3,6 +3,7 @@ package ingestr
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -767,7 +768,8 @@ func TestResolveSeedSourceURI(t *testing.T) {
 		},
 		{
 			name:     "asset dir is joined with relative path",
-			seedPath: "seed.parquet", assetDir: "/repo/assets", want: "parquet:///repo/assets/seed.parquet",
+			seedPath: "seed.parquet", assetDir: filepath.Join("/repo", "assets"),
+			want: "parquet://" + filepath.Join("/repo", "assets", "seed.parquet"),
 		},
 		{name: "http URL is passed through unchanged", seedPath: "http://example.com/data.parquet", want: "http://example.com/data.parquet"},
 		{name: "https URL is passed through unchanged", seedPath: "https://example.com/data.parquet", want: "https://example.com/data.parquet"},

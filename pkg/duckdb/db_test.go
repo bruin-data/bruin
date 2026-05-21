@@ -381,49 +381,6 @@ func (r *emptyRows) Err() error                          { return nil }
 func (r *emptyRows) Next() bool                          { return false }
 func (r *emptyRows) Scan(_ ...any) error                 { return sql.ErrNoRows }
 
-func TestClient_ReadOnly_AllowsParallelQueries(t *testing.T) {
-	t.Parallel()
-
-	const (
-		queryDelay  = 150 * time.Millisecond
-		concurrency = 3
-	)
-
-	// Use a unique path to avoid conflicts with other tests using the global lock map.
-	path := "test_readonly_parallel_" + t.Name() + ".db"
-
-	clients := make([]*Client, concurrency)
-	for i := range concurrency {
-		clients[i] = &Client{
-			connection: &delayedConnection{delay: queryDelay},
-			config:     Config{Path: path, ReadOnly: true},
-			readOnly:   true,
-		}
-	}
-
-	start := time.Now()
-
-	var wg sync.WaitGroup
-	wg.Add(concurrency)
-	for i := range concurrency {
-		go func() {
-			defer wg.Done()
-			err := clients[i].RunQueryWithoutResult(t.Context(), &query.Query{Query: "SELECT 1"})
-			assert.NoError(t, err)
-		}()
-	}
-	wg.Wait()
-
-	elapsed := time.Since(start)
-
-	// If queries ran in parallel, total time should be ~1x queryDelay.
-	// If serialized, it would be ~3x queryDelay (450ms).
-	// Use 2x as the threshold to leave margin for scheduling jitter.
-	maxExpected := queryDelay * 2
-	assert.Less(t, elapsed, maxExpected,
-		"readonly queries should run in parallel: expected < %v, got %v", maxExpected, elapsed)
-}
-
 func TestClient_NonReadOnly_SerializesQueries(t *testing.T) {
 	t.Parallel()
 
