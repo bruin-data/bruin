@@ -5,6 +5,9 @@ description: This asset loads a CSV file into a DuckDB database.
 parameters:
   path: ./seed.csv
 
+depends:
+- macro_example
+
 columns:
   - name: name
     type: varchar
