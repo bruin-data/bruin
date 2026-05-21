@@ -46,8 +46,11 @@ var SortedPythonVersions = []string{"3.8", "3.9", "3.10", "3.11", "3.12", "3.13"
 const (
 	pythonVersionForIngestr = "3.11"
 	defaultPythonVersion    = "3.11"
-	ingestrVersion          = "0.14.155"
-	sqlfluffVersion         = "3.4.1"
+	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
+	IngestrVersionV0 = "0.14.155"
+	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
+	IngestrVersionV1 = "0.15.9"
+	sqlfluffVersion  = "3.4.1"
 )
 
 // parsePythonVersion parses a "X.Y" version string into (major, minor).
@@ -196,15 +199,10 @@ type pipelineConnection interface {
 	GetIngestrURI() (string, error)
 }
 
-type GongInstaller interface {
-	EnsureGongInstalled(ctx context.Context, version string) (string, error)
-}
-
 type UvPythonRunner struct {
 	Cmd            cmd
 	UvInstaller    uvInstaller
 	conn           config.ConnectionGetter
-	Gong           GongInstaller
 	binaryFullPath string
 }
 
@@ -239,34 +237,6 @@ func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 }
 
 func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
-	// Check if gong path is provided in context - if so, use gong binary directly
-	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
-		if path, ok := gongPath.(string); ok && path != "" {
-			// Warn if extraPackages are provided but will be ignored with gong
-			if len(extraPackages) > 0 {
-				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
-			}
-			// Pass --debug to gong when bruin is running in debug mode
-			if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
-				if boolVal, ok := debug.(*bool); ok && *boolVal {
-					args = append(args, "--debug")
-				}
-			}
-
-			logIngestrEngine(ctx, path)
-
-			// Use gong binary directly instead of ingestr
-			err := u.Cmd.Run(ctx, repo, &CommandInstance{
-				Name: path,
-				Args: args,
-			})
-			if err == nil && ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return err
-		}
-	}
-
 	binaryFullPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
 	if err != nil {
 		return err
@@ -291,28 +261,6 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 
 	return u.Cmd.Run(ctx, repo, noDependencyCommand)
-}
-
-func logIngestrEngine(ctx context.Context, path string) {
-	debug, ok := ctx.Value(executor.KeyIsDebug).(*bool)
-	if !ok || debug == nil || !*debug {
-		return
-	}
-	printer, ok := ctx.Value(executor.KeyPrinter).(io.Writer)
-	if !ok || printer == nil {
-		return
-	}
-
-	reportedVersion := ""
-	if out, err := exec.CommandContext(ctx, path, "--version").CombinedOutput(); err == nil {
-		reportedVersion = strings.TrimSpace(string(out))
-	}
-
-	if reportedVersion != "" {
-		_, _ = fmt.Fprintf(printer, "ingestr engine: %s (%s)\n", path, reportedVersion)
-	} else {
-		_, _ = fmt.Fprintf(printer, "ingestr engine: %s (version check failed)\n", path)
-	}
 }
 
 func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
@@ -579,49 +527,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		ingestrCtx = context.WithValue(ctx, executor.KeyPrinter, io.Writer(logBuffer))
 	}
 
-	// If use_gong parameter is set but gong path not yet in context, install gong
-	if asset.Parameters["use_gong"] == "true" && ctx.Value(CtxGongPath) == nil {
-		if u.Gong == nil {
-			return errors.New("use_gong is set but gong installer is not available")
-		}
-		gongPath, gongErr := u.Gong.EnsureGongInstalled(ingestrCtx, "")
-		if gongErr != nil {
-			return fmt.Errorf("use_gong is set but failed to install gong: %w", gongErr)
-		}
-		ctx = context.WithValue(ctx, CtxGongPath, gongPath)
-	}
-
-	// Check if gong path is provided in context - if so, use gong binary
-	if gongPath := ctx.Value(CtxGongPath); gongPath != nil {
-		if path, ok := gongPath.(string); ok && path != "" {
-			if len(extraPackages) > 0 {
-				fmt.Fprintf(os.Stderr, "Warning: extraPackages %v are ignored when using gong binary (gong may include these dependencies)\n", extraPackages)
-			}
-
-			// Pass --debug to gong when bruin is running in debug mode
-			if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
-				if boolVal, ok := debug.(*bool); ok && *boolVal {
-					cmdArgs = append(cmdArgs, "--debug")
-					_, _ = output.Write([]byte("Running CommandInstance: gong " + strings.Join(cmdArgs, " ") + "\n"))
-				}
-			}
-
-			err = u.Cmd.Run(ingestrCtx, execCtx.repo, &CommandInstance{
-				Name: path,
-				Args: cmdArgs,
-			})
-			if err != nil {
-				if logBuffer != nil {
-					logBuffer.flushTo(output)
-				}
-				return errors.Wrap(err, "failed to load the data into the destination")
-			}
-
-			_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
-			return nil
-		}
-	}
-
 	err = u.ensureIngestrInstalled(ctx, extraPackages, execCtx.repo)
 	if err != nil {
 		return err
@@ -666,7 +571,7 @@ func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
 			return "ingestr@" + version, false
 		}
 	}
-	return "ingestr@" + ingestrVersion, false
+	return "ingestr@" + IngestrVersionV1, false
 }
 
 // ingestrInstallCmd returns the uv tool commandline

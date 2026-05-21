@@ -808,31 +808,6 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	},
 }
 
-// gongSources is the set of source names that require gong to be enabled.
-var gongSources = map[string]bool{
-	"adjust":       true,
-	"appleads":     true,
-	"dune":         true,
-	"g2":           true,
-	"hubspot":      true,
-	"jobtread":     true,
-	"posthog":      true,
-	"rabbitmq":     true,
-	"smartsheet":   true,
-	"stripe":       true,
-	"surveymonkey": true,
-	"parquet":      true,
-	"json":         true,
-	"jsonl":        true,
-	"ndjson":       true,
-	"avro":         true,
-}
-
-// gongDestinations is the set of destination schemes that require gong.
-var gongDestinations = map[string]bool{
-	"dynamodb": true,
-}
-
 // GetSourceTables returns the available tables for a specific ingestr source.
 func GetSourceTables(sourceName string) (*Source, error) {
 	tables, ok := SourceTablesRegistry[sourceName]

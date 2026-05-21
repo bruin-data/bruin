@@ -155,22 +155,22 @@ func Test_buildIngestrPackageKey(t *testing.T) {
 		{
 			name:          "no extra packages",
 			extraPackages: []string{},
-			expected:      "ingestr@" + ingestrVersion + ":",
+			expected:      "ingestr@" + IngestrVersionV1 + ":",
 		},
 		{
 			name:          "single package",
 			extraPackages: []string{"pyodbc"},
-			expected:      "ingestr@" + ingestrVersion + ":pyodbc",
+			expected:      "ingestr@" + IngestrVersionV1 + ":pyodbc",
 		},
 		{
 			name:          "multiple packages sorted",
 			extraPackages: []string{"pyodbc", "duckdb"},
-			expected:      "ingestr@" + ingestrVersion + ":duckdb,pyodbc",
+			expected:      "ingestr@" + IngestrVersionV1 + ":duckdb,pyodbc",
 		},
 		{
 			name:          "packages in different order produce same key",
 			extraPackages: []string{"duckdb", "pyodbc"},
-			expected:      "ingestr@" + ingestrVersion + ":duckdb,pyodbc",
+			expected:      "ingestr@" + IngestrVersionV1 + ":duckdb,pyodbc",
 		},
 	}
 
@@ -191,7 +191,7 @@ func Test_ingestrPackage_HonorsCtxIngestrVersion(t *testing.T) {
 	u := &UvPythonRunner{}
 
 	defaultPkg, _ := u.ingestrPackage(t.Context())
-	assert.Equal(t, "ingestr@"+ingestrVersion, defaultPkg)
+	assert.Equal(t, "ingestr@"+IngestrVersionV1, defaultPkg)
 
 	pinnedCtx := context.WithValue(t.Context(), CtxIngestrVersion, "0.14.2")
 	pinnedPkg, isLocal := u.ingestrPackage(pinnedCtx)
