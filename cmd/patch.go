@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -64,15 +65,35 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 	return nil
 }
 
+// buildOverrideManager builds a connection manager scoped to the given environment.
+// It's invoked once per `bruin patch fill-columns-from-db --connection ...` invocation
+// (before any per-asset loop) so that we don't re-initialise every configured connection
+// for each asset in a pipeline.
+func buildOverrideManager(ctx context.Context, cfg *config.Config, environment string) (config.ConnectionGetter, error) {
+	if environment != "" {
+		if err := cfg.SelectEnvironment(environment); err != nil {
+			return nil, errors.Wrapf(err, "failed to use the environment '%s'", environment)
+		}
+	}
+	m, errs := connection.NewManagerFromConfigWithContext(ctx, cfg)
+	if len(errs) > 0 {
+		return nil, errors.Wrap(errs[0], "failed to create connection manager")
+	}
+	return m, nil
+}
+
 // Returns: status ("updated", "skipped", "failed").
-func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager config.ConnectionGetter) (string, error) {
+func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment, connectionOverride string, manager config.ConnectionGetter) (string, error) {
 	var conn interface{}
 	var err error
 
 	if manager != nil {
-		connName, err := pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
-		if err != nil {
-			return fillStatusFailed, err
+		connName := connectionOverride
+		if connName == "" {
+			connName, err = pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
+			if err != nil {
+				return fillStatusFailed, err
+			}
 		}
 
 		conn = manager.GetConnection(connName)
@@ -364,6 +385,11 @@ func Patch() *cli.Command {
 						Aliases: []string{"env"},
 						Usage:   "Target environment name as defined in .bruin.yml.",
 					},
+					&cli.StringFlag{
+						Name:    "connection",
+						Aliases: []string{"c"},
+						Usage:   "Override the connection used to read the schema (defaults to the asset's destination connection).",
+					},
 				},
 				Action: func(ctx context.Context, c *cli.Command) error {
 					inputPath := c.Args().First()
@@ -373,6 +399,7 @@ func Patch() *cli.Command {
 
 					output := c.String("output")
 					environment := c.String("environment")
+					connectionOverride := c.String("connection")
 					fs := afero.NewOsFs()
 					// ctx is already available from function signature
 
@@ -383,7 +410,15 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, err)
 							return cli.Exit("", 1)
 						}
-						status, err := fillColumnsFromDB(pp, fs, environment, nil) //nolint:contextcheck
+						var overrideManager config.ConnectionGetter
+						if connectionOverride != "" {
+							overrideManager, err = buildOverrideManager(ctx, pp.Config, environment)
+							if err != nil {
+								printErrorForOutput(output, err)
+								return cli.Exit("", 1)
+							}
+						}
+						status, err := fillColumnsFromDB(pp, fs, environment, connectionOverride, overrideManager) //nolint:contextcheck
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s': %w", pp.Asset.Name, err))
 							return cli.Exit("", 1)
@@ -418,6 +453,14 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, fmt.Errorf("failed to load the config file: %w", err))
 							return cli.Exit("", 1)
 						}
+						var overrideManager config.ConnectionGetter
+						if connectionOverride != "" {
+							overrideManager, err = buildOverrideManager(ctx, cm, environment)
+							if err != nil {
+								printErrorForOutput(output, err)
+								return cli.Exit("", 1)
+							}
+						}
 						updatedAssets := []string{}
 						skippedAssets := []string{}
 						failedAssets := []string{}
@@ -426,7 +469,7 @@ func Patch() *cli.Command {
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, fs, environment, nil) //nolint:contextcheck
+							status, err := fillColumnsFromDB(pp, fs, environment, connectionOverride, overrideManager) //nolint:contextcheck
 							processedAssets++
 							assetName := asset.Name
 							switch status {

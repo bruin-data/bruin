@@ -46,6 +46,7 @@ Retrieves column metadata from the database and updates the asset's column defin
 |----------------------|-------|-----------------------------------------------------------------------------|
 | `--output [format]`  | `-o`  | Specifies the output type, possible values: `plain`, `json`. Default: `plain` |
 | `--environment`      | `-e`  | Target environment name as defined in .bruin.yml                            |
+| `--connection`       | `-c`  | Override the connection used to read the schema. Defaults to the asset's destination connection. Useful when you want to seed columns from a source database (e.g. when copying MSSQL → MSSQL and you want to clone the source table's schema). |
 
 **Example:**
 
@@ -55,6 +56,9 @@ bruin patch fill-columns-from-db path/to/asset.yml
 
 # Update columns for all assets in a pipeline
 bruin patch fill-columns-from-db path/to/pipeline 
+
+# Fill columns from a specific connection (e.g. the source database)
+bruin patch fill-columns-from-db --connection my_postgres path/to/asset.yml
 ```
 
 **Example output (JSON):**

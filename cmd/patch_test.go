@@ -233,7 +233,7 @@ func TestFillColumnsFromDB(t *testing.T) {
 			fs := afero.NewMemMapFs()
 
 			// Execute the function with mock manager
-			status, err := fillColumnsFromDB(pp, fs, "test", mockManager)
+			status, err := fillColumnsFromDB(pp, fs, "test", "", mockManager)
 
 			// Verify results
 			if tt.expectError {
@@ -251,4 +251,96 @@ func TestFillColumnsFromDB(t *testing.T) {
 			mockManager.AssertExpectations(t)
 		})
 	}
+}
+
+// TestFillColumnsFromDB_ConnectionOverride exercises the production path the CLI
+// uses for `--connection`: the action layer builds the manager once, then passes
+// it together with the override name into fillColumnsFromDB. The override must
+// take precedence over the asset's destination connection.
+func TestFillColumnsFromDB_ConnectionOverride(t *testing.T) {
+	t.Parallel()
+
+	mockConn := new(MockConnection)
+	mockConn.On("SelectWithSchema", mock.Anything, mock.Anything).Return(&query.QueryResult{
+		Columns:     []string{"id", "name"},
+		ColumnTypes: []string{"INTEGER", "STRING"},
+	}, nil)
+
+	mockManager := new(MockConnectionManager)
+	mockManager.On("GetConnection", "source_connection").Return(mockConn, nil)
+	// The destination connection must never be looked up when --connection is set.
+	mockManager.AssertNotCalled(t, "GetConnection", "destination_connection")
+
+	asset := &pipeline.Asset{
+		Name:       "test_asset",
+		Columns:    []pipeline.Column{},
+		Type:       pipeline.AssetTypePostgresQuery,
+		Connection: "destination_connection",
+	}
+
+	pp := &ppInfo{
+		Asset:    asset,
+		Pipeline: &pipeline.Pipeline{Name: "test_pipeline"},
+		Config:   &config.Config{},
+	}
+
+	status, err := fillColumnsFromDB(pp, afero.NewMemMapFs(), "", "source_connection", mockManager)
+	require.NoError(t, err)
+	assert.Equal(t, fillStatusUpdated, status)
+	assert.Equal(t, []pipeline.Column{
+		{Name: "id", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+		{Name: "name", Type: "STRING", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+	}, asset.Columns)
+
+	mockConn.AssertExpectations(t)
+	mockManager.AssertExpectations(t)
+}
+
+// TestFillColumnsFromDB_ConnectionOverrideMissing covers the failure case where
+// the user passes a connection name that doesn't exist. The action layer builds
+// the manager fine (the name is only invalid at lookup time), so the error must
+// surface from fillColumnsFromDB with the override name in the message.
+func TestFillColumnsFromDB_ConnectionOverrideMissing(t *testing.T) {
+	t.Parallel()
+
+	mockManager := new(MockConnectionManager)
+	mockManager.On("GetConnection", "missing_connection").Return(nil, nil)
+
+	asset := &pipeline.Asset{
+		Name:       "test_asset",
+		Type:       pipeline.AssetTypePostgresQuery,
+		Connection: "destination_connection",
+	}
+
+	pp := &ppInfo{
+		Asset:    asset,
+		Pipeline: &pipeline.Pipeline{Name: "test_pipeline"},
+		Config:   &config.Config{},
+	}
+
+	status, err := fillColumnsFromDB(pp, afero.NewMemMapFs(), "", "missing_connection", mockManager)
+	require.Error(t, err)
+	assert.Equal(t, fillStatusFailed, status)
+	assert.Contains(t, err.Error(), "missing_connection")
+
+	mockManager.AssertExpectations(t)
+}
+
+// TestBuildOverrideManager_UnknownEnvironment makes sure the CLI action gives a
+// useful error when --environment names a missing environment, instead of
+// silently proceeding with the default. This is the only code path that runs
+// before fillColumnsFromDB, so it's worth covering here.
+func TestBuildOverrideManager_UnknownEnvironment(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.Config{
+		DefaultEnvironmentName: "default",
+		Environments: map[string]config.Environment{
+			"default": {Connections: &config.Connections{}},
+		},
+	}
+
+	_, err := buildOverrideManager(t.Context(), cfg, "does-not-exist")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does-not-exist")
 }
