@@ -88,7 +88,7 @@ The **New run** button (top right) triggers a manual run. Options:
 #### Backfills
 
 - **Auto-split by schedule:** one job per scheduled interval. A 23-day range on a daily schedule produces 23 jobs.
-- **Manual split:** pick the interval and the chunk size. Useful for processing data in chunks. Splits are capped below 250.
+- **Manual split:** pick the interval and the chunk size. Useful for processing data in chunks. Splits are capped at 250.
 
 ### Status
 
