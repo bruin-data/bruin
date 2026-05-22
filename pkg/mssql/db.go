@@ -57,7 +57,7 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) err
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	queryString := query.String()
-	rows, err := db.conn.QueryContext(ctx, queryString)
+	rows, err := db.conn.QueryContext(ctx, queryString, query.Args...)
 	if err == nil {
 		err = rows.Err()
 	}

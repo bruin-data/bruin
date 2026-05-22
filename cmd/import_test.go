@@ -58,7 +58,10 @@ type mockColumnMetadataConnection struct {
 
 func (m *mockColumnMetadataConnection) GetColumnsForTable(ctx context.Context, schemaName, tableName string) ([]*ansisql.DBColumn, error) {
 	args := m.Called(ctx, schemaName, tableName)
-	return args.Get(0).([]*ansisql.DBColumn), args.Error(1)
+	if v := args.Get(0); v != nil {
+		return v.([]*ansisql.DBColumn), args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 // nolint
@@ -464,6 +467,20 @@ func TestFillAssetColumnsFromDB(t *testing.T) {
 			},
 		},
 		{
+			name: "metadata column fetcher error with nil columns",
+			setupConn: func() interface{} {
+				conn := &mockColumnMetadataConnection{}
+				conn.On("GetColumnsForTable", mock.Anything, "test_schema", "test_table").Return(nil, errors.New("metadata failed"))
+				return conn
+			},
+			setupAsset: func() *pipeline.Asset {
+				return &pipeline.Asset{Name: "test_asset"}
+			},
+			schemaName: "test_schema",
+			tableName:  "test_table",
+			wantErr:    "failed to query columns for table test_schema.test_table",
+		},
+		{
 			name: "connection doesn't support schema introspection",
 			setupConn: func() interface{} {
 				// Return a connection that doesn't implement SelectWithSchema
@@ -556,6 +573,47 @@ func TestFillAssetColumnsFromDB(t *testing.T) {
 			if mockConn, ok := conn.(*mockColumnMetadataConnection); ok {
 				mockConn.AssertExpectations(t)
 			}
+		})
+	}
+}
+
+func TestColumnDescriptionQuery(t *testing.T) {
+	t.Parallel()
+
+	schemaName := "hw'; DROP TABLE important; --"
+	tableName := "staging_honor_event'; DROP TABLE events; --"
+
+	tests := []struct {
+		name             string
+		conn             interface{}
+		wantSchemaMarker string
+		wantTableMarker  string
+	}{
+		{
+			name:             "postgres uses bind args",
+			conn:             &postgres.Client{},
+			wantSchemaMarker: "n.nspname = $1",
+			wantTableMarker:  "c.relname = $2",
+		},
+		{
+			name:             "mssql uses bind args",
+			conn:             &mssql.DB{},
+			wantSchemaMarker: "s.name = @p1",
+			wantTableMarker:  "t.name = @p2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := columnDescriptionQuery(tt.conn, schemaName, tableName)
+			require.True(t, ok)
+			assert.Contains(t, got.Query, tt.wantSchemaMarker)
+			assert.Contains(t, got.Query, tt.wantTableMarker)
+			assert.NotContains(t, got.Query, schemaName)
+			assert.NotContains(t, got.Query, tableName)
+			assert.Equal(t, []any{schemaName, tableName}, got.Args)
 		})
 	}
 }

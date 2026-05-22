@@ -484,58 +484,13 @@ func fetchColumnDescriptions(ctx context.Context, conn interface{}, schemaName, 
 		return descriptions
 	}
 
-	var queryStr string
-
-	// Build database-specific query for column descriptions
-	switch conn.(type) {
-	case *postgres.Client:
-		// PostgreSQL: Query pg_description for column comments
-		queryStr = fmt.Sprintf(`
-SELECT 
-    a.attname as column_name,
-    pg_catalog.col_description(a.attrelid, a.attnum) as column_description
-FROM 
-    pg_catalog.pg_attribute a
-JOIN 
-    pg_catalog.pg_class c ON a.attrelid = c.oid
-JOIN 
-    pg_catalog.pg_namespace n ON c.relnamespace = n.oid
-WHERE 
-    n.nspname = '%s'
-    AND c.relname = '%s'
-    AND a.attnum > 0
-    AND NOT a.attisdropped
-    AND pg_catalog.col_description(a.attrelid, a.attnum) IS NOT NULL
-`, schemaName, tableName)
-
-	case *mssql.DB:
-		// MSSQL: Query extended properties for column descriptions
-		queryStr = fmt.Sprintf(`
-SELECT 
-    c.name AS column_name,
-    CAST(ep.value AS NVARCHAR(MAX)) AS column_description
-FROM 
-    sys.columns c
-JOIN 
-    sys.tables t ON c.object_id = t.object_id
-JOIN 
-    sys.schemas s ON t.schema_id = s.schema_id
-LEFT JOIN 
-    sys.extended_properties ep ON c.object_id = ep.major_id 
-    AND c.column_id = ep.minor_id 
-    AND ep.name = 'MS_Description'
-WHERE 
-    s.name = '%s'
-    AND t.name = '%s'
-    AND ep.value IS NOT NULL
-`, schemaName, tableName)
-
-	default:
+	queryObj, ok := columnDescriptionQuery(conn, schemaName, tableName)
+	if !ok {
 		// For other databases, we don't have a standard way to fetch column descriptions
 		return descriptions
 	}
 
-	result, err := selector.Select(ctx, &query.Query{Query: queryStr})
+	result, err := selector.Select(ctx, queryObj)
 	if err != nil {
 		// Silently ignore errors - column descriptions are optional
 		return descriptions
@@ -552,6 +507,62 @@ WHERE
 	}
 
 	return descriptions
+}
+
+func columnDescriptionQuery(conn interface{}, schemaName, tableName string) (*query.Query, bool) {
+	// Build database-specific query for column descriptions
+	switch conn.(type) {
+	case *postgres.Client:
+		// PostgreSQL: Query pg_description for column comments
+		return &query.Query{
+			Query: `
+SELECT 
+    a.attname as column_name,
+    pg_catalog.col_description(a.attrelid, a.attnum) as column_description
+FROM 
+    pg_catalog.pg_attribute a
+JOIN 
+    pg_catalog.pg_class c ON a.attrelid = c.oid
+JOIN 
+    pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+WHERE 
+    n.nspname = $1
+    AND c.relname = $2
+    AND a.attnum > 0
+    AND NOT a.attisdropped
+    AND pg_catalog.col_description(a.attrelid, a.attnum) IS NOT NULL
+`,
+			Args: []any{schemaName, tableName},
+		}, true
+
+	case *mssql.DB:
+		// MSSQL: Query extended properties for column descriptions
+		return &query.Query{
+			Query: `
+SELECT 
+    c.name AS column_name,
+    CAST(ep.value AS NVARCHAR(MAX)) AS column_description
+FROM 
+    sys.columns c
+JOIN 
+    sys.tables t ON c.object_id = t.object_id
+JOIN 
+    sys.schemas s ON t.schema_id = s.schema_id
+LEFT JOIN 
+    sys.extended_properties ep ON c.object_id = ep.major_id 
+    AND c.column_id = ep.minor_id 
+    AND ep.name = 'MS_Description'
+WHERE 
+    s.name = @p1
+    AND t.name = @p2
+    AND ep.value IS NOT NULL
+`,
+			Args: []any{schemaName, tableName},
+		}, true
+
+	default:
+		return nil, false
+	}
 }
 
 func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool, table *ansisql.DBTable) (*pipeline.Asset, string) {

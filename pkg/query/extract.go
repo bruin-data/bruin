@@ -14,6 +14,7 @@ import (
 type Query struct {
 	VariableDefinitions []string
 	Query               string
+	Args                []any
 }
 
 type QueryResult struct {
