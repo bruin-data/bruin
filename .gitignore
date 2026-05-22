@@ -156,6 +156,7 @@ logs/exports
 .claude/*
 !.claude/commands/
 !.claude/settings.json
+!.claude/skills/
 bruin
 
 __debug_bin*

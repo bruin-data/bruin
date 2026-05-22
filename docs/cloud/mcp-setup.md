@@ -8,12 +8,14 @@ The Bruin Cloud MCP is exposed at:
 
  `https://cloud.getbruin.com/mcp`
 
-Create API token with MCP permission:
+Create an API token with the `mcp:token` ability:
 
-1. Log in to the Bruin Cloud.
-2. Go to **Team settings** → **Team Members** and scroll down.
-3. Create a new API token and grant it (`mcp:token`) permission.
+1. Log in to Bruin Cloud.
+2. Go to **Team Settings → Team Access** and find the **API Tokens** panel.
+3. Create a new token and grant it the `mcp:token` ability.
 4. Copy the **plain-text token** once; it is not shown again.
+
+See [API Tokens](/cloud/api-tokens) for the full token-management walkthrough.
 
 ## Cursor
 
@@ -102,3 +104,10 @@ Once the Bruin Cloud MCP server is connected, you can ask in natural language, f
 - **Cursor, tools not showing:** Ensure `.cursor/mcp.json` is valid JSON and restart Cursor.
 - **Claude Code, server not found:** Run `claude mcp list` to confirm the server is configured; use `claude mcp get bruin_cloud` to check its URL and headers.
 - **Codex CLI, tools not available:** Ensure `~/.codex/config.toml` is valid toml and restart Codex CLI.
+
+## Related
+
+- [Pipelines](/cloud/pipelines) for the operations the MCP can drive (runs, backfills, status).
+- [Connections](/cloud/connections) for the connections the MCP can list and create.
+- [Bruin MCP (local)](/getting-started/bruin-mcp) for the local-CLI MCP, separate from the cloud-hosted one.
+- [`bruin cloud`](/commands/cloud) — the CLI command that talks to Bruin Cloud using the same kind of API token.
