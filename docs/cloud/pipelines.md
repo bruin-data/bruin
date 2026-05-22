@@ -1,6 +1,6 @@
 # Pipelines
 
-The **Pipelines** page in Bruin Cloud is where you enable pipelines, trigger runs, watch run history, manage backfills, and inspect lineage.
+The **Pipelines** page in Bruin Cloud is where you enable pipelines, trigger runs, watch run history, manage backfills, and inspect lineage. Pipelines themselves are still defined in `pipeline.yml` in your repo — see [Pipeline definition](/pipelines/definition) for the schema and [`bruin run`](/commands/run) for what actually happens when one fires.
 
 ## Enable a pipeline
 
@@ -107,4 +107,7 @@ The menu (top right) lets you **disable** or **delete** the pipeline.
 - [Cross-pipeline dependencies](/cloud/cross-pipeline) for depending on assets in other pipelines.
 - [Notifications](/cloud/notifications) for Slack/Teams/Discord/webhook alerts on success and failure.
 - [Instance Types](/cloud/instance-types) for sizing assets at run time.
+- [Pipeline definition](/pipelines/definition) — CLI schema for `pipeline.yml`, including schedule, defaults, and notifications.
+- [`bruin run`](/commands/run) — the underlying command and its flags (workers, selectors, full-refresh).
+- [`bruin lineage`](/commands/lineage) — generate the lineage graph from your local repo.
 - [FAQ](/cloud/faq) for common scheduling and run questions.

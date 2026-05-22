@@ -33,3 +33,11 @@ For how the underlying data is scoped and retained, see [Does the agent see my a
 | Generate dashboards from prompts          | **AI → Dashboards**                                  |
 | Send daily/weekly reports automatically   | **AI → [Scheduled Agents](/cloud/ai-agents/scheduled)** |
 | Manage pipelines from the terminal via AI | [Cloud MCP](/cloud/mcp-setup)                        |
+
+## Related CLI concepts
+
+When an agent reads your repo, it interprets it through the same primitives the CLI uses:
+
+- [Project structure](/core-concepts/project), [`AGENTS.md`](/getting-started/glossary), and the [Glossary](/getting-started/glossary).
+- [Asset definition schema](/assets/definition-schema) — how the agent knows what each asset is.
+- [`bruin ai-enhance`](/commands/ai-enhance) — the local-CLI equivalent of asset suggestions in the cloud.

@@ -1,6 +1,6 @@
 # Projects
 
-A [project](/core-concepts/project) in Bruin Cloud has a one-to-one relationship with a Git repository. Creating a project connects your repo, syncs its pipelines, and gives you a place to manage the [connections](/cloud/connections) and [secrets](/secrets/overview) those pipelines need.
+A [project](/core-concepts/project) in Bruin Cloud has a one-to-one relationship with a Git repository. Creating a project connects your repo, syncs its pipelines, and gives you a place to manage the [connections](/cloud/connections) and [secrets](/secrets/overview) those pipelines need. The project structure itself (the `bruin.yml`, `pipeline.yml`, and `assets/` layout) is defined in the CLI — see [Project](/core-concepts/project) for the layout and [`bruin init`](/commands/init) for scaffolding a new one.
 
 You can create projects during onboarding, or any time afterward from the home page.
 
@@ -101,3 +101,6 @@ If the repo you want is not in the list, grant the Bruin GitHub App access to it
 
 - [Connections](/cloud/connections) for setting up the data sources and secrets the project's pipelines need.
 - [Pipelines](/cloud/pipelines) for enabling and operating the pipelines once they finish syncing.
+- [Project structure](/core-concepts/project) — repo layout and config files the cloud sync expects.
+- [`bruin init`](/commands/init) — scaffold a new Bruin project locally.
+- [`bruin validate`](/commands/validate) — verify pipelines and assets before pushing.

@@ -71,6 +71,7 @@ For more detail on chat-vs-integration routing, see [Integrations overview](/clo
 
 ## Next
 
-- [Integrations](/cloud/integrations/overview) to deliver results into Slack, Teams, Discord, WhatsApp, or Telegram.
+- [Integrations](/cloud/integrations/overview) to deliver results into Slack, Teams, Google Chat, Discord, WhatsApp, or Telegram.
 - [WhatsApp integration](/cloud/integrations/whatsapp#the-24-hour-window-and-template-fallback) for the 24-hour-window template fallback when scheduled runs deliver to WhatsApp.
 - [Chat with Agents](/cloud/ai-agents/chat) to iterate on the underlying agent before scheduling it.
+- [Pipeline schedule](/pipelines/definition) — for *pipeline*-level cron (defined in `pipeline.yml`), as opposed to agent-level scheduling here.

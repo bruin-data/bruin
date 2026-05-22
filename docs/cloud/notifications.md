@@ -2,7 +2,7 @@
 
 Bruin Cloud supports various types of notifications, starting with Slack & Microsoft Teams. These notifications allow you to receive updates on your data pipelines, such as when a pipeline has completed successfully, as well as when a pipeline has failed.
 
-Notifications are always defined at the pipeline level, inside the `pipeline.yml` file. The connections they reference must exist in [Bruin Cloud Connections](/cloud/connections) first.
+Notifications are always defined at the pipeline level, inside the `pipeline.yml` file (see [Pipeline definition](/pipelines/definition) for the full schema). The connections they reference must exist in [Bruin Cloud Connections](/cloud/connections) first.
 
 ## Slack
 
@@ -130,3 +130,4 @@ Column check failure
 - [Connections](/cloud/connections) for setting up the Slack/Teams/Discord/Webhook connection used by these notifications.
 - [Pipelines](/cloud/pipelines) for how runs trigger notifications.
 - [Integrations](/cloud/integrations/overview) for AI agent chat in Slack/Teams/Discord (separate from pipeline notifications).
+- [Pipeline definition](/pipelines/definition) — full `pipeline.yml` schema including the `notifications:` block.

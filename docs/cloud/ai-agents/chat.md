@@ -58,4 +58,5 @@ The agent runs the CLI commands it needs and reports back with the numbers and t
 
 - Want the agent to turn answers into something visual? Open **AI → Dashboards** and use the same agent there.
 - Want it to run on a schedule? See [Scheduled Agents](/cloud/ai-agents/scheduled).
-- Want it in Slack, Teams, Discord, WhatsApp, or Telegram? See the [Integrations overview](/cloud/integrations/overview).
+- Want it in Slack, Teams, Google Chat, Discord, WhatsApp, or Telegram? See the [Integrations overview](/cloud/integrations/overview).
+- The agent is essentially driving [`bruin query`](/commands/query) and [`bruin render`](/commands/render) under the hood — the same primitives you use locally.

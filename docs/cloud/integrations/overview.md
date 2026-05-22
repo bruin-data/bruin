@@ -11,6 +11,7 @@ Bruin Cloud AI agents can answer data questions wherever your team already works
 |---|---|---|
 | [Slack](/cloud/integrations/slack) | Channels and DMs | OAuth install per workspace, then enter a Channel ID on the agent |
 | [Microsoft Teams](/cloud/integrations/teams) | Channels, group chats, and 1:1 chats | Install the Bruin app, then send a `connect BRN-XXXX` code |
+| [Google Chat](/cloud/integrations/google-chat) | DMs and spaces (rooms) | Install the Bruin Chat app, then send a `connect BRN-XXXX` code |
 | [Discord](/cloud/integrations/discord) | Server channels and threads | Install the Bruin bot, then enter a Channel ID on the agent |
 | [WhatsApp](/cloud/integrations/whatsapp) | Direct messages and groups | Message Bruin's number with a `connect BRN-XXXX` code |
 | [Telegram](/cloud/integrations/telegram) | Direct messages only | Message [@BruinDataBot](https://t.me/BruinDataBot) with a `connect BRN-XXXX` code |
@@ -21,7 +22,7 @@ Every chat platform plugs into the same agent runtime. The difference is only in
 
 **Workspace-level install, channel-level config (Slack, Discord).** You install the Bruin app once into the Slack workspace or Discord server. From then on, each agent can be wired to a specific Channel ID — that channel becomes the place where the agent listens and responds.
 
-**Connect codes (Teams, WhatsApp, Telegram).** You generate a short code (format `BRN-XXXX`, valid for 10 minutes) on the agent's integrations panel, then paste it into the target chat. The platform sees the code, links that conversation to the agent, and the code is burned.
+**Connect codes (Teams, Google Chat, WhatsApp, Telegram).** You generate a short code (format `BRN-XXXX`, valid for 10 minutes) on the agent's integrations panel, then paste it into the target chat. The platform sees the code, links that conversation to the agent, and the code is burned.
 
 Either way, the link is stored as an `AgentIntegration` record — platform + external channel/chat ID → agent. When a message comes in, Bruin looks up the integration, finds the agent, and routes the conversation through the same processing pipeline used by the web chat.
 

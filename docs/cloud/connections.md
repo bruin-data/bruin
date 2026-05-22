@@ -2,7 +2,7 @@
 
 [Connections](/connections/overview) are named configurations that let Bruin authenticate and talk to external systems: data sources, destinations, and any other platform a pipeline or agent depends on.
 
-Locally, you define connections in `.bruin.yml`. That file should be gitignored since it holds [secrets](/core-concepts/secrets#secrets) and credentials. In Bruin Cloud, you configure the same connections through the UI. The names need to match the ones referenced in your pipelines, and they are encrypted at rest using [HashiCorp Vault](/secrets/vault) as the secrets backend.
+Locally, you define connections in [`.bruin.yml`](/secrets/bruinyml). That file should be gitignored since it holds [secrets](/secrets/overview) and credentials. In Bruin Cloud, you configure the same connections through the UI. The names need to match the ones referenced in your pipelines, and they are encrypted at rest using [HashiCorp Vault](/secrets/vault) as the secrets backend.
 
 ## Add a connection
 
@@ -54,3 +54,5 @@ To create a connection set, open **AI → Connection Sets** (in the AI Agent Set
 
 - [Pipelines](/cloud/pipelines) for enabling pipelines that use these connections.
 - [AI Agents](/cloud/ai-agents/overview) for attaching connection sets to agents.
+- [`.bruin.yml` reference](/secrets/bruinyml) — the local file your cloud connections mirror.
+- [`bruin connections`](/commands/connections) — list, add, delete, and ping connections from the CLI.

@@ -74,4 +74,5 @@ Open an agent from the agents list to change its settings at any time:
 
 - [Chat with Agents](/cloud/ai-agents/chat) to put a new agent to work in the Bruin Cloud web chat.
 - [Scheduled Agents](/cloud/ai-agents/scheduled) to run the agent on a cron.
-- [Integrations](/cloud/integrations/overview) to deploy the agent into Slack, Teams, Discord, WhatsApp, or Telegram.
+- [Integrations](/cloud/integrations/overview) to deploy the agent into Slack, Teams, Google Chat, Discord, WhatsApp, or Telegram.
+- [Project structure](/core-concepts/project) and [Connections overview](/connections/overview) — what the agent sees through its connection set.

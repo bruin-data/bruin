@@ -99,3 +99,5 @@ These intervals fully cover the original downstream interval and thus the downst
 
 - [Pipelines](/cloud/pipelines) for enabling, monitoring, and triggering runs.
 - [Asset definition](/assets/definition-schema) for the `uri` and `depends` fields.
+- [Sensor assets](/assets/sensor) — the local-CLI primitive that backs cloud's "prerequisite" sensors.
+- [`bruin lineage`](/commands/lineage) — visualise cross-pipeline dependencies from the CLI.

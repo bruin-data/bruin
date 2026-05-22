@@ -50,9 +50,22 @@ A single channel can only be connected to one agent. One Slack channel maps to e
 
 In both places. The Slack channel receives the output, and the run is also recorded under **AI → Chats** where you can review the conversation, the queries it ran, and any generated files. See [Scheduled Agents](/cloud/ai-agents/scheduled).
 
+### What's the difference between a scheduled pipeline and a scheduled agent?
+
+A **scheduled pipeline** is configured in your repo (the `schedule:` field on `pipeline.yml`) and runs the assets defined in that pipeline on the cadence you set. See [Pipelines](/cloud/pipelines).
+
+A **scheduled agent** is an existing AI agent set to run on a cron — it executes a natural-language task (and optional verified SQL) and posts the result to a chat integration or the Bruin Cloud chat. See [Scheduled Agents](/cloud/ai-agents/scheduled).
+
+They're stored in different places (pipeline YAML vs. the AI Agents settings page) and they do different things. The **AI → Scheduled Agents** menu only contains scheduled *agents*; pipeline schedules live on the pipeline itself.
+
 ## See also
 
 - [Pipelines](/cloud/pipelines) for the pipeline page and run controls.
 - [Connections](/cloud/connections) for connection types, naming, and validation.
 - [AI Agents](/cloud/ai-agents/overview) for agent setup, chat, and scheduling.
-- [Integrations](/cloud/integrations/overview) for connecting agents to Slack, Teams, Discord, WhatsApp, and Telegram.
+- [Integrations](/cloud/integrations/overview) for connecting agents to Slack, Teams, Google Chat, Discord, WhatsApp, and Telegram.
+
+For the local CLI side of these features:
+
+- [Project structure](/core-concepts/project), [Pipeline definition](/pipelines/definition), [Asset definition schema](/assets/definition-schema).
+- [`bruin run`](/commands/run), [`bruin validate`](/commands/validate), [`bruin query`](/commands/query), [`bruin render`](/commands/render), [`bruin ai-enhance`](/commands/ai-enhance).
