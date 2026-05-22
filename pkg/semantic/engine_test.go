@@ -146,6 +146,30 @@ func TestLoadDir_LoadsNestedModelFiles(t *testing.T) {
 	}
 }
 
+func TestLoadDirPartial_ReportsParseErrorsByFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "broken.yml"), []byte("name: broken\nsource:\n  table: ["), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	models, invalid, err := LoadDirPartial(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(models) != 0 {
+		t.Fatalf("expected no valid models, got %v", Names(models))
+	}
+	got := invalid["broken.yml"]
+	if got == nil {
+		t.Fatalf("expected broken.yml in invalid map, got %v", invalid)
+	}
+	if !strings.Contains(got.Error(), "loading broken.yml") {
+		t.Fatalf("expected file path in error, got %q", got.Error())
+	}
+}
+
 func TestLoadFile_RejectsInvalidModel(t *testing.T) {
 	t.Parallel()
 
@@ -1224,6 +1248,33 @@ func TestJoinGraphJoinsReachableDimension(t *testing.T) {
 	expectContains(t, sql, "FROM (SELECT * FROM orders) base")
 	expectContains(t, sql, "LEFT JOIN (SELECT * FROM customers) customers ON base.customer_id = customers.customer_id")
 	expectContains(t, sql, "GROUP BY 1")
+}
+
+func TestJoinGraphRejectsMissingTargetKeyAndPrimaryKey(t *testing.T) {
+	t.Parallel()
+
+	orders := &Model{
+		Name:   "orders",
+		Source: Source{Table: "orders"},
+		Joins: []Join{
+			{Name: "customers", Relationship: "many_to_one", ForeignKey: "customer_id"},
+		},
+		Metrics: []Metric{{Name: "revenue", Expression: "sum(order_total)"}},
+	}
+	customers := &Model{
+		Name:       "customers",
+		Source:     Source{Table: "customers"},
+		Dimensions: []Dimension{{Name: "country", Type: "string"}},
+	}
+
+	_, err := NewEngineWithModels(orders, map[string]*Model{"orders": orders, "customers": customers})
+	if err == nil {
+		t.Fatal("expected missing join target key to fail")
+	}
+	want := `model "orders": join "customers" requires target_key or primary_key on target model "customers"`
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("expected error containing %q, got %q", want, err.Error())
+	}
 }
 
 func TestJoinGraphAllowsUnqualifiedDimensionWhenUnambiguous(t *testing.T) {

@@ -105,6 +105,8 @@ func LoadDirPartialFS(fs afero.Fs, dir string) (map[string]*Model, map[string]er
 	for _, path := range files {
 		model, err := parseFileFS(fs, path)
 		if err != nil {
+			relPath := semanticRelPath(dir, path)
+			invalid[relPath] = fmt.Errorf("loading %s: %w", relPath, err)
 			continue
 		}
 		if model.Name == "" {

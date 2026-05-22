@@ -428,6 +428,31 @@ func validateJoins(m *Model) error {
 	return nil
 }
 
+func validateJoinTargets(models map[string]*Model) error {
+	for _, model := range models {
+		for _, join := range model.Joins {
+			if !isSafeRelationship(join.Relationship) ||
+				strings.TrimSpace(join.SQL) != "" ||
+				strings.TrimSpace(join.TargetKey) != "" ||
+				strings.TrimSpace(join.ForeignKey) == "" {
+				continue
+			}
+
+			target := models[joinModelName(join)]
+			if target == nil || strings.TrimSpace(target.PrimaryKey) != "" {
+				continue
+			}
+			return fmt.Errorf(
+				"model %q: join %q requires target_key or primary_key on target model %q",
+				model.Name,
+				joinName(join),
+				target.Name,
+			)
+		}
+	}
+	return nil
+}
+
 func isSafeRelationship(relationship string) bool {
 	switch relationship {
 	case "one_to_one", "many_to_one":

@@ -585,11 +585,6 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 			return "", nil, "", "", nil, errors.Wrap(err, "failed to get pipeline info")
 		}
 	}
-	if env != "" {
-		if err := pipelineInfo.Config.SelectEnvironment(env); err != nil {
-			return "", nil, "", "", nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
-		}
-	}
 
 	semanticInputPath := pipelinePath
 	if assetPath != "" {
@@ -619,6 +614,11 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		return "", nil, "", "", nil, errors.Wrap(err, "failed to compile semantic query")
 	}
 
+	connName, conn, err := getSemanticQueryConnection(ctx, pipelineInfo, env, connectionName, assetPath != "")
+	if err != nil {
+		return "", nil, "", "", nil, err
+	}
+
 	if assetPath != "" {
 		fetchCtx := semanticQueryContext(ctx, pipelineInfo, startDate, endDate)
 		assetRenderer := newSemanticRenderer(pipelineInfo, vars, startDate, endDate)
@@ -643,19 +643,6 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 			return "", nil, "", "", nil, err
 		}
 
-		if connectionName != "" {
-			connName, conn, err := getConnectionByNameFromPipelineInfoWithContext(ctx, pipelineInfo, env, connectionName)
-			if err != nil {
-				return "", nil, "", "", nil, err
-			}
-			return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
-		}
-
-		connName, conn, err := getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
-		if err != nil {
-			return "", nil, "", "", nil, err
-		}
-
 		return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
 	} else {
 		renderer := newSemanticRenderer(pipelineInfo, vars, startDate, endDate)
@@ -667,12 +654,18 @@ func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero
 		if err != nil {
 			return "", nil, "", "", nil, err
 		}
-		connName, conn, err := getConnectionByNameFromPipelineInfoWithContext(ctx, pipelineInfo, env, connectionName)
-		if err != nil {
-			return "", nil, "", "", nil, err
-		}
 		return connName, conn, queryStr, "", pipelineInfo, nil
 	}
+}
+
+func getSemanticQueryConnection(ctx context.Context, pipelineInfo *ppInfo, env, connectionName string, hasAsset bool) (string, interface{}, error) {
+	if connectionName != "" {
+		return getConnectionByNameFromPipelineInfoWithContext(ctx, pipelineInfo, env, connectionName)
+	}
+	if hasAsset {
+		return getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
+	}
+	return "", nil, errors.New("semantic query mode with --pipeline requires --connection")
 }
 
 func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[string]*semantic.Model, string, error) {

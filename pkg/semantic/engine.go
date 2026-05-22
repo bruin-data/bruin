@@ -77,6 +77,9 @@ func newEngine(m *Model, models map[string]*Model) (*Engine, error) {
 			return nil, err
 		}
 	}
+	if err := validateJoinTargets(modelSet); err != nil {
+		return nil, err
+	}
 	return e, nil
 }
 
