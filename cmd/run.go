@@ -655,6 +655,11 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:  "deprecated compatibility flag; passing this flag returns an explicit deprecation error",
 				Hidden: true,
 			},
+			&cli.BoolFlag{
+				Name:   "use-gong",
+				Usage:  "deprecated no-op flag; gong is now bundled with ingestr and selected per-asset",
+				Hidden: true,
+			},
 			&cli.StringFlag{
 				Name:  "debug-ingestr-src",
 				Usage: "Use ingestr from the given path instead of the builtin version.",
