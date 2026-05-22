@@ -994,6 +994,53 @@ func TestClient_GetColumns(t *testing.T) {
 	}
 }
 
+func TestClient_GetColumnsForTable(t *testing.T) {
+	t.Parallel()
+
+	mock, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mock.Close()
+
+	rows := pgxmock.NewRowsWithColumnDefinition(
+		pgconn.FieldDescription{Name: "column_name"},
+		pgconn.FieldDescription{Name: "data_type"},
+		pgconn.FieldDescription{Name: "is_nullable"},
+		pgconn.FieldDescription{Name: "column_default"},
+		pgconn.FieldDescription{Name: "character_maximum_length"},
+		pgconn.FieldDescription{Name: "numeric_precision"},
+		pgconn.FieldDescription{Name: "numeric_scale"},
+	).
+		AddRow("event_id", "bigint", "NO", nil, nil, int32(64), int32(0)).
+		AddRow("payload", "jsonb", "YES", nil, nil, nil, nil)
+
+	mock.ExpectQuery("SELECT\\s+column_name").
+		WithArgs("database1", "hw", "staging_honor_event").
+		WillReturnRows(rows)
+
+	client := Client{connection: mock, config: Config{Database: "database1"}}
+
+	got, err := client.GetColumnsForTable(t.Context(), "hw", "staging_honor_event")
+	require.NoError(t, err)
+
+	require.Equal(t, []*ansisql.DBColumn{
+		{
+			Name:       "event_id",
+			Type:       "bigint(64)",
+			Nullable:   false,
+			PrimaryKey: false,
+			Unique:     false,
+		},
+		{
+			Name:       "payload",
+			Type:       "jsonb",
+			Nullable:   true,
+			PrimaryKey: false,
+			Unique:     false,
+		},
+	}, got)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestDB_GetDatabaseSummary(t *testing.T) {
 	t.Parallel()
 
@@ -1112,6 +1159,55 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestDB_GetDatabaseSummaryForSchemas(t *testing.T) {
+	t.Parallel()
+
+	mock, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mock.Close()
+
+	rows := pgxmock.NewRowsWithColumnDefinition(
+		pgconn.FieldDescription{Name: "table_schema"},
+		pgconn.FieldDescription{Name: "table_name"},
+		pgconn.FieldDescription{Name: "table_type"},
+		pgconn.FieldDescription{Name: "view_definition"},
+	).
+		AddRow("hw", "orders", "BASE TABLE", nil).
+		AddRow("hw", "order_summary", "VIEW", "SELECT * FROM orders")
+
+	mock.ExpectQuery("t\\.table_schema = ANY\\(\\$2\\)").
+		WithArgs("database1", []string{"hw"}).
+		WillReturnRows(rows)
+
+	client := Client{connection: mock, config: Config{Database: "database1"}}
+
+	got, err := client.GetDatabaseSummaryForSchemas(t.Context(), []string{"hw"})
+	require.NoError(t, err)
+
+	require.Equal(t, &ansisql.DBDatabase{
+		Name: "database1",
+		Schemas: []*ansisql.DBSchema{
+			{
+				Name: "hw",
+				Tables: []*ansisql.DBTable{
+					{
+						Name:    "orders",
+						Type:    ansisql.DBTableTypeTable,
+						Columns: []*ansisql.DBColumn{},
+					},
+					{
+						Name:           "order_summary",
+						Type:           ansisql.DBTableTypeView,
+						ViewDefinition: "SELECT * FROM orders",
+						Columns:        []*ansisql.DBColumn{},
+					},
+				},
+			},
+		},
+	}, got)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDB_BuildTableExistsQuery(t *testing.T) {

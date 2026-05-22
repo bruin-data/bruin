@@ -354,6 +354,25 @@ func resolvePipelinePath(pipelinePath string) string {
 }
 
 func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn interface{}, schemaName, tableName string) error {
+	// Prefer database-native column metadata when available. PostgreSQL supports
+	// this through information_schema, which avoids relying on SELECT field
+	// descriptions that are not always returned by the driver.
+	if columnFetcher, ok := conn.(interface {
+		GetColumnsForTable(ctx context.Context, schemaName, tableName string) ([]*ansisql.DBColumn, error)
+	}); ok {
+		dbColumns, err := columnFetcher.GetColumnsForTable(ctx, schemaName, tableName)
+		if err != nil {
+			return errors2.Wrapf(err, "failed to query columns for table %s.%s", schemaName, tableName)
+		}
+		if len(dbColumns) == 0 {
+			return fmt.Errorf("no columns found for table %s.%s", schemaName, tableName)
+		}
+
+		columnDescriptions := fetchColumnDescriptions(ctx, conn, schemaName, tableName)
+		asset.Columns = buildPipelineColumns(dbColumns, columnDescriptions)
+		return nil
+	}
+
 	// Check if connection supports schema introspection
 	querier, ok := conn.(interface {
 		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
@@ -422,6 +441,36 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	return nil
 }
 
+func buildPipelineColumns(dbColumns []*ansisql.DBColumn, columnDescriptions map[string]string) []pipeline.Column {
+	skipColumns := map[string]bool{
+		"_IS_CURRENT":  true,
+		"_VALID_UNTIL": true,
+		"_VALID_FROM":  true,
+	}
+
+	columns := make([]pipeline.Column, 0, len(dbColumns))
+	for _, col := range dbColumns {
+		if skipColumns[col.Name] {
+			continue
+		}
+
+		description := col.Description
+		if description == "" {
+			description = columnDescriptions[col.Name]
+		}
+
+		columns = append(columns, pipeline.Column{
+			Name:        col.Name,
+			Type:        col.Type,
+			Description: description,
+			Checks:      []pipeline.ColumnCheck{},
+			Upstreams:   []*pipeline.UpstreamColumn{},
+		})
+	}
+
+	return columns
+}
+
 // fetchColumnDescriptions fetches column descriptions from the database's information schema.
 // Returns a map of column name to description. If descriptions can't be fetched, returns an empty map.
 func fetchColumnDescriptions(ctx context.Context, conn interface{}, schemaName, tableName string) map[string]string {
@@ -435,58 +484,13 @@ func fetchColumnDescriptions(ctx context.Context, conn interface{}, schemaName, 
 		return descriptions
 	}
 
-	var queryStr string
-
-	// Build database-specific query for column descriptions
-	switch conn.(type) {
-	case *postgres.Client:
-		// PostgreSQL: Query pg_description for column comments
-		queryStr = fmt.Sprintf(`
-SELECT 
-    a.attname as column_name,
-    pg_catalog.col_description(a.attrelid, a.attnum) as column_description
-FROM 
-    pg_catalog.pg_attribute a
-JOIN 
-    pg_catalog.pg_class c ON a.attrelid = c.oid
-JOIN 
-    pg_catalog.pg_namespace n ON c.relnamespace = n.oid
-WHERE 
-    n.nspname = '%s'
-    AND c.relname = '%s'
-    AND a.attnum > 0
-    AND NOT a.attisdropped
-    AND pg_catalog.col_description(a.attrelid, a.attnum) IS NOT NULL
-`, schemaName, tableName)
-
-	case *mssql.DB:
-		// MSSQL: Query extended properties for column descriptions
-		queryStr = fmt.Sprintf(`
-SELECT 
-    c.name AS column_name,
-    CAST(ep.value AS NVARCHAR(MAX)) AS column_description
-FROM 
-    sys.columns c
-JOIN 
-    sys.tables t ON c.object_id = t.object_id
-JOIN 
-    sys.schemas s ON t.schema_id = s.schema_id
-LEFT JOIN 
-    sys.extended_properties ep ON c.object_id = ep.major_id 
-    AND c.column_id = ep.minor_id 
-    AND ep.name = 'MS_Description'
-WHERE 
-    s.name = '%s'
-    AND t.name = '%s'
-    AND ep.value IS NOT NULL
-`, schemaName, tableName)
-
-	default:
+	queryObj, ok := columnDescriptionQuery(conn, schemaName, tableName)
+	if !ok {
 		// For other databases, we don't have a standard way to fetch column descriptions
 		return descriptions
 	}
 
-	result, err := selector.Select(ctx, &query.Query{Query: queryStr})
+	result, err := selector.Select(ctx, queryObj)
 	if err != nil {
 		// Silently ignore errors - column descriptions are optional
 		return descriptions
@@ -503,6 +507,62 @@ WHERE
 	}
 
 	return descriptions
+}
+
+func columnDescriptionQuery(conn interface{}, schemaName, tableName string) (*query.Query, bool) {
+	// Build database-specific query for column descriptions
+	switch conn.(type) {
+	case *postgres.Client:
+		// PostgreSQL: Query pg_description for column comments
+		return &query.Query{
+			Query: `
+SELECT 
+    a.attname as column_name,
+    pg_catalog.col_description(a.attrelid, a.attnum) as column_description
+FROM 
+    pg_catalog.pg_attribute a
+JOIN 
+    pg_catalog.pg_class c ON a.attrelid = c.oid
+JOIN 
+    pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+WHERE 
+    n.nspname = $1
+    AND c.relname = $2
+    AND a.attnum > 0
+    AND NOT a.attisdropped
+    AND pg_catalog.col_description(a.attrelid, a.attnum) IS NOT NULL
+`,
+			Args: []any{schemaName, tableName},
+		}, true
+
+	case *mssql.DB:
+		// MSSQL: Query extended properties for column descriptions
+		return &query.Query{
+			Query: `
+SELECT 
+    c.name AS column_name,
+    CAST(ep.value AS NVARCHAR(MAX)) AS column_description
+FROM 
+    sys.columns c
+JOIN 
+    sys.tables t ON c.object_id = t.object_id
+JOIN 
+    sys.schemas s ON t.schema_id = s.schema_id
+LEFT JOIN 
+    sys.extended_properties ep ON c.object_id = ep.major_id 
+    AND c.column_id = ep.minor_id 
+    AND ep.name = 'MS_Description'
+WHERE 
+    s.name = @p1
+    AND t.name = @p2
+    AND ep.value IS NOT NULL
+`,
+			Args: []any{schemaName, tableName},
+		}, true
+
+	default:
+		return nil, false
+	}
 }
 
 func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool, table *ansisql.DBTable) (*pipeline.Asset, string) {
