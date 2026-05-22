@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	path2 "path"
@@ -401,8 +402,9 @@ func printErrorForOutput(output string, err error) {
 
 func PingConnection() *cli.Command {
 	return &cli.Command{
-		Name:  "test",
-		Usage: "Test the validity of a connection in an environment",
+		Name:      "test",
+		Usage:     "Test the validity of a connection in an environment",
+		ArgsUsage: "[connection name]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "environment",
@@ -415,10 +417,9 @@ func PingConnection() *cli.Command {
 				Hidden: true,
 			},
 			&cli.StringFlag{
-				Name:     "name",
-				Aliases:  []string{"n"},
-				Usage:    "the name of the connection to test",
-				Required: true,
+				Name:    "name",
+				Aliases: []string{"n", "connection", "c"},
+				Usage:   "the name of the connection to test",
 			},
 			&cli.StringFlag{
 				Name:        "output",
@@ -436,7 +437,14 @@ func PingConnection() *cli.Command {
 			// Extract command-line arguments
 			environment := c.String("environment")
 			name := c.String("name")
+			if name == "" {
+				name = c.Args().Get(0)
+			}
 			output := c.String("output")
+			if name == "" {
+				printErrorForOutput(output, errors.New("connection name is required"))
+				return cli.Exit("", 1)
+			}
 
 			repoRoot, err := git.FindRepoFromPath(".")
 			if err != nil {

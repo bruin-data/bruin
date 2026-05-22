@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 )
 
 // Test config constants.
@@ -298,6 +300,43 @@ func TestAddConnectionCommand_Run(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewAddConnectionModel_SkipsEnvironmentSelectionForSingleEnvironment(t *testing.T) {
+	t.Parallel()
+
+	fs, configFile := setupTestConfig(t, emptyConfig)
+	cm, err := config.LoadOrCreate(fs, configFile)
+	require.NoError(t, err)
+
+	model := newAddConnectionModel(cm)
+
+	assert.Equal(t, stepEnterName, model.step)
+	assert.Equal(t, "dev", model.environment)
+	assert.True(t, model.skipEnvSelection)
+	assert.True(t, model.nameInput.Focused())
+	assert.NotContains(t, model.View(), "Select environment")
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	updatedModel, ok := updated.(addConnectionModel)
+	require.True(t, ok)
+	assert.Equal(t, stepEnterName, updatedModel.step)
+}
+
+func TestNewAddConnectionModel_ShowsEnvironmentSelectionForMultipleEnvironments(t *testing.T) {
+	t.Parallel()
+
+	fs, configFile := setupTestConfig(t, testConfigWithConnections)
+	cm, err := config.LoadOrCreate(fs, configFile)
+	require.NoError(t, err)
+
+	model := newAddConnectionModel(cm)
+
+	assert.Equal(t, stepSelectEnv, model.step)
+	assert.Empty(t, model.environment)
+	assert.False(t, model.skipEnvSelection)
+	assert.False(t, model.nameInput.Focused())
+	assert.Contains(t, model.View(), "Select environment")
 }
 
 func TestListConnectionsCommand_Run(t *testing.T) {
@@ -727,6 +766,27 @@ func TestPingConnectionCommand_Run(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPingConnectionCommand_AcceptsConnectionNameArgumentAndAliases(t *testing.T) {
+	t.Parallel()
+
+	command := PingConnection()
+
+	assert.Equal(t, "[connection name]", command.ArgsUsage)
+
+	var nameFlag *cli.StringFlag
+	for _, flag := range command.Flags {
+		stringFlag, ok := flag.(*cli.StringFlag)
+		if ok && stringFlag.Name == "name" {
+			nameFlag = stringFlag
+			break
+		}
+	}
+
+	require.NotNil(t, nameFlag)
+	assert.False(t, nameFlag.Required)
+	assert.ElementsMatch(t, []string{"n", "connection", "c"}, nameFlag.Aliases)
 }
 
 func TestConnectionsCommand_ListConnections(t *testing.T) {
