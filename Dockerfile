@@ -49,12 +49,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # Final stage
 FROM debian:trixie-slim
 
-ARG GCS_BUCKET_NAME=gong-release
-ARG GCS_PREFIX=releases
-ARG GONG_VERSION
-ARG TARGETOS
-ARG TARGETARCH
-
 RUN apt-get update && apt-get install -y \
     curl \
     git \
@@ -73,36 +67,12 @@ RUN chown -R bruin:bruin /home/bruin
 USER bruin
 
 # Create necessary directories for bruin user
-RUN mkdir -p /home/bruin/.local/bin /home/bruin/.bruin/bin /home/bruin/.local/share
+RUN mkdir -p /home/bruin/.local/bin /home/bruin/.local/share
 
 # Copy the built binary from builder stage
 COPY --from=builder /src/bin/bruin /home/bruin/.local/bin/bruin
 
-ENV GONG_PATH="/home/bruin/.bruin/bin"
-
-# Obtain the gong version required
-COPY --from=builder /src/pkg/gong/version.txt gong_version.txt
-
-# Download gong binaries from GCS (public bucket via HTTPS). Optional: build continues if not found.
-RUN SELECTED_RELEASE="${GONG_VERSION:-$(cat gong_version.txt)}" && \
-    if [ -z "${SELECTED_RELEASE}" ]; then \
-        echo "No release tag provided, downloading latest..." && \
-        curl -fsSL "https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/latest.txt" -o /tmp/latest.txt && \
-        SELECTED_RELEASE=$(tr -d '\r\n' < /tmp/latest.txt) && \
-        rm -f /tmp/latest.txt && \
-        echo "Using latest release: ${SELECTED_RELEASE}"; \
-    else \
-        echo "Using provided release tag: ${SELECTED_RELEASE}"; \
-    fi && \
-    GONG_BINARY_NAME="gong_${TARGETARCH}" && \
-    GONG_URL="https://storage.googleapis.com/${GCS_BUCKET_NAME}/${GCS_PREFIX}/${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}" && \
-    echo "Downloading gong binary for platform ${TARGETOS}/${TARGETARCH} from ${GONG_URL}..." && \
-    (curl -fsSL "${GONG_URL}" -o ${GONG_PATH}/gong && \
-     chmod +x ${GONG_PATH}/gong && \
-     echo "Gong binaries downloaded successfully") || \
-    echo "Gong binary not available for ${SELECTED_RELEASE}/${TARGETOS}/${GONG_BINARY_NAME}, skipping"
-
-ENV PATH="/home/bruin/.local/bin:${GONG_PATH}:/home/bruin/.bruin/bin:${PATH}"
+ENV PATH="/home/bruin/.local/bin:${PATH}"
 ENV CC="/usr/bin/gcc"
 ENV CFLAGS="-I/usr/include"
 ENV LDFLAGS="-L/usr/lib"

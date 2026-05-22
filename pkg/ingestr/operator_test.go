@@ -2,7 +2,6 @@ package ingestr
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -68,15 +67,6 @@ type mockRunner struct {
 
 func (m *mockRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
 	return m.Called(ctx, args, extraPackages, repo).Error(0)
-}
-
-type mockGongInstaller struct {
-	mock.Mock
-}
-
-func (m *mockGongInstaller) EnsureGongInstalled(ctx context.Context, version string) (string, error) {
-	res := m.Called(ctx, version)
-	return res.String(0), res.Error(1)
 }
 
 // contextCapturingRunner captures the context passed to RunIngestr for assertion.
@@ -422,15 +412,11 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
 			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
-			gongInst := new(mockGongInstaller)
-			gongInst.On("EnsureGongInstalled", mock.Anything, mock.Anything).Return("/path/to/gong", nil).Maybe()
-
 			o := &BasicOperator{
 				conn:          &fetcher,
 				finder:        finder,
 				runner:        runner,
 				jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
-				gong:          gongInst,
 			}
 
 			ti := scheduler.AssetInstance{
@@ -475,15 +461,11 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t
 		"--interval-end", "2025-01-02T00:00:00Z",
 	}, []string{"pyodbc==5.1.0"}, repo).Return(nil)
 
-	gongInst := new(mockGongInstaller)
-	gongInst.On("EnsureGongInstalled", mock.Anything, mock.Anything).Return("/path/to/gong", nil).Maybe()
-
 	o := &BasicOperator{
 		conn:          &fetcher,
 		finder:        finder,
 		runner:        runner,
 		jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
-		gong:          gongInst,
 	}
 
 	ti := scheduler.AssetInstance{
@@ -715,14 +697,10 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 			runner := new(mockRunner)
 			runner.On("RunIngestr", mock.Anything, tt.want, tt.extraPackages, repo).Return(nil)
 
-			gongInst := new(mockGongInstaller)
-			gongInst.On("EnsureGongInstalled", mock.Anything, mock.Anything).Return("/path/to/gong", nil).Maybe()
-
 			o := &SeedOperator{
 				conn:   &fetcher,
 				finder: finder,
 				runner: runner,
-				gong:   gongInst,
 			}
 
 			ti := scheduler.AssetInstance{
@@ -1053,15 +1031,11 @@ func TestBasicOperator_CDCMode(t *testing.T) {
 			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
 			executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
-			gongInst := new(mockGongInstaller)
-			gongInst.On("EnsureGongInstalled", mock.Anything, mock.Anything).Return("/path/to/gong", nil).Maybe()
-
 			o := &BasicOperator{
 				conn:          &fetcher,
 				finder:        finder,
 				runner:        runner,
 				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil),
-				gong:          gongInst,
 			}
 
 			ti := scheduler.AssetInstance{
@@ -1180,342 +1154,6 @@ func TestBasicOperator_Run_MissingConnectionError(t *testing.T) {
 	}
 }
 
-func TestBasicOperator_UseGong(t *testing.T) {
-	t.Parallel()
-
-	mockSf := new(mockConnection)
-	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
-	mockBq := new(mockConnection)
-	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
-
-	fetcher := simpleConnectionFetcher{
-		connections: map[string]*mockConnection{
-			"sf": mockSf,
-			"bq": mockBq,
-		},
-	}
-
-	finder := new(mockFinder)
-
-	t.Run("use_gong injects gong path into context", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(contextCapturingRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-		gongInst.On("EnsureGongInstalled", mock.Anything, mock.Anything).Return("/path/to/gong", nil)
-
-		startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-		endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
-		executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-
-		o := &BasicOperator{
-			conn:          &fetcher,
-			finder:        finder,
-			runner:        runner,
-			jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
-			gong:          gongInst,
-		}
-
-		ti := scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{},
-			Asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Parameters: map[string]string{
-					"source_connection": "sf",
-					"source_table":      "source-table",
-					"use_gong":          "true",
-				},
-			},
-		}
-
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		err := o.Run(ctx, &ti)
-		require.NoError(t, err)
-		gongInst.AssertCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-		assert.Equal(t, "/path/to/gong", runner.capturedCtx.Value(python.CtxGongPath))
-	})
-
-	t.Run("use_gong skips install when gong already in context", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(mockRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-		// Should NOT be called
-
-		startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-		endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
-		executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-
-		o := &BasicOperator{
-			conn:          &fetcher,
-			finder:        finder,
-			runner:        runner,
-			jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
-			gong:          gongInst,
-		}
-
-		ti := scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{},
-			Asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Parameters: map[string]string{
-					"source_connection": "sf",
-					"source_table":      "source-table",
-					"use_gong":          "true",
-				},
-			},
-		}
-
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-		ctx = context.WithValue(ctx, python.CtxGongPath, "/already/set/gong")
-
-		err := o.Run(ctx, &ti)
-		require.NoError(t, err)
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-	})
-
-	t.Run("use_gong returns error when install fails", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(mockRunner)
-
-		gongInst := new(mockGongInstaller)
-		gongInst.On("EnsureGongInstalled", mock.Anything, mock.Anything).Return("", fmt.Errorf("download failed")) //nolint
-
-		startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-		endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
-		executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-
-		o := &BasicOperator{
-			conn:          &fetcher,
-			finder:        finder,
-			runner:        runner,
-			jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
-			gong:          gongInst,
-		}
-
-		ti := scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{},
-			Asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Parameters: map[string]string{
-					"source_connection": "sf",
-					"source_table":      "source-table",
-					"use_gong":          "true",
-				},
-			},
-		}
-
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		err := o.Run(ctx, &ti)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to install gong")
-	})
-
-	t.Run("version v0 does not call EnsureGongInstalled", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(mockRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-
-		startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-		endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
-		executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-
-		o := &BasicOperator{
-			conn:          &fetcher,
-			finder:        finder,
-			runner:        runner,
-			jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
-			gong:          gongInst,
-		}
-
-		ti := scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{},
-			Asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Parameters: map[string]string{
-					"source_connection": "sf",
-					"source_table":      "source-table",
-					"version":           "v0",
-				},
-			},
-		}
-
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		err := o.Run(ctx, &ti)
-		require.NoError(t, err)
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-	})
-}
-
-func TestSeedOperator_UseGong(t *testing.T) {
-	t.Parallel()
-
-	mockBq := new(mockConnection)
-	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
-
-	fetcher := simpleConnectionFetcher{
-		connections: map[string]*mockConnection{
-			"bq": mockBq,
-		},
-	}
-
-	finder := new(mockFinder)
-
-	t.Run("use_gong injects gong path into context", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(contextCapturingRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-		gongInst.On("EnsureGongInstalled", mock.Anything, mock.Anything).Return("/path/to/gong", nil)
-
-		o := &SeedOperator{
-			conn:   &fetcher,
-			finder: finder,
-			runner: runner,
-			gong:   gongInst,
-		}
-
-		ti := scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{},
-			Asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Parameters: map[string]string{
-					"path":     "seed.csv",
-					"use_gong": "true",
-				},
-			},
-		}
-
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		err := o.Run(ctx, &ti)
-		require.NoError(t, err)
-		gongInst.AssertCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-		assert.Equal(t, "/path/to/gong", runner.capturedCtx.Value(python.CtxGongPath))
-	})
-
-	t.Run("version v0 does not call EnsureGongInstalled", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(mockRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-
-		o := &SeedOperator{
-			conn:   &fetcher,
-			finder: finder,
-			runner: runner,
-			gong:   gongInst,
-		}
-
-		ti := scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{},
-			Asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Parameters: map[string]string{
-					"path":    "seed.csv",
-					"version": "v0",
-				},
-			},
-		}
-
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		err := o.Run(ctx, &ti)
-		require.NoError(t, err)
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-	})
-
-	t.Run("default (no version, no use_gong) routes to gong/v1", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(contextCapturingRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-		gongInst.On("EnsureGongInstalled", mock.Anything, "").Return("/path/to/gong", nil)
-
-		o := &SeedOperator{
-			conn:   &fetcher,
-			finder: finder,
-			runner: runner,
-			gong:   gongInst,
-		}
-
-		ti := scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{},
-			Asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Parameters: map[string]string{
-					"path": "seed.csv",
-				},
-			},
-		}
-
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		err := o.Run(ctx, &ti)
-		require.NoError(t, err)
-		gongInst.AssertCalled(t, "EnsureGongInstalled", mock.Anything, "")
-		assert.Equal(t, "/path/to/gong", runner.capturedCtx.Value(python.CtxGongPath))
-	})
-
-	t.Run("use_gong=false opts out of gong default", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(mockRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-
-		o := &SeedOperator{
-			conn:   &fetcher,
-			finder: finder,
-			runner: runner,
-			gong:   gongInst,
-		}
-
-		ti := scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{},
-			Asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Parameters: map[string]string{
-					"path":     "seed.csv",
-					"use_gong": "false",
-				},
-			},
-		}
-
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		err := o.Run(ctx, &ti)
-		require.NoError(t, err)
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-	})
-}
-
 func TestResolveIngestrEngine(t *testing.T) {
 	t.Parallel()
 
@@ -1526,44 +1164,39 @@ func TestResolveIngestrEngine(t *testing.T) {
 		expectErr string
 	}{
 		{
-			name:   "unset defaults to v0",
+			name:   "unset defaults to v1 (latest)",
 			params: map[string]string{},
-			want:   resolvedEngine{family: versionFamilyIngestr},
+			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1},
 		},
 		{
-			name:   "use_gong true with no version routes to v1",
-			params: map[string]string{"use_gong": "true"},
-			want:   resolvedEngine{family: versionFamilyGong},
-		},
-		{
-			name:   "bare v0 selects ingestr default",
+			name:   "bare v0 pins to legacy version",
 			params: map[string]string{"version": "v0"},
-			want:   resolvedEngine{family: versionFamilyIngestr},
+			want:   resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0},
 		},
 		{
-			name:   "v0.14.2 selects exact ingestr version",
-			params: map[string]string{"version": "v0.14.2"},
-			want:   resolvedEngine{family: versionFamilyIngestr, ingestrVersion: "0.14.2"},
-		},
-		{
-			name:   "bare v1 selects gong default",
+			name:   "bare v1 pins to latest version",
 			params: map[string]string{"version": "v1"},
-			want:   resolvedEngine{family: versionFamilyGong},
+			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1},
 		},
 		{
-			name:   "v1.0.5 selects exact gong version",
+			name:   "v0.14.2 selects exact version in v0 family",
+			params: map[string]string{"version": "v0.14.2"},
+			want:   resolvedEngine{family: versionFamilyV0, ingestrVersion: "0.14.2"},
+		},
+		{
+			name:   "v1.0.5 selects exact version in v1 family",
 			params: map[string]string{"version": "v1.0.5"},
-			want:   resolvedEngine{family: versionFamilyGong, gongVersion: "v1.0.5"},
+			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: "1.0.5"},
 		},
 		{
-			name:   "future major v2 routes to gong",
+			name:   "future major v2 maps to v1 family with v1 pin",
 			params: map[string]string{"version": "v2"},
-			want:   resolvedEngine{family: versionFamilyGong},
+			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1},
 		},
 		{
-			name:   "future major v2.0.0 pins gong release",
+			name:   "future major v2.0.0 keeps exact pin in v1 family",
 			params: map[string]string{"version": "v2.0.0"},
-			want:   resolvedEngine{family: versionFamilyGong, gongVersion: "v2.0.0"},
+			want:   resolvedEngine{family: versionFamilyV1, ingestrVersion: "2.0.0"},
 		},
 		{
 			name:      "v0.14 partial is rejected",
@@ -1618,7 +1251,7 @@ func TestBasicOperator_Version(t *testing.T) {
 	}
 	finder := new(mockFinder)
 
-	makeOperator := func(runner ingestrRunner, gongInst gongInstaller) *BasicOperator {
+	makeOperator := func(runner ingestrRunner) *BasicOperator {
 		startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 		endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
 		executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -1627,7 +1260,6 @@ func TestBasicOperator_Version(t *testing.T) {
 			finder:        finder,
 			runner:        runner,
 			jinjaRenderer: jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &executionDate, "ingestr-test", "ingestr-test", nil, ""),
-			gong:          gongInst,
 		}
 	}
 
@@ -1646,101 +1278,39 @@ func TestBasicOperator_Version(t *testing.T) {
 		}
 	}
 
-	t.Run("version unset defaults to v0 (no gong)", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name        string
+		params      map[string]string
+		wantVersion string
+	}{
+		{name: "unset defaults to v1", params: nil, wantVersion: python.IngestrVersionV1},
+		{name: "bare v0 pins legacy", params: map[string]string{"version": "v0"}, wantVersion: python.IngestrVersionV0},
+		{name: "bare v1 pins latest", params: map[string]string{"version": "v1"}, wantVersion: python.IngestrVersionV1},
+		{name: "exact v0.14.2 honors pin", params: map[string]string{"version": "v0.14.2"}, wantVersion: "0.14.2"},
+		{name: "exact v1.0.5 honors pin", params: map[string]string{"version": "v1.0.5"}, wantVersion: "1.0.5"},
+	}
 
-		runner := new(contextCapturingRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		gongInst := new(mockGongInstaller)
+			runner := new(contextCapturingRunner)
+			runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
 
-		o := makeOperator(runner, gongInst)
-		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(nil)}
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
+			o := makeOperator(runner)
+			ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(tt.params)}
+			ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 
-		require.NoError(t, o.Run(ctx, &ti))
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-		assert.Nil(t, runner.capturedCtx.Value(python.CtxGongPath))
-		assert.Nil(t, runner.capturedCtx.Value(python.CtxIngestrVersion))
-	})
-
-	t.Run("use_gong=true with no version routes to v1", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(contextCapturingRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-		gongInst.On("EnsureGongInstalled", mock.Anything, "").Return("/path/to/gong", nil)
-
-		o := makeOperator(runner, gongInst)
-		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(map[string]string{"use_gong": "true"})}
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		require.NoError(t, o.Run(ctx, &ti))
-		gongInst.AssertCalled(t, "EnsureGongInstalled", mock.Anything, "")
-		assert.Equal(t, "/path/to/gong", runner.capturedCtx.Value(python.CtxGongPath))
-	})
-
-	t.Run("version v0.14.2 sets CtxIngestrVersion and skips gong", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(contextCapturingRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-
-		o := makeOperator(runner, gongInst)
-		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(map[string]string{"version": "v0.14.2"})}
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		require.NoError(t, o.Run(ctx, &ti))
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-		assert.Equal(t, "0.14.2", runner.capturedCtx.Value(python.CtxIngestrVersion))
-		assert.Nil(t, runner.capturedCtx.Value(python.CtxGongPath))
-	})
-
-	t.Run("version v1.0.5 forwards version to gong installer", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(contextCapturingRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-		gongInst.On("EnsureGongInstalled", mock.Anything, "v1.0.5").Return("/path/to/gong-v1.0.5", nil)
-
-		o := makeOperator(runner, gongInst)
-		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(map[string]string{"version": "v1.0.5"})}
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		require.NoError(t, o.Run(ctx, &ti))
-		gongInst.AssertCalled(t, "EnsureGongInstalled", mock.Anything, "v1.0.5")
-		assert.Equal(t, "/path/to/gong-v1.0.5", runner.capturedCtx.Value(python.CtxGongPath))
-	})
-
-	t.Run("version v0 wins over use_gong=true", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(mockRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-
-		o := makeOperator(runner, gongInst)
-		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(map[string]string{"version": "v0", "use_gong": "true"})}
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-
-		require.NoError(t, o.Run(ctx, &ti))
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-	})
+			require.NoError(t, o.Run(ctx, &ti))
+			assert.Equal(t, tt.wantVersion, runner.capturedCtx.Value(python.CtxIngestrVersion))
+		})
+	}
 
 	t.Run("malformed version returns an error before runner is called", func(t *testing.T) {
 		t.Parallel()
 
 		runner := new(mockRunner)
-		gongInst := new(mockGongInstaller)
-
-		o := makeOperator(runner, gongInst)
+		o := makeOperator(runner)
 		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(map[string]string{"version": "latest"})}
 		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
 
@@ -1748,24 +1318,5 @@ func TestBasicOperator_Version(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid parameters.version")
 		runner.AssertNotCalled(t, "RunIngestr", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-	})
-
-	t.Run("--gong-path in context skips per-asset install", func(t *testing.T) {
-		t.Parallel()
-
-		runner := new(contextCapturingRunner)
-		runner.On("RunIngestr", mock.Anything, mock.Anything, mock.Anything, repo).Return(nil)
-
-		gongInst := new(mockGongInstaller)
-
-		o := makeOperator(runner, gongInst)
-		ti := scheduler.AssetInstance{Pipeline: &pipeline.Pipeline{}, Asset: makeAsset(map[string]string{"version": "v1.0.5"})}
-		ctx := context.WithValue(t.Context(), pipeline.RunConfigFullRefresh, false)
-		ctx = context.WithValue(ctx, python.CtxGongPath, "/already/set/gong")
-
-		require.NoError(t, o.Run(ctx, &ti))
-		gongInst.AssertNotCalled(t, "EnsureGongInstalled", mock.Anything, mock.Anything)
-		assert.Equal(t, "/already/set/gong", runner.capturedCtx.Value(python.CtxGongPath))
 	})
 }

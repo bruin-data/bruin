@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
@@ -22,39 +20,29 @@ import (
 
 // versionPattern matches the bare family marker (vMAJOR) or a fully-qualified
 // vMAJOR.MINOR.PATCH. MAJOR is any non-negative integer with no leading zero
-// (other than the literal "0"). Family selection is decided separately:
-// MAJOR == 0 routes to ingestr, anything else routes to gong.
+// (other than the literal "0").
 var versionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)(\.\d+\.\d+)?$`)
 
 const (
-	versionFamilyIngestr = "v0"
-	versionFamilyGong    = "v1"
+	versionFamilyV0 = "v0"
+	versionFamilyV1 = "v1"
 )
 
 // resolvedEngine is the outcome of parsing parameters.version on an ingestr asset.
 type resolvedEngine struct {
-	// family is "v0" (ingestr) or "v1" (gong).
-	family string
-	// ingestrVersion is the PyPI version string (no leading "v"), empty for the bundled default.
+	family         string
 	ingestrVersion string
-	// gongVersion is the gong release tag (with leading "v"), empty for the bundled default.
-	gongVersion string
 }
 
 // resolveIngestrEngine reads parameters.version, validates it, and returns the
-// resolved engine. An empty version defaults to v0 (ingestr) unless use_gong is
-// set — preserving the legacy auto-enable for gong-required sources/destinations.
-// When parameters.version is set explicitly, use_gong is ignored with a
-// deprecation warning.
+// resolved engine. An empty version defaults to v1 (the current pinned release).
+// Bare family markers (v0, v1, ...) resolve to the corresponding pinned PyPI
+// version; fully-qualified vMAJOR.MINOR.PATCH overrides to an exact PyPI version.
 func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 	versionParam := strings.TrimSpace(asset.Parameters["version"])
-	useGongLegacy := asset.Parameters["use_gong"] == "true"
 
 	if versionParam == "" {
-		if useGongLegacy {
-			return resolvedEngine{family: versionFamilyGong}, nil
-		}
-		return resolvedEngine{family: versionFamilyIngestr}, nil
+		return resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}, nil
 	}
 
 	match := versionPattern.FindStringSubmatch(versionParam)
@@ -62,79 +50,27 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 		return resolvedEngine{}, fmt.Errorf("invalid parameters.version %q: expected vMAJOR or vMAJOR.MINOR.PATCH", versionParam)
 	}
 
-	if useGongLegacy {
-		fmt.Fprintf(os.Stderr, "Warning: parameters.use_gong is ignored when parameters.version is set; version=%q wins.\n", versionParam)
-	}
-
-	major := match[1]
-	if major == "0" {
-		out := resolvedEngine{family: versionFamilyIngestr}
-		if versionParam != versionFamilyIngestr {
-			// Strip the leading "v" to get the PyPI version (e.g. v0.14.2 -> 0.14.2).
-			out.ingestrVersion = strings.TrimPrefix(versionParam, "v")
-		}
-		return out, nil
-	}
-
-	out := resolvedEngine{family: versionFamilyGong}
-	// Only fully-qualified versions get pinned; bare family markers (v1, v2, ...)
-	// fall back to bruin's bundled gong default.
 	if match[2] != "" {
-		out.gongVersion = versionParam
+		family := versionFamilyV1
+		if match[1] == "0" {
+			family = versionFamilyV0
+		}
+		return resolvedEngine{family: family, ingestrVersion: strings.TrimPrefix(versionParam, "v")}, nil
 	}
-	return out, nil
+
+	if match[1] == "0" {
+		return resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}, nil
+	}
+	return resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}, nil
 }
 
-// applyIngestrEngine applies the resolved engine choice to ctx and asset:
-//   - For v0: clears use_gong (so downstream code paths run ingestr) and sets
-//     CtxIngestrVersion when an exact version was requested. Warns if the source
-//     or destination scheme is in gongSources/gongDestinations.
-//   - For v1: ensures gong is installed (using the requested version) and sets
-//     CtxGongPath, plus use_gong for legacy code paths that still inspect it.
-func applyIngestrEngine(ctx context.Context, asset *pipeline.Asset, engine resolvedEngine, sourceScheme, destScheme string, installer gongInstaller) (context.Context, error) {
-	if engine.family == versionFamilyIngestr {
-		_, srcAuto := gongSources[sourceScheme]
-		_, dstAuto := gongDestinations[destScheme]
-		if srcAuto || dstAuto {
-			fmt.Fprintf(os.Stderr,
-				"Warning: parameters.version=v0 selected but source/destination (%s/%s) typically requires gong; running on ingestr anyway.\n",
-				sourceScheme, destScheme,
-			)
-		}
-		// Make sure no stale use_gong leaks through to downstream (e.g. the auto-enable
-		// blocks earlier in Run set it). The user explicitly asked for v0.
-		delete(asset.Parameters, "use_gong")
-		if engine.ingestrVersion != "" {
-			ctx = context.WithValue(ctx, python.CtxIngestrVersion, engine.ingestrVersion)
-		}
-		return ctx, nil
+// applyIngestrEngine stashes the resolved PyPI version on the context so the
+// uv runner installs the requested release.
+func applyIngestrEngine(ctx context.Context, engine resolvedEngine) context.Context {
+	if engine.ingestrVersion == "" {
+		return ctx
 	}
-
-	// v1 (gong)
-	if asset.Parameters == nil {
-		asset.Parameters = make(map[string]string)
-	}
-	asset.Parameters["use_gong"] = "true"
-
-	if ctx.Value(python.CtxGongPath) != nil {
-		// Already installed for this run (e.g. via --gong-path or a prior asset).
-		return ctx, nil
-	}
-	if installer == nil {
-		return ctx, errors.New("gong installer is not available but is required for parameters.version=v1")
-	}
-	gongPath, err := installer.EnsureGongInstalled(ctx, engine.gongVersion)
-	if err != nil {
-		return ctx, fmt.Errorf("failed to install gong %s: %w", displayGongVersion(engine.gongVersion), err)
-	}
-	return context.WithValue(ctx, python.CtxGongPath, gongPath), nil
-}
-
-func displayGongVersion(v string) string {
-	if v == "" {
-		return "(default)"
-	}
-	return v
+	return context.WithValue(ctx, python.CtxIngestrVersion, engine.ingestrVersion)
 }
 
 type repoFinder interface {
@@ -145,16 +81,11 @@ type ingestrRunner interface {
 	RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error
 }
 
-type gongInstaller interface {
-	EnsureGongInstalled(ctx context.Context, version string) (string, error)
-}
-
 type BasicOperator struct {
 	conn          config.ConnectionGetter
 	runner        ingestrRunner
 	finder        repoFinder
 	jinjaRenderer jinja.RendererInterface
-	gong          gongInstaller
 }
 
 type SeedOperator struct {
@@ -162,7 +93,6 @@ type SeedOperator struct {
 	runner        ingestrRunner
 	finder        repoFinder
 	jinjaRenderer jinja.RendererInterface
-	gong          gongInstaller
 }
 
 type pipelineConnection interface {
@@ -175,7 +105,7 @@ func NewBasicOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (
 		Cmd:         &python.CommandRunner{},
 	}
 
-	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}, jinjaRenderer: j, gong: &gong.Checker{}}, nil
+	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}, jinjaRenderer: j}, nil
 }
 
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -231,15 +161,6 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	// always feasible. In the case of GSheets, we have to reuse the same GCP credentials, but change the prefix with gsheets://
 	if asset.Parameters["source"] == "gsheets" {
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
-	}
-
-	// Auto-enable gong for sources that require it
-	parsed, err := url.Parse(sourceURI)
-	if err != nil {
-		return fmt.Errorf("failed to parse source URI: %w", err)
-	}
-	if _, ok := gongSources[parsed.Scheme]; ok {
-		asset.Parameters["use_gong"] = "true"
 	}
 
 	// Handle CDC mode - transform PostgreSQL URI to CDC format and auto-set merge strategy
@@ -307,15 +228,6 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		destURI = applyClickHouseEngineParams(destURI, asset.Parameters)
 	}
 
-	// Also enable gong when the destination requires it
-	parsedDest, parseErr := url.Parse(destURI)
-	if parseErr != nil {
-		return fmt.Errorf("failed to parse destination URI: %w", parseErr)
-	}
-	if _, ok := gongDestinations[parsedDest.Scheme]; ok {
-		asset.Parameters["use_gong"] = "true"
-	}
-
 	destTable := asset.Name
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
@@ -369,25 +281,13 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	if err != nil {
 		return err
 	}
-	sourceScheme, destScheme := schemeOf(sourceURI), schemeOf(destURI)
-	ctx, err = applyIngestrEngine(ctx, asset, engine, sourceScheme, destScheme, o.gong)
-	if err != nil {
-		return err
-	}
+	ctx = applyIngestrEngine(ctx, engine)
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
-func schemeOf(uri string) string {
-	parsed, err := url.Parse(uri)
-	if err != nil {
-		return ""
-	}
-	return parsed.Scheme
-}
-
 // seedFileSchemes maps a file_type / extension token to the URI scheme that
-// gongestr expects for local file sources. Keep the keys lower-case.
+// ingestr expects for local file sources. Keep the keys lower-case.
 var seedFileSchemes = map[string]string{
 	"csv":     "csv",
 	"parquet": "parquet",
@@ -464,7 +364,6 @@ func NewSeedOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*
 		runner:        uvRunner,
 		finder:        &git.RepoFinder{},
 		jinjaRenderer: j,
-		gong:          &gong.Checker{},
 	}, nil
 }
 
@@ -496,21 +395,9 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("source connection not configured")
 	}
 
-	// Seed assets default to v1 (gong, the new ingestr). Users can pin the old
-	// engine with parameters.version=v0 or parameters.use_gong=false.
-	if _, hasUseGong := asset.Parameters["use_gong"]; !hasUseGong && strings.TrimSpace(asset.Parameters["version"]) == "" {
-		asset.Parameters["use_gong"] = "true"
-	}
-
 	sourceURI, err := resolveSeedSourceURI(sourceConnectionPath, asset.Parameters["file_type"], filepath.Dir(asset.ExecutableFile.Path))
 	if err != nil {
 		return err
-	}
-
-	if parsedSource, err := url.Parse(sourceURI); err == nil {
-		if _, ok := gongSources[parsedSource.Scheme]; ok {
-			asset.Parameters["use_gong"] = "true"
-		}
 	}
 
 	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
@@ -566,10 +453,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return err
 	}
-	ctx, err = applyIngestrEngine(ctx, asset, engine, schemeOf(sourceURI), schemeOf(destURI), o.gong)
-	if err != nil {
-		return err
-	}
+	ctx = applyIngestrEngine(ctx, engine)
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }

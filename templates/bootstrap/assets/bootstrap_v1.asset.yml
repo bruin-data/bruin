@@ -1,6 +1,6 @@
-name: public.bootstrap_gong
+name: public.bootstrap_v1
 type: duckdb.seed
-connection: duckdb-gong
+connection: duckdb-v1
 
 parameters:
     path: seed.csv

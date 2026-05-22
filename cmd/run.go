@@ -34,7 +34,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/gong"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -660,16 +659,6 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "debug-ingestr-src",
 				Usage: "Use ingestr from the given path instead of the builtin version.",
 			},
-			&cli.BoolFlag{
-				Name:   "use-gong",
-				Usage:  "force gong for all ingestr assets in this run (overridden per-asset by parameters.version=v0)",
-				Hidden: true,
-			},
-			&cli.StringFlag{
-				Name:   "gong-path",
-				Usage:  "path to a pre-installed gong binary; overrides per-asset gong installation for the run",
-				Hidden: true,
-			},
 			&cli.StringFlag{
 				Name:    "config-file",
 				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
@@ -737,34 +726,6 @@ func Run(isDebug *bool) *cli.Command {
 			fullRefresh := c.Bool("full-refresh")
 			applyIntervalModifiers := setApplyIntervalModifiers(c)
 
-			useGong := c.Bool("use-gong")
-			gongPath := c.String("gong-path")
-
-			// When using gong, ensure binary is available
-			if useGong {
-				if gongPath == "" {
-					// Auto-install gong if no custom path provided
-					gongChecker := &gong.Checker{}
-					installedPath, err := gongChecker.EnsureGongInstalled(ctx, "")
-					if err != nil {
-						return cli.Exit(fmt.Sprintf("failed to install gong: %v", err), 1)
-					}
-					gongPath = installedPath
-				} else {
-					// User provided custom path - verify it exists and is executable
-					info, err := os.Stat(gongPath)
-					if err != nil {
-						if os.IsNotExist(err) {
-							return cli.Exit("gong binary not found at path: "+gongPath, 1)
-						}
-						return cli.Exit(fmt.Sprintf("failed to access gong binary at path '%s': %v", gongPath, err), 1)
-					}
-					if info.Mode()&0o111 == 0 {
-						return cli.Exit(fmt.Sprintf("gong binary at path '%s' is not executable", gongPath), 1)
-					}
-				}
-			}
-
 			runConfig := &scheduler.RunConfig{
 				Downstream:             c.Bool("downstream"),
 				StartDate:              c.String("start-date"),
@@ -785,7 +746,6 @@ func Run(isDebug *bool) *cli.Command {
 				SensorMode:             c.String("sensor-mode"),
 				ApplyIntervalModifiers: applyIntervalModifiers,
 				Annotations:            c.String("query-annotations"),
-				UseGong:                useGong,
 			}
 
 			var startDate, endDate time.Time
@@ -952,11 +912,6 @@ func Run(isDebug *bool) *cli.Command {
 				endDate = parsedEndDate
 			}
 
-			// Set gong context after --continue restores RunConfig to ensure consistency
-			if runConfig.UseGong {
-				runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath)
-			}
-
 			// Load macros from the pipeline's macros directory
 			macroContent, err := jinja.LoadMacros(fs, preview.Pipeline.MacrosPath)
 			if err != nil {
@@ -973,41 +928,6 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			applyEnvironmentRefreshRestriction(cm.SelectedEnvironment, pipelineInfo.Pipeline)
 			applyEnvironmentRefreshRestrictionToAsset(cm.SelectedEnvironment, task)
-
-			// Auto-enable gong for CDC mode assets
-			if !runConfig.UseGong {
-				for _, asset := range pipelineInfo.Pipeline.Assets {
-					if asset.Type == pipeline.AssetTypeIngestr && asset.Parameters["cdc"] == "true" {
-						// CDC mode detected, enable gong
-						runConfig.UseGong = true
-
-						if gongPath == "" {
-							// Auto-install gong if no custom path provided
-							gongChecker := &gong.Checker{}
-							installedPath, gongErr := gongChecker.EnsureGongInstalled(runCtx, "")
-							if gongErr != nil {
-								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to install gong: %v", gongErr), 1)
-							}
-							gongPath = installedPath
-						} else {
-							// User provided custom path - verify it exists and is executable
-							info, gongErr := os.Stat(gongPath)
-							if gongErr != nil {
-								if os.IsNotExist(gongErr) {
-									return cli.Exit("CDC mode detected but gong binary not found at path: "+gongPath+"\nPlease install gong or remove cdc: true from your asset.", 1)
-								}
-								return cli.Exit(fmt.Sprintf("CDC mode detected but failed to access gong binary at path '%s': %v", gongPath, gongErr), 1)
-							}
-							if info.Mode()&0o111 == 0 {
-								return cli.Exit(fmt.Sprintf("CDC mode detected but gong binary at path '%s' is not executable", gongPath), 1)
-							}
-						}
-
-						runCtx = context.WithValue(runCtx, python.CtxGongPath, gongPath) //nolint
-						break
-					}
-				}
-			}
 
 			// Load assets from positional arguments
 			// This allows: bruin run asset1.sql asset2.sql asset3.sql

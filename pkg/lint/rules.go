@@ -612,7 +612,7 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 
 		if !isCSVSeed(seedPath, asset.Parameters["file_type"]) {
 			// For parquet/json/jsonl/ndjson/avro the schema is binary or
-			// semi-structured; column-vs-header validation is left to gongestr
+			// semi-structured; column-vs-header validation is left to ingestr
 			// at runtime, just like the URL case above.
 			return issues, nil
 		}
