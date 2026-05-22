@@ -3458,6 +3458,125 @@ func TestWorkflowTasks(t *testing.T) {
 			},
 		},
 		{
+			name: "duckdb_data_vault_materialization",
+			workflow: e2e.Workflow{
+				Name: "duckdb_data_vault_materialization",
+				Steps: []e2e.Task{
+					{
+						Name:    "mat-dv-00: ensure initial customer_orders.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/resources/customer_orders_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/assets/customer_orders.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-dv-01: run pipeline with initial Data Vault rows",
+						Command: binary,
+						Args:    []string{"run", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-dv-02: replace customer_orders.sql with customer_orders_v2.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/resources/customer_orders_v2.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/assets/customer_orders.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-dv-03: run pipeline with changed Data Vault rows",
+						Command: binary,
+						Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-dv-04: run pipeline again to verify idempotency",
+						Command: binary,
+						Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization")},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "mat-dv-05: query final hub data",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT customer_hk, customer_bk, strftime(load_dts, '%Y-%m-%d %H:%M:%S') AS load_dts, record_source FROM rdv.hub_customer ORDER BY customer_hk;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/expectations/final_hub.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-dv-06: query final link data",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT customer_order_hk, customer_hk, order_hk FROM rdv.link_customer_order ORDER BY customer_order_hk;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/expectations/final_link.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-dv-07: query final satellite data",
+						Command: binary,
+						Args:    []string{"query", "--connection", "duckdb-mat-test", "--query", "SELECT customer_hk, hashdiff, strftime(load_dts, '%Y-%m-%d %H:%M:%S') AS load_dts, customer_name, email FROM rdv.sat_customer_details ORDER BY customer_hk, load_dts;", "--output", "csv"},
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+							CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/expectations/final_satellite.csv"),
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByCSV,
+						},
+					},
+					{
+						Name:    "mat-dv-08: restore original customer_orders.sql",
+						Command: "cp",
+						Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/resources/customer_orders_v1.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-datavault-materialization/assets/customer_orders.sql")},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "duckdb_ddl_materialization",
 			workflow: e2e.Workflow{
 				Name: "duckdb_ddl_materialization",

@@ -432,6 +432,119 @@ func TestBuildDDLQuery(t *testing.T) {
 	}
 }
 
+func TestDataVaultMaterializations(t *testing.T) {
+	t.Parallel()
+
+	t.Run("hub creates table and inserts only new hash keys", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "rdv.hub_customer",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDataVaultHub,
+			},
+			Columns: []pipeline.Column{
+				{Name: "customer_hk", Type: "VARCHAR", PrimaryKey: true},
+				{Name: "customer_bk", Type: "VARCHAR"},
+				{Name: "load_dts", Type: "TIMESTAMP"},
+				{Name: "record_source", Type: "VARCHAR"},
+			},
+		}
+
+		got, err := NewMaterializer(false).Render(asset, "select customer_hk, customer_bk, load_dts, record_source from stg.crm_customer_hashed")
+		require.NoError(t, err)
+
+		assert.Contains(t, got, "CREATE SCHEMA IF NOT EXISTS rdv")
+		assert.Contains(t, got, "CREATE TABLE IF NOT EXISTS rdv.hub_customer")
+		assert.Contains(t, got, "PRIMARY KEY (customer_hk)")
+		assert.Contains(t, got, "ROW_NUMBER() OVER (PARTITION BY source.customer_hk ORDER BY source.load_dts ASC) AS __bruin_row_number")
+		assert.Contains(t, got, "WHERE target.customer_hk = source.customer_hk")
+		assert.NotContains(t, got, "ON CONFLICT")
+	})
+
+	t.Run("link dedupes by link hash key", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "rdv.link_customer_order",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDataVaultLink,
+			},
+			Columns: []pipeline.Column{
+				{Name: "customer_order_hk", Type: "VARCHAR", PrimaryKey: true},
+				{Name: "customer_hk", Type: "VARCHAR"},
+				{Name: "order_hk", Type: "VARCHAR"},
+				{Name: "load_dts", Type: "TIMESTAMP"},
+				{Name: "record_source", Type: "VARCHAR"},
+			},
+		}
+
+		got, err := NewMaterializer(false).Render(asset, "select customer_order_hk, customer_hk, order_hk, load_dts, record_source from stg.customer_orders")
+		require.NoError(t, err)
+
+		assert.Contains(t, got, "PRIMARY KEY (customer_order_hk)")
+		assert.Contains(t, got, "ROW_NUMBER() OVER (PARTITION BY source.customer_order_hk ORDER BY source.load_dts ASC) AS __bruin_row_number")
+		assert.Contains(t, got, "source.customer_hk IS NOT NULL")
+		assert.Contains(t, got, "source.order_hk IS NOT NULL")
+		assert.Contains(t, got, "WHERE target.customer_order_hk = source.customer_order_hk")
+	})
+
+	t.Run("satellite inserts only changed hashdiff rows", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "rdv.sat_customer_details",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDataVaultSatellite,
+			},
+			Columns: []pipeline.Column{
+				{Name: "customer_hk", Type: "VARCHAR", PrimaryKey: true},
+				{Name: "hashdiff", Type: "VARCHAR"},
+				{Name: "load_dts", Type: "TIMESTAMP"},
+				{Name: "record_source", Type: "VARCHAR"},
+				{Name: "customer_name", Type: "VARCHAR"},
+			},
+		}
+
+		got, err := NewMaterializer(false).Render(asset, "select customer_hk, hashdiff, load_dts, record_source, customer_name from stg.crm_customer_hashed")
+		require.NoError(t, err)
+
+		assert.Contains(t, got, "PRIMARY KEY (customer_hk, load_dts)")
+		assert.Contains(t, got, "LAG(dedup.hashdiff) OVER (PARTITION BY dedup.customer_hk ORDER BY dedup.load_dts, dedup.hashdiff) AS __bruin_previous_hashdiff")
+		assert.Contains(t, got, "latest.hashdiff IS DISTINCT FROM source.hashdiff")
+		assert.Contains(t, got, "source.__bruin_previous_hashdiff IS DISTINCT FROM source.hashdiff")
+		assert.Contains(t, got, "target.customer_hk = source.customer_hk AND target.load_dts = source.load_dts")
+	})
+
+	t.Run("full refresh keeps Data Vault DDL and load semantics", func(t *testing.T) {
+		t.Parallel()
+
+		asset := &pipeline.Asset{
+			Name: "rdv.hub_customer",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategyDataVaultHub,
+			},
+			Columns: []pipeline.Column{
+				{Name: "customer_hk", Type: "VARCHAR", PrimaryKey: true},
+				{Name: "customer_bk", Type: "VARCHAR"},
+				{Name: "load_dts", Type: "TIMESTAMP"},
+				{Name: "record_source", Type: "VARCHAR"},
+			},
+		}
+
+		got, err := NewMaterializer(true).Render(asset, "select customer_hk, customer_bk, load_dts, record_source from stg.crm_customer_hashed")
+		require.NoError(t, err)
+
+		assert.Contains(t, got, "DROP TABLE IF EXISTS rdv.hub_customer;")
+		assert.Contains(t, got, "CREATE TABLE IF NOT EXISTS rdv.hub_customer")
+		assert.NotContains(t, got, "CREATE TABLE rdv.hub_customer AS")
+	})
+}
+
 func TestDuckDBTimestampWithTimeZone(t *testing.T) {
 	t.Parallel()
 

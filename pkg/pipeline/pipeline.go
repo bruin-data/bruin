@@ -366,18 +366,21 @@ type (
 )
 
 const (
-	MaterializationStrategyNone             MaterializationStrategy        = ""
-	MaterializationStrategyCreateReplace    MaterializationStrategy        = "create+replace"
-	MaterializationStrategyDeleteInsert     MaterializationStrategy        = "delete+insert"
-	MaterializationStrategyTruncateInsert   MaterializationStrategy        = "truncate+insert"
-	MaterializationStrategyAppend           MaterializationStrategy        = "append"
-	MaterializationStrategyMerge            MaterializationStrategy        = "merge"
-	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
-	MaterializationStrategyDDL              MaterializationStrategy        = "ddl"
-	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
-	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
-	MaterializationStrategySCD2ByTime       MaterializationStrategy        = "scd2_by_time"
-	MaterializationStrategySCD2ByColumn     MaterializationStrategy        = "scd2_by_column"
+	MaterializationStrategyNone               MaterializationStrategy        = ""
+	MaterializationStrategyCreateReplace      MaterializationStrategy        = "create+replace"
+	MaterializationStrategyDeleteInsert       MaterializationStrategy        = "delete+insert"
+	MaterializationStrategyTruncateInsert     MaterializationStrategy        = "truncate+insert"
+	MaterializationStrategyAppend             MaterializationStrategy        = "append"
+	MaterializationStrategyMerge              MaterializationStrategy        = "merge"
+	MaterializationStrategyTimeInterval       MaterializationStrategy        = "time_interval"
+	MaterializationStrategyDDL                MaterializationStrategy        = "ddl"
+	MaterializationTimeGranularityDate        MaterializationTimeGranularity = "date"
+	MaterializationTimeGranularityTimestamp   MaterializationTimeGranularity = "timestamp"
+	MaterializationStrategySCD2ByTime         MaterializationStrategy        = "scd2_by_time"
+	MaterializationStrategySCD2ByColumn       MaterializationStrategy        = "scd2_by_column"
+	MaterializationStrategyDataVaultHub       MaterializationStrategy        = "datavault_hub"
+	MaterializationStrategyDataVaultLink      MaterializationStrategy        = "datavault_link"
+	MaterializationStrategyDataVaultSatellite MaterializationStrategy        = "datavault_satellite"
 )
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
@@ -390,6 +393,9 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyDDL,
 	MaterializationStrategySCD2ByTime,
 	MaterializationStrategySCD2ByColumn,
+	MaterializationStrategyDataVaultHub,
+	MaterializationStrategyDataVaultLink,
+	MaterializationStrategyDataVaultSatellite,
 }
 
 type Materialization struct {
