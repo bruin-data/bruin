@@ -274,6 +274,17 @@
       },
       "schema_prefix": ""
     },
+    "env-semantic-query": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-semantic-query",
+            "path": "duckdb-files/semantic-query.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-query-export": {
       "connections": {
         "duckdb": [

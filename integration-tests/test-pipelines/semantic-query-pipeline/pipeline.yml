@@ -1,0 +1,4 @@
+name: semantic-query-pipeline
+
+default_connections:
+  duckdb: "duckdb-semantic-query"

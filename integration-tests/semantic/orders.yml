@@ -1,0 +1,59 @@
+schema: v1
+name: orders
+label: Orders
+description: Semantic model used by bruin query integration tests
+source:
+  table: |
+    (
+      SELECT 1 AS order_id, 101 AS customer_id, DATE '2025-01-15' AS order_date, 'US' AS country, 'completed' AS status, 'electronics' AS category, 100 AS amount
+      UNION ALL SELECT 2, 102, DATE '2025-01-20', 'US', 'completed', 'accessories', 50
+      UNION ALL SELECT 3, 101, DATE '2025-02-05', 'US', 'pending', 'electronics', 70
+      UNION ALL SELECT 4, 201, DATE '2025-02-10', 'DE', 'completed', 'electronics', 200
+      UNION ALL SELECT 5, 101, DATE '2025-03-01', 'US', 'completed', 'furniture', 300
+      UNION ALL SELECT 6, 201, DATE '2025-03-15', 'DE', 'cancelled', 'furniture', 10
+      UNION ALL SELECT 7, 102, DATE '2025-03-20', 'US', 'completed', 'electronics', 80
+    ) AS orders
+
+joins:
+  - name: customers
+    relationship: many_to_one
+    foreign_key: customer_id
+
+dimensions:
+  - name: order_date
+    type: time
+    granularities:
+      day: date_trunc('day', order_date)
+      month: date_trunc('month', order_date)
+  - name: country
+    type: string
+  - name: status
+    type: string
+  - name: category
+    type: string
+
+metrics:
+  - name: revenue
+    expression: sum(amount)
+  - name: order_count
+    expression: count(distinct order_id)
+  - name: avg_order_value
+    expression: "{revenue} / {order_count}"
+  - name: completed_revenue
+    expression: sum(amount)
+    filter: "status = 'completed'"
+  - name: running_revenue
+    expression: "{revenue}"
+    window:
+      type: running_total
+      order_by: order_date
+      partition_by:
+        - country
+
+segments:
+  - name: completed
+    filter: "status = 'completed'"
+  - name: us
+    filter: "country = 'US'"
+  - name: high_value
+    filter: "amount >= 100"

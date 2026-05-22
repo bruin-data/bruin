@@ -6,6 +6,7 @@ Bruin is built around a few simple but powerful concepts. This page gives a brie
 |---------|-------------|
 | [Pipelines](/pipelines/definition) | A group of assets that are executed together in dependency order |
 | [Assets](/assets/definition-schema) | Anything that carries value derived from data (tables, views, files, models) |
+| [Semantic Layer](/core-concepts/semantic-layer) | Reusable business metrics, dimensions, segments, and safe joins defined in YAML |
 | [Variables](/variables/overview) | Dynamic values injected into your asset code during execution |
 | [Connections](/connections/overview) | Named configurations for authenticating with data platforms and sources |
 | [Commands](/commands/overview) | CLI operations to run, validate, and manage your pipelines |

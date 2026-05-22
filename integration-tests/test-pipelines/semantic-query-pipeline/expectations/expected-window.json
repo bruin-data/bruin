@@ -1,0 +1,54 @@
+{
+  "columns": [
+    {
+      "name": "country",
+      "type": "VARCHAR"
+    },
+    {
+      "name": "order_date",
+      "type": "TIMESTAMP"
+    },
+    {
+      "name": "revenue",
+      "type": "DECIMAL(38,0)"
+    },
+    {
+      "name": "running_revenue",
+      "type": "DECIMAL(38,0)"
+    }
+  ],
+  "rows": [
+    [
+      "DE",
+      "2025-02-10T00:00:00Z",
+      200,
+      200
+    ],
+    [
+      "US",
+      "2025-01-15T00:00:00Z",
+      100,
+      100
+    ],
+    [
+      "US",
+      "2025-01-20T00:00:00Z",
+      50,
+      150
+    ],
+    [
+      "US",
+      "2025-03-01T00:00:00Z",
+      300,
+      450
+    ],
+    [
+      "US",
+      "2025-03-20T00:00:00Z",
+      80,
+      530
+    ]
+  ],
+  "connectionName": "duckdb-semantic-query",
+  "query": ""
+}

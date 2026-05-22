@@ -23,6 +23,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/semantic"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
@@ -86,9 +87,37 @@ func Query() *cli.Command {
 				Usage: "Path to a SQL asset file within a Bruin pipeline. This file should contain the query to be executed.",
 			},
 			&cli.StringFlag{
+				Name:  "pipeline",
+				Usage: "Path to a Bruin pipeline. Used with --semantic-model when no asset is provided.",
+			},
+			&cli.StringFlag{
 				Name:    "environment",
 				Aliases: []string{"env"},
 				Usage:   "Target environment name as defined in .bruin.yml. Specifies the configuration environment for executing the query.",
+			},
+			&cli.StringFlag{
+				Name:  "semantic-model",
+				Usage: "Name of the semantic model to compile and query from the repository semantic directory.",
+			},
+			&cli.StringSliceFlag{
+				Name:  "metric",
+				Usage: "Semantic metric to select. Can be passed multiple times.",
+			},
+			&cli.StringSliceFlag{
+				Name:  "dimension",
+				Usage: "Semantic dimension to select. Use name:granularity for time dimensions.",
+			},
+			&cli.StringSliceFlag{
+				Name:  "filter",
+				Usage: `Semantic filter as JSON, e.g. '{"dimension":"country","operator":"equals","value":"US"}'.`,
+			},
+			&cli.StringSliceFlag{
+				Name:  "segment",
+				Usage: "Semantic segment to apply. Can be passed multiple times.",
+			},
+			&cli.StringSliceFlag{
+				Name:  "sort",
+				Usage: "Semantic sort field. Use name:asc or name:desc.",
 			},
 			&cli.BoolFlag{
 				Name:  "export",
@@ -128,7 +157,7 @@ func Query() *cli.Command {
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
-			if err := validateFlags(c.String("connection"), c.String("query"), c.String("asset")); err != nil {
+			if err := validateQueryCommandFlags(c); err != nil {
 				return handleError(c.String("output"), err)
 			}
 
@@ -360,10 +389,51 @@ func Query() *cli.Command {
 	}
 }
 
-func validateFlags(connection, query, asset string) error {
+func validateQueryCommandFlags(c *cli.Command) error {
+	return validateFlags(
+		c.String("connection"),
+		c.String("query"),
+		c.String("asset"),
+		c.String("pipeline"),
+		hasSemanticQueryFlags(c),
+		c.String("semantic-model"),
+	)
+}
+
+func hasSemanticQueryFlags(c *cli.Command) bool {
+	return c.String("semantic-model") != "" ||
+		len(c.StringSlice("metric")) > 0 ||
+		len(c.StringSlice("dimension")) > 0 ||
+		len(c.StringSlice("filter")) > 0 ||
+		len(c.StringSlice("segment")) > 0 ||
+		len(c.StringSlice("sort")) > 0
+}
+
+func validateFlags(connection, query, asset, pipelinePath string, hasSemanticFlags bool, semanticModel string) error {
 	hasConnection := connection != ""
 	hasQuery := query != ""
 	hasAsset := asset != ""
+	hasPipeline := pipelinePath != ""
+
+	if hasSemanticFlags {
+		if semanticModel == "" {
+			return errors.New("--semantic-model is required when using semantic query flags")
+		}
+		if hasQuery {
+			return errors.New("semantic query mode cannot be combined with --query")
+		}
+		if !hasAsset && !hasPipeline {
+			return errors.New("semantic query mode requires --asset or --pipeline")
+		}
+		if hasPipeline && !hasConnection && !hasAsset {
+			return errors.New("semantic query mode with --pipeline requires --connection")
+		}
+		return nil
+	}
+
+	if hasPipeline {
+		return errors.New("--pipeline can only be used with --semantic-model")
+	}
 
 	switch {
 	case hasConnection:
@@ -408,6 +478,10 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 	extractor := &query.WholeFileExtractor{
 		Fs:       fs,
 		Renderer: renderer,
+	}
+
+	if c.String("semantic-model") != "" {
+		return prepareSemanticQueryExecution(ctx, c, fs, vars, startDate, endDate)
 	}
 
 	// Direct query mode (no asset path)
@@ -515,6 +589,285 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 	return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
 }
 
+func prepareSemanticQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, vars map[string]any, startDate time.Time, endDate time.Time) (string, interface{}, string, pipeline.AssetType, *ppInfo, error) {
+	semanticModelName := c.String("semantic-model")
+	assetPath := c.String("asset")
+	pipelinePath := c.String("pipeline")
+	env := c.String("environment")
+	connectionName := c.String("connection")
+
+	var pipelineInfo *ppInfo
+	var err error
+	if assetPath != "" {
+		pipelineInfo, err = GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
+		if err != nil {
+			return "", nil, "", "", nil, errors.Wrap(err, "failed to get pipeline info")
+		}
+	} else {
+		pipelineInfo, err = GetPipelineForQuery(ctx, pipelinePath, fs, c.String("config-file"))
+		if err != nil {
+			return "", nil, "", "", nil, errors.Wrap(err, "failed to get pipeline info")
+		}
+	}
+
+	semanticInputPath := pipelinePath
+	if assetPath != "" {
+		semanticInputPath = assetPath
+	}
+	models, semanticPath, err := loadRepoSemanticModels(fs, pipelineInfo.Config.Path(), semanticInputPath)
+	if err != nil {
+		return "", nil, "", "", nil, errors.Wrap(err, "failed to load repo semantic models")
+	}
+
+	model, ok := models[semanticModelName]
+	if !ok {
+		return "", nil, "", "", nil, errors.Errorf("semantic model %q not found in %s", semanticModelName, semanticPath)
+	}
+
+	semanticQuery, err := semanticQueryFromCommand(c)
+	if err != nil {
+		return "", nil, "", "", nil, err
+	}
+
+	engine, err := semantic.NewEngineWithModels(model, models)
+	if err != nil {
+		return "", nil, "", "", nil, errors.Wrapf(err, "failed to initialize semantic model %q", semanticModelName)
+	}
+	compiledQuery, err := engine.GenerateSQL(semanticQuery)
+	if err != nil {
+		return "", nil, "", "", nil, errors.Wrap(err, "failed to compile semantic query")
+	}
+
+	connName, conn, err := getSemanticQueryConnection(ctx, pipelineInfo, env, connectionName, assetPath != "")
+	if err != nil {
+		return "", nil, "", "", nil, err
+	}
+
+	if assetPath != "" {
+		fetchCtx := semanticQueryContext(ctx, pipelineInfo, startDate, endDate)
+		assetRenderer := newSemanticRenderer(pipelineInfo, vars, startDate, endDate)
+		var extractor query.QueryExtractor = &query.WholeFileExtractor{
+			Fs:       fs,
+			Renderer: assetRenderer,
+		}
+		clonedExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+		if err != nil {
+			return "", nil, "", "", nil, errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+		}
+		extractor = clonedExtractor
+		if clonedRenderer, ok := clonedExtractor.(*query.WholeFileExtractor); ok {
+			if r, ok := clonedRenderer.Renderer.(*jinja.Renderer); ok {
+				for k, v := range vars {
+					r.SetContextValue(k, v)
+				}
+			}
+		}
+		queryStr, err := extractQuery(compiledQuery, extractor)
+		if err != nil {
+			return "", nil, "", "", nil, err
+		}
+
+		return connName, conn, queryStr, pipelineInfo.Asset.Type, pipelineInfo, nil
+	} else {
+		renderer := newSemanticRenderer(pipelineInfo, vars, startDate, endDate)
+		extractor := &query.WholeFileExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
+		queryStr, err := extractQuery(compiledQuery, extractor)
+		if err != nil {
+			return "", nil, "", "", nil, err
+		}
+		return connName, conn, queryStr, "", pipelineInfo, nil
+	}
+}
+
+func getSemanticQueryConnection(ctx context.Context, pipelineInfo *ppInfo, env, connectionName string, hasAsset bool) (string, interface{}, error) {
+	if connectionName != "" {
+		return getConnectionByNameFromPipelineInfoWithContext(ctx, pipelineInfo, env, connectionName)
+	}
+	if hasAsset {
+		return getConnectionFromPipelineInfoWithContext(ctx, pipelineInfo, env)
+	}
+	return "", nil, errors.New("semantic query mode with --pipeline requires --connection")
+}
+
+func loadRepoSemanticModels(fs afero.Fs, configFilePath, inputPath string) (map[string]*semantic.Model, string, error) {
+	semanticRoot := ""
+	if configFilePath != "" {
+		semanticRoot = filepath.Dir(configFilePath)
+	}
+	if semanticRoot == "" {
+		repoRoot, err := git.FindRepoFromPath(inputPath)
+		if err != nil {
+			return nil, "", err
+		}
+		semanticRoot = repoRoot.Path
+	}
+
+	semanticPath := filepath.Join(semanticRoot, "semantic")
+	models, err := semantic.LoadDirFS(fs, semanticPath)
+	if err != nil {
+		return nil, semanticPath, err
+	}
+	return models, semanticPath, nil
+}
+
+func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate time.Time, endDate time.Time) context.Context {
+	fetchCtx := context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
+	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
+	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
+	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
+	fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
+	return fetchCtx
+}
+
+func newSemanticRenderer(pipelineInfo *ppInfo, vars map[string]any, startDate time.Time, endDate time.Time) *jinja.Renderer {
+	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", pipelineInfo.Pipeline.Variables.Value())
+	for k, v := range vars {
+		renderer.SetContextValue(k, v)
+	}
+	return renderer
+}
+
+func semanticQueryFromCommand(c *cli.Command) (*semantic.Query, error) {
+	q := &semantic.Query{}
+
+	for _, raw := range c.StringSlice("dimension") {
+		dim, err := parseSemanticDimensionRef(raw)
+		if err != nil {
+			return nil, err
+		}
+		q.Dimensions = append(q.Dimensions, dim)
+	}
+	q.Metrics = append(q.Metrics, c.StringSlice("metric")...)
+	filters, err := semanticFilterInputs(c.StringSlice("filter"))
+	if err != nil {
+		return nil, err
+	}
+	for _, raw := range filters {
+		var filter semantic.Filter
+		if err := json.Unmarshal([]byte(raw), &filter); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse semantic filter %q", raw)
+		}
+		q.Filters = append(q.Filters, filter)
+	}
+	q.Segments = append(q.Segments, c.StringSlice("segment")...)
+	for _, raw := range c.StringSlice("sort") {
+		sortSpec, err := parseSemanticSortSpec(raw)
+		if err != nil {
+			return nil, err
+		}
+		q.Sort = append(q.Sort, sortSpec)
+	}
+
+	return q, nil
+}
+
+func semanticFilterInputs(rawFilters []string) ([]string, error) {
+	var filters []string
+	var current strings.Builder
+	depth := 0
+	inString := false
+	escaped := false
+
+	for _, raw := range rawFilters {
+		part := strings.TrimSpace(raw)
+		if part == "" {
+			continue
+		}
+
+		if current.Len() > 0 {
+			current.WriteByte(',')
+		}
+		current.WriteString(part)
+
+		for i := range len(part) {
+			ch := part[i]
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' && inString {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = !inString
+				continue
+			}
+			if inString {
+				continue
+			}
+
+			switch ch {
+			case '{', '[':
+				depth++
+			case '}', ']':
+				depth--
+			}
+		}
+
+		if depth < 0 {
+			return nil, errors.Errorf("invalid semantic filter JSON: %s", current.String())
+		}
+		if depth == 0 && !inString {
+			filters = append(filters, current.String())
+			current.Reset()
+		}
+	}
+
+	if current.Len() > 0 || depth != 0 || inString {
+		return nil, errors.Errorf("incomplete semantic filter JSON: %s", current.String())
+	}
+
+	return filters, nil
+}
+
+func parseSemanticDimensionRef(raw string) (semantic.DimensionRef, error) {
+	parts := strings.Split(raw, ":")
+	switch len(parts) {
+	case 1:
+		if strings.TrimSpace(parts[0]) == "" {
+			return semantic.DimensionRef{}, errors.New("semantic dimension name cannot be empty")
+		}
+		return semantic.DimensionRef{Name: strings.TrimSpace(parts[0])}, nil
+	case 2:
+		name := strings.TrimSpace(parts[0])
+		granularity := strings.TrimSpace(parts[1])
+		if name == "" || granularity == "" {
+			return semantic.DimensionRef{}, errors.Errorf("invalid semantic dimension %q: expected name or name:granularity", raw)
+		}
+		return semantic.DimensionRef{Name: name, Granularity: granularity}, nil
+	default:
+		return semantic.DimensionRef{}, errors.Errorf("invalid semantic dimension %q: expected name or name:granularity", raw)
+	}
+}
+
+func parseSemanticSortSpec(raw string) (semantic.SortSpec, error) {
+	parts := strings.Split(raw, ":")
+	switch len(parts) {
+	case 1:
+		name := strings.TrimSpace(parts[0])
+		if name == "" {
+			return semantic.SortSpec{}, errors.New("semantic sort name cannot be empty")
+		}
+		return semantic.SortSpec{Name: name}, nil
+	case 2:
+		name := strings.TrimSpace(parts[0])
+		direction := strings.ToLower(strings.TrimSpace(parts[1]))
+		if name == "" || direction == "" {
+			return semantic.SortSpec{}, errors.Errorf("invalid semantic sort %q: expected name, name:asc, or name:desc", raw)
+		}
+		if direction != "asc" && direction != "desc" {
+			return semantic.SortSpec{}, errors.Errorf("invalid semantic sort direction %q: expected asc or desc", direction)
+		}
+		return semantic.SortSpec{Name: name, Direction: direction}, nil
+	default:
+		return semantic.SortSpec{}, errors.Errorf("invalid semantic sort %q: expected name, name:asc, or name:desc", raw)
+	}
+}
+
 func getConnectionFromConfigWithContext(ctx context.Context, env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
 	repoRoot, err := git.FindRepoFromPath(".")
 	if err != nil {
@@ -584,6 +937,31 @@ func getConnectionFromPipelineInfoWithContext(ctx context.Context, pipelineInfo 
 	connName, err := pipelineInfo.Pipeline.GetConnectionNameForAsset(pipelineInfo.Asset)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to get connection")
+	}
+
+	conn := manager.GetConnection(connName)
+	if conn == nil {
+		return "", nil, &config.MissingConnectionError{
+			Name:            connName,
+			ConfigFilePath:  pipelineInfo.Config.Path(),
+			EnvironmentName: pipelineInfo.Config.SelectedEnvironmentName,
+		}
+	}
+
+	return connName, conn, nil
+}
+
+func getConnectionByNameFromPipelineInfoWithContext(ctx context.Context, pipelineInfo *ppInfo, env string, connName string) (string, interface{}, error) {
+	if env != "" {
+		err := pipelineInfo.Config.SelectEnvironment(env)
+		if err != nil {
+			return "", nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+		}
+	}
+
+	manager, errs := connection.NewManagerFromConfigWithContext(ctx, pipelineInfo.Config)
+	if len(errs) > 0 {
+		return "", nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	conn := manager.GetConnection(connName)
@@ -799,6 +1177,33 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs, con
 	return &ppInfo{
 		Pipeline: foundPipeline,
 		Asset:    task,
+		Config:   cm,
+	}, nil
+}
+
+func GetPipelineForQuery(ctx context.Context, inputPath string, fs afero.Fs, configFilePath string) (*ppInfo, error) {
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if err != nil {
+		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+		return nil, err
+	}
+
+	if configFilePath == "" {
+		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+	}
+	cm, err := config.LoadOrCreate(fs, configFilePath)
+	if err != nil {
+		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
+		return nil, err
+	}
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, inputPath, pipeline.WithMutate())
+	if err != nil {
+		errorPrinter.Println("failed to get the pipeline, are you sure you have referred the right path?")
+		return nil, err
+	}
+
+	return &ppInfo{
+		Pipeline: foundPipeline,
 		Config:   cm,
 	}, nil
 }

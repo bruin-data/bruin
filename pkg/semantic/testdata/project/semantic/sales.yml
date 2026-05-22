@@ -1,0 +1,34 @@
+schema: v1
+name: sales
+label: Sales
+description: Sales analytics model
+source:
+  table: analytics.orders
+
+dimensions:
+  - name: order_date
+    type: time
+    granularities:
+      day: date_trunc('day', order_date)
+      month: date_trunc('month', order_date)
+  - name: country
+    type: string
+  - name: region
+    type: string
+  - name: status
+    type: string
+
+metrics:
+  - name: revenue
+    expression: sum(amount)
+  - name: order_count
+    expression: count(distinct order_id)
+  - name: avg_order_value
+    expression: "{revenue} / {order_count}"
+  - name: completed_revenue
+    expression: sum(amount)
+    filter: "status = 'completed'"
+
+segments:
+  - name: completed
+    filter: "status = 'completed'"

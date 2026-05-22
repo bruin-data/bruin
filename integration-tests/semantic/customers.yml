@@ -1,0 +1,19 @@
+schema: v1
+name: customers
+label: Customers
+description: Customer dimension model used by semantic graph integration tests
+source:
+  table: |
+    (
+      SELECT 101 AS customer_id, 'US' AS country, 'enterprise' AS segment
+      UNION ALL SELECT 102, 'US', 'startup'
+      UNION ALL SELECT 201, 'DE', 'enterprise'
+    ) AS customers
+
+primary_key: customer_id
+
+dimensions:
+  - name: country
+    type: string
+  - name: segment
+    type: string

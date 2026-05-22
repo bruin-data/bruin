@@ -1,0 +1,30 @@
+{
+  "columns": [
+    {
+      "name": "order_date",
+      "type": "TIMESTAMP"
+    },
+    {
+      "name": "revenue",
+      "type": "DECIMAL(38,0)"
+    },
+    {
+      "name": "avg_order_value",
+      "type": "DOUBLE"
+    }
+  ],
+  "rows": [
+    [
+      "2025-01-01T00:00:00Z",
+      150,
+      75
+    ],
+    [
+      "2025-03-01T00:00:00Z",
+      380,
+      190
+    ]
+  ],
+  "connectionName": "duckdb-semantic-query",
+  "query": ""
+}

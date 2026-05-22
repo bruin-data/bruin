@@ -327,6 +327,70 @@ func Test_Builder_ParseGitMetadata(t *testing.T) {
 	assert.Equal(t, commit, pipeline.Commit)
 }
 
+func Test_pipelineBuilder_DoesNotLoadPipelineSemanticModels(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pipeline.yml"), []byte("name: semantic-pipeline\n"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "semantic"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "semantic", "sales.yml"), []byte(`schema: v1
+name: sales
+label: Sales
+description: Sales analytics model
+source:
+  table: analytics.orders
+dimensions:
+  - name: order_date
+    type: time
+    granularities:
+      day: date_trunc('day', order_date)
+  - name: country
+    type: string
+metrics:
+  - name: revenue
+    expression: sum(amount)
+  - name: order_count
+    expression: count(distinct order_id)
+segments:
+  - name: completed
+    filter: "status = 'completed'"
+`), 0o644))
+
+	fs := afero.NewOsFs()
+	builder := pipeline.NewBuilder(pipeline.BuilderConfig{
+		PipelineFileName:    []string{"pipeline.yml"},
+		TasksDirectoryNames: []string{"assets"},
+		TasksFileSuffixes:   []string{"asset.yml", "asset.yaml"},
+	}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil, nil)
+
+	got, err := builder.CreatePipelineFromPath(t.Context(), dir, pipeline.WithMutate())
+	require.NoError(t, err)
+
+	assert.Equal(t, "semantic-pipeline", got.Name)
+}
+
+func Test_pipelineBuilder_IgnoresInvalidPipelineSemanticModels(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pipeline.yml"), []byte("name: semantic-pipeline\n"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "semantic"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "semantic", "broken.yml"), []byte(`name: broken
+source: {}
+`), 0o644))
+
+	fs := afero.NewOsFs()
+	builder := pipeline.NewBuilder(pipeline.BuilderConfig{
+		PipelineFileName:    []string{"pipeline.yml"},
+		TasksDirectoryNames: []string{"assets"},
+		TasksFileSuffixes:   []string{"asset.yml", "asset.yaml"},
+	}, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil, nil)
+
+	got, err := builder.CreatePipelineFromPath(t.Context(), dir, pipeline.WithMutate())
+	require.NoError(t, err)
+	assert.Equal(t, "semantic-pipeline", got.Name)
+}
+
 func TestTask_RelativePathToPipelineRoot(t *testing.T) {
 	t.Parallel()
 
