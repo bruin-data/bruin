@@ -65,9 +65,9 @@ columns:
   - name: privacy_info
     type: STRING
     description: Privacy information as JSON
-  - name: event_server_timestamp_offset
+  - name: event_server_ts_offset_seconds
     type: FLOAT64
-    description: The difference between the event timestamp and the server timestamp (milliseconds).
+    description: The difference between the event timestamp and the server timestamp, in seconds.
   - name: event_value_in_usd
     type: FLOAT64
     description: The value of the event in USD.

@@ -34,7 +34,7 @@ select
   lower(lax_string(device.advertising_id)) as idfa,
   lower(lax_string(device.vendor_id)) as idfv,
   struct(
-    lax_string(device.advertising_id) as advertising_id,
+    lower(lax_string(device.advertising_id)) as advertising_id,
     lax_string(device.browser) as browser,
     lax_string(device.browser_version) as browser_version,
     lax_string(device.category) as category,
@@ -47,7 +47,7 @@ select
     lax_string(device.operating_system) as operating_system,
     lax_string(device.operating_system_version) as operating_system_version,
     lax_int64(device.device_time_zone_offset) as device_time_zone_offset,
-    lax_string(device.vendor_id) as vendor_id,
+    lower(lax_string(device.vendor_id)) as vendor_id,
     lax_string(device.web_info) as web_info
   ) as device,
   struct(
@@ -63,7 +63,7 @@ select
     lax_string(privacy_info.analytics_storage) as analytics_storage,
     lax_string(privacy_info.uses_transient_token) as uses_transient_token
   ) as privacy_info,
-  event_server_timestamp_offset,
+  event_server_ts_offset_seconds,
 
   -- FIREBASE
   lax_string(event_params.firebase_screen) as screen,
