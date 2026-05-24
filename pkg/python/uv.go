@@ -242,18 +242,13 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 	u.binaryFullPath = binaryFullPath
 
-	// uv tool run uses the mutable installed tool environment, so keep the
-	// matching install and run in one critical section.
-	ingestrInstallMutex.Lock()
-	defer ingestrInstallMutex.Unlock()
-
-	if err := u.ensureIngestrInstalledLocked(ctx, extraPackages, repo); err != nil {
+	if err := u.ensureIngestrInstalled(ctx, extraPackages, repo); err != nil {
 		return err
 	}
 
 	noDependencyCommand := &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: ingestrRunCmd(args),
+		Args: u.ingestrRunCmd(ctx, extraPackages, args),
 		EnvVars: map[string]string{
 			"PYTHONUNBUFFERED": "1",
 		},
@@ -526,17 +521,12 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		ingestrCtx = context.WithValue(ctx, executor.KeyPrinter, io.Writer(logBuffer))
 	}
 
-	// uv tool run uses the mutable installed tool environment, so keep the
-	// matching install and run in one critical section.
-	ingestrInstallMutex.Lock()
-	defer ingestrInstallMutex.Unlock()
-
-	err = u.ensureIngestrInstalledLocked(ctx, extraPackages, execCtx.repo)
+	err = u.ensureIngestrInstalled(ctx, extraPackages, execCtx.repo)
 	if err != nil {
 		return err
 	}
 
-	runArgs := ingestrRunCmd(cmdArgs)
+	runArgs := u.ingestrRunCmd(ctx, extraPackages, cmdArgs)
 
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
 		boolVal := debug.(*bool)
@@ -605,9 +595,14 @@ func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string, f
 	return cmdline
 }
 
-func ingestrRunCmd(args []string) []string {
-	cmdline := make([]string, 0, 8+len(args))
-	cmdline = append(cmdline, "tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr")
+func (u *UvPythonRunner) ingestrRunCmd(ctx context.Context, extraPackages, args []string) []string {
+	ingestrPackageName, _ := u.ingestrPackage(ctx)
+	cmdline := make([]string, 0, 10+(2*len(extraPackages))+len(args))
+	cmdline = append(cmdline, "tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "--from", ingestrPackageName)
+	for _, pkg := range extraPackages {
+		cmdline = append(cmdline, "--with", pkg)
+	}
+	cmdline = append(cmdline, "ingestr")
 	return append(cmdline, args...)
 }
 
@@ -624,14 +619,10 @@ func (u *UvPythonRunner) buildIngestrPackageKey(ctx context.Context, extraPackag
 // It prevents parallel workers from installing ingestr simultaneously, which causes file lock
 // conflicts on Windows (OS error 32).
 func (u *UvPythonRunner) ensureIngestrInstalled(ctx context.Context, extraPackages []string, repo *git.Repo) error {
+	packageKey := u.buildIngestrPackageKey(ctx, extraPackages)
+
 	ingestrInstallMutex.Lock()
 	defer ingestrInstallMutex.Unlock()
-
-	return u.ensureIngestrInstalledLocked(ctx, extraPackages, repo)
-}
-
-func (u *UvPythonRunner) ensureIngestrInstalledLocked(ctx context.Context, extraPackages []string, repo *git.Repo) error {
-	packageKey := u.buildIngestrPackageKey(ctx, extraPackages)
 
 	_, isLocal := u.ingestrPackage(ctx)
 	if !isLocal {
