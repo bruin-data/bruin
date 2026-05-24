@@ -205,29 +205,19 @@ func Test_ingestrPackage_HonorsCtxIngestrVersion(t *testing.T) {
 	assert.True(t, isLocal)
 }
 
-func Test_ingestrRunCmd_UsesResolvedPackageInIsolatedRun(t *testing.T) {
+func Test_ingestrRunCmd_UsesInstalledTool(t *testing.T) {
 	t.Parallel()
 
-	u := &UvPythonRunner{}
-	ctx := context.WithValue(t.Context(), CtxIngestrVersion, "0.14.155")
-
-	args := u.ingestrRunCmd(ctx, []string{"pyodbc", "duckdb"}, []string{"ingest", "--source-uri", "csv:///tmp/seed.csv"})
+	args := ingestrRunCmd([]string{"ingest", "--source-uri", "csv:///tmp/seed.csv"})
 
 	assert.Equal(t, []string{
 		"tool",
 		"run",
 		"--no-config",
-		"--isolated",
 		"--prerelease",
 		"allow",
 		"--python",
 		"3.11",
-		"--from",
-		"ingestr@0.14.155",
-		"--with",
-		"pyodbc",
-		"--with",
-		"duckdb",
 		"ingestr",
 		"ingest",
 		"--source-uri",
