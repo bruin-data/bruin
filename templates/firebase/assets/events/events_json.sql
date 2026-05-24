@@ -3,8 +3,8 @@
 type: bq.sql
 description: |
   Flattened events table with JSON fields.
-  This table is partitioned by date and clustered by event_name.
-  This table can be used for ad-hoc analysis and should not be used for reporting.
+  Partitioned by dt, clustered by event_name + user_pseudo_id.
+  Thin materialized window over events.stg_events (all parsing logic lives there).
 
 materialization:
   type: table
@@ -17,8 +17,7 @@ materialization:
   time_granularity: date
 
 depends:
-  - analytics_123456789.parse_version # TODO: Change 123456789 to your analytics ID
-  - analytics_123456789.events # TODO: If you need intraday, use the events_intraday table instead
+  - events.stg_events
 
 columns:
   - name: app
@@ -46,17 +45,17 @@ columns:
   - name: app_version
     type: STRING
     description: >
-      The cleaned app version, suitable for comparisons like >= or sorting. To standardize the version, we use 3 digits for each part of the version. 
+      The cleaned app version, suitable for comparisons like >= or sorting. To standardize the version, we use 3 digits for each part of the version.
       Ex value: 1.20.3 -> 001.020.003
   - name: event_params
     type: STRING
-    description: Parameters specific to each event, independent of others. In the free version, you are limited to 20 parameters per event, with string values capped at 100 characters each.
+    description: JSON-encoded event parameter map.
   - name: user_properties
     type: STRING
-    description: User properties are characteristics that define segments of your user base, such as language or location. These properties persist across subsequent events unless modified. In the free version, you are limited to assigning 20 user properties per user.
+    description: JSON-encoded user properties (excludes user_id and firebase_exp_*/_ltv_*).
   - name: experiments
     type: ARRAY<STRUCT<id INT64, value INT64>>
-    description: List of all the active experiments for the user. It's extracted from user_properties.
+    description: Active Firebase experiments for the user (extracted from user_properties).
   - name: device
     type: STRING
     description: Device information as JSON
@@ -68,73 +67,13 @@ columns:
     description: Privacy information as JSON
   - name: event_server_timestamp_offset
     type: FLOAT64
-    description: The difference between the event timestamp and the server timestamp.
+    description: The difference between the event timestamp and the server timestamp (milliseconds).
   - name: event_value_in_usd
     type: FLOAT64
     description: The value of the event in USD.
 
 @bruin */
 
-SELECT 
-    app_info.id as app,
-    platform,
-    PARSE_DATE('%Y%m%d', event_date) as dt,
-    TIMESTAMP_MICROS(event_timestamp) as ts,
-    TIMESTAMP_MICROS(user_first_touch_timestamp) as user_first_touch_ts,
-    user_pseudo_id,
-    user_id,
-    lower(event_name) as event_name,
-    analytics_123456789.parse_version(app_info.version) as app_version, -- TODO: Change 123456789 to your analytics ID
-    (
-      select 
-        case when array_length(keys) > 0 then json_object(keys, vals) end 
-      from (
-        select
-            array_agg(p.key) as keys,
-            array_agg(coalesce(
-              p.value.string_value, 
-              cast(p.value.int_value as string), 
-              cast(coalesce(p.value.double_value, p.value.float_value) as string)
-            )) as vals
-          from unnest(event_params) as p 
-      )
-    ) as event_params,
-    (
-      select case when array_length(keys) > 0 then json_object(keys, vals) end 
-      from (
-          select
-            array_agg(p.key) as keys, 
-            array_agg(coalesce(
-              p.value.string_value,
-              cast(p.value.int_value as string),
-              cast(coalesce(p.value.double_value, p.value.float_value) as string)
-            )) as vals
-          from unnest(user_properties) as p 
-          where not starts_with(p.key, '_ltv')
-            and not starts_with(p.key, 'firebase_exp')
-            and p.key not in ("user_id", "first_open_time")
-      )
-    ) as user_properties,
-    (
-      select array_agg(struct(
-        safe_cast(replace(key, "firebase_exp_", "") as int64) as id, 
-        safe_cast(value.string_value as int64) as value
-      ))
-      from unnest(user_properties) where key like 'firebase_exp%'
-    ) as experiments,
-    to_json(geo) as geo,
-    to_json((
-      select as struct device.* except(is_limited_ad_tracking, time_zone_offset_seconds),
-        CASE lower(device.is_limited_ad_tracking)
-          WHEN 'yes' THEN True
-          WHEN 'no' THEN False
-        END as is_limited_ad_tracking,
-        device.time_zone_offset_seconds / 3600 as device_time_zone_offset,
-    )) as device,
-    to_json(privacy_info) as privacy_info,
-    event_server_timestamp_offset / 1000000 as event_server_timestamp_offset,
-    event_value_in_usd,
-from `analytics_123456789.events_*` --TODO: Change 123456789 to your analytics ID
-where true
-  -- Filter by date range
-  and replace(_TABLE_SUFFIX, 'intraday_', '') between greatest('{{ start_date_nodash }}', '20200101') and least('{{ end_date_nodash }}', '21000101')
+SELECT *
+FROM `events.stg_events`
+WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
