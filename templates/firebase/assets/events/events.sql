@@ -4,13 +4,19 @@ name: events.events
 type: bq.sql
 materialization:
     type: view
-description:
-    The events table contains all events and parameters from the Firebase Analytics export.
-    The underlying table is partitioned by date and clustered by event_name.
-    This table is used for ad-hoc analysis and is not used for reporting.
+description: |
+  Categorized events view. Unions materialized history (events_json) with live intraday
+  (stg_events where dt > end_date) for near-real-time coverage without re-scanning history.
 depends:
   - events.events_json
+  - events.stg_events
 @bruin */
+
+with base as (
+  select * from `events.events_json` where dt <= '{{ end_date }}'
+  union all
+  select * from `events.stg_events`  where dt >  '{{ end_date }}'
+)
 
 select
   app,
@@ -24,9 +30,11 @@ select
   app_version,
   event_params,
   user_properties,
-  if(array_length(experiments) > 0, (select json_object(array_agg(e.id), array_agg(e.value)) from unnest(experiments) as e), JSON "{}") as experiments,
+  if(array_length(experiments) > 0, (select json_object(array_agg(cast(e.id as string)), array_agg(e.value)) from unnest(experiments) as e), JSON "{}") as experiments,
+  lower(lax_string(device.advertising_id)) as idfa,
+  lower(lax_string(device.vendor_id)) as idfv,
   struct(
-    lax_string(device.advertising_id) as advertising_id,
+    lower(lax_string(device.advertising_id)) as advertising_id,
     lax_string(device.browser) as browser,
     lax_string(device.browser_version) as browser_version,
     lax_string(device.category) as category,
@@ -39,7 +47,7 @@ select
     lax_string(device.operating_system) as operating_system,
     lax_string(device.operating_system_version) as operating_system_version,
     lax_int64(device.device_time_zone_offset) as device_time_zone_offset,
-    lax_string(device.vendor_id) as vendor_id,
+    lower(lax_string(device.vendor_id)) as vendor_id,
     lax_string(device.web_info) as web_info
   ) as device,
   struct(
@@ -55,7 +63,7 @@ select
     lax_string(privacy_info.analytics_storage) as analytics_storage,
     lax_string(privacy_info.uses_transient_token) as uses_transient_token
   ) as privacy_info,
-  event_server_timestamp_offset,
+  event_server_ts_offset_seconds,
 
   -- FIREBASE
   lax_string(event_params.firebase_screen) as screen,
@@ -64,6 +72,7 @@ select
   lax_string(event_params.firebase_previous_class) as previous_screen_class,
   lax_int64(event_params.ga_session_id) as session_id,
   lax_int64(event_params.ga_session_number) as session_number,
+  lax_int64(event_params.ga_dedupe_id) as ga_dedupe_id,
   lax_int64(event_params.engaged_session_event) as engaged_session_event,
   lax_int64(event_params.engagement_time_msec) / 1000 as engagement_time_sec,
   lax_string(event_params.firebase_event_origin) as event_origin,
@@ -74,6 +83,7 @@ select
   lax_int64(event_params.update_with_analytics) as update_with_analytics,
   lax_int64(event_params.system_app) as system_app,
   lax_int64(event_params.system_app_update) as system_app_update,
+  lax_int64(event_params.debug_event) as debug_event,
   lax_string(event_params.source) as source,
   lax_string(event_params.campaign_info_source) as campaign_info_source,
   lax_string(event_params.medium) as medium,
@@ -85,21 +95,14 @@ select
   lax_string(event_params.error_value) as error_value,
   lax_string(event_params.term) as term,
 
-  -- AD IMPRESSIONS
+  -- ADS
   lax_string(event_params.ad_format) as ad_format,
   lax_float64(event_params.value) as value,
   event_value_in_usd,
 
-  --TODO: add other parameters and properties specific to your app
+  -- USER PROPERTIES
+  timestamp_millis(lax_int64(user_properties.first_open_time)) as user_first_open_ts
 
-  -- ALTERNATIVE 1:
-  -- lax_int64(event_params.level) as level,
-  -- lax_string(event_params.result) as result,
+  --TODO: add parameters and properties specific to your app (IAP product_id/price/quantity/currency, level, tutorial_step, custom currencies, etc.)
 
-  -- ALTERNATIVE 2:
-  -- struct(
-  --   lax_int64(event_params.level) as level,
-  --   lax_string(event_params.result) as result,
-  -- ) as progression
-
-from `events.events_json` 
+from base

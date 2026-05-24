@@ -8,7 +8,7 @@ materialization:
     - user_id
 
 depends:
-  - user_model.users_daily
+  - user_model.stg_users_daily
 
 description:
   The users table contains user-level metrics and dimensions.
@@ -89,7 +89,7 @@ t1 as
       {%- endfor %}
     ) order by dt) as daily_metrics,
 
-  from `user_model.users_daily`
+  from `user_model.stg_users_daily`
   group by 1
 )
 select * except(daily_metrics),
