@@ -471,10 +471,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		return "", nil, "", "", nil, err
 	}
 
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, "your-pipeline-name", "your-run-id", nil)
-	for k, v := range vars {
-		renderer.SetContextValue(k, v)
-	}
+	renderer := newQueryRenderer(startDate, endDate, "your-pipeline-name", vars, "")
 	extractor := &query.WholeFileExtractor{
 		Fs:       fs,
 		Renderer: renderer,
@@ -508,10 +505,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 		fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
 		// Auto-detect mode (both asset path and query)
-		autoRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil)
-		for k, v := range vars {
-			autoRenderer.SetContextValue(k, v)
-		}
+		autoRenderer := newQueryRenderer(startDate, endDate, pipelineInfo.Pipeline.Name, vars, pipelineMacroContent(pipelineInfo.Pipeline))
 		extractor = &query.WholeFileExtractor{
 			Fs:       fs,
 			Renderer: autoRenderer,
@@ -552,10 +546,7 @@ func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs, var
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 	fetchCtx = context.WithValue(fetchCtx, config.EnvironmentContextKey, pipelineInfo.Config.SelectedEnvironment)
-	assetRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", nil)
-	for k, v := range vars {
-		assetRenderer.SetContextValue(k, v)
-	}
+	assetRenderer := newQueryRenderer(startDate, endDate, pipelineInfo.Pipeline.Name, vars, pipelineMacroContent(pipelineInfo.Pipeline))
 	extractor = &query.WholeFileExtractor{
 		Fs:       fs,
 		Renderer: assetRenderer,
@@ -723,11 +714,33 @@ func semanticQueryContext(ctx context.Context, pipelineInfo *ppInfo, startDate t
 }
 
 func newSemanticRenderer(pipelineInfo *ppInfo, vars map[string]any, startDate time.Time, endDate time.Time) *jinja.Renderer {
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", pipelineInfo.Pipeline.Variables.Value())
+	renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pipelineInfo.Pipeline.Name, "your-run-id", pipelineInfo.Pipeline.Variables.Value(), pipelineMacroContent(pipelineInfo.Pipeline))
 	for k, v := range vars {
 		renderer.SetContextValue(k, v)
 	}
 	return renderer
+}
+
+func newQueryRenderer(startDate, endDate time.Time, pipelineName string, vars map[string]any, macroContent string) *jinja.Renderer {
+	renderer := jinja.NewRendererWithStartEndDatesAndMacros(&startDate, &endDate, &defaultExecutionDate, pipelineName, "your-run-id", nil, macroContent)
+	for k, v := range vars {
+		renderer.SetContextValue(k, v)
+	}
+	return renderer
+}
+
+func pipelineMacroContent(pl *pipeline.Pipeline) string {
+	if pl == nil || len(pl.Macros) == 0 {
+		return ""
+	}
+
+	var macroContent strings.Builder
+	for _, macro := range pl.Macros {
+		macroContent.WriteString(string(macro))
+		macroContent.WriteString("\n")
+	}
+
+	return macroContent.String()
 }
 
 func semanticQueryFromCommand(c *cli.Command) (*semantic.Query, error) {
