@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -505,6 +507,46 @@ metrics:
 	assert.Equal(t, filepath.Join(projectDir, "semantic"), semanticPath)
 	assert.Contains(t, models, "orders")
 	assert.NotContains(t, models, "root_orders")
+}
+
+func TestQueryRendererRendersPipelineMacroWithListArgument(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC)
+	pl := &pipeline.Pipeline{
+		Name: "issue_758",
+		Macros: []pipeline.Macro{
+			`{% macro generate_surrogate_key(columns) -%}
+MD5(CONCAT_WS('||',
+    {%- for col in columns %}
+        CAST({{ col }} AS VARCHAR)
+        {%- if not loop.last %}, {% endif %}
+    {%- endfor %}
+))
+{%- endmacro %}`,
+		},
+	}
+	asset := &pipeline.Asset{Name: "issue_758.game_team"}
+	renderer := newQueryRenderer(now, now, pl.Name, nil, pipelineMacroContent(pl))
+	extractor := &query.WholeFileExtractor{
+		Fs:       afero.NewMemMapFs(),
+		Renderer: renderer,
+	}
+
+	runCtx := context.WithValue(context.Background(), pipeline.RunConfigStartDate, now)
+	runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, now)
+	runCtx = context.WithValue(runCtx, pipeline.RunConfigExecutionDate, now)
+	runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "test-run")
+
+	clonedExtractor, err := extractor.CloneForAsset(runCtx, pl, asset)
+	require.NoError(t, err)
+
+	queries, err := clonedExtractor.ExtractQueriesFromString(`select
+  {{ generate_surrogate_key(['team.game_id', 'team.team_id']) }} as game_team_id`)
+	require.NoError(t, err)
+	require.Len(t, queries, 1)
+	assert.Contains(t, queries[0].Query, "CAST(team.game_id AS VARCHAR)")
+	assert.Contains(t, queries[0].Query, "CAST(team.team_id AS VARCHAR)")
 }
 
 // MockMSSQLDB implements the Limiter interface like mssql.DB does.

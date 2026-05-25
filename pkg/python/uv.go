@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -243,18 +242,13 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 	u.binaryFullPath = binaryFullPath
 
-	err = u.ensureIngestrInstalled(ctx, extraPackages, repo)
-	if err != nil {
+	if err := u.ensureIngestrInstalled(ctx, extraPackages, repo); err != nil {
 		return err
 	}
 
-	flags := make([]string, 0, 8+len(args))
-	flags = append(flags, "tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr")
-	flags = append(flags, args...)
-
 	noDependencyCommand := &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: flags,
+		Args: u.ingestrRunCmd(ctx, extraPackages, args),
 		EnvVars: map[string]string{
 			"PYTHONUNBUFFERED": "1",
 		},
@@ -532,7 +526,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return err
 	}
 
-	runArgs := slices.Concat([]string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
+	runArgs := u.ingestrRunCmd(ctx, extraPackages, cmdArgs)
 
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
 		boolVal := debug.(*bool)
@@ -599,6 +593,17 @@ func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string, f
 	}
 	cmdline = append(cmdline, ingestrPackageName)
 	return cmdline
+}
+
+func (u *UvPythonRunner) ingestrRunCmd(ctx context.Context, extraPackages, args []string) []string {
+	ingestrPackageName, _ := u.ingestrPackage(ctx)
+	cmdline := make([]string, 0, 10+(2*len(extraPackages))+len(args))
+	cmdline = append(cmdline, "tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "--from", ingestrPackageName)
+	for _, pkg := range extraPackages {
+		cmdline = append(cmdline, "--with", pkg)
+	}
+	cmdline = append(cmdline, "ingestr")
+	return append(cmdline, args...)
 }
 
 // buildIngestrPackageKey creates a unique key for the combination of ingestr version and extra packages.
