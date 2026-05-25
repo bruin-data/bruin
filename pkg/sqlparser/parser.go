@@ -67,19 +67,22 @@ func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, err
 
 func newSQLParserInternal(tmpDirName string, randomize bool, maxQueryLength int) (*SQLParser, error) {
 	tmpDir := filepath.Join(os.TempDir(), tmpDirName)
-	recreate := randomize // only recreate when using random dirs (production); reuse for cached dirs
+	withHashInDir := randomize // only use hash-suffixed dirs for randomized parser instances; reuse cached dirs.
 
-	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", recreate)
+	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", withHashInDir)
 	if err != nil {
 		return nil, err
 	}
-	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, tmpDir+"-sqlglot-lib", recreate)
+	sqlglotDir, err := embed_util.NewEmbeddedFilesWithTmpDir(data.Data, tmpDir+"-sqlglot-lib", withHashInDir)
 	if err != nil {
 		return nil, err
 	}
 	ep.AddPythonPath(sqlglotDir.GetExtractedPath())
 
-	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, tmpDir+"-jinja2-renderer", recreate)
+	// Keep the parser source content-hashed so cached parser instances cannot reuse
+	// stale Python code after pythonsrc changes. This directory is small compared to
+	// the embedded Python/runtime directories above.
+	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, tmpDir+"-jinja2-renderer", true)
 	if err != nil {
 		return nil, err
 	}
@@ -340,17 +343,22 @@ type QueryConfig struct {
 }
 
 var assetTypeDialectMap = map[pipeline.AssetType]string{
-	pipeline.AssetTypeBigqueryQuery:   "bigquery",
-	pipeline.AssetTypeSnowflakeQuery:  "snowflake",
-	pipeline.AssetTypePostgresQuery:   "postgres",
-	pipeline.AssetTypeMySQLQuery:      "mysql",
-	pipeline.AssetTypeRedshiftQuery:   "redshift",
-	pipeline.AssetTypeAthenaQuery:     "athena",
-	pipeline.AssetTypeClickHouse:      "clickhouse",
-	pipeline.AssetTypeDatabricksQuery: "databricks",
-	pipeline.AssetTypeMsSQLQuery:      "tsql",
-	pipeline.AssetTypeSynapseQuery:    "tsql",
-	pipeline.AssetTypeDuckDBQuery:     "duckdb",
+	pipeline.AssetTypeBigqueryQuery:     "bigquery",
+	pipeline.AssetTypeSnowflakeQuery:    "snowflake",
+	pipeline.AssetTypePostgresQuery:     "postgres",
+	pipeline.AssetTypeMySQLQuery:        "mysql",
+	pipeline.AssetTypeRedshiftQuery:     "redshift",
+	pipeline.AssetTypeAthenaQuery:       "athena",
+	pipeline.AssetTypeTrinoQuery:        "trino",
+	pipeline.AssetTypeClickHouse:        "clickhouse",
+	pipeline.AssetTypeDatabricksQuery:   "databricks",
+	pipeline.AssetTypeMsSQLQuery:        "tsql",
+	pipeline.AssetTypeSynapseQuery:      "tsql",
+	pipeline.AssetTypeDuckDBQuery:       "duckdb",
+	pipeline.AssetTypeOracleQuery:       "oracle",
+	pipeline.AssetTypeFabricQuery:       "fabric",
+	pipeline.AssetTypeFabricQueryLegacy: "fabric",
+	pipeline.AssetTypeVerticaQuery:      "postgres",
 }
 
 func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {

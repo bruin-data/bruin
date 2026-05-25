@@ -6,6 +6,13 @@ from sqlglot.optimizer import optimize
 from sqlglot.optimizer.scope import find_all_in_scope, build_scope
 
 
+def normalize_sqlglot_dialect(dialect: str | None) -> str | None:
+    """Map Bruin dialect names that SQLGlot does not expose directly."""
+    if dialect == "vertica":
+        return "postgres"
+    return dialect
+
+
 @dataclass(frozen=True)
 class Column:
     name: str
@@ -238,6 +245,8 @@ def get_tables_tsql(query: str):
 
 
 def get_tables(query: str, dialect: str):
+    dialect = normalize_sqlglot_dialect(dialect)
+
     # Delegate to T-SQL specific implementation if dialect is tsql
     if dialect == "tsql":
         return get_tables_tsql(query)
@@ -266,6 +275,8 @@ def get_tables(query: str, dialect: str):
 
 
 def get_column_lineage(query: str, schema: dict, dialect: str):
+    dialect = normalize_sqlglot_dialect(dialect)
+
     try:
         parsed = parse_one(query, dialect=dialect)
         if not isinstance(parsed, exp.Query):
@@ -497,6 +508,8 @@ def schema_dict_to_schema_object(schema_dict: dict) -> dict:
 def replace_table_references(
     query: str, dialect: str, table_references: dict[str, str]
 ):
+    dialect = normalize_sqlglot_dialect(dialect)
+
     parsed = parse_one(query, dialect=dialect)
     if parsed is None:
         return {"error": "unable to parse query"}
@@ -510,6 +523,8 @@ def replace_table_references(
 
 
 def add_limit(query: str, limit_value: int, dialect: str = None) -> dict:
+    dialect = normalize_sqlglot_dialect(dialect)
+
     try:
         parsed = parse_one(query, dialect=dialect)
         if parsed is None:
@@ -522,6 +537,8 @@ def add_limit(query: str, limit_value: int, dialect: str = None) -> dict:
 
 
 def is_single_select_query(query: str, dialect: str = None) -> dict:
+    dialect = normalize_sqlglot_dialect(dialect)
+
     """
     Check if a query is a single SELECT statement.
     Returns {"is_single_select": bool, "error": str}

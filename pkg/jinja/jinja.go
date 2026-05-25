@@ -68,6 +68,7 @@ func LoadMacros(fs afero.Fs, macrosPath string) (string, error) {
 }
 
 func NewRenderer(context Context) *Renderer {
+	addBuiltinFunctions(context)
 	return &Renderer{
 		context:         exec.NewContext(context),
 		queryRenderLock: &sync.Mutex{},
@@ -75,8 +76,16 @@ func NewRenderer(context Context) *Renderer {
 	}
 }
 
+// addBuiltinFunctions ensures built-in SQL helper functions are available in the given context if not already set.
+func addBuiltinFunctions(ctx Context) {
+	if _, ok := ctx["bruin"]; !ok {
+		ctx["bruin"] = BuiltinFunctions()
+	}
+}
+
 // NewRendererWithMacros creates a new Renderer with the given context and macro content.
 func NewRendererWithMacros(context Context, macroContent string) *Renderer {
+	addBuiltinFunctions(context)
 	return &Renderer{
 		context:         exec.NewContext(context),
 		queryRenderLock: &sync.Mutex{},
@@ -156,6 +165,7 @@ func defaultContext(startDate, endDate, executionDate *time.Time, pipelineName, 
 		"full_refresh":          fullRefresh,
 		"commit_hash":           "",
 		"schema_prefix":         "",
+		"bruin":                 BuiltinFunctions(),
 	}
 }
 
@@ -283,6 +293,9 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		jinjaContext["schema_prefix"] = env.SchemaPrefix
 	}
 
+	// Override built-in functions with platform-specific variants for this asset.
+	jinjaContext["bruin"] = BuiltinFunctions(PlatformForAssetType(asset.Type))
+
 	return &Renderer{
 		context:         exec.NewContext(jinjaContext),
 		queryRenderLock: &sync.Mutex{},
@@ -321,6 +334,102 @@ func findParserErrorType(err error) string {
 	}
 
 	return ""
+}
+
+// assetTypePlatform maps asset types directly to their SQL generation platform.
+var assetTypePlatform = map[pipeline.AssetType]Platform{
+	pipeline.AssetTypeBigqueryQuery:       PlatformBigQuery,
+	pipeline.AssetTypeBigqueryTableSensor: PlatformBigQuery,
+	pipeline.AssetTypeBigquerySeed:        PlatformBigQuery,
+	pipeline.AssetTypeBigquerySource:      PlatformBigQuery,
+	pipeline.AssetTypeBigqueryQuerySensor: PlatformBigQuery,
+
+	pipeline.AssetTypeSnowflakeQuery:       PlatformSnowflake,
+	pipeline.AssetTypeSnowflakeQuerySensor: PlatformSnowflake,
+	pipeline.AssetTypeSnowflakeTableSensor: PlatformSnowflake,
+	pipeline.AssetTypeSnowflakeSeed:        PlatformSnowflake,
+	pipeline.AssetTypeSnowflakeSource:      PlatformSnowflake,
+
+	pipeline.AssetTypePostgresQuery:       PlatformPostgres,
+	pipeline.AssetTypePostgresSeed:        PlatformPostgres,
+	pipeline.AssetTypePostgresQuerySensor: PlatformPostgres,
+	pipeline.AssetTypePostgresTableSensor: PlatformPostgres,
+	pipeline.AssetTypePostgresSource:      PlatformPostgres,
+
+	pipeline.AssetTypeRedshiftQuery:       PlatformRedshift,
+	pipeline.AssetTypeRedshiftSeed:        PlatformRedshift,
+	pipeline.AssetTypeRedshiftQuerySensor: PlatformRedshift,
+	pipeline.AssetTypeRedshiftSource:      PlatformRedshift,
+	pipeline.AssetTypeRedshiftTableSensor: PlatformRedshift,
+
+	pipeline.AssetTypeMySQLQuery:       PlatformMySQL,
+	pipeline.AssetTypeMySQLSeed:        PlatformMySQL,
+	pipeline.AssetTypeMySQLQuerySensor: PlatformMySQL,
+	pipeline.AssetTypeMySQLTableSensor: PlatformMySQL,
+
+	pipeline.AssetTypeDuckDBQuery:       PlatformDuckDB,
+	pipeline.AssetTypeDuckDBSeed:        PlatformDuckDB,
+	pipeline.AssetTypeDuckDBQuerySensor: PlatformDuckDB,
+	pipeline.AssetTypeDuckDBSource:      PlatformDuckDB,
+	pipeline.AssetTypeMotherduckQuery:   PlatformDuckDB,
+
+	pipeline.AssetTypeDatabricksQuery:       PlatformDatabricks,
+	pipeline.AssetTypeDatabricksSeed:        PlatformDatabricks,
+	pipeline.AssetTypeDatabricksQuerySensor: PlatformDatabricks,
+	pipeline.AssetTypeDatabricksSource:      PlatformDatabricks,
+	pipeline.AssetTypeDatabricksTableSensor: PlatformDatabricks,
+
+	pipeline.AssetTypeMsSQLQuery:       PlatformMSSQL,
+	pipeline.AssetTypeMsSQLSeed:        PlatformMSSQL,
+	pipeline.AssetTypeMsSQLQuerySensor: PlatformMSSQL,
+	pipeline.AssetTypeMsSQLTableSensor: PlatformMSSQL,
+	pipeline.AssetTypeMsSQLSource:      PlatformMSSQL,
+
+	pipeline.AssetTypeClickHouse:            PlatformClickhouse,
+	pipeline.AssetTypeClickHouseSeed:        PlatformClickhouse,
+	pipeline.AssetTypeClickHouseQuerySensor: PlatformClickhouse,
+	pipeline.AssetTypeClickHouseTableSensor: PlatformClickhouse,
+	pipeline.AssetTypeClickHouseSource:      PlatformClickhouse,
+
+	pipeline.AssetTypeAthenaQuery:       PlatformAthena,
+	pipeline.AssetTypeAthenaSeed:        PlatformAthena,
+	pipeline.AssetTypeAthenaSQLSensor:   PlatformAthena,
+	pipeline.AssetTypeAthenaTableSensor: PlatformAthena,
+	pipeline.AssetTypeAthenaSource:      PlatformAthena,
+
+	pipeline.AssetTypeTrinoQuery:       PlatformTrino,
+	pipeline.AssetTypeTrinoQuerySensor: PlatformTrino,
+
+	pipeline.AssetTypeSynapseQuery:       PlatformSynapse,
+	pipeline.AssetTypeSynapseSeed:        PlatformSynapse,
+	pipeline.AssetTypeSynapseQuerySensor: PlatformSynapse,
+	pipeline.AssetTypeSynapseSource:      PlatformSynapse,
+
+	pipeline.AssetTypeOracleQuery:  PlatformOracle,
+	pipeline.AssetTypeOracleSource: PlatformOracle,
+
+	pipeline.AssetTypeFabricQuery:             PlatformFabric,
+	pipeline.AssetTypeFabricSeed:              PlatformFabric,
+	pipeline.AssetTypeFabricQuerySensor:       PlatformFabric,
+	pipeline.AssetTypeFabricTableSensor:       PlatformFabric,
+	pipeline.AssetTypeFabricQueryLegacy:       PlatformFabric,
+	pipeline.AssetTypeFabricSeedLegacy:        PlatformFabric,
+	pipeline.AssetTypeFabricQuerySensorLegacy: PlatformFabric,
+	pipeline.AssetTypeFabricTableSensorLegacy: PlatformFabric,
+
+	pipeline.AssetTypeVerticaQuery:       PlatformVertica,
+	pipeline.AssetTypeVerticaSeed:        PlatformVertica,
+	pipeline.AssetTypeVerticaQuerySensor: PlatformVertica,
+	pipeline.AssetTypeVerticaTableSensor: PlatformVertica,
+	pipeline.AssetTypeVerticaSource:      PlatformVertica,
+}
+
+// PlatformForAssetType resolves the SQL generation platform for the given asset type.
+func PlatformForAssetType(assetType pipeline.AssetType) Platform {
+	if p, ok := assetTypePlatform[assetType]; ok {
+		return p
+	}
+	return PlatformDefault
 }
 
 // this ugly interface is needed to avoid circular dependencies and the ability to create different renderer instances per asset.
