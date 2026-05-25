@@ -813,11 +813,11 @@ func TestIndividualTasks(t *testing.T) {
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline/expectations/expected-country.csv")),
+					CSVFile:  filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline/expectations/expected-country.csv"),
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
-					e2e.AssertByOutputString,
+					e2e.AssertByCSV,
 				},
 			},
 		},
@@ -842,11 +842,11 @@ func TestIndividualTasks(t *testing.T) {
 				Env: []string{},
 				Expected: e2e.Output{
 					ExitCode: 0,
-					Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline/expectations/expected-customer-country.csv")),
+					CSVFile:  filepath.Join(currentFolder, "test-pipelines/semantic-query-pipeline/expectations/expected-customer-country.csv"),
 				},
 				Asserts: []func(*e2e.Task) error{
 					e2e.AssertByExitCode,
-					e2e.AssertByOutputString,
+					e2e.AssertByCSV,
 				},
 			},
 		},
