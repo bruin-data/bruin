@@ -22,7 +22,9 @@ func AssertByExitCode(i *Task) error {
 }
 
 func AssertByOutputString(i *Task) error {
-	if i.Actual.Output != i.Expected.Output {
+	expected := strings.ReplaceAll(i.Expected.Output, "\r\n", "\n")
+	actual := strings.ReplaceAll(i.Actual.Output, "\r\n", "\n")
+	if actual != expected {
 		return fmt.Errorf("output mismatch: expected %q, got %q", i.Expected.Output, i.Actual.Output)
 	}
 	return nil
