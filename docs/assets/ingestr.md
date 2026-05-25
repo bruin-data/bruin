@@ -43,6 +43,7 @@ parameters:
   destination: bigquery | snowflake | redshift | synapse
   
   # optional
+  version: v0 | v1 | v1.x.y
   incremental_strategy: replace | append | merge | delete+insert
   incremental_key: string
   sql_backend: pyarrow | sqlalchemy
@@ -59,6 +60,7 @@ parameters:
 | `source` | No | _n/a_ | Overrides the inferred source type. For example, set `gsheets` when reusing a BigQuery connection for Google Sheets. |
 | `source_table` | Yes | `--source-table` | Table, sheet, or resource identifier to pull from the source. |
 | `file_type` | No | `--source-table` suffix | Appended to the `source_table` as `table#type` for connectors that need a file format hint (`csv`, `jsonl`, `parquet`). |
+| `version` | No | _n/a_  | Selects the version of ingestr to install and use.. Valid options are `v1` (latest), `v0` (legacy) or `v1.x.y` (full version specifer) | 
 | `destination` | Yes | `--dest-uri` | Logical destination used to select the target connection; Bruin converts it into the URI supplied to Ingestr. |
 | `incremental_strategy` | No | `--incremental-strategy` | Passes the incremental loading strategy (`replace`, `append`, `merge`, `delete+insert`) to Ingestr. |
 | `incremental_key` | No | `--incremental-key` | Column that determines incremental progress. When the column is defined with type `date`, Bruin also forwards it through the `--columns` option so Ingestr treats it as a date field. |
