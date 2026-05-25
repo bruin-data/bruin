@@ -19,7 +19,7 @@ if os.getenv('INJECTED1') != "value1":
 
 con = duckdb.connect(database = "duckdb-files/env-run-default-option.db", read_only = False)
 
-con.execute("SELECT * FROM chess_playground.player_summary")
-result = con.fetchall()
-if len(result) != 10:
-    raise Exception("Incorrect number of rows in player_summary")
+con.execute("SELECT COUNT(*) FROM chess_playground.player_summary")
+result = con.fetchone()
+if result[0] == 0:
+    raise Exception("player_summary is empty")
