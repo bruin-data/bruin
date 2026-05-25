@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "setup": "set -eu; root=\"${CONDUCTOR_ROOT_PATH:-}\"; src=\"$root/pkg/sqlparser/rustffi/target\"; dst=\"pkg/sqlparser/rustffi/target\"; if [ -n \"$root\" ] && [ \"$root\" != \"$PWD\" ] && [ -d \"$src\" ]; then if command -v rsync >/dev/null 2>&1; then mkdir -p \"$dst\"; rsync -a \"$src/\" \"$dst/\"; else rm -rf \"$dst\"; mkdir -p \"$(dirname \"$dst\")\"; cp -Rp \"$src\" \"$dst\"; fi; fi"
+  }
+}
