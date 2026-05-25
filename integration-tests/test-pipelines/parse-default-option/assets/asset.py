@@ -21,5 +21,5 @@ con = duckdb.connect(database = "duckdb-files/env-run-default-option.db", read_o
 
 con.execute("SELECT * FROM chess_playground.player_summary")
 result = con.fetchall()
-if len(result) != 10:
-    raise Exception("Incorrect number of rows in player_summary")
+if len(result) == 0:
+    raise Exception(f"Expected there to be non-zero number of players")

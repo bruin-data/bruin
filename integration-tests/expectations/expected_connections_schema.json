@@ -19,25 +19,6 @@
         "api_key"
       ]
     },
-    "SurveyMonkeyConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_token": {
-          "type": "string"
-        },
-        "region": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "access_token"
-      ]
-    },
     "AirtableConnection": {
       "properties": {
         "name": {
@@ -455,26 +436,6 @@
         "api_token"
       ]
     },
-    "JobtreadConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "grant_key": {
-          "type": "string"
-        },
-        "organization_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "grant_key",
-        "organization_id"
-      ]
-    },
     "Connections": {
       "properties": {
         "aws": {
@@ -618,12 +579,6 @@
         "adjust": {
           "items": {
             "$ref": "#/$defs/AdjustConnection"
-          },
-          "type": "array"
-        },
-        "surveymonkey": {
-          "items": {
-            "$ref": "#/$defs/SurveyMonkeyConnection"
           },
           "type": "array"
         },
@@ -1098,6 +1053,12 @@
         "vertica": {
           "items": {
             "$ref": "#/$defs/VerticaConnection"
+          },
+          "type": "array"
+        },
+        "surveymonkey": {
+          "items": {
+            "$ref": "#/$defs/SurveyMonkeyConnection"
           },
           "type": "array"
         },
@@ -1639,6 +1600,22 @@
         "api_key"
       ]
     },
+    "G2Connection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
+      ]
+    },
     "GCSConnection": {
       "oneOf": [
         {
@@ -1866,22 +1843,6 @@
         "email"
       ]
     },
-    "G2Connection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_token": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_token"
-      ]
-    },
     "HANAConnection": {
       "properties": {
         "name": {
@@ -2064,6 +2025,26 @@
         "api_token"
       ]
     },
+    "JobtreadConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "grant_key": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "grant_key",
+        "organization_id"
+      ]
+    },
     "KafkaConnection": {
       "properties": {
         "name": {
@@ -2100,39 +2081,6 @@
         "name",
         "bootstrap_servers",
         "group_id"
-      ]
-    },
-    "RabbitMQConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        },
-        "vhost": {
-          "type": "string"
-        },
-        "tls": {
-          "type": "boolean"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "host",
-        "username",
-        "password"
       ]
     },
     "KinesisConnection": {
@@ -2764,6 +2712,39 @@
         "aws_account_id"
       ]
     },
+    "RabbitMQConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "vhost": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username",
+        "password"
+      ]
+    },
     "RedshiftConnection": {
       "properties": {
         "name": {
@@ -3219,6 +3200,25 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "SurveyMonkeyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
       ]
     },
     "SynapseConnection": {
