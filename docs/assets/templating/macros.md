@@ -181,6 +181,165 @@ WHERE country = '{{ country }}'
 {% endfor %}
 ```
 
+## Built-in Bruin SQL Helpers
+
+Bruin also provides built-in SQL helpers under the `bruin` namespace. These are available in SQL assets without creating files in `macros/`, and many of them render platform-specific SQL for the asset type.
+
+For example, the same helper can render different SQL in BigQuery, Snowflake, Postgres, DuckDB, SQL Server, and other supported platforms:
+
+```bruin-sql
+select
+    {{ bruin.generate_surrogate_key(['customer_id', 'order_id']) }} as order_key,
+    {{ bruin.safe_divide('revenue', 'sessions') }} as revenue_per_session
+from orders
+{{ bruin.group_by(1) }}
+```
+
+### `bruin.group_by(n)`
+
+Generates a positional `GROUP BY` clause from `1` through `n`.
+
+```bruin-sql
+select customer_id, order_date, count(*) as orders
+from orders
+{{ bruin.group_by(2) }}
+```
+
+Renders to:
+
+```sql
+group by 1, 2
+```
+
+### `bruin.safe_divide(numerator, denominator)`
+
+Divides two expressions and returns `null` instead of failing on division by zero.
+
+```bruin-sql
+{{ bruin.safe_divide('revenue', 'sessions') }}
+```
+
+### `bruin.safe_add(fields)` and `bruin.safe_subtract(fields)`
+
+Adds or subtracts expressions while treating `null` values as `0`.
+
+```bruin-sql
+{{ bruin.safe_add(['revenue', 'tax', 'shipping']) }}
+{{ bruin.safe_subtract(['gross_revenue', 'discounts', 'refunds']) }}
+```
+
+### `bruin.generate_surrogate_key(fields)`
+
+Generates a stable MD5-based surrogate key expression from one or more fields. The rendered SQL uses the right cast, concatenation, and hash syntax for the asset platform where Bruin has a platform override.
+
+```bruin-sql
+{{ bruin.generate_surrogate_key(['customer_id', 'order_id']) }}
+```
+
+### `bruin.pivot(column, values, ...)`
+
+Generates aggregate `case` expressions for pivoting known values into columns.
+
+```bruin-sql
+select
+    customer_id,
+    {{ bruin.pivot('status', ['paid', 'refunded'], prefix='orders_') }}
+from orders
+group by customer_id
+```
+
+Optional keyword arguments:
+
+- `alias`: add aliases to generated expressions, defaults to `true`
+- `agg`: aggregate function, defaults to `sum`
+- `cmp`: comparison operator, defaults to `=`
+- `prefix`: alias prefix, defaults to empty
+- `suffix`: alias suffix, defaults to empty
+- `then_value`: value used when the comparison matches, defaults to `1`
+- `else_value`: value used when the comparison does not match, defaults to `0`
+- `quote_identifiers`: quote generated aliases, defaults to `true`
+- `distinct`: add `distinct` inside the aggregate, defaults to `false`
+
+### `bruin.haversine_distance(lat1, lon1, lat2, lon2, unit='mi')`
+
+Generates a haversine distance expression. `unit` can be `mi` or `km`.
+
+```bruin-sql
+{{ bruin.haversine_distance('pickup_lat', 'pickup_lon', 'dropoff_lat', 'dropoff_lon', unit='km') }}
+```
+
+### `bruin.degrees_to_radians(degrees)`
+
+Converts a degree expression to radians.
+
+```bruin-sql
+{{ bruin.degrees_to_radians('angle_degrees') }}
+```
+
+### `bruin.width_bucket(expr, min_value, max_value, num_buckets)`
+
+Generates a bucket number expression for a numeric value. Platforms with native `width_bucket` support use the native function where applicable.
+
+```bruin-sql
+{{ bruin.width_bucket('price', '0', '100', '10') }}
+```
+
+### `bruin.deduplicate(relation, partition_by, order_by)`
+
+Generates a query that keeps the first row per partition according to the given ordering.
+
+```bruin-sql
+{{ bruin.deduplicate('events', 'user_id, account_id', 'updated_at desc') }}
+```
+
+Bruin uses platform-specific patterns such as `qualify`, `distinct on`, ordered array aggregation, or subqueries depending on the asset type.
+
+### `bruin.generate_series(upper_bound)`
+
+Generates a single-column relation named `generated_number` with values from `1` through `upper_bound`.
+
+```bruin-sql
+{{ bruin.generate_series(30) }}
+```
+
+### `bruin.date_spine(datepart, start_date, end_date)`
+
+Generates a single-column date or timestamp spine. The output column is named `date_<datepart>`.
+
+```bruin-sql
+{{ bruin.date_spine('day', "'2024-01-01'", "'2024-02-01'") }}
+```
+
+Supported date parts include `day`, `week`, `month`, `quarter`, `year`, `hour`, `minute`, `second`, `millisecond`, and `microsecond`. Exact support depends on the target database.
+
+### `bruin.slugify(value)`
+
+Converts text into a lowercase SQL-friendly identifier.
+
+```bruin-sql
+select 1 as {{ bruin.slugify('9 Active Users!') }}
+```
+
+Renders to:
+
+```sql
+select 1 as _9_active_users
+```
+
+### URL Helpers
+
+These helpers generate SQL expressions for parsing URL strings:
+
+```bruin-sql
+{{ bruin.get_url_host('page_url') }}
+{{ bruin.get_url_path('page_url') }}
+{{ bruin.get_url_parameter('page_url', 'utm_source') }}
+```
+
+- `bruin.get_url_host(field)` extracts the host
+- `bruin.get_url_path(field)` extracts the path without query parameters
+- `bruin.get_url_parameter(field, parameter)` extracts one query parameter value
+
 ## Practical Examples
 
 ### Aggregation Patterns

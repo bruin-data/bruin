@@ -8,6 +8,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1304,6 +1305,65 @@ func TestRenderer_IsFullRefresh(t *testing.T) {
 				require.Equal(t, "full", conditionalResult)
 			} else {
 				require.Equal(t, "incremental", conditionalResult)
+			}
+		})
+	}
+}
+
+func TestRenderer_CloneForAsset_UsesPlatformBuiltins(t *testing.T) {
+	t.Parallel()
+
+	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	executionDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	ctx := t.Context()
+	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, startDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, endDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigExecutionDate, executionDate)
+	ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+	ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+
+	basePipeline := &pipeline.Pipeline{Name: "test-pipeline"}
+	baseRenderer := NewRendererWithStartEndDates(&startDate, &endDate, &executionDate, basePipeline.Name, "test-run-id", nil)
+
+	tests := []struct {
+		name     string
+		asset    *pipeline.Asset
+		query    string
+		contains []string
+		excludes []string
+	}{
+		{
+			name:     "redshift surrogate key uses concat operator",
+			asset:    &pipeline.Asset{Name: "redshift-asset", Type: pipeline.AssetTypeRedshiftQuery},
+			query:    "{{ bruin.generate_surrogate_key(['a', 'b']) }}",
+			contains: []string{" || ", "md5("},
+			excludes: []string{"concat("},
+		},
+		{
+			name:     "bigquery date spine uses bigquery helpers",
+			asset:    &pipeline.Asset{Name: "bigquery-asset", Type: pipeline.AssetTypeBigqueryQuery},
+			query:    `{{ bruin.date_spine('day', "'2020-01-01'", "'2020-01-02'") }}`,
+			contains: []string{"generate_array", "date_add"},
+			excludes: []string{"with recursive"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			clonedRenderer, err := baseRenderer.CloneForAsset(ctx, basePipeline, tt.asset)
+			require.NoError(t, err)
+
+			result, err := clonedRenderer.Render(tt.query)
+			require.NoError(t, err)
+			for _, expected := range tt.contains {
+				assert.Contains(t, result, expected)
+			}
+			for _, unexpected := range tt.excludes {
+				assert.NotContains(t, result, unexpected)
 			}
 		})
 	}
