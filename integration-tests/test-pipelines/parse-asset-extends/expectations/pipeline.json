@@ -103,8 +103,8 @@
           "owner": "",
           "domains": [],
           "meta": {},
-          "checks": null,
-          "upstreams": null
+          "checks": [],
+          "upstreams": []
         },
         {
           "entity_attribute": {
@@ -122,8 +122,8 @@
           "owner": "",
           "domains": [],
           "meta": {},
-          "checks": null,
-          "upstreams": null
+          "checks": [],
+          "upstreams": []
         }
       ],
       "custom_checks": [],

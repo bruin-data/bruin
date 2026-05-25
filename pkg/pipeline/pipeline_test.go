@@ -1634,6 +1634,62 @@ func TestBuilder_SetAssetColumnFromGlossary(t *testing.T) {
 	})
 }
 
+func TestBuilder_AssetLevelGlossaryExtendsInitializesEmptyColumnSlices(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pipeline.yml"), []byte("name: glossary-pipeline\n"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "assets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "assets", "users.sql"), []byte(`/* @bruin
+name: users
+type: duckdb.sql
+extends:
+  - User
+@bruin */
+
+select 1
+`), 0o644))
+
+	fs := afero.NewOsFs()
+	builder := pipeline.NewBuilder(
+		pipeline.BuilderConfig{
+			PipelineFileName:    []string{"pipeline.yml"},
+			TasksDirectoryNames: []string{"assets"},
+			TasksFileSuffixes:   []string{"asset.yml", "asset.yaml"},
+		},
+		pipeline.CreateTaskFromYamlDefinition(fs),
+		pipeline.CreateTaskFromFileComments(fs),
+		fs,
+		&mockGlossaryReader{
+			entities: []*glossary.Entity{
+				{
+					Name: "User",
+					Attributes: map[string]*glossary.Attribute{
+						"id": {
+							Name:        "id",
+							Type:        "integer",
+							Description: "User identifier",
+						},
+					},
+				},
+			},
+		},
+		nil,
+	)
+
+	got, err := builder.CreatePipelineFromPath(t.Context(), dir, pipeline.WithMutate())
+	require.NoError(t, err)
+	require.Len(t, got.Assets, 1)
+	require.Len(t, got.Assets[0].Columns, 1)
+
+	column := got.Assets[0].Columns[0]
+	assert.Equal(t, "id", column.Name)
+	assert.NotNil(t, column.Checks)
+	assert.Empty(t, column.Checks)
+	assert.NotNil(t, column.Upstreams)
+	assert.Empty(t, column.Upstreams)
+}
+
 func TestIntervalModifiers_ModifyDate(t *testing.T) {
 	t.Parallel()
 

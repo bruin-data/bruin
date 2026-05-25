@@ -2494,6 +2494,8 @@ func (b *Builder) fillGlossaryStuff(ctx context.Context, asset *Asset, foundPipe
 						Entity:    entity.Name,
 						Attribute: attribute.Name,
 					},
+					Checks:    make([]ColumnCheck, 0),
+					Upstreams: make([]*UpstreamColumn, 0),
 				})
 			}
 		}
