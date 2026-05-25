@@ -6,27 +6,48 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func parseQuery(t *testing.T, raw string) (string, url.Values) {
 	t.Helper()
 	u, err := url.Parse(raw)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return u.Scheme, u.Query()
 }
 
 func TestBuildIngestrLakehouseURI_NilOrZero(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "", BuildIngestrLakehouseURI(nil))
-	assert.Equal(t, "", BuildIngestrLakehouseURI(&config.LakehouseConfig{}))
+	assert.Empty(t, BuildIngestrLakehouseURI(nil))
+	assert.Empty(t, BuildIngestrLakehouseURI(&config.LakehouseConfig{}))
 }
 
 func TestBuildIngestrLakehouseURI_NonDuckLakeReturnsEmpty(t *testing.T) {
 	t.Parallel()
 
 	lh := &config.LakehouseConfig{Format: config.LakehouseFormatIceberg}
-	assert.Equal(t, "", BuildIngestrLakehouseURI(lh))
+	assert.Empty(t, BuildIngestrLakehouseURI(lh))
+}
+
+func TestBuildIngestrLakehouseURI_DuckLakeWithUnsupportedCatalogReturnsEmpty(t *testing.T) {
+	t.Parallel()
+
+	lh := &config.LakehouseConfig{
+		Format: config.LakehouseFormatDuckLake,
+		Catalog: config.CatalogConfig{
+			Type:      config.CatalogTypeGlue,
+			CatalogID: "123456789012",
+			Region:    "us-east-1",
+			Auth:      config.CatalogAuth{AccessKey: "AKID", SecretKey: "SECRET"},
+		},
+		Storage: config.StorageConfig{
+			Type: config.StorageTypeS3,
+			Path: "s3://b/p",
+			Auth: config.StorageAuth{AccessKey: "a", SecretKey: "b"},
+		},
+	}
+	assert.Empty(t, BuildIngestrLakehouseURI(lh))
 }
 
 func TestBuildIngestrLakehouseURI_DuckDBCatalogS3Storage_MinIO(t *testing.T) {
@@ -163,4 +184,3 @@ func TestConfig_GetIngestrURI_NoLakehouse_UnchangedBehavior(t *testing.T) {
 	c := Config{Path: "/some/path/db.duckdb"}
 	assert.Equal(t, "duckdb:////some/path/db.duckdb", c.GetIngestrURI())
 }
-

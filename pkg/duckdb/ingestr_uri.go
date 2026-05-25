@@ -8,7 +8,7 @@ import (
 )
 
 // Serialises a LakehouseConfig into a URI that
-// ingestr's matching destination parses on the other side. 
+// ingestr's matching destination parses on the other side.
 func BuildIngestrLakehouseURI(lh *config.LakehouseConfig) string {
 	if lh.IsZero() {
 		return ""
@@ -20,7 +20,6 @@ func BuildIngestrLakehouseURI(lh *config.LakehouseConfig) string {
 	q := url.Values{}
 
 	cat := lh.Catalog
-	q.Set("catalog_type", string(cat.Type))
 	switch cat.Type {
 	case config.CatalogTypeDuckDB, config.CatalogTypeSQLite:
 		if cat.Path != "" {
@@ -42,7 +41,10 @@ func BuildIngestrLakehouseURI(lh *config.LakehouseConfig) string {
 		if cat.Auth.Password != "" {
 			q.Set("catalog_password", cat.Auth.Password)
 		}
+	default:
+		return ""
 	}
+	q.Set("catalog_type", string(cat.Type))
 
 	st := lh.Storage
 	q.Set("storage_type", string(st.Type))
