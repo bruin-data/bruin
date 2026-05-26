@@ -45,6 +45,7 @@ type JobRunParams struct {
 	Project          string
 	Region           string
 	RuntimeVersion   string
+	ContainerImage   string
 	Config           string
 	Args             []string
 	Timeout          time.Duration
@@ -62,6 +63,7 @@ func parseParams(cfg *Client, params map[string]string) *JobRunParams {
 		Project:          cfg.ProjectID,
 		Region:           cfg.Region,
 		RuntimeVersion:   params["runtime_version"],
+		ContainerImage:   params["container_image"],
 		Config:           params["config"],
 		Workspace:        cfg.Workspace,
 		ExecutionRole:    cfg.ExecutionRole,
@@ -249,8 +251,9 @@ func (job Job) buildBatchConfig(ws *workspace) *dataprocpb.CreateBatchRequest {
 			PysparkBatch: pysparkBatch,
 		},
 		RuntimeConfig: &dataprocpb.RuntimeConfig{
-			Version:    job.params.RuntimeVersion,
-			Properties: sparkProperties,
+			Version:        job.params.RuntimeVersion,
+			ContainerImage: job.params.ContainerImage,
+			Properties:     sparkProperties,
 		},
 		EnvironmentConfig: batchEnvironmentConfig(job.params),
 	}
