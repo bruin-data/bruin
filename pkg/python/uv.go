@@ -24,11 +24,6 @@ import (
 	"github.com/spf13/afero"
 )
 
-var (
-	ingestrInstallMutex      sync.Mutex
-	ingestrInstalledPackages = make(map[string]bool)
-)
-
 var AvailablePythonVersions = map[string]bool{
 	"3.8":  true,
 	"3.9":  true,
@@ -241,10 +236,6 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 		return err
 	}
 	u.binaryFullPath = binaryFullPath
-
-	if err := u.ensureIngestrInstalled(ctx, extraPackages, repo); err != nil {
-		return err
-	}
 
 	noDependencyCommand := &CommandInstance{
 		Name: u.binaryFullPath,
@@ -521,11 +512,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		ingestrCtx = context.WithValue(ctx, executor.KeyPrinter, io.Writer(logBuffer))
 	}
 
-	err = u.ensureIngestrInstalled(ctx, extraPackages, execCtx.repo)
-	if err != nil {
-		return err
-	}
-
 	runArgs := u.ingestrRunCmd(ctx, extraPackages, cmdArgs)
 
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
@@ -568,80 +554,24 @@ func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
 	return "ingestr@" + IngestrVersionV1, false
 }
 
-// ingestrInstallCmd returns the uv tool commandline
-// args necessary for installing ingestr.
-func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string, forceReinstall bool) []string {
-	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
-	cmdline := []string{
-		"tool",
-		"install",
-		"--no-config",
-		"--quiet",
-		"--prerelease",
-		"allow",
-		"--python",
-		pythonVersionForIngestr,
-	}
-	if forceReinstall {
-		cmdline = append(cmdline, "--force")
-	}
-	for _, pkg := range pkgs {
-		cmdline = append(cmdline, "--with", pkg)
-	}
-	if isLocal {
-		cmdline = append(cmdline, "--reinstall")
-	}
-	cmdline = append(cmdline, ingestrPackageName)
-	return cmdline
-}
-
+// ingestrRunCmd builds the `uv tool run` invocation for ingestr. Each call resolves
+// a per-version environment via `--from ingestr@<ver>` (or a local path), so v0 and
+// v1 assets in the same pipeline never share — and never clobber — an installation.
 func (u *UvPythonRunner) ingestrRunCmd(ctx context.Context, extraPackages, args []string) []string {
-	ingestrPackageName, _ := u.ingestrPackage(ctx)
-	cmdline := make([]string, 0, 10+(2*len(extraPackages))+len(args))
-	cmdline = append(cmdline, "tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "--from", ingestrPackageName)
+	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
+	cmdline := make([]string, 0, 12+(2*len(extraPackages))+len(args))
+	cmdline = append(cmdline, "tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr)
+	if isLocal {
+		// Force uv to rebuild the local source on every run so edits in
+		// debug-ingestr-src are picked up.
+		cmdline = append(cmdline, "--reinstall-package", "ingestr")
+	}
+	cmdline = append(cmdline, "--from", ingestrPackageName)
 	for _, pkg := range extraPackages {
 		cmdline = append(cmdline, "--with", pkg)
 	}
 	cmdline = append(cmdline, "ingestr")
 	return append(cmdline, args...)
-}
-
-// buildIngestrPackageKey creates a unique key for the combination of ingestr version and extra packages.
-func (u *UvPythonRunner) buildIngestrPackageKey(ctx context.Context, extraPackages []string) string {
-	ingestrPackageName, _ := u.ingestrPackage(ctx)
-	sortedPkgs := make([]string, len(extraPackages))
-	copy(sortedPkgs, extraPackages)
-	sort.Strings(sortedPkgs)
-	return ingestrPackageName + ":" + strings.Join(sortedPkgs, ",")
-}
-
-// ensureIngestrInstalled installs ingestr with the specified extra packages in a thread-safe manner.
-// It prevents parallel workers from installing ingestr simultaneously, which causes file lock
-// conflicts on Windows (OS error 32).
-func (u *UvPythonRunner) ensureIngestrInstalled(ctx context.Context, extraPackages []string, repo *git.Repo) error {
-	packageKey := u.buildIngestrPackageKey(ctx, extraPackages)
-
-	ingestrInstallMutex.Lock()
-	defer ingestrInstallMutex.Unlock()
-
-	_, isLocal := u.ingestrPackage(ctx)
-	if !isLocal {
-		if ingestrInstalledPackages[packageKey] {
-			return nil
-		}
-	}
-
-	forceReinstall := isLocal || !ingestrInstalledPackages[packageKey]
-	err := u.Cmd.Run(ctx, repo, &CommandInstance{
-		Name: u.binaryFullPath,
-		Args: u.ingestrInstallCmd(ctx, extraPackages, forceReinstall),
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to install ingestr")
-	}
-
-	ingestrInstalledPackages[packageKey] = true
-	return nil
 }
 
 // tailBuffer is a bounded io.Writer that retains at most maxBytes of the most
@@ -682,14 +612,6 @@ func (t *tailBuffer) flushTo(w io.Writer) {
 		_, _ = w.Write([]byte("[earlier ingestr output omitted]\n"))
 	}
 	_, _ = w.Write(t.data)
-}
-
-// ResetIngestrInstallCache resets the ingestr installation cache.
-// This is primarily useful for testing.
-func ResetIngestrInstallCache() {
-	ingestrInstallMutex.Lock()
-	defer ingestrInstallMutex.Unlock()
-	ingestrInstalledPackages = make(map[string]bool)
 }
 
 // pythonArrowInlineMetadata is the PEP 723 inline script metadata header in the arrow template.
