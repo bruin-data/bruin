@@ -209,6 +209,10 @@ parameters:
   # Spark runtime version (optional, defaults to "2.2")
   runtime_version: "2.2"
 
+  # Custom container image for the job runtime environment (optional)
+  # Equivalent to gcloud's --container-image flag.
+  container_image: us-central1-docker.pkg.dev/my-project/my-repo/my-image:latest
+
   # args to pass to the entrypoint (optional)
   args: arg1 arg2
 
@@ -225,6 +229,7 @@ parameters:
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
 | `runtime_version` | No | `2.2` | Dataproc Serverless Spark runtime version |
+| `container_image` | No | - | Custom container image URI for the job runtime environment (equivalent to gcloud's `--container-image`) |
 | `args` | No | - | Space-separated arguments passed to the PySpark script |
 | `config` | No | - | Spark configuration in `--conf key=value` format |
 | `timeout` | No | - | Job timeout using Go duration format (e.g., `1h`, `30m`) |
