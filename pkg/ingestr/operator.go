@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
+	"golang.org/x/mod/semver"
 )
 
 // versionPattern matches the bare family marker (vMAJOR) or a fully-qualified
@@ -62,6 +63,32 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 		return resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}, nil
 	}
 	return resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}, nil
+}
+
+// fabricMinIngestrVersion is the first ingestr release that ships the Microsoft
+// Fabric source and destination.
+const fabricMinIngestrVersion = "1.0.5"
+
+// ensureFabricEngineSupport rejects fabric ingestr assets resolved to an ingestr
+// version that predates Fabric support (added in 1.0.5). The v0 family never had
+// fabric, and explicit v1 pins below 1.0.5 lack it too.
+func ensureFabricEngineSupport(engine resolvedEngine, uris ...string) error {
+	usesFabric := false
+	for _, uri := range uris {
+		if strings.HasPrefix(uri, "fabric://") {
+			usesFabric = true
+			break
+		}
+	}
+	if !usesFabric {
+		return nil
+	}
+
+	if semver.Compare("v"+engine.ingestrVersion, "v"+fabricMinIngestrVersion) < 0 {
+		return fmt.Errorf("microsoft fabric ingestr assets require ingestr %s or newer, but parameters.version resolved to %s", fabricMinIngestrVersion, engine.ingestrVersion)
+	}
+
+	return nil
 }
 
 // applyIngestrEngine stashes the resolved PyPI version on the context so the
@@ -281,6 +308,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	if err != nil {
 		return err
 	}
+	if err := ensureFabricEngineSupport(engine, sourceURI, destURI); err != nil {
+		return err
+	}
 	ctx = applyIngestrEngine(ctx, engine)
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
@@ -451,6 +481,9 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	engine, err := resolveIngestrEngine(asset)
 	if err != nil {
+		return err
+	}
+	if err := ensureFabricEngineSupport(engine, destURI); err != nil {
 		return err
 	}
 	ctx = applyIngestrEngine(ctx, engine)

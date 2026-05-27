@@ -219,7 +219,7 @@ WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')
 }
 
 func (db *DB) GetIngestrURI() (string, error) {
-	return db.config.GetIngestrURI(), nil
+	return db.config.GetIngestrURI()
 }
 
 func (db *DB) Close() error {

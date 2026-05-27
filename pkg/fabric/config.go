@@ -1,6 +1,7 @@
 package fabric
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -82,11 +83,41 @@ func (c *Config) ToDBConnectionURI() string {
 	return u.String()
 }
 
-func (c *Config) GetIngestrURI() string {
-	return fmt.Sprintf(
-		"fabric://?server=%s&database=%s&authentication=sql&username=%s&password=%s",
-		c.Host, c.Database, c.Username, c.Password,
-	)
+// GetIngestrURI builds the URI ingestr expects for a Microsoft Fabric Warehouse
+// source/destination. Fabric only supports Microsoft Entra ID authentication, so a
+// service-principal URI is produced when client credentials are set, falling back to
+// ActiveDirectoryDefault when use_azure_default_credential is enabled. SQL
+// username/password auth is rejected because Fabric Warehouse has no such login.
+//
+//	fabric://<client_id>:<client_secret>@<host>:<port>/<database>?tenant_id=<tenant_id>
+func (c *Config) GetIngestrURI() (string, error) {
+	if c.ClientID == "" && !c.UseAzureDefaultCredential {
+		return "", errors.New("fabric ingestr assets require Microsoft Entra ID authentication: set client_id/client_secret/tenant_id or use_azure_default_credential")
+	}
+
+	u := &url.URL{
+		Scheme: "fabric",
+		Host:   fmt.Sprintf("%s:%d", c.Host, c.getPort()),
+		Path:   "/" + c.Database,
+	}
+
+	query := url.Values{}
+	if c.ClientID != "" {
+		if c.ClientSecret != "" {
+			u.User = url.UserPassword(c.ClientID, c.ClientSecret)
+		} else {
+			u.User = url.User(c.ClientID)
+		}
+		if c.TenantID != "" {
+			query.Set("tenant_id", c.TenantID)
+		}
+	} else {
+		query.Set("fedauth", "ActiveDirectoryDefault")
+	}
+
+	u.RawQuery = query.Encode()
+
+	return u.String(), nil
 }
 
 func (c *Config) getPort() int {
