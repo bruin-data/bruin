@@ -2,6 +2,7 @@ package ingestr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -62,6 +63,35 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 		return resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}, nil
 	}
 	return resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}, nil
+}
+
+// appendQueryAnnotations adds the --query-annotations flag carrying the
+// pipeline/asset identity, so ingestr can annotate destination queries for
+// warehouse cost attribution (it adds type/ingestr_step itself).
+//
+// Only the v1 engine (the Go ingestr) understands the flag; the legacy v0
+// PyPI release does not, so passing it there would fail with an unknown flag.
+// The flag is therefore gated on the resolved engine family.
+func appendQueryAnnotations(args []string, engine resolvedEngine, ti scheduler.TaskInstance) []string {
+	if engine.family != versionFamilyV1 {
+		return args
+	}
+
+	asset := ti.GetAsset()
+	p := ti.GetPipeline()
+	if asset == nil || p == nil || asset.Name == "" || p.Name == "" {
+		return args
+	}
+
+	payload, err := json.Marshal(map[string]string{
+		"pipeline": p.Name,
+		"asset":    asset.Name,
+	})
+	if err != nil {
+		return args
+	}
+
+	return append(args, "--query-annotations", string(payload))
 }
 
 // applyIngestrEngine stashes the resolved PyPI version on the context so the
@@ -283,6 +313,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 	ctx = applyIngestrEngine(ctx, engine)
 
+	cmdArgs = appendQueryAnnotations(cmdArgs, engine, ti)
+
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
@@ -454,6 +486,8 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return err
 	}
 	ctx = applyIngestrEngine(ctx, engine)
+
+	cmdArgs = appendQueryAnnotations(cmdArgs, engine, ti)
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
