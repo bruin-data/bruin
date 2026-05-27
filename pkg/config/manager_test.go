@@ -1250,6 +1250,20 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add Fabric connection",
+			envName:  "default",
+			connType: "fabric",
+			connName: "fabric-conn",
+			creds: map[string]interface{}{
+				"host":          "myworkspace.datawarehouse.fabric.microsoft.com",
+				"database":      "MyWarehouse",
+				"client_id":     "test-client-id",
+				"client_secret": "test-client-secret",
+				"tenant_id":     "test-tenant-id",
+			},
+			expectedErr: false,
+		},
+		{
 			name:        "Add Invalid connection",
 			envName:     "default",
 			connType:    "invalid",
@@ -1329,6 +1343,14 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Len(t, env.Connections.Fireflies, 1)
 					assert.Equal(t, tt.connName, env.Connections.Fireflies[0].Name)
 					assert.Equal(t, tt.creds["api_key"], env.Connections.Fireflies[0].APIKey)
+				case "fabric":
+					assert.Len(t, env.Connections.Fabric, 1)
+					assert.Equal(t, tt.connName, env.Connections.Fabric[0].Name)
+					assert.Equal(t, tt.creds["host"], env.Connections.Fabric[0].Host)
+					assert.Equal(t, tt.creds["database"], env.Connections.Fabric[0].Database)
+					assert.Equal(t, tt.creds["client_id"], env.Connections.Fabric[0].ClientID)
+					assert.Equal(t, tt.creds["client_secret"], env.Connections.Fabric[0].ClientSecret)
+					assert.Equal(t, tt.creds["tenant_id"], env.Connections.Fabric[0].TenantID)
 				}
 			}
 		})
@@ -1384,6 +1406,25 @@ func TestDeleteConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Delete existing Fabric connection",
+			envName:  "default",
+			connName: "fabric-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								Fabric: []FabricConnection{
+									{Name: "fabric-conn", Host: "fabric.example", Database: "warehouse", ClientID: "client-id"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Delete non-existent connection",
 			envName:  "staging",
 			connName: "non-existent-conn",
@@ -1429,6 +1470,8 @@ func TestDeleteConnection(t *testing.T) {
 					assert.Empty(t, env.Connections.GoogleCloudPlatform)
 				case "aws-conn":
 					assert.Empty(t, env.Connections.AwsConnection)
+				case "fabric-conn":
+					assert.Empty(t, env.Connections.Fabric)
 				}
 
 				assert.False(t, env.Connections.Exists(tt.connName))
