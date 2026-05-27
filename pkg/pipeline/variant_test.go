@@ -497,6 +497,7 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 			Post: []pipeline.Hook{{Query: "q"}},
 		},
 		Metadata: map[string]string{"k": "v"},
+		Routing:  &pipeline.RoutingConfig{EgressGateway: "gw"},
 	}
 	return &pipeline.Pipeline{
 		Name:               "p",
@@ -510,6 +511,7 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 				Pre:  []pipeline.Hook{{Query: "q"}},
 				Post: []pipeline.Hook{{Query: "q"}},
 			},
+			Routing: &pipeline.RoutingConfig{EgressGateway: "gw"},
 		},
 		Variables: pipeline.Variables{
 			"sentinel": map[string]any{"type": "string", "default": "RENDERED"},

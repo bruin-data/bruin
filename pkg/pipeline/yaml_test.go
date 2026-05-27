@@ -396,6 +396,37 @@ select 1
 	require.True(t, *task.RefreshRestricted)
 }
 
+func TestConvertYamlToTask_Routing(t *testing.T) {
+	t.Parallel()
+
+	task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.asset
+type: python
+routing:
+  egress_gateway: wg-shared-ams3
+`)))
+	require.NoError(t, err)
+	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
+}
+
+func TestCreateTaskFromFileComments_Routing(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	err := afero.WriteFile(fs, "asset.sql", []byte(strings.TrimSpace(`
+-- @bruin.name: dataset.asset
+-- @bruin.type: duckdb.sql
+-- @bruin.routing.egress_gateway: wg-shared-ams3
+select 1
+`)), 0o644)
+	require.NoError(t, err)
+
+	creator := pipeline.CreateTaskFromFileComments(fs)
+	task, err := creator("asset.sql")
+	require.NoError(t, err)
+	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
+}
+
 func TestConvertYamlToTask_Hooks(t *testing.T) {
 	t.Parallel()
 

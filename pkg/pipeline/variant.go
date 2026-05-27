@@ -273,6 +273,9 @@ func renderDefaultValues(render RenderFunc, dv *DefaultValues) error {
 			return err
 		}
 	}
+	if err := renderRoutingConfig(render, "default.routing", dv.Routing); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -359,6 +362,9 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 	if a.Athena.Location, err = maybeRender(render, fmt.Sprintf("asset[%s].athena.location", originalName), a.Athena.Location); err != nil {
 		return err
 	}
+	if err := renderRoutingConfig(render, fmt.Sprintf("asset[%s].routing", originalName), a.Routing); err != nil {
+		return err
+	}
 
 	for i := range a.Upstreams {
 		u := &a.Upstreams[i]
@@ -431,6 +437,19 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 		if cc.Description, err = maybeRender(render, fmt.Sprintf("asset[%s].custom_checks[%d].description", originalName, i), cc.Description); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func renderRoutingConfig(render RenderFunc, path string, routing *RoutingConfig) error {
+	if routing == nil {
+		return nil
+	}
+
+	var err error
+	if routing.EgressGateway, err = maybeRender(render, path+".egress_gateway", routing.EgressGateway); err != nil {
+		return err
 	}
 
 	return nil

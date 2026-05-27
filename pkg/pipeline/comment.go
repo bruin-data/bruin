@@ -350,6 +350,21 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 				continue
 			}
 		}
+
+		if strings.HasPrefix(key, "routing.") {
+			routingKeys := strings.Split(key, ".")
+			if len(routingKeys) != 2 {
+				continue
+			}
+
+			if strings.EqualFold(routingKeys[1], "egress_gateway") {
+				if task.Routing == nil {
+					task.Routing = &RoutingConfig{}
+				}
+				task.Routing.EgressGateway = value
+				continue
+			}
+		}
 	}
 
 	task.ID = hash(task.Name)

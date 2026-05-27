@@ -348,6 +348,7 @@ type taskDefinition struct {
 	Tags                  []string          `yaml:"tags"`
 	Snowflake             snowflake         `yaml:"snowflake"`
 	Athena                athena            `yaml:"athena"`
+	Routing               *RoutingConfig    `yaml:"routing"`
 	IntervalModifiers     IntervalModifiers `yaml:"interval_modifiers"`
 	Domains               []string          `yaml:"domains"`
 	Meta                  map[string]string `yaml:"meta"`
@@ -538,6 +539,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Hooks:             definition.Hooks,
 		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		Routing:           definition.Routing,
 		IntervalModifiers: definition.IntervalModifiers,
 		Domains:           definition.Domains,
 		Meta:              definition.Meta,
