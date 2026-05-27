@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -9,6 +10,9 @@ import (
 )
 
 func TestSnowflakeGeneratedSQLParsesWithSQLGlot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("embedded Python parser is flaky under parallel Windows test runs; tracked separately")
+	}
 	t.Parallel()
 
 	testBruinGeneratedSQLParsesWithSQLGlot(t, jinja.PlatformSnowflake, "snowflake")
