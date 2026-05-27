@@ -406,6 +406,8 @@ default:
   secrets:
     - key: MY_API_KEY
       inject_as: API_KEY
+  routing:
+    egress_gateway: wg-shared-ams3
   interval_modifiers:
     start: "-1d"
     end: "-1d"
@@ -420,6 +422,7 @@ Fields:
 | type               | String                     | —       | Default asset type (e.g., "sql") |
 | parameters         | Object (map[string]string) | {}      | Arbitrary key/value defaults     |
 | secrets            | Array of objects           | []      | See below                        |
+| routing            | Object                     | —       | Runtime routing defaults for assets |
 | interval_modifiers | Object                     | —       | See [Interval Modifiers](/assets/interval-modifiers) |
 | hooks              | Object                     | —       | See [Hooks](/assets/definition-schema#hooks) |
 
@@ -429,6 +432,12 @@ Secrets item:
 |-----------|--------|-------------------------|--------------------------|
 | key       | String | —                       | Name of secret to inject |
 | inject_as | String | defaults to same as key | Env var or param name    |
+
+Routing:
+
+| Field          | Type   | Default | Description |
+|----------------|--------|---------|-------------|
+| egress_gateway | String | —       | Named gateway profile to use for asset outbound traffic |
 
 ### Variables
 

@@ -2102,6 +2102,56 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "should apply default routing when missing",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Routing: &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.EmptyStringMap{},
+				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
+			},
+		},
+		{
+			name: "should not override asset routing",
+			asset: &pipeline.Asset{
+				Name:    "test-asset",
+				Routing: &pipeline.RoutingConfig{EgressGateway: "wg-vendor-us"},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Routing: &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.EmptyStringMap{},
+				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-vendor-us"},
+			},
+		},
+		{
+			name: "should apply default egress gateway when asset routing is empty",
+			asset: &pipeline.Asset{
+				Name:    "test-asset",
+				Routing: &pipeline.RoutingConfig{},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Routing: &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.EmptyStringMap{},
+				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2504,6 +2554,21 @@ func TestPipeline_ValidateCatchupMode(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPipeline_UnmarshalDefaultRouting(t *testing.T) {
+	t.Parallel()
+
+	var p pipeline.Pipeline
+	err := yaml.Unmarshal([]byte(`
+name: routed-pipeline
+default:
+  routing:
+    egress_gateway: wg-shared-ams3
+`), &p)
+	require.NoError(t, err)
+	require.NotNil(t, p.DefaultValues)
+	assert.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, p.DefaultValues.Routing)
 }
 
 func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {

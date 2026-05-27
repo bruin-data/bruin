@@ -238,6 +238,23 @@ When deploying to Airflow, this is automatically translated to `retries_delay` f
 
 - **Type:** `Integer`
 
+## `routing`
+
+Runtime routing options for the asset. This is intended for execution environments that can route task traffic through a named gateway.
+
+```yaml
+routing:
+  egress_gateway: wg-shared-ams3
+```
+
+- **Type:** `Object`
+
+| Field          | Type   | Description |
+|----------------|--------|-------------|
+| egress_gateway | String | Named gateway profile to use for the asset's outbound traffic |
+
+If omitted, the asset inherits `default.routing` from `pipeline.yml` when it is set.
+
 ## `materialization`
 
 This option determines how the asset will be materialized. Refer to the docs on [materialization](./materialization) for more details.

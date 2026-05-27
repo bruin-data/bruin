@@ -799,6 +799,27 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(Alias(s))
 }
 
+type RoutingConfig struct {
+	EgressGateway string `json:"egress_gateway,omitempty" yaml:"egress_gateway,omitempty" mapstructure:"egress_gateway"`
+}
+
+func (r *RoutingConfig) IsZero() bool {
+	return r == nil || r.EgressGateway == ""
+}
+
+// Clone returns a deep copy of r. The current implementation is a struct
+// value copy, which is correct as long as all fields are value types. If a
+// pointer/slice/map field is added to RoutingConfig this method must be
+// updated to copy those fields explicitly.
+func (r *RoutingConfig) Clone() *RoutingConfig {
+	if r == nil {
+		return nil
+	}
+
+	clone := *r
+	return &clone
+}
+
 // Asset is the in-memory representation of one asset within a pipeline. When
 // adding a new exported string-valued field, extend renderAssetStrings in
 // pkg/pipeline/variant.go so variant materialization renders it. Asset bodies
@@ -832,6 +853,7 @@ type Asset struct { //nolint:recvcheck
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
@@ -1036,6 +1058,10 @@ func (a *Asset) removeRedundanciesBeforePersisting() {
 	// python assets don't require a type anymore
 	if a.Type == AssetTypePython && strings.HasSuffix(a.ExecutableFile.Path, ".py") {
 		a.Type = ""
+	}
+
+	if a.Routing.IsZero() {
+		a.Routing = nil
 	}
 }
 
@@ -1352,7 +1378,7 @@ func (a *Asset) FormatContent() ([]byte, error) {
 
 	yamlConfig := buf.Bytes()
 
-	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization", "secrets", "parameters", "hooks"}
+	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization", "routing", "secrets", "parameters", "hooks"}
 	for _, key := range keysToAddSpace {
 		yamlConfig = bytes.ReplaceAll(yamlConfig, []byte("\n"+key+":"), []byte("\n\n"+key+":"))
 	}
@@ -1654,6 +1680,7 @@ type DefaultValues struct {
 	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
 	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
 	Hooks             Hooks             `json:"hooks" yaml:"hooks" mapstructure:"hooks"`
+	Routing           *RoutingConfig    `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int              `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 }
@@ -2409,6 +2436,13 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 	if len(asset.Hooks.Post) == 0 {
 		asset.Hooks.Post = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Post...)
+	}
+	if !foundPipeline.DefaultValues.Routing.IsZero() {
+		if asset.Routing == nil {
+			asset.Routing = foundPipeline.DefaultValues.Routing.Clone()
+		} else if asset.Routing.EgressGateway == "" {
+			asset.Routing.EgressGateway = foundPipeline.DefaultValues.Routing.EgressGateway
+		}
 	}
 
 	return asset, nil
