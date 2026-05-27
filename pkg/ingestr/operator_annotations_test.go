@@ -10,6 +10,8 @@ import (
 )
 
 func TestAppendQueryAnnotations(t *testing.T) {
+	t.Parallel()
+
 	ti := &scheduler.AssetInstance{
 		Pipeline: &pipeline.Pipeline{Name: "shopify"},
 		Asset:    &pipeline.Asset{Name: "raw.orders"},
@@ -18,6 +20,7 @@ func TestAppendQueryAnnotations(t *testing.T) {
 	v0 := resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}
 
 	t.Run("added for the v1 engine", func(t *testing.T) {
+		t.Parallel()
 		base := []string{"ingest", "--dest-table", "raw.orders"}
 		got := appendQueryAnnotations(base, v1, ti)
 		require.Equal(t, []string{
@@ -27,11 +30,13 @@ func TestAppendQueryAnnotations(t *testing.T) {
 	})
 
 	t.Run("omitted for the legacy v0 engine", func(t *testing.T) {
+		t.Parallel()
 		base := []string{"ingest", "--dest-table", "raw.orders"}
 		require.Equal(t, base, appendQueryAnnotations(base, v0, ti))
 	})
 
 	t.Run("omitted when pipeline/asset identity is incomplete", func(t *testing.T) {
+		t.Parallel()
 		base := []string{"ingest", "--dest-table", "raw.orders"}
 		incomplete := &scheduler.AssetInstance{
 			Pipeline: &pipeline.Pipeline{}, // no name
