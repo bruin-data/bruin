@@ -807,6 +807,10 @@ func (r *RoutingConfig) IsZero() bool {
 	return r == nil || r.EgressGateway == ""
 }
 
+// Clone returns a deep copy of r. The current implementation is a struct
+// value copy, which is correct as long as all fields are value types. If a
+// pointer/slice/map field is added to RoutingConfig this method must be
+// updated to copy those fields explicitly.
 func (r *RoutingConfig) Clone() *RoutingConfig {
 	if r == nil {
 		return nil

@@ -2135,6 +2135,23 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-vendor-us"},
 			},
 		},
+		{
+			name: "should apply default egress gateway when asset routing is empty",
+			asset: &pipeline.Asset{
+				Name:    "test-asset",
+				Routing: &pipeline.RoutingConfig{},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Routing: &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.EmptyStringMap{},
+				Routing:    &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
