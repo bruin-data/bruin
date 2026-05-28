@@ -2,8 +2,11 @@ package snowflake
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"io"
+	"math"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,7 +23,9 @@ import (
 )
 
 const (
-	invalidQueryError = "SQL compilation error"
+	invalidQueryError       = "SQL compilation error"
+	snowflakeRetryAttempts  = 3
+	snowflakeRetryBaseDelay = 500 * time.Millisecond
 )
 
 type DB struct {
@@ -30,6 +35,8 @@ type DB struct {
 	dsn           string
 	mutex         sync.Mutex
 	typeMapper    *diff.DatabaseTypeMapper
+	connect       func(ctx context.Context) (*sqlx.DB, error)
+	retryDelay    func(attempt int) time.Duration
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -46,6 +53,10 @@ func NewDB(c *Config) (*DB, error) {
 		dsn:           dsn,
 		mutex:         sync.Mutex{},
 		typeMapper:    diff.NewSnowflakeTypeMapper(),
+		connect: func(ctx context.Context) (*sqlx.DB, error) {
+			return sqlx.ConnectContext(ctx, "snowflake", dsn)
+		},
+		retryDelay: defaultSnowflakeRetryDelay,
 	}, nil
 }
 
@@ -57,13 +68,105 @@ func (db *DB) initializeDB(ctx context.Context) error {
 		return nil
 	}
 
-	conn, err := sqlx.ConnectContext(ctx, "snowflake", db.dsn)
+	conn, err := db.connectDB(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "failed to connect to snowflake")
 	}
 
 	db.conn = conn
 	return nil
+}
+
+func (db *DB) connectDB(ctx context.Context) (*sqlx.DB, error) {
+	if db.connect != nil {
+		return db.connect(ctx)
+	}
+
+	return sqlx.ConnectContext(ctx, "snowflake", db.dsn)
+}
+
+func (db *DB) delayBeforeRetry(ctx context.Context, attempt int) error {
+	delay := defaultSnowflakeRetryDelay(attempt)
+	if db.retryDelay != nil {
+		delay = db.retryDelay(attempt)
+	}
+	if delay <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func defaultSnowflakeRetryDelay(attempt int) time.Duration {
+	if attempt <= 0 {
+		return snowflakeRetryBaseDelay
+	}
+
+	return time.Duration(math.Pow(2, float64(attempt-1))) * snowflakeRetryBaseDelay
+}
+
+func isRetriableSnowflakeError(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() != nil {
+		return false
+	}
+
+	var netErr net.Error
+	if stderrors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+
+	message := strings.ToLower(err.Error())
+	retriableMessages := []string{
+		"client.timeout exceeded",
+		"context deadline exceeded",
+		"connection reset",
+		"connection refused",
+		"connection timed out",
+		"eof",
+		"i/o timeout",
+		"no such host",
+		"temporary failure",
+		"tls handshake timeout",
+		"timeout awaiting response headers",
+		"unexpected eof",
+	}
+
+	for _, retriable := range retriableMessages {
+		if strings.Contains(message, retriable) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (db *DB) withIdempotentRetry(ctx context.Context, fn func() error) error {
+	var lastErr error
+	for attempt := 1; attempt <= snowflakeRetryAttempts; attempt++ {
+		err := fn()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		if attempt == snowflakeRetryAttempts || !isRetriableSnowflakeError(ctx, err) {
+			return err
+		}
+
+		if delayErr := db.delayBeforeRetry(ctx, attempt); delayErr != nil {
+			return delayErr
+		}
+	}
+
+	return lastErr
 }
 
 // logSnowflakeQueryID tries to read a query ID from the channel and prints it.
@@ -80,8 +183,16 @@ func logSnowflakeQueryID(ctx context.Context, ch <-chan string) {
 	}
 }
 
+func withSnowflakeRequestID(ctx context.Context, requestID *gosnowflake.UUID) context.Context {
+	if requestID == nil {
+		return ctx
+	}
+
+	return gosnowflake.WithRequestID(ctx, *requestID)
+}
+
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	_, err := db.Select(ctx, query)
+	_, err := db.selectOnce(ctx, query, nil)
 	return err
 }
 
@@ -90,12 +201,24 @@ func (db *DB) GetIngestrURI() (string, error) {
 }
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	var result [][]interface{}
+	requestID := gosnowflake.NewUUID()
+	err := db.withIdempotentRetry(ctx, func() error {
+		var err error
+		result, err = db.selectOnce(ctx, query, &requestID)
+		return err
+	})
+	return result, err
+}
+
+func (db *DB) selectOnce(ctx context.Context, query *query.Query, requestID *gosnowflake.UUID) ([][]interface{}, error) {
 	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
 
 	// Attach a query ID channel and multi-statement context
 	qidChan := make(chan string, 1)
+	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
@@ -149,12 +272,24 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 }
 
 func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	var result [][]interface{}
+	requestID := gosnowflake.NewUUID()
+	err := db.withIdempotentRetry(ctx, func() error {
+		var err error
+		result, err = db.selectOnlyLastResultOnce(ctx, query, &requestID)
+		return err
+	})
+	return result, err
+}
+
+func (db *DB) selectOnlyLastResultOnce(ctx context.Context, query *query.Query, requestID *gosnowflake.UUID) ([][]interface{}, error) {
 	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
 
 	// Attach a query ID channel and multi-statement context
 	qidChan := make(chan string, 1)
+	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
@@ -221,12 +356,24 @@ func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][
 }
 
 func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
+	var valid bool
+	requestID := gosnowflake.NewUUID()
+	err := db.withIdempotentRetry(ctx, func() error {
+		var err error
+		valid, err = db.isValidOnce(ctx, query, &requestID)
+		return err
+	})
+	return valid, err
+}
+
+func (db *DB) isValidOnce(ctx context.Context, query *query.Query, requestID *gosnowflake.UUID) (bool, error) {
 	if err := db.initializeDB(ctx); err != nil {
 		return false, err
 	}
 
 	// Attach a query ID channel and multi-statement context
 	qidChan := make(chan string, 1)
+	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
@@ -289,12 +436,24 @@ func (db *DB) Ping(ctx context.Context) error {
 }
 
 func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	var result *query.QueryResult
+	requestID := gosnowflake.NewUUID()
+	err := db.withIdempotentRetry(ctx, func() error {
+		var err error
+		result, err = db.selectWithSchemaOnce(ctx, queryObj, &requestID)
+		return err
+	})
+	return result, err
+}
+
+func (db *DB) selectWithSchemaOnce(ctx context.Context, queryObj *query.Query, requestID *gosnowflake.UUID) (*query.QueryResult, error) {
 	if err := db.initializeDB(ctx); err != nil {
 		return nil, err
 	}
 	// Prepare Snowflake context for the query execution
 	// Attach a query ID channel and multi-statement context
 	qidChan := make(chan string, 1)
+	ctx = withSnowflakeRequestID(ctx, requestID)
 	ctx = gosnowflake.WithQueryIDChan(ctx, qidChan)
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
