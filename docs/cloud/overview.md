@@ -39,6 +39,7 @@ From there:
 - [Cross-pipeline dependencies](/cloud/cross-pipeline): depend on assets that live in other pipelines.
 - [Governance](/cloud/governance): the rules that drive quality scores and the risk report.
 - [Instance Types](/cloud/instance-types): sizing assets at run time.
+- [Security](/cloud/security): network access and dedicated egress IPs for allowlisting.
 - [Team Settings](/cloud/team-settings), [API Tokens](/cloud/api-tokens), [Audit Logs](/cloud/audit-logs): team administration.
 - [Cloud MCP](/cloud/mcp-setup): talk to Bruin Cloud from Cursor, Claude Code, or Codex.
 - [FAQ](/cloud/faq): short answers to common questions, including patterns that look plausible but are not real features.
