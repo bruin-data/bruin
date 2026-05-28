@@ -20,7 +20,12 @@ var (
 	uvChecker     = &uv.Checker{}
 )
 
-const adbcDriverName = "adbc_duckdb"
+const (
+	adbcDriverName = "adbc_duckdb"
+	// duckdbDriverVersion pins the DuckDB ADBC driver version installed via dbc.
+	// MotherDuck currently supports up to v1.5.2; newer DuckDB releases are rejected.
+	duckdbDriverVersion = "1.5.2"
+)
 
 //nolint:gochecknoinits
 func init() {
@@ -54,7 +59,7 @@ func ensureDriverInstalledInternal(ctx context.Context) error {
 	cmd.Stderr = nil
 	_ = cmd.Run()
 
-	cmd = exec.CommandContext(ctx, uvPath, "tool", "run", "--no-config", "dbc", "install", "--level", "user", "duckdb")
+	cmd = exec.CommandContext(ctx, uvPath, "tool", "run", "--no-config", "dbc", "install", "--level", "user", "duckdb="+duckdbDriverVersion)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
