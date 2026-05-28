@@ -1,10 +1,12 @@
 package snowflake
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -182,6 +184,89 @@ func TestDB_Select(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestDB_SelectRetriesTransientConnectError(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+	mock.ExpectQuery(`SELECT 1`).
+		WillReturnRows(sqlmock.NewRows([]string{"one"}).AddRow(1))
+
+	attempts := 0
+	db := DB{
+		connect: func(_ context.Context) (*sqlx.DB, error) {
+			attempts++
+			if attempts == 1 {
+				return nil, errors.New(`Post "https://account.snowflakecomputing.com/session/v1/login-request": context deadline exceeded (Client.Timeout exceeded while awaiting headers)`)
+			}
+
+			return sqlxDB, nil
+		},
+		retryDelay: func(_ int) time.Duration {
+			return 0
+		},
+	}
+
+	got, err := db.Select(t.Context(), &query.Query{Query: "SELECT 1"})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{int64(1)}}, got)
+	require.Equal(t, 2, attempts)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDB_SelectRetriesTransientQueryError(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+	mock.ExpectQuery(`SELECT 1`).
+		WillReturnError(errors.New("context deadline exceeded (Client.Timeout exceeded while awaiting headers)"))
+	mock.ExpectQuery(`SELECT 1`).
+		WillReturnRows(sqlmock.NewRows([]string{"one"}).AddRow(1))
+
+	db := DB{
+		conn: sqlxDB,
+		retryDelay: func(_ int) time.Duration {
+			return 0
+		},
+	}
+
+	got, err := db.Select(t.Context(), &query.Query{Query: "SELECT 1"})
+	require.NoError(t, err)
+	require.Equal(t, [][]interface{}{{int64(1)}}, got)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDB_RunQueryWithoutResultDoesNotRetryTransientQueryError(t *testing.T) {
+	t.Parallel()
+
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+	mock.ExpectQuery(`CREATE TABLE test AS SELECT 1`).
+		WillReturnError(errors.New("context deadline exceeded (Client.Timeout exceeded while awaiting headers)"))
+
+	db := DB{
+		conn: sqlxDB,
+		retryDelay: func(_ int) time.Duration {
+			return 0
+		},
+	}
+
+	err = db.RunQueryWithoutResult(t.Context(), &query.Query{Query: "CREATE TABLE test AS SELECT 1"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Client.Timeout exceeded while awaiting headers")
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDB_SelectOnlyLastResult(t *testing.T) {
