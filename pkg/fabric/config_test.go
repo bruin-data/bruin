@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/go-mssqldb/azuread"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfig_ToDBConnectionURI(t *testing.T) {
@@ -62,12 +63,61 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 
 func TestConfig_GetIngestrURI(t *testing.T) {
 	t.Parallel()
-	c := Config{
-		Username: "user",
-		Password: "password",
-		Host:     "localhost",
-		Database: "warehouse",
-	}
 
-	assert.Equal(t, "fabric://?server=localhost&database=warehouse&authentication=sql&username=user&password=password", c.GetIngestrURI())
+	t.Run("service principal", func(t *testing.T) {
+		t.Parallel()
+		c := Config{
+			Host:         "myworkspace.datawarehouse.fabric.microsoft.com",
+			Database:     "MyWarehouse",
+			ClientID:     "client-id",
+			ClientSecret: "secret",
+			TenantID:     "tenant-id",
+		}
+
+		uri, err := c.GetIngestrURI()
+		require.NoError(t, err)
+		assert.Equal(t, "fabric://client-id:secret@myworkspace.datawarehouse.fabric.microsoft.com:1433/MyWarehouse?tenant_id=tenant-id", uri)
+	})
+
+	t.Run("service principal without secret", func(t *testing.T) {
+		t.Parallel()
+		c := Config{
+			Host:     "fabric.example",
+			Port:     1433,
+			Database: "warehouse",
+			ClientID: "client-id",
+			TenantID: "tenant-id",
+		}
+
+		uri, err := c.GetIngestrURI()
+		require.NoError(t, err)
+		assert.Equal(t, "fabric://client-id@fabric.example:1433/warehouse?tenant_id=tenant-id", uri)
+	})
+
+	t.Run("azure default credential", func(t *testing.T) {
+		t.Parallel()
+		c := Config{
+			Host:                      "fabric.example",
+			Database:                  "warehouse",
+			UseAzureDefaultCredential: true,
+		}
+
+		uri, err := c.GetIngestrURI()
+		require.NoError(t, err)
+		assert.Equal(t, "fabric://fabric.example:1433/warehouse?fedauth=ActiveDirectoryDefault", uri)
+	})
+
+	t.Run("sql auth is rejected", func(t *testing.T) {
+		t.Parallel()
+		c := Config{
+			Username: "user",
+			Password: "password",
+			Host:     "localhost",
+			Database: "warehouse",
+		}
+
+		_, err := c.GetIngestrURI()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Microsoft Entra ID authentication")
+	})
 }

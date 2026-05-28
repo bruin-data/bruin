@@ -549,6 +549,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Synapse = append(env.Connections.Synapse, conn)
+	case "fabric":
+		var conn FabricConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Fabric = append(env.Connections.Fabric, conn)
 	case "mongo":
 		var conn MongoConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1253,6 +1260,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Snowflake = removeConnection(env.Connections.Snowflake, connectionName)
 	case "synapse":
 		env.Connections.Synapse = removeConnection(env.Connections.Synapse, connectionName)
+	case "fabric":
+		env.Connections.Fabric = removeConnection(env.Connections.Fabric, connectionName)
 	case "gorgias":
 		env.Connections.Gorgias = removeConnection(env.Connections.Gorgias, connectionName)
 	case "g2":
