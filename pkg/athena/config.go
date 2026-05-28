@@ -2,6 +2,7 @@ package athena
 
 import (
 	"log"
+	"net/url"
 
 	drv "github.com/uber/athenadriver/go"
 )
@@ -36,9 +37,13 @@ func (c *Config) ToDBConnectionURI() (string, error) {
 }
 
 func (c *Config) GetIngestrURI() string {
-	str := "athena://?bucket=" + c.OutputBucket + "&access_key_id=" + c.AccessID + "&secret_access_key=" + c.SecretAccessKey + "&region_name=" + c.Region
+	q := url.Values{}
+	q.Set("bucket", c.OutputBucket)
+	q.Set("access_key_id", c.AccessID)
+	q.Set("secret_access_key", c.SecretAccessKey)
+	q.Set("region_name", c.Region)
 	if c.SessionToken != "" {
-		str += "&session_token=" + c.SessionToken
+		q.Set("session_token", c.SessionToken)
 	}
-	return str
+	return "athena://?" + q.Encode()
 }
