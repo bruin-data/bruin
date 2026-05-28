@@ -86,10 +86,12 @@ func (db *DB) connectDB(ctx context.Context) (*sqlx.DB, error) {
 }
 
 func (db *DB) delayBeforeRetry(ctx context.Context, attempt int) error {
-	delay := defaultSnowflakeRetryDelay(attempt)
-	if db.retryDelay != nil {
-		delay = db.retryDelay(attempt)
+	delayFunc := db.retryDelay
+	if delayFunc == nil {
+		delayFunc = defaultSnowflakeRetryDelay
 	}
+
+	delay := delayFunc(attempt)
 	if delay <= 0 {
 		return nil
 	}
@@ -149,13 +151,11 @@ func isRetriableSnowflakeError(ctx context.Context, err error) bool {
 }
 
 func (db *DB) withIdempotentRetry(ctx context.Context, fn func() error) error {
-	var lastErr error
 	for attempt := 1; attempt <= snowflakeRetryAttempts; attempt++ {
 		err := fn()
 		if err == nil {
 			return nil
 		}
-		lastErr = err
 
 		if attempt == snowflakeRetryAttempts || !isRetriableSnowflakeError(ctx, err) {
 			return err
@@ -166,7 +166,7 @@ func (db *DB) withIdempotentRetry(ctx context.Context, fn func() error) error {
 		}
 	}
 
-	return lastErr
+	return nil
 }
 
 // logSnowflakeQueryID tries to read a query ID from the channel and prints it.
