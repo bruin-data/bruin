@@ -2449,7 +2449,7 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 }
 
 func assetAcceptsDefaultHooks(asset *Asset) bool {
-	return strings.HasSuffix(asset.ExecutableFile.Path, ".sql")
+	return asset.IsSQLAsset()
 }
 
 func (b *Builder) InjectConnectionAsSecret(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {

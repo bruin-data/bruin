@@ -2058,6 +2058,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			name: "should apply default hooks when missing",
 			asset: &pipeline.Asset{
 				Name: "test-asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.sql",
 				},
@@ -2072,6 +2073,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 			want: &pipeline.Asset{
 				Name:       "test-asset",
+				Type:       pipeline.AssetTypeBigqueryQuery,
 				Parameters: pipeline.EmptyStringMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.sql",
@@ -2109,7 +2111,7 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			},
 		},
 		{
-			name: "should not apply default hooks to non sql files",
+			name: "should apply default hooks to SQL assets based on type",
 			asset: &pipeline.Asset{
 				Name: "test-asset",
 				Type: pipeline.AssetTypeBigqueryQuery,
@@ -2131,6 +2133,36 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 				Parameters: pipeline.EmptyStringMap{},
 				ExecutableFile: pipeline.ExecutableFile{
 					Path: "/tmp/test-asset.asset.yml",
+				},
+				Hooks: pipeline.Hooks{
+					Pre:  []pipeline.Hook{{Query: "select 1"}},
+					Post: []pipeline.Hook{{Query: "select 2"}},
+				},
+			},
+		},
+		{
+			name: "should not apply default hooks to non SQL assets based on type",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: pipeline.AssetTypeIngestr,
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
+				},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					Hooks: pipeline.Hooks{
+						Pre:  []pipeline.Hook{{Query: "select 1"}},
+						Post: []pipeline.Hook{{Query: "select 2"}},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Type:       pipeline.AssetTypeIngestr,
+				Parameters: pipeline.EmptyStringMap{},
+				ExecutableFile: pipeline.ExecutableFile{
+					Path: "/tmp/test-asset.sql",
 				},
 			},
 		},
