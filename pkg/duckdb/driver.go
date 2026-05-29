@@ -72,7 +72,7 @@ func installDuckDBADBCDriver(ctx context.Context) error {
 	}
 
 	drivers, err := client.Search(ctx, dbcDriverName)
-	if err != nil && len(drivers) == 0 {
+	if err != nil {
 		return fmt.Errorf("failed to search for dbc driver %s: %w", dbcDriverName, err)
 	}
 
@@ -101,7 +101,10 @@ func installDuckDBADBCDriver(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to download dbc driver %s=%s: %w", dbcDriverName, duckdbDriverVersion, err)
 	}
-	defer cleanup()
+	defer func() {
+		_ = downloaded.Close()
+		cleanup()
+	}()
 
 	cfg := client.GetConfig(config.ConfigUser)
 	manifest, err := config.InstallDriver(cfg, dbcDriverName, downloaded)
