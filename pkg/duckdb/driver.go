@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/apache/arrow-adbc/go/adbc/drivermgr"
@@ -46,7 +47,10 @@ func EnsureADBCDriverInstalled(ctx context.Context) error {
 
 func ensureDriverInstalledInternal(ctx context.Context) error {
 	if err := tryLoadDriver(); err == nil { //nolint:contextcheck
-		return nil
+		if version, err := installedDuckDBVersion(); err == nil && version == duckdbDriverVersion { //nolint:contextcheck
+			return nil
+		}
+		// Driver loads but version doesn't match the pinned one; fall through to reinstall.
 	}
 
 	uvPath, err := uvChecker.EnsureUvInstalled(ctx)
@@ -55,6 +59,13 @@ func ensureDriverInstalledInternal(ctx context.Context) error {
 	}
 
 	cmd := exec.CommandContext(ctx, uvPath, "tool", "install", "--quiet", "--no-config", "dbc")
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	_ = cmd.Run()
+
+	// Remove any previously installed duckdb driver so the pinned version replaces it.
+	// Ignore errors: the driver may not be present at the user level.
+	cmd = exec.CommandContext(ctx, uvPath, "tool", "run", "--no-config", "dbc", "uninstall", "--quiet", "--level", "user", "duckdb")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	_ = cmd.Run()
@@ -71,6 +82,22 @@ func ensureDriverInstalledInternal(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// installedDuckDBVersion queries the loaded DuckDB driver for its version string,
+// returning it without the leading "v" (e.g. "1.5.2").
+func installedDuckDBVersion() (string, error) {
+	db, err := sql.Open(adbcDriverName, "driver=duckdb;path=:memory:")
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	var version string
+	if err := db.QueryRowContext(context.Background(), "SELECT version()").Scan(&version); err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(strings.TrimSpace(version), "v"), nil
 }
 
 func tryLoadDriver() error {
