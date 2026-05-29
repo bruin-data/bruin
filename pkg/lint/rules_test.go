@@ -3056,7 +3056,7 @@ func TestValidateScriptAssetHooksUnsupported(t *testing.T) {
 			wantIssue: false,
 		},
 		{
-			name: "script asset with only default-inherited hooks does not return warning",
+			name: "script asset with hooks matching pipeline defaults returns warning",
 			asset: &pipeline.Asset{
 				Name: "py_asset",
 				Type: pipeline.AssetTypePython,
@@ -3071,7 +3071,7 @@ func TestValidateScriptAssetHooksUnsupported(t *testing.T) {
 					Post: []pipeline.Hook{{Query: "select default post"}},
 				},
 			},
-			wantIssue: false,
+			wantIssue: true,
 		},
 	}
 

@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -541,9 +540,6 @@ func ValidateScriptAssetHooksUnsupported(ctx context.Context, p *pipeline.Pipeli
 	if asset.Hooks.IsZero() {
 		return issues, nil
 	}
-	if hooksOnlyFromPipelineDefaults(asset, p) {
-		return issues, nil
-	}
 
 	assetTypeLabel := "Python"
 	if asset.Type == pipeline.AssetTypeR {
@@ -556,15 +552,6 @@ func ValidateScriptAssetHooksUnsupported(ctx context.Context, p *pipeline.Pipeli
 	})
 
 	return issues, nil
-}
-
-func hooksOnlyFromPipelineDefaults(asset *pipeline.Asset, p *pipeline.Pipeline) bool {
-	if asset == nil || p == nil || p.DefaultValues == nil {
-		return false
-	}
-
-	return reflect.DeepEqual(asset.Hooks.Pre, p.DefaultValues.Hooks.Pre) &&
-		reflect.DeepEqual(asset.Hooks.Post, p.DefaultValues.Hooks.Post)
 }
 
 func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {

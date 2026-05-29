@@ -2431,10 +2431,10 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
 		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
 	}
-	if len(asset.Hooks.Pre) == 0 {
+	if assetAcceptsDefaultHooks(asset) && len(asset.Hooks.Pre) == 0 {
 		asset.Hooks.Pre = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Pre...)
 	}
-	if len(asset.Hooks.Post) == 0 {
+	if assetAcceptsDefaultHooks(asset) && len(asset.Hooks.Post) == 0 {
 		asset.Hooks.Post = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Post...)
 	}
 	if !foundPipeline.DefaultValues.Routing.IsZero() {
@@ -2446,6 +2446,10 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	}
 
 	return asset, nil
+}
+
+func assetAcceptsDefaultHooks(asset *Asset) bool {
+	return asset.IsSQLAsset()
 }
 
 func (b *Builder) InjectConnectionAsSecret(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
