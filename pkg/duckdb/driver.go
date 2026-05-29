@@ -106,7 +106,10 @@ func installDuckDBADBCDriver(ctx context.Context) error {
 		cleanup()
 	}()
 
-	cfg := client.GetConfig(config.ConfigUser)
+	cfg := config.Config{
+		Level:    config.ConfigUser,
+		Location: config.ConfigUser.ConfigLocation(),
+	}
 	manifest, err := config.InstallDriver(cfg, dbcDriverName, downloaded)
 	if err != nil {
 		return fmt.Errorf("failed to install dbc driver %s=%s: %w", dbcDriverName, duckdbDriverVersion, err)
