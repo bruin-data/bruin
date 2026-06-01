@@ -581,6 +581,7 @@ type UpstreamColumn struct {
 type Column struct {
 	EntityAttribute *EntityAttribute  `json:"entity_attribute" yaml:"-" mapstructure:"-"`
 	Name            string            `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	SourceColumn    string            `json:"source_column" yaml:"source_column,omitempty" mapstructure:"source_column"`
 	Type            string            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
 	Description     string            `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	Tags            EmptyStringArray  `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`

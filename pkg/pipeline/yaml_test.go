@@ -409,6 +409,26 @@ routing:
 	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
 }
 
+func TestConvertYamlToTask_SourceColumn(t *testing.T) {
+	t.Parallel()
+
+	task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.contacts
+type: ingestr
+columns:
+  - name: first_name
+    source_column: fname
+    type: string
+  - name: email
+    type: string
+`)))
+	require.NoError(t, err)
+	require.Len(t, task.Columns, 2)
+	require.Equal(t, "first_name", task.Columns[0].Name)
+	require.Equal(t, "fname", task.Columns[0].SourceColumn)
+	require.Empty(t, task.Columns[1].SourceColumn)
+}
+
 func TestCreateTaskFromFileComments_Routing(t *testing.T) {
 	t.Parallel()
 

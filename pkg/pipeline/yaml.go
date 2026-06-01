@@ -281,6 +281,7 @@ type columnUpstream struct {
 type column struct {
 	Extends       string            `yaml:"extends"`
 	Name          string            `yaml:"name"`
+	SourceColumn  string            `yaml:"source_column"`
 	Type          string            `yaml:"type"`
 	Description   string            `yaml:"description"`
 	Tests         []columnCheck     `yaml:"checks"`
@@ -480,6 +481,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 		columns[index] = Column{
 			Name:            column.Name,
+			SourceColumn:    column.SourceColumn,
 			Type:            strings.TrimSpace(column.Type),
 			Description:     column.Description,
 			Checks:          tests,
