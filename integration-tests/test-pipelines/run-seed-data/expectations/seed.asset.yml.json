@@ -34,6 +34,7 @@
       {
         "entity_attribute": null,
         "name": "name",
+        "source_column": "",
         "type": "varchar",
         "description": "Contact person's full name",
         "tags": [],
@@ -58,6 +59,7 @@
       {
         "entity_attribute": null,
         "name": "networking_through",
+        "source_column": "",
         "type": "varchar",
         "description": "Source or connection through which contact was made",
         "tags": [],
@@ -94,6 +96,7 @@
       {
         "entity_attribute": null,
         "name": "position",
+        "source_column": "",
         "type": "varchar",
         "description": "Contact's job position or title",
         "tags": [],
@@ -118,6 +121,7 @@
       {
         "entity_attribute": null,
         "name": "contact_date",
+        "source_column": "",
         "type": "varchar",
         "description": "Date when contact was established",
         "tags": [],
