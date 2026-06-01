@@ -630,16 +630,10 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 		}
 
 		for _, column := range asset.Columns {
-			// When source_column is set, the column lives in the CSV under that
-			// name and the asset's `name` is the destination after rename.
-			lookup := column.Name
-			if column.SourceColumn != "" {
-				lookup = column.SourceColumn
-			}
-			if !columnMap[strings.ToLower(lookup)] {
+			if !columnMap[strings.ToLower(column.Name)] {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: fmt.Sprintf("Column '%s' is defined in the asset but does not exist in the CSV", lookup),
+					Description: fmt.Sprintf("Column '%s' is defined in the asset but does not exist in the CSV", column.Name),
 				})
 			}
 		}
