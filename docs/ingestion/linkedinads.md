@@ -186,6 +186,8 @@ The following common analytics breakdowns are all available through the `custom`
 
 Replace `<metrics>` with the LinkedIn metrics you want (e.g. `impressions,clicks,costInLocalCurrency`). Swap `date` for `month` to switch from daily to monthly granularity.
 
+Any other pivot dimension from the list above — including `account` and `member_seniority` — is reachable with the same pattern, e.g. `custom:account,date:<metrics>` or `custom:member_seniority,date:<metrics>`.
+
 ## Step 3: [Run](/commands/run) asset to ingest data
 
 ```bash
