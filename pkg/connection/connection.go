@@ -76,6 +76,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
+	"github.com/bruin-data/bruin/pkg/onelake"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/phantombuster"
@@ -124,6 +125,7 @@ type Manager struct {
 	MsSQL                map[string]*mssql.DB
 	Databricks           map[string]*databricks.DB
 	Fabric               map[string]*fabric.DB
+	OneLake              map[string]*onelake.Client
 	Mongo                map[string]*mongo.DB
 	Couchbase            map[string]*couchbase.DB
 	Cursor               map[string]*cursor.Client
@@ -621,6 +623,35 @@ func (m *Manager) AddFabricConnectionFromConfig(connection *config.FabricConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Fabric[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddOneLakeConnectionFromConfig(connection *config.OneLakeConnection) error {
+	m.mutex.Lock()
+	if m.OneLake == nil {
+		m.OneLake = make(map[string]*onelake.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := onelake.NewClient(onelake.Config{
+		WorkspaceName:             connection.WorkspaceName,
+		LakehouseName:             connection.LakehouseName,
+		TenantID:                  connection.TenantID,
+		ClientID:                  connection.ClientID,
+		ClientSecret:              connection.ClientSecret,
+		SASToken:                  connection.SASToken,
+		UseAzureDefaultCredential: connection.UseAzureDefaultCredential,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.OneLake[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -2958,6 +2989,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fabric, connectionManager.AddFabricConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.OneLake, connectionManager.AddOneLakeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
