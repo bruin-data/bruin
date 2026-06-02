@@ -27,7 +27,7 @@ Bruin supports a wide range of platforms:
 
 - **Cloud warehouses**: BigQuery, Snowflake, Databricks, Redshift, Athena, Synapse, Microsoft Fabric
 - **Relational databases**: PostgreSQL, MySQL, Microsoft SQL Server, Oracle, SAP HANA, SQLite, IBM DB2, Google Cloud Spanner, Vertica
-- **Analytical engines**: ClickHouse, DuckDB, MotherDuck, Trino
+- **Analytical engines**: ClickHouse, DuckDB, MotherDuck, Trino, Arrow Flight SQL (Dremio)
 - **Search & document stores**: Elasticsearch, MongoDB Atlas
 - **Cloud storage**: S3, GCS
 - **Compute engines**: AWS EMR Serverless, GCP Dataproc Serverless

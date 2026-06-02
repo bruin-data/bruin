@@ -264,7 +264,7 @@ Supported platforms for `merge_sql`:
 
 - BigQuery, Snowflake, Postgres, mssql, MySQL: supported
 - Athena (Iceberg tables): supported
-- Databricks,ClickHouse, Trino, DuckDB: not supported
+- Databricks,ClickHouse, Trino, DuckDB, Arrow Flight SQL (Dremio): not supported
 
 > [!INFO]
 > An important difference between `merge` and `delete+insert` is that `merge` will update the existing rows, while `delete+insert` will delete the existing rows and insert the new rows. This means if your source has deleted rows, `merge` will not delete them from the destination, whereas `delete+insert` will if their `incremental_key` matches.
