@@ -1408,14 +1408,17 @@ func Run(isDebug *bool) *cli.Command {
 				if len(errorsInTaskResults) > 0 {
 					if singleCheckID != "" {
 						printSingleCheckError(errorsInTaskResults[0])
-					} else {
-						if minimalLogs {
-							summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
-							printErrorsMinimal(errorsInTaskResults)
-						} else {
-							printExecutionSummary(results, s, duration, len(results))
-							printErrorsInResults(errorsInTaskResults, s)
+						if _, ok := errorsInTaskResults[0].Error.(*ansisql.CheckError); ok { //nolint:errorlint
+							return cli.Exit("", 1)
 						}
+						return cli.Exit("", 2)
+					}
+					if minimalLogs {
+						summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
+						printErrorsMinimal(errorsInTaskResults)
+					} else {
+						printExecutionSummary(results, s, duration, len(results))
+						printErrorsInResults(errorsInTaskResults, s)
 					}
 					return cli.Exit("", 1)
 				}
