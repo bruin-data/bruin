@@ -4,6 +4,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // Config holds the connection parameters for an Arrow Flight SQL platform.
@@ -25,7 +27,16 @@ type Config struct {
 // ToDSN builds a DSN understood by the ADBC Flight SQL database/sql driver.
 // The driver parses the DSN as a ";"-separated list of "key=value" options,
 // where the keys are the standard ADBC option names (uri, username, password).
-func (c Config) ToDSN() string {
+//
+// The driver does not unescape values, so credentials are passed through
+// verbatim; a ";" in a credential would split the DSN into a bogus option and
+// fail to parse. We reject that explicitly rather than corrupt the value. ("="
+// is safe because the driver splits each option on its first "=" only.)
+func (c Config) ToDSN() (string, error) {
+	if strings.Contains(c.Username, ";") || strings.Contains(c.Password, ";") {
+		return "", errors.New("Flight SQL username and password cannot contain ';' (the DSN option delimiter)")
+	}
+
 	uri := "grpc+tcp://" + net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
 
 	opts := []string{"uri=" + uri}
@@ -36,7 +47,7 @@ func (c Config) ToDSN() string {
 		opts = append(opts, "password="+c.Password)
 	}
 
-	return strings.Join(opts, ";")
+	return strings.Join(opts, ";"), nil
 }
 
 func (c Config) GetDatabase() string {

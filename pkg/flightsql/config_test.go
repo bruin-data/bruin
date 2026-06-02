@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfig_ToDSN(t *testing.T) {
@@ -13,6 +14,7 @@ func TestConfig_ToDSN(t *testing.T) {
 		name     string
 		config   Config
 		expected string
+		wantErr  bool
 	}{
 		{
 			name: "host port and credentials",
@@ -41,12 +43,38 @@ func TestConfig_ToDSN(t *testing.T) {
 			},
 			expected: "uri=grpc+tcp://localhost:32010",
 		},
+		{
+			name: "password with '=' is kept verbatim",
+			config: Config{
+				Host:     "localhost",
+				Port:     32010,
+				Username: "admin",
+				Password: "p@ss=word",
+			},
+			expected: "uri=grpc+tcp://localhost:32010;username=admin;password=p@ss=word",
+		},
+		{
+			name: "semicolon in password is rejected",
+			config: Config{
+				Host:     "localhost",
+				Port:     32010,
+				Username: "admin",
+				Password: "p@ss;word",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.expected, tt.config.ToDSN())
+			dsn, err := tt.config.ToDSN()
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, dsn)
 		})
 	}
 }

@@ -25,7 +25,12 @@ type connection interface {
 }
 
 func NewClient(c Config) (*Client, error) {
-	conn, err := sql.Open("flightsql", c.ToDSN())
+	dsn, err := c.ToDSN()
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := sql.Open("flightsql", dsn)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open Flight SQL connection")
 	}
