@@ -24,7 +24,8 @@ func TestBuildTruncateInsertQuery(t *testing.T) {
 			query: "SELECT id, name FROM source_users",
 			expected: `BEGIN TRANSACTION;
 TRUNCATE TABLE users;
-INSERT INTO users SELECT id, name FROM source_users;
+INSERT INTO users SELECT id, name FROM source_users
+;
 COMMIT;`,
 		},
 		{
@@ -35,7 +36,8 @@ COMMIT;`,
 			query: "SELECT * FROM source_products;",
 			expected: `BEGIN TRANSACTION;
 TRUNCATE TABLE products;
-INSERT INTO products SELECT * FROM source_products;
+INSERT INTO products SELECT * FROM source_products
+;
 COMMIT;`,
 		},
 		{
@@ -46,7 +48,8 @@ COMMIT;`,
 			query: "SELECT date, revenue FROM metrics",
 			expected: `BEGIN TRANSACTION;
 TRUNCATE TABLE analytics.daily_metrics;
-INSERT INTO analytics.daily_metrics SELECT date, revenue FROM metrics;
+INSERT INTO analytics.daily_metrics SELECT date, revenue FROM metrics
+;
 COMMIT;`,
 		},
 	}

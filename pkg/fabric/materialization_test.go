@@ -27,7 +27,7 @@ func TestBuildCreateReplaceQuery(t *testing.T) {
 		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
 			"DROP TABLE IF EXISTS [dbo].[Table__bruin_backup];\n" +
 			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
-			"SELECT 1;\n" +
+			"SELECT 1\n;\n" +
 			"IF OBJECT_ID('dbo.Table', 'U') IS NOT NULL BEGIN EXEC sp_rename 'dbo.Table', 'Table__bruin_backup' END;\n" +
 			"EXEC sp_rename 'dbo.Table__bruin_tmp', 'Table';\n" +
 			"DROP TABLE IF EXISTS [dbo].[Table__bruin_backup];"
@@ -37,12 +37,12 @@ func TestBuildCreateReplaceQuery(t *testing.T) {
 	t.Run("query with CTE", func(t *testing.T) {
 		t.Parallel()
 		asset := &pipeline.Asset{Name: "dbo.Table"}
-		result, err := buildCreateReplaceQuery(asset, "WITH monthly AS (SELECT id, amount FROM sales) SELECT * FROM monthly;")
+		result, err := buildCreateReplaceQuery(asset, "WITH monthly AS (SELECT id, amount FROM sales) SELECT * FROM monthly\n;")
 		require.NoError(t, err)
 		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
 			"DROP TABLE IF EXISTS [dbo].[Table__bruin_backup];\n" +
 			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
-			"WITH monthly AS (SELECT id, amount FROM sales) SELECT * FROM monthly;\n" +
+			"WITH monthly AS (SELECT id, amount FROM sales) SELECT * FROM monthly\n;\n" +
 			"IF OBJECT_ID('dbo.Table', 'U') IS NOT NULL BEGIN EXEC sp_rename 'dbo.Table', 'Table__bruin_backup' END;\n" +
 			"EXEC sp_rename 'dbo.Table__bruin_tmp', 'Table';\n" +
 			"DROP TABLE IF EXISTS [dbo].[Table__bruin_backup];"
@@ -70,7 +70,7 @@ func TestBuildDeleteInsertQuery(t *testing.T) {
 		require.NoError(t, err)
 		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
 			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
-			"SELECT 1;\n" +
+			"SELECT 1\n;\n" +
 			"DELETE FROM [dbo].[Table] WHERE EXISTS (\n" +
 			"  SELECT 1 FROM [dbo].[Table__bruin_tmp] WHERE [dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]\n" +
 			");\n" +
@@ -89,7 +89,7 @@ func TestBuildDeleteInsertQuery(t *testing.T) {
 		require.NoError(t, err)
 		expected := "DROP TABLE IF EXISTS [dbo].[Table__bruin_tmp];\n" +
 			"CREATE TABLE [dbo].[Table__bruin_tmp] AS\n" +
-			"WITH cte AS (SELECT id, val FROM src) SELECT * FROM cte;\n" +
+			"WITH cte AS (SELECT id, val FROM src) SELECT * FROM cte\n;\n" +
 			"DELETE FROM [dbo].[Table] WHERE EXISTS (\n" +
 			"  SELECT 1 FROM [dbo].[Table__bruin_tmp] WHERE [dbo].[Table].[id] = [dbo].[Table__bruin_tmp].[id]\n" +
 			");\n" +

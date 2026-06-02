@@ -111,7 +111,8 @@ func TestMaterializer_Render(t *testing.T) {
 			wantRegex: regexp.MustCompile(
 				`(?s)^START TRANSACTION;
 DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
-CREATE TEMPORARY TABLE __bruin_tmp_[^;\n]+ AS SELECT id, value FROM source;
+CREATE TEMPORARY TABLE __bruin_tmp_[^;\n]+ AS SELECT id, value FROM source
+;
 DELETE FROM analytics\.orders WHERE id IN \(SELECT DISTINCT id FROM __bruin_tmp_[^;\n]+\);
 INSERT INTO analytics\.orders SELECT \* FROM __bruin_tmp_[^;\n]+;
 DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
@@ -240,7 +241,7 @@ COMMIT;$`),
 			query: "SELECT * FROM staging",
 			wantExact: "START TRANSACTION;\n" +
 				"DELETE FROM analytics.orders WHERE event_time BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO analytics.orders SELECT * FROM staging;\n" +
+				"INSERT INTO analytics.orders SELECT * FROM staging\n;\n" +
 				"COMMIT;",
 		},
 		{
@@ -523,7 +524,7 @@ COMMIT;$`),
 			query: "SELECT * FROM staging",
 			wantExact: "START TRANSACTION;\n" +
 				"TRUNCATE TABLE analytics.orders;\n" +
-				"INSERT INTO analytics.orders SELECT * FROM staging;\n" +
+				"INSERT INTO analytics.orders SELECT * FROM staging\n;\n" +
 				"COMMIT;",
 		},
 	}

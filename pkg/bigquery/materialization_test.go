@@ -163,7 +163,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
@@ -183,7 +183,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
@@ -203,7 +203,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
@@ -224,7 +224,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			query: "SELECT 1",
 			want: "^DECLARE distinct_keys.+ array<date>;\n" +
 				"BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
 				"SET distinct_keys_.+ = \\(SELECT array_agg\\(distinct somekey\\) FROM __bruin_tmp_.+\\);\n" +
 				"DELETE FROM my\\.asset WHERE somekey in unnest\\(distinct_keys.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
@@ -295,7 +295,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1",
 			want: "MERGE my\\.asset target\n" +
-				"USING \\(SELECT 1\\) source\n" +
+				"USING \\(SELECT 1\n\\) source\n" +
 				"ON \\(\\(source\\.dt = target\\.dt OR \\(source\\.dt IS NULL and target\\.dt IS NULL\\)\\) AND \\(source\\.event_type = target\\.event_type OR \\(source\\.event_type IS NULL and target\\.event_type IS NULL\\)\\)\\)\n" +
 				"\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
@@ -317,7 +317,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1;",
 			want: "MERGE my\\.asset target\n" +
-				"USING \\(SELECT 1\\) source\n" +
+				"USING \\(SELECT 1\n\\) source\n" +
 				"ON \\(\\(source\\.dt = target\\.dt OR \\(source\\.dt IS NULL and target\\.dt IS NULL\\)\\) AND \\(source\\.event_type = target\\.event_type OR \\(source\\.event_type IS NULL and target\\.event_type IS NULL\\)\\)\\)\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.value = source\\.value\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
@@ -340,7 +340,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT pk, col1, col2, col3, col4 from input_table",
 			want: "MERGE my.asset target\n" +
-				"USING (SELECT pk, col1, col2, col3, col4 from input_table) source\n" +
+				"USING (SELECT pk, col1, col2, col3, col4 from input_table\n) source\n" +
 				"ON ((source.pk = target.pk OR (source.pk IS NULL and target.pk IS NULL)))\n" +
 				"WHEN MATCHED THEN UPDATE SET target.col1 = min(target.col1, source.col1), target.col2 = target.col1 - source.col1, target.col3 = source.col3\n" +
 				"WHEN NOT MATCHED THEN INSERT(pk, col1, col2, col3, col4) VALUES(pk, col1, col2, col3, col4);",
@@ -363,7 +363,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT id, value, count, status FROM source",
 			want: "MERGE my.asset target\n" +
-				"USING (SELECT id, value, count, status FROM source) source\n" +
+				"USING (SELECT id, value, count, status FROM source\n) source\n" +
 				"ON ((source.id = target.id OR (source.id IS NULL and target.id IS NULL)))\n" +
 				"WHEN MATCHED THEN UPDATE SET target.value = GREATEST(target.value, source.value), target.count = target.count + source.count\n" +
 				"WHEN NOT MATCHED THEN INSERT(id, value, count, status) VALUES(id, value, count, status);",
@@ -386,7 +386,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT id, col1, col2, col3 FROM source",
 			want: "MERGE my.asset target\n" +
-				"USING (SELECT id, col1, col2, col3 FROM source) source\n" +
+				"USING (SELECT id, col1, col2, col3 FROM source\n) source\n" +
 				"ON ((source.id = target.id OR (source.id IS NULL and target.id IS NULL)))\n" +
 				"WHEN MATCHED THEN UPDATE SET target.col1 = COALESCE(source.col1, target.col1), target.col2 = source.col2\n" +
 				"WHEN NOT MATCHED THEN INSERT(id, col1, col2, col3) VALUES(id, col1, col2, col3);",
@@ -420,7 +420,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'\n;\n" +
 				"COMMIT TRANSACTION;$",
 		},
 		{
@@ -437,7 +437,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'\n;\n" +
 				"COMMIT TRANSACTION;$",
 		},
 	}

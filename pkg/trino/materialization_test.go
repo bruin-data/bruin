@@ -30,7 +30,8 @@ func TestBuildCreateReplaceQuery(t *testing.T) {
 			expected: `
 DROP TABLE IF EXISTS "test_table";
 CREATE TABLE "test_table" WITH (format = 'PARQUET') AS
-SELECT * FROM source_table;`,
+SELECT * FROM source_table
+;`,
 		},
 		{
 			name: "create replace with partitioning",
@@ -46,7 +47,8 @@ SELECT * FROM source_table;`,
 			expected: `
 DROP TABLE IF EXISTS "partitioned_table";
 CREATE TABLE "partitioned_table" WITH (format = 'PARQUET', partitioning = ARRAY['date_column']) AS
-SELECT * FROM source_table;`,
+SELECT * FROM source_table
+;`,
 		},
 		{
 			name: "query with trailing semicolon gets trimmed",
@@ -61,7 +63,8 @@ SELECT * FROM source_table;`,
 			expected: `
 DROP TABLE IF EXISTS "test_table";
 CREATE TABLE "test_table" WITH (format = 'PARQUET') AS
-SELECT * FROM source_table;`,
+SELECT * FROM source_table
+;`,
 		},
 		{
 			name: "complex query with partitioning",
@@ -87,7 +90,8 @@ SELECT
     name,
     YEAR(created_at) as year
 FROM users 
-WHERE active = true;`,
+WHERE active = true
+;`,
 		},
 		{
 			name: "table name with schema",
@@ -102,7 +106,8 @@ WHERE active = true;`,
 			expected: `
 DROP TABLE IF EXISTS "schema"."test_table";
 CREATE TABLE "schema"."test_table" WITH (format = 'PARQUET') AS
-SELECT 1 as col;`,
+SELECT 1 as col
+;`,
 		},
 	}
 
@@ -324,11 +329,13 @@ func TestBuildIncrementalQuery(t *testing.T) {
 DELETE FROM "users" 
 WHERE id IN (
     SELECT DISTINCT id 
-    FROM (SELECT id, name, email FROM source_users WHERE updated_at > '2023-01-01') AS new_data
+    FROM (SELECT id, name, email FROM source_users WHERE updated_at > '2023-01-01'
+) AS new_data
 );
 
 INSERT INTO "users"
-SELECT * FROM (SELECT id, name, email FROM source_users WHERE updated_at > '2023-01-01') AS new_data;`,
+SELECT * FROM (SELECT id, name, email FROM source_users WHERE updated_at > '2023-01-01'
+) AS new_data;`,
 		},
 		{
 			name: "incremental with date key",
@@ -345,11 +352,13 @@ SELECT * FROM (SELECT id, name, email FROM source_users WHERE updated_at > '2023
 DELETE FROM "daily_metrics" 
 WHERE date IN (
     SELECT DISTINCT date 
-    FROM (SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01') AS new_data
+    FROM (SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01'
+) AS new_data
 );
 
 INSERT INTO "daily_metrics"
-SELECT * FROM (SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01') AS new_data;`,
+SELECT * FROM (SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01'
+) AS new_data;`,
 		},
 		{
 			name: "incremental with schema-qualified table",
@@ -366,11 +375,13 @@ SELECT * FROM (SELECT date, revenue, users FROM metrics WHERE date = '2023-01-01
 DELETE FROM "analytics"."user_sessions" 
 WHERE session_id IN (
     SELECT DISTINCT session_id 
-    FROM (SELECT session_id, user_id, duration FROM raw_sessions) AS new_data
+    FROM (SELECT session_id, user_id, duration FROM raw_sessions
+) AS new_data
 );
 
 INSERT INTO "analytics"."user_sessions"
-SELECT * FROM (SELECT session_id, user_id, duration FROM raw_sessions) AS new_data;`,
+SELECT * FROM (SELECT session_id, user_id, duration FROM raw_sessions
+) AS new_data;`,
 		},
 		{
 			name: "query with trailing semicolon gets trimmed",
@@ -387,11 +398,13 @@ SELECT * FROM (SELECT session_id, user_id, duration FROM raw_sessions) AS new_da
 DELETE FROM "products" 
 WHERE product_id IN (
     SELECT DISTINCT product_id 
-    FROM (SELECT product_id, name, price FROM source_products) AS new_data
+    FROM (SELECT product_id, name, price FROM source_products
+) AS new_data
 );
 
 INSERT INTO "products"
-SELECT * FROM (SELECT product_id, name, price FROM source_products) AS new_data;`,
+SELECT * FROM (SELECT product_id, name, price FROM source_products
+) AS new_data;`,
 		},
 		{
 			name: "complex query with joins and aggregations",
@@ -424,7 +437,8 @@ WHERE user_id IN (
 FROM users u
 LEFT JOIN orders o ON u.user_id = o.user_id
 WHERE u.updated_at > '2023-01-01'
-GROUP BY u.user_id, u.name) AS new_data
+GROUP BY u.user_id, u.name
+) AS new_data
 );
 
 INSERT INTO "user_stats"
@@ -436,7 +450,8 @@ SELECT * FROM (SELECT
 FROM users u
 LEFT JOIN orders o ON u.user_id = o.user_id
 WHERE u.updated_at > '2023-01-01'
-GROUP BY u.user_id, u.name) AS new_data;`,
+GROUP BY u.user_id, u.name
+) AS new_data;`,
 		},
 	}
 
@@ -520,7 +535,8 @@ DELETE FROM "events"
 WHERE created_at BETWEEN TIMESTAMP '{{start_timestamp}}' AND TIMESTAMP '{{end_timestamp}}';
 
 INSERT INTO "events"
-SELECT id, user_id, event_type, created_at FROM raw_events WHERE created_at BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';`,
+SELECT id, user_id, event_type, created_at FROM raw_events WHERE created_at BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}'
+;`,
 		},
 		{
 			name: "time interval with date granularity",
@@ -539,7 +555,8 @@ DELETE FROM "daily_sales"
 WHERE sale_date BETWEEN DATE '{{start_date}}' AND DATE '{{end_date}}';
 
 INSERT INTO "daily_sales"
-SELECT product_id, sale_date, amount FROM sales WHERE sale_date BETWEEN '{{start_date}}' AND '{{end_date}}';`,
+SELECT product_id, sale_date, amount FROM sales WHERE sale_date BETWEEN '{{start_date}}' AND '{{end_date}}'
+;`,
 		},
 		{
 			name: "schema-qualified table with timestamp",
@@ -558,7 +575,8 @@ DELETE FROM "analytics"."user_events"
 WHERE event_timestamp BETWEEN TIMESTAMP '{{start_timestamp}}' AND TIMESTAMP '{{end_timestamp}}';
 
 INSERT INTO "analytics"."user_events"
-SELECT user_id, event_type, event_timestamp FROM events;`,
+SELECT user_id, event_type, event_timestamp FROM events
+;`,
 		},
 		{
 			name: "query with trailing semicolon gets trimmed",
@@ -577,7 +595,8 @@ DELETE FROM "logs"
 WHERE log_date BETWEEN DATE '{{start_date}}' AND DATE '{{end_date}}';
 
 INSERT INTO "logs"
-SELECT level, message, log_date FROM system_logs;`,
+SELECT level, message, log_date FROM system_logs
+;`,
 		},
 		{
 			name: "complex query with aggregations and timestamp",
@@ -608,7 +627,8 @@ SELECT
     COUNT(DISTINCT user_id) as unique_users
 FROM events 
 WHERE created_at BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}'
-GROUP BY DATE_TRUNC('hour', created_at);`,
+GROUP BY DATE_TRUNC('hour', created_at)
+;`,
 		},
 	}
 
@@ -727,7 +747,7 @@ func TestViewMaterializer(t *testing.T) {
 				},
 			},
 			query:    "SELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id",
-			expected: "CREATE OR REPLACE VIEW \"user_stats\" AS\nSELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id",
+			expected: "CREATE OR REPLACE VIEW \"user_stats\" AS\nSELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id\n",
 		},
 		{
 			name: "view with schema qualifier",
@@ -739,7 +759,7 @@ func TestViewMaterializer(t *testing.T) {
 				},
 			},
 			query:    "SELECT DATE_TRUNC('month', sale_date) as month, SUM(amount) as total FROM sales GROUP BY DATE_TRUNC('month', sale_date)",
-			expected: "CREATE OR REPLACE VIEW \"analytics\".\"monthly_sales\" AS\nSELECT DATE_TRUNC('month', sale_date) as month, SUM(amount) as total FROM sales GROUP BY DATE_TRUNC('month', sale_date)",
+			expected: "CREATE OR REPLACE VIEW \"analytics\".\"monthly_sales\" AS\nSELECT DATE_TRUNC('month', sale_date) as month, SUM(amount) as total FROM sales GROUP BY DATE_TRUNC('month', sale_date)\n",
 		},
 		{
 			name: "complex view with joins",
@@ -766,7 +786,8 @@ SELECT
     SUM(o.amount) as total_spent
 FROM customers c
 LEFT JOIN orders o ON c.customer_id = o.customer_id
-GROUP BY c.customer_id, c.name`,
+GROUP BY c.customer_id, c.name
+`,
 		},
 		{
 			name: "query with trailing semicolon gets trimmed",
@@ -778,7 +799,7 @@ GROUP BY c.customer_id, c.name`,
 				},
 			},
 			query:    "SELECT user_id, last_login FROM users WHERE last_login > CURRENT_DATE - INTERVAL '30' DAY;",
-			expected: "CREATE OR REPLACE VIEW \"active_users\" AS\nSELECT user_id, last_login FROM users WHERE last_login > CURRENT_DATE - INTERVAL '30' DAY",
+			expected: "CREATE OR REPLACE VIEW \"active_users\" AS\nSELECT user_id, last_login FROM users WHERE last_login > CURRENT_DATE - INTERVAL '30' DAY\n",
 		},
 		{
 			name: "view with window functions",
@@ -790,7 +811,7 @@ GROUP BY c.customer_id, c.name`,
 				},
 			},
 			query:    "SELECT product_id, name, price, ROW_NUMBER() OVER (ORDER BY price DESC) as price_rank FROM products",
-			expected: "CREATE OR REPLACE VIEW \"ranked_products\" AS\nSELECT product_id, name, price, ROW_NUMBER() OVER (ORDER BY price DESC) as price_rank FROM products",
+			expected: "CREATE OR REPLACE VIEW \"ranked_products\" AS\nSELECT product_id, name, price, ROW_NUMBER() OVER (ORDER BY price DESC) as price_rank FROM products\n",
 		},
 		{
 			name: "view with CTEs",
@@ -827,7 +848,8 @@ SELECT
     monthly_total,
     LAG(monthly_total) OVER (ORDER BY month) as prev_month_total,
     (monthly_total - LAG(monthly_total) OVER (ORDER BY month)) / LAG(monthly_total) OVER (ORDER BY month) * 100 as growth_percent
-FROM monthly_sales`,
+FROM monthly_sales
+`,
 		},
 	}
 
@@ -857,7 +879,7 @@ func TestViewMaterializer_EdgeCases(t *testing.T) {
 		result, err := viewMaterializer(asset, "")
 
 		require.NoError(t, err)
-		assert.Equal(t, "CREATE OR REPLACE VIEW \"empty_view\" AS\n", result)
+		assert.Equal(t, "CREATE OR REPLACE VIEW \"empty_view\" AS\n\n", result)
 	})
 
 	t.Run("multiple trailing semicolons", func(t *testing.T) {
@@ -874,7 +896,7 @@ func TestViewMaterializer_EdgeCases(t *testing.T) {
 
 		require.NoError(t, err)
 		// Should only trim one semicolon from the end
-		assert.Equal(t, "CREATE OR REPLACE VIEW \"test_view\" AS\nSELECT 1 as col;;", result)
+		assert.Equal(t, "CREATE OR REPLACE VIEW \"test_view\" AS\nSELECT 1 as col;;\n", result)
 	})
 }
 

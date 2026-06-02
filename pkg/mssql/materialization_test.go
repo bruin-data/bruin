@@ -42,7 +42,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT pk, col1, col2, col3, col4 from input_table",
 			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT pk, col1, col2, col3, col4 from input_table\\) source ON target\\.pk = source.pk\n" +
+				"USING \\(SELECT pk, col1, col2, col3, col4 from input_table\n\\) source ON target\\.pk = source.pk\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.col1 = min\\(target\\.col1, source\\.col1\\), target\\.col2 = target\\.col1 - source\\.col1, target\\.col3 = source\\.col3\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(pk, col1, col2, col3, col4\\) VALUES\\(pk, col1, col2, col3, col4\\);$",
 		},
@@ -63,7 +63,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT id, value, count, status FROM source",
 			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT id, value, count, status FROM source\\) source ON target\\.id = source.id\n" +
+				"USING \\(SELECT id, value, count, status FROM source\n\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.value = GREATEST\\(target\\.value, source\\.value\\), target\\.count = target\\.count \\+ source\\.count\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(id, value, count, status\\) VALUES\\(id, value, count, status\\);$",
 		},
@@ -84,7 +84,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT id, col1, col2, col3 FROM source",
 			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT id, col1, col2, col3 FROM source\\) source ON target\\.id = source.id\n" +
+				"USING \\(SELECT id, col1, col2, col3 FROM source\n\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.col1 = COALESCE\\(source\\.col1, target\\.col1\\), target\\.col2 = source\\.col2\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(id, col1, col2, col3\\) VALUES\\(id, col1, col2, col3\\);$",
 		},
@@ -110,7 +110,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT 1",
 			want: "BEGIN TRANSACTION;\n" +
 				"DROP TABLE IF EXISTS my\\.asset;\n" +
-				"SELECT tmp\\.\\* INTO my.asset FROM \\(SELECT 1\\) AS tmp;\n" +
+				"SELECT tmp\\.\\* INTO my.asset FROM \\(SELECT 1\n\\) AS tmp;\n" +
 				"COMMIT;",
 		},
 		{
@@ -126,7 +126,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query:       "SELECT 1",
 			want: "BEGIN TRANSACTION;\n" +
 				"DROP TABLE IF EXISTS my\\.asset;\n" +
-				"SELECT tmp\\.\\* INTO my.asset FROM \\(SELECT 1\\) AS tmp;\n" +
+				"SELECT tmp\\.\\* INTO my.asset FROM \\(SELECT 1\n\\) AS tmp;\n" +
 				"COMMIT;",
 		},
 		{
@@ -252,7 +252,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
+				"USING \\(SELECT 1 as id, 'abc' as name\n\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.name = source\\.name\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$",
 		},
@@ -284,7 +284,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'\n;\n" +
 				"COMMIT;$",
 		},
 		{
@@ -301,7 +301,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'\n;\n" +
 				"COMMIT;$",
 		},
 		{

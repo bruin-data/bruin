@@ -167,7 +167,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: []string{"^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
+				"USING \\(SELECT 1 as id, 'abc' as name\n\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.name = source\\.name\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$"},
 		},

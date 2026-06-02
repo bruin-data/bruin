@@ -34,7 +34,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE VIEW my.asset AS\nSELECT 1",
+			want:  "CREATE OR REPLACE VIEW my.asset AS\nSELECT 1\n",
 		},
 		{
 			name: "materialize to a table, default to create+replace",
@@ -54,7 +54,7 @@ func TestMaterializer_Render(t *testing.T) {
 				"            RAISE;\n" +
 				"         END IF;\n" +
 				"   END;\n" +
-				"   EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT 1';\n" +
+				"   EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT 1\n';\n" +
 				"END;",
 		},
 		{
@@ -75,7 +75,7 @@ func TestMaterializer_Render(t *testing.T) {
 				"            RAISE;\n" +
 				"         END IF;\n" +
 				"   END;\n" +
-				"   EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT ''hello'' FROM dual';\n" +
+				"   EXECUTE IMMEDIATE 'CREATE TABLE my.asset AS SELECT ''hello'' FROM dual\n';\n" +
 				"END;",
 		},
 		{
@@ -88,7 +88,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "INSERT INTO my.asset SELECT 1",
+			want:  "INSERT INTO my.asset SELECT 1\n",
 		},
 		{
 			name: "incremental strategies require the incremental_key to be set",
@@ -127,10 +127,12 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT 1 as dt",
 			want: `BEGIN
    DELETE FROM my.asset t WHERE EXISTS (
-      SELECT 1 FROM (SELECT 1 as dt) s WHERE s.dt = t.dt
+      SELECT 1 FROM (SELECT 1 as dt
+) s WHERE s.dt = t.dt
    );
    INSERT INTO my.asset
 SELECT 1 as dt
+
 ;
 END;`,
 		},
@@ -176,7 +178,7 @@ END;`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN MATCHED THEN UPDATE SET target.name = source.name\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
+			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN MATCHED THEN UPDATE SET target.name = source.name\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
 		},
 		{
 			name: "merge with custom MergeSQL expression",
@@ -192,7 +194,7 @@ END;`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN MATCHED THEN UPDATE SET target.name = COALESCE(source.name, target.name)\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
+			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN MATCHED THEN UPDATE SET target.name = COALESCE(source.name, target.name)\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
 		},
 		{
 			name: "merge insert-only, no UpdateOnMerge columns",
@@ -208,7 +210,7 @@ END;`,
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
+			want:  "MERGE INTO my.asset target\nUSING (\nSELECT 1 as id, 'abc' as name\n\n) source ON ((target.id = source.id OR (target.id IS NULL AND source.id IS NULL)))\nWHEN NOT MATCHED THEN INSERT (id, name) VALUES (source.id, source.name);",
 		},
 		{
 			name: "semicolon trimming and schema-qualified table name",
@@ -220,7 +222,7 @@ END;`,
 				},
 			},
 			query: "SELECT 1 FROM dual ;  ",
-			want:  "INSERT INTO my_schema.my_table SELECT 1 FROM dual",
+			want:  "INSERT INTO my_schema.my_table SELECT 1 FROM dual\n",
 		},
 		{
 			name: "invalid identifier is rejected",
@@ -260,6 +262,7 @@ END;`,
    EXECUTE IMMEDIATE 'TRUNCATE TABLE my.asset';
    INSERT INTO my.asset
 SELECT 1
+
 ;
 END;`,
 		},
@@ -279,6 +282,7 @@ END;`,
    DELETE FROM my.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';
    INSERT INTO my.asset
 SELECT 1 as ts
+
 ;
 END;`,
 		},
@@ -298,6 +302,7 @@ END;`,
    DELETE FROM my.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';
    INSERT INTO my.asset
 SELECT 1 as dt
+
 ;
 END;`,
 		},
@@ -475,15 +480,18 @@ UPDATE my.asset target
 SET bruin_valid_until = LOCALTIMESTAMP, bruin_is_current = 0
 WHERE target.bruin_is_current = 1
   AND NOT EXISTS (
-    SELECT 1 FROM (SELECT id, event_name, ts from source_table) source
+    SELECT 1 FROM (SELECT id, event_name, ts from source_table
+) source
     WHERE (target.id = source.id OR (target.id IS NULL AND source.id IS NULL))
   )
-  AND EXISTS (SELECT 1 FROM (SELECT id, event_name, ts from source_table) source_exists);
+  AND EXISTS (SELECT 1 FROM (SELECT id, event_name, ts from source_table
+) source_exists);
 
 MERGE INTO my.asset target
 USING (
   WITH s1 AS (
     SELECT id, event_name, ts from source_table
+
   )
   SELECT s1.*, 1 AS bruin_is_current_src
   FROM s1

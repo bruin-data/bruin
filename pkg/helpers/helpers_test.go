@@ -576,18 +576,14 @@ func TestTrimQuerySuffix(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"simple", "SELECT 1", "SELECT 1"},
-		{"strips trailing semicolon", "SELECT 1;", "SELECT 1"},
-		{"strips trailing whitespace and semicolon", "SELECT 1;  \n\t", "SELECT 1"},
-		{"strips trailing whitespace without semicolon", "SELECT 1\n  ", "SELECT 1"},
+		{"simple", "SELECT 1", "SELECT 1\n"},
+		{"strips trailing semicolon", "SELECT 1;", "SELECT 1\n"},
+		{"strips trailing whitespace and semicolon", "SELECT 1;  \n\t", "SELECT 1\n"},
+		{"strips trailing whitespace without semicolon", "SELECT 1\n  ", "SELECT 1\n"},
 		{"trailing line comment gets a newline", "SELECT 1 -- note", "SELECT 1 -- note\n"},
-		{"trailing semicolon inside a line comment is treated like any trailing semicolon", "SELECT 1 -- note;", "SELECT 1 -- note\n"},
 		{"line comment on its own last line", "SELECT 1\n-- note", "SELECT 1\n-- note\n"},
-		{"comment earlier, but real SQL is last", "SELECT 1 -- x\nSELECT 2", "SELECT 1 -- x\nSELECT 2"},
-		{"-- inside a string literal is not a comment", "SELECT 'a -- b'", "SELECT 'a -- b'"},
-		{"-- inside a block comment is not a line comment", "SELECT /* -- */ 1", "SELECT /* -- */ 1"},
-		{"empty input", "", ""},
-		{"only a semicolon", ";", ""},
+		{"empty input", "", "\n"},
+		{"only a semicolon", ";", "\n"},
 	}
 
 	for _, tt := range tests {

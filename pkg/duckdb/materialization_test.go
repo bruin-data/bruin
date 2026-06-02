@@ -46,7 +46,8 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT 1",
 			want: `BEGIN TRANSACTION;
 DROP TABLE IF EXISTS my.asset;
-CREATE TABLE my.asset AS SELECT 1;
+CREATE TABLE my.asset AS SELECT 1
+;
 COMMIT;`,
 		},
 		{
@@ -81,7 +82,8 @@ COMMIT;`,
 			query:       "SELECT 1",
 			want: `BEGIN TRANSACTION;
 DROP TABLE IF EXISTS my.asset;
-CREATE TABLE my.asset AS SELECT 1;
+CREATE TABLE my.asset AS SELECT 1
+;
 COMMIT;`,
 		},
 		{
@@ -132,7 +134,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
 				"DELETE FROM my.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
@@ -200,7 +202,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'abc' as name;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'abc' as name\n;\n" +
 				"INSERT INTO my\\.asset \\(id, name\\) SELECT id, name FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
 				"DROP TABLE __bruin_merge_tmp_.+;\n" +
 				"COMMIT;$",
@@ -220,7 +222,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'abc' as name;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'abc' as name\n;\n" +
 				"UPDATE my\\.asset AS target SET name = source\\.name FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id;\n" +
 				"INSERT INTO my\\.asset \\(id, name\\) SELECT id, name FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
 				"DROP TABLE __bruin_merge_tmp_.+;\n" +
@@ -243,7 +245,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c\n;\n" +
 				"UPDATE my\\.asset AS target SET col_a = GREATEST\\(target\\.col_a, source\\.col_a\\), col_b = target\\.col_b \\+ source\\.col_b, col_c = source\\.col_c FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id;\n" +
 				"INSERT INTO my\\.asset \\(id, col_a, col_b, col_c\\) SELECT id, col_a, col_b, col_c FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
 				"DROP TABLE __bruin_merge_tmp_.+;\n" +
@@ -264,7 +266,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1 as id, 15 as col_a",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a\n;\n" +
 				"UPDATE my\\.asset AS target SET col_a = LEAST\\(target\\.col_a, source\\.col_a\\) FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id;\n" +
 				"INSERT INTO my\\.asset \\(id, col_a\\) SELECT id, col_a FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
 				"DROP TABLE __bruin_merge_tmp_.+;\n" +
@@ -285,7 +287,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1 as id, 15 as col_a",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 15 as col_a\n;\n" +
 				"UPDATE my\\.asset AS target SET col_a = COALESCE\\(source\\.col_a, target\\.col_a\\) FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id;\n" +
 				"INSERT INTO my\\.asset \\(id, col_a\\) SELECT id, col_a FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id\\);\n" +
 				"DROP TABLE __bruin_merge_tmp_.+;\n" +
@@ -307,7 +309,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1 as id, 'A' as category, 'abc' as name",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'A' as category, 'abc' as name;\n" +
+				"CREATE TEMP TABLE __bruin_merge_tmp_.+ AS SELECT 1 as id, 'A' as category, 'abc' as name\n;\n" +
 				"UPDATE my\\.asset AS target SET name = source\\.name FROM __bruin_merge_tmp_.+ AS source WHERE target\\.id = source\\.id AND target\\.category = source\\.category;\n" +
 				"INSERT INTO my\\.asset \\(id, category, name\\) SELECT id, category, name FROM __bruin_merge_tmp_.+ AS source WHERE NOT EXISTS \\(SELECT 1 FROM my\\.asset AS target WHERE target\\.id = source\\.id AND target\\.category = source\\.category\\);\n" +
 				"DROP TABLE __bruin_merge_tmp_.+;\n" +
@@ -341,7 +343,7 @@ COMMIT;`,
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'\n;\n" +
 				"COMMIT;$",
 		},
 		{
@@ -358,7 +360,7 @@ COMMIT;`,
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'\n;\n" +
 				"COMMIT;$",
 		},
 	}

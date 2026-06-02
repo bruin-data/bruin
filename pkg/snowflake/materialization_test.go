@@ -134,7 +134,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
@@ -183,7 +183,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
+				"USING \\(SELECT 1 as id, 'abc' as name\n\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.name = source\\.name\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$",
 		},
@@ -204,7 +204,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c",
 			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c\\) source ON target\\.id = source.id\n" +
+				"USING \\(SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c\n\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.col_a = GREATEST\\(target\\.col_a, source\\.col_a\\), target\\.col_b = target\\.col_b \\+ source\\.col_b, target\\.col_c = source\\.col_c\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(id, col_a, col_b, col_c\\) VALUES\\(id, col_a, col_b, col_c\\);$",
 		},
@@ -223,7 +223,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1 as id, 15 as col_a",
 			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 15 as col_a\\) source ON target\\.id = source.id\n" +
+				"USING \\(SELECT 1 as id, 15 as col_a\n\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.col_a = LEAST\\(target\\.col_a, source\\.col_a\\)\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(id, col_a\\) VALUES\\(id, col_a\\);$",
 		},
@@ -242,7 +242,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1 as id, 15 as col_a",
 			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 15 as col_a\\) source ON target\\.id = source.id\n" +
+				"USING \\(SELECT 1 as id, 15 as col_a\n\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.col_a = COALESCE\\(source\\.col_a, target\\.col_a\\)\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(id, col_a\\) VALUES\\(id, col_a\\);$",
 		},
@@ -274,7 +274,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'\n;\n" +
 				"COMMIT;$",
 		},
 		{
@@ -291,7 +291,7 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'\n;\n" +
 				"COMMIT;$",
 		},
 		{

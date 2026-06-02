@@ -47,7 +47,8 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT 1",
 			want: `BEGIN TRANSACTION;
 DROP TABLE IF EXISTS "my"."asset"; 
-CREATE TABLE "my"."asset" AS SELECT 1;
+CREATE TABLE "my"."asset" AS SELECT 1
+;
 COMMIT;`,
 		},
 		{
@@ -63,7 +64,8 @@ COMMIT;`,
 			query:       "SELECT 1",
 			want: `BEGIN TRANSACTION;
 DROP TABLE IF EXISTS "my"."asset"; 
-CREATE TABLE "my"."asset" AS SELECT 1;
+CREATE TABLE "my"."asset" AS SELECT 1
+;
 COMMIT;`,
 		},
 		{
@@ -114,7 +116,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
 				`DELETE FROM "my"\."asset" WHERE "dt" in \(SELECT DISTINCT "dt" FROM __bruin_tmp_.+\);` + "\n" +
 				`INSERT INTO "my"\."asset" SELECT \* FROM __bruin_tmp_.+;` + "\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
@@ -132,7 +134,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1, NOW() as \"eventTime\"",
 			want: "^BEGIN TRANSACTION;\n" +
-				`CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1, NOW\(\) as "eventTime";\n` +
+				`CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1, NOW\(\) as "eventTime"\n;\n` +
 				`DELETE FROM "my"\."asset" WHERE "eventTime" in \(SELECT DISTINCT "eventTime" FROM __bruin_tmp_.+\);` + "\n" +
 				`INSERT INTO "my"\."asset" SELECT \* FROM __bruin_tmp_.+;` + "\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
@@ -178,7 +180,8 @@ COMMIT;`,
 			query: "SELECT 1 as id, 'test' as name",
 			want: `BEGIN TRANSACTION;
 TRUNCATE TABLE "my"."asset";
-INSERT INTO "my"."asset" SELECT 1 as id, 'test' as name;
+INSERT INTO "my"."asset" SELECT 1 as id, 'test' as name
+;
 COMMIT;`,
 		},
 
@@ -197,7 +200,8 @@ COMMIT;`,
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: `^MERGE INTO "my"\."asset" target
-USING \(SELECT 1 as id, 'abc' as name\) source ON target\."id" = source\."id"
+USING \(SELECT 1 as id, 'abc' as name
+\) source ON target\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "name" = source\."name"
 WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
 		},
@@ -217,7 +221,8 @@ WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\("id", "name"\);$`,
 			},
 			query: "SELECT 1 as id, 'abc' as name",
 			want: `^MERGE INTO "my"\."asset"
-USING \(SELECT 1 as id, 'abc' as name\) source ON "my"\."asset"\."id" = source\."id"
+USING \(SELECT 1 as id, 'abc' as name
+\) source ON "my"\."asset"\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "name" = source\."name"
 WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\(source."id", source."name"\);$`,
 		},
@@ -238,7 +243,8 @@ WHEN NOT MATCHED THEN INSERT\("id", "name"\) VALUES\(source."id", source."name"\
 			},
 			query: `SELECT 'ABC' as code, 1 as "iLeft", 2 as "iRight", 'test' as translation`,
 			want: `^MERGE INTO "my"\."asset" target
-USING \(SELECT 'ABC' as code, 1 as "iLeft", 2 as "iRight", 'test' as translation\) source ON target\."code" = source\."code"
+USING \(SELECT 'ABC' as code, 1 as "iLeft", 2 as "iRight", 'test' as translation
+\) source ON target\."code" = source\."code"
 WHEN MATCHED THEN UPDATE SET "iLeft" = source\."iLeft", "iRight" = source\."iRight", "translation" = source\."translation"
 WHEN NOT MATCHED THEN INSERT\("code", "iLeft", "iRight", "translation"\) VALUES\("code", "iLeft", "iRight", "translation"\);$`,
 		},
@@ -259,7 +265,8 @@ WHEN NOT MATCHED THEN INSERT\("code", "iLeft", "iRight", "translation"\) VALUES\
 			},
 			query: "SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c",
 			want: `^MERGE INTO "my"\."asset" target
-USING \(SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c\) source ON target\."id" = source\."id"
+USING \(SELECT 1 as id, 15 as col_a, 50 as col_b, 'updated' as col_c
+\) source ON target\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "col_a" = GREATEST\(target\.col_a, source\.col_a\), "col_b" = target\.col_b \+ source\.col_b, "col_c" = source\."col_c"
 WHEN NOT MATCHED THEN INSERT\("id", "col_a", "col_b", "col_c"\) VALUES\("id", "col_a", "col_b", "col_c"\);$`,
 		},
@@ -278,7 +285,8 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a", "col_b", "col_c"\) VALUES\("id", "c
 			},
 			query: "SELECT 1 as id, 15 as col_a",
 			want: `^MERGE INTO "my"\."asset" target
-USING \(SELECT 1 as id, 15 as col_a\) source ON target\."id" = source\."id"
+USING \(SELECT 1 as id, 15 as col_a
+\) source ON target\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "col_a" = LEAST\(target\.col_a, source\.col_a\)
 WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 		},
@@ -297,7 +305,8 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 			},
 			query: "SELECT 1 as id, 15 as col_a",
 			want: `^MERGE INTO "my"\."asset" target
-USING \(SELECT 1 as id, 15 as col_a\) source ON target\."id" = source\."id"
+USING \(SELECT 1 as id, 15 as col_a
+\) source ON target\."id" = source\."id"
 WHEN MATCHED THEN UPDATE SET "col_a" = COALESCE\(source\.col_a, target\.col_a\)
 WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 		},
@@ -329,7 +338,7 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: `^BEGIN TRANSACTION;\s*` +
 				`DELETE FROM "my"\."asset" WHERE "ts" BETWEEN '\{\{start_timestamp\}\}' AND '\{\{end_timestamp\}\}';\s*` +
-				`INSERT INTO "my"\."asset" SELECT ts, event_name from source_table where ts between '\{\{start_timestamp\}\}' AND '\{\{end_timestamp\}\}';\s*` +
+				`INSERT INTO "my"\."asset" SELECT ts, event_name from source_table where ts between '\{\{start_timestamp\}\}' AND '\{\{end_timestamp\}\}'\s*;\s*` +
 				`COMMIT;$`,
 		},
 		{
@@ -346,7 +355,7 @@ WHEN NOT MATCHED THEN INSERT\("id", "col_a"\) VALUES\("id", "col_a"\);$`,
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: `^BEGIN TRANSACTION;\s*` +
 				`DELETE FROM "my"\."asset" WHERE "dt" BETWEEN '\{\{start_date\}\}' AND '\{\{end_date\}\}';\s*` +
-				`INSERT INTO "my"\."asset" SELECT dt, event_name from source_table where dt between '\{\{start_date\}\}' and '\{\{end_date\}\}';\s*` +
+				`INSERT INTO "my"\."asset" SELECT dt, event_name from source_table where dt between '\{\{start_date\}\}' and '\{\{end_date\}\}'\s*;\s*` +
 				`COMMIT;$`,
 		},
 		{
