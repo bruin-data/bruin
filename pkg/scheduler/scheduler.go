@@ -407,7 +407,7 @@ func (s *Scheduler) MarkCheckInstancesByID(checkID string, asset *pipeline.Asset
 	for _, instance := range s.taskInstances {
 		columnCheck, ok := instance.(*ColumnCheckInstance)
 		if ok {
-			if columnCheck.Check.ID == checkID && columnCheck.Asset.ID == asset.ID {
+			if columnCheck.Check.ID == checkID && (asset == nil || columnCheck.Asset.ID == asset.ID) {
 				s.MarkTaskInstance(instance, status, false)
 				return nil
 			}
@@ -415,7 +415,7 @@ func (s *Scheduler) MarkCheckInstancesByID(checkID string, asset *pipeline.Asset
 		customCheck, ok := instance.(*CustomCheckInstance)
 
 		if ok {
-			if customCheck.Check.ID == checkID && customCheck.Asset.ID == asset.ID {
+			if customCheck.Check.ID == checkID && (asset == nil || customCheck.Asset.ID == asset.ID) {
 				s.MarkTaskInstance(instance, status, false)
 				return nil
 			}
