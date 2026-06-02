@@ -67,15 +67,14 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 }
 
 // appendQueryAnnotations adds the --query-annotations flag carrying the
-// pipeline/asset identity plus the asset's meta, merged with the run-level
-// annotations supplied via --query-annotations / BRUIN_QUERY_ANNOTATIONS (e.g.
-// project/run_id/try_number from the orchestrator). ingestr adds type and
-// ingestr_step itself.
+// pipeline/asset identity merged with the run-level annotations supplied via
+// --query-annotations / BRUIN_QUERY_ANNOTATIONS (e.g. project/run_id/try_number
+// from the orchestrator). ingestr adds type and ingestr_step itself.
 //
-// It uses ansisql.BuildAnnotationJSON — the same merge the native SQL and
-// Snowflake operators use — so ingestr queries are annotated and attributed
-// identically. Like those operators it is opt-in: when no run-level annotations
-// are configured BuildAnnotationJSON returns "" and nothing is forwarded.
+// It uses ansisql.BuildAnnotationJSON — the same merge the native SQL operators
+// use — so ingestr queries are annotated and attributed identically. Like those
+// operators it is opt-in: when no run-level annotations are configured
+// BuildAnnotationJSON returns "" and nothing is forwarded.
 //
 // Only the v1 engine (the Go ingestr) understands the flag; the legacy v0
 // PyPI release does not, so passing it there would fail with an unknown flag.
@@ -94,9 +93,6 @@ func appendQueryAnnotations(ctx context.Context, args []string, engine resolvedE
 	baseline := map[string]interface{}{
 		"pipeline": p.Name,
 		"asset":    asset.Name,
-	}
-	for k, v := range asset.Meta {
-		baseline[k] = v
 	}
 
 	payload, err := ansisql.BuildAnnotationJSON(ctx, baseline)

@@ -17,13 +17,6 @@ func TestAppendQueryAnnotations(t *testing.T) {
 		Pipeline: &pipeline.Pipeline{Name: "shopify"},
 		Asset:    &pipeline.Asset{Name: "raw.orders"},
 	}
-	withMeta := &scheduler.AssetInstance{
-		Pipeline: &pipeline.Pipeline{Name: "shopify"},
-		Asset: &pipeline.Asset{
-			Name: "raw.orders",
-			Meta: pipeline.EmptyStringMap{"client": "acme", "team": "data"},
-		},
-	}
 	v1 := resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}
 	v0 := resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}
 
@@ -46,16 +39,6 @@ func TestAppendQueryAnnotations(t *testing.T) {
 		require.Equal(t, []string{
 			"ingest",
 			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify"}`,
-		}, got)
-	})
-
-	t.Run("folds asset meta into the annotations", func(t *testing.T) {
-		t.Parallel()
-		base := []string{"ingest"}
-		got := appendQueryAnnotations(annotated("default"), base, v1, withMeta)
-		require.Equal(t, []string{
-			"ingest",
-			"--query-annotations", `{"asset":"raw.orders","client":"acme","pipeline":"shopify","team":"data"}`,
 		}, got)
 	})
 
