@@ -2866,12 +2866,15 @@ func (m *Manager) AddFlightSQLConnectionFromConfig(connection *config.FlightSQLC
 	m.mutex.Unlock()
 
 	client, err := flightsql.NewClient(flightsql.Config{
-		Host:     connection.Host,
-		Port:     connection.Port,
-		Username: connection.Username,
-		Password: connection.Password,
-		Database: connection.Database,
-		Dialect:  connection.Dialect,
+		Host:          connection.Host,
+		Port:          connection.Port,
+		Username:      connection.Username,
+		Password:      connection.Password,
+		Token:         connection.Token,
+		Database:      connection.Database,
+		Dialect:       connection.Dialect,
+		TLS:           connection.TLS,
+		TLSSkipVerify: connection.TLSSkipVerify,
 	})
 	if err != nil {
 		return err

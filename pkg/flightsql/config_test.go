@@ -63,6 +63,48 @@ func TestConfig_ToDSN(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "token auth over TLS (Dremio Cloud)",
+			config: Config{
+				Host:  "data.dremio.cloud",
+				Port:  443,
+				Token: "pat123",
+				TLS:   true,
+			},
+			expected: "uri=grpc+tls://data.dremio.cloud:443;adbc.flight.sql.authorization_header=Bearer pat123",
+		},
+		{
+			name: "tls with skip verify",
+			config: Config{
+				Host:          "localhost",
+				Port:          32010,
+				Username:      "admin",
+				Password:      "secret",
+				TLS:           true,
+				TLSSkipVerify: true,
+			},
+			expected: "uri=grpc+tls://localhost:32010;username=admin;password=secret;adbc.flight.sql.client_option.tls_skip_verify=true",
+		},
+		{
+			name: "token and password together is rejected",
+			config: Config{
+				Host:     "localhost",
+				Port:     32010,
+				Username: "admin",
+				Password: "secret",
+				Token:    "pat123",
+			},
+			wantErr: true,
+		},
+		{
+			name: "semicolon in token is rejected",
+			config: Config{
+				Host:  "localhost",
+				Port:  32010,
+				Token: "pat;123",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

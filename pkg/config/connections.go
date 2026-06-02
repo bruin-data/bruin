@@ -1437,13 +1437,16 @@ func (c TrinoConnection) GetName() string {
 // connection type works across engines; Dialect selects the SQL dialect used
 // for materializations and defaults to "dremio" when empty.
 type FlightSQLConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Host     string `yaml:"host" json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port" json:"port" mapstructure:"port"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
-	Database string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
-	Dialect  string `yaml:"dialect,omitempty" json:"dialect,omitempty" mapstructure:"dialect"`
+	Name          string `yaml:"name" json:"name" mapstructure:"name"`
+	Host          string `yaml:"host" json:"host" mapstructure:"host"`
+	Port          int    `yaml:"port" json:"port" mapstructure:"port"`
+	Username      string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password      string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Token         string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
+	Database      string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Dialect       string `yaml:"dialect,omitempty" json:"dialect,omitempty" mapstructure:"dialect"`
+	TLS           bool   `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls"`
+	TLSSkipVerify bool   `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify,omitempty" mapstructure:"tls_skip_verify"`
 }
 
 func (c FlightSQLConnection) GetName() string {
