@@ -25,17 +25,19 @@ type devEnv interface {
 }
 
 type BasicOperator struct {
-	connection   config.ConnectionGetter
-	extractor    query.QueryExtractor
-	materializer materializer
-	devEnv       devEnv
+	connection  config.ConnectionGetter
+	extractor   query.QueryExtractor
+	fullRefresh bool
+	hoister     pipeline.DeclareHoister
+	devEnv      devEnv
 }
 
-func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer, parser *sqlparser.SQLParser) *BasicOperator {
+func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, fullRefresh bool, hoister pipeline.DeclareHoister, parser *sqlparser.SQLParser) *BasicOperator {
 	return &BasicOperator{
-		connection:   conn,
-		extractor:    extractor,
-		materializer: materializer,
+		connection:  conn,
+		extractor:   extractor,
+		fullRefresh: fullRefresh,
+		hoister:     hoister,
 		devEnv: &devenv.DevEnvQueryModifier{
 			// Flight SQL itself has no dialect; Dremio's SQL is closest to
 			// Trino/Presto, so we reuse that dialect for dev-env rewrites.
@@ -43,6 +45,17 @@ func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtract
 			Conn:    conn,
 			Parser:  parser,
 		},
+	}
+}
+
+// materializerFor builds a hook-wrapping materializer for the given Flight SQL
+// dialect. Materialization is dialect specific (Dremio vs Sail/Spark quoting,
+// etc.), and the dialect is only known once the asset's connection is resolved,
+// so the materializer is built per run rather than at operator construction.
+func (o BasicOperator) materializerFor(dialect string) materializer {
+	return pipeline.HookWrapperMaterializer{
+		Mat:     NewMaterializerForDialect(dialect, o.fullRefresh),
+		Hoister: o.hoister,
 	}
 }
 
@@ -72,16 +85,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
 
-	q := queries[0]
-	materialized, err := o.materializer.Render(t, q.String())
-	if err != nil {
-		return err
-	}
-	writer := ctx.Value(executor.KeyPrinter)
-	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
-	if err != nil {
-		return err
-	}
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return err
@@ -95,6 +98,20 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	conn, ok := rawConn.(*Client)
 	if !ok {
 		return errors.Errorf("connection '%s' is not a Flight SQL connection", connName)
+	}
+
+	// Build the materializer for this connection's dialect (Dremio, Sail, ...).
+	mat := o.materializerFor(conn.Dialect())
+
+	q := queries[0]
+	materialized, err := mat.Render(t, q.String())
+	if err != nil {
+		return err
+	}
+	writer := ctx.Value(executor.KeyPrinter)
+	err = mat.LogIfFullRefreshAndDDL(writer, t)
+	if err != nil {
+		return err
 	}
 
 	materializedQueries, err := extractor.ExtractQueriesFromString(materialized)

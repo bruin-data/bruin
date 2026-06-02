@@ -8,16 +8,19 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-// NewMaterializer builds a materializer for the default (Dremio) dialect.
-//
-// The standard NewMaterializer(fullRefresh) signature is kept so it plugs into
-// cmd/run.go exactly like every other platform. Materialization is dialect
-// specific (see dialect.go); once more than one Flight SQL dialect is
-// supported, dialect selection can be threaded through the operator from the
-// asset's connection.
+// NewMaterializer builds a materializer for the default (Dremio) dialect. It is
+// used by preview commands (render / render-ddl) that do not resolve a specific
+// connection. The run path uses NewMaterializerForDialect via the operator so
+// that each connection's configured dialect is honored.
 func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
+	return NewMaterializerForDialect("dremio", fullRefresh)
+}
+
+// NewMaterializerForDialect builds a materializer for a specific Flight SQL
+// dialect (see dialect.go). An unknown dialect falls back to the ANSI baseline.
+func NewMaterializerForDialect(dialect string, fullRefresh bool) *pipeline.Materializer {
 	return &pipeline.Materializer{
-		MaterializationMap: matMapForDialect(dialectByName("dremio")),
+		MaterializationMap: matMapForDialect(dialectByName(dialect)),
 		FullRefresh:        fullRefresh,
 	}
 }

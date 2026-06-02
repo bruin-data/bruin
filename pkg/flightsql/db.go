@@ -44,8 +44,23 @@ func NewClient(c Config) (*Client, error) {
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	queryStr := strings.TrimSpace(query.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")
-	_, err := c.connection.ExecContext(ctx, queryStr)
-	return errors.Wrap(err, "failed to execute query")
+
+	// We deliberately execute via QueryContext rather than ExecContext. The ADBC
+	// Flight SQL driver only avoids creating a prepared statement on the query
+	// path (ExecContext goes through Prepare), and not every Flight SQL engine
+	// implements prepared statements — e.g. Sail returns "do_action_create_
+	// prepared_statement has no default implementation". Going through the query
+	// path keeps DDL/DML working across engines; we just drain and discard rows.
+	rows, err := c.connection.QueryContext(ctx, queryStr)
+	if err != nil {
+		return errors.Wrap(err, "failed to execute query")
+	}
+	defer rows.Close()
+
+	for rows.Next() { //nolint:revive // drain the reader so the statement fully executes server-side
+	}
+
+	return errors.Wrap(rows.Err(), "failed to execute query")
 }
 
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
@@ -138,6 +153,12 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 func (c *Client) Ping(ctx context.Context) error {
 	q := &query.Query{Query: "SELECT 1"}
 	return c.RunQueryWithoutResult(ctx, q)
+}
+
+// Dialect returns the configured materialization dialect (e.g. "dremio",
+// "sail"), used by the operator to render dialect-appropriate SQL.
+func (c *Client) Dialect() string {
+	return c.config.Dialect
 }
 
 func toString(value any) (string, bool) {

@@ -36,6 +36,21 @@ type dremioDialect struct {
 	ansiDialect
 }
 
+// sailDialect targets Spark SQL engines such as Sail (PySail). The materializa-
+// tion SQL is shared with the ANSI baseline, except that Spark SQL quotes
+// identifiers with backticks; double quotes denote string literals there, so
+// using them for identifiers would break.
+type sailDialect struct{}
+
+func (sailDialect) quoteIdentifier(identifier string) string {
+	parts := strings.Split(identifier, ".")
+	quoted := make([]string, len(parts))
+	for i, part := range parts {
+		quoted[i] = "`" + part + "`"
+	}
+	return strings.Join(quoted, ".")
+}
+
 // dialectByName resolves a connection's configured dialect string to a
 // concrete sqlDialect. An empty value defaults to Dremio, which is the first
 // supported Flight SQL engine.
@@ -45,6 +60,8 @@ func dialectByName(name string) sqlDialect {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "", "dremio":
 		return dremioDialect{}
+	case "sail", "pysail", "spark":
+		return sailDialect{}
 	default:
 		return ansiDialect{}
 	}

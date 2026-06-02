@@ -1,8 +1,11 @@
 # Arrow Flight SQL
 
-Bruin supports any [Arrow Flight SQL](https://arrow.apache.org/docs/format/FlightSql.html) compatible platform as a SQL data platform. [Dremio](https://docs.dremio.com/current/developer/arrow-flight-sql) is the first supported engine.
+Bruin supports any [Arrow Flight SQL](https://arrow.apache.org/docs/format/FlightSql.html) compatible platform as a SQL data platform. Supported engines:
 
-Because Flight SQL is a transport protocol rather than a SQL dialect, a single `flightsql` connection type works across engines. The SQL dialect used for materializations is selected with the `dialect` field (currently always Dremio).
+- [Dremio](https://docs.dremio.com/current/developer/arrow-flight-sql) (`dialect: dremio`, the default)
+- [Sail](https://docs.lakesail.com/sail/latest/guide/integrations/flight-sql.html) / PySail (`dialect: sail`)
+
+Because Flight SQL is a transport protocol rather than a SQL dialect, a single `flightsql` connection type works across engines. The SQL dialect used for materializations is selected with the `dialect` field — this controls engine-specific SQL such as identifier quoting (Dremio uses ANSI double quotes, Sail/Spark uses backticks).
 
 ## Connection
 
@@ -35,6 +38,19 @@ Dremio Cloud does not use username/password; it authenticates with a [Personal A
           tls: true
 ```
 
+### Sail / PySail
+
+[Sail](https://docs.lakesail.com/sail/latest/guide/integrations/flight-sql.html) exposes a Flight SQL server (`sail flight server`, default port `32010`) and speaks Spark SQL. It does not require authentication by default.
+
+```yaml
+    connections:
+      flightsql:
+        - name: "connection_name"
+          host: 127.0.0.1
+          port: 32010
+          dialect: sail
+```
+
 ### Connection fields
 
 | Field | Required | Description |
@@ -46,7 +62,7 @@ Dremio Cloud does not use username/password; it authenticates with a [Personal A
 | `password` | no | Password for username/password auth. Must not contain `;`. |
 | `token` | no | Bearer token / PAT, sent as the `Authorization: Bearer <token>` header. Mutually exclusive with `username`/`password`. |
 | `database` | no | Used as the database name when introspecting schemas (e.g. `bruin import`). |
-| `dialect` | no | Materialization SQL dialect. Defaults to `dremio`. |
+| `dialect` | no | Materialization SQL dialect: `dremio` (default) or `sail`. Controls engine-specific SQL such as identifier quoting. |
 | `tls` | no | Use a TLS-encrypted connection (`grpc+tls`). Required for Dremio Cloud. |
 | `tls_skip_verify` | no | Skip TLS certificate verification. For testing only; do not use in production. |
 

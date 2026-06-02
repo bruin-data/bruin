@@ -1864,10 +1864,10 @@ func SetupExecutors(
 			Fs:       fs,
 			Renderer: renderer,
 		}
-		flightSQLOperator := flightsql.NewBasicOperator(conn, flightSQLFileExtractor, pipeline.HookWrapperMaterializer{
-			Mat:     flightsql.NewMaterializer(fullRefresh),
-			Hoister: hoister,
-		}, parser)
+		// The materializer is built per-asset inside the operator from the
+		// resolved connection's dialect (Dremio, Sail/Spark, ...), so we pass
+		// the full-refresh flag and hoister rather than a pre-built one.
+		flightSQLOperator := flightsql.NewBasicOperator(conn, flightSQLFileExtractor, fullRefresh, hoister, parser)
 		flightSQLCheckRunner := athena.NewColumnCheckOperator(conn)
 		mainExecutors[pipeline.AssetTypeFlightSQLQuery][scheduler.TaskInstanceTypeMain] = flightSQLOperator
 		mainExecutors[pipeline.AssetTypeFlightSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = flightSQLCheckRunner
