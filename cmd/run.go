@@ -1368,15 +1368,26 @@ func Run(isDebug *bool) *cli.Command {
 
 				// Print summary to real terminal
 				printTUISummary(realTerminal, results, s, duration, foundPipeline.Name)
-				if len(errorsInTaskResults) > 0 {
+				if len(errorsInTaskResults) > 0 && singleCheckID == "" {
 					printTUIErrors(realTerminal, errorsInTaskResults)
 				}
 
 				// Also print summary to piped stdout (for log file)
 				printExecutionSummary(results, s, duration, len(results))
 				if len(errorsInTaskResults) > 0 {
+					if singleCheckID != "" {
+						printSingleCheckError(errorsInTaskResults[0])
+						if _, ok := errorsInTaskResults[0].Error.(*ansisql.CheckError); ok { //nolint:errorlint
+							return cli.Exit("", 1)
+						}
+						return cli.Exit("", 2)
+					}
 					printErrorsInResults(errorsInTaskResults, s)
 					return cli.Exit("", 1)
+				}
+
+				if singleCheckID != "" && len(results) > 0 {
+					printSingleCheckSuccess(results[0])
 				}
 			} else {
 				// === Legacy mode (unchanged) ===
@@ -1408,14 +1419,17 @@ func Run(isDebug *bool) *cli.Command {
 				if len(errorsInTaskResults) > 0 {
 					if singleCheckID != "" {
 						printSingleCheckError(errorsInTaskResults[0])
-					} else {
-						if minimalLogs {
-							summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
-							printErrorsMinimal(errorsInTaskResults)
-						} else {
-							printExecutionSummary(results, s, duration, len(results))
-							printErrorsInResults(errorsInTaskResults, s)
+						if _, ok := errorsInTaskResults[0].Error.(*ansisql.CheckError); ok { //nolint:errorlint
+							return cli.Exit("", 1)
 						}
+						return cli.Exit("", 2)
+					}
+					if minimalLogs {
+						summaryPrinter.Printf("\n\nFailed %d tasks in %s\n", len(errorsInTaskResults), duration.Truncate(time.Millisecond).String())
+						printErrorsMinimal(errorsInTaskResults)
+					} else {
+						printExecutionSummary(results, s, duration, len(results))
+						printErrorsInResults(errorsInTaskResults, s)
 					}
 					return cli.Exit("", 1)
 				}

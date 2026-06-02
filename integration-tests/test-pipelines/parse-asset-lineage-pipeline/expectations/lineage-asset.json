@@ -78,6 +78,7 @@
       {
         "entity_attribute": null,
         "name": "country",
+        "source_column": "",
         "type": "varchar",
         "description": "Just a country",
         "tags": [],
@@ -99,6 +100,7 @@
       {
         "entity_attribute": null,
         "name": "last_name",
+        "source_column": "",
         "type": "varchar",
         "description": "Just a last name",
         "tags": [],
@@ -120,6 +122,7 @@
       {
         "entity_attribute": null,
         "name": "name",
+        "source_column": "",
         "type": "varchar",
         "description": "Just a name",
         "tags": [],
@@ -141,6 +144,7 @@
       {
         "entity_attribute": null,
         "name": "updated_at",
+        "source_column": "",
         "type": "timestamp",
         "description": "Just a timestamp",
         "tags": [],

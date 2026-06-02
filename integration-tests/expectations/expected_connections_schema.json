@@ -537,6 +537,12 @@
           },
           "type": "array"
         },
+        "onelake": {
+          "items": {
+            "$ref": "#/$defs/OneLakeConnection"
+          },
+          "type": "array"
+        },
         "mongo": {
           "items": {
             "$ref": "#/$defs/MongoConnection"
@@ -1529,6 +1535,41 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "OneLakeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "workspace_name": {
+          "type": "string"
+        },
+        "lakehouse_name": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "sas_token": {
+          "type": "string"
+        },
+        "use_azure_default_credential": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "workspace_name",
+        "lakehouse_name"
       ]
     },
     "FacebookAdsConnection": {

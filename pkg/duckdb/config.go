@@ -14,9 +14,12 @@ func (c Config) ToDBConnectionURI() string {
 }
 
 func (c Config) GetIngestrURI() string {
-	connString := "duckdb:///" + c.Path
-
-	return connString
+	if c.HasLakehouse() {
+		if uri := BuildIngestrLakehouseURI(c.Lakehouse); uri != "" {
+			return uri
+		}
+	}
+	return "duckdb:///" + c.Path
 }
 
 func (c Config) HasLakehouse() bool {

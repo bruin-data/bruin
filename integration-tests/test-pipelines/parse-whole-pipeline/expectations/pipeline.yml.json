@@ -197,6 +197,7 @@
         {
           "entity_attribute": null,
           "name": "total_games",
+          "source_column": "",
           "type": "integer",
           "description": "the games",
           "tags": [],

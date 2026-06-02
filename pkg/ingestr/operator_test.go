@@ -1320,3 +1320,37 @@ func TestBasicOperator_Version(t *testing.T) {
 		runner.AssertNotCalled(t, "RunIngestr", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }
+
+func TestEnsureFabricEngineSupport(t *testing.T) {
+	t.Parallel()
+
+	const fabricURI = "fabric://client-id:secret@host:1433/warehouse?tenant_id=tid"
+
+	tests := []struct {
+		name    string
+		engine  resolvedEngine
+		uris    []string
+		wantErr bool
+	}{
+		{name: "non-fabric uris are always allowed", engine: resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}, uris: []string{"postgres://x", "bigquery://y"}},
+		{name: "fabric on default v1 is allowed", engine: resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}, uris: []string{fabricURI}},
+		{name: "fabric on exact 1.0.5 is allowed", engine: resolvedEngine{family: versionFamilyV1, ingestrVersion: "1.0.5"}, uris: []string{fabricURI}},
+		{name: "fabric on newer 1.1.0 is allowed", engine: resolvedEngine{family: versionFamilyV1, ingestrVersion: "1.1.0"}, uris: []string{fabricURI}},
+		{name: "fabric on v0 is rejected", engine: resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}, uris: []string{fabricURI}, wantErr: true},
+		{name: "fabric on 1.0.0 is rejected", engine: resolvedEngine{family: versionFamilyV1, ingestrVersion: "1.0.0"}, uris: []string{fabricURI}, wantErr: true},
+		{name: "fabric as destination only is checked", engine: resolvedEngine{family: versionFamilyV1, ingestrVersion: "1.0.0"}, uris: []string{"csv:///tmp/x.csv", fabricURI}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := ensureFabricEngineSupport(tt.engine, tt.uris...)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), fabricMinIngestrVersion)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

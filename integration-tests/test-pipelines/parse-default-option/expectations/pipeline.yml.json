@@ -66,18 +66,7 @@
       "extends": null,
       "columns": [],
       "custom_checks": [],
-      "hooks": {
-        "pre": [
-          {
-            "query": "select 1"
-          }
-        ],
-        "post": [
-          {
-            "query": "select 2"
-          }
-        ]
-      },
+      "hooks": {},
       "metadata": {},
       "snowflake": null,
       "athena": null,
@@ -123,18 +112,7 @@
       "extends": null,
       "columns": [],
       "custom_checks": [],
-      "hooks": {
-        "pre": [
-          {
-            "query": "select 1"
-          }
-        ],
-        "post": [
-          {
-            "query": "select 2"
-          }
-        ]
-      },
+      "hooks": {},
       "metadata": {},
       "snowflake": null,
       "athena": null,
@@ -180,18 +158,7 @@
       "extends": null,
       "columns": [],
       "custom_checks": [],
-      "hooks": {
-        "pre": [
-          {
-            "query": "select 1"
-          }
-        ],
-        "post": [
-          {
-            "query": "select 2"
-          }
-        ]
-      },
+      "hooks": {},
       "metadata": {},
       "snowflake": null,
       "athena": null,
@@ -258,6 +225,7 @@
         {
           "entity_attribute": null,
           "name": "total_games",
+          "source_column": "",
           "type": "integer",
           "description": "the games",
           "tags": [],
