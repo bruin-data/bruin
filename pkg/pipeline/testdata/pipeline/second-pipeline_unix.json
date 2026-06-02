@@ -178,6 +178,7 @@
                 {
                     "entity_attribute": null,
                     "name": "col1",
+                    "source_column": "",
                     "type": "string",
                     "description": "",
                     "tags": [],
@@ -216,6 +217,7 @@
                 {
                     "entity_attribute": null,
                     "name": "col2",
+                    "source_column": "",
                     "type": "string",
                     "description": "",
                     "tags": [],

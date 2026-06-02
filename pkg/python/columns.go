@@ -215,17 +215,25 @@ func ColumnHints(cols []pipeline.Column, normaliseNames bool) string {
 	hints := make([]string, 0)
 	for _, col := range cols {
 		typ := NormaliseColumnType(col.Type)
+		hint, typeKnown := TypeHintMapping[typ]
 
-		hint, exists := TypeHintMapping[typ]
-		if !exists {
+		if !typeKnown && col.SourceColumn == "" {
 			continue
 		}
+
 		name := col.Name
 		if normaliseNames {
 			name = NormalizeColumnName(name)
 		}
 
-		hints = append(hints, fmt.Sprintf("%s:%s", name, hint))
+		switch {
+		case col.SourceColumn != "" && typeKnown:
+			hints = append(hints, fmt.Sprintf("%s:%s:%s", name, hint, col.SourceColumn))
+		case col.SourceColumn != "":
+			hints = append(hints, fmt.Sprintf("%s::%s", name, col.SourceColumn))
+		default:
+			hints = append(hints, fmt.Sprintf("%s:%s", name, hint))
+		}
 	}
 	return strings.Join(hints, ",")
 }

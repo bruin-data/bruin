@@ -39,6 +39,7 @@ Each column will have the following keys:
 | key               | type    | req? | description                                                                     |
 |-------------------|---------|------|---------------------------------------------------------------------------------|
 | `name`            | String  | yes  | The name of the column                                                          |
+| `source_column`   | String  | no   | For ingestr assets, the source column name to map onto `name`. See [Column name mapping](#column-name-mapping-ingestr-assets). |
 | `type`            | String  | no   | The column type in the DB                                                       |
 | `description`     | String  | no   | The description for the column                                                  |
 | `tags`            | String[]| no   | Tags applied to the column for categorization and filtering                     |
@@ -62,3 +63,42 @@ The structure of the quality checks is rather simple:
 | `value`    | Any    | no   | Check-specific expected value                                     |
 
 For more details on the quality checks, please refer to the  [Quality](../quality/overview) documentation.
+
+### Column name mapping (ingestr assets)
+
+For ingestr assets, you can rename a column on its way from the source to the destination
+by setting `source_column` on the column entry. The `name` field stays the destination
+column name; `source_column` is the column that exists on the source.
+
+```yaml
+columns:
+  - name: first_name
+    source_column: fname
+    type: string
+    primary_key: true
+  - name: email
+    source_column: eml
+    type: string
+  - name: created_at
+    source_column: crtd_ts
+    type: timestamp
+```
+
+With the mapping above, the source table's `fname`, `eml`, and `crtd_ts` columns land in
+the destination as `first_name`, `email`, and `created_at`. Columns without
+`source_column` keep their original source names.
+
+For the mapping to take effect, `enforce_schema: "true"` must be set under the asset's
+`parameters` block. 
+
+```yaml
+parameters:
+  enforce_schema: "true"
+
+columns:
+  - name: first_name
+    source_column: fname
+    type: string
+  - name: email
+    source_column: eml          # type omitted: ingestr just renames, no type enforcement
+```

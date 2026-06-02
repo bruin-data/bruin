@@ -101,6 +101,34 @@ func TestColumnHints(t *testing.T) {
 			normalizeNames: false,
 			expected:       "id:bigint,name:text",
 		},
+		{
+			name: "source_column adds dest:type:source triple",
+			columns: []pipeline.Column{
+				{Name: "id", SourceColumn: "sourceid", Type: "integer"},
+				{Name: "email", SourceColumn: "eml", Type: "string"},
+				{Name: "created_at", Type: "timestamp"},
+			},
+			normalizeNames: false,
+			expected:       "id:bigint:sourceid,email:text:eml,created_at:timestamp",
+		},
+		{
+			name: "source_column with name normalization normalizes dest name",
+			columns: []pipeline.Column{
+				{Name: "FirstName", SourceColumn: "fname", Type: "string"},
+			},
+			normalizeNames: true,
+			expected:       "first_name:text:fname",
+		},
+		{
+			name: "source_column without recognized type emits dest::source",
+			columns: []pipeline.Column{
+				{Name: "first_name", SourceColumn: "fname"},
+				{Name: "email", SourceColumn: "eml", Type: "string"},
+				{Name: "weird", SourceColumn: "wrd", Type: "unknown_type"},
+			},
+			normalizeNames: false,
+			expected:       "first_name::fname,email:text:eml,weird::wrd",
+		},
 	}
 
 	for _, tt := range tests {
@@ -262,6 +290,49 @@ func TestConsolidatedParameters_EnforceSchema(t *testing.T) {
 			assert.Equal(t, tt.wantColumn, hasColumns, "expected columns presence to be %v", tt.wantColumn)
 		})
 	}
+}
+
+func TestConsolidatedParameters_SourceColumn(t *testing.T) {
+	t.Parallel()
+
+	t.Run("source_column with enforce_schema=true emits dest:type:source", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Parameters: map[string]string{
+				"enforce_schema": "true",
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", SourceColumn: "sourceid", Type: "integer"},
+				{Name: "email", SourceColumn: "eml", Type: "string"},
+			},
+		}
+		result, err := ConsolidatedParameters(t.Context(), asset, []string{"--existing"}, &ColumnHintOptions{})
+		require.NoError(t, err)
+
+		var columnsValue string
+		for i, arg := range result {
+			if arg == "--columns" && i+1 < len(result) {
+				columnsValue = result[i+1]
+				break
+			}
+		}
+		assert.Equal(t, "id:bigint:sourceid,email:text:eml", columnsValue)
+	})
+
+	t.Run("source_column without enforce_schema does not emit --columns", func(t *testing.T) {
+		t.Parallel()
+		asset := &pipeline.Asset{
+			Parameters: map[string]string{},
+			Columns: []pipeline.Column{
+				{Name: "id", SourceColumn: "sourceid", Type: "integer"},
+			},
+		}
+		result, err := ConsolidatedParameters(t.Context(), asset, []string{"--existing"}, &ColumnHintOptions{})
+		require.NoError(t, err)
+		for _, arg := range result {
+			assert.NotEqual(t, "--columns", arg)
+		}
+	})
 }
 
 func TestColumnHints_Normalization(t *testing.T) {
