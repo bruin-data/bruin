@@ -33,6 +33,7 @@ type Connections struct {
 	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks,omitempty" mapstructure:"databricks"`
 	Synapse             []SynapseConnection             `yaml:"synapse,omitempty" json:"synapse,omitempty" mapstructure:"synapse"`
 	Fabric              []FabricConnection              `yaml:"fabric,omitempty" json:"fabric,omitempty" mapstructure:"fabric"`
+	OneLake             []OneLakeConnection             `yaml:"onelake,omitempty" json:"onelake,omitempty" mapstructure:"onelake"`
 	Mongo               []MongoConnection               `yaml:"mongo,omitempty" json:"mongo,omitempty" mapstructure:"mongo"`
 	Couchbase           []CouchbaseConnection           `yaml:"couchbase,omitempty" json:"couchbase,omitempty" mapstructure:"couchbase"`
 	Cursor              []CursorConnection              `yaml:"cursor,omitempty" json:"cursor,omitempty" mapstructure:"cursor"`
@@ -556,6 +557,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Fabric = append(env.Connections.Fabric, conn)
+	case "onelake":
+		var conn OneLakeConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.OneLake = append(env.Connections.OneLake, conn)
 	case "mongo":
 		var conn MongoConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1262,6 +1270,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Synapse = removeConnection(env.Connections.Synapse, connectionName)
 	case "fabric":
 		env.Connections.Fabric = removeConnection(env.Connections.Fabric, connectionName)
+	case "onelake":
+		env.Connections.OneLake = removeConnection(env.Connections.OneLake, connectionName)
 	case "gorgias":
 		env.Connections.Gorgias = removeConnection(env.Connections.Gorgias, connectionName)
 	case "g2":
@@ -1491,6 +1501,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Databricks, source.Databricks)
 	mergeConnectionList(&c.Synapse, source.Synapse)
 	mergeConnectionList(&c.Fabric, source.Fabric)
+	mergeConnectionList(&c.OneLake, source.OneLake)
 	mergeConnectionList(&c.Mongo, source.Mongo)
 	mergeConnectionList(&c.Couchbase, source.Couchbase)
 	mergeConnectionList(&c.Cursor, source.Cursor)
