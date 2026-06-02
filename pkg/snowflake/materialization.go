@@ -62,7 +62,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, helpers.TrimQuerySuffix(query)),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -129,7 +129,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	mergeLines := []string{
 		fmt.Sprintf("MERGE INTO %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING (%s) source ON %s", helpers.TrimQuerySuffix(query), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
@@ -164,7 +164,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name,
-			strings.TrimSuffix(query, ";")),
+			helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 

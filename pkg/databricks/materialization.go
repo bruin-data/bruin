@@ -73,7 +73,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, error) {
 	queries := []string{
 		"TRUNCATE TABLE " + task.Name,
-		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("INSERT INTO %s %s", task.Name, helpers.TrimQuerySuffix(query)),
 	}
 	return queries, nil
 }
@@ -101,7 +101,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 
 	mergeLines := []string{
 		fmt.Sprintf("MERGE INTO %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING (%s) source ON %s", helpers.TrimQuerySuffix(query), onQuery),
 	}
 
 	if len(nonPrimaryKeys) > 0 {
@@ -146,7 +146,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 
 	tempTableName := databaseName + ".__bruin_tmp_" + helpers.PrefixGenerator()
 
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	return []string{
 		fmt.Sprintf(`CREATE TABLE %s AS %s;`, tempTableName, query),
@@ -231,7 +231,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) ([]string
 		return nil, errors.New("materialization strategy 'scd2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
 
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	validFromExpr := "CURRENT_TIMESTAMP()"
 	if asset.Materialization.IncrementalKey != "" {
@@ -266,7 +266,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) ([]string, 
 		return nil, errors.New("materialization strategy 'scd2_by_time' requires the `primary_key` field to be set on at least one column")
 	}
 
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 	incrementalKey := asset.Materialization.IncrementalKey
 
 	stmt := fmt.Sprintf(

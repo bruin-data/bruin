@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -38,7 +39,7 @@ func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	return "CREATE OR ALTER VIEW " + QuoteIdentifier(asset.Name) + " AS\n" + strings.TrimSuffix(query, ";"), nil
+	return "CREATE OR ALTER VIEW " + QuoteIdentifier(asset.Name) + " AS\n" + helpers.TrimQuerySuffix(query), nil
 }
 
 // buildCreateReplaceQuery uses a temp table swap pattern because Fabric doesn't support CREATE OR REPLACE TABLE.
@@ -54,7 +55,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 	tempName := QuoteIdentifier(tempFullName)
 	backupName := QuoteIdentifier(backupFullName)
 
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	queries := []string{
 		"DROP TABLE IF EXISTS " + tempName,
@@ -69,7 +70,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	return "INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"), nil
+	return "INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + helpers.TrimQuerySuffix(query), nil
 }
 
 func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -86,7 +87,7 @@ func buildDeleteInsertQuery(asset *pipeline.Asset, query string) (string, error)
 	tempName := QuoteIdentifier(asset.Name + "__bruin_tmp")
 
 	deleteCondition := buildDeleteCondition(pkCols, tableName, tempName)
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	queries := []string{
 		"DROP TABLE IF EXISTS " + tempName,
@@ -107,7 +108,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, error) {
 	queries := []string{
 		"TRUNCATE TABLE " + QuoteIdentifier(asset.Name),
-		"INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + strings.TrimSuffix(query, ";"),
+		"INSERT INTO " + QuoteIdentifier(asset.Name) + "\n" + helpers.TrimQuerySuffix(query),
 	}
 	return strings.Join(queries, ";\n") + ";", nil
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -65,7 +66,7 @@ func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	if err := validateIdentifier(asset.Name, "view name"); err != nil {
 		return "", err
 	}
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
 }
 
@@ -74,7 +75,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 		return buildSCD2ByTimeFullRefresh(task, query)
 	}
 
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 	// Oracle (pre-23c) lacks CREATE OR REPLACE TABLE, so we use a PL/SQL block
 	// that drops (with exception handling for non-existent tables) then creates.
 	// DDL requires EXECUTE IMMEDIATE inside PL/SQL; single quotes in the query
@@ -107,7 +108,7 @@ func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query string) (string, er
 		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
 	}
 
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 
 	createAsQuery := fmt.Sprintf(`SELECT
   src.*,
@@ -138,7 +139,7 @@ func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 	if err := validateIdentifier(asset.Name, "table name"); err != nil {
 		return "", err
 	}
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
 }
 
@@ -148,7 +149,7 @@ func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error
 	if err := validateIdentifier(task.Name, "table name"); err != nil {
 		return "", err
 	}
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 	escapedName := escapeOracleString(task.Name)
 	return fmt.Sprintf(`BEGIN
    EXECUTE IMMEDIATE 'TRUNCATE TABLE %s';
@@ -176,7 +177,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		return "", errors.New("time_granularity must be either 'date' or 'timestamp'")
 	}
 
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 
 	startVar := "{{start_timestamp}}"
 	endVar := "{{end_timestamp}}"
@@ -266,7 +267,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 		return "", err
 	}
 
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 
 	// Wrap DELETE + INSERT in a single PL/SQL block so both DML statements
 	// execute atomically through the Go driver in one ExecContext call.
@@ -302,7 +303,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 			return "", err
 		}
 	}
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 
 	onQuery := strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND ")
 
@@ -363,7 +364,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	if err := validateIdentifier(asset.Name, "table name"); err != nil {
 		return "", err
 	}
-	query = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(query), ";"))
+	query = helpers.TrimQuerySuffix(query)
 
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2_by_time strategy")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 )
@@ -390,7 +391,7 @@ func dataVaultTransaction(statements []string) string {
 }
 
 func trimMaterializationQuery(query string) string {
-	return strings.TrimSuffix(strings.TrimSpace(query), ";")
+	return helpers.TrimQuerySuffix(query)
 }
 
 func dataVaultSatellitePrimaryKeys(asset *pipeline.Asset, parentHashKey, loadDatetime *pipeline.Column) []string {

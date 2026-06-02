@@ -98,7 +98,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, helpers.TrimQuerySuffix(query)),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -119,7 +119,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 
 	mergeColumns := ansisql.GetColumnsWithMergeLogic(asset)
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 	columnNames := asset.ColumnNames()
 
 	onConditions := make([]string, 0, len(primaryKeys))
@@ -184,10 +184,10 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	if task.Materialization.Strategy == pipeline.MaterializationStrategyDataVaultSatellite {
 		return buildDataVaultSatelliteQueryWithOptions(task, query, true)
 	}
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 	return fmt.Sprintf(
 		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s; 
+DROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS %s;
 COMMIT;`, task.Name, task.Name, query), nil
 }
@@ -221,7 +221,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name,
-			strings.TrimSuffix(query, ";")),
+			helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 
@@ -263,7 +263,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	var (
 		primaryKeys = make([]string, 0, 4)
@@ -395,7 +395,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 }
 
 func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2_by_time strategy")

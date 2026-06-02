@@ -121,7 +121,7 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 
 	queries := []string{
 		fmt.Sprintf("MERGE INTO %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING (%s) source ON %s", helpers.TrimQuerySuffix(query), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, strings.Join(columnNamesWithSource, ", ")),
 	}
@@ -136,7 +136,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]st
 	case pipeline.MaterializationStrategySCD2ByColumn:
 		return buildSCD2ByColumnFullRefresh(task, query, location)
 	default:
-		query = strings.TrimSuffix(query, ";")
+		query = helpers.TrimQuerySuffix(query)
 
 		tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
@@ -229,7 +229,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string, location string) ([]stri
 }
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	var (
 		primaryKeys = make([]string, 0, 4)
@@ -417,7 +417,7 @@ func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query, location string)
 }
 
 func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	if asset.Materialization.IncrementalKey == "" {
 		return nil, errors.New("incremental_key is required for SCD2_by_time strategy")

@@ -231,7 +231,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 				"COMMIT TRANSACTION;$",
 		},
 		{
-			name: "delete+insert comment out",
+			name: "delete+insert with trailing line comment keeps the appended ; on its own line",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
@@ -242,7 +242,7 @@ INSERT INTO my.asset SELECT 1 as id, 'test' as name`,
 			},
 			query: "SELECT 1\n -- This is a comment",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n -- This is a comment;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n -- This is a comment\n;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",

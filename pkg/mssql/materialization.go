@@ -50,7 +50,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	if len(mat.ClusterBy) > 0 {
 		return "", errors.New("MsSQL assets do not support `cluster_by`")
 	}
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 	queries := []string{
 		"BEGIN TRANSACTION",
 		"DROP TABLE IF EXISTS " + task.Name,
@@ -126,7 +126,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	mergeLines := []string{
 		fmt.Sprintf("MERGE INTO %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING (%s) source ON %s", helpers.TrimQuerySuffix(query), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
@@ -163,7 +163,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name,
-			strings.TrimSuffix(query, ";")),
+			helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 

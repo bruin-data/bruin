@@ -45,8 +45,27 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: `BEGIN TRANSACTION;
-DROP TABLE IF EXISTS my.asset; 
+DROP TABLE IF EXISTS my.asset;
 CREATE TABLE my.asset AS SELECT 1;
+COMMIT;`,
+		},
+		{
+			// Regression: when the user's query ends in a '-- ...' line
+			// comment the appended ';' must land on its own line, otherwise
+			// DuckDB reports 'syntax error at or near "COMMIT"'.
+			name: "create+replace with trailing line comment keeps the appended ; on its own line",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+			query: "SELECT 1\n-- trailing comment",
+			want: `BEGIN TRANSACTION;
+DROP TABLE IF EXISTS my.asset;
+CREATE TABLE my.asset AS SELECT 1
+-- trailing comment
+;
 COMMIT;`,
 		},
 		{
@@ -61,7 +80,7 @@ COMMIT;`,
 			fullRefresh: true,
 			query:       "SELECT 1",
 			want: `BEGIN TRANSACTION;
-DROP TABLE IF EXISTS my.asset; 
+DROP TABLE IF EXISTS my.asset;
 CREATE TABLE my.asset AS SELECT 1;
 COMMIT;`,
 		},
@@ -121,7 +140,7 @@ COMMIT;`,
 		},
 
 		{
-			name: "delete+insert semicolon comment out ",
+			name: "delete+insert with trailing line comment keeps the appended ; on its own line",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
@@ -132,7 +151,7 @@ COMMIT;`,
 			},
 			query: "SELECT 1 --this is a comment",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 --this is a comment;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 --this is a comment\n;\n" +
 				"DELETE FROM my.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +

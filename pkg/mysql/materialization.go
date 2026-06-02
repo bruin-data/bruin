@@ -71,7 +71,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	queries := []string{
 		"START TRANSACTION",
 		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
-		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("CREATE TEMPORARY TABLE %s AS %s", tempTableName, helpers.TrimQuerySuffix(query)),
 		fmt.Sprintf("DELETE FROM %s WHERE %s IN (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
 		"DROP TEMPORARY TABLE IF EXISTS " + tempTableName,
@@ -85,7 +85,7 @@ func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, erro
 	queries := []string{
 		"START TRANSACTION",
 		"TRUNCATE TABLE " + asset.Name,
-		fmt.Sprintf("INSERT INTO %s %s", asset.Name, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("INSERT INTO %s %s", asset.Name, helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 
@@ -141,7 +141,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			endVar),
 		fmt.Sprintf("INSERT INTO %s %s",
 			asset.Name,
-			strings.TrimSuffix(query, ";")),
+			helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 

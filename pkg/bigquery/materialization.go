@@ -50,7 +50,7 @@ func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error
 	// BigQuery doesn't support transactions, so we execute as separate statements
 	queries := []string{
 		"TRUNCATE TABLE " + task.Name,
-		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("INSERT INTO %s %s", task.Name, helpers.TrimQuerySuffix(query)),
 	}
 	return strings.Join(queries, ";\n"), nil
 }
@@ -94,7 +94,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 
 	mergeLines := []string{
 		fmt.Sprintf("MERGE %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source", strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("USING (%s) source", helpers.TrimQuerySuffix(query)),
 		fmt.Sprintf("ON (%s)", onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
@@ -125,7 +125,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	queries := []string{
 		fmt.Sprintf("DECLARE %s array<%s>", declaredVarName, foundCol.Type),
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, helpers.TrimQuerySuffix(query)),
 		fmt.Sprintf("SET %s = (SELECT array_agg(distinct %s) FROM %s)", declaredVarName, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in unnest(%s)", asset.Name, mat.IncrementalKey, declaredVarName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
@@ -141,7 +141,7 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, helpers.TrimQuerySuffix(query)),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
 		"COMMIT TRANSACTION",
@@ -200,7 +200,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name,
-			strings.TrimSuffix(query, ";")),
+			helpers.TrimQuerySuffix(query)),
 		"COMMIT TRANSACTION",
 	}
 

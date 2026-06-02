@@ -77,7 +77,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, helpers.TrimQuerySuffix(query)),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", QuoteIdentifier(task.Name), quotedIncrementalKey, quotedIncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", QuoteIdentifier(task.Name), tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -91,7 +91,7 @@ func buildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error
 	queries := []string{
 		"BEGIN TRANSACTION",
 		"TRUNCATE TABLE " + QuoteIdentifier(task.Name),
-		fmt.Sprintf("INSERT INTO %s %s", QuoteIdentifier(task.Name), strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("INSERT INTO %s %s", QuoteIdentifier(task.Name), helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 
@@ -162,7 +162,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	mergeLines := []string{
 		fmt.Sprintf("MERGE INTO %s target", QuoteIdentifier(asset.Name)),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING (%s) source ON %s", helpers.TrimQuerySuffix(query), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),
 	}
@@ -220,7 +220,7 @@ func buildRedshiftMergeQuery(asset *pipeline.Asset, query string) (string, error
 
 	mergeLines := []string{
 		"MERGE INTO " + targetTableName,
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING (%s) source ON %s", helpers.TrimQuerySuffix(query), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnNamesStr, allColumnValuesStr),
 	}
@@ -241,7 +241,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	case pipeline.MaterializationStrategyDataVaultSatellite:
 		return buildDataVaultSatelliteQueryWithOptions(task, query, true)
 	default:
-		query = strings.TrimSuffix(query, ";")
+		query = helpers.TrimQuerySuffix(query)
 		return fmt.Sprintf(
 			`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s; 
@@ -278,7 +278,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			QuoteIdentifier(asset.Name),
-			strings.TrimSuffix(query, ";")),
+			helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 

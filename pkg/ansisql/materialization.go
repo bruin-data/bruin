@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -26,7 +27,7 @@ func BuildTruncateInsertQuery(task *pipeline.Asset, query string) (string, error
 	queries := []string{
 		"BEGIN TRANSACTION",
 		"TRUNCATE TABLE " + task.Name,
-		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("INSERT INTO %s %s", task.Name, helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 

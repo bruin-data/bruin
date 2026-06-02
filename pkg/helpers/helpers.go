@@ -231,6 +231,66 @@ func ParseJSONOutputs(actual, expected string) (interface{}, interface{}, error)
 	return actualData, expectedData, nil
 }
 
+// TrimQuerySuffix prepares a user-authored SQL query for splicing into a
+// materialization template. It strips a trailing ';' (and surrounding
+// whitespace) so any punctuation the template appends right after the
+// query (e.g. ';', ')') doesn't end up duplicated.
+//
+// If the trimmed query ends inside a '-- ...' line comment, it also
+// appends a newline so the template's appended punctuation lands on its
+// own line and isn't swallowed by the comment.
+func TrimQuerySuffix(q string) string {
+	q = strings.TrimRight(q, " \t\r\n")
+	q = strings.TrimSuffix(q, ";")
+	q = strings.TrimRight(q, " \t\r\n")
+	if endsInsideLineComment(q) {
+		return q + "\n"
+	}
+	return q
+}
+
+// endsInsideLineComment reports whether q ends inside an unterminated
+// '-- ...' line comment (i.e. the final '--' on the last line isn't
+// followed by a newline and isn't inside a string literal or block
+// comment). When true, any text appended directly to q on the same line
+// would be swallowed by the comment.
+func endsInsideLineComment(q string) bool {
+	var inSingle, inDouble, inBlock, inLine bool
+	for i := 0; i < len(q); i++ {
+		c := q[i]
+		switch {
+		case inLine:
+			if c == '\n' {
+				inLine = false
+			}
+		case inBlock:
+			if c == '*' && i+1 < len(q) && q[i+1] == '/' {
+				inBlock = false
+				i++
+			}
+		case inSingle:
+			if c == '\'' {
+				inSingle = false
+			}
+		case inDouble:
+			if c == '"' {
+				inDouble = false
+			}
+		case c == '\'':
+			inSingle = true
+		case c == '"':
+			inDouble = true
+		case c == '-' && i+1 < len(q) && q[i+1] == '-':
+			inLine = true
+			i++
+		case c == '/' && i+1 < len(q) && q[i+1] == '*':
+			inBlock = true
+			i++
+		}
+	}
+	return inLine
+}
+
 func TrimToLength(s string, maxLength int) string {
 	runes := []rune(s)
 	if len(runes) > maxLength {

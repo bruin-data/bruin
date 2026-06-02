@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -50,7 +51,7 @@ func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", quoteIdentifier(asset.Name), query), nil
 }
 
@@ -64,7 +65,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", mat.Strategy)
 	}
 
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 	key := mat.IncrementalKey
 
 	return fmt.Sprintf(`
@@ -94,7 +95,7 @@ func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, erro
 	queries := []string{
 		"BEGIN",
 		"DELETE FROM " + asset.Name,
-		fmt.Sprintf("INSERT INTO %s %s", asset.Name, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("INSERT INTO %s %s", asset.Name, helpers.TrimQuerySuffix(query)),
 		"COMMIT",
 	}
 	return strings.Join(queries, ";\n") + ";", nil
@@ -102,7 +103,7 @@ func buildTruncateInsertQuery(asset *pipeline.Asset, query string) (string, erro
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
 	mat := asset.Materialization
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	withClauses := []string{"format = 'PARQUET'"}
 
@@ -138,7 +139,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
 
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 	key := asset.Materialization.IncrementalKey
 
 	timePrefix := "TIMESTAMP"

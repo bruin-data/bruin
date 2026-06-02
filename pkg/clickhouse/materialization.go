@@ -92,7 +92,7 @@ func buildTruncateInsertQuery(task *pipeline.Asset, query string) ([]string, err
 	// ClickHouse doesn't support transactions, so we return individual statements
 	queries := []string{
 		"TRUNCATE TABLE " + task.Name,
-		fmt.Sprintf("INSERT INTO %s %s", task.Name, strings.TrimSuffix(query, ";")),
+		fmt.Sprintf("INSERT INTO %s %s", task.Name, helpers.TrimQuerySuffix(query)),
 	}
 	return queries, nil
 }
@@ -106,7 +106,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at EXACTLY one column", task.Materialization.Strategy)
 	}
 
-	query = strings.TrimSuffix(query, ";")
+	query = helpers.TrimQuerySuffix(query)
 
 	// Extract database name from task.Name to ensure temp table is created in the correct database
 	assetNameParts := strings.Split(task.Name, ".")
