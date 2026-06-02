@@ -1,6 +1,7 @@
 package ingestr
 
 import (
+	"context"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -16,57 +17,72 @@ func TestAppendQueryAnnotations(t *testing.T) {
 		Pipeline: &pipeline.Pipeline{Name: "shopify"},
 		Asset:    &pipeline.Asset{Name: "raw.orders"},
 	}
+	withMeta := &scheduler.AssetInstance{
+		Pipeline: &pipeline.Pipeline{Name: "shopify"},
+		Asset: &pipeline.Asset{
+			Name: "raw.orders",
+			Meta: pipeline.EmptyStringMap{"client": "acme", "team": "data"},
+		},
+	}
 	v1 := resolvedEngine{family: versionFamilyV1, ingestrVersion: python.IngestrVersionV1}
 	v0 := resolvedEngine{family: versionFamilyV0, ingestrVersion: python.IngestrVersionV0}
 
-	t.Run("added for the v1 engine", func(t *testing.T) {
+	// annotated returns a context carrying the run-level annotations exactly as
+	// `bruin run --query-annotations` / BRUIN_QUERY_ANNOTATIONS would set them.
+	annotated := func(payload string) context.Context {
+		return context.WithValue(context.Background(), pipeline.RunConfigQueryAnnotations, payload)
+	}
+
+	t.Run("opt-in: nothing forwarded without run-level annotations", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest", "--dest-table", "raw.orders"}
-		got := appendQueryAnnotations(base, v1, ti)
-		require.Equal(t, []string{
-			"ingest", "--dest-table", "raw.orders",
-			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify"}`,
-		}, got)
+		require.Equal(t, base, appendQueryAnnotations(context.Background(), base, v1, ti))
 	})
 
-	t.Run("folds asset meta into the annotations", func(t *testing.T) {
+	t.Run("default sentinel forwards pipeline/asset identity", func(t *testing.T) {
 		t.Parallel()
-		withMeta := &scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{Name: "shopify"},
-			Asset: &pipeline.Asset{
-				Name: "raw.orders",
-				Meta: pipeline.EmptyStringMap{"client": "acme", "team": "data"},
-			},
-		}
-		base := []string{"ingest", "--dest-table", "raw.orders"}
-		got := appendQueryAnnotations(base, v1, withMeta)
-		require.Equal(t, []string{
-			"ingest", "--dest-table", "raw.orders",
-			"--query-annotations", `{"asset":"raw.orders","client":"acme","pipeline":"shopify","team":"data"}`,
-		}, got)
-	})
-
-	t.Run("meta cannot override pipeline/asset identity", func(t *testing.T) {
-		t.Parallel()
-		spoofed := &scheduler.AssetInstance{
-			Pipeline: &pipeline.Pipeline{Name: "shopify"},
-			Asset: &pipeline.Asset{
-				Name: "raw.orders",
-				Meta: pipeline.EmptyStringMap{"pipeline": "evil", "asset": "evil"},
-			},
-		}
 		base := []string{"ingest"}
-		got := appendQueryAnnotations(base, v1, spoofed)
+		got := appendQueryAnnotations(annotated("default"), base, v1, ti)
 		require.Equal(t, []string{
 			"ingest",
 			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify"}`,
 		}, got)
 	})
 
+	t.Run("folds asset meta into the annotations", func(t *testing.T) {
+		t.Parallel()
+		base := []string{"ingest"}
+		got := appendQueryAnnotations(annotated("default"), base, v1, withMeta)
+		require.Equal(t, []string{
+			"ingest",
+			"--query-annotations", `{"asset":"raw.orders","client":"acme","pipeline":"shopify","team":"data"}`,
+		}, got)
+	})
+
+	t.Run("merges run-level annotations (project/run_id) from context", func(t *testing.T) {
+		t.Parallel()
+		base := []string{"ingest"}
+		got := appendQueryAnnotations(annotated(`{"project":"3tlabs","run_id":"scheduled__2026-06-01T00:00:00+00:00"}`), base, v1, ti)
+		require.Equal(t, []string{
+			"ingest",
+			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify","project":"3tlabs","run_id":"scheduled__2026-06-01T00:00:00+00:00"}`,
+		}, got)
+	})
+
+	t.Run("preserves non-string run-level values like try_number", func(t *testing.T) {
+		t.Parallel()
+		base := []string{"ingest"}
+		got := appendQueryAnnotations(annotated(`{"project":"3tlabs","run_id":"manual__2026-06-02T12:50:51+00:00","try_number":0}`), base, v1, ti)
+		require.Equal(t, []string{
+			"ingest",
+			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify","project":"3tlabs","run_id":"manual__2026-06-02T12:50:51+00:00","try_number":0}`,
+		}, got)
+	})
+
 	t.Run("omitted for the legacy v0 engine", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest", "--dest-table", "raw.orders"}
-		require.Equal(t, base, appendQueryAnnotations(base, v0, ti))
+		require.Equal(t, base, appendQueryAnnotations(annotated("default"), base, v0, ti))
 	})
 
 	t.Run("omitted when pipeline/asset identity is incomplete", func(t *testing.T) {
@@ -76,6 +92,6 @@ func TestAppendQueryAnnotations(t *testing.T) {
 			Pipeline: &pipeline.Pipeline{}, // no name
 			Asset:    &pipeline.Asset{Name: "raw.orders"},
 		}
-		require.Equal(t, base, appendQueryAnnotations(base, v1, incomplete))
+		require.Equal(t, base, appendQueryAnnotations(annotated("default"), base, v1, incomplete))
 	})
 }

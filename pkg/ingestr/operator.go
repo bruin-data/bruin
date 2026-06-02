@@ -2,13 +2,13 @@ package ingestr
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -66,18 +66,20 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 }
 
 // appendQueryAnnotations adds the --query-annotations flag carrying the
-// pipeline/asset identity plus the asset's meta key/values, so ingestr can
-// annotate destination queries for warehouse cost attribution (it adds
-// type/ingestr_step itself). This mirrors how the Snowflake operator folds
-// asset meta into its query tag.
+// pipeline/asset identity plus the asset's meta, merged with the run-level
+// annotations supplied via --query-annotations / BRUIN_QUERY_ANNOTATIONS (e.g.
+// project/run_id/try_number from the orchestrator). ingestr adds type and
+// ingestr_step itself.
 //
-// pipeline and asset are authoritative: meta cannot override them, so cost
-// attribution stays reliable regardless of what a user puts in meta.
+// It uses ansisql.BuildAnnotationJSON — the same merge the native SQL and
+// Snowflake operators use — so ingestr queries are annotated and attributed
+// identically. Like those operators it is opt-in: when no run-level annotations
+// are configured BuildAnnotationJSON returns "" and nothing is forwarded.
 //
 // Only the v1 engine (the Go ingestr) understands the flag; the legacy v0
 // PyPI release does not, so passing it there would fail with an unknown flag.
 // The flag is therefore gated on the resolved engine family.
-func appendQueryAnnotations(args []string, engine resolvedEngine, ti scheduler.TaskInstance) []string {
+func appendQueryAnnotations(ctx context.Context, args []string, engine resolvedEngine, ti scheduler.TaskInstance) []string {
 	if engine.family != versionFamilyV1 {
 		return args
 	}
@@ -88,19 +90,20 @@ func appendQueryAnnotations(args []string, engine resolvedEngine, ti scheduler.T
 		return args
 	}
 
-	annotations := make(map[string]string, len(asset.Meta)+2)
-	for k, v := range asset.Meta {
-		annotations[k] = v
+	baseline := map[string]interface{}{
+		"pipeline": p.Name,
+		"asset":    asset.Name,
 	}
-	annotations["pipeline"] = p.Name
-	annotations["asset"] = asset.Name
+	for k, v := range asset.Meta {
+		baseline[k] = v
+	}
 
-	payload, err := json.Marshal(annotations)
-	if err != nil {
+	payload, err := ansisql.BuildAnnotationJSON(ctx, baseline)
+	if err != nil || payload == "" {
 		return args
 	}
 
-	return append(args, "--query-annotations", string(payload))
+	return append(args, "--query-annotations", payload)
 }
 
 // applyIngestrEngine stashes the resolved PyPI version on the context so the
@@ -322,7 +325,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 	ctx = applyIngestrEngine(ctx, engine)
 
-	cmdArgs = appendQueryAnnotations(cmdArgs, engine, ti)
+	cmdArgs = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
@@ -496,7 +499,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 	ctx = applyIngestrEngine(ctx, engine)
 
-	cmdArgs = appendQueryAnnotations(cmdArgs, engine, ti)
+	cmdArgs = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
