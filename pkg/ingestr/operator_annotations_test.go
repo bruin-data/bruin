@@ -29,6 +29,40 @@ func TestAppendQueryAnnotations(t *testing.T) {
 		}, got)
 	})
 
+	t.Run("folds asset meta into the annotations", func(t *testing.T) {
+		t.Parallel()
+		withMeta := &scheduler.AssetInstance{
+			Pipeline: &pipeline.Pipeline{Name: "shopify"},
+			Asset: &pipeline.Asset{
+				Name: "raw.orders",
+				Meta: pipeline.EmptyStringMap{"client": "acme", "team": "data"},
+			},
+		}
+		base := []string{"ingest", "--dest-table", "raw.orders"}
+		got := appendQueryAnnotations(base, v1, withMeta)
+		require.Equal(t, []string{
+			"ingest", "--dest-table", "raw.orders",
+			"--query-annotations", `{"asset":"raw.orders","client":"acme","pipeline":"shopify","team":"data"}`,
+		}, got)
+	})
+
+	t.Run("meta cannot override pipeline/asset identity", func(t *testing.T) {
+		t.Parallel()
+		spoofed := &scheduler.AssetInstance{
+			Pipeline: &pipeline.Pipeline{Name: "shopify"},
+			Asset: &pipeline.Asset{
+				Name: "raw.orders",
+				Meta: pipeline.EmptyStringMap{"pipeline": "evil", "asset": "evil"},
+			},
+		}
+		base := []string{"ingest"}
+		got := appendQueryAnnotations(base, v1, spoofed)
+		require.Equal(t, []string{
+			"ingest",
+			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify"}`,
+		}, got)
+	})
+
 	t.Run("omitted for the legacy v0 engine", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest", "--dest-table", "raw.orders"}

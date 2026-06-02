@@ -66,8 +66,13 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 }
 
 // appendQueryAnnotations adds the --query-annotations flag carrying the
-// pipeline/asset identity, so ingestr can annotate destination queries for
-// warehouse cost attribution (it adds type/ingestr_step itself).
+// pipeline/asset identity plus the asset's meta key/values, so ingestr can
+// annotate destination queries for warehouse cost attribution (it adds
+// type/ingestr_step itself). This mirrors how the Snowflake operator folds
+// asset meta into its query tag.
+//
+// pipeline and asset are authoritative: meta cannot override them, so cost
+// attribution stays reliable regardless of what a user puts in meta.
 //
 // Only the v1 engine (the Go ingestr) understands the flag; the legacy v0
 // PyPI release does not, so passing it there would fail with an unknown flag.
@@ -83,10 +88,14 @@ func appendQueryAnnotations(args []string, engine resolvedEngine, ti scheduler.T
 		return args
 	}
 
-	payload, err := json.Marshal(map[string]string{
-		"pipeline": p.Name,
-		"asset":    asset.Name,
-	})
+	annotations := make(map[string]string, len(asset.Meta)+2)
+	for k, v := range asset.Meta {
+		annotations[k] = v
+	}
+	annotations["pipeline"] = p.Name
+	annotations["asset"] = asset.Name
+
+	payload, err := json.Marshal(annotations)
 	if err != nil {
 		return args
 	}
