@@ -645,6 +645,25 @@ func Test_GetAssetCountWithTasksPending(t *testing.T) {
 				{ID: "check3", Asset: &pipeline.Asset{ID: "task12"}},
 			},
 		},
+		{
+			name: "check id alone resolves when asset is nil",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						ID:   "task21",
+						Name: "task21",
+						CustomChecks: []pipeline.CustomCheck{
+							{ID: "check1"},
+						},
+					},
+				},
+			},
+			markAssets: []int{},
+			want:       1,
+			checkInstanceIDs: []CheckUniqueID{
+				{ID: "check1", Asset: nil},
+			},
+		},
 		// Add more cases as needed
 	}
 
