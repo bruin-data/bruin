@@ -1432,6 +1432,24 @@ func (c TrinoConnection) GetName() string {
 	return c.Name
 }
 
+// FlightSQLConnection holds the settings for any Arrow Flight SQL compatible
+// platform (e.g. Dremio). Flight SQL is a transport protocol, so the same
+// connection type works across engines; Dialect selects the SQL dialect used
+// for materializations and defaults to "dremio" when empty.
+type FlightSQLConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port" json:"port" mapstructure:"port"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Database string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Dialect  string `yaml:"dialect,omitempty" json:"dialect,omitempty" mapstructure:"dialect"`
+}
+
+func (c FlightSQLConnection) GetName() string {
+	return c.Name
+}
+
 func (c TableauConnection) GetName() string {
 	return c.Name
 }

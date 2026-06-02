@@ -33,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
+	"github.com/bruin-data/bruin/pkg/flightsql"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -1843,6 +1844,25 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeMain] = trinoQuerySensor
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+	if s.WillRunTaskOfType(pipeline.AssetTypeFlightSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeFlightSQLQuery || s.WillRunTaskOfType(pipeline.AssetTypeFlightSQLQuerySensor) {
+		flightSQLFileExtractor := &query.FileQuerySplitterExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
+		flightSQLOperator := flightsql.NewBasicOperator(conn, flightSQLFileExtractor, pipeline.HookWrapperMaterializer{
+			Mat:     flightsql.NewMaterializer(fullRefresh),
+			Hoister: hoister,
+		}, parser)
+		flightSQLCheckRunner := athena.NewColumnCheckOperator(conn)
+		mainExecutors[pipeline.AssetTypeFlightSQLQuery][scheduler.TaskInstanceTypeMain] = flightSQLOperator
+		mainExecutors[pipeline.AssetTypeFlightSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = flightSQLCheckRunner
+		mainExecutors[pipeline.AssetTypeFlightSQLQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		flightSQLQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		mainExecutors[pipeline.AssetTypeFlightSQLQuerySensor][scheduler.TaskInstanceTypeMain] = flightSQLQuerySensor
+		mainExecutors[pipeline.AssetTypeFlightSQLQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = flightSQLCheckRunner
+		mainExecutors[pipeline.AssetTypeFlightSQLQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)

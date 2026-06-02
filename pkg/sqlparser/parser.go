@@ -350,6 +350,7 @@ var assetTypeDialectMap = map[pipeline.AssetType]string{
 	pipeline.AssetTypeRedshiftQuery:     "redshift",
 	pipeline.AssetTypeAthenaQuery:       "athena",
 	pipeline.AssetTypeTrinoQuery:        "trino",
+	pipeline.AssetTypeFlightSQLQuery:    "trino",
 	pipeline.AssetTypeClickHouse:        "clickhouse",
 	pipeline.AssetTypeDatabricksQuery:   "databricks",
 	pipeline.AssetTypeMsSQLQuery:        "tsql",
