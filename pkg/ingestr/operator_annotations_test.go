@@ -67,6 +67,17 @@ func TestAppendQueryAnnotations(t *testing.T) {
 		}, got)
 	})
 
+	t.Run("caller annotations cannot override pipeline/asset identity", func(t *testing.T) {
+		t.Parallel()
+		base := []string{"ingest"}
+		got, err := appendQueryAnnotations(annotated(`{"asset":"spoofed","pipeline":"spoofed","project":"3tlabs"}`), base, v1, ti)
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"ingest",
+			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify","project":"3tlabs"}`,
+		}, got)
+	})
+
 	t.Run("propagates an error on invalid run-level annotations JSON", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest"}

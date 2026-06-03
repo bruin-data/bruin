@@ -2,6 +2,7 @@ package ingestr
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -76,7 +77,8 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 // operators it is opt-in: when no run-level annotations are configured
 // BuildAnnotationJSON returns "" and nothing is forwarded. An invalid
 // annotations payload surfaces as an error (matching the SQL path) rather than
-// being silently dropped.
+// being silently dropped. The pipeline/asset identity keys are pinned after the
+// merge so caller-supplied annotations cannot override them.
 //
 // Only the v1 engine (the Go ingestr) understands the flag; the legacy v0
 // PyPI release does not, so passing it there would fail with an unknown flag.
@@ -105,7 +107,21 @@ func appendQueryAnnotations(ctx context.Context, args []string, engine resolvedE
 		return args, nil
 	}
 
-	return append(args, "--query-annotations", payload), nil
+	// BuildAnnotationJSON merges caller-supplied annotations over the baseline,
+	// so a stray "pipeline"/"asset" key would override the canonical identity.
+	// Re-pin them last so --query-annotations can't corrupt cost attribution.
+	merged := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(payload), &merged); err != nil {
+		return nil, fmt.Errorf("failed to build query annotations: %w", err)
+	}
+	merged["pipeline"] = p.Name
+	merged["asset"] = asset.Name
+	pinned, err := json.Marshal(merged)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query annotations: %w", err)
+	}
+
+	return append(args, "--query-annotations", string(pinned)), nil
 }
 
 // fabricMinIngestrVersion is the first ingestr release that ships the Microsoft
