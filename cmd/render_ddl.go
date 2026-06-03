@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/date"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/fabric"
+	"github.com/bruin-data/bruin/pkg/flightsql"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -226,6 +227,8 @@ func RenderDDL() *cli.Command {
 					pipeline.AssetTypePostgresQuerySensor:     postgres.NewMaterializer(false),
 					pipeline.AssetTypeTrinoQuery:              trino.NewMaterializer(false),
 					pipeline.AssetTypeTrinoQuerySensor:        trino.NewMaterializer(false),
+					pipeline.AssetTypeFlightSQLQuery:          flightsql.NewMaterializer(false),
+					pipeline.AssetTypeFlightSQLQuerySensor:    flightsql.NewMaterializer(false),
 					pipeline.AssetTypeOracleQuery:             oracle.NewMaterializer(false),
 					pipeline.AssetTypeMsSQLQuery:              mssql.NewMaterializer(false),
 					pipeline.AssetTypeMsSQLQuerySensor:        mssql.NewMaterializer(false),

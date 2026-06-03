@@ -97,6 +97,7 @@ For specific connection fields and configuration options, see the dedicated docu
 | `synapse` | [Azure Synapse](/platforms/synapse) |
 | `oracle` | [Oracle](/platforms/oracle) |
 | `trino` | [Trino](/platforms/trino) |
+| `flightsql` | [Arrow Flight SQL](/platforms/flightsql) |
 | `s3` | [S3](/platforms/s3) |
 
 ## Ingestion Source Connections

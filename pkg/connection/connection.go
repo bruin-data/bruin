@@ -43,6 +43,7 @@ import (
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fireflies"
+	"github.com/bruin-data/bruin/pkg/flightsql"
 	"github.com/bruin-data/bruin/pkg/fluxx"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/freshdesk"
@@ -218,6 +219,7 @@ type Manager struct {
 	Tableau              map[string]*tableau.Client
 	QuickSight           map[string]*quicksight.Client
 	Trino                map[string]*trino.Client
+	FlightSQL            map[string]*flightsql.Client
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
@@ -2887,6 +2889,37 @@ func (m *Manager) AddTrinoConnectionFromConfig(connection *config.TrinoConnectio
 	return nil
 }
 
+func (m *Manager) AddFlightSQLConnectionFromConfig(connection *config.FlightSQLConnection) error {
+	m.mutex.Lock()
+	if m.FlightSQL == nil {
+		m.FlightSQL = make(map[string]*flightsql.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := flightsql.NewClient(flightsql.Config{
+		Host:          connection.Host,
+		Port:          connection.Port,
+		Username:      connection.Username,
+		Password:      connection.Password,
+		Token:         connection.Token,
+		Database:      connection.Database,
+		Dialect:       connection.Dialect,
+		TLS:           connection.TLS,
+		TLSSkipVerify: connection.TLSSkipVerify,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.FlightSQL[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddVerticaConnectionFromConfig(connection *config.VerticaConnection) error {
 	m.mutex.Lock()
 	if m.Vertica == nil {
@@ -3083,6 +3116,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.QuickSight, connectionManager.AddQuickSightConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.FlightSQL, connectionManager.AddFlightSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)

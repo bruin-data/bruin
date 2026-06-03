@@ -29,6 +29,7 @@ var platformConnectionMap = map[string]string{
 	"athena":     "athena",
 	"databricks": "databricks",
 	"fabric":     "fabric",
+	"dremio":     "flightsql",
 }
 
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {
@@ -232,5 +233,24 @@ func TestCloudIntegration(t *testing.T) {
 		t.Logf("Fabric platform is available - running integration tests")
 
 		runTestsInDirectory(t, fabricDir, "Fabric")
+	})
+
+	t.Run("Dremio", func(t *testing.T) {
+		t.Parallel()
+
+		if !availablePlatforms["dremio"] {
+			t.Skip("Skipping Dremio tests - no connection configured")
+			return
+		}
+
+		dremioDir := filepath.Join(currentFolder, "dremio")
+		require.DirExists(t, dremioDir, "Dremio test directory should exist")
+
+		testFile := filepath.Join(dremioDir, "dremio_test.go")
+		require.FileExists(t, testFile, "Dremio test file should exist")
+
+		t.Logf("Dremio platform is available - running integration tests")
+
+		runTestsInDirectory(t, dremioDir, "Dremio")
 	})
 }

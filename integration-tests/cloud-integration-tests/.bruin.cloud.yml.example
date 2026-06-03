@@ -8,3 +8,16 @@ environments:
           port: 1433
           database: your_warehouse
           use_azure_default_credential: true
+      # Dremio (Arrow Flight SQL). The test tables are created in a writable,
+      # Iceberg-capable source/space named "bruin_test" (see dremio/README.md).
+      flightsql:
+        - name: dremio-default
+          host: dremio-coordinator.example.com
+          port: 32010
+          username: dremio_user
+          password: XXXXXXXXXX
+          # For Dremio Cloud, drop username/password and use:
+          # host: data.dremio.cloud
+          # port: 443
+          # token: <personal-access-token>
+          # tls: true
