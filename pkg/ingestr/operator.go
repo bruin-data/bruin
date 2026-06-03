@@ -74,20 +74,22 @@ func resolveIngestrEngine(asset *pipeline.Asset) (resolvedEngine, error) {
 // It uses ansisql.BuildAnnotationJSON — the same merge the native SQL operators
 // use — so ingestr queries are annotated and attributed identically. Like those
 // operators it is opt-in: when no run-level annotations are configured
-// BuildAnnotationJSON returns "" and nothing is forwarded.
+// BuildAnnotationJSON returns "" and nothing is forwarded. An invalid
+// annotations payload surfaces as an error (matching the SQL path) rather than
+// being silently dropped.
 //
 // Only the v1 engine (the Go ingestr) understands the flag; the legacy v0
 // PyPI release does not, so passing it there would fail with an unknown flag.
 // The flag is therefore gated on the resolved engine family.
-func appendQueryAnnotations(ctx context.Context, args []string, engine resolvedEngine, ti scheduler.TaskInstance) []string {
+func appendQueryAnnotations(ctx context.Context, args []string, engine resolvedEngine, ti scheduler.TaskInstance) ([]string, error) {
 	if engine.family != versionFamilyV1 {
-		return args
+		return args, nil
 	}
 
 	asset := ti.GetAsset()
 	p := ti.GetPipeline()
 	if asset == nil || p == nil || asset.Name == "" || p.Name == "" {
-		return args
+		return args, nil
 	}
 
 	baseline := map[string]interface{}{
@@ -96,11 +98,14 @@ func appendQueryAnnotations(ctx context.Context, args []string, engine resolvedE
 	}
 
 	payload, err := ansisql.BuildAnnotationJSON(ctx, baseline)
-	if err != nil || payload == "" {
-		return args
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query annotations: %w", err)
+	}
+	if payload == "" {
+		return args, nil
 	}
 
-	return append(args, "--query-annotations", payload)
+	return append(args, "--query-annotations", payload), nil
 }
 
 // fabricMinIngestrVersion is the first ingestr release that ships the Microsoft
@@ -351,7 +356,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	}
 	ctx = applyIngestrEngine(ctx, engine)
 
-	cmdArgs = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
+	cmdArgs, err = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
+	if err != nil {
+		return err
+	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
@@ -528,7 +536,10 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 	ctx = applyIngestrEngine(ctx, engine)
 
-	cmdArgs = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
+	cmdArgs, err = appendQueryAnnotations(ctx, cmdArgs, engine, ti)
+	if err != nil {
+		return err
+	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }

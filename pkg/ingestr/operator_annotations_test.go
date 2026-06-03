@@ -29,13 +29,16 @@ func TestAppendQueryAnnotations(t *testing.T) {
 	t.Run("opt-in: nothing forwarded without run-level annotations", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest", "--dest-table", "raw.orders"}
-		require.Equal(t, base, appendQueryAnnotations(context.Background(), base, v1, ti))
+		got, err := appendQueryAnnotations(context.Background(), base, v1, ti)
+		require.NoError(t, err)
+		require.Equal(t, base, got)
 	})
 
 	t.Run("default sentinel forwards pipeline/asset identity", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest"}
-		got := appendQueryAnnotations(annotated("default"), base, v1, ti)
+		got, err := appendQueryAnnotations(annotated("default"), base, v1, ti)
+		require.NoError(t, err)
 		require.Equal(t, []string{
 			"ingest",
 			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify"}`,
@@ -45,7 +48,8 @@ func TestAppendQueryAnnotations(t *testing.T) {
 	t.Run("merges run-level annotations (project/run_id) from context", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest"}
-		got := appendQueryAnnotations(annotated(`{"project":"3tlabs","run_id":"scheduled__2026-06-01T00:00:00+00:00"}`), base, v1, ti)
+		got, err := appendQueryAnnotations(annotated(`{"project":"3tlabs","run_id":"scheduled__2026-06-01T00:00:00+00:00"}`), base, v1, ti)
+		require.NoError(t, err)
 		require.Equal(t, []string{
 			"ingest",
 			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify","project":"3tlabs","run_id":"scheduled__2026-06-01T00:00:00+00:00"}`,
@@ -55,17 +59,28 @@ func TestAppendQueryAnnotations(t *testing.T) {
 	t.Run("preserves non-string run-level values like try_number", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest"}
-		got := appendQueryAnnotations(annotated(`{"project":"3tlabs","run_id":"manual__2026-06-02T12:50:51+00:00","try_number":0}`), base, v1, ti)
+		got, err := appendQueryAnnotations(annotated(`{"project":"3tlabs","run_id":"manual__2026-06-02T12:50:51+00:00","try_number":0}`), base, v1, ti)
+		require.NoError(t, err)
 		require.Equal(t, []string{
 			"ingest",
 			"--query-annotations", `{"asset":"raw.orders","pipeline":"shopify","project":"3tlabs","run_id":"manual__2026-06-02T12:50:51+00:00","try_number":0}`,
 		}, got)
 	})
 
+	t.Run("propagates an error on invalid run-level annotations JSON", func(t *testing.T) {
+		t.Parallel()
+		base := []string{"ingest"}
+		got, err := appendQueryAnnotations(annotated(`{not valid json`), base, v1, ti)
+		require.Error(t, err)
+		require.Nil(t, got)
+	})
+
 	t.Run("omitted for the legacy v0 engine", func(t *testing.T) {
 		t.Parallel()
 		base := []string{"ingest", "--dest-table", "raw.orders"}
-		require.Equal(t, base, appendQueryAnnotations(annotated("default"), base, v0, ti))
+		got, err := appendQueryAnnotations(annotated("default"), base, v0, ti)
+		require.NoError(t, err)
+		require.Equal(t, base, got)
 	})
 
 	t.Run("omitted when pipeline/asset identity is incomplete", func(t *testing.T) {
@@ -75,6 +90,8 @@ func TestAppendQueryAnnotations(t *testing.T) {
 			Pipeline: &pipeline.Pipeline{}, // no name
 			Asset:    &pipeline.Asset{Name: "raw.orders"},
 		}
-		require.Equal(t, base, appendQueryAnnotations(annotated("default"), base, v1, incomplete))
+		got, err := appendQueryAnnotations(annotated("default"), base, v1, incomplete)
+		require.NoError(t, err)
+		require.Equal(t, base, got)
 	})
 }
