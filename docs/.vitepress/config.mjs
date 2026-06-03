@@ -258,7 +258,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                             {text: "Synapse", link: "/platforms/synapse"},
                             {text: "S3", link: "/platforms/s3"},
                             {text: "Trino", link: "/platforms/trino"},
-                            {text: "Arrow Flight SQL (Dremio)", link: "/platforms/flightsql"},
+                            {text: "Arrow Flight SQL", link: "/platforms/flightsql"},
                             {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                             {text: "GCP Dataproc Serverless", link: "/platforms/dataproc_serverless"},
                         ],
