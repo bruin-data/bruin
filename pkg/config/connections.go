@@ -230,6 +230,21 @@ func (c FabricConnection) GetName() string {
 	return c.Name
 }
 
+type OneLakeConnection struct {
+	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	WorkspaceName             string `yaml:"workspace_name,omitempty" json:"workspace_name" mapstructure:"workspace_name"`
+	LakehouseName             string `yaml:"lakehouse_name,omitempty" json:"lakehouse_name" mapstructure:"lakehouse_name"`
+	TenantID                  string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	ClientID                  string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret              string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
+	SASToken                  string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token"`
+	UseAzureDefaultCredential bool   `yaml:"use_azure_default_credential,omitempty" json:"use_azure_default_credential,omitempty" mapstructure:"use_azure_default_credential"`
+}
+
+func (c OneLakeConnection) GetName() string {
+	return c.Name
+}
+
 type DatabricksConnection struct {
 	Name         string `yaml:"name,omitempty"  json:"name" mapstructure:"name"`
 	Token        string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token" jsonschema:"oneof_required=token"`

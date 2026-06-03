@@ -324,6 +324,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Mailchimp", link: "/ingestion/mailchimp"},
                                     {text: "Linear", link: "/ingestion/linear"},
                                     {text: "Mixpanel", link: "/ingestion/mixpanel"},
+                                    {text: "Microsoft OneLake", link: "/ingestion/onelake"},
                                     {text: "MongoDB", link: "/ingestion/mongo"},
                                     {text: "MySQL", link: "/ingestion/mysql"},
                                     {text: "Notion", link: "/ingestion/notion"},
