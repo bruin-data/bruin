@@ -19,25 +19,6 @@
         "api_key"
       ]
     },
-    "SurveyMonkeyConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_token": {
-          "type": "string"
-        },
-        "region": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "access_token"
-      ]
-    },
     "AirtableConnection": {
       "properties": {
         "name": {
@@ -455,26 +436,6 @@
         "api_token"
       ]
     },
-    "JobtreadConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "grant_key": {
-          "type": "string"
-        },
-        "organization_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "grant_key",
-        "organization_id"
-      ]
-    },
     "Connections": {
       "properties": {
         "aws": {
@@ -624,12 +585,6 @@
         "adjust": {
           "items": {
             "$ref": "#/$defs/AdjustConnection"
-          },
-          "type": "array"
-        },
-        "surveymonkey": {
-          "items": {
-            "$ref": "#/$defs/SurveyMonkeyConnection"
           },
           "type": "array"
         },
@@ -1035,6 +990,12 @@
           },
           "type": "array"
         },
+        "flightsql": {
+          "items": {
+            "$ref": "#/$defs/FlightSQLConnection"
+          },
+          "type": "array"
+        },
         "fluxx": {
           "items": {
             "$ref": "#/$defs/FluxxConnection"
@@ -1104,6 +1065,12 @@
         "vertica": {
           "items": {
             "$ref": "#/$defs/VerticaConnection"
+          },
+          "type": "array"
+        },
+        "surveymonkey": {
+          "items": {
+            "$ref": "#/$defs/SurveyMonkeyConnection"
           },
           "type": "array"
         },
@@ -1537,41 +1504,6 @@
         "database"
       ]
     },
-    "OneLakeConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "workspace_name": {
-          "type": "string"
-        },
-        "lakehouse_name": {
-          "type": "string"
-        },
-        "tenant_id": {
-          "type": "string"
-        },
-        "client_id": {
-          "type": "string"
-        },
-        "client_secret": {
-          "type": "string"
-        },
-        "sas_token": {
-          "type": "string"
-        },
-        "use_azure_default_credential": {
-          "type": "boolean"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "workspace_name",
-        "lakehouse_name"
-      ]
-    },
     "FacebookAdsConnection": {
       "properties": {
         "name": {
@@ -1606,6 +1538,47 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "FlightSQLConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "dialect": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "port"
       ]
     },
     "FluxxConnection": {
@@ -1678,6 +1651,22 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "G2Connection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
       ]
     },
     "GCSConnection": {
@@ -1907,22 +1896,6 @@
         "email"
       ]
     },
-    "G2Connection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_token": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_token"
-      ]
-    },
     "HANAConnection": {
       "properties": {
         "name": {
@@ -2105,6 +2078,26 @@
         "api_token"
       ]
     },
+    "JobtreadConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "grant_key": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "grant_key",
+        "organization_id"
+      ]
+    },
     "KafkaConnection": {
       "properties": {
         "name": {
@@ -2141,39 +2134,6 @@
         "name",
         "bootstrap_servers",
         "group_id"
-      ]
-    },
-    "RabbitMQConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        },
-        "vhost": {
-          "type": "string"
-        },
-        "tls": {
-          "type": "boolean"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "host",
-        "username",
-        "password"
       ]
     },
     "KinesisConnection": {
@@ -2510,6 +2470,41 @@
         "api_key"
       ]
     },
+    "OneLakeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "workspace_name": {
+          "type": "string"
+        },
+        "lakehouse_name": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "sas_token": {
+          "type": "string"
+        },
+        "use_azure_default_credential": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "workspace_name",
+        "lakehouse_name"
+      ]
+    },
     "OracleConnection": {
       "properties": {
         "name": {
@@ -2803,6 +2798,39 @@
         "aws_session_token",
         "aws_region",
         "aws_account_id"
+      ]
+    },
+    "RabbitMQConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "vhost": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username",
+        "password"
       ]
     },
     "RedshiftConnection": {
@@ -3260,6 +3288,25 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "SurveyMonkeyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
       ]
     },
     "SynapseConnection": {
