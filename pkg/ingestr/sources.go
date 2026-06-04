@@ -437,7 +437,6 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "contacts", PrimaryKey: "", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "companies", PrimaryKey: "", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "conversations", PrimaryKey: "", IncKey: "updated_at", IncStrategy: "merge"},
-		{Name: "tickets", PrimaryKey: "", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "articles", PrimaryKey: "", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "tags", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "segments", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},

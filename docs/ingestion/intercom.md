@@ -1,6 +1,6 @@
 # Intercom
 
-[Intercom](https://www.intercom.com/) is a customer messaging platform that helps businesses engage with their customers through personalized, messenger-based experiences. This source enables you to extract comprehensive data from the Intercom API, including contacts, companies, conversations, tickets, and more.
+[Intercom](https://www.intercom.com/) is a customer messaging platform that helps businesses engage with their customers through personalized, messenger-based experiences. This source enables you to extract comprehensive data from the Intercom API, including contacts, companies, conversations, articles, and more.
 
 To set up an Intercom connection, you need to have an Access Token that has the necessary permissions for the resources you want to access.
 
@@ -45,7 +45,6 @@ Intercom assets will be ingested to your data warehouse as defined in the `desti
 | Contacts | `contacts` | updated_at | Customer contacts with their attributes, tags, and company associations |
 | Companies | `companies` | updated_at | Company information including custom attributes and tags |
 | Conversations | `conversations` | updated_at | Customer conversations with messages, state, and metadata |
-| Tickets | `tickets` | updated_at | Customer support tickets with attributes and resolution details |
 | Articles | `articles` | updated_at | Help center articles and knowledge base content |
 | Tags | `tags` | replace | All available tags in your Intercom workspace |
 | Segments | `segments` | replace | Customer segments and their definitions |
@@ -62,7 +61,6 @@ The following tables support incremental loading based on the `updated_at` field
 - `contacts`
 - `companies`
 - `conversations`
-- `tickets`
 - `articles`
 
 ### Full Refresh Assets
