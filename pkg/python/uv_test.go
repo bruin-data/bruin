@@ -2,6 +2,9 @@ package python
 
 import (
 	"context"
+	"os"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -27,6 +30,143 @@ type mockCmd struct {
 func (m *mockCmd) Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
 	args := m.Called(ctx, repo, command)
 	return args.Error(0)
+}
+
+type fakeConnectionGetter map[string]any
+
+func (f fakeConnectionGetter) GetConnection(name string) any {
+	return f[name]
+}
+
+type fakeIngestrConnection struct {
+	uri string
+}
+
+func (f fakeIngestrConnection) GetIngestrURI() (string, error) {
+	return f.uri, nil
+}
+
+func Test_ingestrEnvVars_DisablesTelemetry(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, map[string]string{
+		"INGESTR_DISABLE_TELEMETRY": "true",
+		"PYTHONUNBUFFERED":          "1",
+	}, ingestrEnvVars())
+}
+
+func Test_uvPythonRunner_RunIngestr_DisablesTelemetry(t *testing.T) {
+	t.Parallel()
+
+	repo := &git.Repo{}
+	cmd := new(mockCmd)
+	cmd.On("Run", mock.Anything, repo, &CommandInstance{
+		Name: "~/.bruin/uv",
+		Args: []string{
+			"tool",
+			"run",
+			"--no-config",
+			"--prerelease",
+			"allow",
+			"--python",
+			"3.11",
+			"--from",
+			"ingestr@" + IngestrVersionV1,
+			"ingestr",
+			"ingest",
+		},
+		EnvVars: map[string]string{
+			"INGESTR_DISABLE_TELEMETRY": "true",
+			"PYTHONUNBUFFERED":          "1",
+		},
+	}).Return(nil)
+
+	inst := new(mockUvInstaller)
+	inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+
+	runner := &UvPythonRunner{
+		Cmd:         cmd,
+		UvInstaller: inst,
+	}
+
+	err := runner.RunIngestr(t.Context(), []string{"ingest"}, nil, repo)
+
+	require.NoError(t, err)
+	cmd.AssertExpectations(t)
+}
+
+func Test_uvPythonRunner_RunWithMaterialization_DisablesTelemetryForIngestrUpload(t *testing.T) {
+	t.Parallel()
+
+	repo := &git.Repo{Path: t.TempDir()}
+	cmd := new(mockCmd)
+	cmd.On("Run", mock.Anything, repo, mock.MatchedBy(func(c *CommandInstance) bool {
+		return c.Name == "~/.bruin/uv" &&
+			len(c.Args) > 0 &&
+			c.Args[0] == "run"
+	})).Run(func(args mock.Arguments) {
+		command := args.Get(2).(*CommandInstance)
+		scriptPath := command.Args[len(command.Args)-1]
+		script, err := os.ReadFile(scriptPath)
+		require.NoError(t, err)
+
+		arrowPath := extractArrowPathFromScript(t, string(script))
+		require.NoError(t, os.WriteFile(arrowPath, []byte("arrow"), 0o600))
+	}).Return(nil)
+
+	cmd.On("Run", mock.Anything, repo, mock.MatchedBy(func(c *CommandInstance) bool {
+		return c.Name == "~/.bruin/uv" &&
+			len(c.Args) > 0 &&
+			c.Args[0] == "tool" &&
+			c.EnvVars["INGESTR_DISABLE_TELEMETRY"] == "true" &&
+			c.EnvVars["PYTHONUNBUFFERED"] == "1" &&
+			containsArg(c.Args, "mmap://")
+	})).Return(nil)
+
+	inst := new(mockUvInstaller)
+	inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+
+	runner := &UvPythonRunner{
+		Cmd:         cmd,
+		UvInstaller: inst,
+		conn: fakeConnectionGetter{
+			"dest": fakeIngestrConnection{uri: "postgres://user:pass@localhost:5432/db"},
+		},
+	}
+
+	err := runner.Run(t.Context(), &executionContext{
+		repo:     repo,
+		module:   "path.to.module",
+		pipeline: &pipeline.Pipeline{},
+		asset: &pipeline.Asset{
+			Name:       "public.asset_data",
+			Type:       pipeline.AssetTypePython,
+			Connection: "dest",
+			Materialization: pipeline.Materialization{
+				Type: "table",
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	cmd.AssertExpectations(t)
+}
+
+func extractArrowPathFromScript(t *testing.T, script string) string {
+	t.Helper()
+
+	matches := regexp.MustCompile(`pa\.OSFile\("([^"]+)", 'wb'\)`).FindStringSubmatch(script)
+	require.Len(t, matches, 2)
+	return strings.ReplaceAll(matches[1], `\\`, `\`)
+}
+
+func containsArg(args []string, value string) bool {
+	for _, arg := range args {
+		if strings.Contains(arg, value) {
+			return true
+		}
+	}
+	return false
 }
 
 func Test_uvPythonRunner_Run(t *testing.T) {
