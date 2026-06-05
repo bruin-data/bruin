@@ -1,6 +1,6 @@
 # AGENTS.md/CLAUDE.md - AI Agent Contribution Guide
 
-This document provides comprehensive information for AI agents to understand and contribute to the Bruin project effectively.
+This document gives AI agents the project-specific operating guidance needed to work safely in Bruin.
 
 ## Before You Finish: Mandatory Checks
 
@@ -17,7 +17,7 @@ Do not consider your task complete until both checks pass. Use the `/format-fix`
 2. [Architecture & Core Concepts](#architecture--core-concepts)
 3. [Development Environment](#development-environment)
 4. [Build System](#build-system)
-5. [CLI Commands & Structure](#cli-commands--structure)
+5. [CLI Source of Truth](#cli-source-of-truth)
 6. [Codebase Organization](#codebase-organization)
 7. [Testing Strategy](#testing-strategy)
 8. [Contributing Guidelines](#contributing-guidelines)
@@ -25,26 +25,21 @@ Do not consider your task complete until both checks pass. Use the `/format-fix`
 
 ## Project Overview
 
-Bruin is an end-to-end data framework that combines data ingestion, transformation, and quality into a single tool. Think of it as "if dbt, Airbyte, and Great Expectations had a lovechild."
+Bruin is a CLI-first data framework for ingestion, SQL/Python/R transformations, data quality, materialization, lineage, and pipeline execution across many data platforms.
+
+Most behavior is configured in version-controlled text files: `pipeline.yml`, asset files, templates, docs, and connection/config files. When changing behavior, prefer existing package patterns and keep docs/tests aligned with user-visible changes.
 
 ### Core Features
 - **Data Ingestion**: Using `ingestr` and Python scripts
-- **Transformations**: SQL & Python on multiple platforms (BigQuery, Snowflake, DuckDB, etc.)
+- **Transformations**: SQL, Python, and R on multiple platforms
 - **Data Quality**: Built-in quality checks and validations
-- **Materializations**: Table/view materializations, incremental tables
-- **Python Isolation**: Using `uv` for isolated Python environments
+- **Materializations**: Table/view materializations and incremental tables
+- **Python Isolation**: Isolated Python environments via `uv`
 - **Templating**: Jinja templating for reusable code
 - **Lineage**: Dependency visualization and tracking
-- **Multi-platform**: Runs locally, on EC2, or GitHub Actions
+- **Multi-platform Execution**: Runs locally, on EC2, or GitHub Actions
 - **Secrets Management**: Environment variable injection
 - **VS Code Extension**: Enhanced developer experience
-
-### Design Principles
-1. **Version-controllable text**: Everything configured via text files, no UI/database configs
-2. **Multi-technology support**: SQL and Python natively, with pre-built binaries for complex use cases
-3. **Multi-source/destination**: Support diverse sources and destinations
-4. **Mix-and-match**: Single pipelines can combine different technologies, sources, and destinations
-5. **Avoid lock-in**: Open-source Apache-licensed, runs anywhere
 
 ## Architecture & Core Concepts
 
@@ -75,18 +70,18 @@ Execution instances containing one or more asset instances with specific configu
 ## Development Environment
 
 ### Prerequisites
-- **Go**: Version 1.23.0+ (see `go.mod`)
+- **Go**: Use the version declared in `go.mod`
 - **Python**: For Python asset development and formatting
 - **CGO**: Required for DuckDB support
 - **Git**: For version control and repository detection
 
 ### Dependencies
 The project uses extensive Go dependencies including:
-- CLI framework: `github.com/urfave/cli/v2`
+- CLI framework: `urfave/cli`
 - Database drivers: BigQuery, Snowflake, PostgreSQL, MySQL, DuckDB, etc.
 - Cloud SDKs: AWS, GCP
-- Templating: Jinja via `github.com/nikolalohinski/gonja/v2`
-- Testing: `github.com/stretchr/testify`
+- Templating: Jinja via Gonja
+- Testing: Testify
 
 ## Build System
 
@@ -105,7 +100,6 @@ make build-no-duckdb # Build without DuckDB (CGO_ENABLED=0)
 make deps           # Install dependencies and tools
 make clean          # Remove build artifacts
 make format         # Format Go and Python code
-make tools          # Install development tools (gci, gofumpt, golangci-lint)
 make tools-update   # Update development tools
 ```
 
@@ -125,58 +119,20 @@ make refresh-integration-expectations # Update integration test expectations
 ```
 
 ### Build Configuration
-- **Version**: Set via `main.Version` variable, defaults to `dev-$(git describe --tags --abbrev=0)`
+- **Build metadata**: The Makefile injects build metadata via linker flags
 - **Telemetry**: Controlled via `TELEMETRY_KEY` and `TELEMETRY_OPTOUT` environment variables
 - **Tags**: Uses `no_duckdb_arrow` for standard builds, `bruin_no_duckdb` for no-DuckDB builds
 
-## CLI Commands & Structure
+## CLI Source of Truth
 
-### Main Application Structure (`main.go`)
-The CLI is built using `github.com/urfave/cli/v2` with these core commands:
+Do not treat this guide as a current command inventory. If a task depends on commands, flags, hidden subcommands, or runtime help text, verify against the source of truth:
 
-```go
-Commands: []*cli.Command{
-    cmd.Lint(&isDebug),           // Lint pipelines and assets
-    cmd.Run(&isDebug),            // Run pipelines/assets
-    cmd.Render(),                 // Render Jinja templates
-    cmd.Lineage(),                // Generate lineage graphs
-    cmd.CleanCmd(),               // Clean up resources
-    cmd.Format(&isDebug),         // Format code
-    cmd.Docs(),                   // Open documentation
-    cmd.Init(),                   // Initialize new projects
-    cmd.Internal(),               // Internal/debugging commands
-    cmd.Environments(&isDebug),   // Manage environments
-    cmd.Connections(),            // Manage connections
-    cmd.Query(),                  // Execute queries
-    cmd.Patch(),                  // Patch assets
-    cmd.DataDiffCmd(),            // Compare data between connections
-    cmd.Import(),                 // Import database tables as assets
-    versionCommand,               // Version information
-}
-```
+1. Check `main.go` for top-level command registration.
+2. Check `cmd/*.go` and `cmd/mcp/*.go` for command definitions, flags, and action wiring.
+3. After `make build`, use `./bin/bruin --help` and `./bin/bruin <command> --help` to confirm runtime behavior.
+4. Check `docs/commands/` when changing user-facing command behavior, and update docs when behavior changes.
 
-### Key Command Categories
-
-#### Primary Commands
-- **`run`**: Execute pipelines with flags for workers, dates, environments, full-refresh
-- **`lint`**: Validate pipeline syntax and configuration
-- **`init`**: Bootstrap new Bruin projects
-- **`lineage`**: Generate dependency graphs
-
-#### Management Commands
-- **`connections`**: List, add, delete, ping database connections
-- **`environments`**: Manage deployment environments
-- **`import`**: Import existing database tables as Bruin assets
-
-#### Development Commands  
-- **`format`**: Code formatting
-- **`render`**: Template rendering for debugging
-- **`docs`**: Open documentation (with `--open` flag for browser)
-
-#### Internal Commands (Hidden)
-- **`internal parse-asset`**: Parse individual assets
-- **`internal parse-pipeline`**: Parse entire pipelines
-- **`internal connections`**: Connection schema operations
+When adding or changing a command, update the command implementation, tests, and user-facing docs together.
 
 ## Codebase Organization
 
@@ -225,10 +181,22 @@ Each CLI command is implemented in its own file:
 - **Coverage**: Race detection enabled, 10-minute timeout
 - **Scope**: Excludes cloud integration tests
 
+Use narrow test loops while developing, then run the required full checks before finishing:
+```bash
+# Target one package or test while iterating
+go test -tags="no_duckdb_arrow" ./pkg/foo -run TestName
+go test -tags="no_duckdb_arrow" ./cmd/... ./pkg/...
+
+# Required final unit-test command
+make test
+```
+
 #### Integration Tests
 - **Light Integration**: `make integration-test-light` (excludes ingestr)
 - **Full Integration**: `make integration-test` (includes ingestr)
 - **Cloud Integration**: `make integration-test-cloud` (cloud platforms)
+
+Use `make integration-test-light` for changes that affect parsing, command workflows, local pipeline execution, or integration-test fixtures. Use full integration tests when touching ingestr behavior. Cloud integration tests require local cloud credentials/config and may skip tests when matching connections are absent.
 
 #### Test Data
 - **Location**: `integration-tests/test-pipelines/`
@@ -237,10 +205,10 @@ Each CLI command is implemented in its own file:
 - **Refresh**: `make refresh-integration-expectations` updates expectations
 
 ### Test Patterns
-- Mock databases using `github.com/DATA-DOG/go-sqlmock`
-- PostgreSQL mocking with `github.com/pashagolub/pgxmock/v3`
-- Concurrent testing with `github.com/sourcegraph/conc`
-- File system abstraction with `github.com/spf13/afero`
+- Mock databases with existing SQL mock helpers
+- Mock PostgreSQL with existing pgx mock patterns
+- Use existing concurrency helpers for parallel work
+- Use the existing file system abstraction patterns in packages that already use them
 
 ## Contributing Guidelines
 
@@ -257,6 +225,14 @@ Tools automatically installed and run via `make format`:
 Tools run via `make lint-python`:
 - **`ruff format`**: Code formatting
 - **`ruff check --fix`**: Linting with auto-fixes
+
+### Secrets, Credentials, and Generated Files
+
+- Do not commit local credentials, tokens, keys, or personal environment files.
+- Treat `.bruin.yml`, `.bruin.cloud.yml`, cloud integration configs, and local connection files as sensitive unless they are clearly committed examples.
+- If a task requires cloud integration config, use local untracked files and document what was needed.
+- `make refresh-integration-expectations` rewrites JSON expectations. Inspect the diff carefully and include only intentional expectation changes.
+- Do not commit build outputs, virtual environments, local caches, logs, or generated binaries unless the repository already tracks that exact artifact and the change is intentional.
 
 ### Development Workflow
 
@@ -276,7 +252,7 @@ Tools run via `make lint-python`:
 
 ### Adding New CLI Commands
 
-1. **Create command file**: `cmd/newcommd.go`
+1. **Create command file**: `cmd/newcommand.go`
 2. **Implement command structure**: Using `cli.Command` pattern
 3. **Add business logic**: In appropriate `pkg/` package
 4. **Register command**: In `main.go` commands slice
@@ -305,10 +281,9 @@ make build
 ### Debugging Integration Tests
 ```bash
 # Run specific test pipeline
-cd integration-tests
-../bin/bruin run test-pipelines/your-test
+(cd integration-tests && ../bin/bruin run test-pipelines/your-test)
 
-# Refresh expectations after changes
+# Refresh expectations after changes from the repository root
 make refresh-integration-expectations
 ```
 
@@ -335,4 +310,4 @@ make refresh-integration-expectations
 
 ---
 
-This guide provides the foundational knowledge needed to contribute effectively to the Bruin project. For specific implementation details, refer to the extensive documentation in the `docs/` directory and examine existing patterns in the codebase. 
+This guide provides the foundational knowledge needed to contribute effectively to the Bruin project. For specific implementation details, refer to the extensive documentation in the `docs/` directory and examine existing patterns in the codebase.
