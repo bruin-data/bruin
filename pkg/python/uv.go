@@ -47,6 +47,13 @@ const (
 	sqlfluffVersion  = "3.4.1"
 )
 
+func ingestrEnvVars() map[string]string {
+	return map[string]string{
+		"INGESTR_DISABLE_TELEMETRY": "true",
+		"PYTHONUNBUFFERED":          "1",
+	}
+}
+
 // parsePythonVersion parses a "X.Y" version string into (major, minor).
 func parsePythonVersion(v string) (int, int, bool) {
 	parts := strings.Split(v, ".")
@@ -238,11 +245,9 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	u.binaryFullPath = binaryFullPath
 
 	noDependencyCommand := &CommandInstance{
-		Name: u.binaryFullPath,
-		Args: u.ingestrRunCmd(ctx, extraPackages, args),
-		EnvVars: map[string]string{
-			"PYTHONUNBUFFERED": "1",
-		},
+		Name:    u.binaryFullPath,
+		Args:    u.ingestrRunCmd(ctx, extraPackages, args),
+		EnvVars: ingestrEnvVars(),
 	}
 
 	return u.Cmd.Run(ctx, repo, noDependencyCommand)
@@ -522,8 +527,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	err = u.Cmd.Run(ingestrCtx, execCtx.repo, &CommandInstance{
-		Name: u.binaryFullPath,
-		Args: runArgs,
+		Name:    u.binaryFullPath,
+		Args:    runArgs,
+		EnvVars: ingestrEnvVars(),
 	})
 	if err != nil {
 		if logBuffer != nil {
