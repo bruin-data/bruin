@@ -3777,6 +3777,8 @@ func TestWorkflowTasks(t *testing.T) {
 								"Finished: mat.yield_batches",
 								"Finished: mat.pandas_df",
 								"Finished: mat.polars_df",
+								"Finished: mat.pyarrow_table",
+								"Finished: mat.pyarrow_tables",
 								"Finished: materialize.country",
 								"materialize() returned None, skipping materialization",
 								"Finished: mat.none_return",
@@ -3859,6 +3861,44 @@ func TestWorkflowTasks(t *testing.T) {
 						Expected: e2e.Output{
 							ExitCode: 0,
 							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 3   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify pyarrow_table row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.pyarrow_table",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 3   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify pyarrow_tables row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.pyarrow_tables",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 4   │\n└─────┘\n",
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,

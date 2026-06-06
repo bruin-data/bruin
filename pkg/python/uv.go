@@ -638,6 +638,7 @@ const PythonArrowTemplate = `
 
 import sys
 import importlib.util
+import itertools
 from pathlib import Path
 
 def import_module_from_path(module_path: str, module_name: str):
@@ -664,14 +665,61 @@ def convert_and_write(df):
     except ImportError:
         pl = None
 
-    # Use isinstance() for robust type checking across pandas/polars versions
-    # This works across all pandas versions (including 3.0+) regardless of string representation
-    if pd is not None and isinstance(df, pd.DataFrame):
+    def is_polars_dataframe(obj):
+        if pl is not None and isinstance(obj, pl.DataFrame):
+            return True
+        type_module = type(obj).__module__
+        type_name = type(obj).__name__
+        return 'polars' in type_module and type_name == 'DataFrame'
+
+    def is_pandas_dataframe(obj):
+        if pd is not None and isinstance(obj, pd.DataFrame):
+            return True
+        type_module = type(obj).__module__
+        type_name = type(obj).__name__
+        return 'pandas' in type_module and type_name == 'DataFrame'
+
+    def write_arrow_tables(tables):
+        iterator = iter(tables)
+        try:
+            first_table = next(iterator)
+        except StopIteration:
+            return
+
+        if not isinstance(first_table, pa.Table):
+            raise TypeError(f"Unsupported return type: {type(first_table)}")
+
+        with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
+            writer = ipc.new_file(f, first_table.schema)
+            writer.write_table(first_table)
+            for next_table in iterator:
+                if not isinstance(next_table, pa.Table):
+                    raise TypeError(f"Unsupported yielded type: {type(next_table)}. expected pyarrow.Table.")
+                if not next_table.schema.equals(first_table.schema):
+                    raise TypeError("All yielded pyarrow Tables must have the same schema.")
+                writer.write_table(next_table)
+            writer.close()
+
+    # Polars can write Arrow IPC directly, avoiding the extra PyArrow writer
+    # memory peak seen when converting through a PyArrow Table first.
+    if is_polars_dataframe(df):
+        if pl is None:
+            raise TypeError(f"Unsupported return type: {type(df)}. polars DataFrame detected but polars cannot be imported.")
+        df.write_ipc("$ARROW_FILE_PATH")
+        return
+
+    if is_pandas_dataframe(df):
+        if pd is None:
+            raise TypeError(f"Unsupported return type: {type(df)}. pandas DataFrame detected but pandas cannot be imported.")
         table = pa.Table.from_pandas(df)
-    elif pl is not None and isinstance(df, pl.DataFrame):
-        table = df.to_arrow()
+    elif isinstance(df, pa.Table):
+        write_arrow_tables([df])
+        return
     elif isinstance(df, (list, tuple)):
         if not df:
+            return
+        if isinstance(df[0], pa.Table):
+            write_arrow_tables(df)
             return
         table = pa.Table.from_pylist(list(df))
     elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
@@ -682,39 +730,24 @@ def convert_and_write(df):
         # The second pattern is common with paginated APIs where each page
         # returns a list of records. We detect this by checking if the first
         # collected element is a list/tuple and flatten one level if so.
-        rows = list(df)
-        if not rows:
+        iterator = iter(df)
+        try:
+            first_row = next(iterator)
+        except StopIteration:
             return
+
+        if isinstance(first_row, pa.Table):
+            write_arrow_tables(itertools.chain([first_row], iterator))
+            return
+
+        rows = [first_row, *iterator]
         if isinstance(rows[0], (list, tuple)):
             rows = [item for batch in rows for item in batch]
         table = pa.Table.from_pylist(rows)
     else:
-        # Fallback: check type module/name for pandas/polars if isinstance failed
-        # This handles edge cases where pandas/polars might not be importable
-        type_name = type(df).__name__
-        type_module = type(df).__module__
-        if 'pandas' in type_module and type_name == 'DataFrame':
-            # Try to import pandas if not already imported
-            try:
-                import pandas as pd
-                table = pa.Table.from_pandas(df)
-            except ImportError:
-                raise TypeError(f"Unsupported return type: {type(df)}. pandas DataFrame detected but pandas cannot be imported.")
-        elif 'polars' in type_module and type_name == 'DataFrame':
-            # Try to import polars if not already imported
-            try:
-                import polars as pl
-                table = df.to_arrow()
-            except ImportError:
-                raise TypeError(f"Unsupported return type: {type(df)}. polars DataFrame detected but polars cannot be imported.")
-        else:
-            raise TypeError(f"Unsupported return type: {type(df)}")
+        raise TypeError(f"Unsupported return type: {type(df)}")
 
-    # Write to memory mapped file
-    with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
-        writer = ipc.new_file(f, table.schema)
-        writer.write_table(table)
-        writer.close()
+    write_arrow_tables([table])
 
 module = import_module_from_path("$REPO_ROOT", "$MODULE_PATH")
 convert_and_write(module.materialize())
