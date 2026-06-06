@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"cloud.google.com/go/bigquery/datatransfer/apiv1/datatransferpb"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/oracle"
@@ -22,6 +24,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/charmbracelet/bubbles/list"
@@ -40,6 +43,7 @@ func Import(isDebug *bool) *cli.Command {
 		Commands: []*cli.Command{
 			ImportDatabase(isDebug),
 			ImportScheduledQueries(),
+			ImportSnowflakeTasks(),
 			ImportTableauDashboards(),
 			ImportQuickSightAssets(),
 		},
@@ -181,6 +185,72 @@ Example:
 			location := c.String("location")
 
 			return runScheduledQueriesImport(ctx, pipelinePath, connectionName, environment, configFile, projectID, location)
+		},
+	}
+}
+
+func ImportSnowflakeTasks() *cli.Command {
+	return &cli.Command{
+		Name:  "snowflake-tasks",
+		Usage: "Import Snowflake tasks as Bruin assets",
+		Description: `Import Snowflake tasks as individual Bruin SQL assets.
+
+This command connects to Snowflake, lists the tasks in the configured or specified database,
+and writes each task definition as a .sql asset. After importing, it updates the imported
+assets' dependencies using the same logic as "bruin patch fill-asset-dependencies".`,
+		ArgsUsage: "[pipeline path]",
+		Before:    telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "connection",
+				Aliases:  []string{"c"},
+				Usage:    "the name of the Snowflake connection to use",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
+				Usage:   "the path to the .bruin.yml file",
+			},
+			&cli.StringFlag{
+				Name:  "database",
+				Usage: "Snowflake database to scan (uses the connection's current database if omitted)",
+			},
+			&cli.StringFlag{
+				Name:    "schema",
+				Aliases: []string{"s"},
+				Usage:   "filter by a specific Snowflake schema",
+			},
+			&cli.StringFlag{
+				Name:  "task",
+				Usage: "Snowflake task name pattern to import (uses Snowflake LIKE syntax)",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			ctx = query.WithQueryType(ctx, query.QueryTypeImport)
+			pipelinePath := c.Args().Get(0)
+			if pipelinePath == "" {
+				return cli.Exit("pipeline path is required", 1)
+			}
+
+			connectionName := c.String("connection")
+			environment := c.String("environment")
+			configFile := c.String("config-file")
+			database := c.String("database")
+			schema := c.String("schema")
+			taskPattern := c.String("task")
+
+			if err := runSnowflakeTasksImport(ctx, pipelinePath, connectionName, environment, configFile, database, schema, taskPattern); err != nil {
+				errorPrinter.Printf("Failed to import Snowflake tasks: %s\n", err)
+				return cli.Exit("", 1)
+			}
+
+			return nil
 		},
 	}
 }
@@ -2013,6 +2083,536 @@ func createAssetFromScheduledQuery(query ScheduledQuery, assetsPath string) *pip
 	}
 
 	return asset
+}
+
+type snowflakeTaskSelector interface {
+	SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
+}
+
+type SnowflakeTask struct {
+	Database                  string
+	Schema                    string
+	Name                      string
+	Owner                     string
+	Comment                   string
+	Warehouse                 string
+	Schedule                  string
+	Predecessors              string
+	State                     string
+	Definition                string
+	Condition                 string
+	AllowOverlappingExecution *bool
+}
+
+func runSnowflakeTasksImport(ctx context.Context, pipelinePath, connectionName, environment, configFile, database, schema, taskPattern string) error {
+	fs := afero.NewOsFs()
+
+	conn, err := getConnectionFromConfigWithContext(ctx, environment, connectionName, fs, configFile)
+	if err != nil {
+		return errors2.Wrap(err, "failed to get Snowflake connection")
+	}
+
+	if determineAssetTypeFromConnection(connectionName, conn) != pipeline.AssetTypeSnowflakeSource {
+		return fmt.Errorf("connection '%s' is not a Snowflake connection", connectionName)
+	}
+
+	selector, ok := conn.(snowflakeTaskSelector)
+	if !ok {
+		return fmt.Errorf("connection '%s' does not support Snowflake task metadata queries", connectionName)
+	}
+
+	if database == "" {
+		database, err = getCurrentSnowflakeDatabase(ctx, selector)
+		if err != nil {
+			return errors2.Wrap(err, "failed to determine current Snowflake database")
+		}
+	}
+
+	if database == "" {
+		return errors.New("could not determine Snowflake database, please specify --database")
+	}
+
+	tasks, err := listSnowflakeTasks(ctx, selector, database, schema, taskPattern)
+	if err != nil {
+		return errors2.Wrap(err, "failed to list Snowflake tasks")
+	}
+
+	if len(tasks) == 0 {
+		fmt.Println("No Snowflake tasks found.")
+		return nil
+	}
+
+	return importSelectedSnowflakeTasks(ctx, pipelinePath, tasks, fs)
+}
+
+func getCurrentSnowflakeDatabase(ctx context.Context, selector snowflakeTaskSelector) (string, error) {
+	result, err := selector.SelectWithSchema(ctx, &query.Query{Query: "SELECT CURRENT_DATABASE()"})
+	if err != nil {
+		return "", err
+	}
+
+	if result == nil || len(result.Rows) == 0 || len(result.Rows[0]) == 0 {
+		return "", errors.New("snowflake did not return a current database")
+	}
+
+	return snowflakeValueAsString(result.Rows[0][0]), nil
+}
+
+func listSnowflakeTasks(ctx context.Context, selector snowflakeTaskSelector, database, schema, taskPattern string) ([]SnowflakeTask, error) {
+	queryString, err := buildShowSnowflakeTasksQuery(database, schema, taskPattern)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := selector.SelectWithSchema(ctx, &query.Query{Query: queryString})
+	if err != nil {
+		return nil, err
+	}
+
+	return snowflakeTasksFromQueryResult(result), nil
+}
+
+func buildShowSnowflakeTasksQuery(database, schema, taskPattern string) (string, error) {
+	var queryParts []string
+	queryParts = append(queryParts, "SHOW TASKS")
+
+	if taskPattern != "" {
+		queryParts = append(queryParts, "LIKE", quoteSnowflakeString(taskPattern))
+	}
+
+	if schema != "" {
+		if database == "" {
+			return "", errors.New("database is required when filtering Snowflake tasks by schema")
+		}
+		queryParts = append(queryParts, "IN SCHEMA", quoteSnowflakeIdentifier(database)+"."+quoteSnowflakeIdentifier(schema))
+	} else if database != "" {
+		queryParts = append(queryParts, "IN DATABASE", quoteSnowflakeIdentifier(database))
+	}
+
+	return strings.Join(queryParts, " "), nil
+}
+
+func quoteSnowflakeIdentifier(identifier string) string {
+	identifier = strings.TrimSpace(identifier)
+	if len(identifier) >= 2 && strings.HasPrefix(identifier, `"`) && strings.HasSuffix(identifier, `"`) {
+		return identifier
+	}
+
+	return `"` + strings.ReplaceAll(strings.ToUpper(identifier), `"`, `""`) + `"`
+}
+
+func quoteSnowflakeString(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+func snowflakeTasksFromQueryResult(result *query.QueryResult) []SnowflakeTask {
+	if result == nil {
+		return nil
+	}
+
+	columnIndexes := make(map[string]int, len(result.Columns))
+	for i, column := range result.Columns {
+		columnIndexes[strings.ToLower(column)] = i
+	}
+
+	tasks := make([]SnowflakeTask, 0, len(result.Rows))
+	for _, row := range result.Rows {
+		task := SnowflakeTask{
+			Database:                  snowflakeColumnString(row, columnIndexes, "database_name", "task_database", "database"),
+			Schema:                    snowflakeColumnString(row, columnIndexes, "schema_name", "task_schema", "schema"),
+			Name:                      snowflakeColumnString(row, columnIndexes, "name", "task_name"),
+			Owner:                     snowflakeColumnString(row, columnIndexes, "owner", "task_owner"),
+			Comment:                   snowflakeColumnString(row, columnIndexes, "comment"),
+			Warehouse:                 snowflakeColumnString(row, columnIndexes, "warehouse"),
+			Schedule:                  snowflakeColumnString(row, columnIndexes, "schedule"),
+			Predecessors:              snowflakeColumnString(row, columnIndexes, "predecessors"),
+			State:                     snowflakeColumnString(row, columnIndexes, "state"),
+			Definition:                snowflakeColumnString(row, columnIndexes, "definition", "task_definition"),
+			Condition:                 snowflakeColumnString(row, columnIndexes, "condition"),
+			AllowOverlappingExecution: snowflakeColumnBool(row, columnIndexes, "allow_overlapping_execution"),
+		}
+
+		if task.Name == "" {
+			continue
+		}
+
+		tasks = append(tasks, task)
+	}
+
+	return tasks
+}
+
+func snowflakeColumnString(row []interface{}, columnIndexes map[string]int, names ...string) string {
+	for _, name := range names {
+		index, ok := columnIndexes[strings.ToLower(name)]
+		if !ok || index >= len(row) {
+			continue
+		}
+
+		return snowflakeValueAsString(row[index])
+	}
+
+	return ""
+}
+
+func snowflakeColumnBool(row []interface{}, columnIndexes map[string]int, names ...string) *bool {
+	for _, name := range names {
+		index, ok := columnIndexes[strings.ToLower(name)]
+		if !ok || index >= len(row) || row[index] == nil {
+			continue
+		}
+
+		switch value := row[index].(type) {
+		case bool:
+			return &value
+		case string:
+			parsed, err := strconv.ParseBool(strings.ToLower(value))
+			if err == nil {
+				return &parsed
+			}
+		}
+	}
+
+	return nil
+}
+
+func snowflakeValueAsString(value interface{}) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case []byte:
+		return string(typed)
+	case time.Time:
+		return typed.UTC().Format(time.RFC3339)
+	default:
+		return fmt.Sprint(typed)
+	}
+}
+
+func importSelectedSnowflakeTasks(ctx context.Context, pipelinePath string, tasks []SnowflakeTask, fs afero.Fs) error {
+	pipelinePath = resolvePipelinePath(pipelinePath)
+
+	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)
+	if err != nil {
+		return errors2.Wrap(err, "failed to get pipeline from path")
+	}
+
+	existingAssets := make(map[string]*pipeline.Asset, len(pipelineFound.Assets))
+	for _, asset := range pipelineFound.Assets {
+		existingAssets[strings.ToLower(asset.Name)] = asset
+	}
+
+	assetsPath := filepath.Join(pipelinePath, "assets")
+	importedCount := 0
+	skippedWithoutDefinition := 0
+	importedAssetPaths := make([]string, 0, len(tasks))
+
+	for _, task := range tasks {
+		asset := createAssetFromSnowflakeTask(task, assetsPath)
+		if strings.TrimSpace(asset.ExecutableFile.Content) == "" {
+			skippedWithoutDefinition++
+			fmt.Printf("Snowflake task '%s' has no definition, skipping...\n", task.FullyQualifiedName())
+			continue
+		}
+
+		existingKey := strings.ToLower(asset.Name)
+		if existingAssets[existingKey] != nil {
+			fmt.Printf("Asset '%s' already exists, skipping...\n", asset.Name)
+			continue
+		}
+
+		exists, err := afero.Exists(fs, asset.ExecutableFile.Path)
+		if err != nil {
+			return errors2.Wrapf(err, "failed to check if asset file '%s' exists", asset.ExecutableFile.Path)
+		}
+		if exists {
+			fmt.Printf("Asset file '%s' already exists, skipping...\n", asset.ExecutableFile.Path)
+			continue
+		}
+
+		assetDir := filepath.Dir(asset.ExecutableFile.Path)
+		if err := fs.MkdirAll(assetDir, 0o755); err != nil {
+			return errors2.Wrapf(err, "failed to create directory %s", assetDir)
+		}
+
+		if err := asset.Persist(fs); err != nil {
+			return errors2.Wrapf(err, "failed to save asset '%s'", asset.Name)
+		}
+
+		existingAssets[existingKey] = asset
+		importedAssetPaths = append(importedAssetPaths, asset.ExecutableFile.Path)
+		importedCount++
+		fmt.Printf("Imported Snowflake task '%s' as asset '%s'\n", task.FullyQualifiedName(), asset.Name)
+	}
+
+	if err := fillDependenciesForImportedAssets(ctx, pipelinePath, importedAssetPaths); err != nil {
+		return errors2.Wrap(err, "failed to update dependencies for imported Snowflake task assets")
+	}
+
+	fmt.Printf("\nSuccessfully imported %d Snowflake tasks into pipeline '%s'\n", importedCount, pipelinePath)
+	if skippedWithoutDefinition > 0 {
+		fmt.Printf("Skipped %d Snowflake tasks without definitions.\n", skippedWithoutDefinition)
+	}
+	if importedCount > 0 {
+		fmt.Println("Updated dependencies for imported Snowflake task assets.")
+	}
+
+	return nil
+}
+
+func fillDependenciesForImportedAssets(ctx context.Context, pipelinePath string, importedAssetPaths []string) error {
+	if len(importedAssetPaths) == 0 {
+		return nil
+	}
+
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
+	if err != nil {
+		return errors2.Wrapf(err, "failed to build pipeline at '%s'", pipelinePath)
+	}
+
+	sqlParserInstance, err := sqlparser.NewSQLParser(false)
+	if err != nil {
+		return errors2.Wrap(err, "failed to create sql parser")
+	}
+	defer sqlParserInstance.Close()
+
+	jinjaRenderer := jinja.NewRendererWithYesterday("test-pipeline", "test-run-id")
+
+	for _, assetPath := range importedAssetPaths {
+		asset := foundPipeline.GetAssetByPath(assetPath)
+		if asset == nil {
+			return fmt.Errorf("failed to find imported asset at '%s' in pipeline '%s'", assetPath, pipelinePath)
+		}
+
+		if err := updateAssetDependencies(ctx, asset, foundPipeline, sqlParserInstance, jinjaRenderer); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func createAssetFromSnowflakeTask(task SnowflakeTask, assetsPath string) *pipeline.Asset {
+	schemaName := sanitizeAssetNamePart(task.Schema, "snowflake")
+	taskName := sanitizeAssetNamePart(task.Name, "task")
+	assetName := fmt.Sprintf("%s.%s", schemaName, taskName)
+	fileName := taskName + ".sql"
+	filePath := filepath.Join(assetsPath, schemaName, fileName)
+
+	return &pipeline.Asset{
+		Name: assetName,
+		Type: pipeline.AssetTypeSnowflakeQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Name:    fileName,
+			Path:    filePath,
+			Content: strings.TrimSpace(task.Definition),
+		},
+		Description: buildSnowflakeTaskDescription(task),
+		Upstreams:   snowflakeTaskPredecessorUpstreams(task.Predecessors, task.Schema),
+	}
+}
+
+func snowflakeTaskPredecessorUpstreams(predecessors, defaultSchema string) []pipeline.Upstream {
+	assetNames := snowflakeTaskPredecessorAssetNames(predecessors, defaultSchema)
+	upstreams := make([]pipeline.Upstream, 0, len(assetNames))
+	for _, assetName := range assetNames {
+		upstreams = append(upstreams, pipeline.Upstream{
+			Type:  "asset",
+			Value: assetName,
+			Mode:  pipeline.UpstreamModeFull,
+		})
+	}
+
+	return upstreams
+}
+
+func snowflakeTaskPredecessorAssetNames(predecessors, defaultSchema string) []string {
+	refs := parseSnowflakeTaskPredecessors(predecessors)
+	assetNames := make([]string, 0, len(refs))
+	seen := make(map[string]bool, len(refs))
+	for _, ref := range refs {
+		assetName := snowflakeTaskReferenceToAssetName(ref, defaultSchema)
+		if assetName == "" {
+			continue
+		}
+
+		assetKey := strings.ToLower(assetName)
+		if seen[assetKey] {
+			continue
+		}
+		seen[assetKey] = true
+		assetNames = append(assetNames, assetName)
+	}
+
+	return assetNames
+}
+
+func parseSnowflakeTaskPredecessors(predecessors string) []string {
+	predecessors = strings.TrimSpace(predecessors)
+	if predecessors == "" {
+		return nil
+	}
+
+	var refs []string
+	if err := json.Unmarshal([]byte(predecessors), &refs); err == nil {
+		return cleanSnowflakeTaskPredecessorRefs(refs)
+	}
+
+	predecessors = strings.Trim(predecessors, "[]")
+	return cleanSnowflakeTaskPredecessorRefs(strings.Split(predecessors, ","))
+}
+
+func cleanSnowflakeTaskPredecessorRefs(refs []string) []string {
+	cleaned := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		ref = strings.TrimSpace(ref)
+		if ref == "" {
+			continue
+		}
+		cleaned = append(cleaned, ref)
+	}
+
+	return cleaned
+}
+
+func snowflakeTaskReferenceToAssetName(ref, defaultSchema string) string {
+	parts := splitSnowflakeIdentifierParts(ref)
+	if len(parts) == 0 {
+		return ""
+	}
+
+	taskName := parts[len(parts)-1]
+	schemaName := defaultSchema
+	if len(parts) >= 2 {
+		schemaName = parts[len(parts)-2]
+	}
+
+	schemaName = sanitizeAssetNamePart(schemaName, "")
+	taskName = sanitizeAssetNamePart(taskName, "")
+	if schemaName == "" || taskName == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("%s.%s", schemaName, taskName)
+}
+
+func splitSnowflakeIdentifierParts(ref string) []string {
+	var parts []string
+	var part strings.Builder
+	inQuotes := false
+	for i := 0; i < len(ref); i++ {
+		c := ref[i]
+		if c == '"' {
+			if inQuotes && i+1 < len(ref) && ref[i+1] == '"' {
+				part.WriteByte('"')
+				i++
+				continue
+			}
+			inQuotes = !inQuotes
+			continue
+		}
+		if c == '.' && !inQuotes {
+			parts = append(parts, strings.TrimSpace(part.String()))
+			part.Reset()
+			continue
+		}
+		part.WriteByte(c)
+	}
+	parts = append(parts, strings.TrimSpace(part.String()))
+
+	cleaned := parts[:0]
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		cleaned = append(cleaned, p)
+	}
+
+	return cleaned
+}
+
+func sanitizeAssetNamePart(value, fallback string) string {
+	value = strings.Trim(strings.TrimSpace(value), `"`)
+	value = strings.ToLower(value)
+
+	var sanitized strings.Builder
+	previousWasUnderscore := false
+	for _, r := range value {
+		isSafe := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if isSafe {
+			sanitized.WriteRune(r)
+			previousWasUnderscore = false
+			continue
+		}
+
+		if r == '_' {
+			sanitized.WriteRune(r)
+			previousWasUnderscore = true
+			continue
+		}
+
+		if !previousWasUnderscore {
+			sanitized.WriteRune('_')
+			previousWasUnderscore = true
+		}
+	}
+
+	result := strings.Trim(sanitized.String(), "_")
+	if result == "" {
+		return fallback
+	}
+
+	return result
+}
+
+func buildSnowflakeTaskDescription(task SnowflakeTask) string {
+	var parts []string
+	if task.Comment != "" {
+		parts = append(parts, task.Comment)
+		parts = append(parts, "")
+	}
+
+	parts = append(parts, "Imported Snowflake task: "+task.FullyQualifiedName())
+	parts = append(parts, "Extracted at: "+time.Now().UTC().Format(time.RFC3339))
+
+	if task.Warehouse != "" {
+		parts = append(parts, "Warehouse: "+task.Warehouse)
+	}
+	if task.Schedule != "" {
+		parts = append(parts, "Schedule: "+task.Schedule)
+	}
+	if task.State != "" {
+		parts = append(parts, "State: "+task.State)
+	}
+	if task.Condition != "" {
+		parts = append(parts, "Condition: "+task.Condition)
+	}
+	if task.Predecessors != "" {
+		parts = append(parts, "Predecessors: "+task.Predecessors)
+	}
+	if task.Owner != "" {
+		parts = append(parts, "Owner: "+task.Owner)
+	}
+	if task.AllowOverlappingExecution != nil {
+		parts = append(parts, fmt.Sprintf("Allow overlapping execution: %t", *task.AllowOverlappingExecution))
+	}
+
+	return strings.Join(parts, "\n")
+}
+
+func (task SnowflakeTask) FullyQualifiedName() string {
+	parts := make([]string, 0, 3)
+	if task.Database != "" {
+		parts = append(parts, task.Database)
+	}
+	if task.Schema != "" {
+		parts = append(parts, task.Schema)
+	}
+	if task.Name != "" {
+		parts = append(parts, task.Name)
+	}
+
+	return strings.Join(parts, ".")
 }
 
 func ImportTableauDashboards() *cli.Command {

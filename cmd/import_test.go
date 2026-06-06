@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -616,6 +618,263 @@ func TestColumnDescriptionQuery(t *testing.T) {
 			assert.Equal(t, []any{schemaName, tableName}, got.Args)
 		})
 	}
+}
+
+func TestBuildShowSnowflakeTasksQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		database    string
+		schema      string
+		taskPattern string
+		want        string
+		wantErr     string
+	}{
+		{
+			name:     "database scope",
+			database: "raw_db",
+			want:     `SHOW TASKS IN DATABASE "RAW_DB"`,
+		},
+		{
+			name:        "schema scope with task pattern",
+			database:    "raw_db",
+			schema:      "analytics",
+			taskPattern: "load_%'daily",
+			want:        `SHOW TASKS LIKE 'load_%''daily' IN SCHEMA "RAW_DB"."ANALYTICS"`,
+		},
+		{
+			name:     "preserves quoted database",
+			database: `"MixedDb"`,
+			want:     `SHOW TASKS IN DATABASE "MixedDb"`,
+		},
+		{
+			name:    "schema requires database",
+			schema:  "analytics",
+			wantErr: "database is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := buildShowSnowflakeTasksQuery(tt.database, tt.schema, tt.taskPattern)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSnowflakeTasksFromQueryResult(t *testing.T) {
+	t.Parallel()
+
+	got := snowflakeTasksFromQueryResult(&query.QueryResult{
+		Columns: []string{
+			"database_name",
+			"schema_name",
+			"name",
+			"owner",
+			"comment",
+			"warehouse",
+			"schedule",
+			"predecessors",
+			"state",
+			"definition",
+			"condition",
+			"allow_overlapping_execution",
+		},
+		Rows: [][]interface{}{
+			{
+				"RAW_DB",
+				"ANALYTICS",
+				"LOAD_DAILY",
+				"TRANSFORMER",
+				"daily load",
+				"COMPUTE_WH",
+				"USING CRON 0 5 * * * UTC",
+				`["RAW_DB.ANALYTICS.ROOT_TASK"]`,
+				"started",
+				"INSERT INTO mart.daily SELECT * FROM raw.events",
+				"SYSTEM$STREAM_HAS_DATA('RAW.EVENTS_STREAM')",
+				"true",
+			},
+			{
+				"RAW_DB",
+				"ANALYTICS",
+				"",
+				"TRANSFORMER",
+				"",
+				"",
+				"",
+				"",
+				"",
+				"SELECT 1",
+				"",
+				nil,
+			},
+		},
+	})
+
+	require.Len(t, got, 1)
+	assert.Equal(t, SnowflakeTask{
+		Database:     "RAW_DB",
+		Schema:       "ANALYTICS",
+		Name:         "LOAD_DAILY",
+		Owner:        "TRANSFORMER",
+		Comment:      "daily load",
+		Warehouse:    "COMPUTE_WH",
+		Schedule:     "USING CRON 0 5 * * * UTC",
+		Predecessors: `["RAW_DB.ANALYTICS.ROOT_TASK"]`,
+		State:        "started",
+		Definition:   "INSERT INTO mart.daily SELECT * FROM raw.events",
+		Condition:    "SYSTEM$STREAM_HAS_DATA('RAW.EVENTS_STREAM')",
+	}, SnowflakeTask{
+		Database:     got[0].Database,
+		Schema:       got[0].Schema,
+		Name:         got[0].Name,
+		Owner:        got[0].Owner,
+		Comment:      got[0].Comment,
+		Warehouse:    got[0].Warehouse,
+		Schedule:     got[0].Schedule,
+		Predecessors: got[0].Predecessors,
+		State:        got[0].State,
+		Definition:   got[0].Definition,
+		Condition:    got[0].Condition,
+	})
+	require.NotNil(t, got[0].AllowOverlappingExecution)
+	assert.True(t, *got[0].AllowOverlappingExecution)
+}
+
+func TestCreateAssetFromSnowflakeTask(t *testing.T) {
+	t.Parallel()
+
+	assetsPath := filepath.Join("pipeline", "assets")
+	allowOverlap := false
+	task := SnowflakeTask{
+		Database:                  "RAW_DB",
+		Schema:                    "Analytics",
+		Name:                      "Daily Refresh",
+		Owner:                     "TRANSFORMER",
+		Comment:                   "Refreshes daily analytics.",
+		Warehouse:                 "COMPUTE_WH",
+		Schedule:                  "USING CRON 0 5 * * * UTC",
+		Predecessors:              `["RAW_DB.ANALYTICS.ROOT_TASK"]`,
+		State:                     "started",
+		Definition:                "\nINSERT INTO mart.daily SELECT * FROM raw.events\n",
+		Condition:                 "SYSTEM$STREAM_HAS_DATA('RAW.EVENTS_STREAM')",
+		AllowOverlappingExecution: &allowOverlap,
+	}
+
+	got := createAssetFromSnowflakeTask(task, assetsPath)
+
+	assert.Equal(t, "analytics.daily_refresh", got.Name)
+	assert.Equal(t, pipeline.AssetTypeSnowflakeQuery, got.Type)
+	assert.Equal(t, "daily_refresh.sql", got.ExecutableFile.Name)
+	assert.Equal(t, filepath.Join(assetsPath, "analytics", "daily_refresh.sql"), got.ExecutableFile.Path)
+	assert.Equal(t, "INSERT INTO mart.daily SELECT * FROM raw.events", got.ExecutableFile.Content)
+	assert.Equal(t, []pipeline.Upstream{
+		{
+			Type:  "asset",
+			Value: "analytics.root_task",
+			Mode:  pipeline.UpstreamModeFull,
+		},
+	}, got.Upstreams)
+	assert.Contains(t, got.Description, "Refreshes daily analytics.")
+	assert.Contains(t, got.Description, "Imported Snowflake task: RAW_DB.Analytics.Daily Refresh")
+	assert.Contains(t, got.Description, "Warehouse: COMPUTE_WH")
+	assert.Contains(t, got.Description, "Schedule: USING CRON 0 5 * * * UTC")
+	assert.Contains(t, got.Description, "Allow overlapping execution: false")
+}
+
+func TestSnowflakeTaskPredecessorAssetNames(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		predecessors string
+		schema       string
+		want         []string
+	}{
+		{
+			name:         "json fully qualified predecessors",
+			predecessors: `["RAW_DB.ANALYTICS.ROOT_TASK","RAW_DB.ANALYTICS.OTHER TASK"]`,
+			schema:       "IGNORED",
+			want:         []string{"analytics.root_task", "analytics.other_task"},
+		},
+		{
+			name:         "unqualified predecessor uses current schema",
+			predecessors: "ROOT_TASK",
+			schema:       "Analytics",
+			want:         []string{"analytics.root_task"},
+		},
+		{
+			name:         "quoted predecessor keeps dots inside identifiers",
+			predecessors: `"RAW.DB"."Data.Schema"."Root Task"`,
+			schema:       "IGNORED",
+			want:         []string{"data_schema.root_task"},
+		},
+		{
+			name:         "duplicates are removed",
+			predecessors: `["RAW_DB.ANALYTICS.ROOT_TASK","RAW_DB.ANALYTICS.ROOT_TASK"]`,
+			schema:       "IGNORED",
+			want:         []string{"analytics.root_task"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := snowflakeTaskPredecessorAssetNames(tt.predecessors, tt.schema)
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestImportSelectedSnowflakeTasksSkipsExistingFilePath(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	pipelinePath := t.TempDir()
+	assetsPath := filepath.Join(pipelinePath, "assets", "analytics")
+	existingAssetPath := filepath.Join(assetsPath, "daily_refresh.sql")
+
+	require.NoError(t, os.Mkdir(filepath.Join(pipelinePath, ".git"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(pipelinePath, "pipeline.yml"), []byte("name: test-pipeline\n"), 0o644))
+	require.NoError(t, os.MkdirAll(assetsPath, 0o755))
+
+	originalContent := `/* @bruin
+
+name: analytics.custom_existing_name
+type: sf.sql
+
+@bruin */
+
+select 42
+`
+	require.NoError(t, os.WriteFile(existingAssetPath, []byte(originalContent), 0o644))
+
+	err := importSelectedSnowflakeTasks(ctx, pipelinePath, []SnowflakeTask{
+		{
+			Schema:     "analytics",
+			Name:       "daily_refresh",
+			Definition: "select 1",
+		},
+	}, afero.NewOsFs())
+
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(existingAssetPath)
+	require.NoError(t, err)
+	assert.Equal(t, originalContent, string(got))
 }
 
 func TestGetPipelinefromPath(t *testing.T) {
