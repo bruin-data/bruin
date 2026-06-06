@@ -31,7 +31,7 @@ jobs:
           node-version: '22.14.0'
 
       - name: Install dependencies with npm@11 (for min-release-age support)
-        run: npx npm@11.10.0 install
+        run: npx npm@11.10.0 ci
 
       - name: Rebuild SPA bundle from sources
         run: npm run docs:app:build

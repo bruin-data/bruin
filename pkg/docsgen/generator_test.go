@@ -93,6 +93,55 @@ func TestGenerateWritesSelfContainedHTMLWithEmbeddedPipelineJSON(t *testing.T) {
 	require.Equal(t, "warehouse/assets/orders.sql", firstAsset["executable_file"].(map[string]any)["path"])
 }
 
+func TestGenerateDoesNotEmbedAbsolutePathsForFilesOutsideSearchRoot(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	outsideRoot := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o755))
+	pipelineDir := filepath.Join(root, "warehouse")
+	require.NoError(t, os.MkdirAll(pipelineDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(pipelineDir, "pipeline.yml"), []byte("name: warehouse\n"), 0o644))
+
+	pipelinePath := filepath.Join(pipelineDir, "pipeline.yml")
+	outsideAssetPath := filepath.Join(outsideRoot, "shared", "orders.sql")
+	builder := fakePipelineBuilder{
+		pipelines: map[string][]*pipeline.Pipeline{
+			pipelineDir: {
+				{
+					Name:           "warehouse",
+					DefinitionFile: pipeline.DefinitionFile{Name: "pipeline.yml", Path: pipelinePath},
+					Assets: []*pipeline.Asset{
+						{
+							Name:           "orders",
+							Type:           pipeline.AssetTypeBigqueryQuery,
+							DefinitionFile: pipeline.TaskDefinitionFile{Name: "orders.sql", Path: outsideAssetPath, Type: "asset"},
+							ExecutableFile: pipeline.ExecutableFile{Name: "orders.sql", Path: outsideAssetPath, Content: "select * from raw.orders"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	outputPath := filepath.Join(root, "site", "docs.html")
+	_, err := Generate(t.Context(), builder, Options{
+		InputPath:  root,
+		OutputPath: outputPath,
+	})
+	require.NoError(t, err)
+
+	html, err := os.ReadFile(outputPath)
+	require.NoError(t, err)
+	require.NotContains(t, string(html), outsideRoot)
+	require.NotContains(t, string(html), outsideAssetPath)
+
+	data := extractDocsData(t, string(html))
+	asset := data["pipelines"].([]any)[0].(map[string]any)["assets"].([]any)[0].(map[string]any)
+	require.Equal(t, "orders.sql", asset["definition_file"].(map[string]any)["path"])
+	require.Equal(t, "orders.sql", asset["executable_file"].(map[string]any)["path"])
+}
+
 func TestGenerateExcludeCodeStripsAssetContent(t *testing.T) {
 	t.Parallel()
 

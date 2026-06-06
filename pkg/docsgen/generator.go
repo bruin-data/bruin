@@ -245,7 +245,7 @@ func relPath(root, value string) string {
 	}
 	rel, err := filepath.Rel(root, value)
 	if err != nil || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
-		return filepath.ToSlash(value)
+		return filepath.ToSlash(filepath.Base(value))
 	}
 	return filepath.ToSlash(rel)
 }
