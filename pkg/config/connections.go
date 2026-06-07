@@ -287,6 +287,50 @@ func (c CouchbaseConnection) GetName() string {
 	return c.Name
 }
 
+type CassandraConnection struct {
+	Name                     string   `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username                 string   `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password                 string   `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host                     string   `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Hosts                    []string `yaml:"hosts,omitempty" json:"hosts,omitempty" mapstructure:"hosts"`
+	Port                     int      `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port" jsonschema:"default=9042"`
+	Keyspace                 string   `yaml:"keyspace,omitempty" json:"keyspace,omitempty" mapstructure:"keyspace"`
+	Consistency              string   `yaml:"consistency,omitempty" json:"consistency,omitempty" mapstructure:"consistency"`
+	PageSize                 int      `yaml:"page_size,omitempty" json:"page_size,omitempty" mapstructure:"page_size"`
+	Timeout                  string   `yaml:"timeout,omitempty" json:"timeout,omitempty" mapstructure:"timeout"`
+	ConnectTimeout           string   `yaml:"connect_timeout,omitempty" json:"connect_timeout,omitempty" mapstructure:"connect_timeout"`
+	SSL                      bool     `yaml:"ssl,omitempty" json:"ssl,omitempty" mapstructure:"ssl"`
+	DisableInitialHostLookup bool     `yaml:"disable_initial_host_lookup,omitempty" json:"disable_initial_host_lookup,omitempty" mapstructure:"disable_initial_host_lookup"`
+}
+
+func (c CassandraConnection) GetName() string {
+	return c.Name
+}
+
+type CrateDBConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty" json:"port,omitempty" mapstructure:"port" jsonschema:"default=5432"`
+	SslMode  string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode"`
+}
+
+func (c CrateDBConnection) GetName() string {
+	return c.Name
+}
+
+type CSVConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Path     string `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+	Encoding string `yaml:"encoding,omitempty" json:"encoding,omitempty" mapstructure:"encoding"`
+	Layout   string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
+}
+
+func (c CSVConnection) GetName() string {
+	return c.Name
+}
+
 type CursorConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
@@ -679,6 +723,15 @@ type DuneConnection struct {
 }
 
 func (c DuneConnection) GetName() string {
+	return c.Name
+}
+
+type GranolaConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c GranolaConnection) GetName() string {
 	return c.Name
 }
 
@@ -1386,6 +1439,30 @@ func (c SFTPConnection) GetName() string {
 	return c.Name
 }
 
+type ADLSConnection struct {
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccountName  string `yaml:"account_name,omitempty" json:"account_name" mapstructure:"account_name"`
+	TenantID     string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty" mapstructure:"tenant_id"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id,omitempty" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret,omitempty" mapstructure:"client_secret"`
+	AccountKey   string `yaml:"account_key,omitempty" json:"account_key,omitempty" mapstructure:"account_key"`
+	SASToken     string `yaml:"sas_token,omitempty" json:"sas_token,omitempty" mapstructure:"sas_token"`
+	Layout       string `yaml:"layout,omitempty" json:"layout,omitempty" mapstructure:"layout"`
+}
+
+func (c ADLSConnection) GetName() string {
+	return c.Name
+}
+
+type HTTPConnection struct {
+	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	URL  string `yaml:"url,omitempty" json:"url" mapstructure:"url"`
+}
+
+func (c HTTPConnection) GetName() string {
+	return c.Name
+}
+
 type ISOCPulseConnection struct {
 	Name  string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Token string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
@@ -1447,6 +1524,15 @@ func (c TrinoConnection) GetName() string {
 	return c.Name
 }
 
+type KalshiConnection struct {
+	Name        string            `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	QueryParams map[string]string `yaml:"query_params,omitempty" json:"query_params,omitempty" mapstructure:"query_params"`
+}
+
+func (c KalshiConnection) GetName() string {
+	return c.Name
+}
+
 // FlightSQLConnection holds the settings for any Arrow Flight SQL compatible
 // platform (e.g. Dremio). Flight SQL is a transport protocol, so the same
 // connection type works across engines; Dialect selects the SQL dialect used
@@ -1493,6 +1579,72 @@ func (c FreshdeskConnection) GetName() string {
 	return c.Name
 }
 
+type RedditAdsConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccountIds  string `yaml:"account_ids,omitempty" json:"account_ids" mapstructure:"account_ids"`
+}
+
+func (c RedditAdsConnection) GetName() string {
+	return c.Name
+}
+
+type ManifoldConnection struct {
+	Name            string              `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	QueryParams     map[string]string   `yaml:"query_params,omitempty" json:"query_params,omitempty" mapstructure:"query_params"`
+	QueryParamLists map[string][]string `yaml:"query_param_lists,omitempty" json:"query_param_lists,omitempty" mapstructure:"query_param_lists"`
+}
+
+func (c ManifoldConnection) GetName() string {
+	return c.Name
+}
+
+type PolymarketConnection struct {
+	Name             string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Order            string `yaml:"order,omitempty" json:"order,omitempty" mapstructure:"order"`
+	Ascending        string `yaml:"ascending,omitempty" json:"ascending,omitempty" mapstructure:"ascending"`
+	Slug             string `yaml:"slug,omitempty" json:"slug,omitempty" mapstructure:"slug"`
+	Closed           string `yaml:"closed,omitempty" json:"closed,omitempty" mapstructure:"closed"`
+	Live             string `yaml:"live,omitempty" json:"live,omitempty" mapstructure:"live"`
+	Active           string `yaml:"active,omitempty" json:"active,omitempty" mapstructure:"active"`
+	Archived         string `yaml:"archived,omitempty" json:"archived,omitempty" mapstructure:"archived"`
+	Featured         string `yaml:"featured,omitempty" json:"featured,omitempty" mapstructure:"featured"`
+	TagID            string `yaml:"tag_id,omitempty" json:"tag_id,omitempty" mapstructure:"tag_id"`
+	TagSlug          string `yaml:"tag_slug,omitempty" json:"tag_slug,omitempty" mapstructure:"tag_slug"`
+	SeriesID         string `yaml:"series_id,omitempty" json:"series_id,omitempty" mapstructure:"series_id"`
+	IncludeChat      string `yaml:"include_chat,omitempty" json:"include_chat,omitempty" mapstructure:"include_chat"`
+	IncludeTemplate  string `yaml:"include_template,omitempty" json:"include_template,omitempty" mapstructure:"include_template"`
+	IncludeMarkets   string `yaml:"include_markets,omitempty" json:"include_markets,omitempty" mapstructure:"include_markets"`
+	ClobTokenIDs     string `yaml:"clob_token_ids,omitempty" json:"clob_token_ids,omitempty" mapstructure:"clob_token_ids"`
+	ConditionIDs     string `yaml:"condition_ids,omitempty" json:"condition_ids,omitempty" mapstructure:"condition_ids"`
+	QuestionIDs      string `yaml:"question_ids,omitempty" json:"question_ids,omitempty" mapstructure:"question_ids"`
+	RelatedTags      string `yaml:"related_tags,omitempty" json:"related_tags,omitempty" mapstructure:"related_tags"`
+	IncludeTag       string `yaml:"include_tag,omitempty" json:"include_tag,omitempty" mapstructure:"include_tag"`
+	RFQEnabled       string `yaml:"rfq_enabled,omitempty" json:"rfq_enabled,omitempty" mapstructure:"rfq_enabled"`
+	Limit            string `yaml:"limit,omitempty" json:"limit,omitempty" mapstructure:"limit"`
+	Offset           string `yaml:"offset,omitempty" json:"offset,omitempty" mapstructure:"offset"`
+	ParentEntityID   string `yaml:"parent_entity_id,omitempty" json:"parent_entity_id,omitempty" mapstructure:"parent_entity_id"`
+	ParentEntityType string `yaml:"parent_entity_type,omitempty" json:"parent_entity_type,omitempty" mapstructure:"parent_entity_type"`
+	Market           string `yaml:"market,omitempty" json:"market,omitempty" mapstructure:"market"`
+	User             string `yaml:"user,omitempty" json:"user,omitempty" mapstructure:"user"`
+	Q                string `yaml:"q,omitempty" json:"q,omitempty" mapstructure:"q"`
+	EventsStatus     string `yaml:"events_status,omitempty" json:"events_status,omitempty" mapstructure:"events_status"`
+	MarketsStatus    string `yaml:"markets_status,omitempty" json:"markets_status,omitempty" mapstructure:"markets_status"`
+	TokenID          string `yaml:"token_id,omitempty" json:"token_id,omitempty" mapstructure:"token_id"`
+	Side             string `yaml:"side,omitempty" json:"side,omitempty" mapstructure:"side"`
+	Interval         string `yaml:"interval,omitempty" json:"interval,omitempty" mapstructure:"interval"`
+	Fidelity         string `yaml:"fidelity,omitempty" json:"fidelity,omitempty" mapstructure:"fidelity"`
+	TakerOnly        string `yaml:"taker_only,omitempty" json:"taker_only,omitempty" mapstructure:"taker_only"`
+	FilterType       string `yaml:"filter_type,omitempty" json:"filter_type,omitempty" mapstructure:"filter_type"`
+	FilterAmount     string `yaml:"filter_amount,omitempty" json:"filter_amount,omitempty" mapstructure:"filter_amount"`
+	EventID          string `yaml:"event_id,omitempty" json:"event_id,omitempty" mapstructure:"event_id"`
+	Type             string `yaml:"type,omitempty" json:"type,omitempty" mapstructure:"type"`
+}
+
+func (c PolymarketConnection) GetName() string {
+	return c.Name
+}
+
 type FundraiseUpConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
@@ -1508,6 +1660,19 @@ type FirefliesConnection struct {
 }
 
 func (c FirefliesConnection) GetName() string {
+	return c.Name
+}
+
+type WistiaConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	APIKey      string `yaml:"api_key,omitempty" json:"api_key,omitempty" mapstructure:"api_key"`
+	Token       string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
+	APIVersion  string `yaml:"api_version,omitempty" json:"api_version,omitempty" mapstructure:"api_version"`
+	BaseURL     string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c WistiaConnection) GetName() string {
 	return c.Name
 }
 

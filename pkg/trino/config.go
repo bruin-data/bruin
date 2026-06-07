@@ -37,3 +37,24 @@ func (c Config) ToDSN() string {
 	}
 	return baseURL
 }
+
+func (c Config) GetIngestrURI() string {
+	hostPort := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
+
+	u := &url.URL{
+		Scheme: "trino",
+		Host:   hostPort,
+	}
+	if c.Username != "" {
+		if c.Password != "" {
+			u.User = url.UserPassword(c.Username, c.Password)
+		} else {
+			u.User = url.User(c.Username)
+		}
+	}
+	if c.Catalog != "" {
+		u.Path = "/" + c.Catalog
+	}
+
+	return u.String()
+}

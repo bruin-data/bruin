@@ -31,11 +31,15 @@ type Connections struct {
 	RedShift            []RedshiftConnection            `yaml:"redshift,omitempty" json:"redshift,omitempty" mapstructure:"redshift"`
 	MsSQL               []MsSQLConnection               `yaml:"mssql,omitempty" json:"mssql,omitempty" mapstructure:"mssql"`
 	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks,omitempty" mapstructure:"databricks"`
+	ADLS                []ADLSConnection                `yaml:"adls,omitempty" json:"adls,omitempty" mapstructure:"adls"`
 	Synapse             []SynapseConnection             `yaml:"synapse,omitempty" json:"synapse,omitempty" mapstructure:"synapse"`
 	Fabric              []FabricConnection              `yaml:"fabric,omitempty" json:"fabric,omitempty" mapstructure:"fabric"`
 	OneLake             []OneLakeConnection             `yaml:"onelake,omitempty" json:"onelake,omitempty" mapstructure:"onelake"`
 	Mongo               []MongoConnection               `yaml:"mongo,omitempty" json:"mongo,omitempty" mapstructure:"mongo"`
+	Cassandra           []CassandraConnection           `yaml:"cassandra,omitempty" json:"cassandra,omitempty" mapstructure:"cassandra"`
 	Couchbase           []CouchbaseConnection           `yaml:"couchbase,omitempty" json:"couchbase,omitempty" mapstructure:"couchbase"`
+	CrateDB             []CrateDBConnection             `yaml:"cratedb,omitempty" json:"cratedb,omitempty" mapstructure:"cratedb"`
+	CSV                 []CSVConnection                 `yaml:"csv,omitempty" json:"csv,omitempty" mapstructure:"csv"`
 	Cursor              []CursorConnection              `yaml:"cursor,omitempty" json:"cursor,omitempty" mapstructure:"cursor"`
 	MongoAtlas          []MongoAtlasConnection          `yaml:"mongo_atlas,omitempty" json:"mongo_atlas,omitempty" mapstructure:"mongo_atlas"`
 	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql,omitempty" mapstructure:"mysql"`
@@ -43,6 +47,7 @@ type Connections struct {
 	Allium              []AlliumConnection              `yaml:"allium,omitempty" json:"allium,omitempty" mapstructure:"allium"`
 	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana,omitempty" mapstructure:"hana"`
 	Hostaway            []HostawayConnection            `yaml:"hostaway,omitempty" json:"hostaway,omitempty" mapstructure:"hostaway"`
+	HTTP                []HTTPConnection                `yaml:"http,omitempty" json:"http,omitempty" mapstructure:"http"`
 	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify,omitempty" mapstructure:"shopify"`
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
 	G2                  []G2Connection                  `yaml:"g2,omitempty" json:"g2,omitempty" mapstructure:"g2"`
@@ -64,7 +69,9 @@ type Connections struct {
 	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
 	Chess               []ChessConnection               `yaml:"chess,omitempty" json:"chess,omitempty" mapstructure:"chess"`
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
+	Granola             []GranolaConnection             `yaml:"granola,omitempty" json:"granola,omitempty" mapstructure:"granola"`
 	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
+	Kalshi              []KalshiConnection              `yaml:"kalshi,omitempty" json:"kalshi,omitempty" mapstructure:"kalshi"`
 	TikTokAds           []TikTokAdsConnection           `yaml:"tiktokads,omitempty" json:"tiktokads,omitempty" mapstructure:"tiktokads"`
 	SnapchatAds         []SnapchatAdsConnection         `yaml:"snapchatads,omitempty" json:"snapchatads,omitempty" mapstructure:"snapchatads"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
@@ -77,7 +84,9 @@ type Connections struct {
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 	AppleAds            []AppleAdsConnection            `yaml:"appleads,omitempty" json:"appleads,omitempty" mapstructure:"appleads"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
+	RedditAds           []RedditAdsConnection           `yaml:"reddit_ads,omitempty" json:"reddit_ads,omitempty" mapstructure:"reddit_ads"`
 	Mailchimp           []MailchimpConnection           `yaml:"mailchimp,omitempty" json:"mailchimp,omitempty" mapstructure:"mailchimp"`
+	Manifold            []ManifoldConnection            `yaml:"manifold,omitempty" json:"manifold,omitempty" mapstructure:"manifold"`
 	RevenueCat          []RevenueCatConnection          `yaml:"revenuecat,omitempty" json:"revenuecat,omitempty" mapstructure:"revenuecat"`
 	Linear              []LinearConnection              `yaml:"linear,omitempty" json:"linear,omitempty" mapstructure:"linear"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
@@ -85,6 +94,7 @@ type Connections struct {
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
+	Polymarket          []PolymarketConnection          `yaml:"polymarket,omitempty" json:"polymarket,omitempty" mapstructure:"polymarket"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	Clickup             []ClickupConnection             `yaml:"clickup,omitempty" json:"clickup,omitempty" mapstructure:"clickup"`
 	Jobtread            []JobtreadConnection            `yaml:"jobtread,omitempty" json:"jobtread,omitempty" mapstructure:"jobtread"`
@@ -93,6 +103,7 @@ type Connections struct {
 	Trustpilot          []TrustpilotConnection          `yaml:"trustpilot,omitempty" json:"trustpilot,omitempty" mapstructure:"trustpilot"`
 	QuickBooks          []QuickBooksConnection          `yaml:"quickbooks,omitempty" json:"quickbooks,omitempty" mapstructure:"quickbooks"`
 	Wise                []WiseConnection                `yaml:"wise,omitempty" json:"wise,omitempty" mapstructure:"wise"`
+	Wistia              []WistiaConnection              `yaml:"wistia,omitempty" json:"wistia,omitempty" mapstructure:"wistia"`
 	Zoom                []ZoomConnection                `yaml:"zoom,omitempty" json:"zoom,omitempty" mapstructure:"zoom"`
 	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	DataprocServerless  []DataprocServerlessConnection  `yaml:"dataproc_serverless,omitempty" json:"dataproc_serverless,omitempty" mapstructure:"dataproc_serverless"`
@@ -544,6 +555,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Databricks = append(env.Connections.Databricks, conn)
+	case "adls":
+		var conn ADLSConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.ADLS = append(env.Connections.ADLS, conn)
 	case "synapse":
 		var conn SynapseConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -572,6 +590,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Mongo = append(env.Connections.Mongo, conn)
+	case "cassandra":
+		var conn CassandraConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Cassandra = append(env.Connections.Cassandra, conn)
 	case "mongo_atlas":
 		var conn MongoAtlasConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -579,6 +604,20 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.MongoAtlas = append(env.Connections.MongoAtlas, conn)
+	case "cratedb":
+		var conn CrateDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.CrateDB = append(env.Connections.CrateDB, conn)
+	case "csv":
+		var conn CSVConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.CSV = append(env.Connections.CSV, conn)
 	case "monday":
 		var conn MondayConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -614,6 +653,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Hostaway = append(env.Connections.Hostaway, conn)
+	case "http":
+		var conn HTTPConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.HTTP = append(env.Connections.HTTP, conn)
 	case "shopify":
 		var conn ShopifyConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -740,6 +786,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Airtable = append(env.Connections.Airtable, conn)
+	case "granola":
+		var conn GranolaConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Granola = append(env.Connections.Granola, conn)
 	case "zendesk":
 		var conn ZendeskConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -747,6 +800,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Zendesk = append(env.Connections.Zendesk, conn)
+	case "kalshi":
+		var conn KalshiConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Kalshi = append(env.Connections.Kalshi, conn)
 	case "s3":
 		var conn S3Connection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -845,6 +905,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.LinkedInAds = append(env.Connections.LinkedInAds, conn)
+	case "reddit_ads":
+		var conn RedditAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.RedditAds = append(env.Connections.RedditAds, conn)
 	case "revenuecat":
 		var conn RevenueCatConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -901,6 +968,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Pipedrive = append(env.Connections.Pipedrive, conn)
+	case "polymarket":
+		var conn PolymarketConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Polymarket = append(env.Connections.Polymarket, conn)
 	case "clickup":
 		var conn ClickupConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -929,6 +1003,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Mailchimp = append(env.Connections.Mailchimp, conn)
+	case "manifold":
+		var conn ManifoldConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Manifold = append(env.Connections.Manifold, conn)
 	case "mixpanel":
 		var conn MixpanelConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -943,6 +1024,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Wise = append(env.Connections.Wise, conn)
+	case "wistia":
+		var conn WistiaConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Wistia = append(env.Connections.Wistia, conn)
 	case "pinterest":
 		var conn PinterestConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1248,10 +1336,18 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.MsSQL = removeConnection(env.Connections.MsSQL, connectionName)
 	case "databricks":
 		env.Connections.Databricks = removeConnection(env.Connections.Databricks, connectionName)
+	case "adls":
+		env.Connections.ADLS = removeConnection(env.Connections.ADLS, connectionName)
 	case "mongo":
 		env.Connections.Mongo = removeConnection(env.Connections.Mongo, connectionName)
+	case "cassandra":
+		env.Connections.Cassandra = removeConnection(env.Connections.Cassandra, connectionName)
 	case "mongo_atlas":
 		env.Connections.MongoAtlas = removeConnection(env.Connections.MongoAtlas, connectionName)
+	case "cratedb":
+		env.Connections.CrateDB = removeConnection(env.Connections.CrateDB, connectionName)
+	case "csv":
+		env.Connections.CSV = removeConnection(env.Connections.CSV, connectionName)
 	case "aws":
 		env.Connections.AwsConnection = removeConnection(env.Connections.AwsConnection, connectionName)
 	case "athena":
@@ -1270,6 +1366,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.HANA = removeConnection(env.Connections.HANA, connectionName)
 	case "hostaway":
 		env.Connections.Hostaway = removeConnection(env.Connections.Hostaway, connectionName)
+	case "http":
+		env.Connections.HTTP = removeConnection(env.Connections.HTTP, connectionName)
 	case "shopify":
 		env.Connections.Shopify = removeConnection(env.Connections.Shopify, connectionName)
 	case "snowflake":
@@ -1314,12 +1412,16 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Chess = removeConnection(env.Connections.Chess, connectionName)
 	case "airtable":
 		env.Connections.Airtable = removeConnection(env.Connections.Airtable, connectionName)
+	case "granola":
+		env.Connections.Granola = removeConnection(env.Connections.Granola, connectionName)
 	case "s3":
 		env.Connections.S3 = removeConnection(env.Connections.S3, connectionName)
 	case "slack":
 		env.Connections.Slack = removeConnection(env.Connections.Slack, connectionName)
 	case "zendesk":
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
+	case "kalshi":
+		env.Connections.Kalshi = removeConnection(env.Connections.Kalshi, connectionName)
 	case "duckdb":
 		env.Connections.DuckDB = removeConnection(env.Connections.DuckDB, connectionName)
 	case "motherduck":
@@ -1344,6 +1446,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.AppleAds = removeConnection(env.Connections.AppleAds, connectionName)
 	case "linkedinads":
 		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
+	case "reddit_ads":
+		env.Connections.RedditAds = removeConnection(env.Connections.RedditAds, connectionName)
 	case "linear":
 		env.Connections.Linear = removeConnection(env.Connections.Linear, connectionName)
 	case "gcs":
@@ -1358,6 +1462,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Kinesis = removeConnection(env.Connections.Kinesis, connectionName)
 	case "pipedrive":
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
+	case "polymarket":
+		env.Connections.Polymarket = removeConnection(env.Connections.Polymarket, connectionName)
 	case "clickup":
 		env.Connections.Clickup = removeConnection(env.Connections.Clickup, connectionName)
 	case "jobtread":
@@ -1366,6 +1472,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Posthog = removeConnection(env.Connections.Posthog, connectionName)
 	case "mailchimp":
 		env.Connections.Mailchimp = removeConnection(env.Connections.Mailchimp, connectionName)
+	case "manifold":
+		env.Connections.Manifold = removeConnection(env.Connections.Manifold, connectionName)
 	case "mixpanel":
 		env.Connections.Mixpanel = removeConnection(env.Connections.Mixpanel, connectionName)
 	case "pinterest":
@@ -1380,6 +1488,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.QuickBooks = removeConnection(env.Connections.QuickBooks, connectionName)
 	case "wise":
 		env.Connections.Wise = removeConnection(env.Connections.Wise, connectionName)
+	case "wistia":
+		env.Connections.Wistia = removeConnection(env.Connections.Wistia, connectionName)
 	case "zoom":
 		env.Connections.Zoom = removeConnection(env.Connections.Zoom, connectionName)
 	case "emr_serverless":
@@ -1509,11 +1619,15 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.RedShift, source.RedShift)
 	mergeConnectionList(&c.MsSQL, source.MsSQL)
 	mergeConnectionList(&c.Databricks, source.Databricks)
+	mergeConnectionList(&c.ADLS, source.ADLS)
 	mergeConnectionList(&c.Synapse, source.Synapse)
 	mergeConnectionList(&c.Fabric, source.Fabric)
 	mergeConnectionList(&c.OneLake, source.OneLake)
 	mergeConnectionList(&c.Mongo, source.Mongo)
+	mergeConnectionList(&c.Cassandra, source.Cassandra)
 	mergeConnectionList(&c.Couchbase, source.Couchbase)
+	mergeConnectionList(&c.CrateDB, source.CrateDB)
+	mergeConnectionList(&c.CSV, source.CSV)
 	mergeConnectionList(&c.Cursor, source.Cursor)
 	mergeConnectionList(&c.MongoAtlas, source.MongoAtlas)
 	mergeConnectionList(&c.MySQL, source.MySQL)
@@ -1521,6 +1635,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Allium, source.Allium)
 	mergeConnectionList(&c.HANA, source.HANA)
 	mergeConnectionList(&c.Hostaway, source.Hostaway)
+	mergeConnectionList(&c.HTTP, source.HTTP)
 	mergeConnectionList(&c.Shopify, source.Shopify)
 	mergeConnectionList(&c.Gorgias, source.Gorgias)
 	mergeConnectionList(&c.G2, source.G2)
@@ -1542,7 +1657,9 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.GoogleSheets, source.GoogleSheets)
 	mergeConnectionList(&c.Chess, source.Chess)
 	mergeConnectionList(&c.Airtable, source.Airtable)
+	mergeConnectionList(&c.Granola, source.Granola)
 	mergeConnectionList(&c.Zendesk, source.Zendesk)
+	mergeConnectionList(&c.Kalshi, source.Kalshi)
 	mergeConnectionList(&c.TikTokAds, source.TikTokAds)
 	mergeConnectionList(&c.SnapchatAds, source.SnapchatAds)
 	mergeConnectionList(&c.S3, source.S3)
@@ -1555,7 +1672,9 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.AppStore, source.AppStore)
 	mergeConnectionList(&c.AppleAds, source.AppleAds)
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
+	mergeConnectionList(&c.RedditAds, source.RedditAds)
 	mergeConnectionList(&c.Mailchimp, source.Mailchimp)
+	mergeConnectionList(&c.Manifold, source.Manifold)
 	mergeConnectionList(&c.RevenueCat, source.RevenueCat)
 	mergeConnectionList(&c.Linear, source.Linear)
 	mergeConnectionList(&c.GCS, source.GCS)
@@ -1563,6 +1682,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Personio, source.Personio)
 	mergeConnectionList(&c.Kinesis, source.Kinesis)
 	mergeConnectionList(&c.Pipedrive, source.Pipedrive)
+	mergeConnectionList(&c.Polymarket, source.Polymarket)
 	mergeConnectionList(&c.Mixpanel, source.Mixpanel)
 	mergeConnectionList(&c.Clickup, source.Clickup)
 	mergeConnectionList(&c.Jobtread, source.Jobtread)
@@ -1571,6 +1691,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Trustpilot, source.Trustpilot)
 	mergeConnectionList(&c.QuickBooks, source.QuickBooks)
 	mergeConnectionList(&c.Wise, source.Wise)
+	mergeConnectionList(&c.Wistia, source.Wistia)
 	mergeConnectionList(&c.Zoom, source.Zoom)
 	mergeConnectionList(&c.EMRServerless, source.EMRServerless)
 	mergeConnectionList(&c.DataprocServerless, source.DataprocServerless)

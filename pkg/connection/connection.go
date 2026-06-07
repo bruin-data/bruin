@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
+	"github.com/bruin-data/bruin/pkg/adls"
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/allium"
 	"github.com/bruin-data/bruin/pkg/anthropic"
@@ -24,11 +25,14 @@ import (
 	"github.com/bruin-data/bruin/pkg/attio"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/bruincloud"
+	"github.com/bruin-data/bruin/pkg/cassandra"
 	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/clickup"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/couchbase"
+	"github.com/bruin-data/bruin/pkg/cratedb"
+	csvsource "github.com/bruin-data/bruin/pkg/csv"
 	"github.com/bruin-data/bruin/pkg/cursor"
 	"github.com/bruin-data/bruin/pkg/customerio"
 	"github.com/bruin-data/bruin/pkg/databricks"
@@ -54,9 +58,11 @@ import (
 	"github.com/bruin-data/bruin/pkg/googleads"
 	"github.com/bruin-data/bruin/pkg/googleanalytics"
 	"github.com/bruin-data/bruin/pkg/gorgias"
+	"github.com/bruin-data/bruin/pkg/granola"
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hostaway"
+	httpsource "github.com/bruin-data/bruin/pkg/http"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/indeed"
 	"github.com/bruin-data/bruin/pkg/influxdb"
@@ -65,11 +71,13 @@ import (
 	"github.com/bruin-data/bruin/pkg/jira"
 	"github.com/bruin-data/bruin/pkg/jobtread"
 	"github.com/bruin-data/bruin/pkg/kafka"
+	"github.com/bruin-data/bruin/pkg/kalshi"
 	"github.com/bruin-data/bruin/pkg/kinesis"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/linear"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mailchimp"
+	"github.com/bruin-data/bruin/pkg/manifold"
 	"github.com/bruin-data/bruin/pkg/mixpanel"
 	"github.com/bruin-data/bruin/pkg/monday"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -84,12 +92,14 @@ import (
 	"github.com/bruin-data/bruin/pkg/pinterest"
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/plusvibeai"
+	"github.com/bruin-data/bruin/pkg/polymarket"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/posthog"
 	"github.com/bruin-data/bruin/pkg/primer"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/quicksight"
 	"github.com/bruin-data/bruin/pkg/rabbitmq"
+	redditads "github.com/bruin-data/bruin/pkg/redditads"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
@@ -111,6 +121,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/vertica"
 	"github.com/bruin-data/bruin/pkg/wise"
+	"github.com/bruin-data/bruin/pkg/wistia"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
 	"github.com/pkg/errors"
@@ -125,10 +136,14 @@ type Manager struct {
 	Postgres             map[string]*postgres.Client
 	MsSQL                map[string]*mssql.DB
 	Databricks           map[string]*databricks.DB
+	ADLS                 map[string]*adls.Client
 	Fabric               map[string]*fabric.DB
 	OneLake              map[string]*onelake.Client
 	Mongo                map[string]*mongo.DB
+	Cassandra            map[string]*cassandra.Client
 	Couchbase            map[string]*couchbase.DB
+	CrateDB              map[string]*cratedb.Client
+	CSV                  map[string]*csvsource.Client
 	Cursor               map[string]*cursor.Client
 	MongoAtlas           map[string]*mongoatlas.DB
 	Mysql                map[string]*mysql.Client
@@ -136,6 +151,7 @@ type Manager struct {
 	Allium               map[string]*allium.Client
 	HANA                 map[string]*hana.Client
 	Hostaway             map[string]*hostaway.Client
+	HTTP                 map[string]*httpsource.Client
 	Shopify              map[string]*shopify.Client
 	Gorgias              map[string]*gorgias.Client
 	G2                   map[string]*g2.Client
@@ -154,6 +170,7 @@ type Manager struct {
 	Airtable             map[string]*airtable.Client
 	DuckDB               map[string]*duck.Client
 	Hubspot              map[string]*hubspot.Client
+	Granola              map[string]*granola.Client
 	GoogleSheets         map[string]*gsheets.Client
 	Chess                map[string]*chess.Client
 	S3                   map[string]*s3.Client
@@ -169,8 +186,11 @@ type Manager struct {
 	GitHub               map[string]*github.Client
 	AppStore             map[string]*appstore.Client
 	AppleAds             map[string]*appleads.Client
+	Kalshi               map[string]*kalshi.Client
 	LinkedInAds          map[string]*linkedinads.Client
+	RedditAds            map[string]*redditads.Client
 	Mailchimp            map[string]*mailchimp.Client
+	Manifold             map[string]*manifold.Client
 	Linear               map[string]*linear.Client
 	RevenueCat           map[string]*revenuecat.Client
 	ClickHouse           map[string]*clickhouse.Client
@@ -179,6 +199,7 @@ type Manager struct {
 	Personio             map[string]*personio.Client
 	Kinesis              map[string]*kinesis.Client
 	Pipedrive            map[string]*pipedrive.Client
+	Polymarket           map[string]*polymarket.Client
 	Mixpanel             map[string]*mixpanel.Client
 	Clickup              map[string]*clickup.Client
 	Jobtread             map[string]*jobtread.Client
@@ -187,6 +208,7 @@ type Manager struct {
 	Trustpilot           map[string]*trustpilot.Client
 	QuickBooks           map[string]*quickbooks.Client
 	Wise                 map[string]*wise.Client
+	Wistia               map[string]*wistia.Client
 	Zoom                 map[string]*zoom.Client
 	Frankfurter          map[string]*frankfurter.Client
 	Fluxx                map[string]*fluxx.Client
@@ -448,6 +470,325 @@ func (m *Manager) AddAlliumConnectionFromConfig(connection *config.AlliumConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Allium[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddADLSConnectionFromConfig(connection *config.ADLSConnection) error {
+	m.mutex.Lock()
+	if m.ADLS == nil {
+		m.ADLS = make(map[string]*adls.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := adls.NewClient(adls.Config{
+		AccountName:  connection.AccountName,
+		TenantID:     connection.TenantID,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		AccountKey:   connection.AccountKey,
+		SASToken:     connection.SASToken,
+		Layout:       connection.Layout,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.ADLS[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddCassandraConnectionFromConfig(connection *config.CassandraConnection) error {
+	m.mutex.Lock()
+	if m.Cassandra == nil {
+		m.Cassandra = make(map[string]*cassandra.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := cassandra.NewClient(cassandra.Config{
+		Username:                 connection.Username,
+		Password:                 connection.Password,
+		Host:                     connection.Host,
+		Hosts:                    connection.Hosts,
+		Port:                     connection.Port,
+		Keyspace:                 connection.Keyspace,
+		Consistency:              connection.Consistency,
+		PageSize:                 connection.PageSize,
+		Timeout:                  connection.Timeout,
+		ConnectTimeout:           connection.ConnectTimeout,
+		SSL:                      connection.SSL,
+		DisableInitialHostLookup: connection.DisableInitialHostLookup,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Cassandra[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddCrateDBConnectionFromConfig(connection *config.CrateDBConnection) error {
+	m.mutex.Lock()
+	if m.CrateDB == nil {
+		m.CrateDB = make(map[string]*cratedb.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := cratedb.NewClient(cratedb.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		SslMode:  connection.SslMode,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.CrateDB[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddCSVConnectionFromConfig(connection *config.CSVConnection) error {
+	m.mutex.Lock()
+	if m.CSV == nil {
+		m.CSV = make(map[string]*csvsource.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := csvsource.NewClient(csvsource.Config{
+		Path:     connection.Path,
+		Encoding: connection.Encoding,
+		Layout:   connection.Layout,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.CSV[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddGranolaConnectionFromConfig(connection *config.GranolaConnection) error {
+	m.mutex.Lock()
+	if m.Granola == nil {
+		m.Granola = make(map[string]*granola.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := granola.NewClient(granola.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Granola[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddHTTPConnectionFromConfig(connection *config.HTTPConnection) error {
+	m.mutex.Lock()
+	if m.HTTP == nil {
+		m.HTTP = make(map[string]*httpsource.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := httpsource.NewClient(httpsource.Config{
+		URL: connection.URL,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.HTTP[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddKalshiConnectionFromConfig(connection *config.KalshiConnection) error {
+	m.mutex.Lock()
+	if m.Kalshi == nil {
+		m.Kalshi = make(map[string]*kalshi.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := kalshi.NewClient(kalshi.Config{
+		QueryParams: connection.QueryParams,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Kalshi[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddManifoldConnectionFromConfig(connection *config.ManifoldConnection) error {
+	m.mutex.Lock()
+	if m.Manifold == nil {
+		m.Manifold = make(map[string]*manifold.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := manifold.NewClient(manifold.Config{
+		QueryParams:     connection.QueryParams,
+		QueryParamLists: connection.QueryParamLists,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Manifold[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddPolymarketConnectionFromConfig(connection *config.PolymarketConnection) error {
+	m.mutex.Lock()
+	if m.Polymarket == nil {
+		m.Polymarket = make(map[string]*polymarket.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := polymarket.NewClient(polymarket.Config{
+		Order:            connection.Order,
+		Ascending:        connection.Ascending,
+		Slug:             connection.Slug,
+		Closed:           connection.Closed,
+		Live:             connection.Live,
+		Active:           connection.Active,
+		Archived:         connection.Archived,
+		Featured:         connection.Featured,
+		TagID:            connection.TagID,
+		TagSlug:          connection.TagSlug,
+		SeriesID:         connection.SeriesID,
+		IncludeChat:      connection.IncludeChat,
+		IncludeTemplate:  connection.IncludeTemplate,
+		IncludeMarkets:   connection.IncludeMarkets,
+		ClobTokenIDs:     connection.ClobTokenIDs,
+		ConditionIDs:     connection.ConditionIDs,
+		QuestionIDs:      connection.QuestionIDs,
+		RelatedTags:      connection.RelatedTags,
+		IncludeTag:       connection.IncludeTag,
+		RFQEnabled:       connection.RFQEnabled,
+		Limit:            connection.Limit,
+		Offset:           connection.Offset,
+		ParentEntityID:   connection.ParentEntityID,
+		ParentEntityType: connection.ParentEntityType,
+		Market:           connection.Market,
+		User:             connection.User,
+		Q:                connection.Q,
+		EventsStatus:     connection.EventsStatus,
+		MarketsStatus:    connection.MarketsStatus,
+		TokenID:          connection.TokenID,
+		Side:             connection.Side,
+		Interval:         connection.Interval,
+		Fidelity:         connection.Fidelity,
+		TakerOnly:        connection.TakerOnly,
+		FilterType:       connection.FilterType,
+		FilterAmount:     connection.FilterAmount,
+		EventID:          connection.EventID,
+		Type:             connection.Type,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Polymarket[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddRedditAdsConnectionFromConfig(connection *config.RedditAdsConnection) error {
+	m.mutex.Lock()
+	if m.RedditAds == nil {
+		m.RedditAds = make(map[string]*redditads.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := redditads.NewClient(redditads.Config{
+		AccessToken: connection.AccessToken,
+		AccountIds:  connection.AccountIds,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.RedditAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddWistiaConnectionFromConfig(connection *config.WistiaConnection) error {
+	m.mutex.Lock()
+	if m.Wistia == nil {
+		m.Wistia = make(map[string]*wistia.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := wistia.NewClient(wistia.Config{
+		AccessToken: connection.AccessToken,
+		APIKey:      connection.APIKey,
+		Token:       connection.Token,
+		APIVersion:  connection.APIVersion,
+		BaseURL:     connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Wistia[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -3020,12 +3361,16 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 		return connectionManager.AddRedshiftConnectionFromConfig(ctx, conn)
 	}, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.ADLS, connectionManager.AddADLSConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Fabric, connectionManager.AddFabricConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.OneLake, connectionManager.AddOneLakeConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Cassandra, connectionManager.AddCassandraConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Couchbase, connectionManager.AddCouchbaseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.CrateDB, connectionManager.AddCrateDBConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.CSV, connectionManager.AddCSVConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Cursor, connectionManager.AddCursorConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MongoAtlas, connectionManager.AddMongoAtlasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
@@ -3033,6 +3378,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Allium, connectionManager.AddAlliumConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.HANA, connectionManager.AddHANAConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Hostaway, connectionManager.AddHostawayConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.HTTP, connectionManager.AddHTTPConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Shopify, connectionManager.AddShopifyConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Gorgias, connectionManager.AddGorgiasConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.G2, connectionManager.AddG2ConnectionFromConfig, &wg, &errList, &mu)
@@ -3053,6 +3399,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Hubspot, connectionManager.AddHubspotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Chess, connectionManager.AddChessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Airtable, connectionManager.AddAirtableConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Granola, connectionManager.AddGranolaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.S3, connectionManager.AddS3ConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Slack, connectionManager.AddSlackConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Socrata, connectionManager.AddSocrataConnectionFromConfig, &wg, &errList, &mu)
@@ -3066,8 +3413,11 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppleAds, connectionManager.AddAppleAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Kalshi, connectionManager.AddKalshiConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.RedditAds, connectionManager.AddRedditAdsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mailchimp, connectionManager.AddMailchimpConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Manifold, connectionManager.AddManifoldConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.RevenueCat, connectionManager.AddRevenueCatConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Linear, connectionManager.AddLinearConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
@@ -3075,6 +3425,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Polymarket, connectionManager.AddPolymarketConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Clickup, connectionManager.AddClickupConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Jobtread, connectionManager.AddJobtreadConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Posthog, connectionManager.AddPosthogConnectionFromConfig, &wg, &errList, &mu)
@@ -3083,6 +3434,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Wise, connectionManager.AddWiseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Wistia, connectionManager.AddWistiaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DataprocServerless, connectionManager.AddDataprocServerlessConnectionFromConfig, &wg, &errList, &mu)
