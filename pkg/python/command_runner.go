@@ -29,12 +29,27 @@ type CommandInstance struct {
 
 type CommandRunner struct{}
 
+// redactArgsForLog joins args for debug printing, replacing any value
+// previously declared as a --debug-mask secret with ***. This prevents
+// bruin's own command_runner debug line from leaking credentials it is
+// asking ingestr to mask. Local runs that pass no --debug-mask flags are
+// unaffected.
+func redactArgsForLog(args []string) string {
+	joined := strings.Join(args, " ")
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--debug-mask" && args[i+1] != "" {
+			joined = strings.ReplaceAll(joined, args[i+1], "***")
+		}
+	}
+	return joined
+}
+
 func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
 	log := ctx.Value(executor.ContextLogger).(logger.Logger)
 	log.Debugf(
 		"%s %s",
 		command.Name,
-		strings.Join(command.Args, " "),
+		redactArgsForLog(command.Args),
 	)
 
 	cmd := exec.CommandContext(context.Background(), command.Name, command.Args...) //nolint:gosec,contextcheck

@@ -326,6 +326,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	if executor.IsDebugMode(ctx) {
 		baseArgs = append(baseArgs, "--debug")
+		if isCloudRun() {
+			baseArgs = appendDebugMaskFlags(baseArgs, sourceURI, destURI)
+		}
 	}
 
 	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
@@ -522,6 +525,9 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	if executor.IsDebugMode(ctx) {
 		baseArgs = append(baseArgs, "--debug")
+		if isCloudRun() {
+			baseArgs = appendDebugMaskFlags(baseArgs, sourceURI, destURI)
+		}
 	}
 
 	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
