@@ -7,14 +7,14 @@
   },
   "devDependencies": {
     "markdownlint-cli2": "^0.20.0",
-    "mermaid": "^11.6.0",
+    "mermaid": "^11.15.0",
     "vitepress": "^1.6.4",
     "vitepress-plugin-mermaid": "^2.0.17"
   },
   "dependencies": {
     "esbuild": "^0.27.1",
     "highlight.js": "^11.10.0",
-    "markdown-it": "^14.1.0",
+    "markdown-it": "^14.1.1",
     "vite": "^6.4.1"
   },
   "overrides": {
