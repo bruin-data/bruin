@@ -480,7 +480,7 @@ func TestLinter_LintAsset(t *testing.T) {
 				logger:        logger.Sugar(),
 			}
 
-			_, err := l.LintAsset(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, "my-asset", nil)
+			_, err := l.LintAsset(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, "my-asset", nil, "")
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -614,7 +614,7 @@ func TestLinter_LintAsset_WithURIDependencies(t *testing.T) {
 				sqlParser: nil,
 			}
 
-			result, err := l.LintAsset(t.Context(), "some-root-path", []string{"pipeline.yml"}, "my-asset", nil)
+			result, err := l.LintAsset(t.Context(), "some-root-path", []string{"pipeline.yml"}, "my-asset", nil, "")
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			require.Len(t, result.Pipelines, 1)
@@ -639,6 +639,105 @@ func TestLinter_LintAsset_WithURIDependencies(t *testing.T) {
 			m.AssertExpectations(t)
 		})
 	}
+}
+
+func TestLinter_LintAsset_CrossPipelineURIResolvesAgainstRepoRoot(t *testing.T) {
+	t.Parallel()
+
+	const (
+		downstreamRoot = "repo/downstream"
+		repoRoot       = "repo"
+	)
+
+	// newLinter builds a linter with fresh pipeline objects on every call so
+	// parallel subtests never share mutable pipeline state. When repoRootBroken
+	// is true, loading the wider repo root fails (e.g. a malformed sibling
+	// pipeline) while the asset's own pipeline root still resolves.
+	newLinter := func(repoRootBroken bool) *Linter {
+		// downstream asset depends on an upstream that lives in a *sibling*
+		// pipeline via a cross-pipeline URI.
+		downstreamPipeline := &pipeline.Pipeline{
+			Name: "downstream",
+			Assets: []*pipeline.Asset{
+				{
+					Name:      "my-asset",
+					Upstreams: []pipeline.Upstream{{Type: "uri", Value: "external://repro_seed/upstream_seed"}},
+				},
+			},
+			DefinitionFile: pipeline.DefinitionFile{Path: "repo/downstream/pipeline.yml"},
+		}
+		upstreamPipeline := &pipeline.Pipeline{
+			Name: "upstream",
+			Assets: []*pipeline.Asset{
+				{Name: "upstream_seed", URI: "external://repro_seed/upstream_seed"},
+			},
+			DefinitionFile: pipeline.DefinitionFile{Path: "repo/upstream/pipeline.yml"},
+		}
+
+		m := new(mockPipelineBuilder)
+		m.On("CreatePipelineFromPath", mock.Anything, "repo/downstream", mock.FunctionalOptions(pipeline.WithMutate())).
+			Return(downstreamPipeline, nil)
+		m.On("CreatePipelineFromPath", mock.Anything, "repo/upstream", mock.FunctionalOptions(pipeline.WithMutate())).
+			Return(upstreamPipeline, nil)
+
+		return &Linter{
+			// The asset's own pipeline root only sees the downstream pipeline,
+			// whereas the repo root sees both pipelines.
+			findPipelines: func(root string, _ []string) ([]string, error) {
+				if root == repoRoot {
+					if repoRootBroken {
+						return nil, errors.New("nested pipelines found")
+					}
+					return []string{"repo/downstream", "repo/upstream"}, nil
+				}
+				return []string{"repo/downstream"}, nil
+			},
+			builder: m,
+			rules: []Rule{
+				&SimpleRule{
+					Identifier:             "cross-pipeline-uri-dependencies",
+					CrossPipelineValidator: ValidateCrossPipelineURIDependencies,
+					ApplicableLevels:       []Level{LevelCrossPipeline},
+				},
+			},
+			logger:    zap.NewNop().Sugar(),
+			sqlParser: nil,
+		}
+	}
+
+	countURIIssues := func(result *PipelineAnalysisResult) int {
+		count := 0
+		for _, p := range result.Pipelines {
+			for _, issues := range p.Issues {
+				count += len(issues)
+			}
+		}
+		return count
+	}
+
+	t.Run("scoped to the asset's pipeline the sibling URI is unresolved", func(t *testing.T) {
+		t.Parallel()
+		l := newLinter(false)
+		result, err := l.LintAsset(t.Context(), downstreamRoot, []string{"pipeline.yml"}, "my-asset", nil, "")
+		require.NoError(t, err)
+		require.Equal(t, 1, countURIIssues(result), "expected the cross-pipeline URI to look unresolved when scoped to a single pipeline")
+	})
+
+	t.Run("resolving against the repo root finds the sibling URI", func(t *testing.T) {
+		t.Parallel()
+		l := newLinter(false)
+		result, err := l.LintAsset(t.Context(), downstreamRoot, []string{"pipeline.yml"}, "my-asset", nil, repoRoot)
+		require.NoError(t, err)
+		require.Equal(t, 0, countURIIssues(result), "expected the cross-pipeline URI to resolve when validating against the repo root")
+	})
+
+	t.Run("a broken repo root falls back to the asset's pipeline instead of failing", func(t *testing.T) {
+		t.Parallel()
+		l := newLinter(true)
+		result, err := l.LintAsset(t.Context(), downstreamRoot, []string{"pipeline.yml"}, "my-asset", nil, repoRoot)
+		require.NoError(t, err, "a broken sibling pipeline must not fail an otherwise-valid asset validate")
+		require.Equal(t, 1, countURIIssues(result), "falling back to the asset's pipeline leaves the sibling URI unresolved")
+	})
 }
 
 func TestPipelineAnalysisResult_ErrorCount(t *testing.T) {

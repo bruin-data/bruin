@@ -308,7 +308,15 @@ func Lint(isDebug *bool) *cli.Command {
 				filteredRules = append(filteredRules, crossPipelineRules...)
 				linter := lint.NewLinter(pipelineFinder, DefaultPipelineBuilder, filteredRules, logger, parser)
 				logger.Debugf("running %d rules for asset-only validation", len(filteredRules))
-				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c)
+
+				// Repo root lets cross-pipeline URI deps resolve against sibling pipelines.
+				crossPipelineRoot := ""
+				if repoRoot, repoErr := git.FindRepoFromPath(rootPath); repoErr != nil {
+					logger.Debugf("could not find repo root for cross-pipeline resolution, falling back to '%s': %v", rootPath, repoErr)
+				} else {
+					crossPipelineRoot = repoRoot.Path
+				}
+				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c, crossPipelineRoot)
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
