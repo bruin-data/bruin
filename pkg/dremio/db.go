@@ -1,4 +1,4 @@
-package flightsql
+package dremio
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	// Registers the "flightsql" database/sql driver provided by Apache ADBC.
+	// Dremio speaks the Arrow Flight SQL protocol, so this is the driver we use.
 	_ "github.com/apache/arrow-adbc/go/adbc/sqldriver/flightsql"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -32,7 +33,7 @@ func NewClient(c Config) (*Client, error) {
 
 	conn, err := sql.Open("flightsql", dsn)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open Flight SQL connection")
+		return nil, errors.Wrap(err, "failed to open Dremio connection")
 	}
 
 	return &Client{
@@ -48,9 +49,8 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 	// We deliberately execute via QueryContext rather than ExecContext. The ADBC
 	// Flight SQL driver only avoids creating a prepared statement on the query
 	// path (ExecContext goes through Prepare), and not every Flight SQL engine
-	// implements prepared statements — e.g. Sail returns "do_action_create_
-	// prepared_statement has no default implementation". Going through the query
-	// path keeps DDL/DML working across engines; we just drain and discard rows.
+	// implements prepared statements. Going through the query path keeps DDL/DML
+	// working across engines; we just drain and discard rows.
 	rows, err := c.connection.QueryContext(ctx, queryStr)
 	if err != nil {
 		return errors.Wrap(err, "failed to execute query")
@@ -155,12 +155,6 @@ func (c *Client) Ping(ctx context.Context) error {
 	return c.RunQueryWithoutResult(ctx, q)
 }
 
-// Dialect returns the configured materialization dialect (e.g. "dremio",
-// "sail"), used by the operator to render dialect-appropriate SQL.
-func (c *Client) Dialect() string {
-	return c.config.Dialect
-}
-
 func toString(value any) (string, bool) {
 	switch v := value.(type) {
 	case string:
@@ -173,7 +167,7 @@ func toString(value any) (string, bool) {
 }
 
 // GetDatabaseSummary introspects the available schemas and tables using the
-// ANSI information_schema, which Flight SQL engines such as Dremio expose.
+// ANSI information_schema, which Dremio exposes.
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	tables, err := c.Select(ctx, &query.Query{Query: `
 SELECT table_schema, table_name, table_type
@@ -186,7 +180,7 @@ WHERE table_schema NOT IN ('information_schema', 'sys', 'INFORMATION_SCHEMA')
 
 	databaseName := c.config.Database
 	if databaseName == "" {
-		databaseName = "flightsql"
+		databaseName = "dremio"
 	}
 
 	summary := &ansisql.DBDatabase{

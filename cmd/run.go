@@ -29,11 +29,11 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
-	"github.com/bruin-data/bruin/pkg/flightsql"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -51,6 +51,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/r"
 	"github.com/bruin-data/bruin/pkg/redshift"
 	"github.com/bruin-data/bruin/pkg/s3"
+	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/secrets"
 	"github.com/bruin-data/bruin/pkg/snowflake"
@@ -1859,24 +1860,37 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
-	if s.WillRunTaskOfType(pipeline.AssetTypeFlightSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeFlightSQLQuery || s.WillRunTaskOfType(pipeline.AssetTypeFlightSQLQuerySensor) {
-		flightSQLFileExtractor := &query.FileQuerySplitterExtractor{
+	if s.WillRunTaskOfType(pipeline.AssetTypeDremioQuery) || estimateCustomCheckType == pipeline.AssetTypeDremioQuery || s.WillRunTaskOfType(pipeline.AssetTypeDremioQuerySensor) {
+		dremioFileExtractor := &query.FileQuerySplitterExtractor{
 			Fs:       fs,
 			Renderer: renderer,
 		}
-		// The materializer is built per-asset inside the operator from the
-		// resolved connection's dialect (Dremio, Sail/Spark, ...), so we pass
-		// the full-refresh flag and hoister rather than a pre-built one.
-		flightSQLOperator := flightsql.NewBasicOperator(conn, flightSQLFileExtractor, fullRefresh, hoister, parser)
-		flightSQLCheckRunner := athena.NewColumnCheckOperator(conn)
-		mainExecutors[pipeline.AssetTypeFlightSQLQuery][scheduler.TaskInstanceTypeMain] = flightSQLOperator
-		mainExecutors[pipeline.AssetTypeFlightSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = flightSQLCheckRunner
-		mainExecutors[pipeline.AssetTypeFlightSQLQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		dremioOperator := dremio.NewBasicOperator(conn, dremioFileExtractor, fullRefresh, hoister, parser)
+		dremioCheckRunner := athena.NewColumnCheckOperator(conn)
+		mainExecutors[pipeline.AssetTypeDremioQuery][scheduler.TaskInstanceTypeMain] = dremioOperator
+		mainExecutors[pipeline.AssetTypeDremioQuery][scheduler.TaskInstanceTypeColumnCheck] = dremioCheckRunner
+		mainExecutors[pipeline.AssetTypeDremioQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
-		flightSQLQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
-		mainExecutors[pipeline.AssetTypeFlightSQLQuerySensor][scheduler.TaskInstanceTypeMain] = flightSQLQuerySensor
-		mainExecutors[pipeline.AssetTypeFlightSQLQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = flightSQLCheckRunner
-		mainExecutors[pipeline.AssetTypeFlightSQLQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		dremioQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		mainExecutors[pipeline.AssetTypeDremioQuerySensor][scheduler.TaskInstanceTypeMain] = dremioQuerySensor
+		mainExecutors[pipeline.AssetTypeDremioQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = dremioCheckRunner
+		mainExecutors[pipeline.AssetTypeDremioQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
+	if s.WillRunTaskOfType(pipeline.AssetTypeSailQuery) || estimateCustomCheckType == pipeline.AssetTypeSailQuery || s.WillRunTaskOfType(pipeline.AssetTypeSailQuerySensor) {
+		sailFileExtractor := &query.FileQuerySplitterExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
+		sailOperator := sail.NewBasicOperator(conn, sailFileExtractor, fullRefresh, hoister, parser)
+		sailCheckRunner := athena.NewColumnCheckOperator(conn)
+		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeMain] = sailOperator
+		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeColumnCheck] = sailCheckRunner
+		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		sailQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeMain] = sailQuerySensor
+		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = sailCheckRunner
+		mainExecutors[pipeline.AssetTypeSailQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeOracleQuery) || s.WillRunTaskOfType(pipeline.AssetTypeOracleSource) || estimateCustomCheckType == pipeline.AssetTypeOracleQuery {
 		oracleCheckRunner := oracle.NewColumnCheckOperator(conn)

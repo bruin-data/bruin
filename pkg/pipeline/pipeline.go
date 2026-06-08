@@ -126,8 +126,10 @@ const (
 	AssetTypeTableauWorksheet          = AssetType("tableau.worksheet")
 	AssetTypeTrinoQuery                = AssetType("trino.sql")
 	AssetTypeTrinoQuerySensor          = AssetType("trino.sensor.query")
-	AssetTypeFlightSQLQuery            = AssetType("flight.sql")
-	AssetTypeFlightSQLQuerySensor      = AssetType("flight.sensor.query")
+	AssetTypeDremioQuery               = AssetType("dremio.sql")
+	AssetTypeDremioQuerySensor         = AssetType("dremio.sensor.query")
+	AssetTypeSailQuery                 = AssetType("sail.sql")
+	AssetTypeSailQuerySensor           = AssetType("sail.sensor.query")
 	AssetTypeVerticaQuery              = AssetType("vertica.sql")
 	AssetTypeVerticaQuerySensor        = AssetType("vertica.sensor.query")
 	AssetTypeVerticaSeed               = AssetType("vertica.seed")
@@ -184,7 +186,8 @@ var defaultMapping = map[string]string{
 	"emr_serverless":        "emr_serverless-default",
 	"dataproc_serverless":   "dataproc_serverless-default",
 	"trino":                 "trino-default",
-	"flightsql":             "flightsql-default",
+	"dremio":                "dremio-default",
+	"sail":                  "sail-default",
 	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
 	"applovin":              "applovin-default",
@@ -680,8 +683,10 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDataprocServerlessPyspark: "dataproc_serverless",
 	AssetTypeTrinoQuery:                "trino",
 	AssetTypeTrinoQuerySensor:          "trino",
-	AssetTypeFlightSQLQuery:            "flightsql",
-	AssetTypeFlightSQLQuerySensor:      "flightsql",
+	AssetTypeDremioQuery:               "dremio",
+	AssetTypeDremioQuerySensor:         "dremio",
+	AssetTypeSailQuery:                 "sail",
+	AssetTypeSailQuerySensor:           "sail",
 	AssetTypeOracleQuery:               "oracle",
 	AssetTypeOracleSource:              "oracle",
 	AssetTypeS3KeySensor:               "aws",
@@ -2568,7 +2573,8 @@ func (a *Asset) IsSQLAsset() bool {
 		AssetTypeDuckDBQuery:       true,
 		AssetTypeClickHouse:        true,
 		AssetTypeTrinoQuery:        true,
-		AssetTypeFlightSQLQuery:    true,
+		AssetTypeDremioQuery:       true,
+		AssetTypeSailQuery:         true,
 		AssetTypeOracleQuery:       true,
 	}
 

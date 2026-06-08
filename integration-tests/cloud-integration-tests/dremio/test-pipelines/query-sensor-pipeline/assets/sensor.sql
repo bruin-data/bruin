@@ -1,6 +1,6 @@
 /* @bruin
 name: bruin_test.sensor
-type: flight.sensor.query
+type: dremio.sensor.query
 
 depends:
   - bruin_test.sensor_table

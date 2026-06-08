@@ -531,13 +531,25 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
-	pipeline.AssetTypeFlightSQLQuery: {
+	pipeline.AssetTypeDremioQuery: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
-	pipeline.AssetTypeFlightSQLQuerySensor: {
+	pipeline.AssetTypeDremioQuerySensor: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+	},
+	pipeline.AssetTypeSailQuery: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
+	},
+	pipeline.AssetTypeSailQuerySensor: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
