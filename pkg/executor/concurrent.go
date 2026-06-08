@@ -42,6 +42,13 @@ const (
 	stillRunningLogInterval = 120 * time.Second
 )
 
+// IsDebugMode reports whether the context carries a KeyIsDebug *bool set to true.
+// Safe against missing, wrong-typed, or nil-pointer values.
+func IsDebugMode(ctx context.Context) bool {
+	b, ok := ctx.Value(KeyIsDebug).(*bool)
+	return ok && b != nil && *b
+}
+
 type FormattingOptions struct {
 	DoNotLogTimestamp bool
 	DoNotLogTaskName  bool

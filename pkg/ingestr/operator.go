@@ -21,15 +21,6 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-func isDebugMode(ctx context.Context) bool {
-	v := ctx.Value(executor.KeyIsDebug)
-	if v == nil {
-		return false
-	}
-	b, ok := v.(*bool)
-	return ok && b != nil && *b
-}
-
 // versionPattern matches the bare family marker (vMAJOR) or a fully-qualified
 // vMAJOR.MINOR.PATCH. MAJOR is any non-negative integer with no leading zero
 // (other than the literal "0").
@@ -333,7 +324,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"log",
 	)
 
-	if isDebugMode(ctx) {
+	if executor.IsDebugMode(ctx) {
 		baseArgs = append(baseArgs, "--debug")
 	}
 
@@ -529,7 +520,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"log",
 	}
 
-	if isDebugMode(ctx) {
+	if executor.IsDebugMode(ctx) {
 		baseArgs = append(baseArgs, "--debug")
 	}
 
