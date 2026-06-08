@@ -9,6 +9,8 @@ In order to set up HubSpot connection, you need to add a configuration item in t
 - For a **service key**, go to Settings → Integrations → Service Keys in your HubSpot account, create a key, grant it the required scopes, and copy the generated key. HubSpot has moved private apps to "legacy apps" and now recommends service keys for system-to-system data integrations.
 - For a **private app access token**, go to Settings → Integrations → Private Apps, create a private app, grant it the required scopes, and copy the generated access token.
 
+> **Note:** HubSpot service keys are currently in **public beta**. The feature may change before general availability, so keep that in mind before relying on it for production workloads.
+
 Follow the steps below to correctly set up HubSpot as a data source and run ingestion.
 
 ## Configuration
