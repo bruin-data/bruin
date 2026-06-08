@@ -231,18 +231,20 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 
 	// Resolve URI deps against every repo pipeline, not just the asset's own.
 	// Keep assetPipeline so the pointer-based issue match below still works.
+	// A broken sibling pipeline must not fail an otherwise-valid asset validate,
+	// so on error we log and fall back to the asset's own pipeline.
 	crossPipelines := pipelines
 	if hasURIDeps && crossPipelineRootPath != "" && crossPipelineRootPath != rootPath {
 		repoPipelines, err := l.extractPipelinesFromPath(ctx, crossPipelineRootPath, pipelineDefinitionFileName)
 		if err != nil {
-			return nil, err
-		}
-
-		crossPipelines = make([]*pipeline.Pipeline, 0, len(repoPipelines))
-		crossPipelines = append(crossPipelines, assetPipeline)
-		for _, p := range repoPipelines {
-			if p.DefinitionFile.Path != assetPipeline.DefinitionFile.Path {
-				crossPipelines = append(crossPipelines, p)
+			l.logger.Debugf("could not load repo pipelines for cross-pipeline URI resolution, falling back to the asset's pipeline: %v", err)
+		} else {
+			crossPipelines = make([]*pipeline.Pipeline, 0, len(repoPipelines))
+			crossPipelines = append(crossPipelines, assetPipeline)
+			for _, p := range repoPipelines {
+				if p.DefinitionFile.Path != assetPipeline.DefinitionFile.Path {
+					crossPipelines = append(crossPipelines, p)
+				}
 			}
 		}
 	}
