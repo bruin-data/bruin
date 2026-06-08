@@ -154,7 +154,10 @@ func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFi
 	return l.LintPipelines(ctx, pipelines)
 }
 
-func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Command) (*PipelineAnalysisResult, error) {
+// LintAsset validates a single asset found under rootPath. When set,
+// crossPipelineRootPath (typically the repo root) widens the pipeline set used
+// to resolve cross-pipeline URI dependencies.
+func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Command, crossPipelineRootPath string) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err
@@ -226,12 +229,30 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 		}
 	}
 
+	// Resolve URI deps against every repo pipeline, not just the asset's own.
+	// Keep assetPipeline so the pointer-based issue match below still works.
+	crossPipelines := pipelines
+	if hasURIDeps && crossPipelineRootPath != "" && crossPipelineRootPath != rootPath {
+		repoPipelines, err := l.extractPipelinesFromPath(ctx, crossPipelineRootPath, pipelineDefinitionFileName)
+		if err != nil {
+			return nil, err
+		}
+
+		crossPipelines = make([]*pipeline.Pipeline, 0, len(repoPipelines))
+		crossPipelines = append(crossPipelines, assetPipeline)
+		for _, p := range repoPipelines {
+			if p.DefinitionFile.Path != assetPipeline.DefinitionFile.Path {
+				crossPipelines = append(crossPipelines, p)
+			}
+		}
+	}
+
 	// now the actual validation starts
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
 		if hasURIDeps && slices.Contains(levels, LevelCrossPipeline) {
 			// Cross-pipeline rules are only included when asset has URI dependencies
-			issues, err := rule.ValidateCrossPipeline(ctx, pipelines)
+			issues, err := rule.ValidateCrossPipeline(ctx, crossPipelines)
 			if err != nil {
 				return nil, err
 			}
