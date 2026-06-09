@@ -74,7 +74,7 @@ func TestColumnHints(t *testing.T) {
 				{Name: "created_at", Type: "timestamp"},
 			},
 			normalizeNames: false,
-			expected:       "id:bigint,name:text,created_at:timestamp",
+			expected:       "id:int,name:text,created_at:timestamp",
 		},
 		{
 			name: "column hints with name normalization",
@@ -99,7 +99,7 @@ func TestColumnHints(t *testing.T) {
 				{Name: "name", Type: "string"},
 			},
 			normalizeNames: false,
-			expected:       "id:bigint,name:text",
+			expected:       "id:int,name:text",
 		},
 		{
 			name: "source_column adds dest:type:source triple",
@@ -109,7 +109,7 @@ func TestColumnHints(t *testing.T) {
 				{Name: "created_at", Type: "timestamp"},
 			},
 			normalizeNames: false,
-			expected:       "id:bigint:sourceid,email:text:eml,created_at:timestamp",
+			expected:       "id:int:sourceid,email:text:eml,created_at:timestamp",
 		},
 		{
 			name: "source_column with name normalization normalizes dest name",
@@ -128,6 +128,52 @@ func TestColumnHints(t *testing.T) {
 			},
 			normalizeNames: false,
 			expected:       "first_name::fname,email:text:eml,weird::wrd",
+		},
+		{
+			name: "integer widths are preserved, not collapsed to bigint",
+			columns: []pipeline.Column{
+				{Name: "tiny", Type: "TINYINT"},
+				{Name: "small", Type: "SMALLINT"},
+				{Name: "regular", Type: "INT"},
+				{Name: "regular2", Type: "INTEGER"},
+				{Name: "big", Type: "BIGINT"},
+			},
+			normalizeNames: false,
+			expected:       "tiny:tinyint,small:smallint,regular:int,regular2:int,big:bigint",
+		},
+		{
+			name: "platform integer aliases map to the right width",
+			columns: []pipeline.Column{
+				{Name: "pg_small", Type: "int2"},
+				{Name: "pg_int", Type: "int4"},
+				{Name: "pg_big", Type: "int8"},
+				{Name: "ch_unsigned", Type: "uint16"},
+				{Name: "spark_byte", Type: "byte"},
+				{Name: "mysql_year", Type: "year"},
+			},
+			normalizeNames: false,
+			expected:       "pg_small:smallint,pg_int:int,pg_big:bigint,ch_unsigned:int,spark_byte:tinyint,mysql_year:int",
+		},
+		{
+			name: "no-tz timestamps map to timestamp_ntz while tz-aware stay timestamp",
+			columns: []pipeline.Column{
+				{Name: "naive", Type: "DATETIME2"},
+				{Name: "naive_ntz", Type: "timestamp_ntz"},
+				{Name: "small_dt", Type: "smalldatetime"},
+				{Name: "aware", Type: "timestamp"},
+				{Name: "aware_tz", Type: "timestamptz"},
+			},
+			normalizeNames: false,
+			expected:       "naive:timestamp_ntz,naive_ntz:timestamp_ntz,small_dt:timestamp_ntz,aware:timestamp,aware_tz:timestamp",
+		},
+		{
+			name: "interval and bigdecimal map to valid ingestr types",
+			columns: []pipeline.Column{
+				{Name: "span", Type: "interval"},
+				{Name: "huge", Type: "bigdecimal"},
+			},
+			normalizeNames: false,
+			expected:       "span:interval,huge:decimal",
 		},
 	}
 
@@ -316,7 +362,7 @@ func TestConsolidatedParameters_SourceColumn(t *testing.T) {
 				break
 			}
 		}
-		assert.Equal(t, "id:bigint:sourceid,email:text:eml", columnsValue)
+		assert.Equal(t, "id:int:sourceid,email:text:eml", columnsValue)
 	})
 
 	t.Run("source_column without enforce_schema does not emit --columns", func(t *testing.T) {
