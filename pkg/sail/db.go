@@ -5,18 +5,21 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 
 	// Registers the "flightsql" database/sql driver provided by Apache ADBC.
 	// Sail speaks the Arrow Flight SQL protocol, so this is the driver we use.
 	_ "github.com/apache/arrow-adbc/go/adbc/sqldriver/flightsql"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 )
 
 type Client struct {
-	connection connection
-	config     Config
+	connection  connection
+	config      Config
+	schemaCache sync.Map
 }
 
 type connection interface {
@@ -46,12 +49,13 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 	queryStr := strings.TrimSpace(query.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")
 
-	// We deliberately execute via QueryContext rather than ExecContext. The ADBC
-	// Flight SQL driver only avoids creating a prepared statement on the query
-	// path (ExecContext goes through Prepare), and Sail does not implement
-	// prepared statements — it returns "do_action_create_prepared_statement has
-	// no default implementation". Going through the query path keeps DDL/DML
-	// working; we just drain and discard rows.
+	// We deliberately execute via QueryContext (Flight SQL ExecuteQuery) rather
+	// than ExecContext. Sail implements neither prepared statements
+	// ("do_action_create_prepared_statement has no default implementation", which
+	// ExecContext needs) nor statement-update ("do_put_statement_update has no
+	// default implementation", the ExecuteUpdate path). Its ExecuteQuery path
+	// handles DDL/DML (CREATE SCHEMA, CTAS, INSERT) and returns a small status
+	// result, so we run everything through it and drain the rows.
 	rows, err := c.connection.QueryContext(ctx, queryStr)
 	if err != nil {
 		return errors.Wrap(err, "failed to execute query")
@@ -154,6 +158,41 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 func (c *Client) Ping(ctx context.Context) error {
 	q := &query.Query{Query: "SELECT 1"}
 	return c.RunQueryWithoutResult(ctx, q)
+}
+
+// schemaForAsset returns the Spark schema (database) an asset's table lives in.
+// Only a flat "schema.table" structure is supported, so the schema is the first
+// component of a two-part name. Any other shape (a bare table, which lands in
+// the default database, or a deeper path) has no schema to auto-create, so it
+// returns "".
+func schemaForAsset(name string) string {
+	parts := strings.Split(name, ".")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[0]
+}
+
+// CreateSchemaIfNotExist ensures the schema (Spark database) an asset's table
+// lives in exists before the table is created. Sail rejects a CREATE TABLE into
+// a database that does not exist ("Database not found: ..."), so we create it
+// first with CREATE SCHEMA IF NOT EXISTS.
+func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	schemaName := schemaForAsset(asset.Name)
+	if schemaName == "" {
+		return nil
+	}
+	if _, exists := c.schemaCache.Load(schemaName); exists {
+		return nil
+	}
+
+	q := &query.Query{Query: "CREATE SCHEMA IF NOT EXISTS " + quoteIdentifier(schemaName)}
+	if err := c.RunQueryWithoutResult(ctx, q); err != nil {
+		return errors.Wrapf(err, "failed to ensure Sail schema %q exists", schemaName)
+	}
+	c.schemaCache.Store(schemaName, true)
+
+	return nil
 }
 
 func toString(value any) (string, bool) {
