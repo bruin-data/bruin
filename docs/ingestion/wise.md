@@ -16,9 +16,9 @@ In order to set up Wise connection, you need to add a configuration item in the 
 
 ```yaml
 connections:
-      Wise:
-        - name: "wise"
-          api_key: "key-123"   
+  wise:
+    - name: "wise"
+      api_key: "key-123"
 ```
 
 - `api_key`: key used for authentication with the Wise API

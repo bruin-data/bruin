@@ -81,6 +81,30 @@ parameters:
 
 Define columns on the asset to enrich the metadata passed to Ingestr. Columns flagged as `primary_key: true` are translated into repeated `--primary-key` flags, and date-typed incremental keys automatically surface through `--columns`. See [Column metadata](./columns.md) for the syntax.
 
+### Custom SQL queries
+
+For SQL sources, `source_table` can be a custom query by prefixing the SQL with `query:`:
+
+```yaml
+name: raw.recent_orders
+type: ingestr
+parameters:
+  source_connection: postgres_prod
+  source_table: "query:select id, customer_id, updated_at from public.orders where updated_at > :interval_start"
+  destination: bigquery
+  incremental_strategy: merge
+  incremental_key: updated_at
+
+columns:
+  - name: id
+    type: integer
+    primary_key: true
+  - name: updated_at
+    type: timestamp
+```
+
+The incremental key must be returned by the query. For incremental runs, include your own timestamp filtering in the query and use Ingestr's `:interval_start` and `:interval_end` variables when needed.
+
 ### Run configuration
 
 Pipeline run options propagate to ingestr automatically:

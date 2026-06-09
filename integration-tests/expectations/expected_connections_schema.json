@@ -3,6 +3,40 @@
   "$id": "https://github.com/bruin-data/bruin/pkg/config/connections",
   "$ref": "#/$defs/Connections",
   "$defs": {
+    "ADLSConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "account_name": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "account_key": {
+          "type": "string"
+        },
+        "sas_token": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "account_name"
+      ]
+    },
     "AdjustConnection": {
       "properties": {
         "name": {
@@ -297,6 +331,83 @@
         "api_token"
       ]
     },
+    "CSVConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "path"
+      ]
+    },
+    "CassandraConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "hosts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "port": {
+          "type": "integer",
+          "default": 9042
+        },
+        "keyspace": {
+          "type": "string"
+        },
+        "consistency": {
+          "type": "string"
+        },
+        "page_size": {
+          "type": "integer"
+        },
+        "timeout": {
+          "type": "string"
+        },
+        "connect_timeout": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "boolean"
+        },
+        "disable_initial_host_lookup": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host"
+      ]
+    },
     "CatalogAuth": {
       "properties": {
         "access_key": {
@@ -486,6 +597,12 @@
           },
           "type": "array"
         },
+        "adls": {
+          "items": {
+            "$ref": "#/$defs/ADLSConnection"
+          },
+          "type": "array"
+        },
         "synapse": {
           "items": {
             "$ref": "#/$defs/SynapseConnection"
@@ -510,9 +627,27 @@
           },
           "type": "array"
         },
+        "cassandra": {
+          "items": {
+            "$ref": "#/$defs/CassandraConnection"
+          },
+          "type": "array"
+        },
         "couchbase": {
           "items": {
             "$ref": "#/$defs/CouchbaseConnection"
+          },
+          "type": "array"
+        },
+        "cratedb": {
+          "items": {
+            "$ref": "#/$defs/CrateDBConnection"
+          },
+          "type": "array"
+        },
+        "csv": {
+          "items": {
+            "$ref": "#/$defs/CSVConnection"
           },
           "type": "array"
         },
@@ -555,6 +690,12 @@
         "hostaway": {
           "items": {
             "$ref": "#/$defs/HostawayConnection"
+          },
+          "type": "array"
+        },
+        "http": {
+          "items": {
+            "$ref": "#/$defs/HTTPConnection"
           },
           "type": "array"
         },
@@ -684,9 +825,21 @@
           },
           "type": "array"
         },
+        "granola": {
+          "items": {
+            "$ref": "#/$defs/GranolaConnection"
+          },
+          "type": "array"
+        },
         "zendesk": {
           "items": {
             "$ref": "#/$defs/ZendeskConnection"
+          },
+          "type": "array"
+        },
+        "kalshi": {
+          "items": {
+            "$ref": "#/$defs/KalshiConnection"
           },
           "type": "array"
         },
@@ -762,9 +915,21 @@
           },
           "type": "array"
         },
+        "reddit_ads": {
+          "items": {
+            "$ref": "#/$defs/RedditAdsConnection"
+          },
+          "type": "array"
+        },
         "mailchimp": {
           "items": {
             "$ref": "#/$defs/MailchimpConnection"
+          },
+          "type": "array"
+        },
+        "manifold": {
+          "items": {
+            "$ref": "#/$defs/ManifoldConnection"
           },
           "type": "array"
         },
@@ -807,6 +972,12 @@
         "pipedrive": {
           "items": {
             "$ref": "#/$defs/PipedriveConnection"
+          },
+          "type": "array"
+        },
+        "polymarket": {
+          "items": {
+            "$ref": "#/$defs/PolymarketConnection"
           },
           "type": "array"
         },
@@ -855,6 +1026,12 @@
         "wise": {
           "items": {
             "$ref": "#/$defs/WiseConnection"
+          },
+          "type": "array"
+        },
+        "wistia": {
+          "items": {
+            "$ref": "#/$defs/WistiaConnection"
           },
           "type": "array"
         },
@@ -1109,6 +1286,37 @@
         },
         "ssl": {
           "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host"
+      ]
+    },
+    "CrateDBConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 5432
+        },
+        "ssl_mode": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -1899,6 +2107,22 @@
         "email"
       ]
     },
+    "GranolaConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "HANAConnection": {
       "properties": {
         "name": {
@@ -1929,6 +2153,22 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "HTTPConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "url"
       ]
     },
     "HostawayConnection": {
@@ -2139,6 +2379,24 @@
         "group_id"
       ]
     },
+    "KalshiConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "query_params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "KinesisConnection": {
       "properties": {
         "name": {
@@ -2251,6 +2509,33 @@
         "name",
         "api_key",
         "server"
+      ]
+    },
+    "ManifoldConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "query_params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "query_param_lists": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
       ]
     },
     "MixpanelConnection": {
@@ -2656,6 +2941,132 @@
         "workspace_id"
       ]
     },
+    "PolymarketConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "order": {
+          "type": "string"
+        },
+        "ascending": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "closed": {
+          "type": "string"
+        },
+        "live": {
+          "type": "string"
+        },
+        "active": {
+          "type": "string"
+        },
+        "archived": {
+          "type": "string"
+        },
+        "featured": {
+          "type": "string"
+        },
+        "tag_id": {
+          "type": "string"
+        },
+        "tag_slug": {
+          "type": "string"
+        },
+        "series_id": {
+          "type": "string"
+        },
+        "include_chat": {
+          "type": "string"
+        },
+        "include_template": {
+          "type": "string"
+        },
+        "include_markets": {
+          "type": "string"
+        },
+        "clob_token_ids": {
+          "type": "string"
+        },
+        "condition_ids": {
+          "type": "string"
+        },
+        "question_ids": {
+          "type": "string"
+        },
+        "related_tags": {
+          "type": "string"
+        },
+        "include_tag": {
+          "type": "string"
+        },
+        "rfq_enabled": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "string"
+        },
+        "parent_entity_id": {
+          "type": "string"
+        },
+        "parent_entity_type": {
+          "type": "string"
+        },
+        "market": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "q": {
+          "type": "string"
+        },
+        "events_status": {
+          "type": "string"
+        },
+        "markets_status": {
+          "type": "string"
+        },
+        "token_id": {
+          "type": "string"
+        },
+        "side": {
+          "type": "string"
+        },
+        "interval": {
+          "type": "string"
+        },
+        "fidelity": {
+          "type": "string"
+        },
+        "taker_only": {
+          "type": "string"
+        },
+        "filter_type": {
+          "type": "string"
+        },
+        "filter_amount": {
+          "type": "string"
+        },
+        "event_id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "PostgresConnection": {
       "properties": {
         "name": {
@@ -2834,6 +3245,26 @@
         "host",
         "username",
         "password"
+      ]
+    },
+    "RedditAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "account_ids": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token",
+        "account_ids"
       ]
     },
     "RedshiftConnection": {
@@ -3554,6 +3985,34 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "WistiaConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "api_version": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
       ]
     },
     "ZendeskConnection": {

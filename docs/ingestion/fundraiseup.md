@@ -22,7 +22,7 @@ connections:
 
 :::
 
-You can also use environment variables in your connections.yml by using the `&#123;&#123; env_var("ENV_VAR_NAME") &#125;&#125;` syntax.
+You can also use environment variables in your connections.yml by using the `${VAR_NAME}` syntax.
 
 For example:
 
@@ -30,7 +30,7 @@ For example:
 connections:
   fundraiseup:
     - name: "my_fundraiseup"
-      api_key: "&#123;&#123; env_var('FUNDRAISEUP_API_KEY') &#125;&#125;"
+      api_key: ${FUNDRAISEUP_API_KEY}
 ```
 
 ## Supported Data Assets

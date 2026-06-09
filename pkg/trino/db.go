@@ -38,6 +38,10 @@ func NewClient(c Config) (*Client, error) {
 	}, nil
 }
 
+func (c *Client) GetIngestrURI() (string, error) {
+	return c.config.GetIngestrURI(), nil
+}
+
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	queryStr := strings.TrimSpace(query.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")

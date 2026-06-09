@@ -33,6 +33,9 @@ type Source struct {
 }
 
 var SourceTablesRegistry = map[string][]*SourceTable{
+	// Azure Data Lake Storage Gen2 (user-defined paths)
+	"adls": {},
+
 	// Adjust - Mobile marketing analytics platform
 	"adjust": {
 		{Name: "campaigns", PrimaryKey: "id", IncKey: "created", IncStrategy: "merge"},
@@ -159,6 +162,15 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// Couchbase - NoSQL database (user-defined tables)
 	"couchbase": {},
+
+	// Cassandra - Wide-column database (user-defined tables)
+	"cassandra": {},
+
+	// CrateDB - Distributed SQL database (user-defined tables)
+	"cratedb": {},
+
+	// CSV - Local CSV files (user-defined paths)
+	"csv": {},
 
 	// JobTread - Construction management platform
 	"jobtread": {
@@ -360,6 +372,12 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "tickets", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Granola - AI meeting notes
+	"granola": {
+		{Name: "notes", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "folders", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// G2 - Software review platform
 	"g2": {
 		{Name: "products", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
@@ -389,6 +407,9 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "reservations", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 		{Name: "conversations", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
+
+	// HTTP - Public file URLs (user-defined paths)
+	"http": {},
 
 	// HubSpot - CRM platform
 	"hubspot": {
@@ -467,6 +488,26 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "project_components", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Kalshi - Prediction market exchange
+	"kalshi": {
+		{Name: "exchange_status", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "exchange_schedule", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "exchange_announcements", PrimaryKey: "id", IncKey: "created_time", IncStrategy: "merge"},
+		{Name: "series", PrimaryKey: "ticker", IncKey: "updated_time", IncStrategy: "merge"},
+		{Name: "series_by_ticker", PrimaryKey: "ticker", IncKey: "", IncStrategy: "merge"},
+		{Name: "events", PrimaryKey: "event_ticker", IncKey: "updated_time", IncStrategy: "merge"},
+		{Name: "event_by_ticker", PrimaryKey: "event_ticker", IncKey: "", IncStrategy: "merge"},
+		{Name: "markets", PrimaryKey: "ticker", IncKey: "updated_time", IncStrategy: "merge"},
+		{Name: "market_by_ticker", PrimaryKey: "ticker", IncKey: "", IncStrategy: "merge"},
+		{Name: "market_orderbook", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "market_orderbooks", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "market_trades", PrimaryKey: "trade_id", IncKey: "created_time", IncStrategy: "merge"},
+		{Name: "market_candlesticks", PrimaryKey: "end_period_ts", IncKey: "end_period_ts", IncStrategy: "merge"},
+		{Name: "market_candlesticks_batch", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "historical_markets", PrimaryKey: "ticker", IncKey: "", IncStrategy: "merge"},
+		{Name: "historical_trades", PrimaryKey: "trade_id", IncKey: "created_time", IncStrategy: "merge"},
+	},
+
 	// Kafka - Event streaming (user-defined topics)
 	"kafka": {},
 
@@ -527,6 +568,31 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "facebook_ads", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "landing_pages", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
 		{Name: "reports", PrimaryKey: "id", IncKey: "send_time", IncStrategy: "merge"},
+	},
+
+	// Manifold - Prediction market platform
+	"manifold": {
+		{Name: "markets", PrimaryKey: "id", IncKey: "createdTime", IncStrategy: "merge"},
+		{Name: "search_markets", PrimaryKey: "id", IncKey: "createdTime", IncStrategy: "merge"},
+		{Name: "market_by_id", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "market_by_slug", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "market_probability", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "market_probabilities", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "market_positions", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "bets", PrimaryKey: "id", IncKey: "createdTime", IncStrategy: "merge"},
+		{Name: "comments", PrimaryKey: "id", IncKey: "createdTime", IncStrategy: "merge"},
+		{Name: "groups", PrimaryKey: "id", IncKey: "createdTime", IncStrategy: "merge"},
+		{Name: "group_by_slug", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "group_by_id", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "users", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "user_by_username", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "user_by_id", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "user_portfolio", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "user_portfolio_history", PrimaryKey: "timestamp", IncKey: "timestamp", IncStrategy: "merge"},
+		{Name: "user_contract_metrics", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "transactions", PrimaryKey: "id", IncKey: "createdTime", IncStrategy: "merge"},
+		{Name: "leagues", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "boost_history", PrimaryKey: "id", IncKey: "createdTime", IncStrategy: "merge"},
 	},
 
 	// Mixpanel - Analytics
@@ -592,6 +658,26 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "users", PrimaryKey: "id", IncKey: "update_time", IncStrategy: "merge"},
 	},
 
+	// Polymarket - Prediction market platform
+	"polymarket": {
+		{Name: "events", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "markets", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "tags", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "series", PrimaryKey: "id", IncKey: "updatedAt", IncStrategy: "merge"},
+		{Name: "comments", PrimaryKey: "id", IncKey: "createdAt", IncStrategy: "merge"},
+		{Name: "search", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "orderbook", PrimaryKey: "asset_id", IncKey: "", IncStrategy: "merge"},
+		{Name: "price", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "midpoint", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "spread", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "last_trade_price", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "price_history", PrimaryKey: "t", IncKey: "t", IncStrategy: "merge"},
+		{Name: "trades", PrimaryKey: "transactionHash", IncKey: "timestamp", IncStrategy: "merge"},
+		{Name: "positions", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "closed_positions", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "activity", PrimaryKey: "transactionHash", IncKey: "timestamp", IncStrategy: "merge"},
+	},
+
 	// Plus Vibe AI - Email marketing
 	"plusvibeai": {
 		{Name: "campaigns", PrimaryKey: "", IncKey: "modified_at", IncStrategy: "merge"},
@@ -624,6 +710,20 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "products", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
 		{Name: "entitlements", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
 		{Name: "offerings", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+	},
+
+	// Reddit Ads - Advertising platform
+	"reddit_ads": {
+		{Name: "accounts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "campaigns", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "ad_groups", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "ads", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "posts", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "custom_audiences", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "saved_audiences", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "pixels", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "funding_instruments", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "custom", PrimaryKey: "level_id,breakdowns", IncKey: "date", IncStrategy: "merge"},
 	},
 
 	// Amazon S3 (user-defined paths)
@@ -774,11 +874,52 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "reviews", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// Trino - Distributed SQL query engine (user-defined tables)
+	"trino": {},
+
 	// Wise - Money transfers
 	"wise": {
 		{Name: "profiles", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
 		{Name: "transfers", PrimaryKey: "id", IncKey: "created", IncStrategy: "merge"},
 		{Name: "balances", PrimaryKey: "id", IncKey: "modificationTime", IncStrategy: "merge"},
+	},
+
+	// Wistia - Video hosting and analytics
+	"wistia": {
+		{Name: "account", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "token", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "allowed_domains", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "folders", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "folder:<folder_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "folder_sharings:<folder_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "subfolders:<folder_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "medias", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "media:<media_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "captions", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "captions:<media_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "media_captions:<media_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "media_localizations:<media_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "media_customizations:<media_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "media_stats:<media_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "channels", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "channel:<channel_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "channel_episodes", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "channel_episodes_by_channel:<channel_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "tags", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "webinars", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "webinar:<webinar_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "stats_account", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "stats_account_by_date", PrimaryKey: "", IncKey: "date", IncStrategy: "merge"},
+		{Name: "stats_events", PrimaryKey: "", IncKey: "received_at", IncStrategy: "merge"},
+		{Name: "stats_events:<media_id>", PrimaryKey: "", IncKey: "received_at", IncStrategy: "merge"},
+		{Name: "stats_events_by_visitor:<visitor_key>", PrimaryKey: "", IncKey: "received_at", IncStrategy: "merge"},
+		{Name: "stats_visitors", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "stats_event:<event_key>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "stats_visitor:<visitor_key>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "stats_media:<media_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "stats_media_by_date:<media_id>", PrimaryKey: "", IncKey: "date", IncStrategy: "merge"},
+		{Name: "stats_media_engagement:<media_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
+		{Name: "stats_project:<project_id>", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
 	// Zendesk - Customer service

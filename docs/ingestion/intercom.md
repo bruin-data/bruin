@@ -24,7 +24,7 @@ connections:
 
 :::
 
-You can also use environment variables in your connections.yml by using the `&#123;&#123; env_var("ENV_VAR_NAME") &#125;&#125;` syntax.
+You can also use environment variables in your connections.yml by using the `${VAR_NAME}` syntax.
 
 For example:
 
@@ -32,7 +32,7 @@ For example:
 connections:
   intercom:
     - name: "my_intercom"
-      access_token: "&#123;&#123; env_var('INTERCOM_ACCESS_TOKEN') &#125;&#125;"
+      access_token: ${INTERCOM_ACCESS_TOKEN}
       region: "us"
 ```
 
