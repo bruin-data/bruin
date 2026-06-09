@@ -519,11 +519,8 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	runArgs := u.ingestrRunCmd(ctx, extraPackages, cmdArgs)
 
-	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
-		boolVal := debug.(*bool)
-		if *boolVal {
-			_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
-		}
+	if executor.IsDebugMode(ctx) {
+		_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
 	}
 
 	err = u.Cmd.Run(ingestrCtx, execCtx.repo, &CommandInstance{
