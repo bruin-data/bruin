@@ -12,36 +12,44 @@ import (
 // TypeHintMapping maps different destination types to dlt types.
 // 'text' mappings are omitted, since they are the default.
 var TypeHintMapping = map[string]string{
-	// Integer types
-	"int":         "bigint",
-	"integer":     "bigint",
-	"bigint":      "bigint",
-	"smallint":    "bigint",
-	"tinyint":     "bigint",
-	"byteint":     "bigint",
-	"mediumint":   "bigint", // MySQL
-	"int2":        "bigint", // PostgreSQL alias
-	"int4":        "bigint", // PostgreSQL alias
-	"int8":        "bigint", // PostgreSQL alias
-	"int16":       "bigint", // ClickHouse
-	"int32":       "bigint", // ClickHouse
-	"int64":       "bigint", // ClickHouse
-	"int128":      "bigint", // ClickHouse
-	"int256":      "bigint", // ClickHouse
-	"uint8":       "bigint", // ClickHouse
-	"uint16":      "bigint", // ClickHouse
-	"uint32":      "bigint", // ClickHouse
-	"uint64":      "bigint", // ClickHouse
-	"uint128":     "bigint", // ClickHouse
-	"uint256":     "bigint", // ClickHouse
-	"serial":      "bigint", // PostgreSQL auto-increment
-	"bigserial":   "bigint", // PostgreSQL auto-increment
-	"smallserial": "bigint", // PostgreSQL auto-increment
-	"serial2":     "bigint", // PostgreSQL alias
-	"serial4":     "bigint", // PostgreSQL alias
-	"serial8":     "bigint", // PostgreSQL alias
-	"long":        "bigint", // Generic
-	"short":       "bigint", // Generic
+	// Integer types — mapped to the narrowest ingestr type that preserves the
+	// declared width, so a column the source detected as Int16/Int32 is not
+	// silently widened to Int64.
+	// 8-bit (-> Int16 in ingestr; ingestr has no Int8 type)
+	"tinyint": "tinyint",
+	"byte":    "tinyint", // Spark/Databricks ByteType (-128..127)
+	"uint8":   "tinyint", // ClickHouse (0..255)
+	// 16-bit
+	"smallint":    "smallint",
+	"int2":        "smallint", // PostgreSQL alias
+	"int16":       "smallint", // ClickHouse
+	"smallserial": "smallint", // PostgreSQL auto-increment
+	"serial2":     "smallint", // PostgreSQL alias
+	"short":       "smallint", // Generic
+	// 32-bit
+	"int":       "int",
+	"integer":   "int",
+	"int4":      "int", // PostgreSQL alias
+	"int32":     "int", // ClickHouse
+	"mediumint": "int", // MySQL (24-bit, fits Int32)
+	"serial":    "int", // PostgreSQL auto-increment
+	"serial4":   "int", // PostgreSQL alias
+	"uint16":    "int", // ClickHouse (0..65535, exceeds Int16)
+	"year":      "int", // MySQL
+	// 64-bit (and wider types clamped to Int64, the widest ingestr offers)
+	"bigint":    "bigint",
+	"int8":      "bigint", // PostgreSQL alias
+	"int64":     "bigint", // ClickHouse
+	"int128":    "bigint", // ClickHouse (no wider ingestr type)
+	"int256":    "bigint", // ClickHouse (no wider ingestr type)
+	"uint32":    "bigint", // ClickHouse (0..4.3B, exceeds Int32)
+	"uint64":    "bigint", // ClickHouse (best-effort; may exceed Int64)
+	"uint128":   "bigint", // ClickHouse
+	"uint256":   "bigint", // ClickHouse
+	"bigserial": "bigint", // PostgreSQL auto-increment
+	"serial8":   "bigint", // PostgreSQL alias
+	"long":      "bigint", // Generic
+	"byteint":   "bigint", // Snowflake (synonym for NUMBER(38,0))
 
 	// Floating point types
 	"float":            "double",
@@ -56,11 +64,11 @@ var TypeHintMapping = map[string]string{
 	// Decimal/Numeric types (with precision and scale)
 	"decimal":    "decimal",
 	"numeric":    "decimal",
-	"number":     "decimal",    // Oracle/Snowflake
-	"dec":        "decimal",    // Alias for decimal
-	"money":      "decimal",    // SQL Server/PostgreSQL
-	"smallmoney": "decimal",    // SQL Server
-	"bigdecimal": "bigdecimal", // High precision decimal (76,76) for BigQuery
+	"number":     "decimal", // Oracle/Snowflake
+	"dec":        "decimal", // Alias for decimal
+	"money":      "decimal", // SQL Server/PostgreSQL
+	"smallmoney": "decimal", // SQL Server
+	"bigdecimal": "decimal", // High precision decimal for BigQuery (ingestr has no separate bigdecimal type)
 
 	// Binary types
 	"binary":      "binary",
@@ -91,20 +99,23 @@ var TypeHintMapping = map[string]string{
 	"time without time zone": "time",
 	"timetz":                 "time", // PostgreSQL
 
-	// Timestamp/Datetime types
+	// Timestamp/Datetime types.
+	// ingestr maps "timestamp" to a timezone-aware type and "timestamp_ntz" to a
+	// naive (no time zone) type, so types that are unambiguously without a time
+	// zone are emitted as "timestamp_ntz" to avoid silently promoting them.
 	"datetime":                    "timestamp",
 	"timestamp":                   "timestamp",
-	"timestamp_ltz":               "timestamp", // Snowflake
-	"timestamp_ntz":               "timestamp", // Snowflake
-	"timestamp_tz":                "timestamp", // Snowflake
-	"timestamptz":                 "timestamp", // PostgreSQL
-	"timestamp with time zone":    "timestamp", // PostgreSQL/Standard SQL
-	"timestamp without time zone": "timestamp", // PostgreSQL/Standard SQL
-	"datetime2":                   "timestamp", // SQL Server
-	"datetimeoffset":              "timestamp", // SQL Server
-	"smalldatetime":               "timestamp", // SQL Server
-	"datetime64":                  "timestamp", // ClickHouse
-	"interval":                    "timestamp", // PostgreSQL (time interval)
+	"timestamp_ltz":               "timestamp",     // Snowflake (tz-aware local)
+	"timestamp_ntz":               "timestamp_ntz", // Snowflake (no time zone)
+	"timestamp_tz":                "timestamp",     // Snowflake
+	"timestamptz":                 "timestamp",     // PostgreSQL
+	"timestamp with time zone":    "timestamp",     // PostgreSQL/Standard SQL
+	"timestamp without time zone": "timestamp_ntz", // PostgreSQL/Standard SQL (no time zone)
+	"datetime2":                   "timestamp_ntz", // SQL Server (no time zone)
+	"datetimeoffset":              "timestamp",     // SQL Server (has offset)
+	"smalldatetime":               "timestamp_ntz", // SQL Server (no time zone)
+	"datetime64":                  "timestamp",     // ClickHouse
+	"interval":                    "interval",      // PostgreSQL (time interval)
 
 	// String/Text types
 	"string":            "text",
@@ -199,12 +210,8 @@ var TypeHintMapping = map[string]string{
 	"pg_lsn":   "text",
 
 	// Databricks/Spark types
-	"byte":             "bigint",
 	"void":             "text",
 	"calendarinterval": "text",
-
-	// Year type (MySQL)
-	"year": "bigint",
 }
 
 var multipleSpacePattern = regexp.MustCompile(`\s+`)

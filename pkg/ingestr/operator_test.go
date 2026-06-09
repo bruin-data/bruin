@@ -247,7 +247,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 					{Name: "DateOfBirth", Type: "integer"},
 				},
 			},
-			want: []string{"ingest", "--source-uri", "duckdb:////some/path", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log", "--columns", "id:bigint,name:text,DateOfBirth:bigint"},
+			want: []string{"ingest", "--source-uri", "duckdb:////some/path", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log", "--columns", "id:int,name:text,DateOfBirth:int"},
 		},
 		{
 			name: "duck db dest, basic scenario",
@@ -588,7 +588,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				"--progress",
 				"log",
 				"--columns",
-				"id:bigint,load_date:timestamp,percent:double",
+				"id:int,load_date:timestamp,percent:double",
 			},
 		},
 		{
