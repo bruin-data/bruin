@@ -1882,7 +1882,7 @@ func SetupExecutors(
 			Renderer: renderer,
 		}
 		sailOperator := sail.NewBasicOperator(conn, sailFileExtractor, fullRefresh, hoister, parser)
-		sailCheckRunner := athena.NewColumnCheckOperator(conn)
+		sailCheckRunner := sail.NewColumnCheckOperator(conn)
 		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeMain] = sailOperator
 		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeColumnCheck] = sailCheckRunner
 		mainExecutors[pipeline.AssetTypeSailQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner

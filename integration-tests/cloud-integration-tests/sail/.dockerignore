@@ -1,0 +1,5 @@
+# The Sail image installs pysail via pip and copies nothing from the build
+# context, so exclude everything (keep the build context tiny) except the
+# Dockerfile itself, which the builder must still be able to read.
+*
+!Dockerfile
