@@ -15,7 +15,9 @@ func TestConfig_GetIngestrURI_DefaultPort(t *testing.T) {
 		Keyspace: "analytics",
 	}
 
-	assert.Equal(t, "cassandra://localhost:9042/analytics", c.GetIngestrURI())
+	got, err := c.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "cassandra://localhost:9042/analytics", got)
 }
 
 func TestConfig_GetIngestrURI_WithCredentials(t *testing.T) {
@@ -29,7 +31,9 @@ func TestConfig_GetIngestrURI_WithCredentials(t *testing.T) {
 		Keyspace: "analytics",
 	}
 
-	assert.Equal(t, "cassandra://user:password@localhost:9142/analytics", c.GetIngestrURI())
+	got, err := c.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "cassandra://user:password@localhost:9142/analytics", got)
 }
 
 func TestConfig_GetIngestrURI_EncodesSpecialChars(t *testing.T) {
@@ -46,7 +50,9 @@ func TestConfig_GetIngestrURI_EncodesSpecialChars(t *testing.T) {
 		ConnectTimeout: "5s",
 	}
 
-	assert.Equal(t, "cassandra://user%40example.com:p%40ss%3Aw%2Frd%3F@cass.example.com:9042/tenant%20keyspace?connect_timeout=5s&consistency=local_quorum&timeout=10s", c.GetIngestrURI())
+	got, err := c.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "cassandra://user%40example.com:p%40ss%3Aw%2Frd%3F@cass.example.com:9042/tenant%20keyspace?connect_timeout=5s&consistency=local_quorum&timeout=10s", got)
 }
 
 func TestConfig_GetIngestrURI_OptionalQueryParameters(t *testing.T) {
@@ -64,7 +70,9 @@ func TestConfig_GetIngestrURI_OptionalQueryParameters(t *testing.T) {
 		DisableInitialHostLookup: true,
 	}
 
-	assert.Equal(t, "cassandra://cass-1:9042/analytics?connect_timeout=10s&consistency=quorum&disable_initial_host_lookup=true&hosts=cass-1%2Ccass-2%2Ccass-3&page_size=1000&ssl=true&timeout=30s", c.GetIngestrURI())
+	got, err := c.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "cassandra://cass-1:9042/analytics?connect_timeout=10s&consistency=quorum&disable_initial_host_lookup=true&hosts=cass-1%2Ccass-2%2Ccass-3&page_size=1000&ssl=true&timeout=30s", got)
 }
 
 func TestConfig_GetIngestrURI_UsesFirstHostWhenHostIsEmpty(t *testing.T) {
@@ -75,7 +83,9 @@ func TestConfig_GetIngestrURI_UsesFirstHostWhenHostIsEmpty(t *testing.T) {
 		Keyspace: "analytics",
 	}
 
-	assert.Equal(t, "cassandra://cass-1:9042/analytics?hosts=cass-1%2Ccass-2", c.GetIngestrURI())
+	got, err := c.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "cassandra://cass-1:9042/analytics?hosts=cass-1%2Ccass-2", got)
 }
 
 func TestConfig_GetIngestrURI_OmitsOptionalAuthAndKeyspace(t *testing.T) {
@@ -85,7 +95,16 @@ func TestConfig_GetIngestrURI_OmitsOptionalAuthAndKeyspace(t *testing.T) {
 		Host: "localhost",
 	}
 
-	assert.Equal(t, "cassandra://localhost:9042", c.GetIngestrURI())
+	got, err := c.GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "cassandra://localhost:9042", got)
+}
+
+func TestConfig_GetIngestrURI_RequiresHost(t *testing.T) {
+	t.Parallel()
+
+	_, err := (Config{}).GetIngestrURI()
+	require.EqualError(t, err, "cassandra: host must be provided")
 }
 
 func TestClient_GetIngestrURI(t *testing.T) {

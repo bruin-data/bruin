@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"errors"
 	"net"
 	"net/url"
 	"strconv"
@@ -24,7 +25,7 @@ type Config struct {
 	DisableInitialHostLookup bool
 }
 
-func (c Config) GetIngestrURI() string {
+func (c Config) GetIngestrURI() (string, error) {
 	port := c.Port
 	if port == 0 {
 		port = defaultPort
@@ -33,6 +34,9 @@ func (c Config) GetIngestrURI() string {
 	host := strings.TrimSpace(c.Host)
 	if host == "" && len(c.Hosts) > 0 {
 		host = strings.TrimSpace(c.Hosts[0])
+	}
+	if host == "" {
+		return "", errors.New("cassandra: host must be provided")
 	}
 
 	u := &url.URL{
@@ -78,5 +82,5 @@ func (c Config) GetIngestrURI() string {
 	}
 	u.RawQuery = q.Encode()
 
-	return u.String()
+	return u.String(), nil
 }

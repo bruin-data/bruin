@@ -12,5 +12,5 @@ func NewClient(c Config) (*Client, error) {
 
 // GetIngestrURI returns the ingestr URI for the client.
 func (c *Client) GetIngestrURI() (string, error) {
-	return c.config.GetIngestrURI(), nil
+	return c.config.GetIngestrURI()
 }

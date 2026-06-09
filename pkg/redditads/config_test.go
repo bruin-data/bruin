@@ -37,9 +37,26 @@ func TestConfig_GetIngestrURI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.expected, tt.config.GetIngestrURI())
+			got, err := tt.config.GetIngestrURI()
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
 		})
 	}
+}
+
+func TestConfig_GetIngestrURI_RequiresAccessToken(t *testing.T) {
+	t.Parallel()
+
+	_, err := (&Config{}).GetIngestrURI()
+	require.EqualError(t, err, "reddit_ads: access_token must be provided")
+}
+
+func TestConfig_GetIngestrURI_OmitsEmptyAccountIDs(t *testing.T) {
+	t.Parallel()
+
+	got, err := (&Config{AccessToken: "token_123"}).GetIngestrURI()
+	require.NoError(t, err)
+	assert.Equal(t, "redditads://?access_token=token_123", got)
 }
 
 func TestClient_GetIngestrURI(t *testing.T) {

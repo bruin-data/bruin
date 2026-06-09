@@ -1,6 +1,9 @@
 package granola
 
-import "net/url"
+import (
+	"errors"
+	"net/url"
+)
 
 // Config holds credentials for a Granola connection.
 type Config struct {
@@ -8,8 +11,12 @@ type Config struct {
 }
 
 // GetIngestrURI builds the Granola ingestr URI.
-func (c *Config) GetIngestrURI() string {
+func (c *Config) GetIngestrURI() (string, error) {
+	if c.APIKey == "" {
+		return "", errors.New("granola: api_key must be provided")
+	}
+
 	params := url.Values{}
 	params.Set("api_key", c.APIKey)
-	return "granola://?" + params.Encode()
+	return "granola://?" + params.Encode(), nil
 }
