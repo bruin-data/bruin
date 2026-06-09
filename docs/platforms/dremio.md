@@ -49,16 +49,19 @@ Dremio Cloud does not use username/password; it authenticates with a [Personal A
 
 ## Asset names and folders
 
-The asset `name` is the full path to the dataset in Dremio. The final dotted component is the table; everything before it is the folder the table lives in — Dremio's equivalent of a schema. So `name` maps directly onto the Dremio catalog hierarchy:
+The asset `name` is the path to the dataset in Dremio, written as `folder.table`. The last component is the table; the first is the folder it lives in — Dremio's equivalent of a schema:
 
 | Asset `name` | Folder | Table |
 |--------------|--------|-------|
 | `analytics.installs` | `analytics` | `installs` |
-| `my_source.staging.installs` | `my_source.staging` | `installs` |
+| `staging.events` | `staging` | `events` |
 
 There is no separate folder field — you choose the folder purely by how you name the asset, the same `schema.table` convention used across Bruin's platforms.
 
-When an asset is materialized (`materialization.type` of `table` or `view`), Bruin ensures the enclosing folder exists first by running `CREATE FOLDER IF NOT EXISTS` on the folder path, then creates the table/view. This is required because Dremio rejects creating a dataset inside a folder that does not yet exist. The top-level container (a source or space) must already exist — Bruin creates folders within it, not the source itself.
+> [!WARNING]
+> Only a flat folder structure (`folder.table`) is supported. Nested folders (`folder.subfolder.table`) are not — name your assets with exactly one folder component.
+
+When an asset is materialized (`materialization.type` of `table` or `view`), Bruin ensures the folder exists first by running `CREATE FOLDER IF NOT EXISTS` on it, then creates the table/view. This is required because Dremio rejects creating a dataset inside a folder that does not yet exist. The top-level container (a source or space) must already exist — Bruin creates folders within it, not the source itself.
 
 ## Dremio Assets
 

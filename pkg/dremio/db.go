@@ -158,16 +158,16 @@ func (c *Client) Ping(ctx context.Context) error {
 	return err
 }
 
-// folderPathForAsset returns the Dremio folder path an asset's table lives in,
-// i.e. the asset name minus its final (table) component. For "folder.table" it
-// returns "folder"; for "source.folder.table" it returns "source.folder". A
-// bare table name (no dot) has no enclosing folder, so it returns "".
+// folderPathForAsset returns the Dremio folder an asset's table lives in. Only a
+// flat "folder.table" structure is supported, so the folder is the first
+// component of a two-part name. Names with any other shape (a bare table, or a
+// deeper path) have no folder to auto-create, so it returns "".
 func folderPathForAsset(name string) string {
 	parts := strings.Split(name, ".")
-	if len(parts) < 2 {
+	if len(parts) != 2 {
 		return ""
 	}
-	return strings.Join(parts[:len(parts)-1], ".")
+	return parts[0]
 }
 
 // CreateSchemaIfNotExist ensures the folder an asset's table lives in exists

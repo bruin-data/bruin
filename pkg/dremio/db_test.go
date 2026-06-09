@@ -14,8 +14,8 @@ func TestFolderPathForAsset(t *testing.T) {
 		asset string
 		want  string
 	}{
-		{name: "schema.table", asset: "my_folder.my_table", want: "my_folder"},
-		{name: "source.folder.table", asset: "my_source.my_folder.my_table", want: "my_source.my_folder"},
+		{name: "folder.table", asset: "my_folder.my_table", want: "my_folder"},
+		{name: "deeper paths are not supported (flat only)", asset: "my_source.my_folder.my_table", want: ""},
 		{name: "bare table has no folder", asset: "my_table", want: ""},
 		{name: "empty name", asset: "", want: ""},
 	}
