@@ -43,7 +43,7 @@ const (
 	// IngestrVersionV0 is the legacy ingestr release pinned for parameters.version=v0.
 	IngestrVersionV0 = "0.14.155"
 	// IngestrVersionV1 is the current ingestr release used by default and for parameters.version=v1.
-	IngestrVersionV1 = "1.0.20"
+	IngestrVersionV1 = "1.0.24"
 	sqlfluffVersion  = "3.4.1"
 )
 
@@ -519,11 +519,8 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	runArgs := u.ingestrRunCmd(ctx, extraPackages, cmdArgs)
 
-	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
-		boolVal := debug.(*bool)
-		if *boolVal {
-			_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
-		}
+	if executor.IsDebugMode(ctx) {
+		_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
 	}
 
 	err = u.Cmd.Run(ingestrCtx, execCtx.repo, &CommandInstance{

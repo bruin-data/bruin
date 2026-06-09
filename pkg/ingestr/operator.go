@@ -11,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -323,6 +324,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"log",
 	)
 
+	if executor.IsDebugMode(ctx) {
+		baseArgs = append(baseArgs, "--debug")
+	}
+
 	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   false,
 		EnforceSchemaByDefault: false,
@@ -500,7 +505,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, []string{
+	baseArgs := []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -513,7 +518,13 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"--yes",
 		"--progress",
 		"log",
-	}, &python.ColumnHintOptions{
+	}
+
+	if executor.IsDebugMode(ctx) {
+		baseArgs = append(baseArgs, "--debug")
+	}
+
+	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, baseArgs, &python.ColumnHintOptions{
 		NormalizeColumnNames:   true,
 		EnforceSchemaByDefault: true,
 	})
