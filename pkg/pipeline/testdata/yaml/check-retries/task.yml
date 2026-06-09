@@ -1,0 +1,19 @@
+name: check-retries
+type: bq.sql
+run: hello.sql
+
+columns:
+  - name: col1
+    type: string
+    checks:
+      - name: unique
+        retries: 2
+      - name: not_null
+
+custom_checks:
+  - name: row count is greater than zero
+    description: this check ensures that the table is not empty
+    query: SELECT count(*) > 1 FROM dataset.player_count
+    retries: 3
+  - name: no retries check
+    query: SELECT 1

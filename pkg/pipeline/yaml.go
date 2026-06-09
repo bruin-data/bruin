@@ -270,6 +270,7 @@ type columnCheck struct {
 	Value         columnCheckValue `yaml:"value"`
 	Blocking      *bool            `yaml:"blocking"`
 	Description   string           `yaml:"description,omitempty"`
+	Retries       *int             `yaml:"retries,omitempty"`
 	Notifications Notifications    `yaml:"notifications"`
 }
 
@@ -308,6 +309,7 @@ type customCheck struct {
 	Value         int64         `yaml:"value"`
 	Count         *int64        `yaml:"count"`
 	Blocking      *bool         `yaml:"blocking"`
+	Retries       *int          `yaml:"retries,omitempty"`
 	Notifications Notifications `yaml:"notifications"`
 }
 
@@ -455,6 +457,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 			check := NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking, test.Description)
 			check.Notifications = notificationsOrNil(test.Notifications)
+			check.Retries = test.Retries
 			tests = append(tests, check)
 		}
 
@@ -560,6 +563,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Value:         check.Value,
 			Count:         check.Count,
 			Blocking:      DefaultTrueBool{Value: check.Blocking},
+			Retries:       check.Retries,
 			Notifications: notificationsOrNil(check.Notifications),
 		}
 	}

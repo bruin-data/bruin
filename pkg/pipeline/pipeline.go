@@ -558,6 +558,7 @@ type ColumnCheck struct {
 	Value         ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
 	Blocking      DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Description   string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Retries       *int             `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications   `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
@@ -743,6 +744,7 @@ type CustomCheck struct {
 	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
+	Retries       *int            `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
