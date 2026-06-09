@@ -61,8 +61,6 @@ There is no separate folder field — you choose the folder purely by how you na
 > [!WARNING]
 > Only a flat folder structure (`folder.table`) is supported. Nested folders (`folder.subfolder.table`) are not — name your assets with exactly one folder component.
 
-When an asset is materialized (`materialization.type` of `table` or `view`), Bruin ensures the folder exists first by running `CREATE FOLDER IF NOT EXISTS` on it, then creates the table/view. This is required because Dremio rejects creating a dataset inside a folder that does not yet exist. The top-level container (a source or space) must already exist — Bruin creates folders within it, not the source itself.
-
 ## Dremio Assets
 
 ### `dremio.sql`
