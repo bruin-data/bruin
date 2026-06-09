@@ -49,21 +49,18 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 	queryStr := strings.TrimSpace(query.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")
 
-	// We deliberately execute via QueryContext rather than ExecContext. The ADBC
-	// Flight SQL driver only avoids creating a prepared statement on the query
-	// path (ExecContext goes through Prepare), and not every Flight SQL engine
-	// implements prepared statements. Going through the query path keeps DDL/DML
-	// working across engines; we just drain and discard rows.
-	rows, err := c.connection.QueryContext(ctx, queryStr)
-	if err != nil {
+	// We execute write statements via ExecContext (Flight SQL ExecuteUpdate)
+	// rather than QueryContext. Dremio answers a CTAS/INSERT with an Iceberg
+	// write summary whose schema does not match the schema it advertises in the
+	// Flight info, so the result-reading path (QueryContext/ExecuteQuery) fails
+	// with "endpoint returned inconsistent schema". ExecuteUpdate returns an
+	// affected-row count without reading a result stream, avoiding the mismatch.
+	// ExecContext prepares the statement first, which Dremio supports.
+	if _, err := c.connection.ExecContext(ctx, queryStr); err != nil {
 		return errors.Wrap(err, "failed to execute query")
 	}
-	defer rows.Close()
 
-	for rows.Next() { //nolint:revive // drain the reader so the statement fully executes server-side
-	}
-
-	return errors.Wrap(rows.Err(), "failed to execute query")
+	return nil
 }
 
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
@@ -154,8 +151,11 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 }
 
 func (c *Client) Ping(ctx context.Context) error {
-	q := &query.Query{Query: "SELECT 1"}
-	return c.RunQueryWithoutResult(ctx, q)
+	// Use the read path: RunQueryWithoutResult goes through ExecuteUpdate, which
+	// Dremio rejects for a SELECT. Select reads the result stream, whose schema
+	// matches the Flight info for a plain SELECT, so it is the right liveness check.
+	_, err := c.Select(ctx, &query.Query{Query: "SELECT 1"})
+	return err
 }
 
 // folderPathForAsset returns the Dremio folder path an asset's table lives in,
