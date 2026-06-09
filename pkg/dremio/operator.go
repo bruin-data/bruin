@@ -90,6 +90,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Errorf("connection '%s' is not a Dremio connection", connName)
 	}
 
+	if t.Materialization.Type != pipeline.MaterializationTypeNone {
+		if err = conn.CreateSchemaIfNotExist(ctx, t); err != nil {
+			return err
+		}
+	}
+
 	q := queries[0]
 	materialized, err := o.materializer.Render(t, q.String())
 	if err != nil {

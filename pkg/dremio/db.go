@@ -5,18 +5,21 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 
 	// Registers the "flightsql" database/sql driver provided by Apache ADBC.
 	// Dremio speaks the Arrow Flight SQL protocol, so this is the driver we use.
 	_ "github.com/apache/arrow-adbc/go/adbc/sqldriver/flightsql"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 )
 
 type Client struct {
-	connection connection
-	config     Config
+	connection  connection
+	config      Config
+	folderCache sync.Map
 }
 
 type connection interface {
@@ -153,6 +156,40 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 func (c *Client) Ping(ctx context.Context) error {
 	q := &query.Query{Query: "SELECT 1"}
 	return c.RunQueryWithoutResult(ctx, q)
+}
+
+// folderPathForAsset returns the Dremio folder path an asset's table lives in,
+// i.e. the asset name minus its final (table) component. For "folder.table" it
+// returns "folder"; for "source.folder.table" it returns "source.folder". A
+// bare table name (no dot) has no enclosing folder, so it returns "".
+func folderPathForAsset(name string) string {
+	parts := strings.Split(name, ".")
+	if len(parts) < 2 {
+		return ""
+	}
+	return strings.Join(parts[:len(parts)-1], ".")
+}
+
+// CreateSchemaIfNotExist ensures the folder an asset's table lives in exists
+// before the table is created. Dremio rejects CREATE TABLE into a folder that
+// does not exist yet, so we create it first. The folder path is derived from
+// the asset name (see folderPathForAsset) and quoted as a dotted identifier.
+func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	folderPath := folderPathForAsset(asset.Name)
+	if folderPath == "" {
+		return nil
+	}
+	if _, exists := c.folderCache.Load(folderPath); exists {
+		return nil
+	}
+
+	q := &query.Query{Query: "CREATE FOLDER IF NOT EXISTS " + quoteIdentifier(folderPath)}
+	if err := c.RunQueryWithoutResult(ctx, q); err != nil {
+		return errors.Wrapf(err, "failed to ensure Dremio folder %q exists", folderPath)
+	}
+	c.folderCache.Store(folderPath, true)
+
+	return nil
 }
 
 func toString(value any) (string, bool) {
