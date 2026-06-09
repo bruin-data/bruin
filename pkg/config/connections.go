@@ -1533,11 +1533,10 @@ func (c KalshiConnection) GetName() string {
 	return c.Name
 }
 
-// FlightSQLConnection holds the settings for any Arrow Flight SQL compatible
-// platform (e.g. Dremio). Flight SQL is a transport protocol, so the same
-// connection type works across engines; Dialect selects the SQL dialect used
-// for materializations and defaults to "dremio" when empty.
-type FlightSQLConnection struct {
+// DremioConnection holds the settings for a Dremio platform. Dremio is reached
+// over the Arrow Flight SQL wire protocol. Authentication is either
+// username/password (Dremio Software) or a bearer Token / PAT (Dremio Cloud).
+type DremioConnection struct {
 	Name          string `yaml:"name" json:"name" mapstructure:"name"`
 	Host          string `yaml:"host" json:"host" mapstructure:"host"`
 	Port          int    `yaml:"port" json:"port" mapstructure:"port"`
@@ -1545,12 +1544,30 @@ type FlightSQLConnection struct {
 	Password      string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
 	Token         string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
 	Database      string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
-	Dialect       string `yaml:"dialect,omitempty" json:"dialect,omitempty" mapstructure:"dialect"`
 	TLS           bool   `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls"`
 	TLSSkipVerify bool   `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify,omitempty" mapstructure:"tls_skip_verify"`
 }
 
-func (c FlightSQLConnection) GetName() string {
+func (c DremioConnection) GetName() string {
+	return c.Name
+}
+
+// SailConnection holds the settings for a Sail (LakeSail / PySail) platform.
+// Sail exposes an Arrow Flight SQL server and speaks Spark SQL. It does not
+// require authentication by default.
+type SailConnection struct {
+	Name          string `yaml:"name" json:"name" mapstructure:"name"`
+	Host          string `yaml:"host" json:"host" mapstructure:"host"`
+	Port          int    `yaml:"port" json:"port" mapstructure:"port"`
+	Username      string `yaml:"username,omitempty" json:"username,omitempty" mapstructure:"username"`
+	Password      string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
+	Token         string `yaml:"token,omitempty" json:"token,omitempty" mapstructure:"token"`
+	Database      string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	TLS           bool   `yaml:"tls,omitempty" json:"tls,omitempty" mapstructure:"tls"`
+	TLSSkipVerify bool   `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify,omitempty" mapstructure:"tls_skip_verify"`
+}
+
+func (c SailConnection) GetName() string {
 	return c.Name
 }
 

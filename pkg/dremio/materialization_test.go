@@ -1,4 +1,4 @@
-package flightsql
+package dremio
 
 import (
 	"testing"
@@ -29,7 +29,7 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  "SELECT 1",
 		},
 		{
-			name: "table create+replace",
+			name: "table create+replace uses ANSI double quotes",
 			asset: &pipeline.Asset{
 				Name: "schema.my_table",
 				Materialization: pipeline.Materialization{
@@ -114,52 +114,6 @@ SELECT * FROM source;`,
 				require.Error(t, err)
 				return
 			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-// TestMaterializer_Dialect verifies that the configured dialect changes how
-// identifiers are quoted: Dremio (default) uses ANSI double quotes, while Sail
-// (Spark SQL) uses backticks.
-func TestMaterializer_Dialect(t *testing.T) {
-	t.Parallel()
-
-	asset := &pipeline.Asset{
-		Name: "schema.my_table",
-		Materialization: pipeline.Materialization{
-			Type:     pipeline.MaterializationTypeTable,
-			Strategy: pipeline.MaterializationStrategyCreateReplace,
-		},
-	}
-
-	tests := []struct {
-		dialect string
-		want    string
-	}{
-		{
-			dialect: "dremio",
-			want: `
-DROP TABLE IF EXISTS "schema"."my_table";
-CREATE TABLE "schema"."my_table" AS
-SELECT * FROM source;`,
-		},
-		{
-			dialect: "sail",
-			want:    "\nDROP TABLE IF EXISTS `schema`.`my_table`;\nCREATE TABLE `schema`.`my_table` AS\nSELECT * FROM source;",
-		},
-		{
-			dialect: "pysail",
-			want:    "\nDROP TABLE IF EXISTS `schema`.`my_table`;\nCREATE TABLE `schema`.`my_table` AS\nSELECT * FROM source;",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.dialect, func(t *testing.T) {
-			t.Parallel()
-			m := NewMaterializerForDialect(tt.dialect, false)
-			got, err := m.Render(asset, "SELECT * FROM source")
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})

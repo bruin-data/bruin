@@ -1,6 +1,6 @@
 /* @bruin
 name: bruin_test.inventory
-type: flight.sql
+type: dremio.sql
 
 materialization:
   type: table

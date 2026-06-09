@@ -126,7 +126,8 @@ type Connections struct {
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
 	QuickSight          []QuickSightConnection          `yaml:"quicksight,omitempty" json:"quicksight,omitempty" mapstructure:"quicksight"`
 	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
-	FlightSQL           []FlightSQLConnection           `yaml:"flightsql,omitempty" json:"flightsql,omitempty" mapstructure:"flightsql"`
+	Dremio              []DremioConnection              `yaml:"dremio,omitempty" json:"dremio,omitempty" mapstructure:"dremio"`
+	Sail                []SailConnection                `yaml:"sail,omitempty" json:"sail,omitempty" mapstructure:"sail"`
 	Fluxx               []FluxxConnection               `yaml:"fluxx,omitempty" json:"fluxx,omitempty" mapstructure:"fluxx"`
 	Freshdesk           []FreshdeskConnection           `yaml:"freshdesk,omitempty" json:"freshdesk,omitempty" mapstructure:"freshdesk"`
 	FundraiseUp         []FundraiseUpConnection         `yaml:"fundraiseup,omitempty" json:"fundraiseup,omitempty" mapstructure:"fundraiseup"`
@@ -1045,13 +1046,20 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Trino = append(env.Connections.Trino, conn)
-	case "flightsql":
-		var conn FlightSQLConnection
+	case "dremio":
+		var conn DremioConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
 		conn.Name = name
-		env.Connections.FlightSQL = append(env.Connections.FlightSQL, conn)
+		env.Connections.Dremio = append(env.Connections.Dremio, conn)
+	case "sail":
+		var conn SailConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Sail = append(env.Connections.Sail, conn)
 	case "trustpilot":
 		var conn TrustpilotConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1480,8 +1488,10 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pinterest = removeConnection(env.Connections.Pinterest, connectionName)
 	case "trino":
 		env.Connections.Trino = removeConnection(env.Connections.Trino, connectionName)
-	case "flightsql":
-		env.Connections.FlightSQL = removeConnection(env.Connections.FlightSQL, connectionName)
+	case "dremio":
+		env.Connections.Dremio = removeConnection(env.Connections.Dremio, connectionName)
+	case "sail":
+		env.Connections.Sail = removeConnection(env.Connections.Sail, connectionName)
 	case "trustpilot":
 		env.Connections.Trustpilot = removeConnection(env.Connections.Trustpilot, connectionName)
 	case "quickbooks":
@@ -1714,7 +1724,8 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Tableau, source.Tableau)
 	mergeConnectionList(&c.QuickSight, source.QuickSight)
 	mergeConnectionList(&c.Trino, source.Trino)
-	mergeConnectionList(&c.FlightSQL, source.FlightSQL)
+	mergeConnectionList(&c.Dremio, source.Dremio)
+	mergeConnectionList(&c.Sail, source.Sail)
 	mergeConnectionList(&c.Fluxx, source.Fluxx)
 	mergeConnectionList(&c.Freshdesk, source.Freshdesk)
 	mergeConnectionList(&c.FundraiseUp, source.FundraiseUp)

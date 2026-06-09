@@ -1,4 +1,4 @@
-package flightsql
+package dremio
 
 import (
 	"net"
@@ -14,17 +14,13 @@ const (
 	optTLSSkipVerify       = "adbc.flight.sql.client_option.tls_skip_verify"
 )
 
-// Config holds the connection parameters for an Arrow Flight SQL platform.
+// Config holds the connection parameters for a Dremio platform.
 //
-// Flight SQL is a wire protocol rather than a SQL dialect, so the same
-// connection settings work against any Flight SQL compatible engine (Dremio
-// being the first one we support). The Dialect field selects the SQL dialect
-// used when rendering materializations (see dialect.go); it defaults to
-// "dremio" when left empty.
-//
-// Authentication is either username/password (Dremio Software) or a bearer
-// Token / Personal Access Token (Dremio Cloud); the two are mutually
-// exclusive. TLS must be enabled for Dremio Cloud.
+// Dremio is reached over the Arrow Flight SQL wire protocol, which in Go is
+// served by the apache/arrow-adbc Flight SQL driver. Authentication is either
+// username/password (Dremio Software) or a bearer Token / Personal Access Token
+// (Dremio Cloud); the two are mutually exclusive. TLS must be enabled for
+// Dremio Cloud.
 type Config struct {
 	Host          string
 	Port          int
@@ -32,7 +28,6 @@ type Config struct {
 	Password      string
 	Token         string
 	Database      string
-	Dialect       string
 	TLS           bool
 	TLSSkipVerify bool
 }
@@ -48,11 +43,11 @@ type Config struct {
 // is safe because the driver splits each option on its first "=" only.)
 func (c Config) ToDSN() (string, error) {
 	if strings.ContainsRune(c.Username+c.Password+c.Token, ';') {
-		return "", errors.New("Flight SQL credentials cannot contain ';' (the DSN option delimiter)")
+		return "", errors.New("Dremio credentials cannot contain ';' (the DSN option delimiter)")
 	}
 	if c.Token != "" && (c.Username != "" || c.Password != "") {
 		// The driver itself rejects this combination; fail early with a clearer message.
-		return "", errors.New("Flight SQL connection cannot set both token and username/password")
+		return "", errors.New("Dremio connection cannot set both token and username/password")
 	}
 
 	scheme := "grpc+tcp"

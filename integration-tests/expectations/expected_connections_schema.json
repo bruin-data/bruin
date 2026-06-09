@@ -1167,9 +1167,15 @@
           },
           "type": "array"
         },
-        "flightsql": {
+        "dremio": {
           "items": {
-            "$ref": "#/$defs/FlightSQLConnection"
+            "$ref": "#/$defs/DremioConnection"
+          },
+          "type": "array"
+        },
+        "sail": {
+          "items": {
+            "$ref": "#/$defs/SailConnection"
           },
           "type": "array"
         },
@@ -1533,6 +1539,44 @@
         "password"
       ]
     },
+    "DremioConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "port"
+      ]
+    },
     "DuckDBConnection": {
       "properties": {
         "name": {
@@ -1746,47 +1790,6 @@
       "required": [
         "name",
         "api_key"
-      ]
-    },
-    "FlightSQLConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        },
-        "token": {
-          "type": "string"
-        },
-        "database": {
-          "type": "string"
-        },
-        "dialect": {
-          "type": "string"
-        },
-        "tls": {
-          "type": "boolean"
-        },
-        "tls_skip_verify": {
-          "type": "boolean"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "host",
-        "port"
       ]
     },
     "FluxxConnection": {
@@ -3402,6 +3405,44 @@
       "required": [
         "name",
         "path"
+      ]
+    },
+    "SailConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "tls": {
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "port"
       ]
     },
     "SalesforceConnection": {

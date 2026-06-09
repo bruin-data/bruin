@@ -1,6 +1,6 @@
 /* @bruin
 name: bruin_test.metrics_view
-type: flight.sql
+type: dremio.sql
 
 materialization:
   type: view

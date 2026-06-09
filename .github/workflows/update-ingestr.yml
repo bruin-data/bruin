@@ -26,9 +26,14 @@ jobs:
               test "$(echo "$v1 $v2" | tr " " "\n" | sort -V | head -n 1)" != "$v1"
           }
 
-          latest=$(curl -s "https://api.github.com/repos/bruin-data/ingestr/tags" | jq -r '.[0].name')
+          latest=$(curl -fsSL "https://api.github.com/repos/bruin-data/ingestr/releases/latest" | jq -er '.tag_name')
           latest=${latest#v}
-          current=$(grep -oE 'ingestrVersion\s*=\s*"[^"]+"' pkg/python/uv.go | cut -d '"' -f2)
+          current=$(sed -nE 's/^[[:space:]]*IngestrVersionV1[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' pkg/python/uv.go)
+
+          if [[ -z "$current" ]]; then
+            echo "Could not find IngestrVersionV1 in pkg/python/uv.go" >&2
+            exit 1
+          fi
 
           echo "current=$current"
           echo "latest=$latest"
@@ -46,11 +51,11 @@ jobs:
           set -euo pipefail
           
           # Update the version using sed with a more robust pattern
-          sed -i -E 's/(ingestrVersion[[:space:]]*=[[:space:]]*)"[^"]+"/\1"${{ steps.check.outputs.version }}"/' pkg/python/uv.go
+          sed -i -E 's/(IngestrVersionV1[[:space:]]*=[[:space:]]*)"[^"]+"/\1"${{ steps.check.outputs.version }}"/' pkg/python/uv.go
           
           # Verify the change was made
           echo "Updated version in pkg/python/uv.go:"
-          grep -n "ingestrVersion" pkg/python/uv.go
+          grep -n "IngestrVersionV1" pkg/python/uv.go
           
           # Stage the changes
           git add pkg/python/uv.go
