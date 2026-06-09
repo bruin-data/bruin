@@ -254,3 +254,21 @@ func TestCloudIntegration(t *testing.T) {
 		runTestsInDirectory(t, dremioDir, "Dremio")
 	})
 }
+
+// TestSailIntegration runs the self-contained Sail suite that lives alongside
+// the cloud platforms. Unlike them, Sail boots its own Arrow Flight SQL server
+// via testcontainers, so it needs no .bruin.cloud.yml connection and is gated on
+// Docker availability (inside the suite) rather than on a configured connection.
+func TestSailIntegration(t *testing.T) {
+	t.Parallel()
+
+	currentFolder, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current working directory")
+
+	sailDir := filepath.Join(currentFolder, "sail")
+	require.DirExists(t, sailDir, "Sail test directory should exist")
+
+	t.Logf("Running self-contained Sail integration tests (testcontainers)")
+
+	runTestsInDirectory(t, sailDir, "Sail")
+}
