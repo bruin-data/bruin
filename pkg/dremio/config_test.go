@@ -1,4 +1,4 @@
-package flightsql
+package dremio
 
 import (
 	"testing"

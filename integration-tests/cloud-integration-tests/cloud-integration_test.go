@@ -29,7 +29,7 @@ var platformConnectionMap = map[string]string{
 	"athena":     "athena",
 	"databricks": "databricks",
 	"fabric":     "fabric",
-	"dremio":     "flightsql",
+	"dremio":     "dremio",
 }
 
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {

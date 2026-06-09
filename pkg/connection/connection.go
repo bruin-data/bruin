@@ -35,6 +35,7 @@ import (
 	dataprocserverless "github.com/bruin-data/bruin/pkg/dataproc_serverless"
 	"github.com/bruin-data/bruin/pkg/db2"
 	"github.com/bruin-data/bruin/pkg/docebo"
+	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dune"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
@@ -43,7 +44,6 @@ import (
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fireflies"
-	"github.com/bruin-data/bruin/pkg/flightsql"
 	"github.com/bruin-data/bruin/pkg/fluxx"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/freshdesk"
@@ -92,6 +92,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/rabbitmq"
 	"github.com/bruin-data/bruin/pkg/revenuecat"
 	"github.com/bruin-data/bruin/pkg/s3"
+	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/sftp"
 	"github.com/bruin-data/bruin/pkg/shopify"
@@ -219,7 +220,8 @@ type Manager struct {
 	Tableau              map[string]*tableau.Client
 	QuickSight           map[string]*quicksight.Client
 	Trino                map[string]*trino.Client
-	FlightSQL            map[string]*flightsql.Client
+	Dremio               map[string]*dremio.Client
+	Sail                 map[string]*sail.Client
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
@@ -2889,21 +2891,20 @@ func (m *Manager) AddTrinoConnectionFromConfig(connection *config.TrinoConnectio
 	return nil
 }
 
-func (m *Manager) AddFlightSQLConnectionFromConfig(connection *config.FlightSQLConnection) error {
+func (m *Manager) AddDremioConnectionFromConfig(connection *config.DremioConnection) error {
 	m.mutex.Lock()
-	if m.FlightSQL == nil {
-		m.FlightSQL = make(map[string]*flightsql.Client)
+	if m.Dremio == nil {
+		m.Dremio = make(map[string]*dremio.Client)
 	}
 	m.mutex.Unlock()
 
-	client, err := flightsql.NewClient(flightsql.Config{
+	client, err := dremio.NewClient(dremio.Config{
 		Host:          connection.Host,
 		Port:          connection.Port,
 		Username:      connection.Username,
 		Password:      connection.Password,
 		Token:         connection.Token,
 		Database:      connection.Database,
-		Dialect:       connection.Dialect,
 		TLS:           connection.TLS,
 		TLSSkipVerify: connection.TLSSkipVerify,
 	})
@@ -2913,7 +2914,37 @@ func (m *Manager) AddFlightSQLConnectionFromConfig(connection *config.FlightSQLC
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.FlightSQL[connection.Name] = client
+	m.Dremio[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddSailConnectionFromConfig(connection *config.SailConnection) error {
+	m.mutex.Lock()
+	if m.Sail == nil {
+		m.Sail = make(map[string]*sail.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sail.NewClient(sail.Config{
+		Host:          connection.Host,
+		Port:          connection.Port,
+		Username:      connection.Username,
+		Password:      connection.Password,
+		Token:         connection.Token,
+		Database:      connection.Database,
+		TLS:           connection.TLS,
+		TLSSkipVerify: connection.TLSSkipVerify,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Sail[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -3116,7 +3147,8 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.QuickSight, connectionManager.AddQuickSightConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.FlightSQL, connectionManager.AddFlightSQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Dremio, connectionManager.AddDremioConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Sail, connectionManager.AddSailConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)

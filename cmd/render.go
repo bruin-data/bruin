@@ -18,9 +18,9 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/dremio"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/fabric"
-	"github.com/bruin-data/bruin/pkg/flightsql"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -30,6 +30,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
@@ -287,8 +288,10 @@ func Render() *cli.Command {
 					pipeline.AssetTypePostgresQuerySensor:     postgres.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeTrinoQuery:              trino.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeTrinoQuerySensor:        trino.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeFlightSQLQuery:          flightsql.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeFlightSQLQuerySensor:    flightsql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDremioQuery:             dremio.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDremioQuerySensor:       dremio.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSailQuery:               sail.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSailQuerySensor:         sail.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeOracleQuery:             oracle.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeMsSQLQuery:              mssql.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeMsSQLQuerySensor:        mssql.NewMaterializer(fullRefresh),
