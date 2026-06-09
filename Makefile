@@ -21,7 +21,7 @@ endif
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if . == $$prefix then "integration-tests" elif startswith($$prefix + "/") then .[($$prefix | length + 1):] elif startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb format pre-commit refresh-integration-expectations integration-test-cloud validate-links tools-update
+.PHONY: all clean test build build-no-duckdb docs-app format pre-commit refresh-integration-expectations integration-test-cloud validate-links tools-update
 all: clean deps test build
 
 deps: 
@@ -36,6 +36,10 @@ build: deps
 build-no-duckdb: deps
 	@echo "$(OK_COLOR)==> Building the application without DuckDB support...$(NO_COLOR)"
 	@CGO_ENABLED=0 go build -v -tags="bruin_no_duckdb" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)-no-duckdb" "$(BUILD_SRC)"
+
+docs-app:
+	@echo "$(OK_COLOR)==> Building docs SPA bundle...$(NO_COLOR)"
+	@npm run docs:app:build
 
 integration-test: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists

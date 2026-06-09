@@ -1,0 +1,44 @@
+name: Docs App Bundle
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'pkg/docsgen/web/**'
+      - 'pkg/docsgen/static/**'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'pkg/docsgen/web/**'
+      - 'pkg/docsgen/static/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  verify-bundle:
+    name: Verify docsgen SPA bundle is up to date
+    runs-on: depot-ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+
+      - name: Install dependencies with npm@11 (for min-release-age support)
+        run: npx npm@11.10.0 ci
+
+      - name: Rebuild SPA bundle from sources
+        run: npm run docs:app:build
+
+      - name: Verify committed bundle matches the sources
+        run: |
+          if ! git diff --exit-code -- pkg/docsgen/static; then
+            echo "::error::pkg/docsgen/static is out of date with pkg/docsgen/web. Run 'make docs-app' and commit the result."
+            exit 1
+          fi
