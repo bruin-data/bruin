@@ -67,7 +67,8 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	query = strings.TrimSuffix(query, ";")
 	key := mat.IncrementalKey
 
-	return fmt.Sprintf(`
+	return fmt.Sprintf(
+		`
 DELETE FROM %s 
 WHERE %s IN (
     SELECT DISTINCT %s 
@@ -115,7 +116,8 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 		withClause = fmt.Sprintf("WITH (%s)", strings.Join(withClauses, ", "))
 	}
 
-	return fmt.Sprintf(`
+	return fmt.Sprintf(
+		`
 DROP TABLE IF EXISTS %s;
 CREATE TABLE %s %s AS
 %s;`,
@@ -150,7 +152,8 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		endVar = "{{end_date}}"
 	}
 
-	return fmt.Sprintf(`
+	return fmt.Sprintf(
+		`
 DELETE FROM %s 
 WHERE %s BETWEEN %s '%s' AND %s '%s';
 

@@ -43,7 +43,8 @@ var matMap = pipeline.AssetMaterializationMap{
 }
 
 func errorMaterializer(asset *pipeline.Asset, _ string) (string, error) {
-	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s and asset type %s",
+	return "", fmt.Errorf(
+		"materialization strategy %s is not supported for materialization type %s and asset type %s",
 		asset.Materialization.Strategy,
 		asset.Materialization.Type,
 		asset.Type,
@@ -102,7 +103,8 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 
-	return fmt.Sprintf(`DROP TABLE IF EXISTS %s;
+	return fmt.Sprintf(
+		`DROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 %s;`,
 		asset.Name,
@@ -178,7 +180,8 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 		columnDefs = append(columnDefs, fmt.Sprintf("PRIMARY KEY (%s)", strings.Join(primaryKeys, ", ")))
 	}
 
-	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n%s\n);",
+	return fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n%s\n);",
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 	), nil
@@ -252,7 +255,8 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		tempTableName,
 	)
 
-	queries = append(queries,
+	queries = append(
+		queries,
 		deleteStmt,
 		insertStmt,
 		"DROP TEMPORARY TABLE IF EXISTS "+tempTableName,
@@ -395,7 +399,8 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 		return "", fmt.Errorf("incremental_key %s must be present in columns", incrementalKey)
 	}
 
-	return fmt.Sprintf(`DROP TABLE IF EXISTS %s;
+	return fmt.Sprintf(
+		`DROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 SELECT
   %s,
@@ -539,7 +544,8 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		validFromExpr = fmt.Sprintf("CAST(src.%s AS DATETIME)", asset.Materialization.IncrementalKey)
 	}
 
-	return fmt.Sprintf(`DROP TABLE IF EXISTS %s;
+	return fmt.Sprintf(
+		`DROP TABLE IF EXISTS %s;
 CREATE TABLE %s AS
 SELECT
   %s,

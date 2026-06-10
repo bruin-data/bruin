@@ -66,9 +66,10 @@ func TestDB_Select(t *testing.T) {
 			name: "multi-row select query is handled",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`some query`).
-					WillReturnRows(sqlmock.NewRows([]string{"one", "two", "three"}).
-						AddRow(1, 2, 3).
-						AddRow(4, 5, 6),
+					WillReturnRows(
+						sqlmock.NewRows([]string{"one", "two", "three"}).
+							AddRow(1, 2, 3).
+							AddRow(4, 5, 6),
 					)
 			},
 			query: query.Query{

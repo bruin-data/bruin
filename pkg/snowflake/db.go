@@ -603,7 +603,8 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		`SELECT COLUMN_NAME, COMMENT 
           FROM %s.INFORMATION_SCHEMA.COLUMNS 
           WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
-		db.config.Database, schemaName, tableName)
+		db.config.Database, schemaName, tableName,
+	)
 
 	rows, err := db.Select(ctx, &query.Query{Query: queryStr})
 	if err != nil {

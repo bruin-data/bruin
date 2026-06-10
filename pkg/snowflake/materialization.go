@@ -255,7 +255,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		validFromExpr := fmt.Sprintf("CAST(source.%s AS TIMESTAMP)", incrementalKey)
 		insertValues = append(insertValues, validFromExpr, "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
 
-		queryStr := fmt.Sprintf(`
+		queryStr := fmt.Sprintf(
+			`
 BEGIN TRANSACTION;
 
 -- Step 1: Update expired records that are no longer in source
@@ -316,7 +317,8 @@ COMMIT;`,
 
 	insertValues = append(insertValues, "$current_scd2_ts", "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 BEGIN TRANSACTION;
 
 -- Capture timestamp once for consistency across all operations
@@ -454,7 +456,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 	pkList := strings.Join(primaryKeys, ", ")
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues,
+	insertValues = append(
+		insertValues,
 		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP)",
 		"TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')",
 		"TRUE",
@@ -467,7 +470,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	onCondition := strings.Join(joinConds, " AND ")
 	tbl := asset.Name
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 BEGIN TRANSACTION;
 
 -- Capture timestamp once for consistency across all operations

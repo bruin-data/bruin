@@ -24,7 +24,8 @@ func buildDataVaultHubQueryWithOptions(asset *pipeline.Asset, query string, full
 		return "", err
 	}
 
-	insertQuery := fmt.Sprintf(`WITH __bruin_source AS (
+	insertQuery := fmt.Sprintf(
+		`WITH __bruin_source AS (
 %s
 ),
 __bruin_ranked AS (
@@ -81,7 +82,8 @@ func buildDataVaultLinkQueryWithOptions(asset *pipeline.Asset, query string, ful
 		return "", err
 	}
 
-	insertQuery := fmt.Sprintf(`WITH __bruin_source AS (
+	insertQuery := fmt.Sprintf(
+		`WITH __bruin_source AS (
 %s
 ),
 __bruin_ranked AS (
@@ -139,7 +141,8 @@ func buildDataVaultSatelliteQueryWithOptions(asset *pipeline.Asset, query string
 		return "", err
 	}
 
-	insertQuery := fmt.Sprintf(`WITH __bruin_source AS (
+	insertQuery := fmt.Sprintf(
+		`WITH __bruin_source AS (
 %s
 ),
 __bruin_valid AS (
@@ -369,7 +372,8 @@ func buildDataVaultTableStatements(asset *pipeline.Asset, primaryKeys []string, 
 	if fullRefresh {
 		statements = append(statements, "DROP TABLE IF EXISTS "+asset.Name)
 	}
-	statements = append(statements, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
+	statements = append(statements, fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
 		asset.Name,
 		strings.Join(columnDefs, ",\n  "),
 	))

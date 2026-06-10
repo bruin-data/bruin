@@ -140,7 +140,8 @@ func (c AthenaConnection) GetName() string {
 }
 
 func (c *AthenaConnection) LoadCredentialsFromProfile(ctx context.Context) error {
-	cfg, err := config.LoadDefaultConfig(ctx,
+	cfg, err := config.LoadDefaultConfig(
+		ctx,
 		config.WithSharedConfigProfile(c.Profile),
 	)
 	if err != nil {
@@ -467,61 +468,71 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 	node := &yaml.Node{Kind: yaml.MappingNode}
 
 	if c.Name != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "name"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Name},
 		)
 	}
 	if c.Account != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "account"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Account},
 		)
 	}
 	if c.Username != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "username"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Username},
 		)
 	}
 	if c.Password != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "password"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Password},
 		)
 	}
 	if c.Region != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "region"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Region},
 		)
 	}
 	if c.Role != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "role"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Role},
 		)
 	}
 	if c.Database != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "database"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Database},
 		)
 	}
 	if c.Schema != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "schema"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Schema},
 		)
 	}
 	if c.Warehouse != "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "warehouse"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.Warehouse},
 		)
 	}
 	if c.PrivateKeyPath != "" && c.PrivateKey == "" {
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "private_key_path"},
 			&yaml.Node{Kind: yaml.ScalarNode, Value: c.PrivateKeyPath},
 		)
@@ -540,7 +551,8 @@ func (c SnowflakeConnection) MarshalYAML() (interface{}, error) {
 		if !strings.HasSuffix(normalizedKey, "\n") {
 			privateKeyNode.Value = normalizedKey + "\n"
 		}
-		node.Content = append(node.Content,
+		node.Content = append(
+			node.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "private_key"},
 			privateKeyNode,
 		)

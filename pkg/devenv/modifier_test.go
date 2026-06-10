@@ -382,7 +382,8 @@ func TestDevEnvQueryModifier_Modify_ThreePartNames(t *testing.T) {
 				}, nil)
 				f.Conn.On("GetConnection", "mssql-default").Return(c)
 
-				f.Parser.On("UsedTables",
+				f.Parser.On(
+					"UsedTables",
 					"select * from mydb.myschema.mytable t1 join otherschema.othertable t2 on t1.id = t2.id",
 					"tsql",
 				).Return([]string{"mydb.myschema.mytable", "otherschema.othertable"}, nil)
@@ -431,7 +432,8 @@ func TestDevEnvQueryModifier_Modify_ThreePartNames(t *testing.T) {
 				}, nil)
 				f.Conn.On("GetConnection", "mssql-default").Return(c)
 
-				f.Parser.On("UsedTables",
+				f.Parser.On(
+					"UsedTables",
 					"select * from db1.schema1.table1 t1 join db2.schema2.table2 t2 on t1.id = t2.id",
 					"tsql",
 				).Return([]string{"db1.schema1.table1", "db2.schema2.table2"}, nil)

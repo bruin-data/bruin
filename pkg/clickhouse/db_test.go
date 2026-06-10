@@ -72,9 +72,12 @@ type MockConn struct {
 	mock.Mock
 }
 
-func (m *MockConn) Contributors() []string                                                { return []string{""} }
-func (m *MockConn) ServerVersion() (*driver.ServerVersion, error)                         { return nil, nil }
+func (m *MockConn) Contributors() []string { return []string{""} }
+
+func (m *MockConn) ServerVersion() (*driver.ServerVersion, error) { return nil, nil }
+
 func (m *MockConn) Select(ctx context.Context, dest any, query string, args ...any) error { return nil }
+
 func (m *MockConn) Query(ctx context.Context, query string, _ ...any) (driver.Rows, error) {
 	res := m.Called(ctx, query)
 	rows := res.Get(0)
@@ -85,6 +88,7 @@ func (m *MockConn) Query(ctx context.Context, query string, _ ...any) (driver.Ro
 }
 
 func (m *MockConn) QueryRow(ctx context.Context, query string, args ...any) driver.Row { return nil }
+
 func (m *MockConn) PrepareBatch(ctx context.Context, query string, opts ...driver.PrepareBatchOption) (driver.Batch, error) {
 	return nil, nil
 }
