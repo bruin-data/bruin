@@ -2444,10 +2444,11 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
 		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
 	}
-	if assetAcceptsDefaultHooks(asset) && len(asset.Hooks.Pre) == 0 {
+	acceptsDefaultHooks := assetAcceptsDefaultHooks(asset)
+	if acceptsDefaultHooks && len(asset.Hooks.Pre) == 0 {
 		asset.Hooks.Pre = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Pre...)
 	}
-	if assetAcceptsDefaultHooks(asset) && len(asset.Hooks.Post) == 0 {
+	if acceptsDefaultHooks && len(asset.Hooks.Post) == 0 {
 		asset.Hooks.Post = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Post...)
 	}
 	if !foundPipeline.DefaultValues.Routing.IsZero() {
@@ -2560,27 +2561,28 @@ func (b *Builder) fillGlossaryStuff(ctx context.Context, asset *Asset, foundPipe
 }
 
 func (a *Asset) IsSQLAsset() bool {
-	sqlAssetTypes := map[AssetType]bool{
-		AssetTypeBigqueryQuery:     true,
-		AssetTypeSnowflakeQuery:    true,
-		AssetTypePostgresQuery:     true,
-		AssetTypeRedshiftQuery:     true,
-		AssetTypeMsSQLQuery:        true,
-		AssetTypeVerticaQuery:      true,
-		AssetTypeDatabricksQuery:   true,
-		AssetTypeSynapseQuery:      true,
-		AssetTypeFabricQuery:       true,
-		AssetTypeFabricQueryLegacy: true,
-		AssetTypeAthenaQuery:       true,
-		AssetTypeDuckDBQuery:       true,
-		AssetTypeClickHouse:        true,
-		AssetTypeTrinoQuery:        true,
-		AssetTypeDremioQuery:       true,
-		AssetTypeSailQuery:         true,
-		AssetTypeOracleQuery:       true,
+	switch a.Type {
+	case AssetTypeBigqueryQuery,
+		AssetTypeSnowflakeQuery,
+		AssetTypePostgresQuery,
+		AssetTypeRedshiftQuery,
+		AssetTypeMsSQLQuery,
+		AssetTypeVerticaQuery,
+		AssetTypeDatabricksQuery,
+		AssetTypeSynapseQuery,
+		AssetTypeFabricQuery,
+		AssetTypeFabricQueryLegacy,
+		AssetTypeAthenaQuery,
+		AssetTypeDuckDBQuery,
+		AssetTypeClickHouse,
+		AssetTypeTrinoQuery,
+		AssetTypeDremioQuery,
+		AssetTypeSailQuery,
+		AssetTypeOracleQuery:
+		return true
+	default:
+		return false
 	}
-
-	return sqlAssetTypes[a.Type]
 }
 
 func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string) error {

@@ -134,7 +134,13 @@ func GetPipelineRootFromTask(taskPath string, pipelineDefinitionFile []string) (
 
 func GetAllFilesRecursive(root string, suffixes []string) ([]string, error) {
 	var paths []string
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get absolute path for %s", root)
+	}
+	cleanRoot := filepath.Clean(root)
+
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -147,13 +153,20 @@ func GetAllFilesRecursive(root string, suffixes []string) ([]string, error) {
 			return nil
 		}
 
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get absolute path for %s", path)
-		}
-
+		abs := ""
 		for _, s := range suffixes {
-			if strings.HasSuffix(abs, s) {
+			if strings.HasSuffix(path, s) {
+				if abs == "" {
+					if filepath.IsAbs(path) {
+						abs = path
+					} else {
+						rel, err := filepath.Rel(cleanRoot, path)
+						if err != nil {
+							return errors.Wrapf(err, "failed to get relative path for %s", path)
+						}
+						abs = filepath.Join(absRoot, rel)
+					}
+				}
 				paths = append(paths, abs)
 			}
 		}

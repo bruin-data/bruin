@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/pprof"
 	"sort"
 	"strings"
 
@@ -43,6 +44,7 @@ func Internal() *cli.Command {
 		Commands: []*cli.Command{
 			ParseAsset(),
 			ParsePipeline(),
+			BenchmarkParsePipeline(),
 			PatchAsset(),
 			PatchPipeline(),
 			ParseGlossary(),
@@ -120,6 +122,71 @@ func ParsePipeline() *cli.Command {
 			}
 
 			return r.ParsePipeline(ctx, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"), c.String("variant"))
+		},
+	}
+}
+
+func BenchmarkParsePipeline() *cli.Command {
+	return &cli.Command{
+		Name:      "benchmark-parse-pipeline",
+		Usage:     "parse a full Bruin pipeline without JSON serialization",
+		ArgsUsage: "[path to the pipeline]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "variant",
+				Usage: "variant to materialize for variant pipelines",
+			},
+			&cli.StringFlag{
+				Name:  "cpuprofile",
+				Usage: "write a CPU profile to the given path",
+			},
+			&cli.IntFlag{
+				Name:  "count",
+				Usage: "number of parses to run in this process",
+				Value: 1,
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			profilePath := c.String("cpuprofile")
+			if profilePath != "" {
+				profileFile, err := os.Create(profilePath)
+				if err != nil {
+					return err
+				}
+				defer profileFile.Close()
+
+				if err := pprof.StartCPUProfile(profileFile); err != nil {
+					return err
+				}
+				defer pprof.StopCPUProfile()
+			}
+
+			pipelinePath := c.Args().Get(0)
+			if pipelinePath == "" {
+				return cli.Exit("pipeline path is required", 1)
+			}
+
+			opts := []pipeline.CreatePipelineOption{pipeline.WithMutate()}
+			if variantName := c.String("variant"); variantName != "" {
+				opts = append(opts, pipeline.WithVariant(variantName))
+			}
+
+			count := c.Int("count")
+			if count < 1 {
+				return cli.Exit("count must be greater than zero", 1)
+			}
+
+			totalAssets := 0
+			for range count {
+				foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
+				if err != nil {
+					return err
+				}
+				totalAssets += len(foundPipeline.Assets)
+			}
+
+			fmt.Printf("assets=%d\n", totalAssets)
+			return nil
 		},
 	}
 }
