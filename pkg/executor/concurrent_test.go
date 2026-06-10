@@ -178,6 +178,32 @@ func TestWorkerWriter_Write(t *testing.T) {
 	}
 }
 
+func TestWorkerWriter_Write_Passthrough(t *testing.T) {
+	t.Parallel()
+
+	task := &pipeline.Asset{Name: "test-task"}
+
+	// In passthrough mode the writer forwards bytes verbatim: no timestamp,
+	// no task name, no ">> " prefix, and carriage returns are preserved so
+	// progress bars render in place.
+	input := []byte("\r 50%|#####     | 50/100")
+
+	var buf bytes.Buffer
+	w := &workerWriter{
+		w:           &buf,
+		task:        task,
+		sprintfFunc: fmt.Sprintf,
+		Passthrough: true,
+	}
+
+	n, err := w.Write(input)
+
+	require.NoError(t, err)
+	assert.Equal(t, len(input), n)
+	assert.Equal(t, string(input), buf.String())
+	assert.True(t, w.IsPassthrough())
+}
+
 func TestWorkerWriter_Write_WriteError(t *testing.T) {
 	t.Parallel()
 

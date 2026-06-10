@@ -58,6 +58,12 @@ type FormattingOptions struct {
 	LogOnlyWriter     io.Writer                                          // in TUI mode, worker output goes here (log file) instead of os.Stdout
 	OnTaskStart       func(scheduler.TaskInstance)                       // called when worker begins executing a task
 	OnTaskEnd         func(scheduler.TaskInstance, error, time.Duration) // called when worker finishes a task
+
+	// InteractivePythonLogs passes child process stdout/stderr through verbatim
+	// (preserving carriage returns, without the timestamp/task-name/">> " prefix)
+	// so progress bars like tqdm can update in place. Only safe for a single
+	// sequential worker writing to a real terminal.
+	InteractivePythonLogs bool
 }
 
 type Concurrent struct {
@@ -185,6 +191,7 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 			sprintfFunc:       w.printer.SprintfFunc(),
 			DoNotLogTimestamp: w.formatOpts.DoNotLogTimestamp,
 			DoNotLogTaskName:  w.formatOpts.DoNotLogTaskName,
+			Passthrough:       w.formatOpts.InteractivePythonLogs,
 		}
 
 		executionCtx := context.WithValue(ctx, KeyPrinter, printer)
@@ -247,9 +254,21 @@ type workerWriter struct {
 	sprintfFunc       func(format string, a ...interface{}) string
 	DoNotLogTimestamp bool
 	DoNotLogTaskName  bool
+	Passthrough       bool
+}
+
+// IsPassthrough reports whether this writer forwards child output verbatim.
+// consumePipe uses this to skip line buffering and the ">> " prefix so
+// carriage-return based progress bars render correctly.
+func (w *workerWriter) IsPassthrough() bool {
+	return w.Passthrough
 }
 
 func (w *workerWriter) Write(p []byte) (int, error) {
+	if w.Passthrough {
+		return w.w.Write(p)
+	}
+
 	var formatted string
 	timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
 
