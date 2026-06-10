@@ -2,14 +2,16 @@
 
 This document gives AI agents the project-specific operating guidance needed to work safely in Bruin.
 
-## Before You Finish: Mandatory Checks
+## Before You Finish: Checks
 
-**You MUST run these commands before completing any task that modifies code:**
+**You MUST run these commands before completing any task that modifies application code:**
 
 1. **Format the code**: Run `make format` in the project root. Check `git diff` afterward — if there are formatting changes, stage and include them in your work.
 2. **Run the tests**: Run `make test` in the project root. If any tests fail, fix the issues before finishing.
 
-Do not consider your task complete until both checks pass. Use the `/format-fix` and `/test` commands if needed.
+Do not consider an application-code task complete until both checks pass. Use the `/format-fix` and `/test` commands if needed.
+
+For changes that only touch non-application files, such as documentation, GitHub Actions workflows, agent instructions, repository metadata, or other configuration that does not affect the Bruin binary/runtime behavior, do not run the full `make format` / `make test` suite by default. Instead, run the smallest relevant validation available for the changed files, such as YAML syntax checks, Markdown checks, workflow review, or `git diff` inspection, and clearly report what was and was not run.
 
 ## Table of Contents
 
@@ -187,7 +189,7 @@ Use narrow test loops while developing, then run the required full checks before
 go test -tags="no_duckdb_arrow" ./pkg/foo -run TestName
 go test -tags="no_duckdb_arrow" ./cmd/... ./pkg/...
 
-# Required final unit-test command
+# Required final unit-test command for application-code changes
 make test
 ```
 
