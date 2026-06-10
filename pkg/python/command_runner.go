@@ -143,11 +143,9 @@ func consumePipe(pipe io.Reader, output io.Writer, passthrough bool) error {
 	// returns survive and progress bars render in place. No ">> " prefix is
 	// added; the writer is responsible for any formatting (none, in this case).
 	if passthrough {
+		// io.Copy returns nil on a clean EOF, so its error can be returned as-is.
 		_, err := io.Copy(output, pipe)
-		if err != nil && !stderrors.Is(err, io.EOF) {
-			return err
-		}
-		return nil
+		return err
 	}
 
 	// Use bufio.Reader.ReadLine() instead of Scanner to handle unlimited line lengths.

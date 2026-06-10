@@ -1153,23 +1153,28 @@ func Run(isDebug *bool) *cli.Command {
 			noColor := c.Bool("no-color")
 			minimalLogs := c.Bool("minimal-logs")
 
-			// Use the interactive TUI only when explicitly requested via --interactive flag
-			useTUI := c.Bool("interactive") &&
-				term.IsTerminal(int(os.Stdout.Fd())) && //nolint:gosec // G115: safe uintptr->int for terminal check
+			// Detect the real terminal here, before logOutput swaps os.Stdout for
+			// the tee writer below. Both interactive features below require a real
+			// terminal with colored, non-JSON output.
+			interactiveTerminal := term.IsTerminal(int(os.Stdout.Fd())) && //nolint:gosec // G115: safe uintptr->int for terminal check
 				runConfig.Output != "json" &&
 				!noColor
 
+			// Use the interactive TUI only when explicitly requested via --interactive flag
+			useTUI := c.Bool("interactive") && interactiveTerminal
+
 			// Pass Python/child process output through verbatim (preserving carriage
 			// returns, no timestamp/task prefix) so progress bars like tqdm render in
-			// place. Only safe with a single sequential worker writing to a real
-			// terminal: with multiple workers or a log file the interleaved \r output
-			// would be unreadable. Detect the terminal here, before logOutput swaps
-			// os.Stdout for the tee writer below.
-			interactivePythonLogs := term.IsTerminal(int(os.Stdout.Fd())) && //nolint:gosec // G115: safe uintptr->int for terminal check
+			// place. Only safe with a single sequential worker writing straight to a
+			// real terminal: with multiple workers the interleaved \r output would be
+			// unreadable, and with a log file the raw \r bytes pollute the log (the
+			// worker writes to the os.Stdout tee that logOutput installs below, and
+			// Clean() strips ANSI escapes but not carriage returns). So this is gated
+			// on !runConfig.NoLogFile to ensure os.Stdout is still the bare terminal.
+			interactivePythonLogs := interactiveTerminal &&
 				c.Int("workers") == 1 &&
 				!useTUI &&
-				runConfig.Output != "json" &&
-				!noColor
+				runConfig.NoLogFile
 
 			// Save the real terminal fd BEFORE logOutput replaces os.Stdout
 			var realTerminal *os.File
