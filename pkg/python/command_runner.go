@@ -99,11 +99,19 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 		return errors.Wrap(err, "failed to get stdout")
 	}
 
+	// When the output writer opts into passthrough (interactive terminal, single
+	// sequential worker), forward child output verbatim so carriage-return based
+	// progress bars (tqdm, etc.) can update in place.
+	passthrough := false
+	if pt, ok := output.(interface{ IsPassthrough() bool }); ok {
+		passthrough = pt.IsPassthrough()
+	}
+
 	// Start reading from pipes in goroutines before starting the command
 	// This prevents deadlock if the command generates a lot of output.
 	wg := new(errgroup.Group)
-	wg.Go(func() error { return consumePipe(stdout, output) })
-	wg.Go(func() error { return consumePipe(stderr, output) })
+	wg.Go(func() error { return consumePipe(stdout, output, passthrough) })
+	wg.Go(func() error { return consumePipe(stderr, output, passthrough) })
 
 	err = cmd.Start()
 	if err != nil {
@@ -130,7 +138,18 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 	return nil
 }
 
-func consumePipe(pipe io.Reader, output io.Writer) error {
+func consumePipe(pipe io.Reader, output io.Writer, passthrough bool) error {
+	// In passthrough mode forward the raw byte stream untouched so carriage
+	// returns survive and progress bars render in place. No ">> " prefix is
+	// added; the writer is responsible for any formatting (none, in this case).
+	if passthrough {
+		_, err := io.Copy(output, pipe)
+		if err != nil && !stderrors.Is(err, io.EOF) {
+			return err
+		}
+		return nil
+	}
+
 	// Use bufio.Reader.ReadLine() instead of Scanner to handle unlimited line lengths.
 	reader := bufio.NewReaderSize(pipe, 64*1024) // 64KB buffer for efficient reading
 

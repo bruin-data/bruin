@@ -1159,6 +1159,18 @@ func Run(isDebug *bool) *cli.Command {
 				runConfig.Output != "json" &&
 				!noColor
 
+			// Pass Python/child process output through verbatim (preserving carriage
+			// returns, no timestamp/task prefix) so progress bars like tqdm render in
+			// place. Only safe with a single sequential worker writing to a real
+			// terminal: with multiple workers or a log file the interleaved \r output
+			// would be unreadable. Detect the terminal here, before logOutput swaps
+			// os.Stdout for the tee writer below.
+			interactivePythonLogs := term.IsTerminal(int(os.Stdout.Fd())) && //nolint:gosec // G115: safe uintptr->int for terminal check
+				c.Int("workers") == 1 &&
+				!useTUI &&
+				runConfig.Output != "json" &&
+				!noColor
+
 			// Save the real terminal fd BEFORE logOutput replaces os.Stdout
 			var realTerminal *os.File
 			if useTUI {
@@ -1287,10 +1299,11 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 			formatOpts := executor.FormattingOptions{
-				DoNotLogTimestamp: c.Bool("no-timestamp"),
-				DoNotLogTaskName:  preview.RunningForAnAsset,
-				NoColor:           noColor,
-				MinimalLogs:       minimalLogs,
+				DoNotLogTimestamp:     c.Bool("no-timestamp"),
+				DoNotLogTaskName:      preview.RunningForAnAsset,
+				NoColor:               noColor,
+				MinimalLogs:           minimalLogs,
+				InteractivePythonLogs: interactivePythonLogs,
 			}
 
 			// Create a context with timeout
