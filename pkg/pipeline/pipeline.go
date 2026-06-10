@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -2173,16 +2175,17 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		taskFiles = append(taskFiles, files...)
 	}
 
-	for _, file := range taskFiles {
-		task, err := b.CreateAssetFromFile(file, pipeline)
-		if err != nil {
-			return nil, err
+	taskResults := b.createAssetsFromFiles(taskFiles, pipeline)
+	for _, result := range taskResults {
+		if result.err != nil {
+			return nil, result.err
 		}
 
-		if task == nil {
+		if result.task == nil {
 			continue
 		}
 
+		task := result.task
 		if config.isMutate {
 			task, err = b.MutateAsset(ctx, task, pipeline)
 			if err != nil {
@@ -2253,6 +2256,48 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	}
 
 	return pipeline, nil
+}
+
+type assetFromFileResult struct {
+	task *Asset
+	err  error
+}
+
+func (b *Builder) createAssetsFromFiles(taskFiles []string, foundPipeline *Pipeline) []assetFromFileResult {
+	results := make([]assetFromFileResult, len(taskFiles))
+	if len(taskFiles) == 0 {
+		return results
+	}
+
+	workerCount := min(runtime.GOMAXPROCS(0), len(taskFiles))
+	if workerCount <= 1 {
+		for i, file := range taskFiles {
+			task, err := b.CreateAssetFromFile(file, foundPipeline)
+			results[i] = assetFromFileResult{task: task, err: err}
+		}
+		return results
+	}
+
+	jobs := make(chan int, workerCount)
+	var wg sync.WaitGroup
+	wg.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer wg.Done()
+			for index := range jobs {
+				task, err := b.CreateAssetFromFile(taskFiles[index], foundPipeline)
+				results[index] = assetFromFileResult{task: task, err: err}
+			}
+		}()
+	}
+
+	for index := range taskFiles {
+		jobs <- index
+	}
+	close(jobs)
+	wg.Wait()
+
+	return results
 }
 
 // CreatePipelinesFromPath returns one *Pipeline per declared variant when the
