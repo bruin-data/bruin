@@ -854,6 +854,17 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "webhook_endpoint", PrimaryKey: "id", IncKey: "created", IncStrategy: "merge"},
 	},
 
+	// Paddle - Billing and subscriptions
+	"paddle": {
+		{Name: "customers", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "products", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "prices", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "discounts", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "transactions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "subscriptions", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "adjustments", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// SurveyMonkey - Survey and feedback platform
 	"surveymonkey": {
 		{Name: "surveys", PrimaryKey: "id", IncKey: "date_modified", IncStrategy: "merge"},

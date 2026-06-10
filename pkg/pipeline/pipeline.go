@@ -166,6 +166,7 @@ var defaultMapping = map[string]string{
 	"klaviyo":               "klaviyo-default",
 	"adjust":                "adjust-default",
 	"stripe":                "stripe-default",
+	"paddle":                "paddle-default",
 	"appsflyer":             "appsflyer-default",
 	"kafka":                 "kafka-default",
 	"duckdb":                "duckdb-default",
