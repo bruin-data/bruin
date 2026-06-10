@@ -447,6 +447,32 @@ select 1
 	require.Equal(t, &pipeline.RoutingConfig{EgressGateway: "wg-shared-ams3"}, task.Routing)
 }
 
+func TestCheckRetries(t *testing.T) {
+	t.Parallel()
+
+	creator := pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs())
+	got, err := creator(filepath.Join("testdata", "yaml", "check-retries", "task.yml"))
+	require.NoError(t, err)
+
+	require.Len(t, got.Columns, 1)
+	checks := got.Columns[0].Checks
+	require.Len(t, checks, 2)
+
+	// "unique" has an explicit retries override.
+	require.Equal(t, "unique", checks[0].Name)
+	require.NotNil(t, checks[0].Retries)
+	require.Equal(t, 2, *checks[0].Retries)
+
+	// "not_null" has no retries; it stays nil so consumers can default to the asset value.
+	require.Equal(t, "not_null", checks[1].Name)
+	require.Nil(t, checks[1].Retries)
+
+	require.Len(t, got.CustomChecks, 2)
+	require.NotNil(t, got.CustomChecks[0].Retries)
+	require.Equal(t, 3, *got.CustomChecks[0].Retries)
+	require.Nil(t, got.CustomChecks[1].Retries)
+}
+
 func TestConvertYamlToTask_Hooks(t *testing.T) {
 	t.Parallel()
 
