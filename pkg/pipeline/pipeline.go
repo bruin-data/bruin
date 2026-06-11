@@ -869,7 +869,7 @@ type Asset struct { //nolint:recvcheck
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
-	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
+	Routing           *RoutingConfig     `json:"routing" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
@@ -1696,7 +1696,7 @@ type DefaultValues struct {
 	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
 	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
 	Hooks             Hooks             `json:"hooks" yaml:"hooks" mapstructure:"hooks"`
-	Routing           *RoutingConfig    `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
+	Routing           *RoutingConfig    `json:"routing" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int              `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
 }

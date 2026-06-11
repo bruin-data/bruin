@@ -60,6 +60,7 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
+      "routing": null,
       "interval_modifiers": null
     },
     {
@@ -101,6 +102,7 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
+      "routing": null,
       "interval_modifiers": null
     },
     {
@@ -142,6 +144,7 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
+      "routing": null,
       "interval_modifiers": null
     },
     {
@@ -225,6 +228,7 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
+      "routing": null,
       "interval_modifiers": null
     }
   ],
