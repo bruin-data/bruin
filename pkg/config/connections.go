@@ -717,6 +717,15 @@ func (c StripeConnection) GetName() string {
 	return c.Name
 }
 
+type PaddleConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c PaddleConnection) GetName() string {
+	return c.Name
+}
+
 type DuneConnection struct {
 	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
