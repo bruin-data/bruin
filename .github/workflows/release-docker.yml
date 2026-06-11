@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           fetch-tags: true
 
       - name: Checkout manual tag
@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: refs/tags/${{ github.event.inputs.tag }}
-          fetch-depth: 1
+          fetch-depth: 0
           fetch-tags: true
 
       - name: Determine release tag (workflow run)
