@@ -237,7 +237,8 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 
 	createTable := fmt.Sprintf("CREATE TABLE %s (\n%s\n)", asset.Name, strings.Join(columnDefs, ",\n"))
 	parts := make([]string, 0, 10+len(commentStatements))
-	parts = append(parts,
+	parts = append(
+		parts,
 		"BEGIN",
 		"   BEGIN",
 		fmt.Sprintf("      EXECUTE IMMEDIATE '%s';", escapeOracleString(createTable)),
@@ -414,7 +415,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 
 	insertCols = append(insertCols, "bruin_valid_from", "bruin_valid_until", "bruin_is_current")
-	insertValues = append(insertValues,
+	insertValues = append(
+		insertValues,
 		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP)",
 		"TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')",
 		"1",
@@ -435,7 +437,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 	// execute atomically through the Go driver.
 	// The EXISTS guard on the UPDATE prevents an empty source batch from
 	// marking all existing current rows as expired.
-	queryStr := fmt.Sprintf(`BEGIN
+	queryStr := fmt.Sprintf(
+		`BEGIN
 UPDATE %s target
 SET bruin_valid_until = LOCALTIMESTAMP, bruin_is_current = 0
 WHERE target.bruin_is_current = 1

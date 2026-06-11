@@ -246,7 +246,8 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 			`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s; 
 CREATE TABLE %s AS %s;
-COMMIT;`, QuoteIdentifier(task.Name), QuoteIdentifier(task.Name), query), nil
+COMMIT;`, QuoteIdentifier(task.Name), QuoteIdentifier(task.Name), query,
+		), nil
 	}
 }
 
@@ -310,8 +311,9 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		columnDefs = append(columnDefs, primaryKeyClause)
 	}
 
-	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n"+
-		"%s\n)",
+	q := fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n"+
+			"%s\n)",
 		QuoteIdentifier(asset.Name),
 		strings.Join(columnDefs, ",\n"),
 	)
@@ -339,7 +341,8 @@ func buildDataVaultHubQueryWithOptions(asset *pipeline.Asset, query string, full
 		return "", err
 	}
 
-	insertQuery := fmt.Sprintf(`WITH __bruin_source AS (
+	insertQuery := fmt.Sprintf(
+		`WITH __bruin_source AS (
 %s
 ),
 __bruin_dedup AS (
@@ -393,7 +396,8 @@ func buildDataVaultLinkQueryWithOptions(asset *pipeline.Asset, query string, ful
 		return "", err
 	}
 
-	insertQuery := fmt.Sprintf(`WITH __bruin_source AS (
+	insertQuery := fmt.Sprintf(
+		`WITH __bruin_source AS (
 %s
 ),
 __bruin_dedup AS (
@@ -448,7 +452,8 @@ func buildDataVaultSatelliteQueryWithOptions(asset *pipeline.Asset, query string
 		return "", err
 	}
 
-	insertQuery := fmt.Sprintf(`WITH __bruin_source AS (
+	insertQuery := fmt.Sprintf(
+		`WITH __bruin_source AS (
 %s
 ),
 __bruin_valid AS (
@@ -656,7 +661,8 @@ func buildDataVaultTableStatements(asset *pipeline.Asset, primaryKeys []string, 
 	if fullRefresh {
 		statements = append(statements, "DROP TABLE IF EXISTS "+QuoteIdentifier(asset.Name))
 	}
-	statements = append(statements, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n%s\n)",
+	statements = append(statements, fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n%s\n)",
 		QuoteIdentifier(asset.Name),
 		strings.Join(columnDefs, ",\n"),
 	))
@@ -998,7 +1004,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		matchedCondition = "FALSE"
 	}
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
@@ -1101,7 +1108,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 
 	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues,
+	insertValues = append(
+		insertValues,
 		"source."+quotedIncrementalKey,
 		"'9999-12-31 00:00:00'",
 		"TRUE",
@@ -1114,7 +1122,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	onCondition := strings.Join(joinConds, " AND ")
 	tbl := asset.Name
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
@@ -1221,7 +1230,8 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 	var updateExistsExpr string
 	if incrementalKey != "" {
 		quotedIncrementalKey := QuoteIdentifier(incrementalKey)
-		updateExistsExpr = fmt.Sprintf(`UPDATE %s AS target
+		updateExistsExpr = fmt.Sprintf(
+			`UPDATE %s AS target
 SET _valid_until = (SELECT %s FROM %s AS source WHERE %s LIMIT 1), _is_current = FALSE
 WHERE target._is_current = TRUE
   AND EXISTS (
@@ -1237,7 +1247,8 @@ WHERE target._is_current = TRUE
 			matchedCondition,
 		)
 	} else {
-		updateExistsExpr = fmt.Sprintf(`UPDATE %s AS target
+		updateExistsExpr = fmt.Sprintf(
+			`UPDATE %s AS target
 SET _valid_until = (SELECT session_timestamp FROM _ts), _is_current = FALSE
 WHERE target._is_current = TRUE
   AND EXISTS (
@@ -1251,7 +1262,8 @@ WHERE target._is_current = TRUE
 		)
 	}
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 BEGIN TRANSACTION;
 
 -- Capture the timestamp once for the entire transaction
@@ -1343,7 +1355,8 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 	}
 	quotedIncrementalKey := QuoteIdentifier(asset.Materialization.IncrementalKey)
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues,
+	insertValues = append(
+		insertValues,
 		"source."+quotedIncrementalKey,
 		"TIMESTAMP '9999-12-31 00:00:00'",
 		"TRUE",
@@ -1358,7 +1371,8 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 
 	tempTableName := "__bruin_scd2_time_tmp_" + helpers.PrefixGenerator()
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 BEGIN TRANSACTION;
 
 -- Create temp table with source data

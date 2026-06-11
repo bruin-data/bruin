@@ -228,7 +228,8 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		columnDefs = append(columnDefs, primaryKeyClause)
 	}
 
-	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
+	q := fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
 		asset.Name,
 		strings.Join(columnDefs, ",\n  "),
 	)
@@ -283,7 +284,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	}
 	pkList := strings.Join(primaryKeys, ", ")
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues,
+	insertValues = append(
+		insertValues,
 		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP)",
 		"TIMESTAMP('9999-12-31')",
 		"TRUE",
@@ -296,7 +298,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	onCondition := strings.Join(joinConds, " AND ")
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
@@ -397,7 +400,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 	whereCondition := strings.Join(compareCondsS1T1, " OR ")
 	whereCondition = "(" + whereCondition + ")" + " AND t1._is_current"
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
