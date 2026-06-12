@@ -71,7 +71,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     },
     {
       "id": "209c299a591add072bfa259ad5f311ab7c5aa154960a55b20f3d6de33bb8f21b",
@@ -123,7 +124,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     },
     {
       "id": "c53385eb13eb4d3d102be02b0d3fe4a10661339b3c098de8b226f7317fc47d21",
@@ -164,7 +166,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     },
     {
       "id": "8361c0131fda306b28fd4f3c8f2af121cca5e57baf77a771b4cb218abda4ca5b",
@@ -236,7 +239,8 @@
               "name": "positive",
               "value": null,
               "blocking": true,
-              "description": ""
+              "description": "",
+              "retries": null
             }
           ],
           "upstreams": []
@@ -261,7 +265,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     }
   ],
   "notifications": {

@@ -69,7 +69,8 @@
             "name": "positive",
             "value": null,
             "blocking": true,
-            "description": ""
+            "description": "",
+            "retries": null
           }
         ],
         "upstreams": []
@@ -94,7 +95,8 @@
     "metadata": {},
     "snowflake": null,
     "athena": null,
-    "interval_modifiers": null
+    "interval_modifiers": null,
+    "retries": null
   },
   "pipeline": {
     "name": "integration_test",

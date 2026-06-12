@@ -135,7 +135,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     }
   ],
   "notifications": {
