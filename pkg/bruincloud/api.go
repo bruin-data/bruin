@@ -207,18 +207,50 @@ func (c *APIClient) GetRun(ctx context.Context, project, pipeline, runID string)
 	return &resp.Data, nil
 }
 
-func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string) error {
-	body := map[string]any{
-		"pipelines": []map[string]string{
-			{
-				"project":    project,
-				"pipeline":   pipeline,
-				"start_date": startDate,
-				"end_date":   endDate,
-			},
-		},
+// RunInterval is a single [start, end] window for a triggered run.
+type RunInterval struct {
+	StartDate string
+	EndDate   string
+}
+
+// TriggerRunOptions holds the optional parameters the trigger endpoint accepts.
+type TriggerRunOptions struct {
+	Whitelist      []string
+	AssetOverrides map[string]map[string]any
+	Variables      map[string]any
+}
+
+// TriggerRun triggers one run per interval. Each interval is sent as its own
+// single-entry request: the trigger endpoint reliably creates a run when given
+// one pipeline entry, but repeating the same pipeline across multiple entries in
+// one request fails server-side, so batches (e.g. one run per month) are issued
+// sequentially. On a partial failure the error reports how many runs succeeded.
+func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline string, intervals []RunInterval, opts TriggerRunOptions) error {
+	for i, iv := range intervals {
+		entry := map[string]any{
+			"project":    project,
+			"pipeline":   pipeline,
+			"start_date": iv.StartDate,
+			"end_date":   iv.EndDate,
+		}
+		if len(opts.Whitelist) > 0 {
+			entry["whitelist"] = opts.Whitelist
+		}
+		if len(opts.AssetOverrides) > 0 {
+			entry["asset_overrides"] = opts.AssetOverrides
+		}
+		if len(opts.Variables) > 0 {
+			entry["variables"] = opts.Variables
+		}
+		body := map[string]any{"pipelines": []map[string]any{entry}}
+		if err := c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-runs", body, nil); err != nil {
+			if len(intervals) > 1 {
+				return fmt.Errorf("triggered %d of %d runs; interval %s..%s failed: %w", i, len(intervals), iv.StartDate, iv.EndDate, err)
+			}
+			return err
+		}
 	}
-	return c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-runs", body, nil)
+	return nil
 }
 
 func (c *APIClient) RerunRun(ctx context.Context, project, pipeline, runID string, onlyFailed bool) error {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/stretchr/testify/assert"
@@ -323,4 +324,271 @@ func TestCloudRunsDiagnoseCommand_Flags(t *testing.T) {
 	assert.Contains(t, flagNames, "pipeline")
 	assert.Contains(t, flagNames, "run-id")
 	assert.Contains(t, flagNames, "latest")
+}
+
+func mkTriggerAsset(t *testing.T, name, id string, tags, downstream []string) bruincloud.Asset {
+	t.Helper()
+	tagsRaw, err := json.Marshal(tags)
+	require.NoError(t, err)
+	dsRaw, err := json.Marshal(downstream)
+	require.NoError(t, err)
+	return bruincloud.Asset{Name: name, ID: id, Tags: tagsRaw, Downstream: dsRaw}
+}
+
+func triggerAssetNames(selected []*bruincloud.Asset) []string {
+	names := make([]string, 0, len(selected))
+	for _, a := range selected {
+		names = append(names, a.Name)
+	}
+	return names
+}
+
+func TestSelectTriggerAssets(t *testing.T) {
+	t.Parallel()
+
+	assets := []bruincloud.Asset{
+		mkTriggerAsset(t, "s.raw", "id-raw", []string{"source"}, []string{"s.summary"}),
+		mkTriggerAsset(t, "s.summary", "id-summary", []string{"summary"}, []string{"s.report"}),
+		mkTriggerAsset(t, "s.report", "id-report", []string{"report"}, nil),
+		mkTriggerAsset(t, "s.standalone", "id-standalone", []string{"report"}, nil),
+	}
+
+	tests := []struct {
+		name    string
+		sel     triggerAssetSelection
+		want    []string
+		wantErr bool
+		wantNil bool
+	}{
+		{name: "no selection runs whole pipeline", sel: triggerAssetSelection{}, wantNil: true},
+		{name: "by asset name", sel: triggerAssetSelection{assetInputs: []string{"s.summary"}}, want: []string{"s.summary"}},
+		{name: "by bare/file name", sel: triggerAssetSelection{assetInputs: []string{"raw.sql"}}, want: []string{"s.raw"}},
+		{name: "by bare name without prefix", sel: triggerAssetSelection{assetInputs: []string{"report"}}, want: []string{"s.report"}},
+		{name: "multiple assets", sel: triggerAssetSelection{assetInputs: []string{"s.raw", "s.report"}}, want: []string{"s.raw", "s.report"}},
+		{name: "duplicate asset deduped", sel: triggerAssetSelection{assetInputs: []string{"s.raw", "raw.sql"}}, want: []string{"s.raw"}},
+		{name: "unknown asset errors", sel: triggerAssetSelection{assetInputs: []string{"nope"}}, wantErr: true},
+		{name: "one unknown among valid errors", sel: triggerAssetSelection{assetInputs: []string{"s.raw", "nope"}}, wantErr: true},
+		{name: "by tag", sel: triggerAssetSelection{tag: "report"}, want: []string{"s.report", "s.standalone"}},
+		{name: "unknown tag errors", sel: triggerAssetSelection{tag: "ghost"}, wantErr: true},
+		{name: "asset and tag union", sel: triggerAssetSelection{assetInputs: []string{"s.standalone"}, tag: "source"}, want: []string{"s.raw", "s.standalone"}},
+		{name: "downstream expansion transitive", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, downstream: true}, want: []string{"s.raw", "s.report", "s.summary"}},
+		{name: "downstream on leaf asset", sel: triggerAssetSelection{assetInputs: []string{"s.standalone"}, downstream: true}, want: []string{"s.standalone"}},
+		{name: "downstream mid-chain", sel: triggerAssetSelection{assetInputs: []string{"s.summary"}, downstream: true}, want: []string{"s.report", "s.summary"}},
+		{name: "tag with downstream", sel: triggerAssetSelection{tag: "source", downstream: true}, want: []string{"s.raw", "s.report", "s.summary"}},
+		{name: "exclude tag from all", sel: triggerAssetSelection{excludeTags: []string{"report"}}, want: []string{"s.raw", "s.summary"}},
+		{name: "multiple exclude tags", sel: triggerAssetSelection{excludeTags: []string{"source", "report"}}, want: []string{"s.summary"}},
+		{name: "exclude all tags yields empty", sel: triggerAssetSelection{excludeTags: []string{"source", "summary", "report"}}, want: []string{}},
+		{name: "downstream then exclude tag", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, downstream: true, excludeTags: []string{"report"}}, want: []string{"s.raw", "s.summary"}},
+		{name: "tag then exclude same tag", sel: triggerAssetSelection{tag: "report", excludeTags: []string{"report"}}, want: []string{}},
+		{name: "asset survives unmatched exclude tag", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, excludeTags: []string{"report"}}, want: []string{"s.raw"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := selectTriggerAssets(assets, tt.sel)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantNil {
+				assert.Nil(t, got)
+				return
+			}
+			assert.Equal(t, tt.want, triggerAssetNames(got))
+		})
+	}
+}
+
+func TestSplitRunIntervals(t *testing.T) {
+	t.Parallel()
+
+	mustParse := func(s string) time.Time {
+		ts, err := parseRunDate(s)
+		require.NoError(t, err)
+		return ts
+	}
+
+	t.Run("monthly split of a quarter yields three runs", func(t *testing.T) {
+		t.Parallel()
+		got := splitRunIntervals(mustParse("2026-01-01"), mustParse("2026-04-01"), "month", 1)
+		require.Len(t, got, 3)
+		assert.Equal(t, "2026-01-01T00:00:00.000Z", got[0].StartDate)
+		assert.Equal(t, "2026-01-31T23:59:59.999Z", got[0].EndDate)
+		assert.Equal(t, "2026-02-01T00:00:00.000Z", got[1].StartDate)
+		assert.Equal(t, "2026-03-01T00:00:00.000Z", got[2].StartDate)
+	})
+
+	t.Run("chunk size groups units per batch", func(t *testing.T) {
+		t.Parallel()
+		got := splitRunIntervals(mustParse("2026-01-01"), mustParse("2026-01-11"), "day", 5)
+		require.Len(t, got, 2)
+		assert.Equal(t, "2026-01-01T00:00:00.000Z", got[0].StartDate)
+		assert.Equal(t, "2026-01-06T00:00:00.000Z", got[1].StartDate)
+	})
+
+	t.Run("final interval is clamped to end", func(t *testing.T) {
+		t.Parallel()
+		got := splitRunIntervals(mustParse("2026-01-01"), mustParse("2026-01-10"), "week", 1)
+		require.Len(t, got, 2)
+		assert.Equal(t, "2026-01-10T00:00:00.000Z", got[1].EndDate)
+	})
+}
+
+func TestParseRunVariables(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty input returns nil", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables(nil)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("quoted string value", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables([]string{`env="prod"`})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"env": "prod"}, got)
+	})
+
+	t.Run("boolean value", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables([]string{"debug=true"})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"debug": true}, got)
+	})
+
+	t.Run("json object form sets multiple keys", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables([]string{`{"region":"eu","retries":3}`})
+		require.NoError(t, err)
+		assert.Equal(t, "eu", got["region"])
+		assert.EqualValues(t, 3, got["retries"])
+	})
+
+	t.Run("multiple flags are merged", func(t *testing.T) {
+		t.Parallel()
+		got, err := parseRunVariables([]string{`a="x"`, "b=true"})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"a": "x", "b": true}, got)
+	})
+
+	t.Run("unquoted bareword value errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseRunVariables([]string{"env=prod"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid variable override")
+	})
+}
+
+func TestApplyAssetSelection(t *testing.T) {
+	t.Parallel()
+
+	assets := []bruincloud.Asset{
+		mkTriggerAsset(t, "s.raw", "id-raw", nil, nil),
+		mkTriggerAsset(t, "s.summary", "id-summary", nil, nil),
+		mkTriggerAsset(t, "s.report", "id-report", nil, nil),
+	}
+	// A concrete selection (as selectTriggerAssets would return): raw + report.
+	selected := []*bruincloud.Asset{&assets[0], &assets[2]}
+
+	t.Run("no selection no full refresh leaves opts empty", func(t *testing.T) {
+		t.Parallel()
+		var opts bruincloud.TriggerRunOptions
+		applyAssetSelection(&opts, nil, assets, false)
+		assert.Nil(t, opts.Whitelist)
+		assert.Nil(t, opts.AssetOverrides)
+	})
+
+	t.Run("no selection with full refresh overrides every asset", func(t *testing.T) {
+		t.Parallel()
+		var opts bruincloud.TriggerRunOptions
+		applyAssetSelection(&opts, nil, assets, true)
+		assert.Nil(t, opts.Whitelist) // empty whitelist => whole pipeline
+		assert.Len(t, opts.AssetOverrides, 3)
+		for _, a := range assets {
+			assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides[a.Name])
+		}
+	})
+
+	t.Run("selection sets whitelist by id without overrides", func(t *testing.T) {
+		t.Parallel()
+		var opts bruincloud.TriggerRunOptions
+		applyAssetSelection(&opts, selected, assets, false)
+		assert.Equal(t, []string{"id-raw", "id-report"}, opts.Whitelist)
+		assert.Nil(t, opts.AssetOverrides)
+	})
+
+	t.Run("selection with full refresh overrides only selected", func(t *testing.T) {
+		t.Parallel()
+		var opts bruincloud.TriggerRunOptions
+		applyAssetSelection(&opts, selected, assets, true)
+		assert.Equal(t, []string{"id-raw", "id-report"}, opts.Whitelist)
+		assert.Len(t, opts.AssetOverrides, 2)
+		assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides["s.raw"])
+		assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides["s.report"])
+		assert.NotContains(t, opts.AssetOverrides, "s.summary")
+	})
+}
+
+func TestBuildTriggerIntervals(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no split is a single passthrough interval", func(t *testing.T) {
+		t.Parallel()
+		got, err := buildTriggerIntervals("", false, 1, "2024-01-01", "2024-01-31")
+		require.NoError(t, err)
+		assert.Equal(t, []bruincloud.RunInterval{{StartDate: "2024-01-01", EndDate: "2024-01-31"}}, got)
+	})
+
+	t.Run("chunk-size without split errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := buildTriggerIntervals("", true, 7, "2024-01-01", "2024-01-31")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--chunk-size requires --split")
+	})
+
+	t.Run("monthly split produces one interval per month", func(t *testing.T) {
+		t.Parallel()
+		got, err := buildTriggerIntervals("month", false, 1, "2024-01-01", "2024-04-01")
+		require.NoError(t, err)
+		require.Len(t, got, 3)
+		assert.Equal(t, "2024-01-01T00:00:00.000Z", got[0].StartDate)
+	})
+
+	t.Run("invalid split unit errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := buildTriggerIntervals("fortnight", false, 1, "2024-01-01", "2024-04-01")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid --split")
+	})
+
+	t.Run("chunk-size below one errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := buildTriggerIntervals("day", true, 0, "2024-01-01", "2024-01-31")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "at least 1")
+	})
+
+	t.Run("invalid date errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := buildTriggerIntervals("day", false, 1, "not-a-date", "2024-01-31")
+		require.Error(t, err)
+	})
+
+	t.Run("start not before end errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := buildTriggerIntervals("day", false, 1, "2024-02-01", "2024-01-01")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "before")
+	})
+
+	t.Run("exceeding the run cap errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := buildTriggerIntervals("day", false, 1, "2024-01-01", "2025-01-01") // 366 daily runs
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds the limit")
+	})
 }

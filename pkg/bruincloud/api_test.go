@@ -304,12 +304,81 @@ func TestTriggerRun(t *testing.T) {
 		body := readJSON(t, r)
 		pipelines := body["pipelines"].([]any)
 		assert.Len(t, pipelines, 1)
+		entry := pipelines[0].(map[string]any)
+		assert.Equal(t, "proj", entry["project"])
+		assert.Equal(t, "pipe", entry["pipeline"])
+		assert.Equal(t, "2026-01-01", entry["start_date"])
+		assert.Equal(t, "2026-01-02", entry["end_date"])
 
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`200`))
 	})
 
-	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-02")
+	intervals := []RunInterval{{StartDate: "2026-01-01", EndDate: "2026-01-02"}}
+	err := client.TriggerRun(t.Context(), "proj", "pipe", intervals, TriggerRunOptions{})
+	require.NoError(t, err)
+}
+
+func TestTriggerRunSplitIntervals(t *testing.T) {
+	t.Parallel()
+	var requestCount int
+	var seenStarts []string
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		body := readJSON(t, r)
+		// Each interval is its own request with a single-entry pipelines array.
+		pipelines := body["pipelines"].([]any)
+		assert.Len(t, pipelines, 1)
+		entry := pipelines[0].(map[string]any)
+		assert.Equal(t, []any{"asset-id-1"}, entry["whitelist"]) // shared options on every request
+		seenStarts = append(seenStarts, entry["start_date"].(string))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	intervals := []RunInterval{
+		{StartDate: "2026-01-01T00:00:00.000Z", EndDate: "2026-01-31T23:59:59.999Z"},
+		{StartDate: "2026-02-01T00:00:00.000Z", EndDate: "2026-02-28T23:59:59.999Z"},
+		{StartDate: "2026-03-01T00:00:00.000Z", EndDate: "2026-03-31T23:59:59.999Z"},
+	}
+	err := client.TriggerRun(t.Context(), "proj", "pipe", intervals, TriggerRunOptions{Whitelist: []string{"asset-id-1"}})
+	require.NoError(t, err)
+	assert.Equal(t, 3, requestCount)
+	assert.Equal(t, []string{
+		"2026-01-01T00:00:00.000Z",
+		"2026-02-01T00:00:00.000Z",
+		"2026-03-01T00:00:00.000Z",
+	}, seenStarts)
+}
+
+func TestTriggerRunWithOptions(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trigger-pipeline-runs", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		body := readJSON(t, r)
+		pipelines := body["pipelines"].([]any)
+		assert.Len(t, pipelines, 1)
+
+		entry := pipelines[0].(map[string]any)
+		assert.Equal(t, []any{"asset-id-1"}, entry["whitelist"])
+		overrides := entry["asset_overrides"].(map[string]any)
+		assert.Contains(t, overrides, "schema.asset")
+		vars := entry["variables"].(map[string]any)
+		assert.Equal(t, "bar", vars["foo"])
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	opts := TriggerRunOptions{
+		Whitelist:      []string{"asset-id-1"},
+		AssetOverrides: map[string]map[string]any{"schema.asset": {"FULL_REFRESH": 1}},
+		Variables:      map[string]any{"foo": "bar"},
+	}
+	intervals := []RunInterval{{StartDate: "2026-01-01", EndDate: "2026-01-31"}}
+	err := client.TriggerRun(t.Context(), "proj", "pipe", intervals, opts)
 	require.NoError(t, err)
 }
 
