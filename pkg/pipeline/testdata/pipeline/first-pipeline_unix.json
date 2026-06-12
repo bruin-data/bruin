@@ -22,6 +22,7 @@
             "name": "task1",
             "type": "bash",
             "description": "This is a hello world task",
+            "start_date": "",
             "connection": "conn1",
             "tags": [],
             "domains": [],
@@ -38,7 +39,6 @@
             "image": "",
             "instance": "",
             "owner": "",
-            "start_date": "",
             "executable_file": {
                 "name": "hello.sh",
                 "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task1/hello.sh",
@@ -74,6 +74,7 @@
             "name": "second-task",
             "type": "bq.transfer",
             "description": "",
+            "start_date": "",
             "connection": "",
             "tags": [],
             "domains": [],
@@ -83,7 +84,6 @@
             "image": "",
             "instance": "",
             "owner": "",
-            "start_date": "",
             "executable_file": {
                 "name": "task.yaml",
                 "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task2/task.yaml",
@@ -115,6 +115,7 @@
             "name": "some-python-task",
             "type": "python",
             "description": "some description goes here",
+            "start_date": "",
             "connection": "first-connection",
             "tags": [],
             "domains": [],
@@ -161,7 +162,6 @@
             "image": "",
             "instance": "",
             "owner": "",
-            "start_date": "",
             "executable_file": {
                 "name": "test.py",
                 "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.py",
@@ -198,6 +198,7 @@
             "name": "some-sql-task",
             "type": "bq.sql",
             "description": "some description goes here",
+            "start_date": "",
             "connection": "conn2",
             "tags": [],
             "domains": [],
@@ -244,7 +245,6 @@
             "image": "",
             "instance": "",
             "owner": "",
-            "start_date": "",
             "executable_file": {
                 "name": "test.sql",
                 "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.sql",
@@ -312,5 +312,5 @@
     "agent": false,
     "variables": null,
     "selected_variant": "",
-  "macros": []
+    "macros": []
 }
