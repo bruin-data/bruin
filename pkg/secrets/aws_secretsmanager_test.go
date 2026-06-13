@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -142,9 +143,31 @@ func clearAWSSecretsManagerEnv(t *testing.T) {
 		"AWS_CONFIG_FILE",
 		"AWS_SHARED_CREDENTIALS_FILE",
 	} {
-		t.Setenv(key, "")
+		unsetenv(t, key)
 	}
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+}
+
+//nolint:usetesting // testing.T has Setenv but no Unsetenv; this helper must restore after os.Unsetenv.
+func unsetenv(t *testing.T, key string) {
+	t.Helper()
+
+	value, ok := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("failed to unset %s: %v", key, err)
+	}
+
+	t.Cleanup(func() {
+		if ok {
+			if err := os.Setenv(key, value); err != nil {
+				t.Fatalf("failed to restore %s: %v", key, err)
+			}
+			return
+		}
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatalf("failed to restore unset %s: %v", key, err)
+		}
+	})
 }
 
 func requireSecretsManagerClientOptions(t *testing.T, client *AWSSecretsManagerClient) secretsmanager.Options {
