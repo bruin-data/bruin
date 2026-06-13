@@ -823,16 +823,40 @@ func buildTriggerIntervals(split string, chunkSizeSet bool, chunkSize int, start
 	return intervals, nil
 }
 
-// matchTriggerAsset finds an asset by full name, bare name, or filename.
-func matchTriggerAsset(assets []bruincloud.Asset, in string) *bruincloud.Asset {
+// matchTriggerAsset finds an asset by full name, bare name, or filename. An exact
+// full-name match always wins. Otherwise it matches by leaf name (schema-qualified
+// suffix); if that leaf name is shared by multiple assets it returns an ambiguity
+// error rather than silently picking one. Returns (nil, nil) when nothing matches.
+func matchTriggerAsset(assets []bruincloud.Asset, in string) (*bruincloud.Asset, error) {
 	query := strings.TrimSuffix(strings.TrimSuffix(in, ".sql"), ".py")
+
+	// An exact full-name match is unambiguous and takes precedence.
 	for i := range assets {
-		a := &assets[i]
-		if a.Name == in || a.Name == query || strings.HasSuffix(a.Name, "."+query) {
-			return a
+		if assets[i].Name == in || assets[i].Name == query {
+			return &assets[i], nil
 		}
 	}
-	return nil
+
+	// Otherwise match by leaf name, detecting ambiguity across schemas.
+	var matches []*bruincloud.Asset
+	for i := range assets {
+		if strings.HasSuffix(assets[i].Name, "."+query) {
+			matches = append(matches, &assets[i])
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return nil, nil
+	case 1:
+		return matches[0], nil
+	default:
+		names := make([]string, len(matches))
+		for i, a := range matches {
+			names[i] = a.Name
+		}
+		sort.Strings(names)
+		return nil, fmt.Errorf("asset %q is ambiguous; it matches %s — use the fully-qualified name", in, strings.Join(names, ", "))
+	}
 }
 
 // assetStringList decodes a json.RawMessage that holds a []string (tags, downstream).
@@ -856,7 +880,7 @@ type triggerAssetSelection struct {
 }
 
 func (s triggerAssetSelection) active() bool {
-	return len(s.assetInputs) > 0 || s.tag != "" || len(s.excludeTags) > 0 || s.downstream
+	return len(s.assetInputs) > 0 || s.tag != "" || len(s.excludeTags) > 0
 }
 
 // selectTriggerAssets resolves the selection flags into a concrete asset set.
@@ -867,7 +891,10 @@ func selectTriggerAssets(assets []bruincloud.Asset, sel triggerAssetSelection) (
 
 	selected := make(map[string]*bruincloud.Asset)
 	for _, in := range sel.assetInputs {
-		m := matchTriggerAsset(assets, in)
+		m, err := matchTriggerAsset(assets, in)
+		if err != nil {
+			return nil, err
+		}
 		if m == nil {
 			return nil, fmt.Errorf("asset %q not found in pipeline; run 'bruin cloud assets list' to see available names", in)
 		}
@@ -930,12 +957,18 @@ func selectTriggerAssets(assets []bruincloud.Asset, sel triggerAssetSelection) (
 		}
 	}
 
+	// An active selection that resolves to nothing must not fall back to running
+	// the whole pipeline (empty whitelist)
+	if len(selected) == 0 {
+		return nil, errors.New("no assets matched the selection; check the asset arguments, --tag, and --exclude-tag")
+	}
+
 	return slices.SortedFunc(maps.Values(selected), func(a, b *bruincloud.Asset) int {
 		return strings.Compare(a.Name, b.Name)
 	}), nil
 }
 
-// applyAssetSelection translates a resolved selection into the trigger options
+// applyAssetSelection sets the whitelist (asset IDs) and, when fullRefresh is set, the FULL_REFRESH overrides; a nil selection runs the whole pipeline.
 func applyAssetSelection(opts *bruincloud.TriggerRunOptions, selected []*bruincloud.Asset, assets []bruincloud.Asset, fullRefresh bool) {
 	if fullRefresh {
 		opts.AssetOverrides = map[string]map[string]any{}
@@ -993,7 +1026,7 @@ func cloudRunsTrigger() *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:  "downstream",
-				Usage: "pass this flag if you'd like to run all the downstream tasks as well",
+				Usage: "also run assets downstream of the selected ones (used with an asset/--tag selection; no effect on its own)",
 			},
 			&cli.StringFlag{
 				Name:    "tag",

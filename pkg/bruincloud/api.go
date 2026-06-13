@@ -221,9 +221,9 @@ type TriggerRunOptions struct {
 }
 
 // TriggerRun triggers one run per interval. Each interval is sent as its own
-// single-entry request: the trigger endpoint reliably creates a run when given
-// one pipeline entry, but repeating the same pipeline across multiple entries in
-// one request fails server-side, so batches (e.g. one run per month) are issued
+// single-entry request: a single-entry request reliably creates a run, whereas
+// repeating the same pipeline across multiple entries in one request was observed
+// to fail server-side (HTTP 500), so batches (e.g. one run per month) are issued
 // sequentially. On a partial failure the error reports how many runs succeeded.
 func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline string, intervals []RunInterval, opts TriggerRunOptions) error {
 	for i, iv := range intervals {

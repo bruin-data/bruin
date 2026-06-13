@@ -361,6 +361,7 @@ func TestSelectTriggerAssets(t *testing.T) {
 		wantNil bool
 	}{
 		{name: "no selection runs whole pipeline", sel: triggerAssetSelection{}, wantNil: true},
+		{name: "downstream alone is not a selection", sel: triggerAssetSelection{downstream: true}, wantNil: true},
 		{name: "by asset name", sel: triggerAssetSelection{assetInputs: []string{"s.summary"}}, want: []string{"s.summary"}},
 		{name: "by bare/file name", sel: triggerAssetSelection{assetInputs: []string{"raw.sql"}}, want: []string{"s.raw"}},
 		{name: "by bare name without prefix", sel: triggerAssetSelection{assetInputs: []string{"report"}}, want: []string{"s.report"}},
@@ -377,9 +378,9 @@ func TestSelectTriggerAssets(t *testing.T) {
 		{name: "tag with downstream", sel: triggerAssetSelection{tag: "source", downstream: true}, want: []string{"s.raw", "s.report", "s.summary"}},
 		{name: "exclude tag from all", sel: triggerAssetSelection{excludeTags: []string{"report"}}, want: []string{"s.raw", "s.summary"}},
 		{name: "multiple exclude tags", sel: triggerAssetSelection{excludeTags: []string{"source", "report"}}, want: []string{"s.summary"}},
-		{name: "exclude all tags yields empty", sel: triggerAssetSelection{excludeTags: []string{"source", "summary", "report"}}, want: []string{}},
+		{name: "exclude all tags errors", sel: triggerAssetSelection{excludeTags: []string{"source", "summary", "report"}}, wantErr: true},
 		{name: "downstream then exclude tag", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, downstream: true, excludeTags: []string{"report"}}, want: []string{"s.raw", "s.summary"}},
-		{name: "tag then exclude same tag", sel: triggerAssetSelection{tag: "report", excludeTags: []string{"report"}}, want: []string{}},
+		{name: "tag then exclude same tag errors", sel: triggerAssetSelection{tag: "report", excludeTags: []string{"report"}}, wantErr: true},
 		{name: "asset survives unmatched exclude tag", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, excludeTags: []string{"report"}}, want: []string{"s.raw"}},
 	}
 
@@ -590,5 +591,64 @@ func TestBuildTriggerIntervals(t *testing.T) {
 		_, err := buildTriggerIntervals("day", false, 1, "2024-01-01", "2025-01-01") // 366 daily runs
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "exceeds the limit")
+	})
+}
+
+func TestMatchTriggerAsset(t *testing.T) {
+	t.Parallel()
+
+	assets := []bruincloud.Asset{
+		mkTriggerAsset(t, "marketing.report", "id-mkt", nil, nil),
+		mkTriggerAsset(t, "finance.report", "id-fin", nil, nil),
+		mkTriggerAsset(t, "core.events", "id-events", nil, nil),
+	}
+
+	t.Run("exact full name", func(t *testing.T) {
+		t.Parallel()
+		got, err := matchTriggerAsset(assets, "finance.report")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "id-fin", got.ID)
+	})
+
+	t.Run("unique leaf name", func(t *testing.T) {
+		t.Parallel()
+		got, err := matchTriggerAsset(assets, "events")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "id-events", got.ID)
+	})
+
+	t.Run("filename extension stripped", func(t *testing.T) {
+		t.Parallel()
+		got, err := matchTriggerAsset(assets, "events.sql")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "id-events", got.ID)
+	})
+
+	t.Run("ambiguous leaf name errors", func(t *testing.T) {
+		t.Parallel()
+		got, err := matchTriggerAsset(assets, "report")
+		require.Error(t, err)
+		assert.Nil(t, got)
+		assert.Contains(t, err.Error(), "ambiguous")
+		assert.Contains(t, err.Error(), "marketing.report")
+		assert.Contains(t, err.Error(), "finance.report")
+	})
+
+	t.Run("exact name wins over ambiguous leaf", func(t *testing.T) {
+		t.Parallel()
+		got, err := matchTriggerAsset(assets, "marketing.report")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "id-mkt", got.ID)
+	})
+
+	t.Run("no match returns nil without error", func(t *testing.T) {
+		t.Parallel()
+		got, err := matchTriggerAsset(assets, "nope")
+		require.NoError(t, err)
+		assert.Nil(t, got)
 	})
 }
