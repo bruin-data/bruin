@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -30,22 +31,35 @@ type AWSSecretsManagerClient struct {
 }
 
 // NewAWSSecretsManagerClientFromEnv creates a new AWS Secrets Manager client from environment variables.
-func NewAWSSecretsManagerClientFromEnv(logger logger.Logger) (*AWSSecretsManagerClient, error) {
+func NewAWSSecretsManagerClientFromEnv(ctx context.Context, logger logger.Logger) (*AWSSecretsManagerClient, error) {
 	accessKeyID := os.Getenv("BRUIN_AWS_ACCESS_KEY_ID")
-	if accessKeyID == "" {
-		return nil, errors.New("BRUIN_AWS_ACCESS_KEY_ID env variable not set")
-	}
 	secretAccessKey := os.Getenv("BRUIN_AWS_SECRET_ACCESS_KEY")
-	if secretAccessKey == "" {
+	if accessKeyID != "" && secretAccessKey == "" {
 		return nil, errors.New("BRUIN_AWS_SECRET_ACCESS_KEY env variable not set")
 	}
-	region := os.Getenv("BRUIN_AWS_REGION")
-	if region == "" {
-		return nil, errors.New("BRUIN_AWS_REGION env variable not set")
+	if accessKeyID == "" && secretAccessKey != "" {
+		return nil, errors.New("BRUIN_AWS_ACCESS_KEY_ID env variable not set")
 	}
-	sessionToken := os.Getenv("BRUIN_AWS_SESSION_TOKEN")
 
-	return NewAWSSecretsManagerClient(logger, accessKeyID, secretAccessKey, region, sessionToken)
+	region := os.Getenv("BRUIN_AWS_REGION")
+	opts := []func(*awsconfig.LoadOptions) error{}
+	if region != "" {
+		opts = append(opts, awsconfig.WithRegion(region))
+	}
+
+	if accessKeyID != "" {
+		sessionToken := os.Getenv("BRUIN_AWS_SESSION_TOKEN")
+		opts = append(opts, awsconfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, sessionToken),
+		))
+	}
+
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load AWS config")
+	}
+
+	return newAWSSecretsManagerClientFromConfig(logger, cfg), nil
 }
 
 // NewAWSSecretsManagerClient creates a new AWS Secrets Manager client.
@@ -69,6 +83,10 @@ func NewAWSSecretsManagerClient(logger logger.Logger, accessKeyID, secretAccessK
 		),
 	}
 
+	return newAWSSecretsManagerClientFromConfig(logger, cfg), nil
+}
+
+func newAWSSecretsManagerClientFromConfig(logger logger.Logger, cfg aws.Config) *AWSSecretsManagerClient {
 	client := secretsmanager.NewFromConfig(cfg)
 
 	return &AWSSecretsManagerClient{
@@ -76,7 +94,7 @@ func NewAWSSecretsManagerClient(logger logger.Logger, accessKeyID, secretAccessK
 		logger:                  logger,
 		cacheConnections:        make(map[string]any),
 		cacheConnectionsDetails: make(map[string]any),
-	}, nil
+	}
 }
 
 // GetConnection retrieves a connection by name from AWS Secrets Manager.
