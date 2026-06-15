@@ -181,6 +181,44 @@ func TestCalculatePercentageDiffInt(t *testing.T) {
 	}
 }
 
+func TestCalculateFillRate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		count     int64
+		nullCount int64
+		want      float64
+	}{
+		{
+			name:      "full column",
+			count:     100,
+			nullCount: 0,
+			want:      100,
+		},
+		{
+			name:      "partially null column",
+			count:     100,
+			nullCount: 25,
+			want:      75,
+		},
+		{
+			name:      "empty column stats",
+			count:     0,
+			nullCount: 0,
+			want:      0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.InDelta(t, tt.want, calculateFillRate(tt.count, tt.nullCount), 0)
+		})
+	}
+}
+
 func TestCalculatePercentageDiffEdgeCases(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -359,6 +397,47 @@ func TestFormatDiffValue(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTableStatsToTableDoesNotRenderNaNFillRateForEmptyCounts(t *testing.T) {
+	t.Parallel()
+
+	output := tableStatsToTable(
+		&diff.NumericalStatistics{},
+		&diff.NumericalStatistics{},
+		"source",
+		"target",
+		0.001,
+	)
+
+	assert.NotContains(t, output, "NaN")
+	assert.Contains(t, output, "0%")
+}
+
+func TestBuildColumnStatisticsDoesNotRenderNaNFillRateForEmptyCounts(t *testing.T) {
+	t.Parallel()
+
+	stats := buildColumnStatistics(
+		&diff.Column{
+			Name:  "amount",
+			Type:  "NUMBER",
+			Stats: &diff.NumericalStatistics{},
+		},
+		&diff.Column{
+			Name:  "amount",
+			Type:  "NUMBER",
+			Stats: &diff.NumericalStatistics{},
+		},
+		0.001,
+	)
+
+	require.Len(t, stats.Statistics, 3)
+	fillRate := stats.Statistics[2]
+	assert.Equal(t, "Fill Rate", fillRate.Name)
+	assert.Equal(t, "0%", fillRate.Source)
+	assert.Equal(t, "0%", fillRate.Target)
+	assert.NotContains(t, fillRate.Diff, "NaN")
+	assert.NotContains(t, fillRate.DiffPercent, "NaN")
 }
 
 func TestGenerateAlterStatements(t *testing.T) {

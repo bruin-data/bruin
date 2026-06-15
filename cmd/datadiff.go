@@ -594,6 +594,13 @@ func calculatePercentageDiffInt(val1, val2 int64, tolerance float64) string {
 	return calculatePercentageDiff(float64(val1), float64(val2), tolerance)
 }
 
+func calculateFillRate(count, nullCount int64) float64 {
+	if count == 0 {
+		return 0
+	}
+	return float64(count-nullCount) / float64(count) * 100
+}
+
 func abs(x float64) float64 {
 	if x < 0 {
 		return -x
@@ -676,8 +683,8 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 		t.AppendRow(table.Row{"Null Count", numStats1.NullCount, numStats2.NullCount, nullDiffStr, nullDiffPercent})
 
 		// Calculate fill rates
-		fillRate1 := float64(numStats1.Count-numStats1.NullCount) / float64(numStats1.Count) * 100
-		fillRate2 := float64(numStats2.Count-numStats2.NullCount) / float64(numStats2.Count) * 100
+		fillRate1 := calculateFillRate(numStats1.Count, numStats1.NullCount)
+		fillRate2 := calculateFillRate(numStats2.Count, numStats2.NullCount)
 		fillRateDiff := fillRate1 - fillRate2
 		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
 		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
@@ -734,8 +741,8 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 		t.AppendRow(table.Row{"Null Count", strStats1.NullCount, strStats2.NullCount, nullDiffStr, nullDiffPercent})
 
 		// Calculate fill rates using proper count
-		fillRate1 := float64(strStats1.Count-strStats1.NullCount) / float64(strStats1.Count) * 100
-		fillRate2 := float64(strStats2.Count-strStats2.NullCount) / float64(strStats2.Count) * 100
+		fillRate1 := calculateFillRate(strStats1.Count, strStats1.NullCount)
+		fillRate2 := calculateFillRate(strStats2.Count, strStats2.NullCount)
 		fillRateDiff := fillRate1 - fillRate2
 		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
 		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
@@ -787,8 +794,8 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 		t.AppendRow(table.Row{"Null Count", boolStats1.NullCount, boolStats2.NullCount, nullDiffStr, nullDiffPercent})
 
 		// Calculate fill rates
-		fillRate1 := float64(boolStats1.Count-boolStats1.NullCount) / float64(boolStats1.Count) * 100
-		fillRate2 := float64(boolStats2.Count-boolStats2.NullCount) / float64(boolStats2.Count) * 100
+		fillRate1 := calculateFillRate(boolStats1.Count, boolStats1.NullCount)
+		fillRate2 := calculateFillRate(boolStats2.Count, boolStats2.NullCount)
 		fillRateDiff := fillRate1 - fillRate2
 		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
 		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
@@ -824,8 +831,8 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 		t.AppendRow(table.Row{"Null Count", dtStats1.NullCount, dtStats2.NullCount, nullDiffStr, nullDiffPercent})
 
 		// Calculate fill rates
-		fillRate1 := float64(dtStats1.Count-dtStats1.NullCount) / float64(dtStats1.Count) * 100
-		fillRate2 := float64(dtStats2.Count-dtStats2.NullCount) / float64(dtStats2.Count) * 100
+		fillRate1 := calculateFillRate(dtStats1.Count, dtStats1.NullCount)
+		fillRate2 := calculateFillRate(dtStats2.Count, dtStats2.NullCount)
 		fillRateDiff := fillRate1 - fillRate2
 		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
 		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
@@ -873,8 +880,8 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 		t.AppendRow(table.Row{"Null Count", jsonStats1.NullCount, jsonStats2.NullCount, nullDiffStr, nullDiffPercent})
 
 		// Calculate fill rates
-		fillRate1 := float64(jsonStats1.Count-jsonStats1.NullCount) / float64(jsonStats1.Count) * 100
-		fillRate2 := float64(jsonStats2.Count-jsonStats2.NullCount) / float64(jsonStats2.Count) * 100
+		fillRate1 := calculateFillRate(jsonStats1.Count, jsonStats1.NullCount)
+		fillRate2 := calculateFillRate(jsonStats2.Count, jsonStats2.NullCount)
 		fillRateDiff := fillRate1 - fillRate2
 		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
 		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
@@ -1232,8 +1239,8 @@ func buildColumnStatistics(t1Col, t2Col *diff.Column, tolerance float64) JSONCol
 		stats.Statistics = append(stats.Statistics, buildStatRow("Count", numStats1.Count, numStats2.Count, tolerance))
 		stats.Statistics = append(stats.Statistics, buildStatRow("Null Count", numStats1.NullCount, numStats2.NullCount, tolerance))
 
-		fillRate1 := float64(numStats1.Count-numStats1.NullCount) / float64(numStats1.Count) * 100
-		fillRate2 := float64(numStats2.Count-numStats2.NullCount) / float64(numStats2.Count) * 100
+		fillRate1 := calculateFillRate(numStats1.Count, numStats1.NullCount)
+		fillRate2 := calculateFillRate(numStats2.Count, numStats2.NullCount)
 		stats.Statistics = append(stats.Statistics, buildStatRowFloat("Fill Rate", fillRate1, fillRate2, tolerance, "%"))
 
 		if numStats1.Avg != nil && numStats2.Avg != nil {
@@ -1259,8 +1266,8 @@ func buildColumnStatistics(t1Col, t2Col *diff.Column, tolerance float64) JSONCol
 		stats.Statistics = append(stats.Statistics, buildStatRow("Count", strStats1.Count, strStats2.Count, tolerance))
 		stats.Statistics = append(stats.Statistics, buildStatRow("Null Count", strStats1.NullCount, strStats2.NullCount, tolerance))
 
-		fillRate1 := float64(strStats1.Count-strStats1.NullCount) / float64(strStats1.Count) * 100
-		fillRate2 := float64(strStats2.Count-strStats2.NullCount) / float64(strStats2.Count) * 100
+		fillRate1 := calculateFillRate(strStats1.Count, strStats1.NullCount)
+		fillRate2 := calculateFillRate(strStats2.Count, strStats2.NullCount)
 		stats.Statistics = append(stats.Statistics, buildStatRowFloat("Fill Rate", fillRate1, fillRate2, tolerance, "%"))
 
 		stats.Statistics = append(stats.Statistics, buildStatRow("Distinct Count", strStats1.DistinctCount, strStats2.DistinctCount, tolerance))
