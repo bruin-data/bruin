@@ -137,6 +137,96 @@ func TestResolveProjectID_ListProjectsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "boom")
 }
 
+func TestResolveAgentID_UsesExplicitID(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	agentID, err := resolveAgentID(42, true, "", func() ([]bruincloud.Agent, error) {
+		called = true
+		return nil, nil
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 42, agentID)
+	assert.False(t, called)
+}
+
+func TestResolveAgentID_ResolvesByName(t *testing.T) {
+	t.Parallel()
+
+	agentID, err := resolveAgentID(0, false, "My Agent", func() ([]bruincloud.Agent, error) {
+		return []bruincloud.Agent{
+			{ID: 1, Name: "Other Agent"},
+			{ID: 7, Name: "My Agent"},
+		}, nil
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 7, agentID)
+}
+
+func TestResolveAgentID_NameIsCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	agentID, err := resolveAgentID(0, false, "my agent", func() ([]bruincloud.Agent, error) {
+		return []bruincloud.Agent{{ID: 7, Name: "My Agent"}}, nil
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 7, agentID)
+}
+
+func TestResolveAgentID_NoIdentifier(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	_, err := resolveAgentID(0, false, "", func() ([]bruincloud.Agent, error) {
+		called = true
+		return nil, nil
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "either --agent-id or --agent-name is required")
+	assert.False(t, called)
+}
+
+func TestResolveAgentID_NameNotFound(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolveAgentID(0, false, "Missing", func() ([]bruincloud.Agent, error) {
+		return []bruincloud.Agent{{ID: 1, Name: "Other"}}, nil
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no agent found with name 'Missing'")
+}
+
+func TestResolveAgentID_MultipleMatches(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolveAgentID(0, false, "Dup", func() ([]bruincloud.Agent, error) {
+		return []bruincloud.Agent{
+			{ID: 1, Name: "Dup"},
+			{ID: 2, Name: "Dup"},
+		}, nil
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple agents found with name 'Dup'")
+}
+
+func TestResolveAgentID_ListAgentsError(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolveAgentID(0, false, "Any", func() ([]bruincloud.Agent, error) {
+		return nil, errors.New("boom")
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to list agents")
+	assert.Contains(t, err.Error(), "boom")
+}
+
 func TestCloudCommand_Help(t *testing.T) {
 	t.Parallel()
 	isDebug := false

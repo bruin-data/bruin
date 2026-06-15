@@ -352,11 +352,13 @@ Interact with Bruin Cloud AI agents from the terminal.
 
 #### `list`
 
-List available agents:
+List available agents. The output includes each agent's numeric **ID**, which the other `agents` commands accept via `--agent-id`:
 
 ```bash
 bruin cloud agents list --project-id <project-id>
 ```
+
+> Every command below accepts either `--agent-id <id>` or `--agent-name <name>`. When you pass `--agent-name`, the CLI resolves it to an ID by matching (case-insensitively) against `agents list`, so you don't need to look the ID up first. Names must be unique; if more than one agent shares a name, use `--agent-id` instead.
 
 #### `send`
 
@@ -366,6 +368,15 @@ Send a message to an agent:
 bruin cloud agents send \
   --project-id <project-id> \
   --agent-id <agent-id> \
+  --message "What pipelines failed today?"
+```
+
+Or reference the agent by name instead of ID:
+
+```bash
+bruin cloud agents send \
+  --project-id <project-id> \
+  --agent-name "My Agent" \
   --message "What pipelines failed today?"
 ```
 

@@ -9,6 +9,7 @@ import (
 	path2 "path"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -91,6 +92,20 @@ func offsetFlag() *cli.IntFlag {
 	}
 }
 
+func agentIDFlag() *cli.IntFlag {
+	return &cli.IntFlag{
+		Name:  "agent-id",
+		Usage: "agent ID (see 'bruin cloud agents list' for available IDs)",
+	}
+}
+
+func agentNameFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:  "agent-name",
+		Usage: "agent name (resolved to an ID via 'bruin cloud agents list')",
+	}
+}
+
 func resolveAPIKey(c *cli.Command) (string, error) {
 	key := c.String("api-key")
 	if key != "" {
@@ -169,6 +184,43 @@ func resolveProjectID(projectID string, listProjects func() ([]bruincloud.Projec
 	default:
 		return "", errors.New("--project-id is required when your account has access to multiple projects")
 	}
+}
+
+func resolveAgentID(agentID int, agentIDSet bool, agentName string, listAgents func() ([]bruincloud.Agent, error)) (int, error) {
+	if agentIDSet {
+		return agentID, nil
+	}
+
+	if agentName == "" {
+		return 0, errors.New("either --agent-id or --agent-name is required")
+	}
+
+	agents, err := listAgents()
+	if err != nil {
+		return 0, fmt.Errorf("failed to list agents: %w", err)
+	}
+
+	var matches []bruincloud.Agent
+	for _, a := range agents {
+		if strings.EqualFold(a.Name, agentName) {
+			matches = append(matches, a)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return 0, fmt.Errorf("no agent found with name '%s'", agentName)
+	case 1:
+		return matches[0].ID, nil
+	default:
+		return 0, fmt.Errorf("multiple agents found with name '%s'; use --agent-id to disambiguate", agentName)
+	}
+}
+
+func resolveAgentIDFromCmd(ctx context.Context, c *cli.Command, client *bruincloud.APIClient) (int, error) {
+	return resolveAgentID(c.Int("agent-id"), c.IsSet("agent-id"), c.String("agent-name"), func() ([]bruincloud.Agent, error) {
+		return client.ListAgents(ctx)
+	})
 }
 
 func printFormattedLogs(result json.RawMessage) {
@@ -1972,11 +2024,8 @@ func cloudAgentsSend() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
-			&cli.IntFlag{
-				Name:     "agent-id",
-				Usage:    "agent ID",
-				Required: true,
-			},
+			agentIDFlag(),
+			agentNameFlag(),
 			&cli.StringFlag{
 				Name:     "message",
 				Usage:    "message to send",
@@ -1997,13 +2046,19 @@ func cloudAgentsSend() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			agentID, err := resolveAgentIDFromCmd(ctx, c, client)
+			if err != nil {
+				printError(err, output, "Failed to resolve agent")
+				return cli.Exit("", 1)
+			}
+
 			var threadID *int
 			if c.IsSet("thread-id") {
 				tid := c.Int("thread-id")
 				threadID = &tid
 			}
 
-			result, err := client.SendAgentMessage(ctx, c.Int("agent-id"), c.String("message"), threadID)
+			result, err := client.SendAgentMessage(ctx, agentID, c.String("message"), threadID)
 			if err != nil {
 				printError(err, output, "Failed to send message")
 				return cli.Exit("", 1)
@@ -2036,11 +2091,8 @@ func cloudAgentsStatus() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
-			&cli.IntFlag{
-				Name:     "agent-id",
-				Usage:    "agent ID",
-				Required: true,
-			},
+			agentIDFlag(),
+			agentNameFlag(),
 			&cli.IntFlag{
 				Name:     "thread-id",
 				Usage:    "thread ID",
@@ -2062,7 +2114,13 @@ func cloudAgentsStatus() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			msg, err := client.GetAgentMessageStatus(ctx, c.Int("agent-id"), c.Int("thread-id"), c.Int("message-id"))
+			agentID, err := resolveAgentIDFromCmd(ctx, c, client)
+			if err != nil {
+				printError(err, output, "Failed to resolve agent")
+				return cli.Exit("", 1)
+			}
+
+			msg, err := client.GetAgentMessageStatus(ctx, agentID, c.Int("thread-id"), c.Int("message-id"))
 			if err != nil {
 				printError(err, output, "Failed to get message status")
 				return cli.Exit("", 1)
@@ -2096,11 +2154,8 @@ func cloudAgentsThreads() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
-			&cli.IntFlag{
-				Name:     "agent-id",
-				Usage:    "agent ID",
-				Required: true,
-			},
+			agentIDFlag(),
+			agentNameFlag(),
 			limitFlag(),
 			offsetFlag(),
 		},
@@ -2114,7 +2169,13 @@ func cloudAgentsThreads() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			threads, err := client.ListAgentThreads(ctx, c.Int("agent-id"), c.Int("limit"), c.Int("offset"))
+			agentID, err := resolveAgentIDFromCmd(ctx, c, client)
+			if err != nil {
+				printError(err, output, "Failed to resolve agent")
+				return cli.Exit("", 1)
+			}
+
+			threads, err := client.ListAgentThreads(ctx, agentID, c.Int("limit"), c.Int("offset"))
 			if err != nil {
 				printError(err, output, "Failed to list threads")
 				return cli.Exit("", 1)
@@ -2145,11 +2206,8 @@ func cloudAgentsMessages() *cli.Command {
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
-			&cli.IntFlag{
-				Name:     "agent-id",
-				Usage:    "agent ID",
-				Required: true,
-			},
+			agentIDFlag(),
+			agentNameFlag(),
 			&cli.IntFlag{
 				Name:     "thread-id",
 				Usage:    "thread ID",
@@ -2168,7 +2226,13 @@ func cloudAgentsMessages() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			messages, err := client.ListAgentMessages(ctx, c.Int("agent-id"), c.Int("thread-id"), c.Int("limit"), c.Int("offset"))
+			agentID, err := resolveAgentIDFromCmd(ctx, c, client)
+			if err != nil {
+				printError(err, output, "Failed to resolve agent")
+				return cli.Exit("", 1)
+			}
+
+			messages, err := client.ListAgentMessages(ctx, agentID, c.Int("thread-id"), c.Int("limit"), c.Int("offset"))
 			if err != nil {
 				printError(err, output, "Failed to list messages")
 				return cli.Exit("", 1)
