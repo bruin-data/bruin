@@ -743,9 +743,16 @@ def convert_and_write(df):
             pending = []
             for item in items:
                 if isinstance(item, pa.Table):
+                    # A yielded pa.Table carries an explicit schema, so use it to
+                    # flush any buffered rows (whose own inference may have left
+                    # null-typed columns) and to lock the schema for later rows.
+                    # This keeps the table and the surrounding dict batches in
+                    # agreement, whether the table comes before or after them.
                     if pending:
-                        yield pa.Table.from_pylist(pending)
+                        yield pa.Table.from_pylist(pending, schema=item.schema)
                         pending = []
+                    if locked_schema is None:
+                        locked_schema = item.schema
                     yield item
                     continue
                 rows = item if isinstance(item, (list, tuple)) else [item]

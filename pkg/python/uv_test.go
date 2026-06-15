@@ -212,6 +212,9 @@ func TestPythonArrowTemplate_PreservesNoDataAndIterableHandling(t *testing.T) {
 	assert.Contains(t, PythonArrowTemplate, "locked_schema = None")
 	assert.Contains(t, PythonArrowTemplate, "pa.types.is_null(field.type)")
 	assert.Contains(t, PythonArrowTemplate, "pa.Table.from_pylist(list(rows), schema=locked_schema)")
+	// A yielded pa.Table's explicit schema flushes pending rows and locks the
+	// schema, so a table next to nullable dict rows agrees in either order.
+	assert.Contains(t, PythonArrowTemplate, "pa.Table.from_pylist(pending, schema=item.schema)")
 	// The old buffer-everything path must be gone.
 	assert.NotContains(t, PythonArrowTemplate, "rows = [first_row, *iterator]")
 }
