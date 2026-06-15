@@ -19,17 +19,37 @@ bruin run
 
 ## Configuring AWS Connection
 
-Bruin connects to AWS Secrets Manager using environment variables. The following are required:
+Bruin connects to AWS Secrets Manager using the default AWS credential provider chain. This means Bruin can use the same credentials that the AWS SDK normally finds, including:
+
+- Environment variables such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN`
+- Shared AWS config and credentials files, including profiles selected with `AWS_PROFILE`
+- IAM roles for Amazon EC2, ECS, EKS, Lambda, or other AWS runtime environments
+- AWS SSO or other credential processes configured in your AWS profile
+
+Set the AWS region through your normal AWS configuration, for example `AWS_REGION`, `AWS_DEFAULT_REGION`, your selected AWS profile, or the runtime environment.
+
+Bruin also supports explicit `BRUIN_` environment variables when you want to override the default AWS credential chain for this secrets backend:
 
 - `BRUIN_AWS_ACCESS_KEY_ID`: Your AWS access key ID
 - `BRUIN_AWS_SECRET_ACCESS_KEY`: Your AWS secret access key
 - `BRUIN_AWS_REGION`: The AWS region where your secrets are stored (e.g., `us-east-1`, `eu-west-1`)
 
-The following is optional:
+The following is optional when using temporary explicit credentials:
 
 - `BRUIN_AWS_SESSION_TOKEN`: A session token for temporary credentials (e.g., when using AWS STS)
 
 ### Example Setup
+
+Use the AWS CLI or your cloud runtime to configure credentials as usual:
+
+```bash
+export AWS_PROFILE=my-profile
+export AWS_REGION=us-east-1
+
+bruin run --secrets-backend aws
+```
+
+Or set Bruin-specific credentials explicitly:
 
 ```bash
 export BRUIN_AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
@@ -139,21 +159,22 @@ When you run Bruin with `--secrets-backend aws`:
 
 ## Troubleshooting
 
-### Environment Variables Not Set
+### AWS Credentials or Region Not Found
 
 If you see an error like:
 
 ```bash
-failed to initialize AWS Secrets Manager client: BRUIN_AWS_ACCESS_KEY_ID env variable not set
+failed to initialize AWS Secrets Manager client: failed to load AWS config
 ```
 
-Make sure all required environment variables are set:
+Make sure AWS credentials and a region are available through either the default AWS credential chain or the Bruin-specific environment variables:
 
 ```bash
-echo $BRUIN_AWS_ACCESS_KEY_ID
-echo $BRUIN_AWS_SECRET_ACCESS_KEY
-echo $BRUIN_AWS_REGION
+aws sts get-caller-identity
+aws configure get region
 ```
+
+If you are using Bruin-specific credentials, both `BRUIN_AWS_ACCESS_KEY_ID` and `BRUIN_AWS_SECRET_ACCESS_KEY` must be set together. `BRUIN_AWS_REGION` is optional when the region is already available through the default AWS configuration, but setting it explicitly is recommended when your secrets are in a specific region.
 
 ### Secret Not Found
 
