@@ -726,16 +726,42 @@ def convert_and_write(df):
         #   2. a batch (list of dicts):   yield [{"col": val}, ...]  -> one batch per page
         #   3. a pyarrow Table:           yield pa.table(...)         -> written directly
         # The batch granularity is whatever materialize() yields; we do not
-        # buffer or re-chunk. This mirrors how yielded pyarrow Tables are handled.
+        # re-chunk. This mirrors how yielded pyarrow Tables are handled.
+        #
+        # The Arrow IPC file has a single schema fixed when the first batch is
+        # written, so every yielded batch must share one schema. If each yield
+        # inferred its own schema, a None in one yield would produce a 'null'-typed
+        # column that mismatches a typed value in the next yield (a common
+        # database-cursor pattern: "for row in cursor: yield row"). To handle this
+        # we buffer only the leading rows until their inferred schema has no
+        # null-typed columns, lock that schema, then stream every later batch
+        # against it so nullable values and missing optional keys conform instead
+        # of raising. The buffer is just the warm-up window; if a column stays
+        # entirely None we cannot infer its type and fall back to buffering it.
         def rows_to_tables(items):
+            locked_schema = None
+            pending = []
             for item in items:
                 if isinstance(item, pa.Table):
+                    if pending:
+                        yield pa.Table.from_pylist(pending)
+                        pending = []
                     yield item
-                elif isinstance(item, (list, tuple)):
-                    if item:  # skip empty pages so we never emit a zero-row batch
-                        yield pa.Table.from_pylist(list(item))
-                else:
-                    yield pa.Table.from_pylist([item])
+                    continue
+                rows = item if isinstance(item, (list, tuple)) else [item]
+                if not rows:  # skip empty pages so we never emit a zero-row batch
+                    continue
+                if locked_schema is not None:
+                    yield pa.Table.from_pylist(list(rows), schema=locked_schema)
+                    continue
+                pending.extend(rows)
+                table = pa.Table.from_pylist(pending)
+                if not any(pa.types.is_null(field.type) for field in table.schema):
+                    locked_schema = table.schema
+                    yield table
+                    pending = []
+            if pending:  # a column stayed all-None through the end of the stream
+                yield pa.Table.from_pylist(pending)
 
         write_arrow_tables(rows_to_tables(df))
         return

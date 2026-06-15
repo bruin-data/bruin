@@ -206,8 +206,12 @@ func TestPythonArrowTemplate_PreservesNoDataAndIterableHandling(t *testing.T) {
 	// Generators are streamed: each yielded value becomes its own Arrow batch
 	// without buffering the whole dataset first.
 	assert.Contains(t, PythonArrowTemplate, "def rows_to_tables(items):")
-	assert.Contains(t, PythonArrowTemplate, "yield pa.Table.from_pylist(list(item))")
-	assert.Contains(t, PythonArrowTemplate, "yield pa.Table.from_pylist([item])")
+	// Leading rows are buffered until a null-free schema is found, then locked so
+	// nullable fields and missing optional keys in later yields conform instead of
+	// raising "All yielded pyarrow Tables must have the same schema."
+	assert.Contains(t, PythonArrowTemplate, "locked_schema = None")
+	assert.Contains(t, PythonArrowTemplate, "pa.types.is_null(field.type)")
+	assert.Contains(t, PythonArrowTemplate, "pa.Table.from_pylist(list(rows), schema=locked_schema)")
 	// The old buffer-everything path must be gone.
 	assert.NotContains(t, PythonArrowTemplate, "rows = [first_row, *iterator]")
 }
