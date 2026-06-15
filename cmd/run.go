@@ -721,6 +721,14 @@ func Run(isDebug *bool) *cli.Command {
 				Sources: cli.EnvVars("BRUIN_QUERY_ANNOTATIONS"),
 				Usage:   fmt.Sprintf("JSON string containing annotations to be added as comments to queries. Use '%s' to only include default annotations.", ansisql.DefaultQueryAnnotations),
 			},
+			&cli.StringFlag{
+				Name:  "backfill-id",
+				Usage: "tag this run as part of a backfill group; written to the run log so related runs can be grouped.",
+			},
+			&cli.IntFlag{
+				Name:  "backfill-total",
+				Usage: "total number of chunks in this backfill; written to the run log so progress can be reported. Informational only.",
+			},
 		},
 		DisableSliceFlagSeparator: true,
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -804,6 +812,21 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			runID := NewRunID()
+			backfillID := c.String("backfill-id")
+			backfillTotal := c.Int("backfill-total")
+			// The backfill id becomes part of the run id, which doubles as the
+			// run-log filename, so reject path separators to prevent writing the
+			// state file outside the logs directory via traversal.
+			if err := validateBackfillID(backfillID); err != nil {
+				errorPrinter.Println(err.Error())
+				return cli.Exit("", 1)
+			}
+			// For a backfill chunk, derive a unique, backfill-scoped run id from
+			// the backfill id and this chunk's start date (mirrors Bruin Cloud).
+			// An explicit BRUIN_RUN_ID still takes precedence.
+			if backfillID != "" && os.Getenv("BRUIN_RUN_ID") == "" {
+				runID = BackfillRunID(backfillID, startDate)
+			}
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
@@ -1375,7 +1398,7 @@ func Run(isDebug *bool) *cli.Command {
 				// cannot overwrite terminal output written by printTUISummary.
 				tui.Stop()
 
-				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
+				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, backfillID, backfillTotal, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))
 				}
 
@@ -1425,7 +1448,7 @@ func Run(isDebug *bool) *cli.Command {
 				results := s.Run(exeCtx)
 				duration := time.Since(start)
 
-				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, runID, statePath); err != nil {
+				if err := s.SavePipelineState(afero.NewOsFs(), os.Args, runConfig, backfillID, backfillTotal, runID, statePath); err != nil {
 					logger.Error("failed to save pipeline state", zap.Error(err))
 				}
 
