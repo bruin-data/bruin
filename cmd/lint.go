@@ -7,6 +7,7 @@ import (
 	"os"
 	path2 "path"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -120,7 +121,10 @@ func Lint(isDebug *bool) *cli.Command {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
-			runID := NewRunID()
+			runID := time.Now().Format("2006_01_02_15_04_05")
+			if os.Getenv("BRUIN_RUN_ID") != "" {
+				runID = os.Getenv("BRUIN_RUN_ID")
+			}
 
 			fullRefresh := c.Bool("full-refresh")
 			lintCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, fullRefresh)
@@ -213,7 +217,7 @@ func Lint(isDebug *bool) *cli.Command {
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
-			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, runID)
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
 
 			// Create a pipeline finder that respects exclude paths
 			excludePaths := c.StringSlice("exclude-paths")

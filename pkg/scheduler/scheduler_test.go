@@ -965,6 +965,21 @@ func TestScheduler_SavePipelineStateBackfill(t *testing.T) {
 		require.Zero(t, state.BackfillTotal)
 	})
 
+	t.Run("does not overwrite a same-second run's log", func(t *testing.T) {
+		t.Parallel()
+		fs := afero.NewMemMapFs()
+		s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "same_second")
+
+		// Two runs that resolve to the same second-granularity runID (e.g. fast
+		// backfill chunks) must each keep their own log file.
+		require.NoError(t, s.SavePipelineState(fs, []string{"bruin", "run"}, &RunConfig{}, "bf_1", 2, "same_second", "logs/runs"))
+		require.NoError(t, s.SavePipelineState(fs, []string{"bruin", "run"}, &RunConfig{}, "bf_1", 2, "same_second", "logs/runs"))
+
+		files, err := afero.ReadDir(fs, "logs/runs")
+		require.NoError(t, err)
+		require.Len(t, files, 2, "the second run must not overwrite the first")
+	})
+
 	t.Run("round-trips start/end dates verbatim including fractional exclusive ends", func(t *testing.T) {
 		t.Parallel()
 		fs := afero.NewMemMapFs()

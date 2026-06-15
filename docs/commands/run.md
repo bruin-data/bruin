@@ -70,7 +70,7 @@ A backfill is typically run as several sequential `bruin run` invocations, one p
 
 ```json
 {
-  "run_id": "2024_01_01_10_00_00_123456789_1",
+  "run_id": "2024_01_01_10_00_00",
   "backfill_id": "bf_...",
   "backfill_total": 24,
   "parameters": { "startDate": "...", "endDate": "..." }
@@ -81,7 +81,7 @@ A consumer groups `logs/runs/**/*.json` by `backfill_id`, reads `backfill_total`
 
 The flags are fully backward compatible: when they are absent the `backfill_id` and `backfill_total` fields are omitted and behavior is unchanged.
 
-Run-log filenames are derived from a unique run id (timestamp + nanoseconds + a per-process counter), so fast back-to-back runs that finish within the same second no longer overwrite each other's log files — every run keeps its own log.
+Run-log filenames are unchanged for normal runs. Because the run id has second granularity, if two runs would resolve to the same file (e.g. fast backfill chunks finishing in the same second), a numeric suffix is appended (`<run-id>_2.json`) so each run keeps its own log instead of overwriting the previous one.
 
 ### Continue from the last failed asset
 
