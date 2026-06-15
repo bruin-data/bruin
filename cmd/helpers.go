@@ -11,6 +11,7 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -134,12 +135,20 @@ func printError(err error, output string, message string) {
 	}
 }
 
+// runIDCounter keeps run ids unique within a process even when the OS clock is
+// coarser than a nanosecond (macOS reports microseconds).
+var runIDCounter atomic.Uint64
+
+// NewRunID returns a unique id for a pipeline run. It doubles as the run-log
+// filename and is written into the log body, so it must be unique even for runs
+// that start in the same second (timestamp + nanoseconds + per-process counter).
+// BRUIN_RUN_ID overrides it.
 func NewRunID() string {
-	runID := time.Now().Format("2006_01_02_15_04_05")
-	if os.Getenv("BRUIN_RUN_ID") != "" {
-		runID = os.Getenv("BRUIN_RUN_ID")
+	if envRunID := os.Getenv("BRUIN_RUN_ID"); envRunID != "" {
+		return envRunID
 	}
-	return runID
+	now := time.Now()
+	return fmt.Sprintf("%s_%09d_%d", now.Format("2006_01_02_15_04_05"), now.Nanosecond(), runIDCounter.Add(1))
 }
 
 func printSuccessForOutput(output string, message string) {

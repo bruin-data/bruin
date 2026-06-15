@@ -943,30 +943,12 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, cmd []string, param *RunConfi
 		BackfillID:        backfillID,
 		BackfillTotal:     backfillTotal,
 	}
-	file := uniqueStatePath(fs, statePath, runID)
+	file := filepath.Join(statePath, runID+".json")
 	if err := helpers.WriteJSONToFile(fs, pipelineState, file); err != nil {
 		s.logger.Error("failed to write pipeline state to file", zap.Error(err))
 		return err
 	}
 	return nil
-}
-
-// uniqueStatePath returns the path to write a run's state file. It is normally
-// <statePath>/<runID>.json, unchanged from before. Because runID has only
-// second granularity, two runs starting in the same second (e.g. fast backfill
-// chunks) would otherwise resolve to the same file and overwrite each other; in
-// that case a numeric suffix is appended so each run keeps its own log.
-func uniqueStatePath(fs afero.Fs, statePath, runID string) string {
-	file := filepath.Join(statePath, runID+".json")
-	if exists, err := afero.Exists(fs, file); err != nil || !exists {
-		return file
-	}
-	for i := 2; ; i++ {
-		candidate := filepath.Join(statePath, fmt.Sprintf("%s_%d.json", runID, i))
-		if exists, err := afero.Exists(fs, candidate); err != nil || !exists {
-			return candidate
-		}
-	}
 }
 
 func (s *Scheduler) RestoreState(state *PipelineState) error {

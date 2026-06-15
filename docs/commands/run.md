@@ -70,18 +70,18 @@ A backfill is typically run as several sequential `bruin run` invocations, one p
 
 ```json
 {
-  "run_id": "2024_01_01_10_00_00",
+  "run_id": "2024_01_01_10_00_00_123456789_1",
   "backfill_id": "bf_...",
   "backfill_total": 24,
   "parameters": { "startDate": "...", "endDate": "..." }
 }
 ```
 
-A consumer groups `logs/runs/**/*.json` by `backfill_id`, reads `backfill_total` from any run in the group for the denominator, and reports `ranCount / total`.
+A consumer groups `logs/runs/**/*.json` by `backfill_id`, reads `backfill_total` from any run in the group for the denominator, identifies individual runs by their unique `run_id`, and reports `ranCount / total`.
 
-The flags are fully backward compatible: when they are absent the `backfill_id` and `backfill_total` fields are omitted and behavior is unchanged.
+The flags are fully backward compatible: when they are absent the `backfill_id` and `backfill_total` fields are omitted.
 
-Run-log filenames are unchanged for normal runs. Because the run id has second granularity, if two runs would resolve to the same file (e.g. fast backfill chunks finishing in the same second), a numeric suffix is appended (`<run-id>_2.json`) so each run keeps its own log instead of overwriting the previous one.
+The `run_id` is now unique per run (second-granularity timestamp + nanoseconds + a per-process counter, e.g. `2024_01_01_10_00_00_123456789_1`). The run id doubles as the run-log filename (`logs/runs/<pipeline>/<run-id>.json`), so fast back-to-back runs that finish within the same second no longer overwrite each other's log — each keeps its own file. An explicit `BRUIN_RUN_ID` still overrides the generated id.
 
 ### Continue from the last failed asset
 
