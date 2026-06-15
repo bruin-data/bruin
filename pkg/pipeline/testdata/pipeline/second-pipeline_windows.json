@@ -63,7 +63,8 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
-            "interval_modifiers": null
+            "interval_modifiers": null,
+            "retries": null
         },
         {
             "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
@@ -104,7 +105,8 @@
             "metadata": {},
             "snowflake": null,
             "athena": null,
-            "interval_modifiers": null
+            "interval_modifiers": null,
+            "retries": null
         },
         {
             "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -203,21 +205,24 @@
                             "name": "not_null",
                             "value": null,
                             "blocking": true,
-                            "description": ""
+                            "description": "",
+                            "retries": null
                         },
                         {
                             "id": "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
                             "name": "positive",
                             "value": null,
                             "blocking": true,
-                            "description": ""
+                            "description": "",
+                            "retries": null
                         },
                         {
                             "id": "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
                             "name": "unique",
                             "value": null,
                             "blocking": true,
-                            "description": ""
+                            "description": "",
+                            "retries": null
                         }
                     ],
                     "upstreams": []
@@ -242,14 +247,16 @@
                             "name": "not_null",
                             "value": null,
                             "blocking": true,
-                            "description": ""
+                            "description": "",
+                            "retries": null
                         },
                         {
                             "id": "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
                             "name": "unique",
                             "value": null,
                             "blocking": true,
-                            "description": ""
+                            "description": "",
+                            "retries": null
                         }
                     ],
                     "upstreams": []
@@ -262,14 +269,16 @@
                     "description": "test description",
                     "value": 16,
                     "blocking": false,
-                    "query": "select 5"
+                    "query": "select 5",
+                    "retries": null
                 }
             ],
             "hooks": {},
             "metadata": {},
             "snowflake": null,
             "athena": null,
-            "interval_modifiers": null
+            "interval_modifiers": null,
+            "retries": null
         }
     ],
   "notifications": {
