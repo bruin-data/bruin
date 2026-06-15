@@ -814,6 +814,13 @@ func Run(isDebug *bool) *cli.Command {
 			runID := NewRunID()
 			backfillID := c.String("backfill-id")
 			backfillTotal := c.Int("backfill-total")
+			// The backfill id becomes part of the run id, which doubles as the
+			// run-log filename, so reject path separators to prevent writing the
+			// state file outside the logs directory via traversal.
+			if err := validateBackfillID(backfillID); err != nil {
+				errorPrinter.Println(err.Error())
+				return cli.Exit("", 1)
+			}
 			// For a backfill chunk, derive a unique, backfill-scoped run id from
 			// the backfill id and this chunk's start date (mirrors Bruin Cloud).
 			// An explicit BRUIN_RUN_ID still takes precedence.

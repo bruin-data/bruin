@@ -153,6 +153,17 @@ func BackfillRunID(backfillID string, startDate time.Time) string {
 	return backfillID + "__" + startDate.Format("2006_01_02_15_04_05")
 }
 
+// validateBackfillID rejects backfill ids that would be unsafe as a run-log
+// filename component. The id becomes part of the run id (see BackfillRunID),
+// which is used as the state file name, so a value containing a path separator
+// could escape the logs directory via traversal.
+func validateBackfillID(backfillID string) error {
+	if strings.ContainsAny(backfillID, `/\`) {
+		return fmt.Errorf("invalid --backfill-id %q: must not contain path separators ('/' or '\\')", backfillID)
+	}
+	return nil
+}
+
 func printSuccessForOutput(output string, message string) {
 	if output == "json" {
 		successResponse := SuccessResponse{
