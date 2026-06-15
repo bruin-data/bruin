@@ -91,7 +91,8 @@ func (p *CLIProvider) EnsureCLI() error {
 
 	// Search common installation locations
 	commonPaths := make([]string, 0, 4+len(p.config.CommonSearchPaths))
-	commonPaths = append(commonPaths,
+	commonPaths = append(
+		commonPaths,
 		filepath.Join(os.Getenv("HOME"), ".local", "bin", p.config.BinaryName),
 		filepath.Join(os.Getenv("HOME"), ".npm-global", "bin", p.config.BinaryName),
 		"/usr/local/bin/"+p.config.BinaryName,

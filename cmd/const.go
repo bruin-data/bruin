@@ -19,7 +19,8 @@ import (
 var PipelineDefinitionFiles = []string{"pipeline.yml", "pipeline.yaml"}
 
 var (
-	fs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
+	fs                = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
+	pipelineBuilderFs = afero.NewOsFs()
 
 	faint          = color.New(color.Faint).SprintFunc()
 	infoPrinter    = color.New(color.Bold)
@@ -41,7 +42,7 @@ var (
 		FileNames:  []string{"glossary.yml", "glossary.yaml"},
 	}
 
-	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, DefaultGlossaryReader, jinja.VariantRendererFactory)
+	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(pipelineBuilderFs), pipeline.CreateTaskFromFileComments(pipelineBuilderFs), pipelineBuilderFs, DefaultGlossaryReader, jinja.VariantRendererFactory)
 	SeedAssetsValidator    = &lint.SimpleRule{
 		Identifier:       "assets-seed-validation",
 		Fast:             true,

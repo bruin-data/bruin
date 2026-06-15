@@ -270,6 +270,7 @@ type columnCheck struct {
 	Value         columnCheckValue `yaml:"value"`
 	Blocking      *bool            `yaml:"blocking"`
 	Description   string           `yaml:"description,omitempty"`
+	Retries       *int             `yaml:"retries,omitempty"`
 	Notifications Notifications    `yaml:"notifications"`
 }
 
@@ -308,6 +309,7 @@ type customCheck struct {
 	Value         int64         `yaml:"value"`
 	Count         *int64        `yaml:"count"`
 	Blocking      *bool         `yaml:"blocking"`
+	Retries       *int          `yaml:"retries,omitempty"`
 	Notifications Notifications `yaml:"notifications"`
 }
 
@@ -373,9 +375,14 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, errors.Wrap(err, "failed to get absolute path for the definition file")
 		}
 
+		buf, err := afero.ReadFile(fs, filePath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read file %s", filePath)
+		}
+
 		yamlError := new(path.YamlParseError)
 		var definition taskDefinition
-		err = path.ReadYaml(fs, filePath, &definition)
+		err = path.ConvertYamlToObject(buf, &definition)
 		if err != nil && errors.As(err, &yamlError) {
 			return nil, &ParseError{Msg: err.Error()}
 		}
@@ -383,12 +390,7 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, err
 		}
 
-		buf, err := afero.ReadFile(fs, filePath)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read file %s", filePath)
-		}
-
-		task, err := ConvertYamlToTask(buf)
+		task, err := taskDefinitionToAsset(definition)
 		if err != nil {
 			return nil, err
 		}
@@ -427,6 +429,10 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		return nil, err
 	}
 
+	return taskDefinitionToAsset(definition)
+}
+
+func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 	mat := Materialization{
 		Type:            MaterializationType(strings.ToLower(definition.Materialization.Type)),
 		Strategy:        MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
@@ -455,6 +461,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 			check := NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking, test.Description)
 			check.Notifications = notificationsOrNil(test.Notifications)
+			check.Retries = test.Retries
 			tests = append(tests, check)
 		}
 
@@ -560,6 +567,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Value:         check.Value,
 			Count:         check.Count,
 			Blocking:      DefaultTrueBool{Value: check.Blocking},
+			Retries:       check.Retries,
 			Notifications: notificationsOrNil(check.Notifications),
 		}
 	}

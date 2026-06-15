@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -47,6 +48,135 @@ func TestNewAWSSecretsManagerClient(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, client)
 	})
+}
+
+func TestNewAWSSecretsManagerClientFromEnv(t *testing.T) {
+	log := &mockLogger{}
+
+	t.Run("falls back to default AWS config chain", func(t *testing.T) {
+		clearAWSSecretsManagerEnv(t)
+		t.Setenv("AWS_ACCESS_KEY_ID", "default-key")
+		t.Setenv("AWS_SECRET_ACCESS_KEY", "default-secret")
+		t.Setenv("AWS_SESSION_TOKEN", "default-token")
+		t.Setenv("AWS_REGION", "eu-west-1")
+
+		client, err := NewAWSSecretsManagerClientFromEnv(context.Background(), log)
+		require.NoError(t, err)
+		require.NotNil(t, client)
+
+		opts := requireSecretsManagerClientOptions(t, client)
+		require.Equal(t, "eu-west-1", opts.Region)
+
+		creds, err := opts.Credentials.Retrieve(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "default-key", creds.AccessKeyID)
+		require.Equal(t, "default-secret", creds.SecretAccessKey)
+		require.Equal(t, "default-token", creds.SessionToken)
+	})
+
+	t.Run("uses BRUIN static credentials as override", func(t *testing.T) {
+		clearAWSSecretsManagerEnv(t)
+		t.Setenv("AWS_ACCESS_KEY_ID", "default-key")
+		t.Setenv("AWS_SECRET_ACCESS_KEY", "default-secret")
+		t.Setenv("AWS_SESSION_TOKEN", "default-token")
+		t.Setenv("AWS_REGION", "eu-west-1")
+		t.Setenv("BRUIN_AWS_ACCESS_KEY_ID", "bruin-key")
+		t.Setenv("BRUIN_AWS_SECRET_ACCESS_KEY", "bruin-secret")
+		t.Setenv("BRUIN_AWS_SESSION_TOKEN", "bruin-token")
+		t.Setenv("BRUIN_AWS_REGION", "us-east-2")
+
+		client, err := NewAWSSecretsManagerClientFromEnv(context.Background(), log)
+		require.NoError(t, err)
+		require.NotNil(t, client)
+
+		opts := requireSecretsManagerClientOptions(t, client)
+		require.Equal(t, "us-east-2", opts.Region)
+
+		creds, err := opts.Credentials.Retrieve(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "bruin-key", creds.AccessKeyID)
+		require.Equal(t, "bruin-secret", creds.SecretAccessKey)
+		require.Equal(t, "bruin-token", creds.SessionToken)
+	})
+
+	t.Run("errors if BRUIN access key is missing for static credentials", func(t *testing.T) {
+		clearAWSSecretsManagerEnv(t)
+		t.Setenv("AWS_ACCESS_KEY_ID", "default-key")
+		t.Setenv("AWS_SECRET_ACCESS_KEY", "default-secret")
+		t.Setenv("AWS_REGION", "eu-west-1")
+		t.Setenv("BRUIN_AWS_SECRET_ACCESS_KEY", "bruin-secret")
+
+		client, err := NewAWSSecretsManagerClientFromEnv(context.Background(), log)
+		require.Error(t, err)
+		require.Nil(t, client)
+		require.Contains(t, err.Error(), "BRUIN_AWS_ACCESS_KEY_ID env variable not set")
+	})
+
+	t.Run("errors if BRUIN secret key is missing for static credentials", func(t *testing.T) {
+		clearAWSSecretsManagerEnv(t)
+		t.Setenv("AWS_ACCESS_KEY_ID", "default-key")
+		t.Setenv("AWS_SECRET_ACCESS_KEY", "default-secret")
+		t.Setenv("AWS_REGION", "eu-west-1")
+		t.Setenv("BRUIN_AWS_ACCESS_KEY_ID", "bruin-key")
+
+		client, err := NewAWSSecretsManagerClientFromEnv(context.Background(), log)
+		require.Error(t, err)
+		require.Nil(t, client)
+		require.Contains(t, err.Error(), "BRUIN_AWS_SECRET_ACCESS_KEY env variable not set")
+	})
+}
+
+func clearAWSSecretsManagerEnv(t *testing.T) {
+	t.Helper()
+
+	for _, key := range []string{
+		"BRUIN_AWS_ACCESS_KEY_ID",
+		"BRUIN_AWS_SECRET_ACCESS_KEY",
+		"BRUIN_AWS_SESSION_TOKEN",
+		"BRUIN_AWS_REGION",
+		"AWS_ACCESS_KEY_ID",
+		"AWS_SECRET_ACCESS_KEY",
+		"AWS_SESSION_TOKEN",
+		"AWS_REGION",
+		"AWS_DEFAULT_REGION",
+		"AWS_PROFILE",
+		"AWS_CONFIG_FILE",
+		"AWS_SHARED_CREDENTIALS_FILE",
+	} {
+		unsetenv(t, key)
+	}
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+}
+
+//nolint:usetesting // testing.T has Setenv but no Unsetenv; this helper must restore after os.Unsetenv.
+func unsetenv(t *testing.T, key string) {
+	t.Helper()
+
+	value, ok := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("failed to unset %s: %v", key, err)
+	}
+
+	t.Cleanup(func() {
+		if ok {
+			if err := os.Setenv(key, value); err != nil {
+				t.Fatalf("failed to restore %s: %v", key, err)
+			}
+			return
+		}
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatalf("failed to restore unset %s: %v", key, err)
+		}
+	})
+}
+
+func requireSecretsManagerClientOptions(t *testing.T, client *AWSSecretsManagerClient) secretsmanager.Options {
+	t.Helper()
+
+	secretsManagerClient, ok := client.client.(*secretsmanager.Client)
+	require.True(t, ok)
+
+	return secretsManagerClient.Options()
 }
 
 type mockAWSSecretsManagerClient struct {

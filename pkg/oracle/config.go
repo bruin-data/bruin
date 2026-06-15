@@ -86,7 +86,8 @@ func (c *Config) GetIngestrURI() (string, error) {
 	// For SID, use: oracle+cx_oracle://user:pass@host:port/sid
 	if c.ServiceName != "" {
 		// Use service_name as a query parameter
-		uri := fmt.Sprintf("oracle+cx_oracle://%s:%s@%s:%s/?service_name=%s",
+		uri := fmt.Sprintf(
+			"oracle+cx_oracle://%s:%s@%s:%s/?service_name=%s",
 			url.QueryEscape(c.Username),
 			url.QueryEscape(c.Password),
 			c.Host,
@@ -98,7 +99,8 @@ func (c *Config) GetIngestrURI() (string, error) {
 
 	if c.SID != "" {
 		// Use SID in the path
-		uri := fmt.Sprintf("oracle+cx_oracle://%s:%s@%s:%s/%s",
+		uri := fmt.Sprintf(
+			"oracle+cx_oracle://%s:%s@%s:%s/%s",
 			url.QueryEscape(c.Username),
 			url.QueryEscape(c.Password),
 			c.Host,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -69,9 +70,11 @@ func TestGenerateWritesSelfContainedHTMLWithEmbeddedPipelineJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(html), "bruin-docs-data")
 	require.NotContains(t, string(html), root)
-	info, err := os.Stat(outputPath)
-	require.NoError(t, err)
-	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(outputPath)
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
 
 	data := extractDocsData(t, string(html))
 	require.Equal(t, "Warehouse Docs", data["title"])

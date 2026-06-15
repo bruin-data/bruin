@@ -212,10 +212,11 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 		clusterByClause = "\nCLUSTER BY (" + strings.Join(asset.Materialization.ClusterBy, ", ") + ")"
 	}
 
-	ddl := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n"+
-		"%s\n"+
-		")%s"+
-		"%s",
+	ddl := fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n"+
+			"%s\n"+
+			")%s"+
+			"%s",
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 		partitionBy,
@@ -350,7 +351,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) ([]string, erro
 		matchedCondition = "FALSE"
 	}
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (
@@ -436,7 +438,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) ([]string, error)
 
 	incrementalKey := asset.Materialization.IncrementalKey
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues,
+	insertValues = append(
+		insertValues,
 		"source."+incrementalKey,
 		"TIMESTAMP '9999-12-31 00:00:00'",
 		"TRUE",
@@ -450,7 +453,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) ([]string, error)
 	joinConds = append(joinConds, "target._is_current AND source._is_current")
 	onCondition := strings.Join(joinConds, " AND ")
 
-	queryStr := fmt.Sprintf(`
+	queryStr := fmt.Sprintf(
+		`
 MERGE INTO %s AS target
 USING (
   WITH s1 AS (

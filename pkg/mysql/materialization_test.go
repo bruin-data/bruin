@@ -115,7 +115,8 @@ CREATE TEMPORARY TABLE __bruin_tmp_[^;\n]+ AS SELECT id, value FROM source;
 DELETE FROM analytics\.orders WHERE id IN \(SELECT DISTINCT id FROM __bruin_tmp_[^;\n]+\);
 INSERT INTO analytics\.orders SELECT \* FROM __bruin_tmp_[^;\n]+;
 DROP TEMPORARY TABLE IF EXISTS __bruin_tmp_[^;\n]+;
-COMMIT;$`),
+COMMIT;$`,
+			),
 		},
 		{
 			name: "merge upserts with default updates",
@@ -142,7 +143,8 @@ INSERT INTO analytics\.orders \(id, value\)
 SELECT source\.id, source\.value
 FROM __bruin_merge_tmp_[^;\n]+ AS source;
 DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
-COMMIT;$`),
+COMMIT;$`,
+			),
 		},
 		{
 			name: "merge with custom expression",
@@ -169,7 +171,8 @@ INSERT INTO analytics\.orders \(id, value\)
 SELECT source\.id, source\.value
 FROM __bruin_merge_tmp_[^;\n]+ AS source;
 DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
-COMMIT;$`),
+COMMIT;$`,
+			),
 		},
 		{
 			name: "merge inserts without updates",
@@ -195,7 +198,8 @@ INSERT INTO analytics\.orders \(id, value\)
 SELECT source\.id, source\.value
 FROM __bruin_merge_tmp_[^;\n]+ AS source;
 DROP TEMPORARY TABLE IF EXISTS __bruin_merge_tmp_[^;\n]+;
-COMMIT;$`),
+COMMIT;$`,
+			),
 		},
 		{
 			name: "merge requires columns",

@@ -449,7 +449,8 @@ func (d *Client) queryExecutionSummary(ctx context.Context, job *bigquery.Job) *
 		}
 	}
 	if stats.DDLTargetRoutine != nil {
-		summary.DDLTargetRoutine = fmt.Sprintf("%s.%s.%s",
+		summary.DDLTargetRoutine = fmt.Sprintf(
+			"%s.%s.%s",
 			stats.DDLTargetRoutine.ProjectID,
 			stats.DDLTargetRoutine.DatasetID,
 			stats.DDLTargetRoutine.RoutineID,

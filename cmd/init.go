@@ -138,14 +138,16 @@ func (m model) View() string {
 	}
 
 	if visibleCount == 1 {
-		fmt.Fprintf(&s,
+		fmt.Fprintf(
+			&s,
 			"\ndisplaying options %d of %d\n",
 			end, len(choices),
 		)
 	}
 
 	if visibleCount > 1 {
-		fmt.Fprintf(&s,
+		fmt.Fprintf(
+			&s,
 			"\ndisplaying options %d-%d of %d\n",
 			m.pageStart+1, end, len(choices),
 		)

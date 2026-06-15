@@ -189,7 +189,8 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s; 
 CREATE TABLE %s AS %s;
-COMMIT;`, task.Name, task.Name, query), nil
+COMMIT;`, task.Name, task.Name, query,
+	), nil
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {

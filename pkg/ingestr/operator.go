@@ -314,7 +314,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		baseArgs = append(baseArgs, "--source-table", sourceTable)
 	}
 
-	baseArgs = append(baseArgs,
+	baseArgs = append(
+		baseArgs,
 		"--dest-uri",
 		destURI,
 		"--dest-table",
