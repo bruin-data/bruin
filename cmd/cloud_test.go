@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -73,6 +74,61 @@ func TestResolveAPIKey_NoKeyError(t *testing.T) {
 
 	err := app.Run(t.Context(), []string{"test"})
 	require.NoError(t, err)
+}
+
+func TestSelectBruinCloudAPIToken(t *testing.T) {
+	cases := []struct {
+		name  string
+		conns []config.BruinCloudConnection
+		want  string
+	}{
+		{
+			name:  "single connection with arbitrary name",
+			conns: []config.BruinCloudConnection{{Name: "custom", APIToken: "tok"}},
+			want:  "tok",
+		},
+		{
+			name:  "legacy bruin-default name",
+			conns: []config.BruinCloudConnection{{Name: "bruin-default", APIToken: "legacy"}},
+			want:  "legacy",
+		},
+		{
+			name:  "current agent-cloud-cli-token name",
+			conns: []config.BruinCloudConnection{{Name: "agent-cloud-cli-token", APIToken: "current"}},
+			want:  "current",
+		},
+		{
+			name: "prefers current name over legacy and others",
+			conns: []config.BruinCloudConnection{
+				{Name: "custom", APIToken: "custom-tok"},
+				{Name: "bruin-default", APIToken: "legacy"},
+				{Name: "agent-cloud-cli-token", APIToken: "current"},
+			},
+			want: "current",
+		},
+		{
+			name: "prefers legacy over arbitrary when current absent",
+			conns: []config.BruinCloudConnection{
+				{Name: "custom", APIToken: "custom-tok"},
+				{Name: "bruin-default", APIToken: "legacy"},
+			},
+			want: "legacy",
+		},
+		{
+			name: "falls back to first when no managed name matches",
+			conns: []config.BruinCloudConnection{
+				{Name: "first", APIToken: "first-tok"},
+				{Name: "second", APIToken: "second-tok"},
+			},
+			want: "first-tok",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, selectBruinCloudAPIToken(tc.conns))
+		})
+	}
 }
 
 func TestResolveProjectID_UsesExplicitProject(t *testing.T) {
