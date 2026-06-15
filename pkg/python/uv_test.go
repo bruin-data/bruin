@@ -193,7 +193,7 @@ func TestPythonArrowTemplate_UsesNativePolarsIPC(t *testing.T) {
 	assert.Less(t, polarsWriteIndex, pandasCheckIndex)
 	assert.Less(t, pandasCheckIndex, arrowTableIndex)
 	assert.NotContains(t, PythonArrowTemplate, "df.to_arrow()")
-	assert.Contains(t, PythonArrowTemplate, "write_arrow_tables(itertools.chain([first_row], iterator))")
+	assert.Contains(t, PythonArrowTemplate, "write_arrow_tables(rows_to_tables(df))")
 }
 
 func TestPythonArrowTemplate_PreservesNoDataAndIterableHandling(t *testing.T) {
@@ -201,10 +201,15 @@ func TestPythonArrowTemplate_PreservesNoDataAndIterableHandling(t *testing.T) {
 
 	assert.Contains(t, PythonArrowTemplate, "if df is None:")
 	assert.Contains(t, PythonArrowTemplate, "if not df:")
-	assert.Contains(t, PythonArrowTemplate, "first_row = next(iterator)")
 	assert.Contains(t, PythonArrowTemplate, "except StopIteration:")
-	assert.Contains(t, PythonArrowTemplate, "rows = [first_row, *iterator]")
-	assert.Contains(t, PythonArrowTemplate, "rows = [item for batch in rows for item in batch]")
+
+	// Generators are streamed: each yielded value becomes its own Arrow batch
+	// without buffering the whole dataset first.
+	assert.Contains(t, PythonArrowTemplate, "def rows_to_tables(items):")
+	assert.Contains(t, PythonArrowTemplate, "yield pa.Table.from_pylist(list(item))")
+	assert.Contains(t, PythonArrowTemplate, "yield pa.Table.from_pylist([item])")
+	// The old buffer-everything path must be gone.
+	assert.NotContains(t, PythonArrowTemplate, "rows = [first_row, *iterator]")
 }
 
 func Test_uvPythonRunner_Run(t *testing.T) {

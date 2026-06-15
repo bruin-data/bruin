@@ -635,7 +635,6 @@ const PythonArrowTemplate = `
 
 import sys
 import importlib.util
-import itertools
 from pathlib import Path
 
 def import_module_from_path(module_path: str, module_name: str):
@@ -721,26 +720,25 @@ def convert_and_write(df):
         table = pa.Table.from_pylist(list(df))
     elif hasattr(df, '__iter__') and not isinstance(df, (str, bytes)):
         # Handle generators and other iterables (but not strings/bytes).
-        # Generators can yield in two ways:
-        #   1. yield individual dicts:  yield {"col": val}
-        #   2. yield batches (lists of dicts): yield [{"col": val}, ...]
-        # The second pattern is common with paginated APIs where each page
-        # returns a list of records. We detect this by checking if the first
-        # collected element is a list/tuple and flatten one level if so.
-        iterator = iter(df)
-        try:
-            first_row = next(iterator)
-        except StopIteration:
-            return
+        # Each yielded value is written as its own Arrow batch, as-is, so a
+        # generator never has to hold the full dataset in memory. A value can be:
+        #   1. an individual dict:        yield {"col": val}         -> a one-row batch
+        #   2. a batch (list of dicts):   yield [{"col": val}, ...]  -> one batch per page
+        #   3. a pyarrow Table:           yield pa.table(...)         -> written directly
+        # The batch granularity is whatever materialize() yields; we do not
+        # buffer or re-chunk. This mirrors how yielded pyarrow Tables are handled.
+        def rows_to_tables(items):
+            for item in items:
+                if isinstance(item, pa.Table):
+                    yield item
+                elif isinstance(item, (list, tuple)):
+                    if item:  # skip empty pages so we never emit a zero-row batch
+                        yield pa.Table.from_pylist(list(item))
+                else:
+                    yield pa.Table.from_pylist([item])
 
-        if isinstance(first_row, pa.Table):
-            write_arrow_tables(itertools.chain([first_row], iterator))
-            return
-
-        rows = [first_row, *iterator]
-        if isinstance(rows[0], (list, tuple)):
-            rows = [item for batch in rows for item in batch]
-        table = pa.Table.from_pylist(rows)
+        write_arrow_tables(rows_to_tables(df))
+        return
     else:
         raise TypeError(f"Unsupported return type: {type(df)}")
 
