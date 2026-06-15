@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -13,22 +14,15 @@ func TestNewRunIDHonorsEnvOverride(t *testing.T) {
 }
 
 func TestBackfillRunID(t *testing.T) {
-	cases := []struct {
-		backfillID string
-		startDate  string
-		want       string
-	}{
-		{"bf_x", "2024-01-01", "bf_x__2024_01_01"},
-		{"bf_x", "2024-01-01 23:59:59.999999", "bf_x__2024_01_01_23_59_59_999999"},
-		{"bf_x", "2024-01-02T00:00:00.000000000Z", "bf_x__2024_01_02T00_00_00_000000000Z"},
-	}
-	for _, tc := range cases {
-		require.Equal(t, tc.want, BackfillRunID(tc.backfillID, tc.startDate))
-	}
+	// The start date is formatted with the same layout as a normal run id, so
+	// the result is filesystem-safe without any extra sanitization.
+	day1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	require.Equal(t, "bf_x__2024_01_01_00_00_00", BackfillRunID("bf_x", day1))
+
+	hour := time.Date(2024, 1, 1, 13, 30, 0, 0, time.UTC)
+	require.Equal(t, "bf_x__2024_01_01_13_30_00", BackfillRunID("bf_x", hour))
 
 	// Chunks of one backfill have distinct start dates, so their run ids differ.
-	require.NotEqual(t,
-		BackfillRunID("bf_x", "2024-01-01"),
-		BackfillRunID("bf_x", "2024-01-02"),
-	)
+	day2 := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)
+	require.NotEqual(t, BackfillRunID("bf_x", day1), BackfillRunID("bf_x", day2))
 }

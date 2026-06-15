@@ -70,7 +70,7 @@ A backfill is typically run as several sequential `bruin run` invocations, one p
 
 ```json
 {
-  "run_id": "bf_2024_q1__2024_01_01",
+  "run_id": "bf_2024_q1__2024_01_01_00_00_00",
   "backfill_id": "bf_2024_q1",
   "backfill_total": 24,
   "parameters": { "startDate": "2024-01-01", "endDate": "..." }
@@ -81,7 +81,7 @@ A consumer groups `logs/runs/**/*.json` by `backfill_id`, reads `backfill_total`
 
 The flags are fully backward compatible: when they are absent the `backfill_id` and `backfill_total` fields are omitted, and the `run_id` keeps its normal second-granularity timestamp format (`2024_01_01_10_00_00`) — behavior is unchanged for ordinary runs.
 
-When `--backfill-id` is set, the `run_id` is composed from the backfill id and the chunk's start date (`<backfill-id>__<start-date>`), mirroring Bruin Cloud's per-chunk run ids. Because each chunk has a distinct start date, the id is unique within the backfill, so the per-chunk run logs never overwrite each other. An explicit `BRUIN_RUN_ID` still overrides the generated id.
+When `--backfill-id` is set, the `run_id` is composed from the backfill id and the chunk's start date (`<backfill-id>__<start-date>`, the start date formatted with the same layout as a normal run id), mirroring Bruin Cloud's per-chunk run ids. Because each chunk has a distinct start date, the id is unique within the backfill, so the per-chunk run logs never overwrite each other. An explicit `BRUIN_RUN_ID` still overrides the generated id.
 
 ### Continue from the last failed asset
 

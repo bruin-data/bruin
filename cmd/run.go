@@ -818,7 +818,7 @@ func Run(isDebug *bool) *cli.Command {
 			// the backfill id and this chunk's start date (mirrors Bruin Cloud).
 			// An explicit BRUIN_RUN_ID still takes precedence.
 			if backfillID != "" && os.Getenv("BRUIN_RUN_ID") == "" {
-				runID = BackfillRunID(backfillID, c.String("start-date"))
+				runID = BackfillRunID(backfillID, startDate)
 			}
 			runCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
