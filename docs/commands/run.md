@@ -61,6 +61,27 @@ table td:first-child {
 | `--var` | []str | - | Override pipeline [variables](/variables/overview) with custom values. |
 | `--variant` | str | - | Materialize the named [variant](/pipelines/variants) of a variant-bearing pipeline. Required when the pipeline declares variants. |
 | `--query-annotations` | str | - | Add annotations to SQL queries as comments. Use `default` to add asset name, pipeline name, and execution step, or provide custom JSON for additional fields. |
+| `--backfill-id` | str | - | Tag this run as part of a backfill group; written to the run log as `backfill_id` so related runs can be grouped. |
+| `--backfill-total` | int | `0` | Total number of chunks in this backfill; written to the run log as `backfill_total` so progress can be reported. Informational only — it does not affect scheduling or execution. |
+
+### Backfill identity in the run log
+
+A backfill is typically run as several sequential `bruin run` invocations, one per interval window. Passing the same `--backfill-id` (and `--backfill-total`) to every run lets a consumer group those runs and report progress. Both values are recorded as top-level fields in the run log (`logs/runs/<pipeline>/<run-id>.json`):
+
+```json
+{
+  "run_id": "2024_01_01_10_00_00_123456789_1",
+  "backfill_id": "bf_...",
+  "backfill_total": 24,
+  "parameters": { "startDate": "...", "endDate": "..." }
+}
+```
+
+A consumer groups `logs/runs/**/*.json` by `backfill_id`, reads `backfill_total` from any run in the group for the denominator, and reports `ranCount / total`.
+
+The flags are fully backward compatible: when they are absent the `backfill_id` and `backfill_total` fields are omitted and behavior is unchanged.
+
+Run-log filenames are derived from a unique run id (timestamp + nanoseconds + a per-process counter), so fast back-to-back runs that finish within the same second no longer overwrite each other's log files — every run keeps its own log.
 
 ### Continue from the last failed asset
 

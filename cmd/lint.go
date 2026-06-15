@@ -7,7 +7,6 @@ import (
 	"os"
 	path2 "path"
 	"strings"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -121,10 +120,7 @@ func Lint(isDebug *bool) *cli.Command {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
-			runID := time.Now().Format("2006_01_02_15_04_05")
-			if os.Getenv("BRUIN_RUN_ID") != "" {
-				runID = os.Getenv("BRUIN_RUN_ID")
-			}
+			runID := NewRunID()
 
 			fullRefresh := c.Bool("full-refresh")
 			lintCtx := context.WithValue(ctx, pipeline.RunConfigFullRefresh, fullRefresh)
