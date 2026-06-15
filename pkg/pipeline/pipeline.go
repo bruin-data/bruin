@@ -564,7 +564,7 @@ type ColumnCheck struct {
 	Value         ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
 	Blocking      DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Description   string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Retries       *int             `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	Retries       *int             `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications   `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
@@ -752,7 +752,7 @@ type CustomCheck struct {
 	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
-	Retries       *int            `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	Retries       *int            `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
@@ -872,6 +872,7 @@ type Asset struct { //nolint:recvcheck
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	Retries           *int               `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
 	Notifications     *Notifications     `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
