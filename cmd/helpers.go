@@ -135,18 +135,13 @@ func printError(err error, output string, message string) {
 	}
 }
 
-// runIDCounter guarantees uniqueness for run ids generated within the same
-// process even when the OS clock resolution is coarser than a nanosecond (e.g.
-// macOS reports microsecond-granularity wall times).
+// runIDCounter keeps run ids unique within a process even when the OS clock is
+// coarser than a nanosecond (macOS reports microseconds).
 var runIDCounter atomic.Uint64
 
-// NewRunID returns a unique identifier for a pipeline run. The id doubles as the
-// run-log filename (logs/runs/<pipeline>/<run-id>.json), so it must be unique
-// even for runs that start within the same second — otherwise fast back-to-back
-// runs (e.g. backfill chunks) would overwrite each other's logs. We append the
-// nanosecond component of the current time plus a monotonically increasing
-// per-process counter to the second-granularity timestamp. An explicit
-// BRUIN_RUN_ID always takes precedence.
+// NewRunID returns a unique id for a pipeline run. It doubles as the run-log
+// filename, so it must be unique even within the same second (timestamp +
+// nanoseconds + per-process counter). BRUIN_RUN_ID overrides it.
 func NewRunID() string {
 	if envRunID := os.Getenv("BRUIN_RUN_ID"); envRunID != "" {
 		return envRunID

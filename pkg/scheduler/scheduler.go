@@ -123,14 +123,9 @@ type PipelineState struct {
 	TimeStamp         time.Time             `json:"timestamp"`
 	RunID             string                `json:"run_id"`
 	CompatibilityHash string                `json:"compatibility_hash"`
-	// BackfillID is an opaque identifier shared by all runs of a single
-	// backfill, set via `bruin run --backfill-id`. It lets consumers group the
-	// per-run logs of one backfill. Empty (and omitted) for normal runs.
+	// BackfillID groups the per-run logs of one backfill (--backfill-id).
 	BackfillID string `json:"backfill_id,omitempty"`
-	// BackfillTotal is the number of runs (chunks) the backfill is made of, set
-	// via `bruin run --backfill-total`. It lets consumers report progress
-	// (e.g. "13/24"). Zero (and omitted) for normal runs. Informational only;
-	// it does not affect scheduling or execution.
+	// BackfillTotal is the backfill's chunk count, for progress (--backfill-total).
 	BackfillTotal int `json:"backfill_total,omitempty"`
 }
 
