@@ -11,7 +11,6 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -135,20 +134,37 @@ func printError(err error, output string, message string) {
 	}
 }
 
-// runIDCounter keeps run ids unique within a process even when the OS clock is
-// coarser than a nanosecond (macOS reports microseconds).
-var runIDCounter atomic.Uint64
-
-// NewRunID returns a unique id for a pipeline run. It doubles as the run-log
-// filename and is written into the log body, so it must be unique even for runs
-// that start in the same second (timestamp + nanoseconds + per-process counter).
-// BRUIN_RUN_ID overrides it.
 func NewRunID() string {
-	if envRunID := os.Getenv("BRUIN_RUN_ID"); envRunID != "" {
-		return envRunID
+	runID := time.Now().Format("2006_01_02_15_04_05")
+	if os.Getenv("BRUIN_RUN_ID") != "" {
+		runID = os.Getenv("BRUIN_RUN_ID")
 	}
-	now := time.Now()
-	return fmt.Sprintf("%s_%09d_%d", now.Format("2006_01_02_15_04_05"), now.Nanosecond(), runIDCounter.Add(1))
+	return runID
+}
+
+// BackfillRunID composes a unique, deterministic run id for a backfill chunk
+// from the shared backfill id and the chunk's start date. This mirrors Bruin
+// Cloud, whose backfill trigger builds a backfill-scoped run id per chunk
+// rather than relying on the generic timestamp id. Each chunk has a distinct
+// start date, so the id is unique within the backfill while staying readable.
+// The result also serves as the run-log filename, so the start date is
+// sanitized to filesystem-safe characters.
+func BackfillRunID(backfillID, startDate string) string {
+	return backfillID + "__" + sanitizeRunIDPart(startDate)
+}
+
+func sanitizeRunIDPart(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch {
+		case r >= '0' && r <= '9', r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('_')
+		}
+	}
+	return b.String()
 }
 
 func printSuccessForOutput(output string, message string) {

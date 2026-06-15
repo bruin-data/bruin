@@ -70,18 +70,18 @@ A backfill is typically run as several sequential `bruin run` invocations, one p
 
 ```json
 {
-  "run_id": "2024_01_01_10_00_00_123456789_1",
-  "backfill_id": "bf_...",
+  "run_id": "bf_2024_q1__2024_01_01",
+  "backfill_id": "bf_2024_q1",
   "backfill_total": 24,
-  "parameters": { "startDate": "...", "endDate": "..." }
+  "parameters": { "startDate": "2024-01-01", "endDate": "..." }
 }
 ```
 
-A consumer groups `logs/runs/**/*.json` by `backfill_id`, reads `backfill_total` from any run in the group for the denominator, identifies individual runs by their unique `run_id`, and reports `ranCount / total`.
+A consumer groups `logs/runs/**/*.json` by `backfill_id`, reads `backfill_total` from any run in the group for the denominator, identifies individual chunks by their `run_id`, and reports `ranCount / total`.
 
-The flags are fully backward compatible: when they are absent the `backfill_id` and `backfill_total` fields are omitted.
+The flags are fully backward compatible: when they are absent the `backfill_id` and `backfill_total` fields are omitted, and the `run_id` keeps its normal second-granularity timestamp format (`2024_01_01_10_00_00`) — behavior is unchanged for ordinary runs.
 
-The `run_id` is now unique per run (second-granularity timestamp + nanoseconds + a per-process counter, e.g. `2024_01_01_10_00_00_123456789_1`). The run id doubles as the run-log filename (`logs/runs/<pipeline>/<run-id>.json`), so fast back-to-back runs that finish within the same second no longer overwrite each other's log — each keeps its own file. An explicit `BRUIN_RUN_ID` still overrides the generated id.
+When `--backfill-id` is set, the `run_id` is composed from the backfill id and the chunk's start date (`<backfill-id>__<start-date>`), mirroring Bruin Cloud's per-chunk run ids. Because each chunk has a distinct start date, the id is unique within the backfill, so the per-chunk run logs never overwrite each other. An explicit `BRUIN_RUN_ID` still overrides the generated id.
 
 ### Continue from the last failed asset
 
