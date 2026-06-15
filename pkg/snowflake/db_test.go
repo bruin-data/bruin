@@ -187,6 +187,213 @@ func TestDB_Select(t *testing.T) {
 	}
 }
 
+func TestParseSnowflakeInt64(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		value   interface{}
+		want    int64
+		wantErr string
+	}{
+		{
+			name:  "int64",
+			value: int64(42),
+			want:  42,
+		},
+		{
+			name:  "int",
+			value: 42,
+			want:  42,
+		},
+		{
+			name:  "int32",
+			value: int32(42),
+			want:  42,
+		},
+		{
+			name:  "float64",
+			value: 42.0,
+			want:  42,
+		},
+		{
+			name:  "string",
+			value: "42",
+			want:  42,
+		},
+		{
+			name:  "string with whitespace",
+			value: " 42 ",
+			want:  42,
+		},
+		{
+			name:    "invalid string",
+			value:   "not-a-number",
+			wantErr: "failed to parse count string",
+		},
+		{
+			name:    "unexpected type",
+			value:   true,
+			wantErr: "unexpected count type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parseSnowflakeInt64(tt.value, "count")
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestDBFetchStatsParsesSnowflakeStringAggregates(t *testing.T) {
+	t.Parallel()
+
+	const (
+		statsQueryPattern = `(?s)SELECT.*COUNT\(\*\) as count.*FROM SCHEMA\.TABLE`
+		statsTableName    = "SCHEMA.TABLE"
+		statsColumnName   = "COL"
+	)
+
+	t.Run("numerical stats", func(t *testing.T) {
+		t.Parallel()
+
+		mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		require.NoError(t, err)
+		defer mockDB.Close()
+		sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+		db := DB{conn: sqlxDB}
+
+		mock.ExpectQuery(statsQueryPattern).
+			WillReturnRows(sqlmock.NewRows([]string{"count", "null_count", "min_val", "max_val", "avg_val", "sum_val", "stddev_val"}).
+				AddRow("42", "3", 1.0, 10.0, 5.5, 100.0, 2.5))
+
+		stats, err := db.fetchNumericalStats(t.Context(), statsTableName, statsColumnName)
+		require.NoError(t, err)
+		assert.Equal(t, int64(42), stats.Count)
+		assert.Equal(t, int64(3), stats.NullCount)
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("string stats", func(t *testing.T) {
+		t.Parallel()
+
+		mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		require.NoError(t, err)
+		defer mockDB.Close()
+		sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+		db := DB{conn: sqlxDB}
+
+		mock.ExpectQuery(statsQueryPattern).
+			WillReturnRows(sqlmock.NewRows([]string{"count", "null_count", "distinct_count", "empty_count", "min_length", "max_length", "avg_length"}).
+				AddRow("42", "3", "12", "2", "1", "25", 8.5))
+
+		stats, err := db.fetchStringStats(t.Context(), statsTableName, statsColumnName)
+		require.NoError(t, err)
+		assert.Equal(t, int64(42), stats.Count)
+		assert.Equal(t, int64(3), stats.NullCount)
+		assert.Equal(t, int64(12), stats.DistinctCount)
+		assert.Equal(t, int64(2), stats.EmptyCount)
+		assert.Equal(t, 1, stats.MinLength)
+		assert.Equal(t, 25, stats.MaxLength)
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("string stats with null lengths", func(t *testing.T) {
+		t.Parallel()
+
+		mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		require.NoError(t, err)
+		defer mockDB.Close()
+		sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+		db := DB{conn: sqlxDB}
+
+		mock.ExpectQuery(statsQueryPattern).
+			WillReturnRows(sqlmock.NewRows([]string{"count", "null_count", "distinct_count", "empty_count", "min_length", "max_length", "avg_length"}).
+				AddRow("42", "42", "0", "0", nil, nil, nil))
+
+		stats, err := db.fetchStringStats(t.Context(), statsTableName, statsColumnName)
+		require.NoError(t, err)
+		assert.Equal(t, int64(42), stats.Count)
+		assert.Equal(t, int64(42), stats.NullCount)
+		assert.Zero(t, stats.MinLength)
+		assert.Zero(t, stats.MaxLength)
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("boolean stats", func(t *testing.T) {
+		t.Parallel()
+
+		mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		require.NoError(t, err)
+		defer mockDB.Close()
+		sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+		db := DB{conn: sqlxDB}
+
+		mock.ExpectQuery(statsQueryPattern).
+			WillReturnRows(sqlmock.NewRows([]string{"count", "null_count", "true_count", "false_count"}).
+				AddRow("42", "3", "20", "19"))
+
+		stats, err := db.fetchBooleanStats(t.Context(), statsTableName, statsColumnName)
+		require.NoError(t, err)
+		assert.Equal(t, int64(42), stats.Count)
+		assert.Equal(t, int64(3), stats.NullCount)
+		assert.Equal(t, int64(20), stats.TrueCount)
+		assert.Equal(t, int64(19), stats.FalseCount)
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("datetime stats", func(t *testing.T) {
+		t.Parallel()
+
+		mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		require.NoError(t, err)
+		defer mockDB.Close()
+		sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+		db := DB{conn: sqlxDB}
+
+		mock.ExpectQuery(statsQueryPattern).
+			WillReturnRows(sqlmock.NewRows([]string{"count", "null_count", "unique_count", "earliest_date", "latest_date"}).
+				AddRow("42", "3", "12", "2024-01-01 00:00:00", "2024-01-02 00:00:00"))
+
+		stats, err := db.fetchDateTimeStats(t.Context(), statsTableName, statsColumnName)
+		require.NoError(t, err)
+		assert.Equal(t, int64(42), stats.Count)
+		assert.Equal(t, int64(3), stats.NullCount)
+		assert.Equal(t, int64(12), stats.UniqueCount)
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("json stats", func(t *testing.T) {
+		t.Parallel()
+
+		mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		require.NoError(t, err)
+		defer mockDB.Close()
+		sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+		db := DB{conn: sqlxDB}
+
+		mock.ExpectQuery(statsQueryPattern).
+			WillReturnRows(sqlmock.NewRows([]string{"count", "null_count"}).
+				AddRow("42", "3"))
+
+		stats, err := db.fetchJSONStats(t.Context(), statsTableName, statsColumnName)
+		require.NoError(t, err)
+		assert.Equal(t, int64(42), stats.Count)
+		assert.Equal(t, int64(3), stats.NullCount)
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 func TestDB_SelectRetriesTransientConnectError(t *testing.T) {
 	t.Parallel()
 

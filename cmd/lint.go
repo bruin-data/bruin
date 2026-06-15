@@ -217,7 +217,7 @@ func Lint(isDebug *bool) *cli.Command {
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigExecutionDate, defaultExecutionDate)
-			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, runID)
 
 			// Create a pipeline finder that respects exclude paths
 			excludePaths := c.StringSlice("exclude-paths")

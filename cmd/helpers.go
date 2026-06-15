@@ -142,6 +142,28 @@ func NewRunID() string {
 	return runID
 }
 
+// BackfillRunID composes a unique, deterministic run id for a backfill chunk
+// from the shared backfill id and the chunk's start date. This mirrors Bruin
+// Cloud, whose backfill trigger builds a backfill-scoped run id per chunk
+// rather than relying on the generic timestamp id. The start date is formatted
+// with the same layout as NewRunID, so it is filesystem-safe (the id doubles as
+// the run-log filename) and consistent with ordinary run ids. Each chunk has a
+// distinct start date, so the id is unique within the backfill.
+func BackfillRunID(backfillID string, startDate time.Time) string {
+	return backfillID + "__" + startDate.Format("2006_01_02_15_04_05")
+}
+
+// validateBackfillID rejects backfill ids that would be unsafe as a run-log
+// filename component. The id becomes part of the run id (see BackfillRunID),
+// which is used as the state file name, so a value containing a path separator
+// could escape the logs directory via traversal.
+func validateBackfillID(backfillID string) error {
+	if strings.ContainsAny(backfillID, `/\`) {
+		return fmt.Errorf("invalid --backfill-id %q: must not contain path separators ('/' or '\\')", backfillID)
+	}
+	return nil
+}
+
 func printSuccessForOutput(output string, message string) {
 	if output == "json" {
 		successResponse := SuccessResponse{
