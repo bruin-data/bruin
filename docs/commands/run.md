@@ -66,7 +66,7 @@ table td:first-child {
 
 ### Backfill identity in the run log
 
-A backfill is typically run as several sequential `bruin run` invocations, one per interval window. Passing the same `--backfill-id` (and `--backfill-total`) to every run lets a consumer group those runs and report progress. Both values are recorded as top-level fields in the run log (`logs/runs/<pipeline>/<run-id>.json`):
+A backfill is run as several `bruin run` invocations, one per interval window. Passing the same `--backfill-id` (and `--backfill-total`) to each lets a consumer group them and report progress. Both are recorded as top-level fields in the run log (`logs/runs/<pipeline>/<run-id>.json`):
 
 ```json
 {
@@ -77,11 +77,9 @@ A backfill is typically run as several sequential `bruin run` invocations, one p
 }
 ```
 
-A consumer groups `logs/runs/**/*.json` by `backfill_id`, reads `backfill_total` from any run in the group for the denominator, identifies individual chunks by their `run_id`, and reports `ranCount / total`.
+Group `logs/runs/**/*.json` by `backfill_id`, use `backfill_total` as the denominator, and report `ranCount / total`.
 
-The flags are fully backward compatible: when they are absent the `backfill_id` and `backfill_total` fields are omitted, and the `run_id` keeps its normal second-granularity timestamp format (`2024_01_01_10_00_00`) — behavior is unchanged for ordinary runs.
-
-When `--backfill-id` is set, the `run_id` is composed from the backfill id and the chunk's start date (`<backfill-id>__<start-date>`, the start date formatted with the same layout as a normal run id), mirroring Bruin Cloud's per-chunk run ids. Because each chunk has a distinct start date, the id is unique within the backfill, so the per-chunk run logs never overwrite each other. An explicit `BRUIN_RUN_ID` still overrides the generated id.
+When `--backfill-id` is set, the `run_id` is composed as `<backfill-id>__<start-date>` (mirroring Bruin Cloud's per-chunk run ids); each chunk's distinct start date keeps it unique, so the logs never overwrite each other. Without the flags, behavior is unchanged: both fields are omitted and `run_id` keeps its normal timestamp format. `BRUIN_RUN_ID` still overrides the generated id.
 
 ### Continue from the last failed asset
 
