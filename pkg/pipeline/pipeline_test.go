@@ -204,7 +204,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"slack":           "slack-connection",
 			"gcpConnectionId": "gcp-connection-id-here",
 		},
-		Retries: 3,
+		Retries: ptrInt(3),
 		Assets:  []*pipeline.Asset{asset1, asset2, asset3, asset4},
 	}
 	fs := afero.NewOsFs()
@@ -1204,7 +1204,7 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 			Name:               "complex-test",
 			Schedule:           "daily",
 			StartDate:          "2024-01-01",
-			Retries:            3,
+			Retries:            ptrInt(3),
 			Concurrency:        5,
 			Catchup:            true,
 			Agent:              true,
@@ -2730,3 +2730,5 @@ func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {
 		})
 	}
 }
+
+func ptrInt(i int) *int { return &i }

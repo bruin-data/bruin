@@ -461,7 +461,7 @@ var builtinRules = map[string]validators{
 	},
 	"pipeline-has-retries": {
 		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
-			if pipeline.Retries > 0 {
+			if pipeline.Retries != nil && *pipeline.Retries > 0 {
 				return nil, nil
 			}
 
