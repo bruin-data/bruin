@@ -182,7 +182,7 @@ The flags mirror `bruin run` for the options the Cloud trigger API supports.
 | `--downstream` | bool | `false` | Also run all assets downstream of the selected ones. |
 | `--tag`, `-t` | []str | - | Tag the run (repeatable). A run-level label shown in the Cloud activity log — **not** an asset filter. |
 | `--full-refresh`, `-r` | []str | - | Full-refresh. Pass `all` for every asset in the run, or asset name(s) to refresh only those. Combine with `--asset` to refresh a subset of the selected assets. |
-| `--var` | []str | - | Override pipeline variables, as `key=value`. Can be used multiple times. |
+| `--var` | []str | - | Override pipeline variables, as `key=value` where the value is JSON (strings need quotes, e.g. `'env="prod"'`). Can be used multiple times, or pass one JSON object. |
 | `--note` | str | - | Attach a note to the run; shown in the Cloud activity log. |
 | `--split` | str | - | Trigger a backfill, splitting the date range into one run per interval by unit: `minute`, `hour`, `day`, `week`, `month`, `year`. |
 | `--chunk-size` | int | `1` | Number of split units per batch (used with `--split`). |
@@ -245,6 +245,30 @@ bruin cloud runs trigger \
 > A `--full-refresh` asset name must be part of the run. When you narrow the run with
 > `--asset`, each named `--full-refresh` asset has to be in that selection. (`--full-refresh`
 > can't be used bare; pass `all` to refresh everything.)
+
+**Override pipeline variables.** Each `--var` is `key=value`, where the **value is parsed
+as JSON**. So a string must be quoted (`"prod"`), while numbers and booleans are written
+bare. Repeat `--var` for multiple keys, or pass a whole JSON object at once.
+
+```bash
+# String value — note the JSON quotes (wrapped in single quotes for the shell)
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --var 'env="prod"'
+
+# Several variables of different types
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --var 'env="prod"' --var retries=3 --var debug=true
+
+# Or pass them all as one JSON object
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --var '{"env":"prod","retries":3}'
+```
 
 **Split a range into batches (monthly, weekly, …).** With `--split`, the trigger
 becomes a **backfill**: The date range is splitted into one run per interval
