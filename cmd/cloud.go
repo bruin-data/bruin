@@ -810,13 +810,10 @@ type triggerAssetSelection struct {
 	downstream  bool
 }
 
-func (s triggerAssetSelection) active() bool {
-	return len(s.assetInputs) > 0
-}
-
 // selectTriggerAssets resolves the selection flags into a concrete asset set.
 func selectTriggerAssets(assets []bruincloud.Asset, sel triggerAssetSelection) ([]*bruincloud.Asset, error) {
-	if !sel.active() {
+	// A selection is active only when assets are named; --downstream alone is a no-op.
+	if len(sel.assetInputs) == 0 {
 		return nil, nil
 	}
 
@@ -866,22 +863,88 @@ func selectTriggerAssets(assets []bruincloud.Asset, sel triggerAssetSelection) (
 	}), nil
 }
 
-// applyAssetSelection sets the whitelist (asset IDs) and, when fullRefresh is set, the FULL_REFRESH overrides; a nil selection runs the whole pipeline.
-func applyAssetSelection(opts *bruincloud.TriggerRunOptions, selected []*bruincloud.Asset, assets []bruincloud.Asset, fullRefresh bool) {
-	if fullRefresh {
-		opts.AssetOverrides = map[string]map[string]any{}
+type fullRefreshSpec struct {
+	all    bool
+	assets []string
+}
+
+// resolveFullRefresh interprets the --full-refresh flag values.
+func resolveFullRefresh(fullrefreshs []string, assets []bruincloud.Asset, selected []*bruincloud.Asset) (fullRefreshSpec, error) {
+	var spec fullRefreshSpec
+	if len(fullrefreshs) == 0 {
+		return spec, nil
 	}
+
+	var names []string
+	for _, fr := range fullrefreshs {
+		if fr == "all" {
+			spec.all = true
+			continue
+		}
+		names = append(names, fr)
+	}
+	if spec.all {
+		if len(names) > 0 {
+			return spec, errors.New(`--full-refresh "all" cannot be combined with specific asset names`)
+		}
+		return spec, nil
+	}
+
+	inSelection := make(map[string]bool, len(selected))
+	for _, a := range selected {
+		inSelection[a.Name] = true
+	}
+	for _, in := range names {
+		m, err := matchTriggerAsset(assets, in)
+		if err != nil {
+			return spec, err
+		}
+		if m == nil {
+			return spec, fmt.Errorf("asset %q not found in pipeline; run 'bruin cloud assets list' to see available names", in)
+		}
+		if len(selected) > 0 && !inSelection[m.Name] {
+			return spec, fmt.Errorf("cannot full-refresh %q because it is not in the selected assets", in)
+		}
+		spec.assets = append(spec.assets, m.Name)
+	}
+	return spec, nil
+}
+
+// applyAssetSelection sets the whitelist (asset IDs) from the selection and the
+// FULL_REFRESH overrides from the full-refresh spec. A nil selection runs the whole
+// pipeline; an "all" full-refresh covers the selection if there is one, otherwise the
+// whole pipeline.
+func applyAssetSelection(opts *bruincloud.TriggerRunOptions, selected []*bruincloud.Asset, assets []bruincloud.Asset, fr fullRefreshSpec) {
+	for _, a := range selected {
+		opts.Whitelist = append(opts.Whitelist, a.ID)
+	}
+
+	// 1. Nothing to refresh → return early so AssetOverrides stays nil
+	if !fr.all && len(fr.assets) == 0 {
+		return
+	}
+	opts.AssetOverrides = map[string]map[string]any{}
+
+	// 2. Named subset → refresh exactly the assets the user listed.
+	if !fr.all {
+		for _, name := range fr.assets {
+			opts.AssetOverrides[name] = map[string]any{"FULL_REFRESH": 1}
+		}
+		return
+	}
+
+	// 3. "all" → but "all" means different things:
+	// 3a. with --asset: refresh only the selected assets
 	if selected != nil {
 		for _, a := range selected {
-			opts.Whitelist = append(opts.Whitelist, a.ID)
-			if fullRefresh {
-				opts.AssetOverrides[a.Name] = map[string]any{"FULL_REFRESH": 1}
-			}
+			opts.AssetOverrides[a.Name] = map[string]any{"FULL_REFRESH": 1}
 		}
-	} else if fullRefresh {
-		for i := range assets {
-			opts.AssetOverrides[assets[i].Name] = map[string]any{"FULL_REFRESH": 1}
-		}
+		return
+	}
+
+	// 3b. without --asset: refresh every asset in the pipeline
+	for i := range assets {
+		opts.AssetOverrides[assets[i].Name] = map[string]any{"FULL_REFRESH": 1}
 	}
 }
 
@@ -904,9 +967,8 @@ func parseRunVariables(pairs []string) (map[string]any, error) {
 
 func cloudRunsTrigger() *cli.Command {
 	return &cli.Command{
-		Name:      "trigger",
-		Usage:     "Trigger a new pipeline run",
-		ArgsUsage: "[path to the task file]",
+		Name:  "trigger",
+		Usage: "Trigger a new pipeline run",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -922,19 +984,24 @@ func cloudRunsTrigger() *cli.Command {
 				Usage:    "end date for the run (e.g. 2026-01-02T00:00:00Z)",
 				Required: true,
 			},
+			&cli.StringSliceFlag{
+				Name:    "asset",
+				Aliases: []string{"assets"},
+				Usage:   "select specific assets to run by name; repeat or comma-separate for multiple",
+			},
 			&cli.BoolFlag{
 				Name:  "downstream",
-				Usage: "also run assets downstream of the selected ones (used with a positional asset selection; no effect on its own)",
+				Usage: "also run assets downstream of the selected ones (used with --asset; no effect on its own)",
 			},
 			&cli.StringSliceFlag{
 				Name:    "tag",
 				Aliases: []string{"t"},
 				Usage:   "tag the run; repeat for multiple.",
 			},
-			&cli.BoolFlag{
+			&cli.StringSliceFlag{
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
-				Usage:   "truncate the table before running",
+				Usage:   `full-refresh (truncate before running): "all" for every asset in the run, or asset name(s) to refresh only those`,
 			},
 			&cli.StringSliceFlag{
 				Name:  "var",
@@ -988,13 +1055,18 @@ func cloudRunsTrigger() *cli.Command {
 
 			opts := bruincloud.TriggerRunOptions{Variables: vars, Note: c.String("note"), Tags: c.StringSlice("tag")}
 
-			// Asset selection
+			if c.Args().Len() > 0 {
+				printError(fmt.Errorf("unexpected argument(s): %s", strings.Join(c.Args().Slice(), " ")), output, "Invalid arguments")
+				return cli.Exit("", 1)
+			}
+
+			// Asset selection comes from --asset.
 			sel := triggerAssetSelection{
-				assetInputs: c.Args().Slice(),
+				assetInputs: c.StringSlice("asset"),
 				downstream:  c.Bool("downstream"),
 			}
-			fullRefresh := c.Bool("full-refresh")
-			if sel.active() || fullRefresh {
+			fullRefresh := c.StringSlice("full-refresh")
+			if len(sel.assetInputs) > 0 || len(fullRefresh) > 0 {
 				assets, err := client.ListAssets(ctx, project, pipeline)
 				if err != nil {
 					printError(err, output, "Failed to list assets")
@@ -1007,7 +1079,13 @@ func cloudRunsTrigger() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				applyAssetSelection(&opts, selected, assets, fullRefresh)
+				fr, err := resolveFullRefresh(fullRefresh, assets, selected)
+				if err != nil {
+					printError(err, output, "Failed to resolve full refresh")
+					return cli.Exit("", 1)
+				}
+
+				applyAssetSelection(&opts, selected, assets, fr)
 			}
 
 			startDate, endDate := c.String("start-date"), c.String("end-date")

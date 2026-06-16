@@ -487,15 +487,23 @@ func TestApplyAssetSelection(t *testing.T) {
 	t.Run("no selection no full refresh leaves opts empty", func(t *testing.T) {
 		t.Parallel()
 		var opts bruincloud.TriggerRunOptions
-		applyAssetSelection(&opts, nil, assets, false)
+		applyAssetSelection(&opts, nil, assets, fullRefreshSpec{})
 		assert.Nil(t, opts.Whitelist)
 		assert.Nil(t, opts.AssetOverrides)
 	})
 
-	t.Run("no selection with full refresh overrides every asset", func(t *testing.T) {
+	t.Run("selection sets whitelist by id without overrides", func(t *testing.T) {
 		t.Parallel()
 		var opts bruincloud.TriggerRunOptions
-		applyAssetSelection(&opts, nil, assets, true)
+		applyAssetSelection(&opts, selected, assets, fullRefreshSpec{})
+		assert.Equal(t, []string{"id-raw", "id-report"}, opts.Whitelist)
+		assert.Nil(t, opts.AssetOverrides)
+	})
+
+	t.Run("full refresh all without selection covers whole pipeline", func(t *testing.T) {
+		t.Parallel()
+		var opts bruincloud.TriggerRunOptions
+		applyAssetSelection(&opts, nil, assets, fullRefreshSpec{all: true})
 		assert.Nil(t, opts.Whitelist) // empty whitelist => whole pipeline
 		assert.Len(t, opts.AssetOverrides, 3)
 		for _, a := range assets {
@@ -503,23 +511,96 @@ func TestApplyAssetSelection(t *testing.T) {
 		}
 	})
 
-	t.Run("selection sets whitelist by id without overrides", func(t *testing.T) {
+	t.Run("full refresh all with selection covers only selected", func(t *testing.T) {
 		t.Parallel()
 		var opts bruincloud.TriggerRunOptions
-		applyAssetSelection(&opts, selected, assets, false)
-		assert.Equal(t, []string{"id-raw", "id-report"}, opts.Whitelist)
-		assert.Nil(t, opts.AssetOverrides)
-	})
-
-	t.Run("selection with full refresh overrides only selected", func(t *testing.T) {
-		t.Parallel()
-		var opts bruincloud.TriggerRunOptions
-		applyAssetSelection(&opts, selected, assets, true)
+		applyAssetSelection(&opts, selected, assets, fullRefreshSpec{all: true})
 		assert.Equal(t, []string{"id-raw", "id-report"}, opts.Whitelist)
 		assert.Len(t, opts.AssetOverrides, 2)
 		assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides["s.raw"])
 		assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides["s.report"])
-		assert.NotContains(t, opts.AssetOverrides, "s.summary")
+	})
+
+	t.Run("full refresh subset overrides only named assets", func(t *testing.T) {
+		t.Parallel()
+		var opts bruincloud.TriggerRunOptions
+		applyAssetSelection(&opts, selected, assets, fullRefreshSpec{assets: []string{"s.report"}})
+		assert.Equal(t, []string{"id-raw", "id-report"}, opts.Whitelist)
+		assert.Len(t, opts.AssetOverrides, 1)
+		assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides["s.report"])
+		assert.NotContains(t, opts.AssetOverrides, "s.raw")
+	})
+
+	t.Run("full refresh names without selection runs whole pipeline", func(t *testing.T) {
+		t.Parallel()
+		var opts bruincloud.TriggerRunOptions
+		applyAssetSelection(&opts, nil, assets, fullRefreshSpec{assets: []string{"s.summary"}})
+		assert.Nil(t, opts.Whitelist) // empty whitelist => whole pipeline
+		assert.Len(t, opts.AssetOverrides, 1)
+		assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides["s.summary"])
+	})
+}
+
+func TestResolveFullRefresh(t *testing.T) {
+	t.Parallel()
+
+	assets := []bruincloud.Asset{
+		mkTriggerAsset(t, "s.raw", "id-raw", nil, nil),
+		mkTriggerAsset(t, "s.summary", "id-summary", nil, nil),
+		mkTriggerAsset(t, "s.report", "id-report", nil, nil),
+	}
+	selected := []*bruincloud.Asset{&assets[0], &assets[2]} // raw + report
+
+	t.Run("empty values returns empty spec", func(t *testing.T) {
+		t.Parallel()
+		spec, err := resolveFullRefresh(nil, assets, nil)
+		require.NoError(t, err)
+		assert.False(t, spec.all)
+		assert.Empty(t, spec.assets)
+	})
+
+	t.Run("all keyword sets all", func(t *testing.T) {
+		t.Parallel()
+		spec, err := resolveFullRefresh([]string{"all"}, assets, nil)
+		require.NoError(t, err)
+		assert.True(t, spec.all)
+		assert.Empty(t, spec.assets)
+	})
+
+	t.Run("all combined with names errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := resolveFullRefresh([]string{"all", "s.raw"}, assets, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot be combined")
+	})
+
+	t.Run("names resolved to canonical form", func(t *testing.T) {
+		t.Parallel()
+		spec, err := resolveFullRefresh([]string{"report", "raw.sql"}, assets, nil)
+		require.NoError(t, err)
+		assert.False(t, spec.all)
+		assert.Equal(t, []string{"s.report", "s.raw"}, spec.assets)
+	})
+
+	t.Run("unknown asset errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := resolveFullRefresh([]string{"nope"}, assets, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("name within selection is allowed", func(t *testing.T) {
+		t.Parallel()
+		spec, err := resolveFullRefresh([]string{"s.report"}, assets, selected)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"s.report"}, spec.assets)
+	})
+
+	t.Run("name outside selection errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := resolveFullRefresh([]string{"s.summary"}, assets, selected)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not in the selected assets")
 	})
 }
 
