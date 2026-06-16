@@ -333,6 +333,8 @@ retries: 2
 - **Type:** `Integer`
 - **Default:** `2`
 
+**Inheritance:** The pipeline-level `retries` is the default for every asset and every quality check in the pipeline. An [asset can override it](../assets/definition-schema.md#retries) with its own `retries`, and a [check can override it](../quality/overview.md#retries) again, following the resolution chain **check → asset → pipeline**. An explicit value (including `0`, meaning no retries) at any level wins over the inherited default.
+
 ### Rerun Cooldown
 
 Set a delay (in seconds) between retry attempts for failed assets. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. When deploying to Airflow, this is automatically translated to `retries_delay` for compatibility.

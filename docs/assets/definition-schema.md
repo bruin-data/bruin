@@ -220,6 +220,24 @@ See [interval modifiers](./interval-modifiers) for more details.
 
 - **Type:** `Object`
 
+## `retries`
+
+Number of times the asset is retried on failure before it is marked as failed. If not specified, the asset inherits the pipeline-level [`retries`](../pipelines/definition.md#retries).
+
+```yaml
+retries: 3
+```
+
+**Special values:**
+
+- unset: inherit the pipeline-level `retries`
+- `0`: no retries
+- `> 0`: retry the asset up to this many times
+
+The asset-level value is, in turn, the default for the asset's [quality checks](../quality/overview.md#retries), following the resolution chain **check → asset → pipeline**.
+
+- **Type:** `Integer`
+
 ## `rerun_cooldown`
 
 Set a delay (in seconds) between retry attempts for failed assets. This helps prevent overwhelming downstream systems during failures and allows for temporary issues to resolve. If not specified, the asset inherits the pipeline's `rerun_cooldown` setting.

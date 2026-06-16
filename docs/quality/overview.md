@@ -21,6 +21,28 @@ columns:
 
 If any of those checks fails the asset will be marked as failed and any downstream assets will not be executed.
 
+## retries
+
+Both column checks and [custom checks](./custom.md) accept an optional `retries` attribute that controls how many times the check is retried on failure before it is marked as failed. It can be configured independently of the asset- and pipeline-level retries.
+
+```yaml
+columns:
+  - name: id
+    type: integer
+    checks:
+      - name: unique
+        retries: 3   # retry this check up to 3 times
+      - name: not_null
+```
+
+**Special values:**
+
+- unset: inherit the asset-level [`retries`](../assets/definition-schema.md#retries) (which in turn falls back to the pipeline-level [`retries`](../pipelines/definition.md#retries))
+- `0`: no retries
+- `> 0`: retry the check up to this many times
+
+Retries are resolved through the chain **check → asset → pipeline**: a check without its own `retries` inherits the asset's, and an asset without its own inherits the pipeline's. An explicit value (including `0`) at any level wins over the inherited default.
+
 Quality checks can also be executed on their own without running the asset again:
 
 ```bash
