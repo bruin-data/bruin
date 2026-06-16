@@ -207,50 +207,72 @@ func (c *APIClient) GetRun(ctx context.Context, project, pipeline, runID string)
 	return &resp.Data, nil
 }
 
-// RunInterval is a single [start, end] window for a triggered run.
-type RunInterval struct {
-	StartDate string
-	EndDate   string
-}
-
-// TriggerRunOptions holds the optional parameters the trigger endpoint accepts.
+// TriggerRunOptions holds the optional parameters the trigger endpoints accept.
 type TriggerRunOptions struct {
 	Whitelist      []string
 	AssetOverrides map[string]map[string]any
 	Variables      map[string]any
+	Note string
+	Tags []string
 }
 
-// TriggerRun triggers one run per interval. Each interval is sent as its own
-// single-entry request: a single-entry request reliably creates a run, whereas
-// repeating the same pipeline across multiple entries in one request was observed
-// to fail server-side (HTTP 500), so batches (e.g. one run per month) are issued
-// sequentially. On a partial failure the error reports how many runs succeeded.
-func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline string, intervals []RunInterval, opts TriggerRunOptions) error {
-	for i, iv := range intervals {
-		entry := map[string]any{
-			"project":    project,
-			"pipeline":   pipeline,
-			"start_date": iv.StartDate,
-			"end_date":   iv.EndDate,
-		}
-		if len(opts.Whitelist) > 0 {
-			entry["whitelist"] = opts.Whitelist
-		}
-		if len(opts.AssetOverrides) > 0 {
-			entry["asset_overrides"] = opts.AssetOverrides
-		}
-		if len(opts.Variables) > 0 {
-			entry["variables"] = opts.Variables
-		}
-		body := map[string]any{"pipelines": []map[string]any{entry}}
-		if err := c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-runs", body, nil); err != nil {
-			if len(intervals) > 1 {
-				return fmt.Errorf("triggered %d of %d runs; interval %s..%s failed: %w", i, len(intervals), iv.StartDate, iv.EndDate, err)
-			}
-			return err
-		}
+// encodeRunNote serializes the run note and tags into the single note field the Cloud expects
+func encodeRunNote(note string, tags []string) string {
+	if note == "" && len(tags) == 0 {
+		return ""
 	}
-	return nil
+	if tags == nil {
+		tags = []string{}
+	}
+	b, err := json.Marshal(struct {
+		Note string   `json:"note"`
+		Tags []string `json:"tags"`
+	}{Note: note, Tags: tags})
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// triggerEntry builds the fields shared by the run and backfill request bodies:
+// the pipeline target, the date range, and the run options.
+func triggerEntry(project, pipeline, startDate, endDate string, opts TriggerRunOptions) map[string]any {
+	entry := map[string]any{
+		"project":    project,
+		"pipeline":   pipeline,
+		"start_date": startDate,
+		"end_date":   endDate,
+	}
+	if len(opts.Whitelist) > 0 {
+		entry["whitelist"] = opts.Whitelist
+	}
+	if len(opts.AssetOverrides) > 0 {
+		entry["asset_overrides"] = opts.AssetOverrides
+	}
+	if len(opts.Variables) > 0 {
+		entry["variables"] = opts.Variables
+	}
+	if note := encodeRunNote(opts.Note, opts.Tags); note != "" {
+		entry["note"] = note
+	}
+	return entry
+}
+
+// TriggerRun triggers a single pipeline run for the given date range.
+func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate, endDate string, opts TriggerRunOptions) error {
+	entry := triggerEntry(project, pipeline, startDate, endDate, opts)
+	body := map[string]any{"pipelines": []map[string]any{entry}}
+	return c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-runs", body, nil)
+}
+
+// TriggerBackfill triggers a backfill: the Cloud splits the date range into one run
+// per interval (by split unit + chunk size) server-side and groups them as a single
+// backfill.
+func (c *APIClient) TriggerBackfill(ctx context.Context, project, pipeline, startDate, endDate, split string, chunkSize int, opts TriggerRunOptions) error {
+	body := triggerEntry(project, pipeline, startDate, endDate, opts)
+	body["split"] = split
+	body["chunk_size"] = chunkSize
+	return c.doRequest(ctx, http.MethodPost, "/trigger-pipeline-backfill", body, nil)
 }
 
 func (c *APIClient) RerunRun(ctx context.Context, project, pipeline, runID string, onlyFailed bool) error {

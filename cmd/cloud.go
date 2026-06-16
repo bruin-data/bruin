@@ -12,7 +12,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -732,95 +731,28 @@ func cloudRunsGet() *cli.Command {
 	}
 }
 
-// maxTriggerIntervals caps how many runs a single split can create.
-const maxTriggerIntervals = 250
-
 var validSplitUnits = map[string]bool{
 	"minute": true, "hour": true, "day": true,
 	"week": true, "month": true, "year": true,
 }
 
-// parseRunDate accepts the common date/datetime formats the trigger endpoint allows.
-func parseRunDate(s string) (time.Time, error) {
-	for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05", "2006-01-02"} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t.UTC(), nil
-		}
-	}
-	return time.Time{}, fmt.Errorf("invalid date %q (use RFC3339 like 2026-05-01T00:00:00Z or YYYY-MM-DD)", s)
-}
-
-// addRunInterval advances t by n units.
-func addRunInterval(t time.Time, unit string, n int) time.Time {
-	switch unit {
-	case "minute":
-		return t.Add(time.Duration(n) * time.Minute)
-	case "hour":
-		return t.Add(time.Duration(n) * time.Hour)
-	case "day":
-		return t.AddDate(0, 0, n)
-	case "week":
-		return t.AddDate(0, 0, 7*n)
-	case "month":
-		return t.AddDate(0, n, 0)
-	case "year":
-		return t.AddDate(n, 0, 0)
-	}
-	return t
-}
-
-// splitRunIntervals chunks [start, end] into windows of chunkSize units.
-func splitRunIntervals(start, end time.Time, split string, chunkSize int) []bruincloud.RunInterval {
-	var intervals []bruincloud.RunInterval
-	cur := start
-	for cur.Before(end) {
-		next := addRunInterval(cur, split, chunkSize)
-		ivEnd := next.Add(-time.Millisecond)
-		if ivEnd.After(end) {
-			ivEnd = end
-		}
-		intervals = append(intervals, bruincloud.RunInterval{
-			StartDate: cur.Format("2006-01-02T15:04:05.000Z"),
-			EndDate:   ivEnd.Format("2006-01-02T15:04:05.000Z"),
-		})
-		cur = next
-	}
-	return intervals
-}
-
-func buildTriggerIntervals(split string, chunkSizeSet bool, chunkSize int, startDate, endDate string) ([]bruincloud.RunInterval, error) {
+// validateSplitFlags checks the --split / --chunk-size combination. The actual
+// splitting happens server-side (the backfill endpoint), so this only validates
+// the flags locally for a clear error before the request.
+func validateSplitFlags(split string, chunkSizeSet bool, chunkSize int) error {
 	if split == "" {
 		if chunkSizeSet {
-			return nil, errors.New("--chunk-size requires --split")
+			return errors.New("--chunk-size requires --split")
 		}
-		return []bruincloud.RunInterval{{StartDate: startDate, EndDate: endDate}}, nil
+		return nil
 	}
-
 	if !validSplitUnits[split] {
-		return nil, fmt.Errorf("invalid --split %q (valid: minute, hour, day, week, month, year)", split)
+		return fmt.Errorf("invalid --split %q (valid: minute, hour, day, week, month, year)", split)
 	}
 	if chunkSize < 1 {
-		return nil, errors.New("--chunk-size must be at least 1")
+		return errors.New("--chunk-size must be at least 1")
 	}
-	start, err := parseRunDate(startDate)
-	if err != nil {
-		return nil, err
-	}
-	end, err := parseRunDate(endDate)
-	if err != nil {
-		return nil, err
-	}
-	if !start.Before(end) {
-		return nil, errors.New("start date must be before end date")
-	}
-	intervals := splitRunIntervals(start, end, split, chunkSize)
-	if len(intervals) == 0 {
-		return nil, errors.New("no intervals generated from the given date range")
-	}
-	if len(intervals) > maxTriggerIntervals {
-		return nil, fmt.Errorf("split produces %d runs, which exceeds the limit of %d; use a larger --chunk-size or a smaller range", len(intervals), maxTriggerIntervals)
-	}
-	return intervals, nil
+	return nil
 }
 
 // matchTriggerAsset finds an asset by full name, bare name, or filename. An exact
@@ -870,17 +802,16 @@ func assetStringList(raw json.RawMessage) []string {
 }
 
 // triggerAssetSelection holds the asset-selection flags. The Cloud trigger API
-// only understands an explicit whitelist of asset IDs, so tag/exclude-tag/
-// downstream are resolved client-side into that whitelist.
+// only understands an explicit whitelist of asset IDs, so the selection (asset
+// names, optionally expanded by --downstream) is resolved client-side into that
+// whitelist. (--tag is run-level metadata, not an asset filter.)
 type triggerAssetSelection struct {
 	assetInputs []string
-	tag         string
-	excludeTags []string
 	downstream  bool
 }
 
 func (s triggerAssetSelection) active() bool {
-	return len(s.assetInputs) > 0 || s.tag != "" || len(s.excludeTags) > 0
+	return len(s.assetInputs) > 0
 }
 
 // selectTriggerAssets resolves the selection flags into a concrete asset set.
@@ -899,25 +830,6 @@ func selectTriggerAssets(assets []bruincloud.Asset, sel triggerAssetSelection) (
 			return nil, fmt.Errorf("asset %q not found in pipeline; run 'bruin cloud assets list' to see available names", in)
 		}
 		selected[m.Name] = m
-	}
-	if sel.tag != "" {
-		matched := false
-		for i := range assets {
-			if slices.Contains(assetStringList(assets[i].Tags), sel.tag) {
-				selected[assets[i].Name] = &assets[i]
-				matched = true
-			}
-		}
-		if !matched && len(sel.assetInputs) == 0 {
-			return nil, fmt.Errorf("no assets found with tag %q", sel.tag)
-		}
-	}
-
-	// With only exclude-tag/downstream given, start from the full pipeline.
-	if len(sel.assetInputs) == 0 && sel.tag == "" {
-		for i := range assets {
-			selected[assets[i].Name] = &assets[i]
-		}
 	}
 
 	// Transitively pull in downstream assets.
@@ -947,20 +859,6 @@ func selectTriggerAssets(assets []bruincloud.Asset, sel triggerAssetSelection) (
 				}
 			}
 		}
-	}
-
-	for _, ex := range sel.excludeTags {
-		for name, a := range selected {
-			if slices.Contains(assetStringList(a.Tags), ex) {
-				delete(selected, name)
-			}
-		}
-	}
-
-	// An active selection that resolves to nothing must not fall back to running
-	// the whole pipeline (empty whitelist)
-	if len(selected) == 0 {
-		return nil, errors.New("no assets matched the selection; check the asset arguments, --tag, and --exclude-tag")
 	}
 
 	return slices.SortedFunc(maps.Values(selected), func(a, b *bruincloud.Asset) int {
@@ -1026,17 +924,12 @@ func cloudRunsTrigger() *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:  "downstream",
-				Usage: "also run assets downstream of the selected ones (used with an asset/--tag selection; no effect on its own)",
-			},
-			&cli.StringFlag{
-				Name:    "tag",
-				Aliases: []string{"t"},
-				Usage:   "pick assets with the given tag",
+				Usage: "also run assets downstream of the selected ones (used with a positional asset selection; no effect on its own)",
 			},
 			&cli.StringSliceFlag{
-				Name:    "exclude-tag",
-				Aliases: []string{"x"},
-				Usage:   "exclude assets with the given tag",
+				Name:    "tag",
+				Aliases: []string{"t"},
+				Usage:   "tag the run; repeat for multiple.",
 			},
 			&cli.BoolFlag{
 				Name:    "full-refresh",
@@ -1046,6 +939,10 @@ func cloudRunsTrigger() *cli.Command {
 			&cli.StringSliceFlag{
 				Name:  "var",
 				Usage: "override pipeline variables with custom values (key=value)",
+			},
+			&cli.StringFlag{
+				Name:  "note",
+				Usage: "attach a note to the run.",
 			},
 			&cli.StringFlag{
 				Name:  "split",
@@ -1074,9 +971,11 @@ func cloudRunsTrigger() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Build the run intervals
-			intervals, err := buildTriggerIntervals(c.String("split"), c.IsSet("chunk-size"), c.Int("chunk-size"), c.String("start-date"), c.String("end-date"))
-			if err != nil {
+			// --split routes to the backfill endpoint;
+			// without it we trigger a single run.
+			split := c.String("split")
+			chunkSize := c.Int("chunk-size")
+			if err := validateSplitFlags(split, c.IsSet("chunk-size"), chunkSize); err != nil {
 				printError(err, output, "Invalid flags")
 				return cli.Exit("", 1)
 			}
@@ -1087,13 +986,11 @@ func cloudRunsTrigger() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			opts := bruincloud.TriggerRunOptions{Variables: vars}
+			opts := bruincloud.TriggerRunOptions{Variables: vars, Note: c.String("note"), Tags: c.StringSlice("tag")}
 
 			// Asset selection
 			sel := triggerAssetSelection{
 				assetInputs: c.Args().Slice(),
-				tag:         c.String("tag"),
-				excludeTags: c.StringSlice("exclude-tag"),
 				downstream:  c.Bool("downstream"),
 			}
 			fullRefresh := c.Bool("full-refresh")
@@ -1113,16 +1010,21 @@ func cloudRunsTrigger() *cli.Command {
 				applyAssetSelection(&opts, selected, assets, fullRefresh)
 			}
 
-			if err := client.TriggerRun(ctx, project, pipeline, intervals, opts); err != nil {
-				printError(err, output, "Failed to trigger run")
-				return cli.Exit("", 1)
+			startDate, endDate := c.String("start-date"), c.String("end-date")
+			if split == "" {
+				if err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts); err != nil {
+					printError(err, output, "Failed to trigger run")
+					return cli.Exit("", 1)
+				}
+				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project))
+				return nil
 			}
 
-			msg := fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project)
-			if len(intervals) > 1 {
-				msg = fmt.Sprintf("Successfully triggered %d runs for pipeline '%s' in project '%s'", len(intervals), pipeline, project)
+			if err := client.TriggerBackfill(ctx, project, pipeline, startDate, endDate, split, chunkSize, opts); err != nil {
+				printError(err, output, "Failed to trigger backfill")
+				return cli.Exit("", 1)
 			}
-			printSuccessForOutput(output, msg)
+			printSuccessForOutput(output, fmt.Sprintf("Successfully triggered backfill (split by %s, chunk size %d) for pipeline '%s' in project '%s'", split, chunkSize, pipeline, project))
 			return nil
 		},
 	}

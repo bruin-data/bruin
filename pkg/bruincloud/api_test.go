@@ -314,41 +314,31 @@ func TestTriggerRun(t *testing.T) {
 		_, _ = w.Write([]byte(`200`))
 	})
 
-	intervals := []RunInterval{{StartDate: "2026-01-01", EndDate: "2026-01-02"}}
-	err := client.TriggerRun(t.Context(), "proj", "pipe", intervals, TriggerRunOptions{})
+	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-02", TriggerRunOptions{})
 	require.NoError(t, err)
 }
 
-func TestTriggerRunSplitIntervals(t *testing.T) {
+func TestTriggerBackfill(t *testing.T) {
 	t.Parallel()
-	var requestCount int
-	var seenStarts []string
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		assert.Equal(t, "/trigger-pipeline-backfill", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+
 		body := readJSON(t, r)
-		// Each interval is its own request with a single-entry pipelines array.
-		pipelines := body["pipelines"].([]any)
-		assert.Len(t, pipelines, 1)
-		entry := pipelines[0].(map[string]any)
-		assert.Equal(t, []any{"asset-id-1"}, entry["whitelist"]) // shared options on every request
-		seenStarts = append(seenStarts, entry["start_date"].(string))
+		assert.Equal(t, "proj", body["project"])
+		assert.Equal(t, "pipe", body["pipeline"])
+		assert.Equal(t, "2026-01-01", body["start_date"])
+		assert.Equal(t, "2026-04-01", body["end_date"])
+		assert.Equal(t, "month", body["split"])
+		assert.EqualValues(t, 2, body["chunk_size"])
+		assert.Equal(t, []any{"asset-id-1"}, body["whitelist"])
+
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`200`))
 	})
 
-	intervals := []RunInterval{
-		{StartDate: "2026-01-01T00:00:00.000Z", EndDate: "2026-01-31T23:59:59.999Z"},
-		{StartDate: "2026-02-01T00:00:00.000Z", EndDate: "2026-02-28T23:59:59.999Z"},
-		{StartDate: "2026-03-01T00:00:00.000Z", EndDate: "2026-03-31T23:59:59.999Z"},
-	}
-	err := client.TriggerRun(t.Context(), "proj", "pipe", intervals, TriggerRunOptions{Whitelist: []string{"asset-id-1"}})
+	err := client.TriggerBackfill(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", "month", 2, TriggerRunOptions{Whitelist: []string{"asset-id-1"}})
 	require.NoError(t, err)
-	assert.Equal(t, 3, requestCount)
-	assert.Equal(t, []string{
-		"2026-01-01T00:00:00.000Z",
-		"2026-02-01T00:00:00.000Z",
-		"2026-03-01T00:00:00.000Z",
-	}, seenStarts)
 }
 
 func TestTriggerRunWithOptions(t *testing.T) {
@@ -377,8 +367,7 @@ func TestTriggerRunWithOptions(t *testing.T) {
 		AssetOverrides: map[string]map[string]any{"schema.asset": {"FULL_REFRESH": 1}},
 		Variables:      map[string]any{"foo": "bar"},
 	}
-	intervals := []RunInterval{{StartDate: "2026-01-01", EndDate: "2026-01-31"}}
-	err := client.TriggerRun(t.Context(), "proj", "pipe", intervals, opts)
+	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-31", opts)
 	require.NoError(t, err)
 }
 
@@ -631,4 +620,28 @@ func TestSendAgentMessage_WithThreadID(t *testing.T) {
 	result, err := client.SendAgentMessage(t.Context(), 1, "hello", &threadID)
 	require.NoError(t, err)
 	assert.Contains(t, string(result), "message_id")
+}
+
+func TestEncodeRunNote(t *testing.T) {
+	t.Parallel()
+	assert.Empty(t, encodeRunNote("", nil))
+	assert.JSONEq(t, `{"note":"hi","tags":[]}`, encodeRunNote("hi", nil))
+	assert.JSONEq(t, `{"note":"","tags":["a","b"]}`, encodeRunNote("", []string{"a", "b"}))
+	assert.JSONEq(t, `{"note":"hi","tags":["a"]}`, encodeRunNote("hi", []string{"a"}))
+}
+
+func TestTriggerRunWithTags(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body := readJSON(t, r)
+		entry := body["pipelines"].([]any)[0].(map[string]any)
+		// Note + tags are carried together inside the note field as JSON (the Cloud RunNote format).
+		assert.JSONEq(t, `{"note":"Q1 backfill","tags":["nightly","manual"]}`, entry["note"].(string))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	err := client.TriggerRun(t.Context(), "p", "pipe", "2026-01-01", "2026-01-02",
+		TriggerRunOptions{Note: "Q1 backfill", Tags: []string{"nightly", "manual"}})
+	require.NoError(t, err)
 }

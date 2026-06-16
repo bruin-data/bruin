@@ -179,15 +179,15 @@ The flags mirror `bruin run` for the options the Cloud trigger API supports.
 | `--start-date` | str | - | Start date for the run (YYYY-MM-DD) |
 | `--end-date` | str | - | End date for the run (YYYY-MM-DD) |
 | `--downstream` | bool | `false` | Also run all assets downstream of the selected ones. |
-| `--tag`, `-t` | str | - | Run only assets with the given tag. |
-| `--exclude-tag`, `-x` | []str | - | Exclude assets with the given tag. Can be used multiple times. |
+| `--tag`, `-t` | []str | - | Tag the run (repeatable). A run-level label shown in the Cloud activity log — **not** an asset filter. |
 | `--full-refresh`, `-r` | bool | `false` | Run the selected assets (or whole pipeline) as a full refresh. |
 | `--var` | []str | - | Override pipeline variables, as `key=value`. Can be used multiple times. |
-| `--split` | str | - | Split the date range into batches by unit: `minute`, `hour`, `day`, `week`, `month`, `year`. One run is created per batch. |
+| `--note` | str | - | Attach a note to the run; shown in the Cloud activity log. |
+| `--split` | str | - | Trigger a backfill, splitting the date range into one run per interval by unit: `minute`, `hour`, `day`, `week`, `month`, `year`. |
 | `--chunk-size` | int | `1` | Number of split units per batch (used with `--split`). |
 
-**Run only selected assets.** Pass an asset path/name as a positional argument, or
-filter with `--tag`/`--exclude-tag`. 
+**Run only selected assets.** Pass an asset path/name as a positional argument
+(repeatable), optionally with `--downstream` to include their downstream assets.
 
 ```bash
 # Run a single asset
@@ -196,16 +196,21 @@ bruin cloud runs trigger \
   --start-date 2024-01-01 --end-date 2024-01-31 \
   my_asset
 
-# Run everything tagged "daily", plus their downstream assets
+# Run an asset plus its downstream, and tag the run
 bruin cloud runs trigger \
   --project-id <project-id> --pipeline <pipeline-name> \
   --start-date 2024-01-01 --end-date 2024-01-31 \
-  --tag daily --downstream
+  my_asset --downstream --tag nightly --tag manual
 ```
 
-**Split a range into batches (monthly, weekly, …).** With `--split`, the CLI breaks
-the date range into intervals and triggers one run per interval (up to 250). This is
-how you start a backfill of selected assets with monthly batches:
+> [!NOTE]
+> `--tag` labels the run (it shows in the Cloud activity log); it does **not** select
+> assets. Select assets by name (positional) and expand with `--downstream`.
+
+**Split a range into batches (monthly, weekly, …).** With `--split`, the trigger
+becomes a **backfill**: The date range is splitted into one run per interval
+(by unit and chunk size) as a single backfill. This is
+how you backfill selected assets with monthly batches:
 
 ```bash
 # One run per month across the quarter, for a single asset
@@ -234,8 +239,8 @@ bruin cloud runs trigger \
 ```
 
 > [!NOTE]
-> Split runs are created as separate runs, one per interval. They are not grouped
-> into a single "Backfill" view in the Cloud UI.
+> `--split` creates a backfill.
+> Without `--split`, the command triggers a single normal run.
 
 #### `rerun`
 
@@ -509,18 +514,18 @@ bruin cloud runs trigger \
 ```
 
 To reprocess in batches — one run per month, week, or day — add `--split` (and
-optionally `--chunk-size`). Combine it with asset selection to backfill just part of
-the pipeline:
+optionally `--chunk-size`). Combine it with a positional asset selection to backfill
+just part of the pipeline:
 
 ```bash
-# One run per month across the year, for assets tagged "reporting"
+# One run per month across the year, for a single asset
 bruin cloud runs trigger \
   --project-id my-project \
   --pipeline my-pipeline \
   --start-date 2024-01-01 \
   --end-date 2025-01-01 \
   --split month \
-  --tag reporting
+  reporting_summary
 ```
 
 ### Script it with JSON output

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/stretchr/testify/assert"
@@ -369,19 +368,9 @@ func TestSelectTriggerAssets(t *testing.T) {
 		{name: "duplicate asset deduped", sel: triggerAssetSelection{assetInputs: []string{"s.raw", "raw.sql"}}, want: []string{"s.raw"}},
 		{name: "unknown asset errors", sel: triggerAssetSelection{assetInputs: []string{"nope"}}, wantErr: true},
 		{name: "one unknown among valid errors", sel: triggerAssetSelection{assetInputs: []string{"s.raw", "nope"}}, wantErr: true},
-		{name: "by tag", sel: triggerAssetSelection{tag: "report"}, want: []string{"s.report", "s.standalone"}},
-		{name: "unknown tag errors", sel: triggerAssetSelection{tag: "ghost"}, wantErr: true},
-		{name: "asset and tag union", sel: triggerAssetSelection{assetInputs: []string{"s.standalone"}, tag: "source"}, want: []string{"s.raw", "s.standalone"}},
 		{name: "downstream expansion transitive", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, downstream: true}, want: []string{"s.raw", "s.report", "s.summary"}},
 		{name: "downstream on leaf asset", sel: triggerAssetSelection{assetInputs: []string{"s.standalone"}, downstream: true}, want: []string{"s.standalone"}},
 		{name: "downstream mid-chain", sel: triggerAssetSelection{assetInputs: []string{"s.summary"}, downstream: true}, want: []string{"s.report", "s.summary"}},
-		{name: "tag with downstream", sel: triggerAssetSelection{tag: "source", downstream: true}, want: []string{"s.raw", "s.report", "s.summary"}},
-		{name: "exclude tag from all", sel: triggerAssetSelection{excludeTags: []string{"report"}}, want: []string{"s.raw", "s.summary"}},
-		{name: "multiple exclude tags", sel: triggerAssetSelection{excludeTags: []string{"source", "report"}}, want: []string{"s.summary"}},
-		{name: "exclude all tags errors", sel: triggerAssetSelection{excludeTags: []string{"source", "summary", "report"}}, wantErr: true},
-		{name: "downstream then exclude tag", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, downstream: true, excludeTags: []string{"report"}}, want: []string{"s.raw", "s.summary"}},
-		{name: "tag then exclude same tag errors", sel: triggerAssetSelection{tag: "report", excludeTags: []string{"report"}}, wantErr: true},
-		{name: "asset survives unmatched exclude tag", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, excludeTags: []string{"report"}}, want: []string{"s.raw"}},
 	}
 
 	for _, tt := range tests {
@@ -402,38 +391,38 @@ func TestSelectTriggerAssets(t *testing.T) {
 	}
 }
 
-func TestSplitRunIntervals(t *testing.T) {
+func TestValidateSplitFlags(t *testing.T) {
 	t.Parallel()
 
-	mustParse := func(s string) time.Time {
-		ts, err := parseRunDate(s)
-		require.NoError(t, err)
-		return ts
-	}
-
-	t.Run("monthly split of a quarter yields three runs", func(t *testing.T) {
+	t.Run("no split, no chunk-size is valid", func(t *testing.T) {
 		t.Parallel()
-		got := splitRunIntervals(mustParse("2026-01-01"), mustParse("2026-04-01"), "month", 1)
-		require.Len(t, got, 3)
-		assert.Equal(t, "2026-01-01T00:00:00.000Z", got[0].StartDate)
-		assert.Equal(t, "2026-01-31T23:59:59.999Z", got[0].EndDate)
-		assert.Equal(t, "2026-02-01T00:00:00.000Z", got[1].StartDate)
-		assert.Equal(t, "2026-03-01T00:00:00.000Z", got[2].StartDate)
+		require.NoError(t, validateSplitFlags("", false, 1))
 	})
 
-	t.Run("chunk size groups units per batch", func(t *testing.T) {
+	t.Run("chunk-size without split errors", func(t *testing.T) {
 		t.Parallel()
-		got := splitRunIntervals(mustParse("2026-01-01"), mustParse("2026-01-11"), "day", 5)
-		require.Len(t, got, 2)
-		assert.Equal(t, "2026-01-01T00:00:00.000Z", got[0].StartDate)
-		assert.Equal(t, "2026-01-06T00:00:00.000Z", got[1].StartDate)
+		err := validateSplitFlags("", true, 7)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--chunk-size requires --split")
 	})
 
-	t.Run("final interval is clamped to end", func(t *testing.T) {
+	t.Run("valid split unit", func(t *testing.T) {
 		t.Parallel()
-		got := splitRunIntervals(mustParse("2026-01-01"), mustParse("2026-01-10"), "week", 1)
-		require.Len(t, got, 2)
-		assert.Equal(t, "2026-01-10T00:00:00.000Z", got[1].EndDate)
+		require.NoError(t, validateSplitFlags("month", true, 2))
+	})
+
+	t.Run("invalid split unit errors", func(t *testing.T) {
+		t.Parallel()
+		err := validateSplitFlags("fortnight", false, 1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid --split")
+	})
+
+	t.Run("chunk-size below one errors", func(t *testing.T) {
+		t.Parallel()
+		err := validateSplitFlags("day", true, 0)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "at least 1")
 	})
 }
 
@@ -531,66 +520,6 @@ func TestApplyAssetSelection(t *testing.T) {
 		assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides["s.raw"])
 		assert.Equal(t, map[string]any{"FULL_REFRESH": 1}, opts.AssetOverrides["s.report"])
 		assert.NotContains(t, opts.AssetOverrides, "s.summary")
-	})
-}
-
-func TestBuildTriggerIntervals(t *testing.T) {
-	t.Parallel()
-
-	t.Run("no split is a single passthrough interval", func(t *testing.T) {
-		t.Parallel()
-		got, err := buildTriggerIntervals("", false, 1, "2024-01-01", "2024-01-31")
-		require.NoError(t, err)
-		assert.Equal(t, []bruincloud.RunInterval{{StartDate: "2024-01-01", EndDate: "2024-01-31"}}, got)
-	})
-
-	t.Run("chunk-size without split errors", func(t *testing.T) {
-		t.Parallel()
-		_, err := buildTriggerIntervals("", true, 7, "2024-01-01", "2024-01-31")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "--chunk-size requires --split")
-	})
-
-	t.Run("monthly split produces one interval per month", func(t *testing.T) {
-		t.Parallel()
-		got, err := buildTriggerIntervals("month", false, 1, "2024-01-01", "2024-04-01")
-		require.NoError(t, err)
-		require.Len(t, got, 3)
-		assert.Equal(t, "2024-01-01T00:00:00.000Z", got[0].StartDate)
-	})
-
-	t.Run("invalid split unit errors", func(t *testing.T) {
-		t.Parallel()
-		_, err := buildTriggerIntervals("fortnight", false, 1, "2024-01-01", "2024-04-01")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid --split")
-	})
-
-	t.Run("chunk-size below one errors", func(t *testing.T) {
-		t.Parallel()
-		_, err := buildTriggerIntervals("day", true, 0, "2024-01-01", "2024-01-31")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "at least 1")
-	})
-
-	t.Run("invalid date errors", func(t *testing.T) {
-		t.Parallel()
-		_, err := buildTriggerIntervals("day", false, 1, "not-a-date", "2024-01-31")
-		require.Error(t, err)
-	})
-
-	t.Run("start not before end errors", func(t *testing.T) {
-		t.Parallel()
-		_, err := buildTriggerIntervals("day", false, 1, "2024-02-01", "2024-01-01")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "before")
-	})
-
-	t.Run("exceeding the run cap errors", func(t *testing.T) {
-		t.Parallel()
-		_, err := buildTriggerIntervals("day", false, 1, "2024-01-01", "2025-01-01") // 366 daily runs
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "exceeds the limit")
 	})
 }
 
