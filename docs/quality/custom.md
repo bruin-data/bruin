@@ -44,6 +44,7 @@ There are a few fields to configure the check behavior:
 - `count`: optional, expected number of rows returned by the query. When set,
   Bruin will automatically wrap the query with `SELECT count(*) FROM (<query>)`.
 - `blocking`: optional, whether the test should block running downstreams, default `true`.
+- `retries`: optional, how many times the check is retried on failure. If unset, it inherits the asset-level [`retries`](../assets/definition-schema.md#retries) (which falls back to the pipeline-level [`retries`](../pipelines/definition.md#retries)); `0` means no retries. See [retries](./overview.md#retries).
 
 ## Examples
 
