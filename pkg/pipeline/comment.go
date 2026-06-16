@@ -270,6 +270,14 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			task.RerunCooldown = &rerunCooldown
 
 			continue
+		case "retries":
+			retries, err := strconv.Atoi(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse retries value '%s'", value)
+			}
+			task.Retries = &retries
+
+			continue
 		case "refresh_restricted", "full_refresh_restricted":
 			refreshRestricted, err := strconv.ParseBool(value)
 			if err != nil {

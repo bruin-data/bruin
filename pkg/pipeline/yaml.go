@@ -356,6 +356,7 @@ type taskDefinition struct {
 	Domains               []string          `yaml:"domains"`
 	Meta                  map[string]string `yaml:"meta"`
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
+	Retries               *int              `yaml:"retries,omitempty"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
 	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
 	Notifications         Notifications     `yaml:"notifications"`
@@ -553,6 +554,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Domains:           definition.Domains,
 		Meta:              definition.Meta,
 		RerunCooldown:     definition.RerunCooldown,
+		Retries:           definition.Retries,
 		RefreshRestricted: definition.refreshRestricted(),
 		Notifications:     notificationsOrNil(definition.Notifications),
 	}

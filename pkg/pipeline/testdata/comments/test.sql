@@ -1,6 +1,7 @@
 -- @bruin.name: some-sql-task
 -- @bruin.description: some description goes here
 -- @bruin.type: bq.sql
+-- @bruin.retries: 5
 -- @bruin.depends: task1, task2
 -- @bruin.depends: task3,task4
 -- @bruin.depends: task5, task3

@@ -454,6 +454,10 @@ func TestCheckRetries(t *testing.T) {
 	got, err := creator(filepath.Join("testdata", "yaml", "check-retries", "task.yml"))
 	require.NoError(t, err)
 
+	// asset-level retries is parsed from the definition.
+	require.NotNil(t, got.Retries)
+	require.Equal(t, 4, *got.Retries)
+
 	require.Len(t, got.Columns, 1)
 	checks := got.Columns[0].Checks
 	require.Len(t, checks, 2)
