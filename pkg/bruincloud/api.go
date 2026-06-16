@@ -212,11 +212,11 @@ type TriggerRunOptions struct {
 	Whitelist      []string
 	AssetOverrides map[string]map[string]any
 	Variables      map[string]any
-	Note string
-	Tags []string
+	Note           string
+	Tags           []string
 }
 
-// encodeRunNote serializes the run note and tags into the single note field the Cloud expects
+// encodeRunNote serializes the run note and tags into the single note field the Cloud expects.
 func encodeRunNote(note string, tags []string) string {
 	if note == "" && len(tags) == 0 {
 		return ""
