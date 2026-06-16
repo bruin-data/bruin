@@ -281,6 +281,12 @@ bruin cloud runs trigger \
 > `--split` creates a backfill.
 > Without `--split`, the command triggers a single normal run.
 
+> [!NOTE]
+> For a backfill, `--end-date` is **exclusive**: the range is split as
+> `[start-date, end-date)`, so the last interval ends just before `--end-date`. To
+> include a final period, pass the date one period past it — e.g. `--end-date 2024-01-04`
+> to cover `2024-01-03` with `--split day`.
+
 #### `rerun`
 
 Re-run a previous pipeline run. Useful when a transient issue caused a failure:
