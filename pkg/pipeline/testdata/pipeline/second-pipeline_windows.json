@@ -290,7 +290,7 @@
   "catchup": false,
   "catchup_mode": "",
   "commit": "",
-  "retries": 0,
+  "retries": null,
   "concurrency": 1,
   "max_active_steps": null
 }

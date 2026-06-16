@@ -150,7 +150,7 @@
   "metadata_push": {
     "bigquery": false
   },
-  "retries": 0,
+  "retries": null,
   "concurrency": 1,
   "max_active_steps": null,
   "commit": "",
