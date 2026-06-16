@@ -736,9 +736,7 @@ var validSplitUnits = map[string]bool{
 	"week": true, "month": true, "year": true,
 }
 
-// validateSplitFlags checks the --split / --chunk-size combination. The actual
-// splitting happens server-side (the backfill endpoint), so this only validates
-// the flags locally for a clear error before the request.
+// validateSplitFlags checks the --split / --chunk-size combination.
 func validateSplitFlags(split string, chunkSizeSet bool, chunkSize int) error {
 	if split == "" {
 		if chunkSizeSet {
@@ -755,10 +753,7 @@ func validateSplitFlags(split string, chunkSizeSet bool, chunkSize int) error {
 	return nil
 }
 
-// matchTriggerAsset finds an asset by full name, bare name, or filename. An exact
-// full-name match always wins. Otherwise it matches by leaf name (schema-qualified
-// suffix); if that leaf name is shared by multiple assets it returns an ambiguity
-// error rather than silently picking one. Returns (nil, nil) when nothing matches.
+// matchTriggerAsset finds an asset by full name, bare name, or filename. 
 func matchTriggerAsset(assets []bruincloud.Asset, in string) (*bruincloud.Asset, error) {
 	query := strings.TrimSuffix(strings.TrimSuffix(in, ".sql"), ".py")
 
@@ -801,10 +796,7 @@ func assetStringList(raw json.RawMessage) []string {
 	return list
 }
 
-// triggerAssetSelection holds the asset-selection flags. The Cloud trigger API
-// only understands an explicit whitelist of asset IDs, so the selection (asset
-// names, optionally expanded by --downstream) is resolved client-side into that
-// whitelist. (--tag is run-level metadata, not an asset filter.)
+// triggerAssetSelection holds the asset-selection flags. 
 type triggerAssetSelection struct {
 	assetInputs []string
 	downstream  bool
