@@ -753,7 +753,7 @@ func validateSplitFlags(split string, chunkSizeSet bool, chunkSize int) error {
 	return nil
 }
 
-// matchTriggerAsset finds an asset by full name, bare name, or filename. 
+// matchTriggerAsset finds an asset by full name, bare name, or filename.
 func matchTriggerAsset(assets []bruincloud.Asset, in string) (*bruincloud.Asset, error) {
 	query := strings.TrimSuffix(strings.TrimSuffix(in, ".sql"), ".py")
 
@@ -796,7 +796,7 @@ func assetStringList(raw json.RawMessage) []string {
 	return list
 }
 
-// triggerAssetSelection holds the asset-selection flags. 
+// triggerAssetSelection holds the asset-selection flags.
 type triggerAssetSelection struct {
 	assetInputs []string
 	downstream  bool
