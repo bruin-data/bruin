@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -166,6 +168,7 @@ var defaultMapping = map[string]string{
 	"klaviyo":               "klaviyo-default",
 	"adjust":                "adjust-default",
 	"stripe":                "stripe-default",
+	"paddle":                "paddle-default",
 	"appsflyer":             "appsflyer-default",
 	"kafka":                 "kafka-default",
 	"duckdb":                "duckdb-default",
@@ -561,7 +564,7 @@ type ColumnCheck struct {
 	Value         ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
 	Blocking      DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Description   string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Retries       *int             `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	Retries       *int             `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications   `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
@@ -749,7 +752,7 @@ type CustomCheck struct {
 	Count         *int64          `json:"count,omitempty" yaml:"count,omitempty" mapstructure:"count"`
 	Blocking      DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query         string          `json:"query" yaml:"query" mapstructure:"query"`
-	Retries       *int            `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	Retries       *int            `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	Notifications *Notifications  `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
 }
 
@@ -869,6 +872,7 @@ type Asset struct { //nolint:recvcheck
 	Routing           *RoutingConfig     `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int               `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	Retries           *int               `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay      *int               `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	RefreshRestricted *bool              `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
 	Notifications     *Notifications     `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
@@ -1616,7 +1620,7 @@ type Pipeline struct {
 	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	CatchupMode        string                 `json:"catchup_mode" yaml:"catchup_mode,omitempty" mapstructure:"catchup_mode"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
-	Retries            int                    `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
+	Retries            *int                   `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
 	Concurrency        int                    `json:"concurrency" yaml:"concurrency,omitempty" mapstructure:"concurrency"`
 	MaxActiveSteps     *int                   `json:"max_active_steps" yaml:"max_active_steps,omitempty" mapstructure:"max_active_steps"`
@@ -2173,16 +2177,17 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		taskFiles = append(taskFiles, files...)
 	}
 
-	for _, file := range taskFiles {
-		task, err := b.CreateAssetFromFile(file, pipeline)
-		if err != nil {
-			return nil, err
+	taskResults := b.createAssetsFromFiles(taskFiles, pipeline)
+	for _, result := range taskResults {
+		if result.err != nil {
+			return nil, result.err
 		}
 
-		if task == nil {
+		if result.task == nil {
 			continue
 		}
 
+		task := result.task
 		if config.isMutate {
 			task, err = b.MutateAsset(ctx, task, pipeline)
 			if err != nil {
@@ -2253,6 +2258,48 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	}
 
 	return pipeline, nil
+}
+
+type assetFromFileResult struct {
+	task *Asset
+	err  error
+}
+
+func (b *Builder) createAssetsFromFiles(taskFiles []string, foundPipeline *Pipeline) []assetFromFileResult {
+	results := make([]assetFromFileResult, len(taskFiles))
+	if len(taskFiles) == 0 {
+		return results
+	}
+
+	workerCount := min(runtime.GOMAXPROCS(0), len(taskFiles))
+	if workerCount <= 1 {
+		for i, file := range taskFiles {
+			task, err := b.CreateAssetFromFile(file, foundPipeline)
+			results[i] = assetFromFileResult{task: task, err: err}
+		}
+		return results
+	}
+
+	jobs := make(chan int, workerCount)
+	var wg sync.WaitGroup
+	wg.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer wg.Done()
+			for index := range jobs {
+				task, err := b.CreateAssetFromFile(taskFiles[index], foundPipeline)
+				results[index] = assetFromFileResult{task: task, err: err}
+			}
+		}()
+	}
+
+	for index := range taskFiles {
+		jobs <- index
+	}
+	close(jobs)
+	wg.Wait()
+
+	return results
 }
 
 // CreatePipelinesFromPath returns one *Pipeline per declared variant when the
@@ -2444,10 +2491,11 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
 		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
 	}
-	if assetAcceptsDefaultHooks(asset) && len(asset.Hooks.Pre) == 0 {
+	acceptsDefaultHooks := assetAcceptsDefaultHooks(asset)
+	if acceptsDefaultHooks && len(asset.Hooks.Pre) == 0 {
 		asset.Hooks.Pre = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Pre...)
 	}
-	if assetAcceptsDefaultHooks(asset) && len(asset.Hooks.Post) == 0 {
+	if acceptsDefaultHooks && len(asset.Hooks.Post) == 0 {
 		asset.Hooks.Post = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Post...)
 	}
 	if !foundPipeline.DefaultValues.Routing.IsZero() {
@@ -2560,27 +2608,28 @@ func (b *Builder) fillGlossaryStuff(ctx context.Context, asset *Asset, foundPipe
 }
 
 func (a *Asset) IsSQLAsset() bool {
-	sqlAssetTypes := map[AssetType]bool{
-		AssetTypeBigqueryQuery:     true,
-		AssetTypeSnowflakeQuery:    true,
-		AssetTypePostgresQuery:     true,
-		AssetTypeRedshiftQuery:     true,
-		AssetTypeMsSQLQuery:        true,
-		AssetTypeVerticaQuery:      true,
-		AssetTypeDatabricksQuery:   true,
-		AssetTypeSynapseQuery:      true,
-		AssetTypeFabricQuery:       true,
-		AssetTypeFabricQueryLegacy: true,
-		AssetTypeAthenaQuery:       true,
-		AssetTypeDuckDBQuery:       true,
-		AssetTypeClickHouse:        true,
-		AssetTypeTrinoQuery:        true,
-		AssetTypeDremioQuery:       true,
-		AssetTypeSailQuery:         true,
-		AssetTypeOracleQuery:       true,
+	switch a.Type {
+	case AssetTypeBigqueryQuery,
+		AssetTypeSnowflakeQuery,
+		AssetTypePostgresQuery,
+		AssetTypeRedshiftQuery,
+		AssetTypeMsSQLQuery,
+		AssetTypeVerticaQuery,
+		AssetTypeDatabricksQuery,
+		AssetTypeSynapseQuery,
+		AssetTypeFabricQuery,
+		AssetTypeFabricQueryLegacy,
+		AssetTypeAthenaQuery,
+		AssetTypeDuckDBQuery,
+		AssetTypeClickHouse,
+		AssetTypeTrinoQuery,
+		AssetTypeDremioQuery,
+		AssetTypeSailQuery,
+		AssetTypeOracleQuery:
+		return true
+	default:
+		return false
 	}
-
-	return sqlAssetTypes[a.Type]
 }
 
 func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string) error {

@@ -603,7 +603,8 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		`SELECT COLUMN_NAME, COMMENT 
           FROM %s.INFORMATION_SCHEMA.COLUMNS 
           WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
-		db.config.Database, schemaName, tableName)
+		db.config.Database, schemaName, tableName,
+	)
 
 	rows, err := db.Select(ctx, &query.Query{Query: queryStr})
 	if err != nil {
@@ -666,25 +667,11 @@ func (db *DB) GetTableSummary(ctx context.Context, tableName string, schemaOnly 
 		}
 
 		if len(countResult) > 0 && len(countResult[0]) > 0 {
-			switch val := countResult[0][0].(type) {
-			case int64:
-				rowCount = val
-			case int:
-				rowCount = int64(val)
-			case int32:
-				rowCount = int64(val)
-			case float64:
-				rowCount = int64(val)
-			case string:
-				// Handle string representation of numbers (common with Snowflake)
-				parsed, err := strconv.ParseInt(val, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse row count string '%s' for table '%s': %w", val, tableName, err)
-				}
-				rowCount = parsed
-			default:
-				return nil, fmt.Errorf("unexpected row count type for table '%s': got %T with value %v", tableName, val, val)
+			parsedRowCount, err := parseSnowflakeInt64(countResult[0][0], "row count")
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse row count for table '%s': %w", tableName, err)
 			}
+			rowCount = parsedRowCount
 		}
 	}
 
@@ -850,6 +837,27 @@ func (db *DB) GetTableSummary(ctx context.Context, tableName string, schemaOnly 
 	}, nil
 }
 
+func parseSnowflakeInt64(value interface{}, fieldName string) (int64, error) {
+	switch val := value.(type) {
+	case int64:
+		return val, nil
+	case int:
+		return int64(val), nil
+	case int32:
+		return int64(val), nil
+	case float64:
+		return int64(val), nil
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse %s string %q: %w", fieldName, val, err)
+		}
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("unexpected %s type: got %T with value %v", fieldName, val, val)
+	}
+}
+
 func (db *DB) fetchNumericalStats(ctx context.Context, tableName, columnName string) (*diff.NumericalStatistics, error) {
 	stats := &diff.NumericalStatistics{}
 	queryStr := fmt.Sprintf(`
@@ -872,11 +880,14 @@ func (db *DB) fetchNumericalStats(ctx context.Context, tableName, columnName str
 	if len(result) > 0 && len(result[0]) >= 7 { //nolint:nestif
 		row := result[0]
 
-		if val, ok := row[0].(int64); ok {
-			stats.Count = val
+		var err error
+		stats.Count, err = parseSnowflakeInt64(row[0], "count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[1].(int64); ok {
-			stats.NullCount = val
+		stats.NullCount, err = parseSnowflakeInt64(row[1], "null count")
+		if err != nil {
+			return nil, err
 		}
 
 		// Handle nullable numeric fields
@@ -932,23 +943,36 @@ func (db *DB) fetchStringStats(ctx context.Context, tableName, columnName string
 	if len(result) > 0 && len(result[0]) >= 7 {
 		row := result[0]
 
-		if val, ok := row[0].(int64); ok {
-			stats.Count = val
+		var err error
+		stats.Count, err = parseSnowflakeInt64(row[0], "count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[1].(int64); ok {
-			stats.NullCount = val
+		stats.NullCount, err = parseSnowflakeInt64(row[1], "null count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[2].(int64); ok {
-			stats.DistinctCount = val
+		stats.DistinctCount, err = parseSnowflakeInt64(row[2], "distinct count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[3].(int64); ok {
-			stats.EmptyCount = val
+		stats.EmptyCount, err = parseSnowflakeInt64(row[3], "empty count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[4].(int64); ok {
-			stats.MinLength = int(val)
+		if row[4] != nil {
+			minLength, err := parseSnowflakeInt64(row[4], "min length")
+			if err != nil {
+				return nil, err
+			}
+			stats.MinLength = int(minLength)
 		}
-		if val, ok := row[5].(int64); ok {
-			stats.MaxLength = int(val)
+		if row[5] != nil {
+			maxLength, err := parseSnowflakeInt64(row[5], "max length")
+			if err != nil {
+				return nil, err
+			}
+			stats.MaxLength = int(maxLength)
 		}
 		if val, ok := row[6].(float64); ok {
 			stats.AvgLength = val
@@ -977,17 +1001,22 @@ func (db *DB) fetchBooleanStats(ctx context.Context, tableName, columnName strin
 	if len(result) > 0 && len(result[0]) >= 4 {
 		row := result[0]
 
-		if val, ok := row[0].(int64); ok {
-			stats.Count = val
+		var err error
+		stats.Count, err = parseSnowflakeInt64(row[0], "count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[1].(int64); ok {
-			stats.NullCount = val
+		stats.NullCount, err = parseSnowflakeInt64(row[1], "null count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[2].(int64); ok {
-			stats.TrueCount = val
+		stats.TrueCount, err = parseSnowflakeInt64(row[2], "true count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[3].(int64); ok {
-			stats.FalseCount = val
+		stats.FalseCount, err = parseSnowflakeInt64(row[3], "false count")
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -1014,14 +1043,18 @@ func (db *DB) fetchDateTimeStats(ctx context.Context, tableName, columnName stri
 	if len(result) > 0 && len(result[0]) >= 5 {
 		row := result[0]
 
-		if val, ok := row[0].(int64); ok {
-			stats.Count = val
+		var err error
+		stats.Count, err = parseSnowflakeInt64(row[0], "count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[1].(int64); ok {
-			stats.NullCount = val
+		stats.NullCount, err = parseSnowflakeInt64(row[1], "null count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[2].(int64); ok {
-			stats.UniqueCount = val
+		stats.UniqueCount, err = parseSnowflakeInt64(row[2], "unique count")
+		if err != nil {
+			return nil, err
 		}
 		// Handle datetime values - convert to proper time.Time objects
 		if row[3] != nil {
@@ -1057,11 +1090,14 @@ func (db *DB) fetchJSONStats(ctx context.Context, tableName, columnName string) 
 	if len(result) > 0 && len(result[0]) >= 2 {
 		row := result[0]
 
-		if val, ok := row[0].(int64); ok {
-			stats.Count = val
+		var err error
+		stats.Count, err = parseSnowflakeInt64(row[0], "count")
+		if err != nil {
+			return nil, err
 		}
-		if val, ok := row[1].(int64); ok {
-			stats.NullCount = val
+		stats.NullCount, err = parseSnowflakeInt64(row[1], "null count")
+		if err != nil {
+			return nil, err
 		}
 	}
 

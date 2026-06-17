@@ -161,7 +161,8 @@ func TestRustSQLParser_HoistDeclares(t *testing.T) {
 		in := "BEGIN TRANSACTION;\nSET x = 1;\nDECLARE y INT64;\nCOMMIT TRANSACTION;"
 		got, err := parser.HoistDeclares(in, pipeline.AssetTypeBigqueryQuery)
 		require.NoError(t, err)
-		require.Equal(t,
+		require.Equal(
+			t,
 			"DECLARE y INT64;\nBEGIN TRANSACTION;\nSET x = 1;\nCOMMIT TRANSACTION;",
 			got,
 		)

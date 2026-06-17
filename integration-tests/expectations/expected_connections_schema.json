@@ -753,6 +753,12 @@
           },
           "type": "array"
         },
+        "paddle": {
+          "items": {
+            "$ref": "#/$defs/PaddleConnection"
+          },
+          "type": "array"
+        },
         "appsflyer": {
           "items": {
             "$ref": "#/$defs/AppsflyerConnection"
@@ -2851,6 +2857,22 @@
         "prefetch_rows",
         "trace_file",
         "wallet"
+      ]
+    },
+    "PaddleConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "PersonioConnection": {

@@ -175,7 +175,8 @@ func (ks *KeySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipel
 	}
 
 	// Load base config without forcing region
-	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+	cfg, err := awsconfig.LoadDefaultConfig(
+		ctx,
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			accessKey, secretKey, "",
 		)),

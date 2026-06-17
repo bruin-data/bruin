@@ -20,7 +20,8 @@ type Config struct {
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
 func (c Config) ToDBConnectionURI() string {
-	connectionURI := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&pool_max_conns=%d",
+	connectionURI := fmt.Sprintf(
+		"postgres://%s:%s@%s/%s?sslmode=%s&pool_max_conns=%d",
 		url.PathEscape(c.Username),
 		url.PathEscape(c.Password),
 		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
@@ -36,7 +37,8 @@ func (c Config) ToDBConnectionURI() string {
 }
 
 func (c Config) GetIngestrURI() string {
-	connString := fmt.Sprintf("postgresql://%s:%s@%s/%s",
+	connString := fmt.Sprintf(
+		"postgresql://%s:%s@%s/%s",
 		url.PathEscape(c.Username),
 		url.PathEscape(c.Password),
 		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
@@ -66,7 +68,8 @@ type RedShiftConfig struct {
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
 func (c RedShiftConfig) ToDBConnectionURI() string {
-	connectionURI := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s",
+	connectionURI := fmt.Sprintf(
+		"postgres://%s:%s@%s/%s?sslmode=%s",
 		url.PathEscape(c.Username),
 		url.PathEscape(c.Password),
 		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
@@ -81,7 +84,8 @@ func (c RedShiftConfig) ToDBConnectionURI() string {
 }
 
 func (c RedShiftConfig) GetIngestrURI() string {
-	connString := fmt.Sprintf("redshift://%s:%s@%s/%s",
+	connString := fmt.Sprintf(
+		"redshift://%s:%s@%s/%s",
 		url.PathEscape(c.Username),
 		url.PathEscape(c.Password),
 		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),

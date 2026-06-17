@@ -329,6 +329,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "MongoDB", link: "/ingestion/mongo"},
                                     {text: "MySQL", link: "/ingestion/mysql"},
                                     {text: "Notion", link: "/ingestion/notion"},
+                                    {text: "Paddle", link: "/ingestion/paddle"},
                                     {text: "Personio", link: "/ingestion/personio"},
                                     {text: "PhantomBuster", link: "/ingestion/phantombuster"},
                                     {text: "Pipedrive", link: "/ingestion/pipedrive"},
@@ -519,5 +520,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     // optionally set additional config for plugin itself with MermaidPluginConfig
     mermaidPlugin: {
         class: "mermaid my-class", // set additional css classes for parent container
+    },
+    vite: {
+        build: {
+            target: ["chrome107", "edge107", "firefox104", "safari16"],
+        },
     },
 });

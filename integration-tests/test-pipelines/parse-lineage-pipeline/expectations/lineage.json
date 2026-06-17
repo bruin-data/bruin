@@ -116,7 +116,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     },
     {
       "id": "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c",
@@ -288,7 +289,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     },
     {
       "id": "c9022680f888674e2b2274758755bfa07dea729b68d71cde5c521ed70ef261bf",
@@ -449,7 +451,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     },
     {
       "id": "7dfb4cf67742cb0660305e56ef816c53fcec892cae7f6ee39b75f34e659d672c",
@@ -579,7 +582,8 @@
       "metadata": {},
       "snowflake": null,
       "athena": null,
-      "interval_modifiers": null
+      "interval_modifiers": null,
+      "retries": null
     }
   ],
   "notifications": {
@@ -593,7 +597,7 @@
   "metadata_push": {
     "bigquery": false
   },
-  "retries": 0,
+  "retries": null,
   "concurrency": 1,
   "max_active_steps": null,
   "commit": "",

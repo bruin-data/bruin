@@ -84,7 +84,8 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	key := mat.IncrementalKey
 	name := quoteIdentifier(asset.Name)
 
-	return fmt.Sprintf(`
+	return fmt.Sprintf(
+		`
 DELETE FROM %s
 WHERE %s IN (
     SELECT DISTINCT %s
@@ -128,7 +129,8 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		endVar = "{{end_date}}"
 	}
 
-	return fmt.Sprintf(`
+	return fmt.Sprintf(
+		`
 DELETE FROM %s
 WHERE %s BETWEEN %s '%s' AND %s '%s';
 
