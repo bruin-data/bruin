@@ -353,30 +353,26 @@ func TestSelectTriggerAssets(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		sel     triggerAssetSelection
-		want    []string
-		wantErr bool
-		wantNil bool
+		name        string
+		assetInputs []string
+		want        []string
+		wantErr     bool
+		wantNil     bool
 	}{
-		{name: "no selection runs whole pipeline", sel: triggerAssetSelection{}, wantNil: true},
-		{name: "downstream alone is not a selection", sel: triggerAssetSelection{downstream: true}, wantNil: true},
-		{name: "by asset name", sel: triggerAssetSelection{assetInputs: []string{"s.summary"}}, want: []string{"s.summary"}},
-		{name: "by bare/file name", sel: triggerAssetSelection{assetInputs: []string{"raw.sql"}}, want: []string{"s.raw"}},
-		{name: "by bare name without prefix", sel: triggerAssetSelection{assetInputs: []string{"report"}}, want: []string{"s.report"}},
-		{name: "multiple assets", sel: triggerAssetSelection{assetInputs: []string{"s.raw", "s.report"}}, want: []string{"s.raw", "s.report"}},
-		{name: "duplicate asset deduped", sel: triggerAssetSelection{assetInputs: []string{"s.raw", "raw.sql"}}, want: []string{"s.raw"}},
-		{name: "unknown asset errors", sel: triggerAssetSelection{assetInputs: []string{"nope"}}, wantErr: true},
-		{name: "one unknown among valid errors", sel: triggerAssetSelection{assetInputs: []string{"s.raw", "nope"}}, wantErr: true},
-		{name: "downstream expansion transitive", sel: triggerAssetSelection{assetInputs: []string{"s.raw"}, downstream: true}, want: []string{"s.raw", "s.report", "s.summary"}},
-		{name: "downstream on leaf asset", sel: triggerAssetSelection{assetInputs: []string{"s.standalone"}, downstream: true}, want: []string{"s.standalone"}},
-		{name: "downstream mid-chain", sel: triggerAssetSelection{assetInputs: []string{"s.summary"}, downstream: true}, want: []string{"s.report", "s.summary"}},
+		{name: "no selection runs whole pipeline", assetInputs: nil, wantNil: true},
+		{name: "by asset name", assetInputs: []string{"s.summary"}, want: []string{"s.summary"}},
+		{name: "by bare/file name", assetInputs: []string{"raw.sql"}, want: []string{"s.raw"}},
+		{name: "by bare name without prefix", assetInputs: []string{"report"}, want: []string{"s.report"}},
+		{name: "multiple assets", assetInputs: []string{"s.raw", "s.report"}, want: []string{"s.raw", "s.report"}},
+		{name: "duplicate asset deduped", assetInputs: []string{"s.raw", "raw.sql"}, want: []string{"s.raw"}},
+		{name: "unknown asset errors", assetInputs: []string{"nope"}, wantErr: true},
+		{name: "one unknown among valid errors", assetInputs: []string{"s.raw", "nope"}, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := selectTriggerAssets(assets, tt.sel)
+			got, err := selectTriggerAssets(assets, tt.assetInputs)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -551,17 +547,17 @@ func TestResolveFullRefresh(t *testing.T) {
 	}
 	selected := []*bruincloud.Asset{&assets[0], &assets[2]} // raw + report
 
-	t.Run("empty values returns empty spec", func(t *testing.T) {
+	t.Run("nothing requested returns empty spec", func(t *testing.T) {
 		t.Parallel()
-		spec, err := resolveFullRefresh(nil, assets, nil)
+		spec, err := resolveFullRefresh(nil, false, assets, nil)
 		require.NoError(t, err)
 		assert.False(t, spec.all)
 		assert.Empty(t, spec.assets)
 	})
 
-	t.Run("all keyword sets all", func(t *testing.T) {
+	t.Run("full-refresh-all sets all", func(t *testing.T) {
 		t.Parallel()
-		spec, err := resolveFullRefresh([]string{"all"}, assets, nil)
+		spec, err := resolveFullRefresh(nil, true, assets, nil)
 		require.NoError(t, err)
 		assert.True(t, spec.all)
 		assert.Empty(t, spec.assets)
@@ -569,36 +565,45 @@ func TestResolveFullRefresh(t *testing.T) {
 
 	t.Run("all combined with names errors", func(t *testing.T) {
 		t.Parallel()
-		_, err := resolveFullRefresh([]string{"all", "s.raw"}, assets, nil)
+		_, err := resolveFullRefresh([]string{"s.raw"}, true, assets, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot be combined")
 	})
 
 	t.Run("names resolved to canonical form", func(t *testing.T) {
 		t.Parallel()
-		spec, err := resolveFullRefresh([]string{"report", "raw.sql"}, assets, nil)
+		spec, err := resolveFullRefresh([]string{"report", "raw.sql"}, false, assets, nil)
 		require.NoError(t, err)
 		assert.False(t, spec.all)
 		assert.Equal(t, []string{"s.report", "s.raw"}, spec.assets)
 	})
 
+	t.Run("asset literally named all is matched, not treated as keyword", func(t *testing.T) {
+		t.Parallel()
+		withAll := append([]bruincloud.Asset{mkTriggerAsset(t, "all", "id-all", nil, nil)}, assets...)
+		spec, err := resolveFullRefresh([]string{"all"}, false, withAll, nil)
+		require.NoError(t, err)
+		assert.False(t, spec.all)
+		assert.Equal(t, []string{"all"}, spec.assets)
+	})
+
 	t.Run("unknown asset errors", func(t *testing.T) {
 		t.Parallel()
-		_, err := resolveFullRefresh([]string{"nope"}, assets, nil)
+		_, err := resolveFullRefresh([]string{"nope"}, false, assets, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("name within selection is allowed", func(t *testing.T) {
 		t.Parallel()
-		spec, err := resolveFullRefresh([]string{"s.report"}, assets, selected)
+		spec, err := resolveFullRefresh([]string{"s.report"}, false, assets, selected)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"s.report"}, spec.assets)
 	})
 
 	t.Run("name outside selection errors", func(t *testing.T) {
 		t.Parallel()
-		_, err := resolveFullRefresh([]string{"s.summary"}, assets, selected)
+		_, err := resolveFullRefresh([]string{"s.summary"}, false, assets, selected)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not in the selected assets")
 	})
