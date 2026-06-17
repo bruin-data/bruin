@@ -215,6 +215,21 @@ bruin cloud runs trigger \
 > `--tag` labels the run (it shows in the Cloud activity log); it does **not** select
 > assets. Select assets by name with `--asset` and expand with `--downstream`.
 
+**Include downstream assets.** `--downstream` expands the selection to everything that
+depends on the chosen assets, transitively. It only has an effect alongside `--asset` —
+on its own it does nothing (the whole pipeline already runs).
+
+```bash
+# Run raw_events and every asset downstream of it
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --asset raw_events --downstream
+```
+
+For example, if `raw_events → daily_summary → weekly_rollup`, that single command runs
+all three. Without `--downstream`, only `raw_events` runs.
+
 **Full refresh.** `--full-refresh` truncates tables before running. Pass `all` to
 refresh every asset in the run, or asset name(s) to refresh only those. It can be
 combined with `--asset` to refresh a subset of the selected assets while the rest run
