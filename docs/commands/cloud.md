@@ -255,7 +255,7 @@ bruin cloud runs trigger \
 ```
 
 **Split a range into batches (monthly, weekly, …).** With `--split`, the trigger
-becomes a **backfill**: The date range is splitted into one run per interval
+becomes a **backfill**: the date range is split into one run per interval
 (by unit and chunk size) as a single backfill. This is
 how you backfill selected assets with monthly batches:
 

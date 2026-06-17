@@ -340,6 +340,22 @@ func TestTriggerRunWithSplit(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestTriggerRunSplitDefaultsChunkSize(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body := readJSON(t, r)
+		assert.Equal(t, "month", body["split"])
+		// Split set with the zero-value ChunkSize must still send a valid chunk size.
+		assert.EqualValues(t, 1, body["chunk_size"])
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month"})
+	require.NoError(t, err)
+}
+
 func TestTriggerRunWithOptions(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

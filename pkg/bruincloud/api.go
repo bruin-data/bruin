@@ -252,7 +252,11 @@ func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate
 	}
 	if opts.Split != "" {
 		body["split"] = opts.Split
-		body["chunk_size"] = opts.ChunkSize
+		chunkSize := opts.ChunkSize
+		if chunkSize < 1 {
+			chunkSize = 1
+		}
+		body["chunk_size"] = chunkSize
 	}
 	if len(opts.Variables) > 0 {
 		body["variables"] = opts.Variables

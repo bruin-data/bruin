@@ -838,7 +838,7 @@ func cloudRunsTrigger() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// With --split the run becomes a backfill 
+			// With --split the run becomes a backfill
 			split := c.String("split")
 			chunkSize := c.Int("chunk-size")
 			if err := validateSplitFlags(split, c.IsSet("chunk-size"), chunkSize); err != nil {
@@ -856,7 +856,7 @@ func cloudRunsTrigger() *cli.Command {
 				printError(fmt.Errorf("unexpected argument(s): %s", strings.Join(c.Args().Slice(), " ")), output, "Invalid arguments")
 				return cli.Exit("", 1)
 			}
-			
+
 			opts := bruincloud.TriggerRunOptions{
 				Assets:      c.StringSlice("asset"),
 				FullRefresh: c.Bool("full-refresh"),
