@@ -180,8 +180,7 @@ The flags mirror `bruin run` for the options the Cloud trigger API supports.
 | `--end-date` | str | - | End date for the run (YYYY-MM-DD) |
 | `--asset`, `--assets` | []str | - | Select assets to run by name (repeatable or comma-separated). |
 | `--tag`, `-t` | []str | - | Tag the run (repeatable). A run-level label shown in the Cloud activity log — **not** an asset filter. |
-| `--full-refresh`, `-r` | bool | `false` | Full-refresh every asset in the run. |
-| `--full-refresh-asset` | []str | - | Full-refresh only the named asset(s); repeatable or comma-separated. Combine with `--asset` to refresh a subset. Mutually exclusive with `--full-refresh`. |
+| `--full-refresh`, `-r` | bool | `false` | Full-refresh the assets in the run: the `--asset` selection if given, otherwise every asset. |
 | `--var` | []str | - | Override pipeline variables, as `key=value` where the value is JSON (strings need quotes, e.g. `'env="prod"'`). Can be used multiple times, or pass one JSON object. |
 | `--note` | str | - | Attach a note to the run; shown in the Cloud activity log. |
 | `--split` | str | - | Trigger a backfill, splitting the date range into one run per interval by unit: `minute`, `hour`, `day`, `week`, `month`, `year`. |
@@ -208,11 +207,9 @@ bruin cloud runs trigger \
 > `--tag` labels the run (it shows in the Cloud activity log); it does **not** select
 > assets. Select assets by name with `--asset`.
 
-**Full refresh.** Pass `--full-refresh` (bare, no value) to truncate **every** asset in
-the run before running, or `--full-refresh-asset <name>` to truncate only specific
-assets (repeatable or comma-separated, e.g. `--full-refresh-asset asset_a,asset_b`).
-`--full-refresh-asset` can be combined with `--asset` to refresh a subset of the selected
-assets while the rest run normally; the two full-refresh flags are mutually exclusive.
+**Full refresh.** Pass `--full-refresh` (bare, no value) to truncate assets before
+running. It covers the `--asset` selection when you give one, otherwise every asset in
+the pipeline.
 
 ```bash
 # Full-refresh the whole pipeline (every asset)
@@ -221,25 +218,13 @@ bruin cloud runs trigger \
   --start-date 2024-01-01 --end-date 2024-01-31 \
   --full-refresh
 
-# Run the whole pipeline, but full-refresh only standalone_report
+# Run only standalone_report, with full refresh
 bruin cloud runs trigger \
   --project-id <project-id> --pipeline <pipeline-name> \
   --start-date 2024-01-01 --end-date 2024-01-31 \
-  --full-refresh-asset standalone_report
+  --asset standalone_report --full-refresh
 
-# Full-refresh a couple of specific assets (runs the whole pipeline, refreshing those two)
-bruin cloud runs trigger \
-  --project-id <project-id> --pipeline <pipeline-name> \
-  --start-date 2024-01-01 --end-date 2024-01-31 \
-  --full-refresh-asset raw_events,daily_summary
-
-# Run raw_events + daily_summary, but full-refresh only raw_events
-bruin cloud runs trigger \
-  --project-id <project-id> --pipeline <pipeline-name> \
-  --start-date 2024-01-01 --end-date 2024-01-31 \
-  --asset raw_events,daily_summary --full-refresh-asset raw_events
-
-# Run raw_events + daily_summary and full-refresh both (--full-refresh covers the selection)
+# Run raw_events + daily_summary and full-refresh both (the selection)
 bruin cloud runs trigger \
   --project-id <project-id> --pipeline <pipeline-name> \
   --start-date 2024-01-01 --end-date 2024-01-31 \
@@ -247,9 +232,8 @@ bruin cloud runs trigger \
 ```
 
 > [!NOTE]
-> `--full-refresh-asset` without `--asset` still runs the **whole pipeline** — it only
-> changes which assets are truncated first. When you narrow the run with `--asset`, each
-> named `--full-refresh-asset` has to be part of that selection.
+> `--full-refresh` truncates whatever the run covers: with `--asset` it refreshes only
+> the selected assets, without it the whole pipeline.
 
 **Override pipeline variables.** Each `--var` is `key=value`, where the **value is parsed
 as JSON**. So a string must be quoted (`"prod"`), while numbers and booleans are written

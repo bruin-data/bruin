@@ -809,72 +809,26 @@ func selectTriggerAssets(assets []bruincloud.Asset, assetInputs []string) ([]*br
 	}), nil
 }
 
-type fullRefreshSpec struct {
-	all    bool
-	assets []string
-}
-
-// resolveFullRefresh builds the full-refresh spec from --full-refresh (every asset in
-// the run) and --full-refresh-asset (specific asset names).
-func resolveFullRefresh(names []string, all bool, assets []bruincloud.Asset, selected []*bruincloud.Asset) (fullRefreshSpec, error) {
-	spec := fullRefreshSpec{all: all}
-	if all && len(names) > 0 {
-		return spec, errors.New("--full-refresh cannot be combined with specific --full-refresh-asset names")
-	}
-
-	inSelection := make(map[string]bool, len(selected))
-	for _, a := range selected {
-		inSelection[a.Name] = true
-	}
-	for _, in := range names {
-		m, err := matchTriggerAsset(assets, in)
-		if err != nil {
-			return spec, err
-		}
-		if m == nil {
-			return spec, fmt.Errorf("asset %q not found in pipeline; run 'bruin cloud assets list' to see available names", in)
-		}
-		if len(selected) > 0 && !inSelection[m.Name] {
-			return spec, fmt.Errorf("cannot full-refresh %q because it is not in the selected assets", in)
-		}
-		spec.assets = append(spec.assets, m.Name)
-	}
-	return spec, nil
-}
-
-// applyAssetSelection sets the whitelist (asset IDs) from the selection and the
-// FULL_REFRESH overrides from the full-refresh spec. With "all" set, full refresh covers
-// the selected assets when an --asset selection is given, otherwise every asset in the
-// pipeline; otherwise it covers exactly the named assets.
-func applyAssetSelection(opts *bruincloud.TriggerRunOptions, selected []*bruincloud.Asset, assets []bruincloud.Asset, fr fullRefreshSpec) {
+// applyAssetSelection sets the whitelist (asset IDs) from the selection and, when
+// fullRefresh is set, the FULL_REFRESH overrides. Full refresh covers the selected
+// assets when an --asset selection is given, otherwise every asset in the pipeline.
+func applyAssetSelection(opts *bruincloud.TriggerRunOptions, selected []*bruincloud.Asset, assets []bruincloud.Asset, fullRefresh bool) {
 	for _, a := range selected {
 		opts.Whitelist = append(opts.Whitelist, a.ID)
 	}
 
-	// 1. Nothing to refresh → return early so AssetOverrides stays nil
-	if !fr.all && len(fr.assets) == 0 {
+	if !fullRefresh {
 		return
 	}
 	opts.AssetOverrides = map[string]map[string]any{}
 
-	// 2. Named subset → refresh exactly the assets the user listed.
-	if !fr.all {
-		for _, name := range fr.assets {
-			opts.AssetOverrides[name] = map[string]any{"FULL_REFRESH": 1}
-		}
-		return
-	}
-
-	// 3. "all" → but "all" means different things:
-	// 3a. with --asset: refresh only the selected assets
+	// With an --asset selection, refresh only those; otherwise the whole pipeline.
 	if selected != nil {
 		for _, a := range selected {
 			opts.AssetOverrides[a.Name] = map[string]any{"FULL_REFRESH": 1}
 		}
 		return
 	}
-
-	// 3b. without --asset: refresh every asset in the pipeline
 	for i := range assets {
 		opts.AssetOverrides[assets[i].Name] = map[string]any{"FULL_REFRESH": 1}
 	}
@@ -929,11 +883,7 @@ func cloudRunsTrigger() *cli.Command {
 			&cli.BoolFlag{
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
-				Usage:   "full-refresh every asset in the run (the --asset selection if given, otherwise all)",
-			},
-			&cli.StringSliceFlag{
-				Name:  "full-refresh-asset",
-				Usage: "full-refresh only the named asset(s); repeat or comma-separate. Mutually exclusive with --full-refresh.",
+				Usage:   "full-refresh the assets in the run: the --asset selection if given, otherwise every asset",
 			},
 			&cli.StringSliceFlag{
 				Name:  "var",
@@ -992,12 +942,11 @@ func cloudRunsTrigger() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Asset selection comes from --asset; full refresh from --full-refresh (all)
-			// or --full-refresh-asset (specific names).
+			// Asset selection comes from --asset; --full-refresh truncates the assets in
+			// the run (the selection if given, otherwise every asset).
 			assetInputs := c.StringSlice("asset")
-			fullRefreshAssets := c.StringSlice("full-refresh-asset")
-			fullRefreshAll := c.Bool("full-refresh")
-			if len(assetInputs) > 0 || len(fullRefreshAssets) > 0 || fullRefreshAll {
+			fullRefresh := c.Bool("full-refresh")
+			if len(assetInputs) > 0 || fullRefresh {
 				assets, err := client.ListAssets(ctx, project, pipeline)
 				if err != nil {
 					printError(err, output, "Failed to list assets")
@@ -1010,13 +959,7 @@ func cloudRunsTrigger() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				fr, err := resolveFullRefresh(fullRefreshAssets, fullRefreshAll, assets, selected)
-				if err != nil {
-					printError(err, output, "Failed to resolve full refresh")
-					return cli.Exit("", 1)
-				}
-
-				applyAssetSelection(&opts, selected, assets, fr)
+				applyAssetSelection(&opts, selected, assets, fullRefresh)
 			}
 
 			startDate, endDate := c.String("start-date"), c.String("end-date")
