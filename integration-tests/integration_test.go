@@ -3775,6 +3775,9 @@ func TestWorkflowTasks(t *testing.T) {
 							Contains: []string{
 								"Finished: mat.yield_dicts",
 								"Finished: mat.yield_batches",
+								"Finished: mat.nullable_dicts",
+								"Finished: mat.table_after_dict",
+								"Finished: mat.table_before_dict",
 								"Finished: mat.pandas_df",
 								"Finished: mat.polars_df",
 								"Finished: mat.pyarrow_table",
@@ -3899,6 +3902,120 @@ func TestWorkflowTasks(t *testing.T) {
 						Expected: e2e.Output{
 							ExitCode: 0,
 							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 4   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify nullable_dicts row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.nullable_dicts",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 3   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify nullable_dicts typed values survive null-first yield",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT sum(score) AS s FROM mat.nullable_dicts",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ S   │\n├─────┤\n│ 149 │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify table_after_dict row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.table_after_dict",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 2   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify table_after_dict typed value",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT sum(col_a) AS s FROM mat.table_after_dict",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌───┐\n│ S │\n├───┤\n│ 1 │\n└───┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify table_before_dict row count",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT count(*) AS cnt FROM mat.table_before_dict",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌─────┐\n│ CNT │\n├─────┤\n│ 2   │\n└─────┘\n",
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+							e2e.AssertByOutputString,
+						},
+					},
+					{
+						Name:    "python_mat: verify table_before_dict typed value",
+						Command: binary,
+						Args: []string{
+							"query",
+							"--env", "env-python-mat",
+							"--connection", "duckdb-python-mat",
+							"--query", "SELECT sum(col_a) AS s FROM mat.table_before_dict",
+						},
+						WorkingDir: currentFolder,
+						Expected: e2e.Output{
+							ExitCode: 0,
+							Output:   "┌───┐\n│ S │\n├───┤\n│ 1 │\n└───┘\n",
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
