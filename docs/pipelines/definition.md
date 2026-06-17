@@ -293,8 +293,8 @@ runs after downtime or late onboarding.
 `catchup` accepts either a boolean or a string mode:
 
 - `false` (or omitted): no catchup
-- `true` or `"active"`: catch up only active assets
-- `"all"`: catch up every asset
+- `true` or `"active"`: catch up only the runs that should have happened while the pipeline was active
+- `"all"`: catch up every run regardless of the pipeline's active state at the time
 
 Any other string is treated as `false`. The value is always serialized as a string (`""`, `"active"`, or `"all"`).
 
