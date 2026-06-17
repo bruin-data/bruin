@@ -9,6 +9,7 @@ import (
 	path2 "path"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/bruincloud"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -728,6 +729,46 @@ func cloudRunsGet() *cli.Command {
 	}
 }
 
+var validSplitUnits = map[string]bool{
+	"minute": true, "hour": true, "day": true,
+	"week": true, "month": true, "year": true,
+}
+
+// validateSplitFlags checks the --split / --chunk-size combination.
+func validateSplitFlags(split string, chunkSizeSet bool, chunkSize int) error {
+	if split == "" {
+		if chunkSizeSet {
+			return errors.New("--chunk-size requires --split")
+		}
+		return nil
+	}
+	if !validSplitUnits[split] {
+		return fmt.Errorf("invalid --split %q (valid: minute, hour, day, week, month, year)", split)
+	}
+	if chunkSize < 1 {
+		return errors.New("--chunk-size must be at least 1")
+	}
+	return nil
+}
+
+// parseRunVariables parses --var key=value pairs (JSON values) into a variables map.
+func parseRunVariables(pairs []string) (map[string]any, error) {
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+	vars := make(map[string]any, len(pairs))
+	for _, variable := range pairs {
+		parsed, err := parseVariable(variable)
+		if err != nil {
+			return nil, fmt.Errorf("invalid variable override %q: %w", variable, err)
+		}
+		for key, value := range parsed {
+			vars[key] = value
+		}
+	}
+	return vars, nil
+}
+
 func cloudRunsTrigger() *cli.Command {
 	return &cli.Command{
 		Name:  "trigger",
@@ -747,6 +788,38 @@ func cloudRunsTrigger() *cli.Command {
 				Usage:    "end date for the run (e.g. 2026-01-02T00:00:00Z)",
 				Required: true,
 			},
+			&cli.StringSliceFlag{
+				Name:    "asset",
+				Aliases: []string{"assets"},
+				Usage:   "select specific assets to run by name; repeat or comma-separate for multiple",
+			},
+			&cli.StringSliceFlag{
+				Name:    "tag",
+				Aliases: []string{"t"},
+				Usage:   "tag the run; repeat for multiple.",
+			},
+			&cli.BoolFlag{
+				Name:    "full-refresh",
+				Aliases: []string{"r"},
+				Usage:   "full-refresh the assets in the run: the --asset selection if given, otherwise every asset",
+			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "override pipeline variables with custom values (key=value)",
+			},
+			&cli.StringFlag{
+				Name:  "note",
+				Usage: "attach a note to the run.",
+			},
+			&cli.StringFlag{
+				Name:  "split",
+				Usage: "split the date range into batches by unit: minute, hour, day, week, month, year (one run per batch)",
+			},
+			&cli.IntFlag{
+				Name:  "chunk-size",
+				Usage: "number of split units per batch (used with --split)",
+				Value: 1,
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			defer RecoverFromPanic()
@@ -765,13 +838,46 @@ func cloudRunsTrigger() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			err = client.TriggerRun(ctx, project, pipeline, c.String("start-date"), c.String("end-date"))
+			// With --split the run becomes a backfill 
+			split := c.String("split")
+			chunkSize := c.Int("chunk-size")
+			if err := validateSplitFlags(split, c.IsSet("chunk-size"), chunkSize); err != nil {
+				printError(err, output, "Invalid flags")
+				return cli.Exit("", 1)
+			}
+
+			vars, err := parseRunVariables(c.StringSlice("var"))
 			if err != nil {
+				printError(err, output, "Invalid flag")
+				return cli.Exit("", 1)
+			}
+
+			if c.Args().Len() > 0 {
+				printError(fmt.Errorf("unexpected argument(s): %s", strings.Join(c.Args().Slice(), " ")), output, "Invalid arguments")
+				return cli.Exit("", 1)
+			}
+			
+			opts := bruincloud.TriggerRunOptions{
+				Assets:      c.StringSlice("asset"),
+				FullRefresh: c.Bool("full-refresh"),
+				Split:       split,
+				ChunkSize:   chunkSize,
+				Variables:   vars,
+				Note:        c.String("note"),
+				Tags:        c.StringSlice("tag"),
+			}
+
+			startDate, endDate := c.String("start-date"), c.String("end-date")
+			if err := client.TriggerRun(ctx, project, pipeline, startDate, endDate, opts); err != nil {
 				printError(err, output, "Failed to trigger run")
 				return cli.Exit("", 1)
 			}
 
-			printSuccessForOutput(output, fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project))
+			if split == "" {
+				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered run for pipeline '%s' in project '%s'", pipeline, project))
+			} else {
+				printSuccessForOutput(output, fmt.Sprintf("Successfully triggered backfill (split by %s, chunk size %d) for pipeline '%s' in project '%s'", split, chunkSize, pipeline, project))
+			}
 			return nil
 		},
 	}

@@ -298,18 +298,70 @@ func TestGetRun(t *testing.T) {
 func TestTriggerRun(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/trigger-pipeline-runs", r.URL.Path)
+		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
 
 		body := readJSON(t, r)
-		pipelines := body["pipelines"].([]any)
-		assert.Len(t, pipelines, 1)
+		assert.Equal(t, "proj", body["project"])
+		assert.Equal(t, "pipe", body["pipeline"])
+		assert.Equal(t, "2026-01-01", body["start_date"])
+		assert.Equal(t, "2026-01-02", body["end_date"])
+		// A plain run omits split/asset fields entirely.
+		assert.NotContains(t, body, "split")
+		assert.NotContains(t, body, "assets")
 
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`200`))
 	})
 
-	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-02")
+	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-02", TriggerRunOptions{})
+	require.NoError(t, err)
+}
+
+func TestTriggerRunWithSplit(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		body := readJSON(t, r)
+		assert.Equal(t, "proj", body["project"])
+		assert.Equal(t, "pipe", body["pipeline"])
+		assert.Equal(t, "2026-01-01", body["start_date"])
+		assert.Equal(t, "2026-04-01", body["end_date"])
+		assert.Equal(t, "month", body["split"])
+		assert.EqualValues(t, 2, body["chunk_size"])
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-04-01", TriggerRunOptions{Split: "month", ChunkSize: 2})
+	require.NoError(t, err)
+}
+
+func TestTriggerRunWithOptions(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		body := readJSON(t, r)
+		assert.Equal(t, []any{"raw_events"}, body["assets"])
+		assert.Equal(t, true, body["full_refresh"])
+		vars := body["variables"].(map[string]any)
+		assert.Equal(t, "bar", vars["foo"])
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	opts := TriggerRunOptions{
+		Assets:      []string{"raw_events"},
+		FullRefresh: true,
+		Variables:   map[string]any{"foo": "bar"},
+	}
+	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-31", opts)
 	require.NoError(t, err)
 }
 
@@ -562,4 +614,27 @@ func TestSendAgentMessage_WithThreadID(t *testing.T) {
 	result, err := client.SendAgentMessage(t.Context(), 1, "hello", &threadID)
 	require.NoError(t, err)
 	assert.Contains(t, string(result), "message_id")
+}
+
+func TestEncodeRunNote(t *testing.T) {
+	t.Parallel()
+	assert.Empty(t, encodeRunNote("", nil))
+	assert.JSONEq(t, `{"note":"hi","tags":[]}`, encodeRunNote("hi", nil))
+	assert.JSONEq(t, `{"note":"","tags":["a","b"]}`, encodeRunNote("", []string{"a", "b"}))
+	assert.JSONEq(t, `{"note":"hi","tags":["a"]}`, encodeRunNote("hi", []string{"a"}))
+}
+
+func TestTriggerRunWithTags(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body := readJSON(t, r)
+		// Note + tags are carried together inside the note field as JSON (the Cloud RunNote format).
+		assert.JSONEq(t, `{"note":"Q1 backfill","tags":["nightly","manual"]}`, body["note"].(string))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	err := client.TriggerRun(t.Context(), "p", "pipe", "2026-01-01", "2026-01-02",
+		TriggerRunOptions{Note: "Q1 backfill", Tags: []string{"nightly", "manual"}})
+	require.NoError(t, err)
 }
