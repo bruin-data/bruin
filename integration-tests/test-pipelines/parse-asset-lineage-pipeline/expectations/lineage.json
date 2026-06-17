@@ -466,7 +466,7 @@
     "ms_teams": [],
     "discord": []
   },
-  "catchup": false, "catchup_mode": "",
+  "catchup": "",
   "metadata_push": {
     "bigquery": false
   },

@@ -375,7 +375,7 @@ func TestVariantVisitorCoversStringFields(t *testing.T) {
 	skipFields := map[string]bool{
 		// Pipeline metadata set internally or validated against an enum.
 		"Pipeline.LegacyID":            true,
-		"Pipeline.CatchupMode":         true,
+		"Pipeline.Catchup":             true,
 		"Pipeline.MacrosPath":          true,
 		"Pipeline.Commit":              true,
 		"Pipeline.Snapshot":            true,

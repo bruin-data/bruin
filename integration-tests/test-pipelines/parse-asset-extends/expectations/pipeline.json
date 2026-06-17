@@ -145,8 +145,7 @@
     "discord": [],
     "webhook": []
   },
-  "catchup": false,
-  "catchup_mode": "",
+  "catchup": "",
   "metadata_push": {
     "bigquery": false
   },

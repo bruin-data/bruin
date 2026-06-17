@@ -290,13 +290,21 @@ notifications:
 Backfill any missed intervals between start_date and now. Turn this on when you need to automatically recover historical
 runs after downtime or late onboarding.
 
+`catchup` accepts either a boolean or a string mode:
+
+- `false` (or omitted): no catchup
+- `true` or `"active"`: catch up only the runs that should have happened while the pipeline was active
+- `"all"`: catch up every run regardless of the pipeline's active state at the time
+
+Any other string is treated as `false`. The value is always serialized as a string (`""`, `"active"`, or `"all"`).
+
 Example:
 
 ```yaml
-catchup: true
+catchup: active
 ```
 
-- **Type:** `Boolean`
+- **Type:** `Boolean` or one of `"active"`, `"all"`
 - **Default:** `false`
 
 ### Metadata push

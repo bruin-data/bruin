@@ -1206,7 +1206,7 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 			StartDate:          "2024-01-01",
 			Retries:            ptrInt(3),
 			Concurrency:        5,
-			Catchup:            true,
+			Catchup:            pipeline.CatchupActive,
 			Agent:              true,
 			Tags:               pipeline.EmptyStringArray{"production", "critical"},
 			Domains:            pipeline.EmptyStringArray{"analytics"},
@@ -1233,7 +1233,7 @@ func TestPipeline_FormatContent_ErrorHandling(t *testing.T) {
 		assert.Contains(t, contentStr, "schedule: daily")
 		assert.Contains(t, contentStr, "retries: 3")
 		assert.Contains(t, contentStr, "concurrency: 5")
-		assert.Contains(t, contentStr, "catchup: true")
+		assert.Contains(t, contentStr, "catchup: active")
 		assert.Contains(t, contentStr, "agent: true")
 		assert.Contains(t, contentStr, "tags:")
 		assert.Contains(t, contentStr, "- production")
@@ -2618,18 +2618,20 @@ func TestIntervalModifiers_JSON_Integration(t *testing.T) {
 	assert.Equal(t, modifiers, result)
 }
 
-func TestPipeline_ValidateCatchupMode(t *testing.T) {
+func TestPipeline_CatchupNormalization(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		yaml    string
-		wantErr bool
+		name string
+		yaml string
+		want pipeline.CatchupMode
 	}{
-		{name: "empty is valid", yaml: "name: test\n", wantErr: false},
-		{name: "active is valid", yaml: "name: test\ncatchup_mode: active\n", wantErr: false},
-		{name: "all is valid", yaml: "name: test\ncatchup_mode: all\n", wantErr: false},
-		{name: "invalid value", yaml: "name: test\ncatchup_mode: invalid\n", wantErr: true},
+		{name: "missing is none", yaml: "name: test\n", want: pipeline.CatchupNone},
+		{name: "bool true is active", yaml: "name: test\ncatchup: true\n", want: pipeline.CatchupActive},
+		{name: "bool false is none", yaml: "name: test\ncatchup: false\n", want: pipeline.CatchupNone},
+		{name: "string active stays active", yaml: "name: test\ncatchup: active\n", want: pipeline.CatchupActive},
+		{name: "string all stays all", yaml: "name: test\ncatchup: all\n", want: pipeline.CatchupAll},
+		{name: "unknown string collapses to none", yaml: "name: test\ncatchup: invalid\n", want: pipeline.CatchupNone},
 	}
 
 	for _, tt := range tests {
@@ -2637,11 +2639,34 @@ func TestPipeline_ValidateCatchupMode(t *testing.T) {
 			t.Parallel()
 			var p pipeline.Pipeline
 			err := yaml.Unmarshal([]byte(tt.yaml), &p)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, p.Catchup)
+		})
+	}
+}
+
+func TestPipeline_CatchupJSONNormalization(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		json string
+		want pipeline.CatchupMode
+	}{
+		{name: "bool true is active", json: `{"name":"t","catchup":true}`, want: pipeline.CatchupActive},
+		{name: "bool false is none", json: `{"name":"t","catchup":false}`, want: pipeline.CatchupNone},
+		{name: "string active", json: `{"name":"t","catchup":"active"}`, want: pipeline.CatchupActive},
+		{name: "string all", json: `{"name":"t","catchup":"all"}`, want: pipeline.CatchupAll},
+		{name: "unknown string collapses to none", json: `{"name":"t","catchup":"weird"}`, want: pipeline.CatchupNone},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var p pipeline.Pipeline
+			err := json.Unmarshal([]byte(tt.json), &p)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, p.Catchup)
 		})
 	}
 }

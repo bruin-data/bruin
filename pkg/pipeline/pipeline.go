@@ -1598,6 +1598,60 @@ func (mp *MetadataPush) HasAnyEnabled() bool {
 
 type Macro string
 
+type CatchupMode string
+
+const (
+	CatchupNone   CatchupMode = ""
+	CatchupActive CatchupMode = "active"
+	CatchupAll    CatchupMode = "all"
+)
+
+func (c *CatchupMode) UnmarshalYAML(node *yaml.Node) error {
+	var b bool
+	if err := node.Decode(&b); err == nil {
+		*c = boolToCatchup(b)
+		return nil
+	}
+	var s string
+	if err := node.Decode(&s); err == nil {
+		*c = normalizeCatchupString(s)
+		return nil
+	}
+	*c = CatchupNone
+	return nil
+}
+
+func (c *CatchupMode) UnmarshalJSON(data []byte) error {
+	var b bool
+	if err := json.Unmarshal(data, &b); err == nil {
+		*c = boolToCatchup(b)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*c = normalizeCatchupString(s)
+		return nil
+	}
+	*c = CatchupNone
+	return nil
+}
+
+func boolToCatchup(b bool) CatchupMode {
+	if b {
+		return CatchupActive
+	}
+	return CatchupNone
+}
+
+func normalizeCatchupString(s string) CatchupMode {
+	switch CatchupMode(s) {
+	case CatchupActive, CatchupAll:
+		return CatchupMode(s)
+	default:
+		return CatchupNone
+	}
+}
+
 // Pipeline is the in-memory representation of a pipeline.yml plus its loaded
 // assets. When adding a new exported field that may legitimately contain Jinja
 // (`{{ var.X }}`) — typically string-valued metadata fields — extend the
@@ -1617,8 +1671,7 @@ type Pipeline struct {
 	DefaultConnections EmptyStringMap         `json:"default_connections" yaml:"default_connections,omitempty" mapstructure:"default_connections"`
 	Assets             []*Asset               `json:"assets" yaml:"assets,omitempty"`
 	Notifications      Notifications          `json:"notifications" yaml:"notifications,omitempty" mapstructure:"notifications"`
-	Catchup            bool                   `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
-	CatchupMode        string                 `json:"catchup_mode" yaml:"catchup_mode,omitempty" mapstructure:"catchup_mode"`
+	Catchup            CatchupMode            `json:"catchup" yaml:"catchup,omitempty" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push,omitempty" mapstructure:"metadata_push"`
 	Retries            *int                   `json:"retries" yaml:"retries,omitempty" mapstructure:"retries"`
 	RetriesDelay       *int                   `json:"retries_delay,omitempty" yaml:"-" mapstructure:"-"`
@@ -1637,15 +1690,6 @@ type Pipeline struct {
 	Macros             []Macro                `json:"macros" yaml:"macros,omitempty" mapstructure:"macros"`
 }
 
-func validateCatchupMode(mode string) error {
-	switch mode {
-	case "", "active", "all":
-		return nil
-	default:
-		return fmt.Errorf("invalid catchup_mode %q, must be one of: 'active', 'all'", mode)
-	}
-}
-
 func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type pipelineAlias Pipeline
 	aux := (*pipelineAlias)(p)
@@ -1656,10 +1700,6 @@ func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	if p.Concurrency == 0 {
 		p.Concurrency = 1
-	}
-
-	if err := validateCatchupMode(p.CatchupMode); err != nil {
-		return err
 	}
 
 	if err := p.Variants.Validate(p.Variables); err != nil {
@@ -1679,10 +1719,6 @@ func (p *Pipeline) UnmarshalJSON(data []byte) error {
 
 	if p.Concurrency == 0 {
 		p.Concurrency = 1
-	}
-
-	if err := validateCatchupMode(p.CatchupMode); err != nil {
-		return err
 	}
 
 	if err := p.Variants.Validate(p.Variables); err != nil {
