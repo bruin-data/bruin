@@ -360,11 +360,13 @@ func intp(i int) *int { return &i }
 
 func TestColumnMetadataDDL(t *testing.T) {
 	t.Parallel()
+	notNull := false
 	asset := &pipeline.Asset{
 		Name:            "orders",
 		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyDDL},
 		Columns: []pipeline.Column{
-			{Name: "amount", Type: "numeric", Precision: intp(10), Scale: intp(2), Default: "0"},
+			// non-nullable + default to assert Vertica's required `DEFAULT ... NOT NULL` order
+			{Name: "amount", Type: "numeric", Precision: intp(10), Scale: intp(2), Default: "0", Nullable: pipeline.DefaultTrueBool{Value: &notNull}},
 			{Name: "name", Type: "varchar", Length: intp(255), Collation: "en_US"},
 			{Name: "customer_id", Type: "integer", ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"}},
 		},
@@ -373,7 +375,7 @@ func TestColumnMetadataDDL(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, render, "numeric(10, 2)")
 	assert.Contains(t, render, "varchar(255)")
-	assert.Contains(t, render, "DEFAULT 0")
+	assert.Contains(t, render, "DEFAULT 0 NOT NULL")
 	assert.Contains(t, render, "COLLATE")
 	assert.Contains(t, render, "REFERENCES")
 }

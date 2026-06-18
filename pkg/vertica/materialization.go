@@ -197,11 +197,11 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 		if col.Collation != "" {
 			definition += " COLLATE " + QuoteIdentifier(col.Collation)
 		}
-		if col.PrimaryKey || !col.Nullable.Bool() {
-			definition += " NOT NULL"
-		}
 		if col.Default != "" {
 			definition += " DEFAULT " + col.Default
+		}
+		if col.PrimaryKey || !col.Nullable.Bool() {
+			definition += " NOT NULL"
 		}
 		columnDefs = append(columnDefs, definition)
 
