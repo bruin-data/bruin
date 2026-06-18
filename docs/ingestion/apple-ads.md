@@ -94,19 +94,11 @@ parameters:
   - `source_table`: The name of the table to fetch. Supported tables: `campaigns`, `ad_groups`, `ads`, `creatives`.
   - `destination`: The destination platform where the data will be ingested (e.g., `postgres`).
 
-### Step 3: [Run](/commands/run) asset to ingest data
-
-```
-bruin run assets/appleads_ingestion.yml
-```
-
-As a result of this command, Bruin will ingest data from the given Apple Ads table into your destination database.
-
-## Tables
+## Available Source Tables
 
 ### Entity tables
 
-| Table | Primary Key | Incremental Key | Strategy | Details |
+| Table | PK | Inc Key | Inc Strategy | Details |
 |---|---|---|---|---|
 | `campaigns` | `[orgId, id]` | `modificationTime` | merge | All ad campaigns in the organization, including budget, status, countries/regions, and timeframe. |
 | `ad_groups` | `[orgId, id]` | `modificationTime` | merge | Targeting groups inside each campaign — bids, audience/device/geo targeting, and keyword-matching settings. |
@@ -117,7 +109,7 @@ As a result of this command, Bruin will ingest data from the given Apple Ads tab
 
 Report tables return performance metrics (impressions, taps, installs, spend, etc.) from the [Apple Search Ads Reporting API](https://developer.apple.com/documentation/apple_ads/apple-search-ads-campaign-management-api-5).
 
-| Table | Primary Key | Incremental Key | Strategy | Details |
+| Table | PK | Inc Key | Inc Strategy | Details |
 |---|---|---|---|---|
 | `campaign_reports` | `[orgId, campaignId]` | `modificationTime` | merge | Campaign-level performance metrics. |
 | `ad_group_reports` | `[orgId, campaignId, adGroupId]` | `modificationTime` | merge | Ad group-level performance metrics. |
@@ -137,6 +129,15 @@ Report table names support an optional `:granularity:groupBy` suffix to control 
 | `daily` | — | 90 days |
 | `weekly` | > 14 days | 24 months |
 | `monthly` | > 90 days (3 months) | 24 months |
+
+
+### Step 3: [Run](/commands/run) asset to ingest data
+
+```
+bruin run assets/appleads_ingestion.yml
+```
+
+As a result of this command, Bruin will ingest data from the given Apple Ads table into your destination database.
 
 ## Examples
 

@@ -58,12 +58,12 @@ Reddit Ads source allows ingesting the following tables:
 | `campaigns` | id | - | replace | Retrieves campaigns for each ad account. |
 | `ad_groups` | id | - | replace | Retrieves ad groups for each ad account. |
 | `ads` | id | - | replace | Retrieves ads for each ad account. |
-| `posts` | id | - | replace | Retrieves ad posts and creatives for each ad account. |
+| `posts` | id | - | replace | Retrieves ad posts (creatives) for each ad account. |
 | `custom_audiences` | id | - | replace | Retrieves custom audiences for targeting. |
 | `saved_audiences` | id | - | replace | Retrieves saved audience configurations. |
 | `pixels` | id | - | replace | Retrieves conversion tracking pixels. |
-| `funding_instruments` | id | - | replace | Retrieves funding instruments for each ad account. |
-| `custom` | level_id, breakdowns | date | merge | Retrieves advertising performance reports for selected levels, breakdowns, and metrics. |
+| `funding_instruments` | id | - | replace | Retrieves funding instruments (payment methods) for each ad account. |
+| `custom` | [level_id, breakdowns] | date | merge | Custom reports allow you to retrieve performance data based on specific levels, breakdowns, and metrics. |
 
 ### Example
 

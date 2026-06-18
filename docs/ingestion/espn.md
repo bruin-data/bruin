@@ -60,13 +60,13 @@ parameters:
 
 ## Available Source Tables
 
-| Table | PK | Inc Strategy | Details |
-|-------|----|--------------| ------- |
-| `teams` | `id` | replace | Roster snapshot for the configured sport/league. |
-| `scoreboard` | `id` | merge | Events for the interval. `--interval-start` / `--interval-end` map to ESPN's `dates` parameter, and rows accumulate across runs. |
-| `competitors` | `event_id, competition_id, team_id` | merge | One row per competitor per scoreboard event. |
-| `standings` | `league_id, group_id, season, team_id` | replace | Standings snapshot for the current (or `--full-refresh`-selected) season. |
-| `news` | `id` | merge | Latest league news articles. Accumulates across runs. |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `teams` | `id` | - | `replace` | Loads teams from `/apis/site/v2/sports/{sport}/{league}/teams`. Roster snapshot. |
+| `scoreboard` | `id` | - | `merge` | Loads scoreboard events from `/apis/site/v2/sports/{sport}/{league}/scoreboard`. Use `merge` to accumulate events across interval runs. |
+| `competitors` | `event_id`, `competition_id`, `team_id` | - | `merge` | Fans out each scoreboard event into one row per competitor/team. |
+| `standings` | `league_id`, `group_id`, `season`, `team_id` | - | `replace` | Loads standings from `/apis/v2/sports/{sport}/{league}/standings`. Latest snapshot for the given season. |
+| `news` | `id` | - | `merge` | Loads latest league news articles from `/apis/site/v2/sports/{sport}/{league}/news`. Accumulates over runs. |
 
 Nested ESPN objects are preserved as JSON columns in the destination; schema inference derives types from the actual payload, so column shapes vary across sports and leagues.
 

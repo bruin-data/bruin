@@ -71,9 +71,14 @@ parameters:
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Google Analytics connection defined in .bruin.yml.
 - `source_table`: The name of the data table in Google Analytics to ingest data from.
-Currently, only one table is supported: custom, which refers to Custom Reports. These allow you to retrieve data based on specific dimensions and metrics.
-For more information, please visit [here](https://getbruin.com/docs/ingestr/supported-sources/google_analytics.html).
 - `destination`: The name of the destination connection.
+
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|-----|---------|--------------|---------|
+| `realtime` | ingested_at | - | merge | Retrieves real-time analytics data based on specified dimensions and metrics. Format: `realtime:<dimensions>:<metrics>:<minutes_ranges>`. Supports incremental loading by ingestion timestamp. |
+| `custom` | datetime_dimension | datetime_dimension | merge | Retrieves custom reports based on specified dimensions and metrics. Format: `custom:<dimensions>:<metrics>` |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

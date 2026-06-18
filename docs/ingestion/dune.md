@@ -52,6 +52,15 @@ parameters:
 | `query:<id>:<params>` | `query:1234567:bar=1000&foo=value` | Executes a saved query with query parameters |
 | `sql:<raw SQL>` | `sql:SELECT * FROM ethereum.transactions LIMIT 100` | Executes raw SQL directly |
 
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `queries` | - | - | replace | Lists all saved queries in your Dune account |
+| `query:<id>` | - | - | replace | Executes a saved query by its numeric ID (e.g., `query:1234567`) |
+| `query:<id>:<params>` | - | - | replace | Executes a saved query with query parameters (e.g., `query:1234567:bar=1000&foo=value`) |
+| `sql:<raw SQL>` | - | - | replace | Executes raw SQL directly against the Dune engine |
+
 ### Step 3: [Run](/commands/run) asset to ingest data
 
 ```bash

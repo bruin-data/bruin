@@ -59,6 +59,12 @@ Parameters:
 `filter_name`: The name of the filter (e.g. campaign_ids).
 `filter_values`: A comma-separated list of one or more values associated with the filter name (e.g., camp_id123,camp_id456). Only the IN filter type is supported. Learn more about filters [here](https://business-api.tiktok.com/portal/docs?id=1751443975608321).
 
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `custom` | dimensions, advertiser_id | stat_time_day/stat_time_hour | merge | Custom reports based on specified dimensions, metrics, and filters. Format: `custom:<dimensions>:<metrics>[:<filter_name,filter_values>]` |
+
 ### Step 3: [Run](/commands/run) asset to ingest data
 
 ```bash

@@ -39,8 +39,14 @@ parameters:
 ```
 
 - `source_connection`: The Trustpilot connection name defined in `.bruin.yml`.
-- `source_table`: Table to ingest. Currently only `reviews` is supported.
+- `source_table`: Table to ingest. See the available tables below.
 - `destination`: Destination connection name.
+
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `reviews` | id | updated_at | merge | Customer reviews for the specified business |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

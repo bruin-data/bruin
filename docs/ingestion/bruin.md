@@ -55,10 +55,10 @@ parameters:
 
 ## Available Source Tables
 
-| Table     | PK | Inc Key | Inc Strategy | Details                                                          |
-|-----------|----|---------|--------------|-----------------------------------------------------------------|
-| pipelines | -  | -       | replace      | Contains information about your data pipelines including metadata and configuration. |
-| assets    | -  | -       | replace      | Contains information about your data assets including metadata and configuration. |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `pipelines` | - | - | replace | Contains information about your data pipelines including metadata and configuration. |
+| `assets` | - | - | replace | Contains information about your pipeline assets including their definitions and dependencies. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

@@ -57,7 +57,7 @@ Socrata source allows ingesting datasets by specifying their dataset ID as the s
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| `<dataset_id>` | `:id` | user-defined | replace/merge | Loads all records from the specified Socrata dataset. Uses `replace` by default, or `merge` when incremental key is specified. |
+| `dataset` | `:id` | user-defined | replace/merge | Loads all records from the specified Socrata dataset. Uses `replace` by default, or `merge` when `--incremental-key` is specified |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

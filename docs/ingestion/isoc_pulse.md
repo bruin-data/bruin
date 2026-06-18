@@ -46,23 +46,23 @@ bruin run assets/pulse_ingestion.asset.yml
 
 This command will ingest data from the specified Internet Society Pulse metric into your destination database.
 
-## Supported Metrics and Tables
+## Available Source Tables
 
-| Metric | Description | Country Support | Additional Options | PK | Inc Key | Inc Strategy |
-|--------|-------------|-----------------|-------------------|----|---------|--------------|
-| dnssec_adoption | DNSSEC adoption metrics for specific domains | No | Domain name | date | date | merge |
-| dnssec_tld_adoption | DNSSEC adoption metrics for top-level domains | Yes | Country code | date | date | merge |
-| dnssec_validation | DNSSEC validation metrics | Yes | Country code | date | date | merge |
-| http | HTTP protocol metrics | No | None | date | date | merge |
-| http3 | HTTP/3 protocol metrics | No | None | date | date | merge |
-| https | HTTPS adoption metrics | Yes | topsites, Country code | date | date | merge |
-| ipv6 | IPv6 adoption metrics | Yes | topsites, Country code | date | date | merge |
-| net_loss | Internet disconnection metrics | Yes | Shutdown type, Country code | date | date | merge |
-| resilience | Internet resilience metrics | Yes | Country code | date | date | merge |
-| roa | Route Origin Authorization metrics | Yes | IP version (4/6), Country code | date | date | merge |
-| rov | Route Origin Validation metrics | No | None | date | date | merge |
-| tls | TLS protocol metrics | No | None | date | date | merge |
-| tls13 | TLS 1.3 protocol metrics | No | None | date | date | merge |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `dnssec_adoption` | date | date | merge | DNSSEC adoption metrics for specific domains. Supports domain name as an additional option. |
+| `dnssec_tld_adoption` | date | date | merge | DNSSEC adoption metrics for top-level domains. Supports country code. |
+| `dnssec_validation` | date | date | merge | DNSSEC validation metrics. Supports country code. |
+| `http` | date | date | merge | HTTP protocol metrics. |
+| `http3` | date | date | merge | HTTP/3 protocol metrics. |
+| `https` | date | date | merge | HTTPS adoption metrics. Supports topsites and country code (e.g., `https:topsites:US`). |
+| `ipv6` | date | date | merge | IPv6 adoption metrics. Supports topsites and country code (e.g., `ipv6:DE`). |
+| `net_loss` | date | date | merge | Internet disconnection metrics. Supports shutdown type and country code. |
+| `resilience` | date | date | merge | Internet resilience metrics. Supports country code. |
+| `roa` | date | date | merge | Route Origin Authorization metrics. Supports IP version (4/6) and country code. |
+| `rov` | date | date | merge | Route Origin Validation metrics. |
+| `tls` | date | date | merge | TLS protocol metrics. |
+| `tls13` | date | date | merge | TLS 1.3 protocol metrics. |
 
 Refer to the [Pulse documentation](https://getbruin.com/docs/ingestr/supported-sources/isoc-pulse.html#tables) for the full list and parameter syntax.
 

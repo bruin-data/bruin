@@ -39,21 +39,22 @@ connections:
       api_key: ${ANTHROPIC_API_KEY}
 ```
 
-## Supported Data Assets
+## Available Source Tables
 
 Anthropic assets will be ingested to your data warehouse as defined in the `destination` table.
 
-| Asset | Table Name | Incremental Key | Description |
-|-------|------------|-----------------|-------------|
-| Claude Code Usage | `claude_code_usage` | date | Daily aggregated usage metrics for Claude Code users in your organization |
-| Usage Report | `usage_report` | replace | Detailed token usage metrics from the Messages API, aggregated by time bucket |
-| Cost Report | `cost_report` | replace | Aggregated cost data broken down by workspace and cost description |
-| Organization | `organization` | replace | Information about your Anthropic organization |
-| Workspaces | `workspaces` | replace | All workspaces in your organization |
-| API Keys | `api_keys` | replace | All API keys in your organization |
-| Invites | `invites` | replace | All pending organization invites |
-| Users | `users` | replace | All users in your organization |
-| Workspace Members | `workspace_members` | replace | Workspace membership information |
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `claude_code_usage` | date, actor_type, actor_id, terminal_type | date | append | Daily aggregated usage metrics for Claude Code users in your organization |
+| `usage_report` | bucket, api_key_id, workspace_id, model, service_tier | bucket | replace | API usage and latency metrics from the Messages API |
+| `cost_report` | bucket, workspace_id, description | bucket | replace | Cost breakdown by workspace and cost description |
+| `organization` | - | - | replace | Organization information |
+| `workspaces` | id | - | replace | Workspace list |
+| `api_keys` | id | - | replace | API key management |
+| `invites` | id | - | replace | Pending invitations |
+| `users` | id | - | replace | User list |
+| `workspace_members` | workspace_id, user_id | - | replace | Workspace memberships |
 
 ## Asset-Specific Configuration
 

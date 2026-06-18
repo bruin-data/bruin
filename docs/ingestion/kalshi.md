@@ -88,24 +88,24 @@ bruin run assets/kalshi_candlesticks.asset.yml --start-date 2026-01-01 --end-dat
 
 Kalshi source allows ingesting the following tables:
 
-| Table | Required URI params | Optional URI params | PK | Inc Key | Details |
-|-------|---------------------|---------------------|----|---------|---------|
-| `exchange_status` | - | - | - | - | Exchange active/trading active flags and estimated resume time. |
-| `exchange_schedule` | - | - | - | - | Exchange schedule payload in `raw`. |
-| `exchange_announcements` | - | - | `id` | `created_time` | Public exchange announcements. |
-| `series` | - | `category`, `tags` | `ticker` | `updated_time` | Series metadata. |
-| `series_by_ticker` | `series_ticker` | - | `ticker` | - | One series by ticker. |
-| `events` | - | `series_ticker`, `status`, `with_nested_markets` | `event_ticker` | `updated_time` | Events and optional nested markets. |
-| `event_by_ticker` | `event_ticker` | - | `event_ticker` | - | One event by ticker. |
-| `markets` | - | `event_ticker`, `series_ticker`, `status`, `tickers`, `mve_filter`, `min_updated_ts`, `max_close_ts`, `min_close_ts`, `min_settled_ts`, `max_settled_ts` | `ticker` | `updated_time` | Market discovery with prices, volume, open interest, status, and `raw`. |
-| `market_by_ticker` | `ticker` | - | `ticker` | - | One market by ticker. |
-| `market_orderbook` | `ticker` | - | - | - | Current YES/NO bid ladders for one market. |
-| `market_orderbooks` | `tickers` | - | - | - | Batch order books for comma-separated tickers. |
-| `market_trades` | - | `ticker`, `is_block_trade` | `trade_id` | `created_time` | Public trades. Supports interval pushdown. |
-| `market_candlesticks` | `series_ticker`, `ticker`, `period_interval` | `include_latest_before_start` | `end_period_ts` | `end_period_ts` | Candlesticks for one market. Requires intervals. |
-| `market_candlesticks_batch` | `market_tickers`, `period_interval` | `include_latest_before_start` | - | - | Batch candlesticks for up to 100 market tickers. Requires intervals. |
-| `historical_markets` | - | `tickers`, `event_ticker`, `series_ticker`, `status` | `ticker` | - | Archived historical markets. |
-| `historical_trades` | - | `ticker`, `is_block_trade` | `trade_id` | `created_time` | Historical trades. Supports interval pushdown. |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `exchange_status` | - | - | replace | Exchange active/trading active flags and estimated resume time. |
+| `exchange_schedule` | - | - | replace | Exchange schedule payload in `raw`. |
+| `exchange_announcements` | `id` | `created_time` | merge | Public exchange announcements. |
+| `series` | `ticker` | `updated_time` | merge | Series metadata. Optional URI params: `category`, `tags`. |
+| `series_by_ticker` | `ticker` | - | replace | One series by ticker. Required URI param: `series_ticker`. |
+| `events` | `event_ticker` | `updated_time` | merge | Events and optional nested markets. Optional URI params: `series_ticker`, `status`, `with_nested_markets`. |
+| `event_by_ticker` | `event_ticker` | - | replace | One event by ticker. Required URI param: `event_ticker`. |
+| `markets` | `ticker` | `updated_time` | merge | Market discovery with prices, volume, open interest, status, and `raw`. Optional URI params: `event_ticker`, `series_ticker`, `status`, `tickers`, `mve_filter`, `min_updated_ts`, `max_close_ts`, `min_close_ts`, `min_settled_ts`, `max_settled_ts`. |
+| `market_by_ticker` | `ticker` | - | replace | One market by ticker. Required URI param: `ticker`. |
+| `market_orderbook` | - | - | replace | Current YES/NO bid ladders for one market. Required URI param: `ticker`. |
+| `market_orderbooks` | - | - | replace | Batch order books for comma-separated tickers. Required URI param: `tickers`. |
+| `market_trades` | `trade_id` | `created_time` | merge | Public trades. Supports interval pushdown. Optional URI params: `ticker`, `is_block_trade`. |
+| `market_candlesticks` | `end_period_ts` | `end_period_ts` | merge | Candlesticks for one market. Requires intervals. Required URI params: `series_ticker`, `ticker`, `period_interval`. Optional URI param: `include_latest_before_start`. |
+| `market_candlesticks_batch` | - | - | replace | Batch candlesticks for up to 100 market tickers. Requires intervals. Required URI params: `market_tickers`, `period_interval`. Optional URI param: `include_latest_before_start`. |
+| `historical_markets` | `ticker` | - | replace | Archived historical markets. Optional URI params: `tickers`, `event_ticker`, `series_ticker`, `status`. |
+| `historical_trades` | `trade_id` | `created_time` | merge | Historical trades. Supports interval pushdown. Optional URI params: `ticker`, `is_block_trade`. |
 
 ## Interval Behavior
 
