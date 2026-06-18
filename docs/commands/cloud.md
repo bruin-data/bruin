@@ -541,6 +541,64 @@ bruin cloud agents messages \
   --thread-id <thread-id>
 ```
 
+### `connections`
+
+Manage the connections stored in Bruin Cloud. Connections live in your team's
+vault and are shared by your cloud pipelines.
+
+#### `add`
+
+Push a connection to Bruin Cloud. By default it reads the connection straight
+from your local `.bruin.yml`, so you don't have to retype credentials:
+
+```bash
+# Reads the "my_pg" connection from the selected environment in .bruin.yml
+bruin cloud connections add --name my_pg
+
+# Pick a specific environment
+bruin cloud connections add --name my_pg --environment prod
+
+# Point at a specific config file
+bruin cloud connections add --name my_pg --config-file ./path/to/.bruin.yml
+```
+
+When `--environment` is omitted, the `default_environment` from `.bruin.yml` is
+used (falling back to `default`).
+
+For service-account based connections (BigQuery, GCS, Spanner, …) the CLI reads
+the local `service_account_file` and uploads its contents, since the cloud
+runner can't reach your local disk. A relative `service_account_file` is
+resolved against the `.bruin.yml` directory.
+
+To add a connection without a local `.bruin.yml` (e.g. in CI), pass the
+credentials inline. `--type` is required in this mode:
+
+```bash
+bruin cloud connections add \
+  --name my_pg \
+  --type postgres \
+  --credentials '{"username":"u","password":"p","host":"db.example.com","port":5432,"database":"prod"}'
+```
+
+The credentials object uses the same snake_case field names as `.bruin.yml`.
+
+#### `list`
+
+List the connections in your team's cloud vault (name and type):
+
+```bash
+bruin cloud connections list
+bruin cloud connections list --output json
+```
+
+#### `delete`
+
+Delete a connection by name:
+
+```bash
+bruin cloud connections delete --name my_pg
+```
+
 ---
 
 ## Common Workflows

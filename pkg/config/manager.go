@@ -190,6 +190,17 @@ func (c *Connections) Exists(name string) bool {
 	return ok
 }
 
+// GetConnection returns the connection object registered under the given name,
+// or nil if it does not exist. The returned value is a pointer to the typed
+// connection struct (e.g. *PostgresConnection).
+func (c *Connections) GetConnection(name string) any {
+	if c.byKey == nil {
+		c.buildConnectionKeyMap()
+	}
+
+	return c.byKey[name]
+}
+
 func (c *Connections) buildConnectionKeyMap() {
 	c.byKey = make(map[string]any)
 	c.typeNameMap = make(map[string]string)
