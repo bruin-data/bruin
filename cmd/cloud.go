@@ -33,6 +33,7 @@ func Cloud(isDebug *bool) *cli.Command {
 			CloudInstances(),
 			CloudGlossary(),
 			CloudAgents(),
+			CloudConnections(),
 		},
 	}
 }
@@ -2310,6 +2311,154 @@ func cloudAgentsMessages() *cli.Command {
 				t.AppendRow(table.Row{m.ID, m.Status, outputMsg, m.CreatedAt})
 			}
 			t.Render()
+			return nil
+		},
+	}
+}
+
+func CloudConnections() *cli.Command {
+	return &cli.Command{
+		Name:  "connections",
+		Usage: "Manage Bruin Cloud connections",
+		Commands: []*cli.Command{
+			cloudConnectionsList(),
+			cloudConnectionsAdd(),
+			cloudConnectionsDelete(),
+		},
+	}
+}
+
+func cloudConnectionsList() *cli.Command {
+	return &cli.Command{
+		Name:  "list",
+		Usage: "List all connections",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			connections, err := client.ListConnections(ctx)
+			if err != nil {
+				printError(err, output, "Failed to list connections")
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				data, _ := json.MarshalIndent(connections, "", "  ")
+				fmt.Println(string(data))
+				return nil
+			}
+
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+			t.AppendHeader(table.Row{"Name", "Type"})
+			for _, conn := range connections {
+				t.AppendRow(table.Row{conn.Name, conn.Type})
+			}
+			t.Render()
+			return nil
+		},
+	}
+}
+
+func cloudConnectionsAdd() *cli.Command {
+	return &cli.Command{
+		Name:  "add",
+		Usage: "Add a new connection",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the name of the connection",
+			},
+			&cli.StringFlag{
+				Name:  "type",
+				Usage: "the type of the connection (e.g. postgres, snowflake, bigquery)",
+			},
+			&cli.StringFlag{
+				Name:  "credentials",
+				Usage: "the JSON object containing the credentials",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			name := c.String("name")
+			connType := c.String("type")
+			creds := c.String("credentials")
+			if name == "" || connType == "" || creds == "" {
+				printError(errors.New("--name, --type, and --credentials are required"), output, "Missing required flags")
+				return cli.Exit("", 1)
+			}
+
+			var credentials map[string]any
+			if err := json.Unmarshal([]byte(creds), &credentials); err != nil {
+				printError(err, output, "Invalid --credentials JSON")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.CreateConnection(ctx, name, connType, credentials); err != nil {
+				printError(err, output, "Failed to create connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Successfully created connection '%s' of type '%s'", name, connType))
+			return nil
+		},
+	}
+}
+
+func cloudConnectionsDelete() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a connection",
+		Flags: []cli.Flag{
+			apiKeyFlag(),
+			outputFlag(),
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "the name of the connection to delete",
+			},
+		},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			defer RecoverFromPanic()
+			output := c.String("output")
+
+			name := c.String("name")
+			if name == "" {
+				printError(errors.New("--name is required"), output, "Missing required flags")
+				return cli.Exit("", 1)
+			}
+
+			client, err := newCloudClient(c)
+			if err != nil {
+				printError(err, output, "Failed to create API client")
+				return cli.Exit("", 1)
+			}
+
+			if err := client.DeleteConnection(ctx, name); err != nil {
+				printError(err, output, "Failed to delete connection")
+				return cli.Exit("", 1)
+			}
+
+			printSuccessForOutput(output, fmt.Sprintf("Successfully deleted connection '%s'", name))
 			return nil
 		},
 	}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 
@@ -40,8 +41,12 @@ func NewAPIClient(apiKey string) *APIClient {
 	// doRequest can surface the upstream APIError instead of an opaque "giving
 	// up after N attempts" message.
 	rc.ErrorHandler = retryablehttp.PassthroughErrorHandler
+	baseURL := defaultBaseURL
+	if v := os.Getenv("BRUIN_CLOUD_BASE_URL"); v != "" {
+		baseURL = v
+	}
 	return &APIClient{
-		baseURL:    defaultBaseURL,
+		baseURL:    baseURL,
 		apiKey:     apiKey,
 		httpClient: rc.StandardClient(),
 	}
@@ -473,4 +478,25 @@ func (c *APIClient) ListAgentMessages(ctx context.Context, agentID, threadID int
 	}
 	err := c.doRequest(ctx, http.MethodGet, path, nil, &resp)
 	return resp.Messages, err
+}
+
+// --- Connections ---
+
+func (c *APIClient) ListConnections(ctx context.Context) ([]Connection, error) {
+	var connections []Connection
+	err := c.doRequest(ctx, http.MethodGet, "/connections", nil, &connections)
+	return connections, err
+}
+
+func (c *APIClient) CreateConnection(ctx context.Context, name, connType string, credentials map[string]any) error {
+	body := map[string]any{
+		"name":        name,
+		"type":        connType,
+		"credentials": credentials,
+	}
+	return c.doRequest(ctx, http.MethodPost, "/connections", body, nil)
+}
+
+func (c *APIClient) DeleteConnection(ctx context.Context, name string) error {
+	return c.doRequest(ctx, http.MethodDelete, "/connections/"+url.PathEscape(name), nil, nil)
 }
