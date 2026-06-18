@@ -105,6 +105,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/sail"
 	"github.com/bruin-data/bruin/pkg/salesforce"
+	"github.com/bruin-data/bruin/pkg/sendgrid"
 	"github.com/bruin-data/bruin/pkg/sftp"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
@@ -249,6 +250,7 @@ type Manager struct {
 	Dune                 map[string]*dune.Client
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
+	Sendgrid             map[string]*sendgrid.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -3079,6 +3081,26 @@ func (m *Manager) AddCustomerIoConnectionFromConfig(connection *config.CustomerI
 	return nil
 }
 
+func (m *Manager) AddSendgridConnectionFromConfig(connection *config.SendgridConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Sendgrid == nil {
+		m.Sendgrid = make(map[string]*sendgrid.Client)
+	}
+
+	client, err := sendgrid.NewClient(sendgrid.Config{
+		APIKey:     connection.APIKey,
+		OnBehalfOf: connection.OnBehalfOf,
+	})
+	if err != nil {
+		return err
+	}
+	m.Sendgrid[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddDuneConnectionFromConfig(connection *config.DuneConnection) error {
 	m.mutex.Lock()
 	if m.Dune == nil {
@@ -3529,6 +3551,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Sail, connectionManager.AddSailConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList

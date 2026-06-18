@@ -501,6 +501,10 @@ environments:
         - name: "customerio-1"
           api_key: "test-api-key"
           region: "us"
+      sendgrid:
+        - name: "sendgrid-1"
+          api_key: "test-api-key"
+          on_behalf_of: "test-subuser"
 
   prod:
     connections:

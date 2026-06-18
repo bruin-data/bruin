@@ -1783,6 +1783,16 @@ func (c CustomerIoConnection) GetName() string {
 	return c.Name
 }
 
+type SendgridConnection struct {
+	Name       string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey     string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	OnBehalfOf string `yaml:"on_behalf_of,omitempty" json:"on_behalf_of,omitempty" mapstructure:"on_behalf_of"`
+}
+
+func (c SendgridConnection) GetName() string {
+	return c.Name
+}
+
 type VerticaConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
