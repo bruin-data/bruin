@@ -8,7 +8,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func ptrInt(i int) *int { return &i }
 
 var SQLParser *sqlparser.SQLParser
 
@@ -1582,6 +1585,56 @@ func TestUpdateExistingColumn(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateExistingColumn_TypeDetail(t *testing.T) {
+	t.Parallel()
+
+	t.Run("type-detail metadata is copied when unset on the existing column", func(t *testing.T) {
+		t.Parallel()
+
+		existingCol := &pipeline.Column{Name: "amount"}
+		upstreamCol := &pipeline.Column{
+			Name:      "amount",
+			Precision: ptrInt(10),
+			Scale:     ptrInt(2),
+			Length:    ptrInt(255),
+			Collation: "en_US",
+		}
+
+		updateExistingColumn(existingCol, upstreamCol)
+
+		require.Equal(t, 10, *existingCol.Precision)
+		require.Equal(t, 2, *existingCol.Scale)
+		require.Equal(t, 255, *existingCol.Length)
+		require.Equal(t, "en_US", existingCol.Collation)
+	})
+
+	t.Run("existing type-detail metadata is not overwritten", func(t *testing.T) {
+		t.Parallel()
+
+		existingCol := &pipeline.Column{
+			Name:      "amount",
+			Precision: ptrInt(38),
+			Scale:     ptrInt(9),
+			Length:    ptrInt(64),
+			Collation: "binary",
+		}
+		upstreamCol := &pipeline.Column{
+			Name:      "amount",
+			Precision: ptrInt(10),
+			Scale:     ptrInt(2),
+			Length:    ptrInt(255),
+			Collation: "en_US",
+		}
+
+		updateExistingColumn(existingCol, upstreamCol)
+
+		require.Equal(t, 38, *existingCol.Precision)
+		require.Equal(t, 9, *existingCol.Scale)
+		require.Equal(t, 64, *existingCol.Length)
+		require.Equal(t, "binary", existingCol.Collation)
+	})
 }
 
 func TestUpdateAssetColumn(t *testing.T) {

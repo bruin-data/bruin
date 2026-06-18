@@ -588,6 +588,13 @@ type UpstreamColumn struct {
 	Table  string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
 }
 
+// ColumnReference points to a column in another asset. It is used to describe a
+// foreign-key relationship between this column and the referenced table/column.
+type ColumnReference struct {
+	Table  string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
+	Column string `json:"column" yaml:"column,omitempty" mapstructure:"column"`
+}
+
 type Column struct {
 	EntityAttribute *EntityAttribute  `json:"entity_attribute" yaml:"-" mapstructure:"-"`
 	Name            string            `json:"name" yaml:"name,omitempty" mapstructure:"name"`
@@ -599,6 +606,12 @@ type Column struct {
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
 	MergeSQL        string            `json:"merge_sql" yaml:"merge_sql,omitempty" mapstructure:"merge_sql"`
 	Nullable        DefaultTrueBool   `json:"nullable" yaml:"nullable,omitempty" mapstructure:"nullable"`
+	Default         string            `json:"default" yaml:"default,omitempty" mapstructure:"default"`
+	Precision       *int              `json:"precision" yaml:"precision,omitempty" mapstructure:"precision"`
+	Scale           *int              `json:"scale" yaml:"scale,omitempty" mapstructure:"scale"`
+	Length          *int              `json:"length" yaml:"length,omitempty" mapstructure:"length"`
+	Collation       string            `json:"collation" yaml:"collation,omitempty" mapstructure:"collation"`
+	ForeignKey      *ColumnReference  `json:"foreign_key" yaml:"foreign_key,omitempty" mapstructure:"foreign_key"`
 	Owner           string            `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
 	Domains         EmptyStringArray  `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
 	Meta            EmptyStringMap    `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`

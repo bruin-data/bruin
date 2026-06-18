@@ -808,6 +808,100 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 	return issues, nil
 }
 
+// ValidateColumnMetadata checks that optional column metadata fields, when set,
+// are well-formed: foreign keys must reference an existing asset (and, when that
+// asset declares its columns, an existing column on it), and numeric type-detail
+// (precision/scale/length) must hold sane values.
+func ValidateColumnMetadata(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0, len(asset.Columns))
+
+	for _, column := range asset.Columns {
+		issues = append(issues, validateColumnForeignKey(p, asset, &column)...)
+		issues = append(issues, validateColumnTypeDetail(asset, &column)...)
+	}
+
+	return issues, nil
+}
+
+func validateColumnForeignKey(p *pipeline.Pipeline, asset *pipeline.Asset, column *pipeline.Column) []*Issue {
+	fk := column.ForeignKey
+	if fk == nil {
+		return nil
+	}
+
+	issues := make([]*Issue, 0)
+
+	if fk.Table == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a foreign key without a referenced table", column.Name),
+		})
+	}
+	if fk.Column == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a foreign key without a referenced column", column.Name),
+		})
+	}
+	if fk.Table == "" || fk.Column == "" {
+		return issues
+	}
+
+	referenced := p.GetAssetByName(fk.Table)
+	if referenced == nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a foreign key referencing asset '%s', which does not exist in the pipeline", column.Name, fk.Table),
+		})
+		return issues
+	}
+
+	// Columns are optional in Bruin, so we can only verify the referenced column
+	// when the target asset actually declares its columns; otherwise we have no
+	// schema to check against and skip rather than emit a false positive.
+	if len(referenced.Columns) > 0 && referenced.GetColumnWithName(fk.Column) == nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a foreign key referencing column '%s.%s', which does not exist", column.Name, fk.Table, fk.Column),
+		})
+	}
+
+	return issues
+}
+
+func validateColumnTypeDetail(asset *pipeline.Asset, column *pipeline.Column) []*Issue {
+	issues := make([]*Issue, 0)
+
+	if column.Precision != nil && *column.Precision <= 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has an invalid precision '%d'; it must be a positive integer", column.Name, *column.Precision),
+		})
+	}
+	if column.Length != nil && *column.Length <= 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has an invalid length '%d'; it must be a positive integer", column.Name, *column.Length),
+		})
+	}
+	if column.Scale != nil && *column.Scale < 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has an invalid scale '%d'; it must not be negative", column.Name, *column.Scale),
+		})
+	}
+	// Only compare scale against precision when precision is itself valid;
+	// otherwise the user already gets the more actionable "invalid precision" error.
+	if column.Precision != nil && *column.Precision > 0 && column.Scale != nil && *column.Scale > *column.Precision {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Column '%s' has a scale '%d' greater than its precision '%d'", column.Name, *column.Scale, *column.Precision),
+		})
+	}
+
+	return issues
+}
+
 // ValidateDuplicateTags checks for duplicate tags within an asset and its columns.
 // It performs case-insensitive comparisons to find duplicates and returns issues
 // for any repeated tags found either on the asset itself or within individual

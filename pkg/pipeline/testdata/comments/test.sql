@@ -14,7 +14,13 @@
 -- @bruin.materialization.strategy: delete+insert
 -- @bruin.materialization.incremental_key: dt
 -- @bruin.columns.some_column.primary_key: true
+-- @bruin.columns.some_column.type: numeric
+-- @bruin.columns.some_column.precision: 10
+-- @bruin.columns.some_column.scale: 2
 -- @bruin.columns.some_other_column.primary_key: false
+-- @bruin.columns.some_other_column.default: 'active'
+-- @bruin.columns.some_other_column.collation: en_US
+-- @bruin.columns.some_other_column.length: 255
 
 select *
 from foo;

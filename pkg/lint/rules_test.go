@@ -2811,6 +2811,118 @@ func TestValidateDuplicateColumnNames(t *testing.T) {
 	}
 }
 
+func TestValidateColumnMetadata(t *testing.T) {
+	t.Parallel()
+
+	customers := &pipeline.Asset{
+		Name:    "customers",
+		Columns: []pipeline.Column{{Name: "id"}},
+	}
+	intPtr := func(i int) *int { return &i }
+
+	tests := []struct {
+		name      string
+		asset     *pipeline.Asset
+		wantDescs []string
+	}{
+		{
+			name: "valid foreign key and type detail produce no issues",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "customer_id", ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"}},
+					{Name: "amount", Precision: intPtr(10), Scale: intPtr(2)},
+					{Name: "name", Length: intPtr(255)},
+				},
+			},
+			wantDescs: nil,
+		},
+		{
+			name: "foreign key missing table and column",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "customer_id", ForeignKey: &pipeline.ColumnReference{}},
+				},
+			},
+			wantDescs: []string{
+				"Column 'customer_id' has a foreign key without a referenced table",
+				"Column 'customer_id' has a foreign key without a referenced column",
+			},
+		},
+		{
+			name: "foreign key references a non-existent asset",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "customer_id", ForeignKey: &pipeline.ColumnReference{Table: "missing", Column: "id"}},
+				},
+			},
+			wantDescs: []string{
+				"Column 'customer_id' has a foreign key referencing asset 'missing', which does not exist in the pipeline",
+			},
+		},
+		{
+			name: "foreign key references a non-existent column",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "customer_id", ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "nope"}},
+				},
+			},
+			wantDescs: []string{
+				"Column 'customer_id' has a foreign key referencing column 'customers.nope', which does not exist",
+			},
+		},
+		{
+			name: "invalid precision/scale combinations",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "a", Precision: intPtr(0)},
+					{Name: "b", Length: intPtr(-1)},
+					{Name: "c", Scale: intPtr(-2)},
+					{Name: "d", Precision: intPtr(2), Scale: intPtr(5)},
+				},
+			},
+			wantDescs: []string{
+				"Column 'a' has an invalid precision '0'; it must be a positive integer",
+				"Column 'b' has an invalid length '-1'; it must be a positive integer",
+				"Column 'c' has an invalid scale '-2'; it must not be negative",
+				"Column 'd' has a scale '5' greater than its precision '2'",
+			},
+		},
+		{
+			name: "invalid precision does not also trigger scale-greater-than-precision",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "a", Precision: intPtr(0), Scale: intPtr(2)},
+				},
+			},
+			wantDescs: []string{
+				"Column 'a' has an invalid precision '0'; it must be a positive integer",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{customers, tt.asset}}
+			got, err := ValidateColumnMetadata(t.Context(), p, tt.asset)
+			require.NoError(t, err)
+
+			gotDescs := make([]string, 0, len(got))
+			for _, issue := range got {
+				gotDescs = append(gotDescs, issue.Description)
+			}
+			assert.ElementsMatch(t, tt.wantDescs, gotDescs)
+		})
+	}
+}
+
 func TestValidateDuplicateTags(t *testing.T) {
 	t.Parallel()
 

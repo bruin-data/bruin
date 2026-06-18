@@ -429,6 +429,46 @@ columns:
 	require.Empty(t, task.Columns[1].SourceColumn)
 }
 
+func TestConvertYamlToTask_ColumnMetadata(t *testing.T) {
+	t.Parallel()
+
+	task, err := pipeline.ConvertYamlToTask([]byte(strings.TrimSpace(`
+name: dataset.orders
+type: bq.sql
+columns:
+  - name: id
+    type: integer
+    primary_key: true
+  - name: customer_id
+    type: integer
+    foreign_key:
+      table: customers
+      column: id
+  - name: amount
+    type: numeric
+    precision: 10
+    scale: 2
+    default: "0"
+  - name: name
+    type: varchar
+    length: 255
+    collation: en_US
+`)))
+	require.NoError(t, err)
+	require.Len(t, task.Columns, 4)
+
+	require.Nil(t, task.Columns[0].ForeignKey)
+
+	require.Equal(t, &pipeline.ColumnReference{Table: "customers", Column: "id"}, task.Columns[1].ForeignKey)
+
+	require.Equal(t, 10, *task.Columns[2].Precision)
+	require.Equal(t, 2, *task.Columns[2].Scale)
+	require.Equal(t, "0", task.Columns[2].Default)
+
+	require.Equal(t, 255, *task.Columns[3].Length)
+	require.Equal(t, "en_US", task.Columns[3].Collation)
+}
+
 func TestCreateTaskFromFileComments_Routing(t *testing.T) {
 	t.Parallel()
 
