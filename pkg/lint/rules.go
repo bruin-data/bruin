@@ -809,8 +809,9 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 }
 
 // ValidateColumnMetadata checks that optional column metadata fields, when set,
-// are well-formed: foreign keys must reference an existing asset and column, and
-// numeric type-detail (precision/scale/length) must hold sane values.
+// are well-formed: foreign keys must reference an existing asset (and, when that
+// asset declares its columns, an existing column on it), and numeric type-detail
+// (precision/scale/length) must hold sane values.
 func ValidateColumnMetadata(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0, len(asset.Columns))
 
@@ -855,6 +856,9 @@ func validateColumnForeignKey(p *pipeline.Pipeline, asset *pipeline.Asset, colum
 		return issues
 	}
 
+	// Columns are optional in Bruin, so we can only verify the referenced column
+	// when the target asset actually declares its columns; otherwise we have no
+	// schema to check against and skip rather than emit a false positive.
 	if len(referenced.Columns) > 0 && referenced.GetColumnWithName(fk.Column) == nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -886,7 +890,9 @@ func validateColumnTypeDetail(asset *pipeline.Asset, column *pipeline.Column) []
 			Description: fmt.Sprintf("Column '%s' has an invalid scale '%d'; it must not be negative", column.Name, *column.Scale),
 		})
 	}
-	if column.Precision != nil && column.Scale != nil && *column.Scale > *column.Precision {
+	// Only compare scale against precision when precision is itself valid;
+	// otherwise the user already gets the more actionable "invalid precision" error.
+	if column.Precision != nil && *column.Precision > 0 && column.Scale != nil && *column.Scale > *column.Precision {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: fmt.Sprintf("Column '%s' has a scale '%d' greater than its precision '%d'", column.Name, *column.Scale, *column.Precision),

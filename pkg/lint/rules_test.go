@@ -2892,6 +2892,18 @@ func TestValidateColumnMetadata(t *testing.T) {
 				"Column 'd' has a scale '5' greater than its precision '2'",
 			},
 		},
+		{
+			name: "invalid precision does not also trigger scale-greater-than-precision",
+			asset: &pipeline.Asset{
+				Name: "orders",
+				Columns: []pipeline.Column{
+					{Name: "a", Precision: intPtr(0), Scale: intPtr(2)},
+				},
+			},
+			wantDescs: []string{
+				"Column 'a' has an invalid precision '0'; it must be a positive integer",
+			},
+		},
 	}
 
 	for _, tt := range tests {
