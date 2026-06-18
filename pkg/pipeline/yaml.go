@@ -279,6 +279,11 @@ type columnUpstream struct {
 	Table  string `yaml:"table"`
 }
 
+type columnForeignKey struct {
+	Table  string `yaml:"table"`
+	Column string `yaml:"column"`
+}
+
 type column struct {
 	Extends       string            `yaml:"extends"`
 	Name          string            `yaml:"name"`
@@ -290,6 +295,12 @@ type column struct {
 	UpdateOnMerge bool              `yaml:"update_on_merge"`
 	MergeSQL      string            `yaml:"merge_sql"`
 	Nullable      *bool             `yaml:"nullable"`
+	Default       string            `yaml:"default"`
+	Precision     *int              `yaml:"precision"`
+	Scale         *int              `yaml:"scale"`
+	Length        *int              `yaml:"length"`
+	Collation     string            `yaml:"collation"`
+	ForeignKey    *columnForeignKey `yaml:"foreign_key"`
 	Upstreams     []columnUpstream  `yaml:"upstreams"`
 	Tags          []string          `yaml:"tags"`
 	Domains       []string          `yaml:"domains"`
@@ -486,6 +497,14 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			}
 		}
 
+		var foreignKey *ColumnReference
+		if column.ForeignKey != nil {
+			foreignKey = &ColumnReference{
+				Table:  strings.TrimSpace(column.ForeignKey.Table),
+				Column: strings.TrimSpace(column.ForeignKey.Column),
+			}
+		}
+
 		columns[index] = Column{
 			Name:            column.Name,
 			SourceColumn:    column.SourceColumn,
@@ -496,6 +515,12 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 			UpdateOnMerge:   column.UpdateOnMerge,
 			MergeSQL:        column.MergeSQL,
 			Nullable:        DefaultTrueBool{Value: column.Nullable},
+			Default:         column.Default,
+			Precision:       column.Precision,
+			Scale:           column.Scale,
+			Length:          column.Length,
+			Collation:       column.Collation,
+			ForeignKey:      foreignKey,
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
 			Upstreams:       upstreamColumns,

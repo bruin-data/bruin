@@ -406,6 +406,20 @@ func renderAssetStrings(render RenderFunc, a *Asset) error {
 		if c.Owner, err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].owner", originalName, i), c.Owner); err != nil {
 			return err
 		}
+		if c.Default, err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].default", originalName, i), c.Default); err != nil {
+			return err
+		}
+		if c.Collation, err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].collation", originalName, i), c.Collation); err != nil {
+			return err
+		}
+		if c.ForeignKey != nil {
+			if c.ForeignKey.Table, err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].foreign_key.table", originalName, i), c.ForeignKey.Table); err != nil {
+				return err
+			}
+			if c.ForeignKey.Column, err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].foreign_key.column", originalName, i), c.ForeignKey.Column); err != nil {
+				return err
+			}
+		}
 		for j, tag := range c.Tags {
 			if c.Tags[j], err = maybeRender(render, fmt.Sprintf("asset[%s].columns[%d].tags[%d]", originalName, i, j), tag); err != nil {
 				return err

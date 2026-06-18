@@ -174,6 +174,10 @@ func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *pipeline.Pipeline
 			for _, upstreamCol := range upstreamAsset.Columns {
 				upstreamCol.PrimaryKey = false
 				upstreamCol.Checks = []pipeline.ColumnCheck{}
+				// Foreign keys and defaults are properties of the upstream's own
+				// definition, not something that flows through a SELECT.
+				upstreamCol.ForeignKey = nil
+				upstreamCol.Default = ""
 				if err := p.addColumnToAsset(asset, upstreamCol.Name, &upstreamCol); err != nil {
 					return err
 				}
@@ -309,6 +313,10 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *pipeline.Pipelin
 				upstreamCol.Name = lineageCol.Name
 				upstreamCol.PrimaryKey = false
 				upstreamCol.Checks = []pipeline.ColumnCheck{}
+				// Foreign keys and defaults belong to the upstream column's own
+				// definition and must not be inherited by a derived column.
+				upstreamCol.ForeignKey = nil
+				upstreamCol.Default = ""
 				upstreamCol.Upstreams = []*pipeline.UpstreamColumn{
 					{
 						Column: upstream.Column,
@@ -381,6 +389,19 @@ func updateExistingColumn(existingCol *pipeline.Column, upstreamCol *pipeline.Co
 	}
 	if len(existingCol.Type) == 0 {
 		existingCol.Type = upstreamCol.Type
+	}
+	// Type-detail metadata travels together with the data type itself.
+	if existingCol.Precision == nil {
+		existingCol.Precision = upstreamCol.Precision
+	}
+	if existingCol.Scale == nil {
+		existingCol.Scale = upstreamCol.Scale
+	}
+	if existingCol.Length == nil {
+		existingCol.Length = upstreamCol.Length
+	}
+	if existingCol.Collation == "" {
+		existingCol.Collation = upstreamCol.Collation
 	}
 	if existingCol.EntityAttribute == nil {
 		existingCol.EntityAttribute = upstreamCol.EntityAttribute

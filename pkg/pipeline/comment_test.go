@@ -92,8 +92,8 @@ func Test_createTaskFromFile(t *testing.T) {
 					ClusterBy:      []string{"event_name"},
 				},
 				Columns: []pipeline.Column{
-					{Name: "some_column", PrimaryKey: true, Checks: make([]pipeline.ColumnCheck, 0)},
-					{Name: "some_other_column", PrimaryKey: false, Checks: make([]pipeline.ColumnCheck, 0)},
+					{Name: "some_column", PrimaryKey: true, Type: "numeric", Precision: ptrInt(10), Scale: ptrInt(2), Checks: make([]pipeline.ColumnCheck, 0)},
+					{Name: "some_other_column", PrimaryKey: false, Default: "'active'", Collation: "en_US", Length: ptrInt(255), Checks: make([]pipeline.ColumnCheck, 0)},
 				},
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},

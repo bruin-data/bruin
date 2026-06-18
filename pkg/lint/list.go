@@ -184,6 +184,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlpa
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "valid-column-metadata",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateColumnMetadata,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "duplicate-tags",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
