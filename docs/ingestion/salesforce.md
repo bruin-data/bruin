@@ -4,13 +4,18 @@
 
 Bruin supports Salesforce as a source for [ingestr assets](/assets/ingestr), and you can use it to ingest data from Salesforce into your data platform.
 
-To set up a Salesforce connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `username`, `password`, `token` and `domain`. You can obtain your security token by logging into your Salesforce account and navigating to the user settings under "Reset My Security Token."
+To set up a Salesforce connection, you must add a configuration item in the `.bruin.yml` and `asset` file. Salesforce supports two authentication methods:
+
+- **Username, password, and security token**: classic SOAP-style login. You can obtain your security token by logging into your Salesforce account and navigating to the user settings under "Reset My Security Token."
+- **OAuth access token**: an access token minted by the Salesforce CLI (`sf org auth show-access-token`). Use this when you want to authenticate interactively in a browser.
 
 Follow the steps below to set up Salesforce correctly as a data source and run ingestion.
 
 ## Configuration
 
 ### Step 1: Add a connection to the .bruin.yml file
+
+Use either the username/password/token combination:
 
 ```yaml
 connections:
@@ -26,6 +31,21 @@ connections:
 - `password` is your Salesforce account password.
 - `token` is your Salesforce security token.
 - `domain` is your Salesforce domain (e.g., "your-company.my.salesforce.com").
+
+Or an OAuth access token:
+
+```yaml
+connections:
+      salesforce:
+            - name: "salesforce"
+              access_token: "00D...!AQ...your_oauth_access_token"
+              domain: "https://your-domain.my.salesforce.com"
+```
+
+- `access_token` is an OAuth access token for your Salesforce org. You can obtain one with `sf org auth show-access-token --target-org <salesforce-username>` after logging in via `sf org login web`.
+- `domain` is your Salesforce instance URL (e.g., the `Instance Url` shown by `sf org display`). For sandboxes, use the sandbox My Domain URL.
+
+When `access_token` is set it takes precedence over `username`/`password`/`token`.
 
 ### Step 2: Create an asset file for data ingestion
 

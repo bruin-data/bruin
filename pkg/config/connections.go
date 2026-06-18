@@ -1330,11 +1330,12 @@ func (c FrankfurterConnection) GetName() string {
 }
 
 type SalesforceConnection struct {
-	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	Token    string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
-	Domain   string `yaml:"domain" json:"domain" mapstructure:"domain"`
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username    string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password    string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Token       string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token"`
+	Domain      string `yaml:"domain" json:"domain" mapstructure:"domain"`
 }
 
 func (c SalesforceConnection) GetName() string {

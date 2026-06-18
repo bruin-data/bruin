@@ -3487,6 +3487,9 @@
         "token": {
           "type": "string"
         },
+        "access_token": {
+          "type": "string"
+        },
         "domain": {
           "type": "string"
         }
