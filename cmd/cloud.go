@@ -2370,10 +2370,54 @@ func cloudConnectionsList() *cli.Command {
 	}
 }
 
+// connectionFromConfig loads a named connection from the local .bruin.yml and
+// returns its type and credentials as a snake_case map (the cloud wire format).
+// The struct's JSON tags already match the wire format, so a marshal round-trip
+// avoids any per-type mapping.
+func connectionFromConfig(name, environment, configFile string) (string, map[string]any, error) {
+	configFilePath := configFile
+	if configFilePath == "" {
+		repoRoot, err := git.FindRepoFromPath(".")
+		if err != nil {
+			return "", nil, errors.New("could not locate .bruin.yml (not in a git repo); pass --config-file or --credentials")
+		}
+		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+	}
+
+	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to load %s: %w", configFilePath, err)
+	}
+
+	env := cm.SelectedEnvironment
+	if environment != "" {
+		e, ok := cm.Environments[environment]
+		if !ok {
+			return "", nil, fmt.Errorf("environment '%s' not found in config", environment)
+		}
+		env = &e
+	}
+	if env == nil || env.Connections == nil || !env.Connections.Exists(name) {
+		return "", nil, fmt.Errorf("connection '%s' not found in config", name)
+	}
+
+	connType := env.Connections.ConnectionsSummaryList()[name]
+	data, err := json.Marshal(env.Connections.GetConnection(name))
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to serialize connection: %w", err)
+	}
+	var credentials map[string]any
+	if err := json.Unmarshal(data, &credentials); err != nil {
+		return "", nil, fmt.Errorf("failed to serialize connection: %w", err)
+	}
+	delete(credentials, "name")
+	return connType, credentials, nil
+}
+
 func cloudConnectionsAdd() *cli.Command {
 	return &cli.Command{
 		Name:  "add",
-		Usage: "Add a new connection",
+		Usage: "Add a connection to Bruin Cloud (from local .bruin.yml by default)",
 		Flags: []cli.Flag{
 			apiKeyFlag(),
 			outputFlag(),
@@ -2382,12 +2426,20 @@ func cloudConnectionsAdd() *cli.Command {
 				Usage: "the name of the connection",
 			},
 			&cli.StringFlag{
+				Name:  "environment",
+				Usage: "the .bruin.yml environment to read the connection from (default: selected environment)",
+			},
+			&cli.StringFlag{
+				Name:  "config-file",
+				Usage: "path to the .bruin.yml file",
+			},
+			&cli.StringFlag{
 				Name:  "type",
-				Usage: "the type of the connection (e.g. postgres, snowflake, bigquery)",
+				Usage: "connection type; required only with --credentials (otherwise read from .bruin.yml)",
 			},
 			&cli.StringFlag{
 				Name:  "credentials",
-				Usage: "the JSON object containing the credentials",
+				Usage: "JSON credentials; if omitted, the connection is read from .bruin.yml",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -2395,17 +2447,31 @@ func cloudConnectionsAdd() *cli.Command {
 			output := c.String("output")
 
 			name := c.String("name")
-			connType := c.String("type")
-			creds := c.String("credentials")
-			if name == "" || connType == "" || creds == "" {
-				printError(errors.New("--name, --type, and --credentials are required"), output, "Missing required flags")
+			if name == "" {
+				printError(errors.New("--name is required"), output, "Missing required flags")
 				return cli.Exit("", 1)
 			}
 
+			connType := c.String("type")
+			creds := c.String("credentials")
 			var credentials map[string]any
-			if err := json.Unmarshal([]byte(creds), &credentials); err != nil {
-				printError(err, output, "Invalid --credentials JSON")
-				return cli.Exit("", 1)
+
+			if creds != "" {
+				if connType == "" {
+					printError(errors.New("--type is required when --credentials is provided"), output, "Missing required flags")
+					return cli.Exit("", 1)
+				}
+				if err := json.Unmarshal([]byte(creds), &credentials); err != nil {
+					printError(err, output, "Invalid --credentials JSON")
+					return cli.Exit("", 1)
+				}
+			} else {
+				t, cr, err := connectionFromConfig(name, c.String("environment"), c.String("config-file"))
+				if err != nil {
+					printError(err, output, "Failed to read connection from .bruin.yml")
+					return cli.Exit("", 1)
+				}
+				connType, credentials = t, cr
 			}
 
 			// The cloud runner can't read local files, so resolve a local
