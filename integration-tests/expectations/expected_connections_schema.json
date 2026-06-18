@@ -3498,9 +3498,6 @@
       "type": "object",
       "required": [
         "name",
-        "username",
-        "password",
-        "token",
         "domain"
       ]
     },
