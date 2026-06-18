@@ -1,0 +1,70 @@
+# ESPN
+
+[ESPN](https://www.espn.com/) exposes a public Site API that returns JSON for teams, scores, standings, and news across the major US sports plus international soccer.
+
+Bruin supports ESPN as a source for [Ingestr assets](/assets/ingestr), so you can ingest sports data into your data warehouse without an API key.
+
+For the underlying connector reference, see the [ingestr documentation](https://getbruin.com/docs/ingestr/supported-sources/espn.html).
+
+Follow the steps below to set up ESPN as a data source and run ingestion:
+
+## Configuration
+
+### Step 1: Add a connection to .bruin.yml file
+
+ESPN's public endpoints are auth-less, so the connection is purely a routing target — point it at the sport and league you want and reuse it across assets.
+
+```yaml
+    connections:
+      espn:
+        - name: "espn_nfl"
+          sport: "football"
+          league: "nfl"
+        - name: "espn_epl"
+          sport: "soccer"
+          league: "eng.1"
+```
+
+- `name`: Name of the connection.
+- `sport` (optional): ESPN sport slug. Defaults to `football`.
+- `league` (optional): ESPN league slug. Defaults to `nfl`.
+- `base_url` (optional): Overrides the ESPN API base URL. Defaults to `https://site.api.espn.com`.
+
+### Step 2: Create an asset file for data ingestion
+
+```yaml
+name: public.espn_scoreboard
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: espn_nfl
+  source_table: 'scoreboard'
+  destination: postgres
+```
+
+- `name`: Name of the asset.
+- `type`: Always `ingestr` for ESPN.
+- `connection`: Destination connection name.
+- `source_connection`: Name of the ESPN connection defined in `.bruin.yml`.
+- `source_table`: One of the tables listed below.
+
+## Available Source Tables
+
+| Table | PK | Inc Strategy | Details |
+|-------|----|--------------| ------- |
+| `teams` | `id` | replace | Roster snapshot for the configured sport/league. |
+| `scoreboard` | `id` | merge | Events for the interval. `--interval-start` / `--interval-end` map to ESPN's `dates` parameter, and rows accumulate across runs. |
+| `competitors` | `event_id, competition_id, team_id` | merge | One row per competitor per scoreboard event. |
+| `standings` | `league_id, group_id, season, team_id` | replace | Standings snapshot for the current (or `--full-refresh`-selected) season. |
+| `news` | `id` | merge | Latest league news articles. Accumulates across runs. |
+
+Nested ESPN objects are preserved as JSON columns in the destination; schema inference derives types from the actual payload, so column shapes vary across sports and leagues.
+
+### Step 3: [Run](/commands/run) asset to ingest data
+
+```bash
+bruin run ingestr.espn.asset.yml
+```
+
+As a result of this command, Bruin will ingest data from the configured ESPN endpoint into your destination database.

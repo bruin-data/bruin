@@ -45,6 +45,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
+	"github.com/bruin-data/bruin/pkg/espn"
 	fabric "github.com/bruin-data/bruin/pkg/fabric"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fireflies"
@@ -251,6 +252,7 @@ type Manager struct {
 	Vertica              map[string]*vertica.DB
 	CustomerIo           map[string]*customerio.Client
 	Sendgrid             map[string]*sendgrid.Client
+	Espn                 map[string]*espn.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -3101,6 +3103,27 @@ func (m *Manager) AddSendgridConnectionFromConfig(connection *config.SendgridCon
 	return nil
 }
 
+func (m *Manager) AddEspnConnectionFromConfig(connection *config.EspnConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Espn == nil {
+		m.Espn = make(map[string]*espn.Client)
+	}
+
+	client, err := espn.NewClient(espn.Config{
+		Sport:   connection.Sport,
+		League:  connection.League,
+		BaseURL: connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.Espn[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddDuneConnectionFromConfig(connection *config.DuneConnection) error {
 	m.mutex.Lock()
 	if m.Dune == nil {
@@ -3552,6 +3575,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Vertica, connectionManager.AddVerticaConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Espn, connectionManager.AddEspnConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList

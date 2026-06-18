@@ -13,9 +13,5 @@ func (c *Config) GetIngestrURI() string {
 	if c.OnBehalfOf != "" {
 		params.Set("on_behalf_of", c.OnBehalfOf)
 	}
-	uri := url.URL{
-		Scheme:   "sendgrid",
-		RawQuery: params.Encode(),
-	}
-	return uri.String()
+	return "sendgrid://?" + params.Encode()
 }

@@ -1793,6 +1793,17 @@ func (c SendgridConnection) GetName() string {
 	return c.Name
 }
 
+type EspnConnection struct {
+	Name    string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Sport   string `yaml:"sport,omitempty" json:"sport,omitempty" mapstructure:"sport"`
+	League  string `yaml:"league,omitempty" json:"league,omitempty" mapstructure:"league"`
+	BaseURL string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c EspnConnection) GetName() string {
+	return c.Name
+}
+
 type VerticaConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`

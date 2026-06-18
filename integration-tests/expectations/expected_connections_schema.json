@@ -1257,6 +1257,12 @@
           },
           "type": "array"
         },
+        "espn": {
+          "items": {
+            "$ref": "#/$defs/EspnConnection"
+          },
+          "type": "array"
+        },
         "vertica": {
           "items": {
             "$ref": "#/$defs/VerticaConnection"
@@ -1766,6 +1772,27 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "EspnConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sport": {
+          "type": "string"
+        },
+        "league": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
       ]
     },
     "FacebookAdsConnection": {
