@@ -91,8 +91,6 @@ parameters:
 
 > [!NOTE]
 > `:linked` discovers sub-boards by the convention that **an item on the master board has the same title as the sub-board's name**. So if your master board has an item called `Q1 Roadmap` and you also have a board called `Q1 Roadmap`, that board is treated as a linked sub-board and its items are included in the result.
->
-> This is a naming convention, not a real Monday-side relationship — so keep your master item titles and sub-board names in sync. If they ever drift apart (renames, typos, casing), the link is lost without any error and the sub-board's items are silently omitted. After a rename on either side, sanity-check the row count.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 
