@@ -273,6 +273,15 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// Elasticsearch - Search and analytics engine (user-defined indices)
 	"elasticsearch": {},
 
+	// ESPN - Public sports data (auth-less site API)
+	"espn": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "scoreboard", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "competitors", PrimaryKey: "event_id, competition_id, team_id", IncKey: "", IncStrategy: "merge"},
+		{Name: "standings", PrimaryKey: "league_id, group_id, season, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "news", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+	},
+
 	// Facebook Ads - Advertising platform
 	"facebookads": {
 		{Name: "campaigns", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},

@@ -804,6 +804,13 @@ func TestLoadFromFile(t *testing.T) {
 					OnBehalfOf: "test-subuser",
 				},
 			},
+			Espn: []EspnConnection{
+				{
+					Name:   "espn-1",
+					Sport:  "football",
+					League: "nfl",
+				},
+			},
 		},
 	}
 
@@ -2141,6 +2148,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Indeed:              []IndeedConnection{{Name: "indeed1"}},
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
+				Espn:                []EspnConnection{{Name: "espn1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
@@ -2261,6 +2269,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Indeed:              []IndeedConnection{{Name: "indeed1"}},
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
+				Espn:                []EspnConnection{{Name: "espn1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},

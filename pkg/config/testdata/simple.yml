@@ -504,6 +504,10 @@ environments:
         - name: "sendgrid-1"
           api_key: "test-api-key"
           on_behalf_of: "test-subuser"
+      espn:
+        - name: "espn-1"
+          sport: "football"
+          league: "nfl"
 
   prod:
     connections:
