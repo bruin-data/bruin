@@ -1151,6 +1151,22 @@ func (c GCSConnection) GetName() string {
 	return c.Name
 }
 
+type SharePointConnection struct {
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	TenantID     string `yaml:"tenant_id" json:"tenant_id" mapstructure:"tenant_id"`
+	ClientID     string `yaml:"client_id" json:"client_id" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret" json:"client_secret" mapstructure:"client_secret"`
+	Hostname     string `yaml:"hostname" json:"hostname" mapstructure:"hostname"`
+	Site         string `yaml:"site" json:"site" mapstructure:"site"`
+	Library      string `yaml:"library,omitempty" json:"library,omitempty" mapstructure:"library"`
+	MaxFileSize  *int64 `yaml:"max_file_size,omitempty" json:"max_file_size,omitempty" mapstructure:"max_file_size"`
+	MaxFiles     *int64 `yaml:"max_files,omitempty" json:"max_files,omitempty" mapstructure:"max_files"`
+}
+
+func (c SharePointConnection) GetName() string {
+	return c.Name
+}
+
 type KinesisConnection struct {
 	Name            string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
