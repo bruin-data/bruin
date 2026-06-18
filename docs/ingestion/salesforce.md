@@ -39,11 +39,11 @@ connections:
       salesforce:
             - name: "salesforce"
               access_token: "00D...!AQ...your_oauth_access_token"
-              domain: "https://your-domain.my.salesforce.com"
+              domain: "your-domain.my.salesforce.com"
 ```
 
 - `access_token` is an OAuth access token for your Salesforce org. You can obtain one with `sf org auth show-access-token --target-org <salesforce-username>` after logging in via `sf org login web`.
-- `domain` is your Salesforce instance URL (e.g., the `Instance Url` shown by `sf org display`). For sandboxes, use the sandbox My Domain URL.
+- `domain` is your Salesforce instance domain — same field as above. You can pass it either as a host (e.g. `your-domain.my.salesforce.com`) or as a full URL (e.g. `https://your-domain.my.salesforce.com`); both are accepted. For sandboxes, use the sandbox My Domain URL.
 
 When `access_token` is set it takes precedence over `username`/`password`/`token`.
 
