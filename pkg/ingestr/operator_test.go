@@ -231,6 +231,20 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
+			name: "trim whitespace",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "source-table",
+					"destination":       "bigquery",
+					"trim_whitespace":   "true",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log", "--trim-whitespace"},
+		},
+		{
 			name: "duck db source, basic scenario",
 			asset: &pipeline.Asset{
 				Name:       "asset-name",
