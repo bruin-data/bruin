@@ -788,6 +788,38 @@ func TestColumnCheckValue_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestMaterialization_MarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		materialization pipeline.Materialization
+		want            string
+	}{
+		{
+			name: "empty materialization marshals to null",
+			want: "null",
+		},
+		{
+			name: "time granularity only materialization is preserved",
+			materialization: pipeline.Materialization{
+				TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+			},
+			want: `{"type":"","strategy":"","partition_by":"","cluster_by":null,"incremental_key":"","time_granularity":"date"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tt.materialization.MarshalJSON()
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, string(got))
+		})
+	}
+}
+
 func TestColumnCheckValue_MarshalJSON(t *testing.T) {
 	t.Parallel()
 

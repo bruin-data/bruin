@@ -417,7 +417,7 @@ type Materialization struct {
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
-	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" {
+	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" && m.TimeGranularity == "" {
 		return []byte("null"), nil
 	}
 
@@ -2633,9 +2633,9 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 	mergeEmptyStringMapDefaults(&asset.Meta, defaults.Meta)
 	mergeEmptyStringMapDefaults(&asset.Metadata, defaults.Metadata)
 
-	asset.Tags = appendMissingStrings(asset.Tags, defaults.Tags)
-	asset.Domains = appendMissingStrings(asset.Domains, defaults.Domains)
-	asset.Extends = appendMissingPlainStrings(asset.Extends, defaults.Extends)
+	appendMissingStringValues(&asset.Tags, defaults.Tags)
+	appendMissingStringValues(&asset.Domains, defaults.Domains)
+	appendMissingStringValues(&asset.Extends, defaults.Extends)
 	mergeMaterializationDefaults(&asset.Materialization, defaults.Materialization)
 	asset.Upstreams = appendMissingUpstreams(asset.Upstreams, defaults.Upstreams)
 	mergeColumnDefaults(asset, defaults.Columns)
@@ -2715,12 +2715,12 @@ func mergeEmptyStringMapDefaults(target *EmptyStringMap, defaults EmptyStringMap
 	}
 }
 
-func appendMissingStrings(target EmptyStringArray, defaults EmptyStringArray) EmptyStringArray {
+func appendMissingStringValues[S ~[]E, E ~string](target *S, defaults S) {
 	if len(defaults) == 0 {
-		return target
+		return
 	}
-	merged := append(EmptyStringArray(nil), target...)
-	existing := make(map[string]bool, len(merged))
+	merged := append(S(nil), (*target)...)
+	existing := make(map[E]bool, len(merged))
 	for _, value := range merged {
 		existing[value] = true
 	}
@@ -2730,25 +2730,7 @@ func appendMissingStrings(target EmptyStringArray, defaults EmptyStringArray) Em
 			existing[value] = true
 		}
 	}
-	return merged
-}
-
-func appendMissingPlainStrings(target []string, defaults []string) []string {
-	if len(defaults) == 0 {
-		return target
-	}
-	merged := append([]string(nil), target...)
-	existing := make(map[string]bool, len(merged))
-	for _, value := range merged {
-		existing[value] = true
-	}
-	for _, value := range defaults {
-		if !existing[value] {
-			merged = append(merged, value)
-			existing[value] = true
-		}
-	}
-	return merged
+	*target = merged
 }
 
 func mergeMaterializationDefaults(target *Materialization, defaults Materialization) {
@@ -2837,7 +2819,7 @@ func mergeColumnDefault(target *Column, defaults Column, assetName string) {
 	applyStringDefault(&target.SourceColumn, defaults.SourceColumn)
 	applyStringDefault(&target.Type, defaults.Type)
 	applyStringDefault(&target.Description, defaults.Description)
-	target.Tags = appendMissingStrings(target.Tags, defaults.Tags)
+	appendMissingStringValues(&target.Tags, defaults.Tags)
 	if !target.PrimaryKey && defaults.PrimaryKey {
 		target.PrimaryKey = true
 	}
@@ -2863,7 +2845,7 @@ func mergeColumnDefault(target *Column, defaults Column, assetName string) {
 		target.ForeignKey = cloneColumnReference(defaults.ForeignKey)
 	}
 	applyStringDefault(&target.Owner, defaults.Owner)
-	target.Domains = appendMissingStrings(target.Domains, defaults.Domains)
+	appendMissingStringValues(&target.Domains, defaults.Domains)
 	mergeEmptyStringMapDefaults(&target.Meta, defaults.Meta)
 	applyStringDefault(&target.Extends, defaults.Extends)
 	target.Checks = mergeColumnCheckDefaults(target.Checks, defaults.Checks, assetName, target.Name)
