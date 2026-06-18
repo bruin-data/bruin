@@ -192,7 +192,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
 
 	for _, col := range asset.Columns {
-		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+		def := fmt.Sprintf("%s %s", col.Name, col.SQLType())
 		if col.PrimaryKey {
 			def += " PRIMARY KEY"
 		}

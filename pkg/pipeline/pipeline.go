@@ -630,6 +630,30 @@ func (c *Column) HasCheck(check string) bool {
 	return false
 }
 
+// SQLType returns the column's SQL type, augmenting the declared Type with
+// precision/scale or length when those are provided as separate fields and the
+// type does not already encode them. For example, type "decimal" with precision
+// 10 and scale 2 becomes "decimal(10, 2)", and type "varchar" with length 255
+// becomes "varchar(255)". If Type is empty or already parameterized (contains a
+// parenthesis), it is returned unchanged.
+func (c *Column) SQLType() string {
+	t := strings.TrimSpace(c.Type)
+	if t == "" || strings.Contains(t, "(") {
+		return t
+	}
+
+	switch {
+	case c.Precision != nil && c.Scale != nil:
+		return fmt.Sprintf("%s(%d, %d)", t, *c.Precision, *c.Scale)
+	case c.Precision != nil:
+		return fmt.Sprintf("%s(%d)", t, *c.Precision)
+	case c.Length != nil:
+		return fmt.Sprintf("%s(%d)", t, *c.Length)
+	default:
+		return t
+	}
+}
+
 type AssetType string
 
 var AssetTypeConnectionMapping = map[AssetType]string{

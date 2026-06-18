@@ -103,6 +103,15 @@ columns:
     collation: en_US
 ```
 
+### DDL generation
+
+When an asset uses the `ddl` [materialization](./materialization.md) strategy, these fields
+are emitted into the generated `CREATE TABLE` statement: `precision`/`scale`/`length` become
+type modifiers (e.g. `decimal(10, 2)`, `varchar(255)`), and `collation`, `default`, and
+`foreign_key` become column/table clauses. Foreign keys are emitted as `NOT ENFORCED` on
+platforms that only store them as metadata (e.g. BigQuery). Support is currently available
+for PostgreSQL, BigQuery, and Snowflake, and is being extended to the other platforms.
+
 ### Quality Checks
 
 The structure of the quality checks is rather simple:

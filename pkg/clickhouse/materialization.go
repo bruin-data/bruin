@@ -169,8 +169,11 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	primaryKeys := ""
 
 	for _, col := range asset.Columns {
-		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+		def := fmt.Sprintf("%s %s", col.Name, col.SQLType())
 
+		if col.Default != "" {
+			def += " DEFAULT " + col.Default
+		}
 		if col.Description != "" {
 			def += fmt.Sprintf(" COMMENT '%s'", col.Description)
 		}
