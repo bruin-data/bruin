@@ -751,6 +751,22 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// SAP HANA (user-defined tables)
 	"hana": {},
 
+	// SendGrid - Email delivery and marketing platform
+	"sendgrid": {
+		{Name: "messages", PrimaryKey: "msg_id", IncKey: "last_event_time", IncStrategy: "merge"},
+		{Name: "global_stats", PrimaryKey: "date", IncKey: "date", IncStrategy: "merge"},
+		{Name: "bounces", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "blocks", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "invalid_emails", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "spam_reports", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "unsubscribes", PrimaryKey: "email, created", IncKey: "created", IncStrategy: "merge"},
+		{Name: "suppression_groups", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "suppression_group_members", PrimaryKey: "group_id, email", IncKey: "", IncStrategy: "replace"},
+		{Name: "templates", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+		{Name: "lists", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "single_sends", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},
+	},
+
 	// SFTP (user-defined paths)
 	"sftp": {},
 

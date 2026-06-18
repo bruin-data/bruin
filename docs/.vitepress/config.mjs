@@ -343,6 +343,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Salesforce", link: "/ingestion/salesforce"},
                                     {text: "SAP HANA", link: "/ingestion/sap_hana"},
                                     {text: "S3", link: "/ingestion/s3"},
+                                    {text: "SendGrid", link: "/ingestion/sendgrid"},
                                     {text: "SFTP", link: "/ingestion/sftp"},
                                     {text: "Shopify", link: "/ingestion/shopify"},
                                     {text: "Smartsheet", link: "/ingestion/smartsheet"},

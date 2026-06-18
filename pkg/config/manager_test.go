@@ -797,6 +797,13 @@ func TestLoadFromFile(t *testing.T) {
 					Region: "us",
 				},
 			},
+			Sendgrid: []SendgridConnection{
+				{
+					Name:       "sendgrid-1",
+					APIKey:     "test-api-key",
+					OnBehalfOf: "test-subuser",
+				},
+			},
 		},
 	}
 

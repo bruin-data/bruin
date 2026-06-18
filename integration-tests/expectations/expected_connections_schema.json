@@ -1251,6 +1251,12 @@
           },
           "type": "array"
         },
+        "sendgrid": {
+          "items": {
+            "$ref": "#/$defs/SendgridConnection"
+          },
+          "type": "array"
+        },
         "vertica": {
           "items": {
             "$ref": "#/$defs/VerticaConnection"
@@ -3493,6 +3499,25 @@
         "password",
         "token",
         "domain"
+      ]
+    },
+    "SendgridConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "on_behalf_of": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "ShopifyConnection": {
