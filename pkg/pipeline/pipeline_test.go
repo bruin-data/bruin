@@ -2757,3 +2757,28 @@ func TestAsset_FormatContent_DeduplicatesTags(t *testing.T) {
 }
 
 func ptrInt(i int) *int { return &i }
+
+func TestColumn_SQLType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		col  pipeline.Column
+		want string
+	}{
+		{name: "plain type", col: pipeline.Column{Type: "integer"}, want: "integer"},
+		{name: "empty type", col: pipeline.Column{Type: ""}, want: ""},
+		{name: "precision and scale", col: pipeline.Column{Type: "decimal", Precision: ptrInt(10), Scale: ptrInt(2)}, want: "decimal(10, 2)"},
+		{name: "precision only", col: pipeline.Column{Type: "number", Precision: ptrInt(38)}, want: "number(38)"},
+		{name: "length only", col: pipeline.Column{Type: "varchar", Length: ptrInt(255)}, want: "varchar(255)"},
+		{name: "already parameterized type is untouched", col: pipeline.Column{Type: "decimal(5,2)", Precision: ptrInt(10), Scale: ptrInt(2)}, want: "decimal(5,2)"},
+		{name: "no modifiers", col: pipeline.Column{Type: "timestamp"}, want: "timestamp"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.col.SQLType())
+		})
+	}
+}

@@ -222,9 +222,15 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) ([]string, error) {
 			return nil, fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
 		}
 
-		definition := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.Type)
+		definition := fmt.Sprintf("    %s %s", quoteIdentifier(col.Name), col.SQLType())
+		if col.Collation != "" {
+			definition += " COLLATE " + col.Collation
+		}
 		if col.PrimaryKey || !col.Nullable.Bool() {
 			definition += " NOT NULL"
+		}
+		if col.Default != "" {
+			definition += " DEFAULT " + col.Default
 		}
 		columnDefs = append(columnDefs, definition)
 

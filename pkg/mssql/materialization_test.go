@@ -382,3 +382,25 @@ func TestMaterializer_Render(t *testing.T) {
 		})
 	}
 }
+
+func intp(i int) *int { return &i }
+
+func TestColumnMetadataDDL(t *testing.T) {
+	t.Parallel()
+	asset := &pipeline.Asset{
+		Name:            "orders",
+		Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable, Strategy: pipeline.MaterializationStrategyDDL},
+		Columns: []pipeline.Column{
+			{Name: "amount", Type: "numeric", Precision: intp(10), Scale: intp(2), Default: "0"},
+			{Name: "name", Type: "varchar", Length: intp(255), Collation: "en_US"},
+			{Name: "customer_id", Type: "integer", ForeignKey: &pipeline.ColumnReference{Table: "customers", Column: "id"}},
+		},
+	}
+	render, err := NewMaterializer(false).Render(asset, "SELECT 1")
+	require.NoError(t, err)
+	assert.Contains(t, render, "numeric(10, 2)")
+	assert.Contains(t, render, "varchar(255)")
+	assert.Contains(t, render, "DEFAULT 0")
+	assert.Contains(t, render, "COLLATE")
+	assert.Contains(t, render, "REFERENCES")
+}

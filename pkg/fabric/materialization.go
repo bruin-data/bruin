@@ -124,7 +124,7 @@ func buildDDLQuery(asset *pipeline.Asset, _ string) (string, error) {
 			return "", fmt.Errorf("materialization strategy %s requires column %q to have a type", asset.Materialization.Strategy, col.Name)
 		}
 
-		definition := fmt.Sprintf("    %s %s", QuoteIdentifier(col.Name), col.Type)
+		definition := fmt.Sprintf("    %s %s", QuoteIdentifier(col.Name), col.SQLType())
 		if col.PrimaryKey || !col.Nullable.Bool() {
 			definition += " NOT NULL"
 		}
