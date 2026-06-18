@@ -2408,6 +2408,18 @@ func cloudConnectionsAdd() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			// The cloud runner can't read local files, so resolve a local
+			// service_account_file path into the service_account_json content here.
+			if path, ok := credentials["service_account_file"].(string); ok && path != "" {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					printError(err, output, "Failed to read service_account_file")
+					return cli.Exit("", 1)
+				}
+				credentials["service_account_json"] = string(data)
+				delete(credentials, "service_account_file")
+			}
+
 			client, err := newCloudClient(c)
 			if err != nil {
 				printError(err, output, "Failed to create API client")
