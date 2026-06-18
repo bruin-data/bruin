@@ -3514,6 +3514,9 @@
         "token": {
           "type": "string"
         },
+        "access_token": {
+          "type": "string"
+        },
         "domain": {
           "type": "string"
         }
@@ -3522,9 +3525,6 @@
       "type": "object",
       "required": [
         "name",
-        "username",
-        "password",
-        "token",
         "domain"
       ]
     },

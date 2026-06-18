@@ -620,11 +620,12 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Salesforce: []SalesforceConnection{
 				{
-					Name:     "salesforce-1",
-					Username: "username-123",
-					Password: "password-123",
-					Token:    "token-123",
-					Domain:   "mydomain.my.salesforce.com",
+					Name:        "salesforce-1",
+					Username:    "username-123",
+					Password:    "password-123",
+					Token:       "token-123",
+					AccessToken: "access-token-123",
+					Domain:      "mydomain.my.salesforce.com",
 				},
 			},
 			SQLite: []SQLiteConnection{
