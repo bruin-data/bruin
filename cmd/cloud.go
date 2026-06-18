@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	path2 "path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -2411,6 +2412,13 @@ func connectionFromConfig(name, environment, configFile string) (string, map[str
 		return "", nil, fmt.Errorf("failed to serialize connection: %w", err)
 	}
 	delete(credentials, "name")
+
+	// A relative service_account_file in .bruin.yml is relative to the config
+	// file, not the CWD the command runs from. Resolve it against the config dir.
+	if p, ok := credentials["service_account_file"].(string); ok && p != "" && !filepath.IsAbs(p) {
+		credentials["service_account_file"] = filepath.Join(filepath.Dir(configFilePath), p)
+	}
+
 	return connType, credentials, nil
 }
 
