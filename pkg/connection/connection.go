@@ -3114,6 +3114,8 @@ func (m *Manager) AddEspnConnectionFromConfig(connection *config.EspnConnection)
 	client, err := espn.NewClient(espn.Config{
 		Sport:   connection.Sport,
 		League:  connection.League,
+		Season:  connection.Season,
+		Limit:   connection.Limit,
 		BaseURL: connection.BaseURL,
 	})
 	if err != nil {

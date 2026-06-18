@@ -1,10 +1,15 @@
 package espn
 
-import "net/url"
+import (
+	"net/url"
+	"strconv"
+)
 
 type Config struct {
 	Sport   string
 	League  string
+	Season  string
+	Limit   int
 	BaseURL string
 }
 
@@ -15,6 +20,12 @@ func (c *Config) GetIngestrURI() string {
 	}
 	if c.League != "" {
 		params.Set("league", c.League)
+	}
+	if c.Season != "" {
+		params.Set("season", c.Season)
+	}
+	if c.Limit > 0 {
+		params.Set("limit", strconv.Itoa(c.Limit))
 	}
 	if c.BaseURL != "" {
 		params.Set("base_url", c.BaseURL)

@@ -1798,6 +1798,8 @@ type EspnConnection struct {
 	Name    string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Sport   string `yaml:"sport,omitempty" json:"sport,omitempty" mapstructure:"sport"`
 	League  string `yaml:"league,omitempty" json:"league,omitempty" mapstructure:"league"`
+	Season  string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
+	Limit   int    `yaml:"limit,omitempty" json:"limit,omitempty" mapstructure:"limit"`
 	BaseURL string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
 }
 

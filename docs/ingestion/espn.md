@@ -23,12 +23,21 @@ ESPN's public endpoints are auth-less, so the connection is purely a routing tar
         - name: "espn_epl"
           sport: "soccer"
           league: "eng.1"
+        - name: "espn_nba_2025"
+          sport: "basketball"
+          league: "nba"
+          season: "2025"
+          limit: 50
 ```
 
 - `name`: Name of the connection.
 - `sport` (optional): ESPN sport slug. Defaults to `football`.
 - `league` (optional): ESPN league slug. Defaults to `nfl`.
+- `season` (optional): Season year, passed to scoreboard and standings requests. Useful for pinning a connection to a specific historical season.
+- `limit` (optional): Request limit for scoreboard and news. ESPN defaults to `100` when not set.
 - `base_url` (optional): Overrides the ESPN API base URL. Defaults to `https://site.api.espn.com`.
+
+The scoreboard window itself is taken from `--interval-start` / `--interval-end` on the run, which ingestr converts to ESPN's `dates=YYYYMMDD[-YYYYMMDD]` query parameter.
 
 ### Step 2: Create an asset file for data ingestion
 
