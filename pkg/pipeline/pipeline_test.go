@@ -2301,6 +2301,7 @@ func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
 
 	nonDefaultable := map[string]bool{
 		"ID":             true,
+		"Name":           true,
 		"URI":            true,
 		"ExecutableFile": true,
 		"DefinitionFile": true,
@@ -2315,6 +2316,28 @@ func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
 
 		assert.Truef(t, defaultFields[field.Name], "Asset.%s should be represented in DefaultValues or explicitly marked non-defaultable", field.Name)
 	}
+}
+
+func TestDefaultValues_UnmarshalYAMLDoesNotSupportName(t *testing.T) {
+	t.Parallel()
+
+	var p pipeline.Pipeline
+	err := yaml.Unmarshal([]byte(`
+name: test-pipeline
+default:
+  name: should-not-default
+  description: default description
+`), &p)
+	require.NoError(t, err)
+	require.NotNil(t, p.DefaultValues)
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), &pipeline.Asset{}, &p)
+	require.NoError(t, err)
+
+	assert.Empty(t, got.Name)
+	assert.Empty(t, got.ID)
+	assert.Equal(t, "default description", got.Description)
 }
 
 func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T) {
@@ -2359,7 +2382,6 @@ func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T
 	}
 
 	defaults := &pipeline.DefaultValues{
-		Name:        "default-name",
 		Type:        string(pipeline.AssetTypeSnowflakeQuery),
 		Description: "default description",
 		StartDate:   "2024-01-01",

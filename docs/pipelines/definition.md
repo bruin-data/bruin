@@ -434,7 +434,6 @@ Fields:
 
 | Field              | Type                       | Default | Notes                            |
 |--------------------|----------------------------|---------|----------------------------------|
-| name               | String                     | —       | Default asset name when an asset has none |
 | type               | String                     | —       | Default asset type (e.g., "sql") |
 | description        | String                     | —       | Default asset description        |
 | start_date         | String                     | —       | Default asset start date         |
@@ -463,6 +462,9 @@ Fields:
 | rerun_cooldown     | Integer                    | —       | Default retry delay/cooldown     |
 | refresh_restricted | Boolean                    | —       | Default full-refresh restriction |
 | notifications      | Object                     | —       | Default asset notifications      |
+
+Asset identity/runtime fields such as `name`, `uri`, executable file metadata, definition file metadata, and `retries_delay`
+are not supported in pipeline defaults.
 
 Secrets item:
 

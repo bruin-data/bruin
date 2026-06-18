@@ -281,7 +281,6 @@ func assetFromDefaultValues(dv *DefaultValues) *Asset {
 	}
 
 	return &Asset{
-		Name:              dv.Name,
 		Type:              AssetType(dv.Type),
 		Description:       dv.Description,
 		StartDate:         dv.StartDate,
@@ -319,7 +318,6 @@ func copyAssetToDefaultValues(dv *DefaultValues, asset *Asset) {
 		secrets = append(secrets, secretMapping(secret))
 	}
 
-	dv.Name = asset.Name
 	dv.Type = string(asset.Type)
 	dv.Description = asset.Description
 	dv.StartDate = asset.StartDate

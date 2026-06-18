@@ -553,7 +553,6 @@ func buildFullyPopulatedPipelineForVisitorTest() *pipeline.Pipeline {
 		Meta:               map[string]string{"k": "v"},
 		DefaultConnections: map[string]string{"k": "v"},
 		DefaultValues: &pipeline.DefaultValues{
-			Name:        "n",
 			Type:        "type",
 			Description: "desc",
 			StartDate:   "start",

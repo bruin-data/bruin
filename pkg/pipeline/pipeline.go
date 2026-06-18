@@ -1766,7 +1766,6 @@ func (p *Pipeline) UnmarshalJSON(data []byte) error {
 }
 
 type DefaultValues struct {
-	Name              string            `json:"name,omitempty" yaml:"name,omitempty" mapstructure:"name"`
 	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
 	Description       string            `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
 	StartDate         string            `json:"start_date,omitempty" yaml:"start_date,omitempty" mapstructure:"start_date"`
@@ -1809,7 +1808,6 @@ func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	*d = DefaultValues{
-		Name:              asset.Name,
 		Type:              string(asset.Type),
 		Description:       asset.Description,
 		StartDate:         asset.StartDate,
@@ -2602,10 +2600,6 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		return asset, nil
 	}
 
-	if asset.Name == "" && defaults.Name != "" {
-		asset.Name = defaults.Name
-		asset.ID = hash(defaults.Name)
-	}
 	applyStringDefault(&asset.Description, defaults.Description)
 	applyStringDefault(&asset.StartDate, defaults.StartDate)
 	applyStringDefault(&asset.Connection, defaults.Connection)
