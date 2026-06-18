@@ -177,6 +177,7 @@ bruin cloud runs trigger \
 | `--start-date` | str | - | Start date for the run (YYYY-MM-DD) |
 | `--end-date` | str | - | End date for the run (YYYY-MM-DD) |
 | `--asset`, `--assets` | []str | - | Select assets to run by their full name, e.g. `schema.table` (repeatable or comma-separated). |
+| `--downstream` | bool | `false` | Also run everything downstream of the selected `--asset`(s). Requires `--asset`. |
 | `--tag`, `-t` | []str | - | Tag the run (repeatable). A run-level label shown in the Cloud activity log — **not** an asset filter. |
 | `--full-refresh`, `-r` | bool | `false` | Full-refresh the assets in the run: the `--asset` selection if given, otherwise every asset. |
 | `--var` | []str | - | Override pipeline variables, as `key=value` where the value is JSON (strings need quotes, e.g. `'env="prod"'`). Can be used multiple times, or pass one JSON object. |
@@ -200,6 +201,18 @@ bruin cloud runs trigger \
   --project-id <project-id> --pipeline <pipeline-name> \
   --start-date 2024-01-01 --end-date 2024-01-31 \
   --asset analytics.raw_events,analytics.daily_summary
+```
+
+**Include downstream assets.** Add `--downstream` to also run everything that depends on
+the selected `--asset`(s), following the pipeline's dependency graph. It requires
+`--asset`.
+
+```bash
+# Run raw_events and everything downstream of it
+bruin cloud runs trigger \
+  --project-id <project-id> --pipeline <pipeline-name> \
+  --start-date 2024-01-01 --end-date 2024-01-31 \
+  --asset analytics.raw_events --downstream
 ```
 
 **Full refresh.** Pass `--full-refresh` (bare, no value) to truncate assets before

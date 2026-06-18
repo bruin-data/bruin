@@ -210,6 +210,7 @@ func (c *APIClient) GetRun(ctx context.Context, project, pipeline, runID string)
 // TriggerRunOptions holds the optional parameters the trigger endpoint accepts.
 type TriggerRunOptions struct {
 	Assets      []string
+	Downstream  bool
 	FullRefresh bool
 	Split       string
 	ChunkSize   int
@@ -246,6 +247,9 @@ func (c *APIClient) TriggerRun(ctx context.Context, project, pipeline, startDate
 	}
 	if len(opts.Assets) > 0 {
 		body["assets"] = opts.Assets
+	}
+	if opts.Downstream {
+		body["downstream"] = true
 	}
 	if opts.FullRefresh {
 		body["full_refresh"] = true
