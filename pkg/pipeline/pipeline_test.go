@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -2254,6 +2255,191 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestDefaultValues_CoversAssetConfigFields(t *testing.T) {
+	t.Parallel()
+
+	assetType := reflect.TypeOf(pipeline.Asset{})
+	defaultType := reflect.TypeOf(pipeline.DefaultValues{})
+	defaultFields := make(map[string]bool, defaultType.NumField())
+	for i := range defaultType.NumField() {
+		defaultFields[defaultType.Field(i).Name] = true
+	}
+
+	nonDefaultable := map[string]bool{
+		"ID":             true,
+		"URI":            true,
+		"ExecutableFile": true,
+		"DefinitionFile": true,
+		"RetriesDelay":   true,
+	}
+
+	for i := range assetType.NumField() {
+		field := assetType.Field(i)
+		if !field.IsExported() || nonDefaultable[field.Name] {
+			continue
+		}
+
+		assert.Truef(t, defaultFields[field.Name], "Asset.%s should be represented in DefaultValues or explicitly marked non-defaultable", field.Name)
+	}
+}
+
+func TestBuilder_SetupDefaultsFromPipelineAppliesAssetFieldDefaults(t *testing.T) {
+	t.Parallel()
+
+	falseValue := false
+	retries := 3
+	rerunCooldown := 45
+	customCount := int64(1)
+
+	asset := &pipeline.Asset{
+		ID:          hash("asset"),
+		Name:        "asset",
+		Type:        pipeline.AssetTypeBigqueryQuery,
+		Description: "asset description",
+		Tags:        []string{"asset-tag"},
+		Domains:     []string{"asset-domain"},
+		Meta:        pipeline.EmptyStringMap{"shared": "asset", "asset": "yes"},
+		Materialization: pipeline.Materialization{
+			Strategy: pipeline.MaterializationStrategyAppend,
+		},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "asset-upstream"}},
+		Parameters: pipeline.EmptyStringMap{
+			"shared": "asset",
+		},
+		Extends: []string{"asset.extend"},
+		Columns: []pipeline.Column{
+			{
+				Name:        "id",
+				Description: "asset column",
+				Checks: []pipeline.ColumnCheck{
+					{Name: "not_null"},
+				},
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "row_count", Query: "select asset", Value: 1},
+		},
+		Notifications: &pipeline.Notifications{
+			Slack: []pipeline.SlackNotification{{Channel: "#asset"}},
+		},
+	}
+
+	defaults := &pipeline.DefaultValues{
+		Name:        "default-name",
+		Type:        string(pipeline.AssetTypeSnowflakeQuery),
+		Description: "default description",
+		StartDate:   "2024-01-01",
+		Connection:  "default-connection",
+		Tags:        []string{"default-tag", "asset-tag"},
+		Domains:     []string{"default-domain", "asset-domain"},
+		Meta:        pipeline.EmptyStringMap{"shared": "default", "default": "yes"},
+		Materialization: pipeline.Materialization{
+			Type:           pipeline.MaterializationTypeTable,
+			Strategy:       pipeline.MaterializationStrategyCreateReplace,
+			PartitionBy:    "dt",
+			ClusterBy:      []string{"tenant"},
+			IncrementalKey: "updated_at",
+		},
+		Upstreams: []pipeline.Upstream{
+			{Type: "asset", Value: "default-upstream"},
+			{Type: "asset", Value: "asset-upstream"},
+		},
+		Image:      "python:3.12",
+		Instance:   "b1.small",
+		Owner:      "data",
+		Tier:       2,
+		Parameters: map[string]string{"shared": "default", "default": "yes"},
+		Extends:    []string{"default.extend", "asset.extend"},
+		Columns: []pipeline.Column{
+			{
+				Name:        "id",
+				Type:        "integer",
+				Description: "default column",
+				Checks: []pipeline.ColumnCheck{
+					{Name: "unique"},
+					{Name: "not_null", Description: "default not null"},
+				},
+			},
+			{
+				Name: "loaded_at",
+				Type: "timestamp",
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "row_count", Description: "default row count", Query: "select default", Value: 2},
+			{Name: "freshness", Query: "select 0", Count: &customCount},
+		},
+		Metadata: pipeline.EmptyStringMap{"catalog": "default"},
+		Snowflake: pipeline.SnowflakeConfig{
+			Warehouse: "default-wh",
+		},
+		Athena: pipeline.AthenaConfig{
+			Location: "s3://default/results",
+		},
+		Routing: &pipeline.RoutingConfig{
+			EgressGateway: "default-gateway",
+		},
+		IntervalModifiers: pipeline.IntervalModifiers{
+			Start: pipeline.TimeModifier{Days: -1},
+			End:   pipeline.TimeModifier{Days: 1},
+		},
+		RerunCooldown:     &rerunCooldown,
+		Retries:           &retries,
+		RefreshRestricted: &falseValue,
+		Notifications: &pipeline.Notifications{
+			Slack: []pipeline.SlackNotification{{Channel: "#default"}},
+		},
+	}
+
+	builder := &pipeline.Builder{}
+	got, err := builder.SetupDefaultsFromPipeline(t.Context(), asset, &pipeline.Pipeline{DefaultValues: defaults})
+	require.NoError(t, err)
+
+	assert.Equal(t, "asset", got.Name)
+	assert.Empty(t, got.URI)
+	assert.Equal(t, pipeline.AssetTypeBigqueryQuery, got.Type)
+	assert.Equal(t, "asset description", got.Description)
+	assert.Equal(t, "2024-01-01", got.StartDate)
+	assert.Equal(t, "default-connection", got.Connection)
+	assert.Equal(t, []string{"asset-tag", "default-tag"}, []string(got.Tags))
+	assert.Equal(t, []string{"asset-domain", "default-domain"}, []string(got.Domains))
+	assert.Equal(t, pipeline.EmptyStringMap{"shared": "asset", "asset": "yes", "default": "yes"}, got.Meta)
+	assert.Equal(t, pipeline.MaterializationTypeTable, got.Materialization.Type)
+	assert.Equal(t, pipeline.MaterializationStrategyAppend, got.Materialization.Strategy)
+	assert.Equal(t, "dt", got.Materialization.PartitionBy)
+	assert.Equal(t, []string{"tenant"}, got.Materialization.ClusterBy)
+	assert.Equal(t, []pipeline.Upstream{
+		{Type: "asset", Value: "asset-upstream"},
+		{Type: "asset", Value: "default-upstream"},
+	}, got.Upstreams)
+	assert.Equal(t, "python:3.12", got.Image)
+	assert.Equal(t, "b1.small", got.Instance)
+	assert.Equal(t, "data", got.Owner)
+	assert.Equal(t, 2, got.Tier)
+	assert.Equal(t, pipeline.EmptyStringMap{"shared": "asset", "default": "yes"}, got.Parameters)
+	assert.Equal(t, []string{"asset.extend", "default.extend"}, got.Extends)
+	assert.Equal(t, pipeline.EmptyStringMap{"catalog": "default"}, got.Metadata)
+	assert.Equal(t, "default-wh", got.Snowflake.Warehouse)
+	assert.Equal(t, "s3://default/results", got.Athena.Location)
+	assert.Equal(t, &pipeline.RoutingConfig{EgressGateway: "default-gateway"}, got.Routing)
+	assert.Equal(t, &rerunCooldown, got.RerunCooldown)
+	assert.Equal(t, &retries, got.Retries)
+	assert.Equal(t, &falseValue, got.RefreshRestricted)
+	assert.Len(t, got.Columns, 2)
+	assert.Equal(t, "asset column", got.Columns[0].Description)
+	assert.Equal(t, "integer", got.Columns[0].Type)
+	assert.True(t, got.Columns[0].HasCheck("not_null"))
+	assert.True(t, got.Columns[0].HasCheck("unique"))
+	assert.Equal(t, "loaded_at", got.Columns[1].Name)
+	assert.Len(t, got.CustomChecks, 2)
+	assert.Equal(t, "select asset", got.CustomChecks[0].Query)
+	assert.Equal(t, "default row count", got.CustomChecks[0].Description)
+	assert.Equal(t, "freshness", got.CustomChecks[1].Name)
+	assert.Len(t, got.Notifications.Slack, 2)
+	assert.Equal(t, "#asset", got.Notifications.Slack[0].Channel)
+	assert.Equal(t, "#default", got.Notifications.Slack[1].Channel)
 }
 
 func TestBuilder_InjectConnectionAsSecret(t *testing.T) {
