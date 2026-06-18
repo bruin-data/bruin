@@ -381,6 +381,28 @@ func TestTriggerRunWithOptions(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestTriggerRunWithDownstream(t *testing.T) {
+	t.Parallel()
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/trigger-pipeline-run", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		body := readJSON(t, r)
+		assert.Equal(t, []any{"raw_events"}, body["assets"])
+		assert.Equal(t, true, body["downstream"])
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`200`))
+	})
+
+	opts := TriggerRunOptions{
+		Assets:     []string{"raw_events"},
+		Downstream: true,
+	}
+	err := client.TriggerRun(t.Context(), "proj", "pipe", "2026-01-01", "2026-01-31", opts)
+	require.NoError(t, err)
+}
+
 func TestRerunRun(t *testing.T) {
 	t.Parallel()
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

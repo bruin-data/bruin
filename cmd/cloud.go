@@ -793,6 +793,10 @@ func cloudRunsTrigger() *cli.Command {
 				Aliases: []string{"assets"},
 				Usage:   "select specific assets to run by name; repeat or comma-separate for multiple",
 			},
+			&cli.BoolFlag{
+				Name:  "downstream",
+				Usage: "also run everything downstream of the selected --asset(s)",
+			},
 			&cli.StringSliceFlag{
 				Name:    "tag",
 				Aliases: []string{"t"},
@@ -857,8 +861,14 @@ func cloudRunsTrigger() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			if c.Bool("downstream") && len(c.StringSlice("asset")) == 0 {
+				printError(errors.New("--downstream requires --asset"), output, "Invalid flags")
+				return cli.Exit("", 1)
+			}
+
 			opts := bruincloud.TriggerRunOptions{
 				Assets:      c.StringSlice("asset"),
+				Downstream:  c.Bool("downstream"),
 				FullRefresh: c.Bool("full-refresh"),
 				Split:       split,
 				ChunkSize:   chunkSize,
