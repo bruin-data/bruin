@@ -810,6 +810,8 @@ func TestLoadFromFile(t *testing.T) {
 					Name:   "espn-1",
 					Sport:  "football",
 					League: "nfl",
+					Season: "2026",
+					Limit:  50,
 				},
 			},
 		},
