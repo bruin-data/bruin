@@ -797,6 +797,13 @@ func TestLoadFromFile(t *testing.T) {
 					Region: "us",
 				},
 			},
+			Sendgrid: []SendgridConnection{
+				{
+					Name:       "sendgrid-1",
+					APIKey:     "test-api-key",
+					OnBehalfOf: "test-subuser",
+				},
+			},
 		},
 	}
 
@@ -2133,6 +2140,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Primer:              []PrimerConnection{{Name: "primer1"}},
 				Indeed:              []IndeedConnection{{Name: "indeed1"}},
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
+				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
@@ -2252,6 +2260,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Primer:              []PrimerConnection{{Name: "primer1"}},
 				Indeed:              []IndeedConnection{{Name: "indeed1"}},
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
+				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
