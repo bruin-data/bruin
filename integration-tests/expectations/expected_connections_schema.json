@@ -1785,6 +1785,12 @@
         "league": {
           "type": "string"
         },
+        "season": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
         "base_url": {
           "type": "string"
         }

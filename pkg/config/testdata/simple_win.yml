@@ -510,6 +510,8 @@ environments:
         - name: "espn-1"
           sport: "football"
           league: "nfl"
+          season: "2026"
+          limit: 50
 
   prod:
     connections:
