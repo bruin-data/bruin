@@ -19,9 +19,8 @@ func (c *Config) GetIngestrURI() string {
 	if c.BaseURL != "" {
 		params.Set("base_url", c.BaseURL)
 	}
-	uri := url.URL{
-		Scheme:   "espn",
-		RawQuery: params.Encode(),
+	if len(params) == 0 {
+		return "espn://"
 	}
-	return uri.String()
+	return "espn://?" + params.Encode()
 }
