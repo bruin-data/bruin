@@ -57,6 +57,106 @@ func Test_uvPythonRunner_ingestrLoaderFileFormat(t *testing.T) {
 	}
 }
 
+func TestConsolidatedParameters_IngestrFlagPassthrough(t *testing.T) {
+	t.Parallel()
+
+	asset := &pipeline.Asset{
+		Parameters: map[string]string{
+			"incremental_key":      "updated_at",
+			"incremental_strategy": "merge",
+			"partition_by":         "event_date",
+			"cluster_by":           "account_id",
+			"schema_contract":      "freeze",
+			"schema_naming":        "snake_case",
+			"page_size":            "1000",
+			"loader_file_size":     "2000",
+			"extract_parallelism":  "7",
+			"sql_reflection_level": "full",
+			"sql_limit":            "500",
+			"sql_exclude_columns":  "internal_notes",
+			"mask":                 "email:hash",
+			"pipelines_dir":        ".ingestr",
+			"staging_bucket":       "gs://bucket/path",
+			"staging_dataset":      "scratch",
+			"flush_interval":       "10s",
+			"flush_records":        "10000",
+			"sql_backend":          "sqlalchemy",
+			"loader_file_format":   "parquet",
+			"no_inference":         "true",
+			"trim_whitespace":      "true",
+			"stream":               "true",
+		},
+	}
+
+	result, err := ConsolidatedParameters(t.Context(), asset, []string{"--existing"}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"--existing",
+		"--incremental-key", "updated_at",
+		"--incremental-strategy", "merge",
+		"--partition-by", "event_date",
+		"--cluster-by", "account_id",
+		"--schema-contract", "freeze",
+		"--schema-naming", "snake_case",
+		"--page-size", "1000",
+		"--loader-file-size", "2000",
+		"--extract-parallelism", "7",
+		"--sql-reflection-level", "full",
+		"--sql-limit", "500",
+		"--sql-exclude-columns", "internal_notes",
+		"--mask", "email:hash",
+		"--pipelines-dir", ".ingestr",
+		"--staging-bucket", "gs://bucket/path",
+		"--staging-dataset", "scratch",
+		"--flush-interval", "10s",
+		"--flush-records", "10000",
+		"--sql-backend", "sqlalchemy",
+		"--loader-file-format", "parquet",
+		"--no-inference",
+		"--trim-whitespace",
+		"--stream",
+	}, result)
+}
+
+func TestConsolidatedParameters_TrimWhitespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		params   map[string]string
+		expected []string
+	}{
+		{
+			name: "true appends trim whitespace flag",
+			params: map[string]string{
+				"trim_whitespace": "true",
+			},
+			expected: []string{"--existing", "--trim-whitespace"},
+		},
+		{
+			name: "false does not append trim whitespace flag",
+			params: map[string]string{
+				"trim_whitespace": "false",
+			},
+			expected: []string{"--existing"},
+		},
+		{
+			name:     "missing does not append trim whitespace flag",
+			params:   map[string]string{},
+			expected: []string{"--existing"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := ConsolidatedParameters(t.Context(), &pipeline.Asset{Parameters: tt.params}, []string{"--existing"}, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestColumnHints(t *testing.T) {
 	t.Parallel()
 

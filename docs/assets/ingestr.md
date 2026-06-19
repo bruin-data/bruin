@@ -46,8 +46,24 @@ parameters:
   version: v0 | v1 | v1.x.y
   incremental_strategy: replace | append | merge | delete+insert
   incremental_key: string
+  schema_contract: evolve | freeze | discard_row | discard_value
+  schema_naming: auto | direct | snake_case
   sql_backend: pyarrow | sqlalchemy
+  page_size: integer
   loader_file_format: jsonl | csv | parquet
+  loader_file_size: integer
+  extract_parallelism: integer
+  sql_limit: integer
+  sql_exclude_columns: string
+  no_inference: true|false
+  mask: string
+  trim_whitespace: true|false
+  pipelines_dir: string
+  staging_bucket: string
+  staging_dataset: string
+  stream: true|false
+  flush_interval: string
+  flush_records: integer
   enforce_schema: true|false # Will ensure that the columns defined in the asset are present in the destination and with the desired types (see https://getbruin.com/docs/bruin/assets/columns.html)
 ```
 
@@ -66,15 +82,25 @@ parameters:
 | `incremental_key` | No | `--incremental-key` | Column that determines incremental progress. When the column is defined with type `date`, Bruin also forwards it through the `--columns` option so Ingestr treats it as a date field. |
 | `partition_by` | No | `--partition-by` | Comma-separated list of destination columns to partition by. |
 | `cluster_by` | No | `--cluster-by` | Comma-separated list of destination clustering keys. |
+| `schema_contract` | No | `--schema-contract` | Controls how Ingestr handles schema changes (`evolve`, `freeze`, `discard_row`, `discard_value`). |
 | `loader_file_format` | No | `--loader-file-format` | Overrides the loader file format (`jsonl`, `csv`, `parquet`). |
 | `loader_file_size` | No | `--loader-file-size` | Sets the maximum loader file size accepted by Ingestr. |
 | `sql_backend` | No | `--sql-backend` | Selects the SQL backend Ingestr should use (`pyarrow` or `sqlalchemy`). |
 | `schema_naming` | No | `--schema-naming` | Controls how Ingestr normalizes schema names. Accepted values match the [Ingestr CLI.](https://getbruin.com/docs/ingestr/commands/ingest.html#optional-flags) |
+| `page_size` | No | `--page-size` | Sets the fetch page size for SQL sources. |
 | `extract_parallelism` | No | `--extract-parallelism` | Limits the number of concurrent extraction workers. |
 | `sql_reflection_level` | No | `--sql-reflection-level` | Tunes the amount of schema reflection performed against the source. |
 | `sql_limit` | No | `--sql-limit` | Applies a `LIMIT` clause when extracting from the source. |
 | `sql_exclude_columns` | No | `--sql-exclude-columns` | List of columns to skip during extraction. |
+| `no_inference` | No | `--no-inference` | Uses `columns` as the source schema for schema-less sources instead of inferring types. |
+| `mask` | No | `--mask` | Adds a column masking rule such as `email:hash`. |
+| `pipelines_dir` | No | `--pipelines-dir` | Directory where Ingestr stores pipeline metadata. |
 | `staging_bucket` | No | `--staging-bucket` | Overrides the staging bucket that Ingestr uses for intermediate files. |
+| `staging_dataset` | No | `--staging-dataset` | Dataset/schema to use for staging tables. |
+| `trim_whitespace` | No | `--trim-whitespace` | Trims leading and trailing whitespace from extracted string values when set to `true`. |
+| `stream` | No | `--stream` | Enables continuous ingestion for CDC and message-broker sources. |
+| `flush_interval` | No | `--flush-interval` | Flush interval for streaming mode, such as `30s`. |
+| `flush_records` | No | `--flush-records` | Number of buffered records that triggers a flush in streaming mode. |
 | `enforce_schema` | No | `--columns` | When set to `true`, enforces the column types defined in the asset's `columns` section. Ingestr will create or update the destination table with the specified schema. |
 
 ### Column metadata
