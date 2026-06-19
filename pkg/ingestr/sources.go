@@ -779,6 +779,15 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 	// SFTP (user-defined paths)
 	"sftp": {},
 
+	// SharePoint (user-defined document library paths)
+	"sharepoint": {
+		{Name: "<path/to/file.xlsx>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.xlsx>#sheet=<sheet_name>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.xlsx>#sheets=<sheet_a>|<sheet_b>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/files/*.xlsx>#sheets=<sheet_a>|<sheet_b>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.csv>#csv,encoding=utf-16le,sep=tab", PrimaryKey: "_source_file,_row_idx", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Shopify - E-commerce
 	"shopify": {
 		{Name: "orders", PrimaryKey: "id", IncKey: "updated_at", IncStrategy: "merge"},

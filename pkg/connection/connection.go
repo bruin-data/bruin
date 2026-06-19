@@ -108,6 +108,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/sendgrid"
 	"github.com/bruin-data/bruin/pkg/sftp"
+	"github.com/bruin-data/bruin/pkg/sharepoint"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/smartsheet"
@@ -179,6 +180,7 @@ type Manager struct {
 	GoogleSheets         map[string]*gsheets.Client
 	Chess                map[string]*chess.Client
 	S3                   map[string]*s3.Client
+	SharePoint           map[string]*sharepoint.Client
 	Slack                map[string]*slack.Client
 	Socrata              map[string]*socrata.Client
 	Asana                map[string]*asana.Client
@@ -797,6 +799,36 @@ func (m *Manager) AddWistiaConnectionFromConfig(connection *config.WistiaConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Wistia[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddSharePointConnectionFromConfig(connection *config.SharePointConnection) error {
+	m.mutex.Lock()
+	if m.SharePoint == nil {
+		m.SharePoint = make(map[string]*sharepoint.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sharepoint.NewClient(sharepoint.Config{
+		TenantID:     connection.TenantID,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		Hostname:     connection.Hostname,
+		Site:         connection.Site,
+		Library:      connection.Library,
+		MaxFileSize:  connection.MaxFileSize,
+		MaxFiles:     connection.MaxFiles,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SharePoint[connection.Name] = client
 	m.availableConnections[connection.Name] = client
 	m.AllConnectionDetails[connection.Name] = connection
 
@@ -3540,6 +3572,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Wise, connectionManager.AddWiseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Wistia, connectionManager.AddWistiaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.SharePoint, connectionManager.AddSharePointConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DataprocServerless, connectionManager.AddDataprocServerlessConnectionFromConfig, &wg, &errList, &mu)

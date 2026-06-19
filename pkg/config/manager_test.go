@@ -28,6 +28,8 @@ func TestLoadFromFile(t *testing.T) {
 	}
 
 	clickhouseSecureValue := 0
+	sharePointMaxFileSize := int64(104857600)
+	sharePointMaxFiles := int64(10000)
 
 	devEnv := Environment{
 		Connections: &Connections{
@@ -814,6 +816,19 @@ func TestLoadFromFile(t *testing.T) {
 					Limit:  50,
 				},
 			},
+			SharePoint: []SharePointConnection{
+				{
+					Name:         "sharepoint-1",
+					TenantID:     "test-tenant-id",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					Hostname:     "example.sharepoint.com",
+					Site:         "sites/Example",
+					Library:      "Documents",
+					MaxFileSize:  &sharePointMaxFileSize,
+					MaxFiles:     &sharePointMaxFiles,
+				},
+			},
 		},
 	}
 
@@ -1287,6 +1302,21 @@ func TestConfig_AddConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Add SharePoint connection",
+			envName:  "default",
+			connType: "sharepoint",
+			connName: "sharepoint-conn",
+			creds: map[string]interface{}{
+				"tenant_id":     "tenant-id",
+				"client_id":     "client-id",
+				"client_secret": "client-secret",
+				"hostname":      "example.sharepoint.com",
+				"site":          "sites/Example",
+				"library":       "Documents",
+			},
+			expectedErr: false,
+		},
+		{
 			name:        "Add Invalid connection",
 			envName:     "default",
 			connType:    "invalid",
@@ -1374,6 +1404,15 @@ func TestConfig_AddConnection(t *testing.T) {
 					assert.Equal(t, tt.creds["client_id"], env.Connections.Fabric[0].ClientID)
 					assert.Equal(t, tt.creds["client_secret"], env.Connections.Fabric[0].ClientSecret)
 					assert.Equal(t, tt.creds["tenant_id"], env.Connections.Fabric[0].TenantID)
+				case "sharepoint":
+					assert.Len(t, env.Connections.SharePoint, 1)
+					assert.Equal(t, tt.connName, env.Connections.SharePoint[0].Name)
+					assert.Equal(t, tt.creds["tenant_id"], env.Connections.SharePoint[0].TenantID)
+					assert.Equal(t, tt.creds["client_id"], env.Connections.SharePoint[0].ClientID)
+					assert.Equal(t, tt.creds["client_secret"], env.Connections.SharePoint[0].ClientSecret)
+					assert.Equal(t, tt.creds["hostname"], env.Connections.SharePoint[0].Hostname)
+					assert.Equal(t, tt.creds["site"], env.Connections.SharePoint[0].Site)
+					assert.Equal(t, tt.creds["library"], env.Connections.SharePoint[0].Library)
 				}
 			}
 		})
@@ -1448,6 +1487,25 @@ func TestDeleteConnection(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name:     "Delete existing SharePoint connection",
+			envName:  "default",
+			connName: "sharepoint-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								SharePoint: []SharePointConnection{
+									{Name: "sharepoint-conn", TenantID: "tenant-id", ClientID: "client-id", ClientSecret: "secret", Hostname: "example.sharepoint.com", Site: "sites/Example"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
 			name:     "Delete non-existent connection",
 			envName:  "staging",
 			connName: "non-existent-conn",
@@ -1495,6 +1553,8 @@ func TestDeleteConnection(t *testing.T) {
 					assert.Empty(t, env.Connections.AwsConnection)
 				case "fabric-conn":
 					assert.Empty(t, env.Connections.Fabric)
+				case "sharepoint-conn":
+					assert.Empty(t, env.Connections.SharePoint)
 				}
 
 				assert.False(t, env.Connections.Exists(tt.connName))
@@ -2103,6 +2163,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
 				Linear:              []LinearConnection{{Name: "linear1"}},
 				GCS:                 []GCSConnection{{Name: "gcs1"}},
+				SharePoint:          []SharePointConnection{{Name: "sharepoint1"}},
 				ApplovinMax:         []ApplovinMaxConnection{{Name: "applovinmax1"}},
 				Personio:            []PersonioConnection{{Name: "personio1"}},
 				Kinesis:             []KinesisConnection{{Name: "kinesis1"}},
@@ -2224,6 +2285,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				RevenueCat:          []RevenueCatConnection{{Name: "revenuecat1"}},
 				Linear:              []LinearConnection{{Name: "linear1"}},
 				GCS:                 []GCSConnection{{Name: "gcs1"}},
+				SharePoint:          []SharePointConnection{{Name: "sharepoint1"}},
 				ApplovinMax:         []ApplovinMaxConnection{{Name: "applovinmax1"}},
 				Personio:            []PersonioConnection{{Name: "personio1"}},
 				Kinesis:             []KinesisConnection{{Name: "kinesis1"}},
