@@ -86,6 +86,16 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "creatives", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// API-Football - Soccer data from API-SPORTS (api-sports.io), supports any league/season
+	"apifootball": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "stadiums", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "group_standings", PrimaryKey: "league_id, season, group_name, team_id", IncKey: "", IncStrategy: "merge"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "players", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "event_key", IncKey: "", IncStrategy: "merge"},
+	},
+
 	// football-data.org - FIFA World Cup soccer data
 	"footballdata": {
 		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},

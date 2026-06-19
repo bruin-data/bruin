@@ -1823,6 +1823,19 @@ func (c EspnConnection) GetName() string {
 	return c.Name
 }
 
+type APIFootballConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey   string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	League   string `yaml:"league,omitempty" json:"league,omitempty" mapstructure:"league"`
+	Season   string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
+	Timezone string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
+	BaseURL  string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c APIFootballConnection) GetName() string {
+	return c.Name
+}
+
 type FootballDataConnection struct {
 	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	APIKey         string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`

@@ -277,6 +277,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                                     {text: "Airtable", link: "/ingestion/airtable"},
                                     {text: "Anthropic", link: "/ingestion/anthropic"},
                                     {text: "Allium", link: "/ingestion/allium"},
+                                    {text: "API-Football", link: "/ingestion/api-football"},
                                     {text: "Apple Ads", link: "/ingestion/apple-ads"},
                                     {text: "AppStore", link: "/ingestion/appstore"},
                                     {text: "AppLovin", link: "/ingestion/applovin"},

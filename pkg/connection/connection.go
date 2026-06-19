@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/allium"
 	"github.com/bruin-data/bruin/pkg/anthropic"
+	"github.com/bruin-data/bruin/pkg/apifootball"
 	"github.com/bruin-data/bruin/pkg/appleads"
 	"github.com/bruin-data/bruin/pkg/applovin"
 	"github.com/bruin-data/bruin/pkg/applovinmax"
@@ -256,6 +257,7 @@ type Manager struct {
 	CustomerIo           map[string]*customerio.Client
 	Sendgrid             map[string]*sendgrid.Client
 	Espn                 map[string]*espn.Client
+	APIFootball          map[string]*apifootball.Client
 	FootballData         map[string]*footballdata.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
@@ -3161,6 +3163,29 @@ func (m *Manager) AddEspnConnectionFromConfig(connection *config.EspnConnection)
 	return nil
 }
 
+func (m *Manager) AddAPIFootballConnectionFromConfig(connection *config.APIFootballConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.APIFootball == nil {
+		m.APIFootball = make(map[string]*apifootball.Client)
+	}
+
+	client, err := apifootball.NewClient(apifootball.Config{
+		APIKey:   connection.APIKey,
+		League:   connection.League,
+		Season:   connection.Season,
+		Timezone: connection.Timezone,
+		BaseURL:  connection.BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+	m.APIFootball[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddFootballDataConnectionFromConfig(connection *config.FootballDataConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -3644,6 +3669,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.CustomerIo, connectionManager.AddCustomerIoConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Espn, connectionManager.AddEspnConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.APIFootball, connectionManager.AddAPIFootballConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.FootballData, connectionManager.AddFootballDataConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
