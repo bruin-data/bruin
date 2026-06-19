@@ -86,6 +86,45 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "creatives", PrimaryKey: "", IncKey: "", IncStrategy: "replace"},
 	},
 
+	// API-Football - Soccer data from API-SPORTS (api-sports.io), supports any league/season
+	"apifootball": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "stadiums", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "group_standings", PrimaryKey: "league_id, season, group_name, team_id", IncKey: "", IncStrategy: "merge"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "players", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "event_key", IncKey: "", IncStrategy: "merge"},
+	},
+
+	// football-data.org - FIFA World Cup soccer data
+	"footballdata": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "stadiums", PrimaryKey: "venue_key", IncKey: "", IncStrategy: "replace"},
+		{Name: "group_standings", PrimaryKey: "competition_id, season_id, stage, standing_type, group_name, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "players", PrimaryKey: "team_id, id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "event_key", IncKey: "", IncStrategy: "merge"},
+	},
+
+	// BallDontLie - FIFA World Cup data
+	"balldontlie": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "stadiums", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "group_standings", PrimaryKey: "season_year, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "players", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "rosters", PrimaryKey: "season_year, team_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_lineups", PrimaryKey: "match_id, team_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "player_match_stats", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "team_match_stats", PrimaryKey: "match_id, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_shots", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_momentum", PrimaryKey: "match_id, minute", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_best_players", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_avg_positions", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_team_form", PrimaryKey: "match_id, team_id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Apple Ads - Apple Search Ads campaign management
 	"appleads": {
 		{Name: "campaigns", PrimaryKey: "orgId,id", IncKey: "modificationTime", IncStrategy: "merge"},
@@ -778,6 +817,15 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 
 	// SFTP (user-defined paths)
 	"sftp": {},
+
+	// SharePoint (user-defined document library paths)
+	"sharepoint": {
+		{Name: "<path/to/file.xlsx>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.xlsx>#sheet=<sheet_name>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.xlsx>#sheets=<sheet_a>|<sheet_b>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/files/*.xlsx>#sheets=<sheet_a>|<sheet_b>", PrimaryKey: "_source_file,_sheet_name,_row_idx", IncKey: "", IncStrategy: "replace"},
+		{Name: "<path/to/file.csv>#csv,encoding=utf-16le,sep=tab", PrimaryKey: "_source_file,_row_idx", IncKey: "", IncStrategy: "replace"},
+	},
 
 	// Shopify - E-commerce
 	"shopify": {

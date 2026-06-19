@@ -512,6 +512,30 @@ environments:
           league: "nfl"
           season: "2026"
           limit: 50
+      sharepoint:
+        - name: "sharepoint-1"
+          tenant_id: "test-tenant-id"
+          client_id: "test-client-id"
+          client_secret: "test-client-secret"
+          hostname: "example.sharepoint.com"
+          site: "sites/Example"
+          library: "Documents"
+          max_file_size: 104857600
+          max_files: 10000
+      apifootball:
+        - name: "apifootball-1"
+          api_key: "test-api-key"
+          league: "1"
+          season: "2026"
+      footballdata:
+        - name: "footballdata-1"
+          api_key: "test-api-key"
+          competition: "WC"
+          season: "2026"
+      balldontlie:
+        - name: "balldontlie-1"
+          api_key: "test-api-key"
+          season: "2026"
 
   prod:
     connections:

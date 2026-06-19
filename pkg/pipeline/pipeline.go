@@ -417,7 +417,7 @@ type Materialization struct {
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
-	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" {
+	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" && m.TimeGranularity == "" {
 		return []byte("null"), nil
 	}
 
@@ -807,7 +807,7 @@ type Upstream struct {
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
-	isAsset := u.Type == "" || u.Type == "asset"
+	isAsset := u.Type == "" || u.Type == selectorAssetDependencyType
 	if u.Mode == UpstreamModeFull && isAsset {
 		return u.Value, nil
 	}
@@ -815,7 +815,7 @@ func (u Upstream) MarshalYAML() (interface{}, error) {
 	val := map[string]any{}
 	id := "uri"
 	if isAsset {
-		id = "asset"
+		id = selectorAssetDependencyType
 	}
 	val[id] = u.Value
 
@@ -1068,7 +1068,7 @@ func (a *Asset) AddUpstream(asset *Asset) {
 	}
 
 	a.Upstreams = append(a.Upstreams, Upstream{
-		Type:  "asset",
+		Type:  selectorAssetDependencyType,
 		Value: asset.Name,
 		Mode:  UpstreamModeFull,
 	})
@@ -1091,7 +1091,7 @@ func (a *Asset) PrefixUpstreams(prefix string) {
 	}
 
 	for i, u := range a.Upstreams {
-		if u.Type != "asset" {
+		if u.Type != selectorAssetDependencyType {
 			continue
 		}
 
@@ -1767,12 +1767,78 @@ func (p *Pipeline) UnmarshalJSON(data []byte) error {
 
 type DefaultValues struct {
 	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
+	Description       string            `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
+	StartDate         string            `json:"start_date,omitempty" yaml:"start_date,omitempty" mapstructure:"start_date"`
+	Connection        string            `json:"connection,omitempty" yaml:"connection,omitempty" mapstructure:"connection"`
+	Tags              EmptyStringArray  `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains           EmptyStringArray  `json:"domains,omitempty" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta              EmptyStringMap    `json:"meta,omitempty" yaml:"meta,omitempty" mapstructure:"meta"`
+	Materialization   Materialization   `json:"materialization,omitempty" yaml:"materialization,omitempty" mapstructure:"materialization"`
+	Upstreams         []Upstream        `json:"upstreams,omitempty" yaml:"depends,omitempty" mapstructure:"depends"`
+	Image             string            `json:"image,omitempty" yaml:"image,omitempty" mapstructure:"image"`
+	Instance          string            `json:"instance,omitempty" yaml:"instance,omitempty" mapstructure:"instance"`
+	Owner             string            `json:"owner,omitempty" yaml:"owner,omitempty" mapstructure:"owner"`
+	Tier              int               `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
 	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
 	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	Extends           []string          `json:"extends,omitempty" yaml:"extends,omitempty" mapstructure:"extends"`
+	Columns           []Column          `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks      []CustomCheck     `json:"custom_checks,omitempty" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
 	Hooks             Hooks             `json:"hooks" yaml:"hooks" mapstructure:"hooks"`
+	Metadata          EmptyStringMap    `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Snowflake         SnowflakeConfig   `json:"snowflake,omitempty" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
+	Athena            AthenaConfig      `json:"athena,omitempty" yaml:"athena,omitempty" mapstructure:"athena"`
 	Routing           *RoutingConfig    `json:"routing,omitempty" yaml:"routing,omitempty" mapstructure:"routing"`
 	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 	RerunCooldown     *int              `json:"rerun_cooldown,omitempty" yaml:"rerun_cooldown,omitempty" mapstructure:"rerun_cooldown"`
+	Retries           *int              `json:"retries,omitempty" yaml:"retries,omitempty" mapstructure:"retries"`
+	RefreshRestricted *bool             `json:"refresh_restricted,omitempty" yaml:"refresh_restricted,omitempty" mapstructure:"refresh_restricted"`
+	Notifications     *Notifications    `json:"notifications,omitempty" yaml:"notifications,omitempty" mapstructure:"notifications"`
+}
+
+func (d *DefaultValues) UnmarshalYAML(value *yaml.Node) error {
+	var definition taskDefinition
+	if err := value.Decode(&definition); err != nil {
+		return err
+	}
+
+	asset, err := taskDefinitionToAsset(definition)
+	if err != nil {
+		return err
+	}
+
+	*d = DefaultValues{
+		Type:              string(asset.Type),
+		Description:       asset.Description,
+		StartDate:         asset.StartDate,
+		Connection:        asset.Connection,
+		Tags:              asset.Tags,
+		Domains:           asset.Domains,
+		Meta:              asset.Meta,
+		Materialization:   asset.Materialization,
+		Upstreams:         asset.Upstreams,
+		Image:             asset.Image,
+		Instance:          asset.Instance,
+		Owner:             asset.Owner,
+		Tier:              asset.Tier,
+		Parameters:        asset.Parameters,
+		Secrets:           definition.Secrets,
+		Extends:           asset.Extends,
+		Columns:           asset.Columns,
+		CustomChecks:      asset.CustomChecks,
+		Hooks:             asset.Hooks,
+		Metadata:          asset.Metadata,
+		Snowflake:         asset.Snowflake,
+		Athena:            asset.Athena,
+		Routing:           asset.Routing,
+		IntervalModifiers: asset.IntervalModifiers,
+		RerunCooldown:     asset.RerunCooldown,
+		Retries:           asset.Retries,
+		RefreshRestricted: asset.RefreshRestricted,
+		Notifications:     asset.Notifications,
+	}
+
+	return nil
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -2294,7 +2360,7 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 				upstream.Mode = UpstreamModeFull
 			}
 
-			if upstream.Type != "asset" {
+			if upstream.Type != selectorAssetDependencyType {
 				continue
 			}
 			u, ok := pipeline.tasksByName[upstream.Value]
@@ -2525,7 +2591,8 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		return asset, nil
 	}
 
-	if foundPipeline.DefaultValues == nil {
+	defaults := foundPipeline.DefaultValues
+	if defaults == nil {
 		return asset, nil
 	}
 
@@ -2533,8 +2600,17 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		return asset, nil
 	}
 
-	if len(asset.Type) == 0 && len(foundPipeline.DefaultValues.Type) > 0 {
-		asset.Type = AssetType(foundPipeline.DefaultValues.Type)
+	applyStringDefault(&asset.Description, defaults.Description)
+	applyStringDefault(&asset.StartDate, defaults.StartDate)
+	applyStringDefault(&asset.Connection, defaults.Connection)
+	applyStringDefault(&asset.Image, defaults.Image)
+	applyStringDefault(&asset.Instance, defaults.Instance)
+	applyStringDefault(&asset.Owner, defaults.Owner)
+	if asset.Tier == 0 && defaults.Tier != 0 {
+		asset.Tier = defaults.Tier
+	}
+	if len(asset.Type) == 0 && len(defaults.Type) > 0 {
+		asset.Type = AssetType(defaults.Type)
 	}
 
 	// merge parameters from the default values to asset parameters
@@ -2542,44 +2618,635 @@ func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		asset.Parameters = EmptyStringMap{}
 	}
 
-	for key, value := range foundPipeline.DefaultValues.Parameters {
+	for key, value := range defaults.Parameters {
 		if _, exists := asset.Parameters[key]; !exists {
 			asset.Parameters[key] = value
 		}
 	}
+
+	mergeEmptyStringMapDefaults(&asset.Meta, defaults.Meta)
+	mergeEmptyStringMapDefaults(&asset.Metadata, defaults.Metadata)
+
+	appendMissingStringValues(&asset.Tags, defaults.Tags)
+	appendMissingStringValues(&asset.Domains, defaults.Domains)
+	appendMissingStringValues(&asset.Extends, defaults.Extends)
+	mergeMaterializationDefaults(&asset.Materialization, defaults.Materialization)
+	asset.Upstreams = appendMissingUpstreams(asset.Upstreams, defaults.Upstreams)
+	mergeColumnDefaults(asset, defaults.Columns)
+	mergeCustomCheckDefaults(asset, defaults.CustomChecks)
+	if asset.Name != "" {
+		refreshAssetCheckIDs(asset)
+	}
+
 	// merge secrets from the default values to asset secrets
 	existingSecrets := make(map[string]bool)
 	for _, secret := range asset.Secrets {
 		existingSecrets[secret.SecretKey] = true
 	}
-	for _, secret := range foundPipeline.DefaultValues.Secrets {
+	for _, secret := range defaults.Secrets {
 		secretMap := SecretMapping(secret)
 		if !existingSecrets[secretMap.SecretKey] {
 			asset.Secrets = append(asset.Secrets, secretMap)
 		}
 	}
 	if (asset.IntervalModifiers.Start == TimeModifier{}) {
-		asset.IntervalModifiers.Start = foundPipeline.DefaultValues.IntervalModifiers.Start
+		asset.IntervalModifiers.Start = defaults.IntervalModifiers.Start
 	}
 	if (asset.IntervalModifiers.End == TimeModifier{}) {
-		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
+		asset.IntervalModifiers.End = defaults.IntervalModifiers.End
 	}
 	acceptsDefaultHooks := assetAcceptsDefaultHooks(asset)
 	if acceptsDefaultHooks && len(asset.Hooks.Pre) == 0 {
-		asset.Hooks.Pre = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Pre...)
+		asset.Hooks.Pre = append([]Hook(nil), defaults.Hooks.Pre...)
 	}
 	if acceptsDefaultHooks && len(asset.Hooks.Post) == 0 {
-		asset.Hooks.Post = append([]Hook(nil), foundPipeline.DefaultValues.Hooks.Post...)
+		asset.Hooks.Post = append([]Hook(nil), defaults.Hooks.Post...)
 	}
-	if !foundPipeline.DefaultValues.Routing.IsZero() {
+	if asset.Snowflake.Warehouse == "" {
+		asset.Snowflake.Warehouse = defaults.Snowflake.Warehouse
+	}
+	if asset.Athena.Location == "" {
+		asset.Athena.Location = defaults.Athena.Location
+	}
+	if !defaults.Routing.IsZero() {
 		if asset.Routing == nil {
-			asset.Routing = foundPipeline.DefaultValues.Routing.Clone()
+			asset.Routing = defaults.Routing.Clone()
 		} else if asset.Routing.EgressGateway == "" {
-			asset.Routing.EgressGateway = foundPipeline.DefaultValues.Routing.EgressGateway
+			asset.Routing.EgressGateway = defaults.Routing.EgressGateway
 		}
 	}
+	if asset.RerunCooldown == nil && defaults.RerunCooldown != nil {
+		asset.RerunCooldown = cloneIntPtr(defaults.RerunCooldown)
+	}
+	if asset.Retries == nil && defaults.Retries != nil {
+		asset.Retries = cloneIntPtr(defaults.Retries)
+	}
+	if asset.RefreshRestricted == nil && defaults.RefreshRestricted != nil {
+		asset.RefreshRestricted = cloneBoolPtr(defaults.RefreshRestricted)
+	}
+	asset.Notifications = mergeNotificationDefaults(asset.Notifications, defaults.Notifications)
 
 	return asset, nil
+}
+
+func applyStringDefault(target *string, defaultValue string) {
+	if *target == "" && defaultValue != "" {
+		*target = defaultValue
+	}
+}
+
+func mergeEmptyStringMapDefaults(target *EmptyStringMap, defaults EmptyStringMap) {
+	if len(defaults) == 0 {
+		return
+	}
+	if *target == nil {
+		*target = EmptyStringMap{}
+	}
+	for key, value := range defaults {
+		if _, exists := (*target)[key]; !exists {
+			(*target)[key] = value
+		}
+	}
+}
+
+func appendMissingStringValues[S ~[]E, E ~string](target *S, defaults S) {
+	if len(defaults) == 0 {
+		return
+	}
+	merged := append(S(nil), (*target)...)
+	existing := make(map[E]bool, len(merged))
+	for _, value := range merged {
+		existing[value] = true
+	}
+	for _, value := range defaults {
+		if !existing[value] {
+			merged = append(merged, value)
+			existing[value] = true
+		}
+	}
+	*target = merged
+}
+
+func mergeMaterializationDefaults(target *Materialization, defaults Materialization) {
+	if target.Type == "" {
+		target.Type = defaults.Type
+	}
+	if target.Strategy == "" {
+		target.Strategy = defaults.Strategy
+	}
+	if target.PartitionBy == "" {
+		target.PartitionBy = defaults.PartitionBy
+	}
+	if len(target.ClusterBy) == 0 && len(defaults.ClusterBy) > 0 {
+		target.ClusterBy = append([]string(nil), defaults.ClusterBy...)
+	}
+	if target.IncrementalKey == "" {
+		target.IncrementalKey = defaults.IncrementalKey
+	}
+	if target.TimeGranularity == "" {
+		target.TimeGranularity = defaults.TimeGranularity
+	}
+}
+
+func appendMissingUpstreams(target []Upstream, defaults []Upstream) []Upstream {
+	if len(defaults) == 0 {
+		return target
+	}
+	merged := append([]Upstream(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, upstream := range merged {
+		existing[upstreamIdentity(upstream)] = true
+	}
+	for _, upstream := range defaults {
+		key := upstreamIdentity(upstream)
+		if !existing[key] {
+			merged = append(merged, cloneUpstream(upstream))
+			existing[key] = true
+		}
+	}
+	return merged
+}
+
+func upstreamIdentity(upstream Upstream) string {
+	upstreamType := upstream.Type
+	if upstreamType == "" {
+		upstreamType = selectorAssetDependencyType
+	}
+	return upstreamType + "\x00" + upstream.Value
+}
+
+func cloneUpstream(upstream Upstream) Upstream {
+	clone := upstream
+	clone.Metadata = cloneEmptyStringMap(upstream.Metadata)
+	clone.Columns = append([]DependsColumn(nil), upstream.Columns...)
+	return clone
+}
+
+func mergeColumnDefaults(asset *Asset, defaults []Column) {
+	if len(defaults) == 0 {
+		return
+	}
+	for _, defaultColumn := range defaults {
+		index := findColumnIndex(asset.Columns, defaultColumn.Name)
+		if index == -1 {
+			asset.Columns = append(asset.Columns, cloneColumnForAsset(defaultColumn, asset.Name))
+			continue
+		}
+		mergeColumnDefault(&asset.Columns[index], defaultColumn, asset.Name)
+	}
+}
+
+func findColumnIndex(columns []Column, name string) int {
+	for index, column := range columns {
+		if strings.EqualFold(column.Name, name) {
+			return index
+		}
+	}
+	return -1
+}
+
+func mergeColumnDefault(target *Column, defaults Column, assetName string) {
+	if target.EntityAttribute == nil {
+		target.EntityAttribute = cloneEntityAttribute(defaults.EntityAttribute)
+	}
+	applyStringDefault(&target.Name, defaults.Name)
+	applyStringDefault(&target.SourceColumn, defaults.SourceColumn)
+	applyStringDefault(&target.Type, defaults.Type)
+	applyStringDefault(&target.Description, defaults.Description)
+	appendMissingStringValues(&target.Tags, defaults.Tags)
+	if !target.PrimaryKey && defaults.PrimaryKey {
+		target.PrimaryKey = true
+	}
+	if !target.UpdateOnMerge && defaults.UpdateOnMerge {
+		target.UpdateOnMerge = true
+	}
+	applyStringDefault(&target.MergeSQL, defaults.MergeSQL)
+	if target.Nullable.Value == nil && defaults.Nullable.Value != nil {
+		target.Nullable = DefaultTrueBool{Value: cloneBoolPtr(defaults.Nullable.Value)}
+	}
+	applyStringDefault(&target.Default, defaults.Default)
+	if target.Precision == nil {
+		target.Precision = cloneIntPtr(defaults.Precision)
+	}
+	if target.Scale == nil {
+		target.Scale = cloneIntPtr(defaults.Scale)
+	}
+	if target.Length == nil {
+		target.Length = cloneIntPtr(defaults.Length)
+	}
+	applyStringDefault(&target.Collation, defaults.Collation)
+	if target.ForeignKey == nil {
+		target.ForeignKey = cloneColumnReference(defaults.ForeignKey)
+	}
+	applyStringDefault(&target.Owner, defaults.Owner)
+	appendMissingStringValues(&target.Domains, defaults.Domains)
+	mergeEmptyStringMapDefaults(&target.Meta, defaults.Meta)
+	applyStringDefault(&target.Extends, defaults.Extends)
+	target.Checks = mergeColumnCheckDefaults(target.Checks, defaults.Checks, assetName, target.Name)
+	target.Upstreams = appendMissingColumnUpstreams(target.Upstreams, defaults.Upstreams)
+}
+
+func cloneColumnForAsset(column Column, assetName string) Column {
+	clone := column
+	clone.EntityAttribute = cloneEntityAttribute(column.EntityAttribute)
+	clone.Tags = append(EmptyStringArray(nil), column.Tags...)
+	clone.Nullable = cloneDefaultTrueBool(column.Nullable)
+	clone.Precision = cloneIntPtr(column.Precision)
+	clone.Scale = cloneIntPtr(column.Scale)
+	clone.Length = cloneIntPtr(column.Length)
+	clone.ForeignKey = cloneColumnReference(column.ForeignKey)
+	clone.Domains = append(EmptyStringArray(nil), column.Domains...)
+	clone.Meta = cloneEmptyStringMap(column.Meta)
+	clone.Checks = cloneColumnChecksForAsset(column.Checks, assetName, column.Name)
+	clone.Upstreams = cloneColumnUpstreams(column.Upstreams)
+	return clone
+}
+
+func cloneEntityAttribute(value *EntityAttribute) *EntityAttribute {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneColumnReference(value *ColumnReference) *ColumnReference {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func appendMissingColumnUpstreams(target []*UpstreamColumn, defaults []*UpstreamColumn) []*UpstreamColumn {
+	if len(defaults) == 0 {
+		return target
+	}
+	merged := cloneColumnUpstreams(target)
+	existing := make(map[string]bool, len(merged))
+	for _, upstream := range merged {
+		existing[columnUpstreamIdentity(upstream)] = true
+	}
+	for _, upstream := range defaults {
+		key := columnUpstreamIdentity(upstream)
+		if !existing[key] {
+			merged = append(merged, cloneColumnUpstream(upstream))
+			existing[key] = true
+		}
+	}
+	return merged
+}
+
+func columnUpstreamIdentity(upstream *UpstreamColumn) string {
+	if upstream == nil {
+		return ""
+	}
+	return upstream.Table + "\x00" + upstream.Column
+}
+
+func cloneColumnUpstreams(upstreams []*UpstreamColumn) []*UpstreamColumn {
+	if len(upstreams) == 0 {
+		return upstreams
+	}
+	clone := make([]*UpstreamColumn, 0, len(upstreams))
+	for _, upstream := range upstreams {
+		clone = append(clone, cloneColumnUpstream(upstream))
+	}
+	return clone
+}
+
+func cloneColumnUpstream(upstream *UpstreamColumn) *UpstreamColumn {
+	if upstream == nil {
+		return nil
+	}
+	clone := *upstream
+	return &clone
+}
+
+func mergeColumnCheckDefaults(target []ColumnCheck, defaults []ColumnCheck, assetName, columnName string) []ColumnCheck {
+	if len(defaults) == 0 {
+		return target
+	}
+	merged := append([]ColumnCheck(nil), target...)
+	for _, defaultCheck := range defaults {
+		index := findColumnCheckIndex(merged, defaultCheck.Name)
+		if index == -1 {
+			merged = append(merged, cloneColumnCheckForAsset(defaultCheck, assetName, columnName))
+			continue
+		}
+		mergeColumnCheckDefault(&merged[index], defaultCheck)
+	}
+	return merged
+}
+
+func findColumnCheckIndex(checks []ColumnCheck, name string) int {
+	for index, check := range checks {
+		if strings.EqualFold(check.Name, name) {
+			return index
+		}
+	}
+	return -1
+}
+
+func mergeColumnCheckDefault(target *ColumnCheck, defaults ColumnCheck) {
+	applyStringDefault(&target.Name, defaults.Name)
+	if isColumnCheckValueZero(target.Value) && !isColumnCheckValueZero(defaults.Value) {
+		target.Value = cloneColumnCheckValue(defaults.Value)
+	}
+	if target.Blocking.Value == nil && defaults.Blocking.Value != nil {
+		target.Blocking = cloneDefaultTrueBool(defaults.Blocking)
+	}
+	applyStringDefault(&target.Description, defaults.Description)
+	if target.Retries == nil {
+		target.Retries = cloneIntPtr(defaults.Retries)
+	}
+	if target.Notifications == nil {
+		target.Notifications = cloneNotifications(defaults.Notifications)
+	}
+}
+
+func cloneColumnChecksForAsset(checks []ColumnCheck, assetName, columnName string) []ColumnCheck {
+	if len(checks) == 0 {
+		return checks
+	}
+	clone := make([]ColumnCheck, 0, len(checks))
+	for _, check := range checks {
+		clone = append(clone, cloneColumnCheckForAsset(check, assetName, columnName))
+	}
+	return clone
+}
+
+func cloneColumnCheckForAsset(check ColumnCheck, assetName, columnName string) ColumnCheck {
+	clone := check
+	clone.ID = hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, check.Name))
+	clone.Value = cloneColumnCheckValue(check.Value)
+	clone.Blocking = cloneDefaultTrueBool(check.Blocking)
+	clone.Retries = cloneIntPtr(check.Retries)
+	clone.Notifications = cloneNotifications(check.Notifications)
+	return clone
+}
+
+func mergeCustomCheckDefaults(asset *Asset, defaults []CustomCheck) {
+	if len(defaults) == 0 {
+		return
+	}
+	for _, defaultCheck := range defaults {
+		index := findCustomCheckIndex(asset.CustomChecks, defaultCheck.Name)
+		if index == -1 {
+			asset.CustomChecks = append(asset.CustomChecks, cloneCustomCheckForAsset(defaultCheck, asset.Name))
+			continue
+		}
+		mergeCustomCheckDefault(&asset.CustomChecks[index], defaultCheck)
+	}
+}
+
+func findCustomCheckIndex(checks []CustomCheck, name string) int {
+	for index, check := range checks {
+		if strings.EqualFold(check.Name, name) {
+			return index
+		}
+	}
+	return -1
+}
+
+func mergeCustomCheckDefault(target *CustomCheck, defaults CustomCheck) {
+	applyStringDefault(&target.Name, defaults.Name)
+	applyStringDefault(&target.Description, defaults.Description)
+	if target.Value == 0 && defaults.Value != 0 {
+		target.Value = defaults.Value
+	}
+	if target.Count == nil {
+		target.Count = cloneInt64Ptr(defaults.Count)
+	}
+	if target.Blocking.Value == nil && defaults.Blocking.Value != nil {
+		target.Blocking = cloneDefaultTrueBool(defaults.Blocking)
+	}
+	applyStringDefault(&target.Query, defaults.Query)
+	if target.Retries == nil {
+		target.Retries = cloneIntPtr(defaults.Retries)
+	}
+	if target.Notifications == nil {
+		target.Notifications = cloneNotifications(defaults.Notifications)
+	}
+}
+
+func cloneCustomCheckForAsset(check CustomCheck, assetName string) CustomCheck {
+	clone := check
+	clone.ID = hash(fmt.Sprintf("%s-%s", assetName, check.Name))
+	clone.Count = cloneInt64Ptr(check.Count)
+	clone.Blocking = cloneDefaultTrueBool(check.Blocking)
+	clone.Retries = cloneIntPtr(check.Retries)
+	clone.Notifications = cloneNotifications(check.Notifications)
+	return clone
+}
+
+func refreshAssetCheckIDs(asset *Asset) {
+	for columnIndex := range asset.Columns {
+		for checkIndex := range asset.Columns[columnIndex].Checks {
+			check := &asset.Columns[columnIndex].Checks[checkIndex]
+			check.ID = hash(fmt.Sprintf("%s-%s-%s", asset.Name, asset.Columns[columnIndex].Name, check.Name))
+		}
+	}
+	for checkIndex := range asset.CustomChecks {
+		check := &asset.CustomChecks[checkIndex]
+		check.ID = hash(fmt.Sprintf("%s-%s", asset.Name, check.Name))
+	}
+}
+
+func mergeNotificationDefaults(target *Notifications, defaults *Notifications) *Notifications {
+	if defaults == nil {
+		return target
+	}
+	if target == nil {
+		return cloneNotifications(defaults)
+	}
+	merged := cloneNotifications(target)
+	merged.Slack = appendMissingSlackNotifications(merged.Slack, defaults.Slack)
+	merged.MSTeams = appendMissingMSTeamsNotifications(merged.MSTeams, defaults.MSTeams)
+	merged.Discord = appendMissingDiscordNotifications(merged.Discord, defaults.Discord)
+	merged.Webhook = appendMissingWebhookNotifications(merged.Webhook, defaults.Webhook)
+	return merged
+}
+
+func appendMissingSlackNotifications(target []SlackNotification, defaults []SlackNotification) []SlackNotification {
+	merged := append([]SlackNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[notification.Channel] = true
+	}
+	for _, notification := range defaults {
+		if !existing[notification.Channel] {
+			merged = append(merged, cloneSlackNotification(notification))
+			existing[notification.Channel] = true
+		}
+	}
+	return merged
+}
+
+func appendMissingMSTeamsNotifications(target []MSTeamsNotification, defaults []MSTeamsNotification) []MSTeamsNotification {
+	merged := append([]MSTeamsNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[notification.Connection] = true
+	}
+	for _, notification := range defaults {
+		if !existing[notification.Connection] {
+			merged = append(merged, cloneMSTeamsNotification(notification))
+			existing[notification.Connection] = true
+		}
+	}
+	return merged
+}
+
+func appendMissingDiscordNotifications(target []DiscordNotification, defaults []DiscordNotification) []DiscordNotification {
+	merged := append([]DiscordNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[notification.Connection] = true
+	}
+	for _, notification := range defaults {
+		if !existing[notification.Connection] {
+			merged = append(merged, cloneDiscordNotification(notification))
+			existing[notification.Connection] = true
+		}
+	}
+	return merged
+}
+
+func appendMissingWebhookNotifications(target []WebhookNotification, defaults []WebhookNotification) []WebhookNotification {
+	merged := append([]WebhookNotification(nil), target...)
+	existing := make(map[string]bool, len(merged))
+	for _, notification := range merged {
+		existing[notification.Connection] = true
+	}
+	for _, notification := range defaults {
+		if !existing[notification.Connection] {
+			merged = append(merged, cloneWebhookNotification(notification))
+			existing[notification.Connection] = true
+		}
+	}
+	return merged
+}
+
+func cloneEmptyStringMap(value EmptyStringMap) EmptyStringMap {
+	if value == nil {
+		return nil
+	}
+	clone := make(EmptyStringMap, len(value))
+	for key, mapValue := range value {
+		clone[key] = mapValue
+	}
+	return clone
+}
+
+func cloneDefaultTrueBool(value DefaultTrueBool) DefaultTrueBool {
+	return DefaultTrueBool{Value: cloneBoolPtr(value.Value)}
+}
+
+func cloneColumnCheckValue(value ColumnCheckValue) ColumnCheckValue {
+	clone := ColumnCheckValue{}
+	if value.IntArray != nil {
+		clone.IntArray = ptrTo(append([]int(nil), (*value.IntArray)...))
+	}
+	if value.Int != nil {
+		clone.Int = cloneIntPtr(value.Int)
+	}
+	if value.Float != nil {
+		floatValue := *value.Float
+		clone.Float = &floatValue
+	}
+	if value.StringArray != nil {
+		clone.StringArray = ptrTo(append([]string(nil), (*value.StringArray)...))
+	}
+	if value.String != nil {
+		stringValue := *value.String
+		clone.String = &stringValue
+	}
+	if value.Bool != nil {
+		clone.Bool = cloneBoolPtr(value.Bool)
+	}
+	return clone
+}
+
+func isColumnCheckValueZero(value ColumnCheckValue) bool {
+	return value.IntArray == nil && value.Int == nil && value.Float == nil && value.StringArray == nil && value.String == nil && value.Bool == nil
+}
+
+func ptrTo[T any](value T) *T {
+	return &value
+}
+
+func cloneIntPtr(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneInt64Ptr(value *int64) *int64 {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneBoolPtr(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneNotifications(value *Notifications) *Notifications {
+	if value == nil {
+		return nil
+	}
+	clone := &Notifications{
+		Slack:   make([]SlackNotification, 0, len(value.Slack)),
+		MSTeams: make([]MSTeamsNotification, 0, len(value.MSTeams)),
+		Discord: make([]DiscordNotification, 0, len(value.Discord)),
+		Webhook: make([]WebhookNotification, 0, len(value.Webhook)),
+	}
+	for _, notification := range value.Slack {
+		clone.Slack = append(clone.Slack, cloneSlackNotification(notification))
+	}
+	for _, notification := range value.MSTeams {
+		clone.MSTeams = append(clone.MSTeams, cloneMSTeamsNotification(notification))
+	}
+	for _, notification := range value.Discord {
+		clone.Discord = append(clone.Discord, cloneDiscordNotification(notification))
+	}
+	for _, notification := range value.Webhook {
+		clone.Webhook = append(clone.Webhook, cloneWebhookNotification(notification))
+	}
+	return clone
+}
+
+func cloneSlackNotification(value SlackNotification) SlackNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
+}
+
+func cloneMSTeamsNotification(value MSTeamsNotification) MSTeamsNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
+}
+
+func cloneDiscordNotification(value DiscordNotification) DiscordNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
+}
+
+func cloneWebhookNotification(value WebhookNotification) WebhookNotification {
+	value.Success = cloneDefaultTrueBool(value.Success)
+	value.Failure = cloneDefaultTrueBool(value.Failure)
+	return value
 }
 
 func assetAcceptsDefaultHooks(asset *Asset) bool {
@@ -2754,6 +3421,7 @@ func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeli
 
 	asset.Name = name
 	asset.ID = hash(name)
+	refreshAssetCheckIDs(asset)
 	return asset, nil
 }
 

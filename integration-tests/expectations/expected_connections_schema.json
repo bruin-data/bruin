@@ -37,6 +37,34 @@
         "account_name"
       ]
     },
+    "APIFootballConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "league": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AdjustConnection": {
       "properties": {
         "name": {
@@ -313,6 +341,28 @@
         "access_key",
         "secret_key",
         "region"
+      ]
+    },
+    "BallDontLieConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "BruinCloudConnection": {
@@ -957,6 +1007,12 @@
           },
           "type": "array"
         },
+        "sharepoint": {
+          "items": {
+            "$ref": "#/$defs/SharePointConnection"
+          },
+          "type": "array"
+        },
         "applovinmax": {
           "items": {
             "$ref": "#/$defs/ApplovinMaxConnection"
@@ -1260,6 +1316,24 @@
         "espn": {
           "items": {
             "$ref": "#/$defs/EspnConnection"
+          },
+          "type": "array"
+        },
+        "apifootball": {
+          "items": {
+            "$ref": "#/$defs/APIFootballConnection"
+          },
+          "type": "array"
+        },
+        "footballdata": {
+          "items": {
+            "$ref": "#/$defs/FootballDataConnection"
+          },
+          "type": "array"
+        },
+        "balldontlie": {
+          "items": {
+            "$ref": "#/$defs/BallDontLieConnection"
           },
           "type": "array"
         },
@@ -1728,6 +1802,33 @@
         "verify_certs"
       ]
     },
+    "EspnConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sport": {
+          "type": "string"
+        },
+        "league": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "FabricConnection": {
       "properties": {
         "name": {
@@ -1772,33 +1873,6 @@
         "host",
         "port",
         "database"
-      ]
-    },
-    "EspnConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "sport": {
-          "type": "string"
-        },
-        "league": {
-          "type": "string"
-        },
-        "season": {
-          "type": "string"
-        },
-        "limit": {
-          "type": "integer"
-        },
-        "base_url": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name"
       ]
     },
     "FacebookAdsConnection": {
@@ -1859,6 +1933,55 @@
         "instance",
         "client_id",
         "client_secret"
+      ]
+    },
+    "FootballDataConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "competition": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "matchday": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "unfold_goals": {
+          "type": "boolean"
+        },
+        "unfold_bookings": {
+          "type": "boolean"
+        },
+        "unfold_subs": {
+          "type": "boolean"
+        },
+        "unfold_lineups": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "FrankfurterConnection": {
@@ -3551,6 +3674,47 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "SharePointConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string"
+        },
+        "library": {
+          "type": "string"
+        },
+        "max_file_size": {
+          "type": "integer"
+        },
+        "max_files": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "tenant_id",
+        "client_id",
+        "client_secret",
+        "hostname",
+        "site"
       ]
     },
     "ShopifyConnection": {
