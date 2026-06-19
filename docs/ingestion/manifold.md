@@ -84,29 +84,29 @@ parameters:
 
 ## Available Source Tables
 
-| Table | Required URI params | Optional URI params | PK | Inc Key | Inc Strategy | Details |
-|-------|---------------------|---------------------|----|---------|--------------|---------|
-| `markets` | - | `sort`, `order`, `userId`, `groupId` | `id` | `createdTime` | merge | Public market list. |
-| `search_markets` | - | `term`, `sort`, `filter`, `creatorId`, `contractType`, `topicSlug`, `minLiquidity`, `maxLiquidity` | `id` | `createdTime` | merge | Search and filter markets. Supports interval end as `beforeTime`. |
-| `market_by_id` | `market_id` | - | `id` | - | replace | Full market by id. |
-| `market_by_slug` | `contract_slug` | - | `id` | - | replace | Full market by slug. |
-| `market_probability` | `market_id` | - | - | - | replace | Current probability for one market. Multiple choice market details are returned in `raw`. |
-| `market_probabilities` | `ids` | - | - | - | replace | Current probabilities for up to 100 market ids. Repeat `ids` with `query_param_lists`. |
-| `market_positions` | `market_id` | `order`, `top`, `bottom`, `userId`, `answerId` | - | - | replace | Position information for one market. |
-| `bets` | - | `userId`, `username`, `contractId`, `contractSlug`, `kinds`, `order` | `id` | `createdTime` | merge | Public bets. Supports interval pushdown. |
-| `comments` | - | `contractId`, `contractSlug`, `userId`, `order` | `id` | `createdTime` | merge | Public comments. |
-| `groups` | - | `availableToUserId` | `id` | `createdTime` | merge | Public groups/topics. Supports interval end as `beforeTime`. |
-| `group_by_slug` | `group_slug` | - | - | - | replace | One group by slug. |
-| `group_by_id` | `group_id` | - | - | - | replace | One group by id. |
-| `users` | - | - | `id` | - | replace | Public users. |
-| `user_by_username` | `username` | - | `id` | - | replace | Public user by username. |
-| `user_by_id` | `user_id` | - | `id` | - | replace | Public user by id. |
-| `user_portfolio` | `userId` | - | - | - | replace | Current public portfolio metrics for a user. |
-| `user_portfolio_history` | `userId`, `period` | - | `timestamp` | `timestamp` | merge | Historical portfolio metrics. `period` is `daily`, `weekly`, `monthly`, or `allTime`. |
-| `user_contract_metrics` | `userId` | `order`, `perAnswer` | - | - | replace | User contract metrics with market contracts. |
-| `transactions` | - | `token`, `toId`, `fromId`, `category` | `id` | `createdTime` | merge | Public transactions. Supports interval pushdown. |
-| `leagues` | - | `userId`, `season`, `cohort` | - | - | replace | Public league standings. |
-| `boost_history` | - | `contractId`, `postId`, `userId`, `includePending` | `id` | `createdTime` | merge | Contract and post boost history. |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `markets` | `id` | `createdTime` | merge | Public market list. Optional URI params: `sort`, `order`, `userId`, `groupId`. |
+| `search_markets` | `id` | `createdTime` | merge | Search/filter markets. Supports interval end as `beforeTime`. Optional URI params: `term`, `sort`, `filter`, `creatorId`, `contractType`, `topicSlug`, `minLiquidity`, `maxLiquidity`. |
+| `market_by_id` | `id` | - | replace | Full market by id. Required URI param: `market_id`. |
+| `market_by_slug` | `id` | - | replace | Full market by slug. Required URI param: `contract_slug`. |
+| `market_probability` | - | - | replace | Current probability for one market. Multiple choice markets return answer probabilities in `raw`. Required URI param: `market_id`. |
+| `market_probabilities` | - | - | replace | Current probabilities for up to 100 market ids. Repeat `ids` in the URI for multiple markets. Required URI param: `ids`. |
+| `market_positions` | - | - | replace | Position information for one market. Required URI param: `market_id`. Optional URI params: `order`, `top`, `bottom`, `userId`, `answerId`. |
+| `bets` | `id` | `createdTime` | merge | Public bets. Supports interval pushdown. Optional URI params: `userId`, `username`, `contractId`, `contractSlug`, `kinds`, `order`. |
+| `comments` | `id` | `createdTime` | merge | Public comments. Optional URI params: `contractId`, `contractSlug`, `userId`, `order`. |
+| `groups` | `id` | `createdTime` | merge | Public groups/topics. Supports interval end as `beforeTime`. Optional URI param: `availableToUserId`. |
+| `group_by_slug` | - | - | replace | One group by slug. Required URI param: `group_slug`. |
+| `group_by_id` | - | - | replace | One group by id. Required URI param: `group_id`. |
+| `users` | `id` | - | replace | Public users. |
+| `user_by_username` | `id` | - | replace | Public user by username. Required URI param: `username`. |
+| `user_by_id` | `id` | - | replace | Public user by id. Required URI param: `user_id`. |
+| `user_portfolio` | - | - | replace | Current public portfolio metrics for a user. Required URI param: `userId`. |
+| `user_portfolio_history` | `timestamp` | `timestamp` | merge | Historical portfolio metrics. `period` is `daily`, `weekly`, `monthly`, or `allTime`. Required URI params: `userId`, `period`. |
+| `user_contract_metrics` | - | - | replace | User contract metrics with market contracts. Required URI param: `userId`. Optional URI params: `order`, `perAnswer`. |
+| `transactions` | `id` | `createdTime` | merge | Public transactions. Supports interval pushdown. Optional URI params: `token`, `toId`, `fromId`, `category`. |
+| `leagues` | - | - | replace | Public league standings. Optional URI params: `userId`, `season`, `cohort`. |
+| `boost_history` | `id` | `createdTime` | merge | Contract and post boost history. Optional URI params: `contractId`, `postId`, `userId`, `includePending`. |
 
 ## Interval Behavior
 

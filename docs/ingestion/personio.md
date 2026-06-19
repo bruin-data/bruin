@@ -51,14 +51,14 @@ parameters:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| employees | id | last_modified_at | merge | Retrieves company employees details. |
-| absence_types | id | – | replace | Retrieves list of various types of employee absences Retrieves absence periods for absences tracked in days. |
-| absences | id | updated_at | merge | Fetches absence periods for absences with time unit set to days. |
-| attendances | id | updated_at | merge | Retrieves attendance records for each employee |
-| projects | id | – | replace | Retrieves a list of all company projects |
-| document_categories | id | – | replace | Retrieves all document categories of the company |
-| custom_reports_list | id | – | replace | Retrieves metadata about existing custom reports in your Personio account, such as report name, report type, report date / timeframe. |
-| employees_absences_balance | [employee_id,id] | – | merge | Retrieves the absence balance for a specific employee |
+| `employees` | id | last_modified_at | merge | Retrieves company employees details. |
+| `absence_types` | id | – | replace | Retrieves list of various types of employee absences Retrieves absence periods for absences tracked in days. |
+| `absences` | id | updated_at | merge | Fetches absence periods for absences with time unit set to days. |
+| `attendances` | id | updated_at | merge | Retrieves attendance records for each employee |
+| `projects` | id | – | replace | Retrieves a list of all company projects |
+| `document_categories` | id | – | replace | Retrieves all document categories of the company |
+| `custom_reports_list` | id | – | replace | Retrieves metadata about existing custom reports in your Personio account, such as report name, report type, report date / timeframe. |
+| `employees_absences_balance` | [employee_id,id] | – | merge | Retrieves the absence balance for a specific employee |
 
 - `destination`: The name of the destination connection.
 

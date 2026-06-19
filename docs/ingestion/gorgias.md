@@ -49,6 +49,15 @@ parameters:
 - `source_connection`: The name of the Gorgias connection defined in .bruin.yml.
 - `source_table`: The name of the data table in Gorgias that you want to ingest. For example, `customers` is the table of Gorgias that you want to ingest. You can find the available source tables in Gorgias [here](https://getbruin.com/docs/ingestr/supported-sources/gorgias.html#supported-entities)
 
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `customers` | id | updated_datetime | merge | Customers are the users who have interacted with the support team. Each customer has a unique ID and contains information such as the name and email. Retrieves customers lists |
+| `tickets` | id | updated_datetime | merge | Tickets are the main entity in Gorgias, representing customer inquiries. Each ticket has a unique ID and contains information such as the customer, status, and messages. Retrieves tickets lists |
+| `ticket_messages` | id | updated_datetime | merge | Ticket messages are the messages exchanged between the customer and the support agent in a ticket. Each message has a unique ID and contains information such as the sender, content, and timestamp. Retrieves messages lists |
+| `satisfaction_surveys` | id | updated_datetime | merge | Satisfaction surveys are sent to customers after a ticket is resolved to gather feedback on their experience. Each survey has a unique ID and contains information such as the rating and comments. Retrieves surveys lists |
+
 ### Step 3: [Run](/commands/run) asset to ingest data
 
 ```bash

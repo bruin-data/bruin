@@ -57,18 +57,16 @@ bruin run assets/surveymonkey.asset.yml
 
 Running this command ingests data from SurveyMonkey into your destination.
 
-## Tables
-
-SurveyMonkey source allows ingesting the following tables:
+## Available Source Tables
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 | ----- | -- | ------- | ------------ | ------- |
-| [surveys](https://api.surveymonkey.com/v3/docs?shell#api-endpoints-get-surveys) | id | date_modified | merge | List of all surveys with metadata |
-| [survey_details](https://api.surveymonkey.com/v3/docs?shell#api-endpoints-get-surveys-id-details) | id | date_modified | merge | Full survey details with nested pages and questions as JSON |
-| [survey_responses](https://api.surveymonkey.com/v3/docs?shell#api-endpoints-survey-responses) | id | date_modified | merge | Survey response data with answers |
-| [collectors](https://api.surveymonkey.com/v3/docs?shell#api-endpoints-get-surveys-survey_id-collectors) | id | date_modified | merge | Survey distribution channels |
-| [contact_lists](https://api.surveymonkey.com/v3/docs?shell#api-endpoints-get-contact_lists) | id | - | replace | Contact lists |
-| [contacts](https://api.surveymonkey.com/v3/docs?shell#api-endpoints-get-contacts) | id | - | replace | Contacts (all statuses: active, optout, bounced) |
+| `surveys` | id | date_modified | merge | List of all surveys with metadata (title, dates, response count, question count) |
+| `survey_details` | id | date_modified | merge | Full survey details including nested pages and questions as JSON |
+| `survey_responses` | id | date_modified | merge | Survey response data with answers, collected per survey |
+| `collectors` | id | date_modified | merge | Survey distribution channels (weblink, email, etc.) |
+| `contact_lists` | id | - | replace | Contact lists |
+| `contacts` | id | - | replace | Contacts across all statuses (active, optout, bounced) |
 
 Use these as the `source_table` parameter in the asset configuration.
 

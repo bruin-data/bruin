@@ -47,17 +47,18 @@ parameters:
 ```
 
 - `source_connection`: name of the QuickBooks connection defined in `.bruin.yml`.
-- `source_table`: QuickBooks table to ingest. Available tables:
-
-| Table     | PK | Inc Key          | Inc Strategy | Details                      |
-|-----------|----|-----------------|-------------|------------------------------|
-| customers | id | lastupdatedtime | merge       | Retrieves list of customers. |
-| invoices  | id | lastupdatedtime | merge       | Retrieves sales invoices.    |
-| accounts  | id | lastupdatedtime | merge       | Retrieves details of accounts.|
-| vendors   | id | lastupdatedtime | merge       | Retrieves vendor records.    |
-| payments  | id | lastupdatedtime | merge       | Retrieves payments recorded. |
-
+- `source_table`: QuickBooks table to ingest.
 - `destination`: name of the destination connection.
+
+## Available Source Tables
+
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `customers` | id | lastupdatedtime | merge | Retrieves list of customers. |
+| `invoices` | id | lastupdatedtime | merge | Retrieves sales invoices. |
+| `accounts` | id | lastupdatedtime | merge | Retrieves details of accounts. |
+| `vendors` | id | lastupdatedtime | merge | Retrieves vendor records. |
+| `payments` | id | lastupdatedtime | merge | Retrieves payments recorded. |
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 

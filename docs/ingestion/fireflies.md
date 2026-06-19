@@ -43,20 +43,18 @@ parameters:
 - `source_connection`: The name of the Fireflies connection defined in .bruin.yml.
 - `source_table`: The name of the data table in Fireflies you want to ingest. You can find the available source tables below.
 
-## Available Tables
+## Available Source Tables
 
-Fireflies source allows ingesting the following sources into separate tables:
-
-| Table | Inc Key | Inc Strategy | Details |
-|-------|---------|--------------|---------|
-| `active_meetings` | - | replace | Currently active/ongoing meetings in your Fireflies account |
-| `analytics` | end_time | merge | Meeting analytics including duration, speaker stats, and sentiment |
-| `channels` | - | replace | Channels (workspaces) configured in your Fireflies account |
-| `users` | - | replace | Users in your Fireflies team/organization |
-| `user_groups` | - | replace | User groups configured in your organization |
-| `transcripts` | date | merge | Meeting transcripts with full conversation details and metadata |
-| `bites` | - | replace | Short audio/video clips (bites) extracted from meetings |
-| `contacts` | - | replace | Contacts associated with your Fireflies account |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `active_meetings` | - | - | replace | Currently active/ongoing meetings in your Fireflies account. |
+| `analytics` | start_time, end_time | end_time | merge | Meeting analytics including duration, speaker stats, and sentiment analysis. |
+| `channels` | - | - | replace | Channels (workspaces) configured in your Fireflies account. |
+| `users` | - | - | replace | Users in your Fireflies team/organization. |
+| `user_groups` | - | - | replace | User groups configured in your organization. |
+| `transcripts` | id | date | merge | Meeting transcripts with full conversation details, participants, and metadata. |
+| `bites` | - | - | replace | Short audio/video clips (bites) extracted from meetings. |
+| `contacts` | - | - | replace | Contacts associated with your Fireflies account. |
 
 ## Analytics Granularity
 

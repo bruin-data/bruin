@@ -36,19 +36,17 @@ connections:
       workspace_id: ${PLUSVIBEAI_WORKSPACE_ID}
 ```
 
-## Supported Data Assets
+## Available Source Tables
 
-Plus Vibe AI assets will be ingested to your data warehouse as defined in the `destination` table.
-
-| Asset | Table Name | Incremental Key | Description |
-|-------|------------|-----------------|-------------|
-| Campaigns | `campaigns` | `modified_at` | Campaign information including configuration, schedules, sequences, and performance metrics |
-| Leads | `leads` | `modified_at` | Lead information including contact details, campaign association, engagement metrics, and professional information |
-| Email Accounts | `email_accounts` | `timestamp_updated` | Email account configurations including SMTP/IMAP settings, warmup configurations, and analytics data |
-| Emails | `emails` | `timestamp_created` | Email data including message content, headers, thread information, and recipient details |
-| Blocklist | `blocklist` | `created_at` | Blocklist entries for email addresses or domains that should be excluded from campaigns |
-| Webhooks | `webhooks` | `modified_at` | Webhook configurations for receiving real-time notifications about campaign events and lead interactions |
-| Tags | `tags` | `modified_at` | Tag information used for organizing and categorizing campaigns, leads, and other resources |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------|---------|
+| `campaigns` | id | modified_at | merge | Contains campaign information including configuration, schedules, sequences, and performance metrics. Nested objects (schedule, sequences) are stored as JSON columns. |
+| `leads` | _id | modified_at | merge | Contains lead information including contact details, campaign association, engagement metrics, and professional information. |
+| `email_accounts` | _id | timestamp_updated | merge | Contains email account configurations including SMTP/IMAP settings, warmup configurations, and analytics data stored in payload JSON. |
+| `emails` | id | timestamp_created | merge | Contains email data including message content, headers, thread information, and recipient details. Uses cursor-based pagination. |
+| `blocklist` | _id | created_at | merge | Contains blocklist entries for email addresses or domains that should be excluded from campaigns. |
+| `webhooks` | _id | modified_at | merge | Contains webhook configurations for receiving real-time notifications about campaign events and lead interactions. |
+| `tags` | _id | modified_at | merge | Contains tag information used for organizing and categorizing campaigns, leads, and other resources. |
 
 ## Asset-Specific Configuration
 

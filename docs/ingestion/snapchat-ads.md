@@ -71,18 +71,18 @@ These resources require only authentication credentials:
 
 These resources can fetch data for a specific ad account, multiple ad accounts, or all ad accounts in the organization. All of these resources support the following formats:
 
-- `table:ad_account_id` - fetch data for a single ad account
-- `table:ad_account_id1,ad_account_id2` - fetch data for multiple ad accounts
+- `table:ad_account_id` - fetch data for a specific ad account
+- `table:id1,id2,id3` - fetch data for multiple ad accounts
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| `campaigns` | id | updated_at | merge | Retrieves all campaigns for ad account(s). Supports `campaigns:ad_account_id` or `campaigns:id1,id2` |
-| `adsquads` | id | updated_at | merge | Retrieves all ad squads for ad account(s). Supports `adsquads:ad_account_id` or `adsquads:id1,id2` |
-| `ads` | id | updated_at | merge | Retrieves all ads for ad account(s). Supports `ads:ad_account_id` or `ads:id1,id2` |
-| `invoices` | id | updated_at | merge | Retrieves all invoices for ad account(s). Supports `invoices:ad_account_id` or `invoices:id1,id2` |
-| `event_details` | id | updated_at | merge | Retrieves all event details (pixel events) for ad account(s). Supports `event_details:ad_account_id` or `event_details:id1,id2` |
-| `creatives` | id | updated_at | merge | Retrieves all creatives for ad account(s). Supports `creatives:ad_account_id` or `creatives:id1,id2` |
-| `segments` | id | updated_at | merge | Retrieves all audience segments for ad account(s). Supports `segments:ad_account_id` or `segments:id1,id2` |
+| `campaigns` | id | updated_at | merge | Retrieves all campaigns for ad account(s). Supports `campaigns:ad_account_id` or `campaigns:id1,id2,id3` |
+| `adsquads` | id | updated_at | merge | Retrieves all ad squads for ad account(s). Supports `adsquads:ad_account_id` or `adsquads:id1,id2,id3` |
+| `ads` | id | updated_at | merge | Retrieves all ads for ad account(s). Supports `ads:ad_account_id` or `ads:id1,id2,id3` |
+| `invoices` | id | updated_at | merge | Retrieves all invoices for ad account(s). Supports `invoices:ad_account_id` or `invoices:id1,id2,id3` |
+| `event_details` | id | updated_at | merge | Retrieves all event details (pixel events) for ad account(s). Supports `event_details:ad_account_id` or `event_details:id1,id2,id3` |
+| `creatives` | id | updated_at | merge | Retrieves all creatives for ad account(s). Supports `creatives:ad_account_id` or `creatives:id1,id2,id3` |
+| `segments` | id | updated_at | merge | Retrieves all audience segments for ad account(s). Supports `segments:ad_account_id` or `segments:id1,id2,id3` |
 
 ### Stats / Measurement Data
 
@@ -90,45 +90,38 @@ Snapchat Ads source supports fetching stats/measurement data for campaigns, ad s
 
 #### Stats Resources
 
-| Table | Inc Strategy | Details |
-|-------|--------------|---------|
-| `campaigns_stats` | replace | Retrieves stats for all campaigns in the organization or specific ad account |
-| `ads_stats` | replace | Retrieves stats for all ads in the organization or specific ad account |
-| `ad_squads_stats` | replace | Retrieves stats for all ad squads in the organization or specific ad account |
-| `ad_accounts_stats` | replace | Retrieves stats for all ad accounts in the organization (Note: only `spend` field is supported) |
+| Table | PK | Inc Key | Inc Strategy | Details |
+|-------|----|---------|--------------| ------- |
+| `campaigns_stats` | campaign_id, adsquad_id, ad_id, start_time, end_time | - | merge | Retrieves stats for all campaigns. Supports breakdowns by `ad` or `adsquad` |
+| `ads_stats` | campaign_id, adsquad_id, ad_id, start_time, end_time | - | merge | Retrieves stats for all ads. No breakdown supported (already lowest level) |
+| `ad_squads_stats` | campaign_id, adsquad_id, ad_id, start_time, end_time | - | merge | Retrieves stats for all ad squads. Supports breakdown by `ad` |
+| `ad_accounts_stats` | campaign_id, adsquad_id, ad_id, start_time, end_time | - | merge | Retrieves stats for all ad accounts. Supports breakdowns by `ad`, `adsquad`, or `campaign` |
 
 #### Stats Table Format
 
-The stats source table follows this format:
-
 ```plaintext
-<resource_name>:<granularity>[:<fields>][:<options>]
-```
-
-Or with a specific ad account:
-
-```plaintext
-<resource_name>:<ad_account_id>:<granularity>[:<fields>][:<options>]
+<resource_name>:<granularity>:<fields>
+<resource_name>:<breakdown>,<granularity>:<fields>
 ```
 
 **Parameters:**
 
-- `resource_name`: One of `campaigns_stats`, `ads_stats`, `ad_squads_stats`, `ad_accounts_stats`
-- `ad_account_id` (optional): Specific ad account ID to fetch stats for
-- `granularity`: Time granularity - `TOTAL`, `DAY`, `HOUR`, or `LIFETIME`
-- `fields` (optional): Metrics to retrieve (comma-separated). Default: `impressions,spend`
-- `options` (optional): Additional parameters in `key=value,key=value` format
+- `resource_name` (required): One of `campaigns_stats`, `ads_stats`, `ad_squads_stats`, `ad_accounts_stats`
+- `breakdown` (optional): Object-level breakdown. Valid values depend on the resource:
+  - `campaigns_stats`: `ad`, `adsquad`
+  - `ad_squads_stats`: `ad`
+  - `ad_accounts_stats`: `ad`, `adsquad`, `campaign`
+  - `ads_stats`: No breakdown supported
+- `granularity` (required): Time granularity - `TOTAL`, `DAY`, `HOUR`, or `LIFETIME`
+- `fields` (required): Metrics to retrieve (comma-separated). Examples: `impressions`, `spend`, `swipes`, `conversion_purchases`, etc.
 
-**Available Options:**
+**Format Examples:**
+- Without breakdown: `campaigns_stats:DAY:impressions,spend,swipes`
+- With ad breakdown: `campaigns_stats:ad,HOUR:impressions,spend`
+- With adsquad breakdown: `campaigns_stats:adsquad,DAY:impressions,swipes`
+- Ad account stats with campaign breakdown: `ad_accounts_stats:campaign,DAY:spend`
 
-| Option | Description | Values |
-|--------|-------------|--------|
-| `breakdown` | Object-level breakdown | `ad`, `adsquad` (Campaign only), `campaign` (Ad Account only) |
-| `dimension` | Insight-level breakdown | `GEO`, `DEMO`, `INTEREST`, `DEVICE` |
-| `pivot` | Pivot for insights breakdown | `country`, `region`, `dma`, `gender`, `age_bucket`, `interest_category_id`, `interest_category_name`, `operating_system`, `make`, `model` |
-| `swipe_up_attribution_window` | Attribution window for swipe ups | `1_DAY`, `7_DAY`, `28_DAY` (default) |
-| `view_attribution_window` | Attribution window for views | `none`, `1_HOUR`, `3_HOUR`, `6_HOUR`, `1_DAY` (default), `7_DAY`, `28_DAY` |
-| `omit_empty` | Omit records with zero data | `false` (default), `true` |
+**Note:** When breakdown is not specified, `adsquad_id` and `ad_id` will be `NULL` in the results.
 
 #### Stats Asset Example
 
@@ -146,7 +139,7 @@ parameters:
   destination: postgres
 ```
 
-For stats with additional options like breakdown and attribution window:
+For stats with ad-level breakdown:
 
 ```yaml
 name: public.snapchat_campaigns_stats_detailed
@@ -155,7 +148,7 @@ connection: postgres
 
 parameters:
   source_connection: my-snapchatads
-  source_table: 'campaigns_stats:DAY:impressions,spend,swipes:breakdown=ad,swipe_up_attribution_window=7_DAY'
+  source_table: 'campaigns_stats:ad,DAY:impressions,spend'
 
   destination: postgres
 ```

@@ -48,7 +48,7 @@ parameters:
 
 | Table | PK | Inc Key | Inc Strategy | Details |
 |-------|----|---------|--------------| ------- |
-| completed_phantoms:<agent_id> | container_id | ended_at | merge | Gets all containers associated to a specified agent. Where agent id is a unique identifier for a specific Phantom which can be found in URI of a specific phantom. |
+| `completed_phantoms:<agent_id>` | container_id | ended_at | merge | Gets all containers associated to a specified agent. Where agent id is a unique identifier for a specific Phantom which can be found in URI of a specific phantom. |
 
 For now, we only support `completed_phantoms` tables followed by an agent ID. For example:
 `completed_phantoms:<agentid>`. An Agent ID is a unique identifier for a specific Phantom.
