@@ -46,7 +46,7 @@ func TestConfig_GetIngestrURI_RequiresCredentials(t *testing.T) {
 	t.Parallel()
 
 	_, err := (Config{}).GetIngestrURI()
-	require.ErrorContains(t, err, "sharepoint:")
+	require.ErrorContains(t, err, "sharepoint: tenant_id must be provided")
 }
 
 func TestConfig_GetIngestrURI_RejectsNegativeLimits(t *testing.T) {

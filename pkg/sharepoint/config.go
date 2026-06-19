@@ -22,20 +22,25 @@ type Config struct {
 func (c Config) GetIngestrURI() (string, error) {
 	params := url.Values{}
 
-	required := map[string]string{
-		"tenant_id":     c.TenantID,
-		"client_id":     c.ClientID,
-		"client_secret": c.ClientSecret,
-		"hostname":      c.Hostname,
-		"site":          c.Site,
+	type requiredField struct {
+		key   string
+		value string
 	}
 
-	for key, value := range required {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			return "", fmt.Errorf("sharepoint: %s must be provided", key)
+	requiredFields := []requiredField{
+		{"tenant_id", c.TenantID},
+		{"client_id", c.ClientID},
+		{"client_secret", c.ClientSecret},
+		{"hostname", c.Hostname},
+		{"site", c.Site},
+	}
+
+	for _, field := range requiredFields {
+		field.value = strings.TrimSpace(field.value)
+		if field.value == "" {
+			return "", fmt.Errorf("sharepoint: %s must be provided", field.key)
 		}
-		params.Set(key, value)
+		params.Set(field.key, field.value)
 	}
 
 	if library := strings.TrimSpace(c.Library); library != "" {
