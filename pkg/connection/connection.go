@@ -51,6 +51,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/fireflies"
 	"github.com/bruin-data/bruin/pkg/fluxx"
+	"github.com/bruin-data/bruin/pkg/footballdata"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/freshdesk"
 	"github.com/bruin-data/bruin/pkg/fundraiseup"
@@ -257,6 +258,7 @@ type Manager struct {
 	Sendgrid             map[string]*sendgrid.Client
 	Espn                 map[string]*espn.Client
 	APIFootball          map[string]*apifootball.Client
+	FootballData         map[string]*footballdata.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -3184,6 +3186,36 @@ func (m *Manager) AddAPIFootballConnectionFromConfig(connection *config.APIFootb
 	return nil
 }
 
+func (m *Manager) AddFootballDataConnectionFromConfig(connection *config.FootballDataConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.FootballData == nil {
+		m.FootballData = make(map[string]*footballdata.Client)
+	}
+
+	client, err := footballdata.NewClient(footballdata.Config{
+		APIKey:         connection.APIKey,
+		Competition:    connection.Competition,
+		Season:         connection.Season,
+		BaseURL:        connection.BaseURL,
+		Matchday:       connection.Matchday,
+		Status:         connection.Status,
+		Stage:          connection.Stage,
+		Group:          connection.Group,
+		UnfoldGoals:    connection.UnfoldGoals,
+		UnfoldBookings: connection.UnfoldBookings,
+		UnfoldSubs:     connection.UnfoldSubs,
+		UnfoldLineups:  connection.UnfoldLineups,
+	})
+	if err != nil {
+		return err
+	}
+	m.FootballData[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddDuneConnectionFromConfig(connection *config.DuneConnection) error {
 	m.mutex.Lock()
 	if m.Dune == nil {
@@ -3638,6 +3670,7 @@ func NewManagerFromConfigWithContext(ctx context.Context, cm *config.Config) (co
 	processConnections(cm.SelectedEnvironment.Connections.Sendgrid, connectionManager.AddSendgridConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Espn, connectionManager.AddEspnConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.APIFootball, connectionManager.AddAPIFootballConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.FootballData, connectionManager.AddFootballDataConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Dune, connectionManager.AddDuneConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList

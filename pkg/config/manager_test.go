@@ -837,6 +837,14 @@ func TestLoadFromFile(t *testing.T) {
 					Season: "2026",
 				},
 			},
+			FootballData: []FootballDataConnection{
+				{
+					Name:        "footballdata-1",
+					APIKey:      "test-api-key",
+					Competition: "WC",
+					Season:      "2026",
+				},
+			},
 		},
 	}
 
@@ -2222,6 +2230,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
 				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
+				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
@@ -2345,6 +2354,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
 				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
+				FootballData:        []FootballDataConnection{{Name: "footballdata1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
