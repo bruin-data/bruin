@@ -527,6 +527,11 @@ environments:
           api_key: "test-api-key"
           league: "1"
           season: "2026"
+      footballdata:
+        - name: "footballdata-1"
+          api_key: "test-api-key"
+          competition: "WC"
+          season: "2026"
 
   prod:
     connections:

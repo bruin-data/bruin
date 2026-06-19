@@ -96,6 +96,16 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "match_events", PrimaryKey: "event_key", IncKey: "", IncStrategy: "merge"},
 	},
 
+	// football-data.org - FIFA World Cup soccer data
+	"footballdata": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "stadiums", PrimaryKey: "venue_key", IncKey: "", IncStrategy: "replace"},
+		{Name: "group_standings", PrimaryKey: "competition_id, season_id, stage, standing_type, group_name, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "merge"},
+		{Name: "players", PrimaryKey: "team_id, id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "event_key", IncKey: "", IncStrategy: "merge"},
+	},
+
 	// Apple Ads - Apple Search Ads campaign management
 	"appleads": {
 		{Name: "campaigns", PrimaryKey: "orgId,id", IncKey: "modificationTime", IncStrategy: "merge"},
