@@ -4,7 +4,7 @@ Bruin supports adjusting the start and end of your data processing window using 
 
 You can shift the start or end of the interval either forward or backward, depending on how you want to widen the processing window.
 
-This works for both SQL and Python assets and is primarily designed for regularly scheduled pipeline runs.
+This works for SQL, Python, and ingestr assets and is primarily designed for regularly scheduled pipeline runs.
 
 ## How It Works
 
