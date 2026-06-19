@@ -94,7 +94,7 @@ bruin query --connection my_connection \
 **Nested variables (dot-notation):**
 
 Use a dotted key to build a nested object. This matches the nested `filters` object the
-dashboard runtime injects, so `{{ filters.start_date }}` resolves as expected:
+dashboard runtime injects, so <span v-pre>`{{ filters.start_date }}`</span> resolves as expected:
 
 ```bash
 bruin query --connection my_connection \
