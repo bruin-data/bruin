@@ -143,6 +143,7 @@ type Connections struct {
 	CustomerIo          []CustomerIoConnection          `yaml:"customerio,omitempty" json:"customerio,omitempty" mapstructure:"customerio"`
 	Sendgrid            []SendgridConnection            `yaml:"sendgrid,omitempty" json:"sendgrid,omitempty" mapstructure:"sendgrid"`
 	Espn                []EspnConnection                `yaml:"espn,omitempty" json:"espn,omitempty" mapstructure:"espn"`
+	APIFootball         []APIFootballConnection         `yaml:"apifootball,omitempty" json:"apifootball,omitempty" mapstructure:"apifootball"`
 	Vertica             []VerticaConnection             `yaml:"vertica,omitempty" json:"vertica,omitempty" mapstructure:"vertica"`
 	SurveyMonkey        []SurveyMonkeyConnection        `yaml:"surveymonkey,omitempty" json:"surveymonkey,omitempty" mapstructure:"surveymonkey"`
 	Dune                []DuneConnection                `yaml:"dune,omitempty" json:"dune,omitempty" mapstructure:"dune"`
@@ -1329,6 +1330,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Espn = append(env.Connections.Espn, conn)
+	case "apifootball":
+		var conn APIFootballConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.APIFootball = append(env.Connections.APIFootball, conn)
 	case "vertica":
 		var conn VerticaConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1611,6 +1619,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Sendgrid = removeConnection(env.Connections.Sendgrid, connectionName)
 	case "espn":
 		env.Connections.Espn = removeConnection(env.Connections.Espn, connectionName)
+	case "apifootball":
+		env.Connections.APIFootball = removeConnection(env.Connections.APIFootball, connectionName)
 	case "vertica":
 		env.Connections.Vertica = removeConnection(env.Connections.Vertica, connectionName)
 	case "surveymonkey":
@@ -1792,6 +1802,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.CustomerIo, source.CustomerIo)
 	mergeConnectionList(&c.Sendgrid, source.Sendgrid)
 	mergeConnectionList(&c.Espn, source.Espn)
+	mergeConnectionList(&c.APIFootball, source.APIFootball)
 	mergeConnectionList(&c.Vertica, source.Vertica)
 	mergeConnectionList(&c.SurveyMonkey, source.SurveyMonkey)
 	mergeConnectionList(&c.Dune, source.Dune)

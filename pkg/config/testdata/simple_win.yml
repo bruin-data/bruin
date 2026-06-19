@@ -522,6 +522,11 @@ environments:
           library: "Documents"
           max_file_size: 104857600
           max_files: 10000
+      apifootball:
+        - name: "apifootball-1"
+          api_key: "test-api-key"
+          league: "1"
+          season: "2026"
 
   prod:
     connections:
