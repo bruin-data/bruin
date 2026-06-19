@@ -106,6 +106,25 @@ var SourceTablesRegistry = map[string][]*SourceTable{
 		{Name: "match_events", PrimaryKey: "event_key", IncKey: "", IncStrategy: "merge"},
 	},
 
+	// BallDontLie - FIFA World Cup data
+	"balldontlie": {
+		{Name: "teams", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "stadiums", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "group_standings", PrimaryKey: "season_year, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "matches", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "players", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "rosters", PrimaryKey: "season_year, team_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_lineups", PrimaryKey: "match_id, team_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_events", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "player_match_stats", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "team_match_stats", PrimaryKey: "match_id, team_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_shots", PrimaryKey: "id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_momentum", PrimaryKey: "match_id, minute", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_best_players", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_avg_positions", PrimaryKey: "match_id, player_id", IncKey: "", IncStrategy: "replace"},
+		{Name: "match_team_form", PrimaryKey: "match_id, team_id", IncKey: "", IncStrategy: "replace"},
+	},
+
 	// Apple Ads - Apple Search Ads campaign management
 	"appleads": {
 		{Name: "campaigns", PrimaryKey: "orgId,id", IncKey: "modificationTime", IncStrategy: "merge"},

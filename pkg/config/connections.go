@@ -1856,6 +1856,17 @@ func (c FootballDataConnection) GetName() string {
 	return c.Name
 }
 
+type BallDontLieConnection struct {
+	Name    string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey  string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Season  string `yaml:"season,omitempty" json:"season,omitempty" mapstructure:"season"`
+	BaseURL string `yaml:"base_url,omitempty" json:"base_url,omitempty" mapstructure:"base_url"`
+}
+
+func (c BallDontLieConnection) GetName() string {
+	return c.Name
+}
+
 type VerticaConnection struct {
 	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
