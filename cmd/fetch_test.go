@@ -112,6 +112,25 @@ func TestParseQueryVars(t *testing.T) {
 			expected: map[string]any{"filters": map[string]any{"start_date": "2026-05-20", "end_date": "2026-05-27"}},
 		},
 		{
+			name:     "dot-notation key merges with later json object",
+			rawVars:  []string{"filters.start_date=2026-05-20", `filters={"end_date":"2026-05-27"}`},
+			expected: map[string]any{"filters": map[string]any{"start_date": "2026-05-20", "end_date": "2026-05-27"}},
+		},
+		{
+			name:    "two json objects on same key deep-merge",
+			rawVars: []string{`filters={"start_date":"2026-05-20","page":{"size":10}}`, `filters={"end_date":"2026-05-27","page":{"num":2}}`},
+			expected: map[string]any{"filters": map[string]any{
+				"start_date": "2026-05-20",
+				"end_date":   "2026-05-27",
+				"page":       map[string]any{"size": float64(10), "num": float64(2)},
+			}},
+		},
+		{
+			name:     "later scalar overrides earlier object on same key",
+			rawVars:  []string{`filters={"start_date":"2026-05-20"}`, "filters=all"},
+			expected: map[string]any{"filters": "all"},
+		},
+		{
 			name:     "invalid json object stays literal string",
 			rawVars:  []string{"filter={not valid json}"},
 			expected: map[string]any{"filter": "{not valid json}"},

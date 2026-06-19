@@ -1654,6 +1654,26 @@ func parseQueryVarValue(value string) any {
 	return value
 }
 
+// mergeVarValue merges an incoming value onto an existing one. When both are
+// objects they are deep-merged (so dot-notation and JSON assignments to the same
+// key combine in either order), with incoming leaf values winning on conflicts.
+// Otherwise the incoming value replaces the existing one.
+func mergeVarValue(existing, incoming any) any {
+	existingMap, ok := existing.(map[string]any)
+	if !ok {
+		return incoming
+	}
+	incomingMap, ok := incoming.(map[string]any)
+	if !ok {
+		return incoming
+	}
+
+	for key, value := range incomingMap {
+		existingMap[key] = mergeVarValue(existingMap[key], value)
+	}
+	return existingMap
+}
+
 // setNestedVar assigns value to a dot-notation key inside vars, creating
 // intermediate maps as needed and merging into existing ones.
 func setNestedVar(vars map[string]any, key string, value any) error {
@@ -1667,7 +1687,7 @@ func setNestedVar(vars map[string]any, key string, value any) error {
 		}
 
 		if i == len(segments)-1 {
-			current[segment] = value
+			current[segment] = mergeVarValue(current[segment], value)
 			return nil
 		}
 
