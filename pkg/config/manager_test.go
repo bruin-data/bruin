@@ -28,6 +28,8 @@ func TestLoadFromFile(t *testing.T) {
 	}
 
 	clickhouseSecureValue := 0
+	sharePointMaxFileSize := int64(104857600)
+	sharePointMaxFiles := int64(10000)
 
 	devEnv := Environment{
 		Connections: &Connections{
@@ -812,6 +814,19 @@ func TestLoadFromFile(t *testing.T) {
 					League: "nfl",
 					Season: "2026",
 					Limit:  50,
+				},
+			},
+			SharePoint: []SharePointConnection{
+				{
+					Name:         "sharepoint-1",
+					TenantID:     "test-tenant-id",
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					Hostname:     "example.sharepoint.com",
+					Site:         "sites/Example",
+					Library:      "Documents",
+					MaxFileSize:  &sharePointMaxFileSize,
+					MaxFiles:     &sharePointMaxFiles,
 				},
 			},
 		},
