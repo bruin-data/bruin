@@ -79,6 +79,44 @@ func TestParseQueryVars(t *testing.T) {
 			expected: map[string]any{"key": "hello"},
 		},
 		{
+			name:     "dot-notation builds nested object",
+			rawVars:  []string{"filters.start_date=2026-05-20"},
+			expected: map[string]any{"filters": map[string]any{"start_date": "2026-05-20"}},
+		},
+		{
+			name:    "multiple dot-notation vars merge into same object",
+			rawVars: []string{"filters.start_date=2026-05-20", "filters.end_date=2026-05-27"},
+			expected: map[string]any{"filters": map[string]any{
+				"start_date": "2026-05-20",
+				"end_date":   "2026-05-27",
+			}},
+		},
+		{
+			name:     "deeply nested dot-notation",
+			rawVars:  []string{"a.b.c=value"},
+			expected: map[string]any{"a": map[string]any{"b": map[string]any{"c": "value"}}},
+		},
+		{
+			name:     "json object value builds nested object",
+			rawVars:  []string{`filters={"start_date":"2026-05-20","end_date":"2026-05-27"}`},
+			expected: map[string]any{"filters": map[string]any{"start_date": "2026-05-20", "end_date": "2026-05-27"}},
+		},
+		{
+			name:     "json array value",
+			rawVars:  []string{`client_ids=["a","b","c"]`},
+			expected: map[string]any{"client_ids": []any{"a", "b", "c"}},
+		},
+		{
+			name:     "json object merges with later dot-notation key",
+			rawVars:  []string{`filters={"start_date":"2026-05-20"}`, "filters.end_date=2026-05-27"},
+			expected: map[string]any{"filters": map[string]any{"start_date": "2026-05-20", "end_date": "2026-05-27"}},
+		},
+		{
+			name:     "invalid json object stays literal string",
+			rawVars:  []string{"filter={not valid json}"},
+			expected: map[string]any{"filter": "{not valid json}"},
+		},
+		{
 			name:    "empty key errors",
 			rawVars: []string{"=value"},
 			wantErr: `invalid variable "=value": key must not be empty`,
@@ -87,6 +125,16 @@ func TestParseQueryVars(t *testing.T) {
 			name:    "missing equals sign errors",
 			rawVars: []string{"invalid"},
 			wantErr: `invalid variable "invalid": must be in key=value format`,
+		},
+		{
+			name:    "empty dot segment errors",
+			rawVars: []string{"filters..start_date=2026-05-20"},
+			wantErr: `invalid variable "filters..start_date=2026-05-20": key "filters..start_date" has an empty segment`,
+		},
+		{
+			name:    "nesting into a scalar value errors",
+			rawVars: []string{"filters=value", "filters.start_date=2026-05-20"},
+			wantErr: `invalid variable "filters.start_date=2026-05-20": key segment "filters" is already set to a non-object value`,
 		},
 	}
 
@@ -140,6 +188,18 @@ func TestParseQueryVarsWithJinjaRendering(t *testing.T) {
 			template: "SELECT * FROM {{ table }} WHERE date = '{{ dt }}' LIMIT {{ n }}",
 			rawVars:  []string{"table=users", "dt=2026-01-01", "n=100"},
 			expected: "SELECT * FROM users WHERE date = '2026-01-01' LIMIT 100",
+		},
+		{
+			name:     "nested dot-notation var renders in template",
+			template: "SELECT * FROM events WHERE date >= '{{ filters.start_date }}'",
+			rawVars:  []string{"filters.start_date=2026-05-20"},
+			expected: "SELECT * FROM events WHERE date >= '2026-05-20'",
+		},
+		{
+			name:     "nested json var renders in template",
+			template: "SELECT * FROM events WHERE date BETWEEN '{{ filters.start_date }}' AND '{{ filters.end_date }}'",
+			rawVars:  []string{`filters={"start_date":"2026-05-20","end_date":"2026-05-27"}`},
+			expected: "SELECT * FROM events WHERE date BETWEEN '2026-05-20' AND '2026-05-27'",
 		},
 	}
 

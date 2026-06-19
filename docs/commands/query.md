@@ -25,6 +25,7 @@ You can run it in three modes:
 | `--filter`           |       | Semantic filter as JSON, for example `{"dimension":"country","operator":"equals","value":"US"}`. Can be passed multiple times. |
 | `--segment`          |       | Semantic segment to apply. Can be passed multiple times.                   |
 | `--sort`             |       | Semantic sort field. Use `name:asc` or `name:desc`. Can be passed multiple times. |
+| `--var`              |       | Set a Jinja template variable for query rendering. Supports flat, dot-notation nested, and JSON values. Can be passed multiple times. See [Template variables](#template-variables). |
 | `--start-date`       |       | Start date for query variables in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`.    |
 | `--end-date`         |       | End date for query variables in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`.      |
 | `--limit`            | `-l`  | Limit the number of rows returned.                                         |
@@ -75,6 +76,45 @@ If your query returns 1,000,000 rows with `--split-rows 400000`, you'll get 3 fi
 - `query_result_<timestamp>_part3.csv` (200,000 rows)
 
 Each file includes the header row with column names.
+
+## Template variables
+
+You can inject Jinja template variables into a query with `--var`. The flag can be passed
+multiple times and supports flat, nested, and JSON values, so you can test dashboard-style
+SQL — including nested `filters.*` variables — directly from the CLI.
+
+**Flat variables:**
+
+```bash
+bruin query --connection my_connection \
+  --query "SELECT * FROM events WHERE date >= '{{ start_date }}'" \
+  --var start_date=2026-05-20
+```
+
+**Nested variables (dot-notation):**
+
+Use a dotted key to build a nested object. This matches the nested `filters` object the
+dashboard runtime injects, so `{{ filters.start_date }}` resolves as expected:
+
+```bash
+bruin query --connection my_connection \
+  --query "SELECT * FROM events WHERE date >= '{{ filters.start_date }}'" \
+  --var filters.start_date=2026-05-20 \
+  --var filters.end_date=2026-05-27
+```
+
+**Nested variables (JSON):**
+
+You can also pass a whole object (or array) as a JSON value:
+
+```bash
+bruin query --connection my_connection \
+  --query "SELECT * FROM events WHERE date >= '{{ filters.start_date }}'" \
+  --var filters='{"start_date":"2026-05-20","end_date":"2026-05-27"}'
+```
+
+Scalar values are kept as literal strings (matching how pipeline variables work in YAML);
+only values that look like a JSON object or array are parsed as JSON.
 
 ## Semantic Queries
 
