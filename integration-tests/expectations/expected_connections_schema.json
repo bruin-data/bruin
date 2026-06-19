@@ -37,6 +37,34 @@
         "account_name"
       ]
     },
+    "APIFootballConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "league": {
+          "type": "string"
+        },
+        "season": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AdjustConnection": {
       "properties": {
         "name": {
@@ -1266,6 +1294,12 @@
         "espn": {
           "items": {
             "$ref": "#/$defs/EspnConnection"
+          },
+          "type": "array"
+        },
+        "apifootball": {
+          "items": {
+            "$ref": "#/$defs/APIFootballConnection"
           },
           "type": "array"
         },

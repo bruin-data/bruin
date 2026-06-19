@@ -829,6 +829,14 @@ func TestLoadFromFile(t *testing.T) {
 					MaxFiles:     &sharePointMaxFiles,
 				},
 			},
+			APIFootball: []APIFootballConnection{
+				{
+					Name:   "apifootball-1",
+					APIKey: "test-api-key",
+					League: "1",
+					Season: "2026",
+				},
+			},
 		},
 	}
 
@@ -2213,6 +2221,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
+				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
@@ -2335,6 +2344,7 @@ func TestConnections_MergeFrom(t *testing.T) {
 				CustomerIo:          []CustomerIoConnection{{Name: "customerio1"}},
 				Sendgrid:            []SendgridConnection{{Name: "sendgrid1"}},
 				Espn:                []EspnConnection{{Name: "espn1"}},
+				APIFootball:         []APIFootballConnection{{Name: "apifootball1"}},
 				Vertica:             []VerticaConnection{{Name: "vertica1"}},
 				Dune:                []DuneConnection{{Name: "dune1"}},
 			},
