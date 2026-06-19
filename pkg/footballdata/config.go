@@ -1,6 +1,9 @@
 package footballdata
 
-import "net/url"
+import (
+	"errors"
+	"net/url"
+)
 
 type Config struct {
 	APIKey         string
@@ -17,7 +20,11 @@ type Config struct {
 	UnfoldLineups  bool
 }
 
-func (c *Config) GetIngestrURI() string {
+func (c *Config) GetIngestrURI() (string, error) {
+	if c.APIKey == "" {
+		return "", errors.New("footballdata: api_key must be provided")
+	}
+
 	params := url.Values{}
 	params.Set("api_key", c.APIKey)
 	if c.Competition != "" {
@@ -53,5 +60,5 @@ func (c *Config) GetIngestrURI() string {
 	if c.UnfoldLineups {
 		params.Set("unfold_lineups", "true")
 	}
-	return "footballdata://?" + params.Encode()
+	return "footballdata://?" + params.Encode(), nil
 }
