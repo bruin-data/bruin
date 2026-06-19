@@ -354,6 +354,7 @@ type taskDefinition struct {
 	Instance              string            `yaml:"instance"`
 	Materialization       materialization   `yaml:"materialization"`
 	Owner                 string            `yaml:"owner"`
+	Tier                  int               `yaml:"tier"`
 	StartDate             string            `yaml:"start_date"`
 	Extends               []string          `yaml:"extends"`
 	Columns               []column          `yaml:"columns"`
@@ -366,6 +367,8 @@ type taskDefinition struct {
 	IntervalModifiers     IntervalModifiers `yaml:"interval_modifiers"`
 	Domains               []string          `yaml:"domains"`
 	Meta                  map[string]string `yaml:"meta"`
+	Metadata              map[string]string `yaml:"metadata"`
+	Retries               *int              `yaml:"retries"`
 	RerunCooldown         *int              `yaml:"rerun_cooldown"`
 	RefreshRestricted     *bool             `yaml:"refresh_restricted,omitempty"`
 	FullRefreshRestricted *bool             `yaml:"full_refresh_restricted,omitempty"`
@@ -565,6 +568,7 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		Image:             definition.Image,
 		Instance:          definition.Instance,
 		Owner:             definition.Owner,
+		Tier:              definition.Tier,
 		StartDate:         definition.StartDate,
 		Tags:              definition.Tags,
 		Extends:           definition.Extends,
@@ -577,6 +581,8 @@ func taskDefinitionToAsset(definition taskDefinition) (*Asset, error) {
 		IntervalModifiers: definition.IntervalModifiers,
 		Domains:           definition.Domains,
 		Meta:              definition.Meta,
+		Metadata:          definition.Metadata,
+		Retries:           definition.Retries,
 		RerunCooldown:     definition.RerunCooldown,
 		RefreshRestricted: definition.refreshRestricted(),
 		Notifications:     notificationsOrNil(definition.Notifications),
